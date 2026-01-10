@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Sora', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+    --font-display: 'Fraunces', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+
+    --color-ink: oklch(0.2 0.03 262);
+    --color-ink-soft: oklch(0.35 0.02 252);
+    --color-parchment: oklch(0.98 0.02 95);
+    --color-sand: oklch(0.94 0.03 92);
+    --color-olive: oklch(0.45 0.08 150);
+    --color-moss: oklch(0.35 0.07 160);
+    --color-amber: oklch(0.82 0.12 78);
+    --color-clay: oklch(0.68 0.08 48);
+    --color-sea: oklch(0.68 0.08 185);
+    --color-cloud: oklch(0.9 0.02 260);
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes float-slow {
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        transform: translateY(-14px) scale(1.02);
+    }
+}
+
+@layer utilities {
+    .animate-rise {
+        animation: rise 0.7s ease-out both;
+    }
+
+    .animate-rise-delay {
+        animation: rise 0.7s ease-out 0.12s both;
+    }
+
+    .animate-rise-delay-lg {
+        animation: rise 0.8s ease-out 0.2s both;
+    }
+
+    .animate-float {
+        animation: float-slow 12s ease-in-out infinite;
+    }
+
+    .stagger-children > * {
+        animation: rise 0.7s ease-out both;
+    }
+
+    .stagger-children > *:nth-child(2) {
+        animation-delay: 0.08s;
+    }
+
+    .stagger-children > *:nth-child(3) {
+        animation-delay: 0.16s;
+    }
+
+    .stagger-children > *:nth-child(4) {
+        animation-delay: 0.24s;
+    }
+}

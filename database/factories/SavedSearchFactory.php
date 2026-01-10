@@ -1,0 +1,38 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SavedSearch>
+ */
+class SavedSearchFactory extends Factory
+{
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $radius = fake()->boolean(40) ? fake()->numberBetween(1, 50) : null;
+
+        return [
+            'user_id' => User::factory(),
+            'name' => fake()->words(3, true),
+            'query' => fake()->optional()->words(2, true),
+            'filters' => fake()->boolean(50)
+                ? [
+                    'genre' => fake()->randomElement(['kuliah', 'ceramah', 'tazkirah', 'forum']),
+                    'language' => fake()->randomElement(['bm', 'en', 'ar']),
+                  ]
+                : null,
+            'radius_km' => $radius,
+            'lat' => $radius ? fake()->randomFloat(7, 1.0, 7.0) : null,
+            'lng' => $radius ? fake()->randomFloat(7, 99.0, 119.0) : null,
+            'notify' => fake()->randomElement(['off', 'instant', 'daily', 'weekly']),
+        ];
+    }
+}
