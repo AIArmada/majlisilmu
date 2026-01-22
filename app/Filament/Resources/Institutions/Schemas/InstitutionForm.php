@@ -3,9 +3,10 @@
 namespace App\Filament\Resources\Institutions\Schemas;
 
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class InstitutionForm
@@ -37,35 +38,70 @@ class InstitutionForm
                     ->columns(2),
                 Section::make('Contact')
                     ->components([
-                        TextInput::make('phone')
-                            ->tel()
-                            ->maxLength(50),
-                        TextInput::make('email')
-                            ->email()
-                            ->maxLength(255),
-                        TextInput::make('website_url')
-                            ->url()
-                            ->maxLength(255),
-                    ])
-                    ->columns(2),
+                        \Filament\Forms\Components\Repeater::make('contacts')
+                            ->relationship()
+                            ->schema([
+                                Select::make('category')
+                                    ->options([
+                                        'email' => 'Email',
+                                        'phone' => 'Phone',
+                                    ])
+                                    ->required()
+                                    ->live(),
+                                TextInput::make('value')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->label(fn (Get $get) => match ($get('category')) {
+                                        'email' => 'Email Address',
+                                        'phone' => 'Phone Number',
+                                        default => 'Value',
+                                    })
+                                    ->email(fn (Get $get) => $get('category') === 'email')
+                                    ->tel(fn (Get $get) => $get('category') === 'phone'),
+                                Select::make('type')
+                                    ->options([
+                                        'main' => 'Main',
+                                        'work' => 'Work',
+                                        'personal' => 'Personal',
+                                        'whatsapp' => 'WhatsApp',
+                                    ])
+                                    ->default('main')
+                                    ->required(),
+                            ])
+                            ->columns(3)
+                            ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
+                    ]),
                 Section::make('Location')
+                    ->relationship('address')
                     ->components([
+                        Select::make('country_id')
+                            ->relationship('country', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->live(),
                         Select::make('state_id')
-                            ->relationship('state', 'name')
+                            ->relationship('state', 'name', fn ($query, $get) => $query->where('country_id', $get('country_id')))
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->live()
+                            ->hidden(fn ($get) => ! $get('country_id')),
                         Select::make('district_id')
-                            ->relationship('district', 'name')
+                            ->relationship('district', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
                             ->searchable()
-                            ->preload(),
-                        TextInput::make('address_line1')
+                            ->preload()
+                            ->live()
+                            ->hidden(fn ($get) => ! $get('state_id')),
+                        Select::make('city_id')
+                            ->relationship('city', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
+                            ->searchable()
+                            ->preload()
+                            ->hidden(fn ($get) => ! $get('state_id')),
+                        TextInput::make('address1')
                             ->maxLength(255),
-                        TextInput::make('address_line2')
+                        TextInput::make('address2')
                             ->maxLength(255),
                         TextInput::make('postcode')
                             ->maxLength(16),
-                        TextInput::make('city')
-                            ->maxLength(255),
                         TextInput::make('lat')
                             ->numeric()
                             ->minValue(-90)
@@ -74,11 +110,16 @@ class InstitutionForm
                             ->numeric()
                             ->minValue(-180)
                             ->maxValue(180),
+                        TextInput::make('google_place_id')
+                            ->maxLength(255),
+                        TextInput::make('waze_url')
+                            ->url()
+                            ->maxLength(255),
                     ])
                     ->columns(2),
-                Section::make('Trust & Verification')
+                Section::make('Status')
                     ->components([
-                        Select::make('verification_status')
+                        Select::make('status')
                             ->options([
                                 'unverified' => 'Unverified',
                                 'pending' => 'Pending',
@@ -86,12 +127,40 @@ class InstitutionForm
                                 'rejected' => 'Rejected',
                             ])
                             ->required(),
-                        TextInput::make('trust_score')
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(100),
                     ])
-                    ->columns(2),
+                    ->columns(1),
+                Section::make('Social Media')
+                    ->components([
+                        \Filament\Forms\Components\Repeater::make('socialMedia')
+                            ->relationship()
+                            ->schema([
+                                Select::make('platform')
+                                    ->options([
+                                        'facebook' => 'Facebook',
+                                        'instagram' => 'Instagram',
+                                        'youtube' => 'YouTube',
+                                        'tiktok' => 'TikTok',
+                                        'twitter' => 'X (Twitter)',
+                                        'linkedin' => 'LinkedIn',
+                                        'website' => 'Website',
+                                        'other' => 'Other',
+                                    ])
+                                    ->searchable()
+                                    ->required()
+                                    ->columnSpan(1),
+                                TextInput::make('username')
+                                    ->label('Username / Handle')
+                                    ->placeholder('@username')
+                                    ->columnSpan(1),
+                                TextInput::make('url')
+                                    ->label('URL')
+                                    ->url()
+                                    ->required()
+                                    ->columnSpanFull(),
+                            ])
+                            ->columns(2)
+                            ->itemLabel(fn (array $state): ?string => $state['platform'] ?? null),
+                    ]),
             ]);
     }
 }

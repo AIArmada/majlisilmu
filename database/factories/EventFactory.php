@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\DonationAccount;
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
 use App\Models\Institution;
 use App\Models\Series;
 use App\Models\Venue;
@@ -23,21 +25,48 @@ class EventFactory extends Factory
     public function definition(): array
     {
         $eventTypes = [
-            'Kuliah Maghrib', 'Tazkirah Subuh', 'Kuliah Dhuha', 'Halaqah Al-Quran',
-            'Kelas Fiqh', 'Kelas Kitab', 'Forum Perdana', 'Sesi Tadabbur',
-            'Majlis Ilmu', 'Daurah Ilmiah', 'Seminar Ilmu', 'Kuliah Isya',
+            'Kuliah Maghrib',
+            'Tazkirah Subuh',
+            'Kuliah Dhuha',
+            'Halaqah Al-Quran',
+            'Kelas Fiqh',
+            'Kelas Kitab',
+            'Forum Perdana',
+            'Sesi Tadabbur',
+            'Majlis Ilmu',
+            'Daurah Ilmiah',
+            'Seminar Ilmu',
+            'Kuliah Isya',
         ];
         $topics = [
-            'Tafsir Al-Fatihah', 'Tafsir Al-Kahfi', 'Fiqh Solat', 'Fiqh Puasa',
-            'Fiqh Zakat', 'Sirah Nabawiyyah', 'Sirah Sahabah', 'Adab Menuntut Ilmu',
-            'Aqidah Ahlus Sunnah', 'Hadis Arba\'in', 'Riyadus Salihin',
-            'Tazkiyah An-Nafs', 'Muamalat Islam', 'Keluarga Sakinah',
-            'Remaja & Identiti', 'Persiapan Ramadhan', 'Isu Semasa Ummah',
-            'Tadabbur Surah Yasin', 'Tadabbur Surah Al-Mulk', 'Tafsir Juz Amma',
+            'Tafsir Al-Fatihah',
+            'Tafsir Al-Kahfi',
+            'Fiqh Solat',
+            'Fiqh Puasa',
+            'Fiqh Zakat',
+            'Sirah Nabawiyyah',
+            'Sirah Sahabah',
+            'Adab Menuntut Ilmu',
+            'Aqidah Ahlus Sunnah',
+            'Hadis Arba\'in',
+            'Riyadus Salihin',
+            'Tazkiyah An-Nafs',
+            'Muamalat Islam',
+            'Keluarga Sakinah',
+            'Remaja & Identiti',
+            'Persiapan Ramadhan',
+            'Isu Semasa Ummah',
+            'Tadabbur Surah Yasin',
+            'Tadabbur Surah Al-Mulk',
+            'Tafsir Juz Amma',
         ];
         $books = [
-            'Riyadus Salihin', 'Bulughul Maram', 'Al-Arba\'in An-Nawawiyyah',
-            'Tafsir Ibnu Kathir', 'Fiqh Manhaji', 'Umdatul Ahkam',
+            'Riyadus Salihin',
+            'Bulughul Maram',
+            'Al-Arba\'in An-Nawawiyyah',
+            'Tafsir Ibnu Kathir',
+            'Fiqh Manhaji',
+            'Umdatul Ahkam',
         ];
 
         $startsAt = Carbon::instance(fake()->dateTimeBetween('now', '+2 months'));
@@ -65,27 +94,31 @@ class EventFactory extends Factory
         return [
             'institution_id' => Institution::factory(),
             'venue_id' => fake()->boolean(75) ? Venue::factory() : null,
+            'speaker_id' => null,
             'series_id' => fake()->boolean(25) ? Series::factory() : null,
             'title' => $title,
             'slug' => Str::slug($title.'-'.fake()->unique()->numerify('###')),
             'description' => fake()->optional()->paragraphs(2, true),
-            'state_id' => null,
-            'district_id' => null,
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
             'timezone' => 'Asia/Kuala_Lumpur',
+            'timing_mode' => TimingMode::Absolute->value,
+            'prayer_reference' => null,
+            'prayer_offset' => null,
+            'prayer_display_text' => null,
+            'prayer_calc_lat' => null,
+            'prayer_calc_lng' => null,
             'language' => fake()->randomElement(['Bahasa Melayu', 'English', 'Mandarin', 'Tamil', 'Javanese', 'Arabic']),
             'genre' => fake()->randomElement(['Kuliah', 'Tazkirah', 'Halaqah', 'Forum', 'Daurah', 'Kelas Kitab']),
             'audience' => fake()->randomElement(['Umum', 'Belia', 'Muslimah', 'Keluarga', 'Pelajar IPT', 'Profesional']),
             'visibility' => fake()->randomElement(['public', 'public', 'unlisted']),
             'status' => $status,
-            'livestream_url' => $livestreamUrl
+            'live_url' => $livestreamUrl
                 ? Str::replaceFirst('http://', 'https://', $livestreamUrl)
                 : null,
             'recording_url' => $recordingUrl
                 ? Str::replaceFirst('http://', 'https://', $recordingUrl)
                 : null,
-            'donation_account_id' => fake()->boolean(50) ? DonationAccount::factory() : null,
             'registration_required' => $registrationRequired,
             'capacity' => $registrationRequired ? fake()->numberBetween(30, 300) : null,
             'registration_opens_at' => $registrationOpensAt,
@@ -95,5 +128,78 @@ class EventFactory extends Factory
             'registrations_count' => fake()->numberBetween(0, 200),
             'published_at' => $publishedAt,
         ];
+    }
+
+    /**
+     * Indicate that the event is prayer-relative.
+     */
+    public function prayerRelative(
+        ?PrayerReference $prayer = null,
+        ?PrayerOffset $offset = null
+    ): static {
+        $prayer ??= fake()->randomElement(PrayerReference::cases());
+        $offset ??= fake()->randomElement([
+            PrayerOffset::Immediately,
+            PrayerOffset::After15,
+            PrayerOffset::After30,
+        ]);
+
+        return $this->state(fn (array $attributes) => [
+            'timing_mode' => TimingMode::PrayerRelative->value,
+            'prayer_reference' => $prayer->value,
+            'prayer_offset' => $offset->value,
+            'prayer_display_text' => $offset->displayText($prayer),
+        ]);
+    }
+
+    /**
+     * Indicate a Kuliah Maghrib event.
+     */
+    public function kuliahMaghrib(): static
+    {
+        return $this->prayerRelative(
+            PrayerReference::Maghrib,
+            PrayerOffset::Immediately
+        )->state(fn (array $attributes) => [
+            'title' => 'Kuliah Maghrib: '.fake()->randomElement([
+                'Tafsir Al-Kahfi',
+                'Sirah Nabawiyyah',
+                'Fiqh Solat',
+            ]),
+        ]);
+    }
+
+    /**
+     * Indicate a Kuliah Isya event.
+     */
+    public function kuliahIsya(): static
+    {
+        return $this->prayerRelative(
+            PrayerReference::Isha,
+            PrayerOffset::After15
+        )->state(fn (array $attributes) => [
+            'title' => 'Kuliah Isya: '.fake()->randomElement([
+                'Hadis Arba\'in',
+                'Riyadus Salihin',
+                'Aqidah Ahlus Sunnah',
+            ]),
+        ]);
+    }
+
+    /**
+     * Indicate a Tazkirah Subuh event.
+     */
+    public function tazkirahSubuh(): static
+    {
+        return $this->prayerRelative(
+            PrayerReference::Fajr,
+            PrayerOffset::Immediately
+        )->state(fn (array $attributes) => [
+            'title' => 'Tazkirah Subuh: '.fake()->randomElement([
+                'Tazkiyah An-Nafs',
+                'Adab Menuntut Ilmu',
+                'Zikir Pagi',
+            ]),
+        ]);
     }
 }

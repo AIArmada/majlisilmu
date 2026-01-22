@@ -2,40 +2,21 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Nnjeim\World\Models\State as WorldState;
 
-class State extends Model
+class State extends WorldState
 {
-    /** @use HasFactory<\Database\Factories\StateFactory> */
-    use HasFactory;
-
-    /**
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'slug',
-    ];
-
     public function districts(): HasMany
     {
         return $this->hasMany(District::class);
     }
 
-    public function institutions(): HasMany
+    /**
+     * Get all addresses in this state.
+     */
+    public function addresses(): HasMany
     {
-        return $this->hasMany(Institution::class);
-    }
-
-    public function venues(): HasMany
-    {
-        return $this->hasMany(Venue::class);
-    }
-
-    public function events(): HasMany
-    {
-        return $this->hasMany(Event::class);
+        return $this->hasMany(Address::class);
     }
 }

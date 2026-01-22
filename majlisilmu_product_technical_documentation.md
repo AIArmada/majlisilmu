@@ -171,6 +171,15 @@ Supporting:
 - Geo rules:
   - Event location inherits from venue when present; fall back to institution address.
   - Search requires lat/lng for distance sorting; if missing, fall back to time + relevance only.
+- **Event timing modes** (prayer-relative scheduling):
+  - `absolute`: Event scheduled at a specific clock time (e.g., 10:00 AM).
+  - `prayer_relative`: Event scheduled relative to prayer times (e.g., "selepas Maghrib").
+  - Prayer references: `fajr` (Subuh), `dhuhr` (Zohor), `asr` (Asar), `maghrib`, `isha` (Isyak), `friday_prayer` (Jumaat).
+  - Prayer offsets: `before_30`, `before_15`, `immediately` (5 min buffer), `after_15`, `after_30`, `after_45`, `after_60`.
+  - Display text auto-generated (e.g., "Selepas Maghrib", "30 minit selepas Isyak").
+  - `starts_at` is always calculated and stored for search/filtering.
+  - Prayer times fetched via Aladhan API using venue coordinates.
+
 
 ## B4) Workflows (technical)
 ### Event lifecycle

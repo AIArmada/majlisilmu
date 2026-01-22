@@ -2,16 +2,21 @@
 
 namespace App\Models;
 
+use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Speaker extends Model
+class Speaker extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\SpeakerFactory> */
-    use HasFactory, HasUuids;
+    use \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonations, \App\Models\Concerns\HasSocialMedia, Auditable, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -22,24 +27,17 @@ class Speaker extends Model
      */
     protected $fillable = [
         'name',
+        'title',
         'slug',
         'bio',
-        'phone',
-        'email',
         'avatar_url',
-        'website_url',
-        'youtube_url',
-        'facebook_url',
-        'instagram_url',
-        'verification_status',
-        'trust_score',
+
+        'status',
     ];
 
     protected function casts(): array
     {
-        return [
-            'trust_score' => 'integer',
-        ];
+        return [];
     }
 
     public function events(): BelongsToMany
@@ -50,10 +48,14 @@ class Speaker extends Model
             ->orderByPivot('sort_order');
     }
 
+    public function series(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Series::class);
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'speaker_members')
-            ->withPivot('role')
             ->withTimestamps();
     }
 
@@ -62,8 +64,17 @@ class Speaker extends Model
         return $this->morphMany(Report::class, 'entity');
     }
 
-    public function auditLogs(): MorphMany
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
     {
-        return $this->morphMany(AuditLog::class, 'entity');
+        $this->addMediaCollection('avatar')
+            ->singleFile();
+    }
+
+    public function getAuthzScopeLabel(): string
+    {
+        return 'Speaker: '.$this->name;
     }
 }

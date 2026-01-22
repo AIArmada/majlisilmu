@@ -22,6 +22,7 @@ class ModerationReview extends Model
     protected $fillable = [
         'event_id',
         'reviewer_id',
+        'moderator_id',
         'decision',
         'note',
         'reason_code',

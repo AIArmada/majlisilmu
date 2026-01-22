@@ -22,41 +22,29 @@ class EventSubmissionsRelationManager extends RelationManager
     {
         return $schema
             ->components([
-                Select::make('source')
-                    ->options([
-                        'institution' => 'Institution',
-                        'speaker' => 'Speaker',
-                        'public' => 'Public',
-                        'import' => 'Import',
-                    ])
-                    ->required(),
-                TextInput::make('submitter_name')
-                    ->maxLength(255),
-                TextInput::make('submitter_contact')
-                    ->maxLength(255),
                 Select::make('submitted_by')
                     ->relationship('submitter', 'email')
                     ->searchable()
                     ->preload(),
+                TextInput::make('submitter_name')
+                    ->maxLength(255),
             ])
-            ->columns(2);
+            ->columns(1);
     }
 
     public function table(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('source')
-                    ->badge()
-                    ->sortable(),
-                TextColumn::make('submitter_name')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('submitter_contact')
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('submitter.email')
-                    ->label('Submitter')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->label('User')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('submitter_name')
+                    ->label('Guest Name')
+                    ->searchable(),
+                TextColumn::make('email')
+                    ->label('Guest Email'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

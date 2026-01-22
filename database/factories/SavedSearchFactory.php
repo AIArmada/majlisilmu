@@ -27,7 +27,7 @@ class SavedSearchFactory extends Factory
                 ? [
                     'genre' => fake()->randomElement(['kuliah', 'ceramah', 'tazkirah', 'forum']),
                     'language' => fake()->randomElement(['bm', 'en', 'ar']),
-                  ]
+                ]
                 : null,
             'radius_km' => $radius,
             'lat' => $radius ? fake()->randomFloat(7, 1.0, 7.0) : null,

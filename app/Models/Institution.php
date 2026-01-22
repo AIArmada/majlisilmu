@@ -2,18 +2,22 @@
 
 namespace App\Models;
 
+use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Institution extends Model
+class Institution extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\InstitutionFactory> */
-    use HasFactory, HasUuids;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonations, \App\Models\Concerns\HasSocialMedia, Auditable, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -27,38 +31,13 @@ class Institution extends Model
         'name',
         'slug',
         'description',
-        'phone',
-        'email',
-        'website_url',
-        'state_id',
-        'district_id',
-        'address_line1',
-        'address_line2',
-        'postcode',
-        'city',
-        'lat',
-        'lng',
-        'verification_status',
-        'trust_score',
+
+        'status',
     ];
 
     protected function casts(): array
     {
-        return [
-            'lat' => 'float',
-            'lng' => 'float',
-            'trust_score' => 'integer',
-        ];
-    }
-
-    public function state(): BelongsTo
-    {
-        return $this->belongsTo(State::class);
-    }
-
-    public function district(): BelongsTo
-    {
-        return $this->belongsTo(District::class);
+        return [];
     }
 
     public function venues(): HasMany
@@ -76,15 +55,9 @@ class Institution extends Model
         return $this->hasMany(Series::class);
     }
 
-    public function donationAccounts(): HasMany
-    {
-        return $this->hasMany(DonationAccount::class);
-    }
-
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'institution_members')
-            ->withPivot('role')
             ->withTimestamps();
     }
 
@@ -93,8 +66,20 @@ class Institution extends Model
         return $this->morphMany(Report::class, 'entity');
     }
 
-    public function auditLogs(): MorphMany
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
     {
-        return $this->morphMany(AuditLog::class, 'entity');
+        $this->addMediaCollection('logo')
+            ->singleFile();
+
+        $this->addMediaCollection('cover')
+            ->singleFile();
+    }
+
+    public function getAuthzScopeLabel(): string
+    {
+        return 'Institution: '.$this->name;
     }
 }

@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -24,7 +27,7 @@ class EventSeeder extends Seeder
         }
 
         $institutions = Institution::query()
-            ->with(['venues', 'donationAccounts', 'series'])
+            ->with(['venues.address', 'address', 'donations', 'series'])
             ->get();
         $speakers = Speaker::query()->get();
         $topics = Topic::query()->get();
@@ -35,21 +38,25 @@ class EventSeeder extends Seeder
 
         $institutions->each(function (Institution $institution) use ($speakers, $topics): void {
             $venue = $institution->venues->isNotEmpty() ? $institution->venues->random() : null;
-            $donationAccount = $institution->donationAccounts->isNotEmpty()
-                ? $institution->donationAccounts->random()
+            $donation = $institution->donations->isNotEmpty()
+                ? $institution->donations->random()
                 : null;
             $series = $institution->series->isNotEmpty() ? $institution->series->random() : null;
 
-            $events = Event::factory()
-                ->count(4)
-                ->create([
-                    'institution_id' => $institution->id,
-                    'venue_id' => $venue?->id,
-                    'series_id' => $series?->id,
-                    'donation_account_id' => $donationAccount?->id,
-                    'state_id' => $institution->state_id,
-                    'district_id' => $institution->district_id,
-                ]);
+            $baseAttributes = [
+                'institution_id' => $institution->id,
+                'venue_id' => $venue?->id,
+                'series_id' => $series?->id,
+            ];
+
+            // 4 General/Absolute events
+            $events = Event::factory()->count(4)->create($baseAttributes);
+
+            // 3 Kuliah Maghrib events
+            $events = $events->merge(Event::factory()->count(3)->kuliahMaghrib()->create($baseAttributes));
+
+            // 3 Tazkirah Subuh events
+            $events = $events->merge(Event::factory()->count(3)->tazkirahSubuh()->create($baseAttributes));
 
             $events->each(function (Event $event) use ($speakers, $topics): void {
                 if ($speakers->isNotEmpty()) {
@@ -71,20 +78,35 @@ class EventSeeder extends Seeder
 
     private function seedMajlisIlmuSchedule(): void
     {
+        $malaysia = \App\Models\Country::where('iso2', 'MY')->first();
+
         $institution = Institution::query()->firstOrCreate([
             'slug' => 'masjid-tengku-ampuan-jemaah-bukit-jelutong',
         ], [
             'type' => 'masjid',
             'name' => 'Masjid Tengku Ampuan Jemaah Bukit Jelutong',
             'description' => 'Jadual kuliah Januari 2026.',
-            'phone' => '03-78313641',
-            'email' => 'mtajbj@gmail.com',
-            'website_url' => 'https://mtajbj.gov.my',
-            'address_line1' => 'Bukit Jelutong',
-            'city' => 'Shah Alam',
+            'status' => 'verified',
         ]);
 
-        if (! $institution->state_id) {
+        $institution->contacts()->firstOrCreate(
+            ['category' => 'email'],
+            ['value' => 'mtajbj@gmail.com', 'type' => 'work']
+        );
+
+        $institution->contacts()->firstOrCreate(
+            ['category' => 'phone'],
+            ['value' => '03-78313641', 'type' => 'work']
+        );
+
+        if (! $institution->address) {
+            $institution->address()->create([
+                'address1' => 'Bukit Jelutong',
+                'lat' => 3.0991666,
+                'lng' => 101.529892,
+                'country_id' => $malaysia?->id,
+            ]);
+
             $state = \App\Models\State::query()
                 ->where('name', 'ILIKE', '%selangor%')
                 ->first();
@@ -93,9 +115,14 @@ class EventSeeder extends Seeder
                 ->where('name', 'ILIKE', '%petaling%')
                 ->first();
 
-            $institution->update([
+            $city = $state?->cities()
+                ->where('name', 'ILIKE', '%shah alam%')
+                ->first();
+
+            $institution->address()->update([
                 'state_id' => $state?->id,
                 'district_id' => $district?->id,
+                'city_id' => $city?->id,
             ]);
         }
 
@@ -104,11 +131,17 @@ class EventSeeder extends Seeder
         ], [
             'institution_id' => $institution->id,
             'name' => 'Dewan Solat Utama',
-            'state_id' => $institution->state_id,
-            'district_id' => $institution->district_id,
-            'address_line1' => $institution->address_line1,
-            'city' => $institution->city,
         ]);
+
+        if (! $venue->address) {
+            $venue->address()->create([
+                'address1' => $institution->address?->address1,
+                'country_id' => $institution->address?->country_id,
+                'state_id' => $institution->address?->state_id,
+                'district_id' => $institution->address?->district_id,
+                'city_id' => $institution->address?->city_id,
+            ]);
+        }
 
         $schedule = [
             ['date' => '2026-01-05', 'slot' => 'Dhuha', 'time' => '10:30', 'speaker' => 'Ust Mukhlisur Riyadus', 'topic' => 'Adab Iman'],
@@ -206,6 +239,35 @@ class EventSeeder extends Seeder
 
             $slug = \Illuminate\Support\Str::slug($title.'-'.$entry['date']);
 
+            // Determine timing mode
+            $timingMode = TimingMode::Absolute->value;
+            $prayerReference = null;
+            $prayerOffset = null;
+            $prayerDisplayText = null;
+
+            $slotLower = strtolower($entry['slot']);
+            if (str_contains($slotLower, 'maghrib')) {
+                $timingMode = TimingMode::PrayerRelative->value;
+                $prayerReference = PrayerReference::Maghrib->value;
+                $prayerOffset = PrayerOffset::Immediately->value;
+                $prayerDisplayText = 'Selepas Maghrib';
+            } elseif (str_contains($slotLower, 'isyak') || str_contains($slotLower, 'isya')) {
+                $timingMode = TimingMode::PrayerRelative->value;
+                $prayerReference = PrayerReference::Isha->value;
+                $prayerOffset = PrayerOffset::After15->value; // Usually Isyak lectures start a bit later
+                $prayerDisplayText = '15 minit selepas Isyak';
+            } elseif (str_contains($slotLower, 'subuh')) {
+                $timingMode = TimingMode::PrayerRelative->value;
+                $prayerReference = PrayerReference::Fajr->value;
+                $prayerOffset = PrayerOffset::Immediately->value;
+                $prayerDisplayText = 'Selepas Subuh';
+            } elseif (str_contains($slotLower, 'zuhur') || str_contains($slotLower, 'zohor')) {
+                $timingMode = TimingMode::PrayerRelative->value;
+                $prayerReference = PrayerReference::Dhuhr->value;
+                $prayerOffset = PrayerOffset::Immediately->value;
+                $prayerDisplayText = 'Selepas Zohor';
+            }
+
             $event = Event::query()->updateOrCreate([
                 'slug' => $slug,
             ], [
@@ -222,6 +284,10 @@ class EventSeeder extends Seeder
                 'visibility' => 'public',
                 'status' => 'approved',
                 'published_at' => $startsAt->copy()->subDays(7),
+                'timing_mode' => $timingMode,
+                'prayer_reference' => $prayerReference,
+                'prayer_offset' => $prayerOffset,
+                'prayer_display_text' => $prayerDisplayText,
             ]);
 
             if (! empty($entry['speaker'])) {
@@ -230,8 +296,7 @@ class EventSeeder extends Seeder
                     'slug' => \Illuminate\Support\Str::slug($speakerName),
                 ], [
                     'name' => $speakerName,
-                    'verification_status' => 'verified',
-                    'trust_score' => 90,
+                    'status' => 'verified',
                 ]);
 
                 $event->speakers()->syncWithoutDetaching([
@@ -240,25 +305,29 @@ class EventSeeder extends Seeder
             }
 
             if ($topic && ! $note) {
-                $category = null;
+                $categorySlug = null;
                 $topicLower = mb_strtolower($topic);
                 if (str_contains($topicLower, 'tafsir') || str_contains($topicLower, 'juz') || str_contains($topicLower, 'quran')) {
-                    $category = 'quran';
+                    $categorySlug = 'al-quran';
                 } elseif (str_contains($topicLower, 'hadis') || str_contains($topicLower, 'hadith')) {
-                    $category = 'hadith';
+                    $categorySlug = 'hadith';
                 } elseif (str_contains($topicLower, 'fiqh')) {
-                    $category = 'fiqh';
+                    $categorySlug = 'fiqh';
                 } elseif (str_contains($topicLower, 'sirah')) {
-                    $category = 'sirah';
+                    $categorySlug = 'sirah';
                 } elseif (str_contains($topicLower, 'adab') || str_contains($topicLower, 'akhlak')) {
-                    $category = 'akhlak';
+                    $categorySlug = 'akhlak';
                 }
+
+                $parentId = $categorySlug
+                    ? \App\Models\Topic::where('slug', $categorySlug)->value('id')
+                    : null;
 
                 $topicModel = \App\Models\Topic::query()->firstOrCreate([
                     'slug' => \Illuminate\Support\Str::slug($topic),
                 ], [
                     'name' => $topic,
-                    'category' => $category,
+                    'parent_id' => $parentId,
                     'is_official' => false,
                 ]);
 

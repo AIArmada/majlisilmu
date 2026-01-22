@@ -8,10 +8,15 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 ## Foundational Context
 This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
-- php - 8.4.16
+- php - 8.4.17
 - filament/filament (FILAMENT) - v5
+- laravel/fortify (FORTIFY) - v1
 - laravel/framework (LARAVEL) - v12
 - laravel/prompts (PROMPTS) - v0
+- laravel/sanctum (SANCTUM) - v4
+- laravel/scout (SCOUT) - v10
+- laravel/socialite (SOCIALITE) - v5
+- livewire/flux (FLUXUI_FREE) - v2
 - livewire/livewire (LIVEWIRE) - v4
 - laravel/mcp (MCP) - v0
 - laravel/pint (PINT) - v1
@@ -108,6 +113,13 @@ protected function isAccessible(User $user, ?string $path = null): bool
 ## Enums
 - Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
 
+=== tests rules ===
+
+## Test Enforcement
+
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+
 === laravel/core rules ===
 
 ## Do Things the Laravel Way
@@ -174,6 +186,28 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ### Models
 - Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
+
+=== fluxui-free/core rules ===
+
+## Flux UI Free
+
+- This project is using the free edition of Flux UI. It has full access to the free components and variants, but does not have access to the Pro components.
+- Flux UI is a component library for Livewire. Flux is a robust, hand-crafted UI component library for your Livewire applications. It's built using Tailwind CSS and provides a set of components that are easy to use and customize.
+- You should use Flux UI components when available.
+- Fallback to standard Blade components if Flux is unavailable.
+- If available, use the `search-docs` tool to get the exact documentation and code snippets available for this project.
+- Flux UI components look like this:
+
+<code-snippet name="Flux UI Component Example" lang="blade">
+    <flux:button variant="primary"/>
+</code-snippet>
+
+### Available Components
+This is correct as of Boost installation, but there may be additional components within the codebase.
+
+<available-flux-components>
+avatar, badge, brand, breadcrumbs, button, callout, checkbox, dropdown, field, heading, icon, input, modal, navbar, otp-input, profile, radio, select, separator, skeleton, switch, text, textarea, tooltip
+</available-flux-components>
 
 === livewire/core rules ===
 
@@ -386,4 +420,171 @@ $pages->assertNoJavascriptErrors()->assertNoConsoleLogs();
 | overflow-ellipsis | text-ellipsis |
 | decoration-slice | box-decoration-slice |
 | decoration-clone | box-decoration-clone |
+
+=== filament/filament rules ===
+
+## Filament
+
+- Filament is used by this application. Follow existing conventions for how and where it's implemented.
+- Filament is a Server-Driven UI (SDUI) framework for Laravel that lets you define user interfaces in PHP using structured configuration objects. Built on Livewire, Alpine.js, and Tailwind CSS.
+- Use the `search-docs` tool for official documentation on Artisan commands, code examples, testing, relationships, and idiomatic practices.
+
+### Artisan
+
+- Use Filament-specific Artisan commands to create files. Find them with `list-artisan-commands` or `php artisan --help`.
+- Inspect required options and always pass `--no-interaction`.
+
+### Patterns
+
+Use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values.
+
+Use `Get $get` to read other form field values for conditional logic:
+
+<code-snippet name="Conditional form field" lang="php">
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
+
+Select::make('type')
+    ->options(CompanyType::class)
+    ->required()
+    ->live(),
+
+TextInput::make('company_name')
+    ->required()
+    ->visible(fn (Get $get): bool => $get('type') === 'business'),
+</code-snippet>
+
+Use `state()` with a `Closure` to compute derived column values:
+
+<code-snippet name="Computed table column" lang="php">
+use Filament\Tables\Columns\TextColumn;
+
+TextColumn::make('full_name')
+    ->state(fn (User $record): string => "{$record->first_name} {$record->last_name}"),
+</code-snippet>
+
+Actions encapsulate a button with optional modal form and logic:
+
+<code-snippet name="Action with modal form" lang="php">
+use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
+
+Action::make('updateEmail')
+    ->form([
+        TextInput::make('email')->email()->required(),
+    ])
+    ->action(fn (array $data, User $record): void => $record->update($data)),
+</code-snippet>
+
+### Testing
+
+Authenticate before testing panel functionality. Filament uses Livewire, so use `livewire()` or `Livewire::test()`:
+
+<code-snippet name="Filament Table Test" lang="php">
+    livewire(ListUsers::class)
+        ->assertCanSeeTableRecords($users)
+        ->searchTable($users->first()->name)
+        ->assertCanSeeTableRecords($users->take(1))
+        ->assertCanNotSeeTableRecords($users->skip(1));
+</code-snippet>
+
+<code-snippet name="Filament Create Resource Test" lang="php">
+    livewire(CreateUser::class)
+        ->fillForm([
+            'name' => 'Test',
+            'email' => 'test@example.com',
+        ])
+        ->call('create')
+        ->assertNotified()
+        ->assertRedirect();
+
+    assertDatabaseHas(User::class, [
+        'name' => 'Test',
+        'email' => 'test@example.com',
+    ]);
+</code-snippet>
+
+<code-snippet name="Testing Validation" lang="php">
+    livewire(CreateUser::class)
+        ->fillForm([
+            'name' => null,
+            'email' => 'invalid-email',
+        ])
+        ->call('create')
+        ->assertHasFormErrors([
+            'name' => 'required',
+            'email' => 'email',
+        ])
+        ->assertNotNotified();
+</code-snippet>
+
+<code-snippet name="Calling Actions" lang="php">
+    use Filament\Actions\DeleteAction;
+    use Filament\Actions\Testing\TestAction;
+
+    livewire(EditUser::class, ['record' => $user->id])
+        ->callAction(DeleteAction::class)
+        ->assertNotified()
+        ->assertRedirect();
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('promote')->table($user), [
+            'role' => 'admin',
+        ])
+        ->assertNotified();
+</code-snippet>
+
+### Common Mistakes
+
+**Commonly Incorrect Namespaces:**
+- Form fields (TextInput, Select, etc.): `Filament\Forms\Components\`
+- Infolist entries (for read-only views) (TextEntry, IconEntry, etc.): `Filament\Forms\Components\`
+- Layout components (Grid, Section, Fieldset, Tabs, Wizard, etc.): `Filament\Schemas\Components\`
+- Schema utilities (Get, Set, etc.): `Filament\Schemas\Components\Utilities\`
+- Actions: `Filament\Actions\` (no `Filament\Tables\Actions\` etc.)
+- Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
+
+**Recent breaking changes to Filament:**
+- File visibility is `private` by default. Use `->visibility('public')` for public access.
+- `Grid`, `Section`, and `Fieldset` no longer span all columns by default.
+
+=== laravel/fortify rules ===
+
+## Laravel Fortify
+
+Fortify is a headless authentication backend that provides authentication routes and controllers for Laravel applications.
+
+**Before implementing any authentication features, use the `search-docs` tool to get the latest docs for that specific feature.**
+
+### Configuration & Setup
+- Check `config/fortify.php` to see what's enabled. Use `search-docs` for detailed information on specific features.
+- Enable features by adding them to the `'features' => []` array: `Features::registration()`, `Features::resetPasswords()`, etc.
+- To see the all Fortify registered routes, use the `list-routes` tool with the `only_vendor: true` and `action: "Fortify"` parameters.
+- Fortify includes view routes by default (login, register). Set `'views' => false` in the configuration file to disable them if you're handling views yourself.
+
+### Customization
+- Views can be customized in `FortifyServiceProvider`'s `boot()` method using `Fortify::loginView()`, `Fortify::registerView()`, etc.
+- Customize authentication logic with `Fortify::authenticateUsing()` for custom user retrieval / validation.
+- Actions in `app/Actions/Fortify/` handle business logic (user creation, password reset, etc.). They're fully customizable, so you can modify them to change feature behavior.
+
+## Available Features
+- `Features::registration()` for user registration.
+- `Features::emailVerification()` to verify new user emails.
+- `Features::twoFactorAuthentication()` for 2FA with QR codes and recovery codes.
+  - Add options: `['confirmPassword' => true, 'confirm' => true]` to require password confirmation and OTP confirmation before enabling 2FA.
+- `Features::updateProfileInformation()` to let users update their profile.
+- `Features::updatePasswords()` to let users change their passwords.
+- `Features::resetPasswords()` for password reset via email.
+
+=== filament/blueprint rules ===
+
+## Filament Blueprint
+
+You are writing Filament v5 implementation plans. Plans must be specific enough
+that an implementing agent can write code without making decisions.
+
+**Start here**: Read
+`/vendor/filament/blueprint/resources/markdown/planning/overview.md` for plan format,
+required sections, and what to clarify with the user before planning.
 </laravel-boost-guidelines>

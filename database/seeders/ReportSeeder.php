@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\DonationAccount;
+use App\Models\Donation;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Report;
@@ -66,11 +66,11 @@ class ReportSeeder extends Seeder
             ]);
         }
 
-        $donationAccounts = DonationAccount::query()->take(1)->get();
-        foreach ($donationAccounts as $donationAccount) {
+        $donations = Donation::query()->take(1)->get();
+        foreach ($donations as $donation) {
             Report::factory()->create([
-                'entity_type' => 'donation_account',
-                'entity_id' => $donationAccount->id,
+                'entity_type' => 'donation',
+                'entity_id' => $donation->id,
                 'category' => 'donation_scam',
                 'reporter_id' => $reporters->random()->id,
             ]);

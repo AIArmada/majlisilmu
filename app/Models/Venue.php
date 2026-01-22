@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Venue extends Model
 {
     /** @use HasFactory<\Database\Factories\VenueFactory> */
-    use HasFactory, HasUuids;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasSocialMedia, HasFactory, HasUuids;
 
     public $incrementing = false;
 
@@ -23,25 +23,14 @@ class Venue extends Model
     protected $fillable = [
         'institution_id',
         'name',
+        'type',
         'slug',
-        'state_id',
-        'district_id',
-        'address_line1',
-        'address_line2',
-        'postcode',
-        'city',
-        'lat',
-        'lng',
-        'google_maps_place_id',
-        'waze_place_url',
         'facilities',
     ];
 
     protected function casts(): array
     {
         return [
-            'lat' => 'float',
-            'lng' => 'float',
             'facilities' => 'array',
         ];
     }
@@ -49,16 +38,6 @@ class Venue extends Model
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
-    }
-
-    public function state(): BelongsTo
-    {
-        return $this->belongsTo(State::class);
-    }
-
-    public function district(): BelongsTo
-    {
-        return $this->belongsTo(District::class);
     }
 
     public function events(): HasMany

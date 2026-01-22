@@ -6,6 +6,7 @@ use App\Models\District;
 use App\Models\State;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
+use Nnjeim\World\Models\Country;
 
 class DistrictSeeder extends Seeder
 {
@@ -14,8 +15,17 @@ class DistrictSeeder extends Seeder
      */
     public function run(): void
     {
+        // Get Malaysia country ID
+        $malaysia = Country::where('iso2', 'MY')->first();
+
+        if (! $malaysia) {
+            $this->command->warn('Malaysia country not found. Make sure WorldSeeder has been run.');
+
+            return;
+        }
+
         $districtsByState = [
-            'johor' => [
+            'Johor' => [
                 'Johor Bahru',
                 'Batu Pahat',
                 'Muar',
@@ -23,68 +33,68 @@ class DistrictSeeder extends Seeder
                 'Kota Tinggi',
                 'Pontian',
             ],
-            'kedah' => [
+            'Kedah' => [
                 'Kota Setar',
                 'Kuala Muda',
                 'Kulim',
                 'Kubang Pasu',
                 'Langkawi',
             ],
-            'kelantan' => [
+            'Kelantan' => [
                 'Kota Bharu',
                 'Pasir Mas',
                 'Bachok',
                 'Tanah Merah',
             ],
-            'melaka' => [
+            'Malacca' => [
                 'Melaka Tengah',
                 'Alor Gajah',
                 'Jasin',
             ],
-            'negeri-sembilan' => [
+            'Negeri Sembilan' => [
                 'Seremban',
                 'Port Dickson',
                 'Tampin',
                 'Jempol',
             ],
-            'pahang' => [
+            'Pahang' => [
                 'Kuantan',
                 'Temerloh',
                 'Bentong',
                 'Pekan',
             ],
-            'perak' => [
+            'Perak' => [
                 'Kinta',
                 'Manjung',
                 'Kuala Kangsar',
                 'Hilir Perak',
                 'Larut Matang dan Selama',
             ],
-            'perlis' => [
+            'Perlis' => [
                 'Kangar',
             ],
-            'pulau-pinang' => [
+            'Penang' => [
                 'Timur Laut',
                 'Barat Daya',
                 'Seberang Perai Utara',
                 'Seberang Perai Tengah',
                 'Seberang Perai Selatan',
             ],
-            'sabah' => [
+            'Sabah' => [
                 'Kota Kinabalu',
                 'Sandakan',
                 'Tawau',
                 'Lahad Datu',
                 'Keningau',
             ],
-            'sarawak' => [
+            'Sarawak' => [
                 'Kuching',
                 'Miri',
                 'Sibu',
                 'Bintulu',
                 'Samarahan',
             ],
-            'selangor' => [
+            'Selangor' => [
                 'Petaling',
                 'Gombak',
                 'Hulu Langat',
@@ -92,27 +102,32 @@ class DistrictSeeder extends Seeder
                 'Kuala Langat',
                 'Sepang',
             ],
-            'terengganu' => [
+            'Terengganu' => [
                 'Kuala Terengganu',
                 'Kemaman',
                 'Dungun',
                 'Besut',
             ],
-            'wp-kuala-lumpur' => [
+            'Kuala Lumpur' => [
                 'Kuala Lumpur',
             ],
-            'wp-putrajaya' => [
+            'Putrajaya' => [
                 'Putrajaya',
             ],
-            'wp-labuan' => [
+            'Labuan' => [
                 'Labuan',
             ],
         ];
 
-        foreach ($districtsByState as $stateSlug => $districts) {
-            $state = State::query()->where('slug', $stateSlug)->first();
+        foreach ($districtsByState as $stateName => $districts) {
+            $state = State::query()
+                ->where('country_id', $malaysia->id)
+                ->where('name', $stateName)
+                ->first();
 
             if ($state === null) {
+                $this->command->warn("State not found: {$stateName}");
+
                 continue;
             }
 

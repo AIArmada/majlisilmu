@@ -85,11 +85,11 @@ return [
     'faker_locale' => env('APP_FAKER_LOCALE', 'ms_MY'),
 
     'supported_locales' => [
-        'ms' => 'Bahasa Melayu',
+        'ms' => 'Melayu',
         'en' => 'English',
         'zh' => '中文',
         'ta' => 'தமிழ்',
-        'jv' => 'Basa Jawa',
+        'jv' => 'Jawa',
     ],
 
     /*

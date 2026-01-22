@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EventSubmission extends Model
 {
     /** @use HasFactory<\Database\Factories\EventSubmissionFactory> */
-    use HasFactory, HasUuids;
+    use \App\Models\Concerns\HasContacts, HasFactory, HasUuids;
 
     public $incrementing = false;
 
@@ -22,9 +22,7 @@ class EventSubmission extends Model
     protected $fillable = [
         'event_id',
         'submitted_by',
-        'source',
         'submitter_name',
-        'submitter_contact',
     ];
 
     public function event(): BelongsTo

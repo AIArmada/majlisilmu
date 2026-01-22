@@ -21,15 +21,14 @@ class InstitutionsTable
                 TextColumn::make('type')
                     ->badge()
                     ->sortable(),
-                TextColumn::make('state.name')
+                TextColumn::make('address.state.name')
+                    ->label('State')
                     ->sortable(),
-                TextColumn::make('district.name')
+                TextColumn::make('address.district.name')
+                    ->label('District')
                     ->sortable(),
-                TextColumn::make('verification_status')
+                TextColumn::make('status')
                     ->badge()
-                    ->sortable(),
-                TextColumn::make('trust_score')
-                    ->numeric()
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -43,15 +42,13 @@ class InstitutionsTable
                         'surau' => 'Surau',
                         'others' => 'Others',
                     ]),
-                SelectFilter::make('verification_status')
+                SelectFilter::make('status')
                     ->options([
                         'unverified' => 'Unverified',
                         'pending' => 'Pending',
                         'verified' => 'Verified',
                         'rejected' => 'Rejected',
                     ]),
-                SelectFilter::make('state')
-                    ->relationship('state', 'name'),
             ])
             ->recordActions([
                 EditAction::make(),

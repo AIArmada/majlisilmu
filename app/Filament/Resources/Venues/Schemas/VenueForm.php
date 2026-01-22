@@ -6,6 +6,7 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class VenueForm
@@ -23,30 +24,91 @@ class VenueForm
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
+                        Select::make('type')
+                            ->options([
+                                'main_hall' => 'Main Hall',
+                                'seminar_room' => 'Seminar Room',
+                                'classroom' => 'Classroom',
+                                'meeting_room' => 'Meeting Room',
+                                'auditorium' => 'Auditorium',
+                                'field' => 'Field',
+                                'foyer' => 'Foyer',
+                                'other' => 'Other',
+                            ])
+                            ->default('main_hall')
+                            ->required(),
                         TextInput::make('slug')
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
                     ])
                     ->columns(2),
-                Section::make('Location')
+                Section::make('Contact')
                     ->components([
+                        \Filament\Forms\Components\Repeater::make('contacts')
+                            ->relationship()
+                            ->schema([
+                                Select::make('category')
+                                    ->options([
+                                        'email' => 'Email',
+                                        'phone' => 'Phone',
+                                    ])
+                                    ->required()
+                                    ->live(),
+                                TextInput::make('value')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->label(fn (Get $get) => match ($get('category')) {
+                                        'email' => 'Email Address',
+                                        'phone' => 'Phone Number',
+                                        default => 'Value',
+                                    })
+                                    ->email(fn (Get $get) => $get('category') === 'email')
+                                    ->tel(fn (Get $get) => $get('category') === 'phone'),
+                                Select::make('type')
+                                    ->options([
+                                        'main' => 'Main',
+                                        'work' => 'Work',
+                                        'personal' => 'Personal',
+                                        'whatsapp' => 'WhatsApp',
+                                    ])
+                                    ->default('main')
+                                    ->required(),
+                            ])
+                            ->columns(3)
+                            ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
+                    ]),
+                Section::make('Location')
+                    ->relationship('address')
+                    ->components([
+                        Select::make('country_id')
+                            ->relationship('country', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->live(),
                         Select::make('state_id')
-                            ->relationship('state', 'name')
+                            ->relationship('state', 'name', fn ($query, $get) => $query->where('country_id', $get('country_id')))
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->live()
+                            ->hidden(fn ($get) => ! $get('country_id')),
                         Select::make('district_id')
-                            ->relationship('district', 'name')
+                            ->relationship('district', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
                             ->searchable()
-                            ->preload(),
-                        TextInput::make('address_line1')
+                            ->preload()
+                            ->live()
+                            ->hidden(fn ($get) => ! $get('state_id')),
+                        Select::make('city_id')
+                            ->relationship('city', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
+                            ->searchable()
+                            ->preload()
+                            ->hidden(fn ($get) => ! $get('state_id')),
+                        TextInput::make('address1')
                             ->maxLength(255),
-                        TextInput::make('address_line2')
+                        TextInput::make('address2')
                             ->maxLength(255),
                         TextInput::make('postcode')
                             ->maxLength(16),
-                        TextInput::make('city')
-                            ->maxLength(255),
                         TextInput::make('lat')
                             ->numeric()
                             ->minValue(-90)
@@ -55,15 +117,15 @@ class VenueForm
                             ->numeric()
                             ->minValue(-180)
                             ->maxValue(180),
-                    ])
-                    ->columns(2),
-                Section::make('Maps & Facilities')
-                    ->components([
-                        TextInput::make('google_maps_place_id')
+                        TextInput::make('google_place_id')
                             ->maxLength(255),
-                        TextInput::make('waze_place_url')
+                        TextInput::make('waze_url')
                             ->url()
                             ->maxLength(255),
+                    ])
+                    ->columns(2),
+                Section::make('Facilities')
+                    ->components([
                         CheckboxList::make('facilities')
                             ->options([
                                 'parking' => 'Parking',
@@ -84,7 +146,39 @@ class VenueForm
                             })
                             ->columnSpanFull(),
                     ])
-                    ->columns(2),
+                    ->columns(1),
+                Section::make('Social Media')
+                    ->components([
+                        \Filament\Forms\Components\Repeater::make('socialMedia')
+                            ->relationship()
+                            ->schema([
+                                Select::make('platform')
+                                    ->options([
+                                        'facebook' => 'Facebook',
+                                        'instagram' => 'Instagram',
+                                        'youtube' => 'YouTube',
+                                        'tiktok' => 'TikTok',
+                                        'twitter' => 'X (Twitter)',
+                                        'linkedin' => 'LinkedIn',
+                                        'website' => 'Website',
+                                        'other' => 'Other',
+                                    ])
+                                    ->searchable()
+                                    ->required()
+                                    ->columnSpan(1),
+                                TextInput::make('username')
+                                    ->label('Username / Handle')
+                                    ->placeholder('@username')
+                                    ->columnSpan(1),
+                                TextInput::make('url')
+                                    ->label('URL')
+                                    ->url()
+                                    ->required()
+                                    ->columnSpanFull(),
+                            ])
+                            ->columns(2)
+                            ->itemLabel(fn (array $state): ?string => $state['platform'] ?? null),
+                    ]),
             ]);
     }
 }

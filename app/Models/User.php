@@ -10,11 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasUuids, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable;
 
     public $incrementing = false;
 
@@ -30,6 +33,9 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'phone',
         'password',
+        'google_id',
+        'avatar',
+        'email_verified_at',
     ];
 
     /**
@@ -55,22 +61,15 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    public function roles(): BelongsToMany
-    {
-        return $this->belongsToMany(Role::class)->withTimestamps();
-    }
-
     public function institutions(): BelongsToMany
     {
         return $this->belongsToMany(Institution::class, 'institution_members')
-            ->withPivot('role')
             ->withTimestamps();
     }
 
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'speaker_members')
-            ->withPivot('role')
             ->withTimestamps();
     }
 
@@ -109,20 +108,33 @@ class User extends Authenticatable implements FilamentUser
         return $this->belongsToMany(Event::class, 'event_saves')->withTimestamps();
     }
 
-    public function mediaAssets(): HasMany
+    public function interestedEvents(): BelongsToMany
     {
-        return $this->hasMany(MediaAsset::class, 'uploaded_by');
+        return $this->belongsToMany(Event::class, 'event_interests')->withTimestamps();
     }
 
-    public function auditLogs(): HasMany
+    public function ownedEvents(): HasMany
     {
-        return $this->hasMany(AuditLog::class, 'actor_id');
+        return $this->hasMany(Event::class);
+    }
+
+    public function memberEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(Event::class, 'event_members')
+            ->withPivot(['role', 'joined_at'])
+            ->withTimestamps();
     }
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->roles()
-            ->whereIn('name', ['super_admin', 'moderator'])
-            ->exists();
+        $registrar = app(PermissionRegistrar::class);
+        $teams = $registrar->teams;
+        $registrar->teams = false;
+
+        try {
+            return $this->roles()->exists();
+        } finally {
+            $registrar->teams = $teams;
+        }
     }
 }

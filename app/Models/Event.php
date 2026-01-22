@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,11 +12,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Laravel\Scout\Searchable;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Event extends Model
+class Event extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\EventFactory> */
-    use HasFactory, HasUuids;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonations, Auditable, HasFactory, HasUuids, InteractsWithMedia, Searchable;
 
     public $incrementing = false;
 
@@ -23,25 +32,31 @@ class Event extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'user_id',
         'institution_id',
+        'submitter_id',
         'venue_id',
         'series_id',
+        'speaker_id',
         'title',
         'slug',
         'description',
-        'state_id',
-        'district_id',
         'starts_at',
         'ends_at',
         'timezone',
+        'timing_mode',
+        'prayer_reference',
+        'prayer_offset',
+        'prayer_display_text',
+        'prayer_calc_lat',
+        'prayer_calc_lng',
         'language',
         'genre',
         'audience',
         'visibility',
         'status',
-        'livestream_url',
+        'live_url',
         'recording_url',
-        'donation_account_id',
         'registration_required',
         'capacity',
         'registration_opens_at',
@@ -49,7 +64,10 @@ class Event extends Model
         'views_count',
         'saves_count',
         'registrations_count',
+        'interests_count',
         'published_at',
+        'escalated_at',
+        'is_priority',
     ];
 
     protected function casts(): array
@@ -57,6 +75,11 @@ class Event extends Model
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'timing_mode' => TimingMode::class,
+            'prayer_reference' => PrayerReference::class,
+            'prayer_offset' => PrayerOffset::class,
+            'prayer_calc_lat' => 'decimal:8',
+            'prayer_calc_lng' => 'decimal:8',
             'registration_required' => 'boolean',
             'registration_opens_at' => 'datetime',
             'registration_closes_at' => 'datetime',
@@ -64,8 +87,78 @@ class Event extends Model
             'views_count' => 'integer',
             'saves_count' => 'integer',
             'registrations_count' => 'integer',
+            'interests_count' => 'integer',
             'published_at' => 'datetime',
+            'escalated_at' => 'datetime',
+            'is_priority' => 'boolean',
         ];
+    }
+
+    /**
+     * Determine if the model should be searchable.
+     * Only index approved public events per documentation B8a.
+     */
+    public function shouldBeSearchable(): bool
+    {
+        return $this->status === 'approved' && $this->visibility === 'public';
+    }
+
+    /**
+     * Get the indexable data array for the model.
+     * Schema matches documentation B8.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        $this->loadMissing(['institution', 'venue', 'speakers', 'topics', 'address']);
+
+        $array = [
+            'id' => $this->id,
+            'title' => $this->title,
+            'description' => $this->description ?? '',
+            'slug' => $this->slug,
+            'speaker_names' => $this->speakers->pluck('name')->implode(', '),
+            'institution_name' => $this->institution?->name ?? '',
+            'venue_name' => $this->venue?->name ?? '',
+            'language' => $this->language ?? 'malay',
+            'genre' => $this->genre ?? 'kuliah',
+            'audience' => $this->audience ?? 'general',
+            'status' => $this->status,
+            'visibility' => $this->visibility,
+            'topic_ids' => $this->topics->pluck('id')->toArray(),
+            'speaker_ids' => $this->speakers->pluck('id')->toArray(),
+            'starts_at' => $this->starts_at?->timestamp ?? 0,
+            'ends_at' => $this->ends_at?->timestamp,
+            'saves_count' => $this->saves_count ?? 0,
+            'registrations_count' => $this->registrations_count ?? 0,
+        ];
+
+        // Add geolocation if available
+        if ($this->venue?->lat && $this->venue?->lng) {
+            $array['location'] = [$this->venue->lat, $this->venue->lng];
+        } elseif ($this->address?->lat) {
+            $array['location'] = [$this->address->lat, $this->address->lng];
+        }
+
+        return $array;
+    }
+
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitter_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'event_members')
+            ->withPivot(['role', 'joined_at'])
+            ->withTimestamps();
     }
 
     public function institution(): BelongsTo
@@ -83,19 +176,9 @@ class Event extends Model
         return $this->belongsTo(Series::class);
     }
 
-    public function state(): BelongsTo
+    public function speaker(): BelongsTo
     {
-        return $this->belongsTo(State::class);
-    }
-
-    public function district(): BelongsTo
-    {
-        return $this->belongsTo(District::class);
-    }
-
-    public function donationAccount(): BelongsTo
-    {
-        return $this->belongsTo(DonationAccount::class);
+        return $this->belongsTo(Speaker::class);
     }
 
     public function speakers(): BelongsToMany
@@ -108,12 +191,15 @@ class Event extends Model
 
     public function topics(): BelongsToMany
     {
-        return $this->belongsToMany(Topic::class, 'event_topics')->withTimestamps();
+        return $this->belongsToMany(Topic::class, 'event_topics')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderByPivot('sort_order');
     }
 
-    public function mediaLinks(): HasMany
+    public function mediaLinks(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
-        return $this->hasMany(EventMediaLink::class);
+        return $this->morphMany(\App\Models\EventMedia::class, 'mediable');
     }
 
     public function submissions(): HasMany
@@ -136,13 +222,88 @@ class Event extends Model
         return $this->belongsToMany(User::class, 'event_saves')->withTimestamps();
     }
 
+    public function interestedBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'event_interests')->withTimestamps();
+    }
+
     public function reports(): MorphMany
     {
         return $this->morphMany(Report::class, 'entity');
     }
 
-    public function auditLogs(): MorphMany
+    public function donationAccount(): MorphOne
     {
-        return $this->morphMany(AuditLog::class, 'entity');
+        return $this->morphOne(Donation::class, 'donatable')
+            ->where('is_default', true);
+    }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('poster')
+            ->singleFile();
+
+        $this->addMediaCollection('gallery');
+    }
+
+    /**
+     * Check if this event uses prayer-relative timing.
+     */
+    public function isPrayerRelative(): bool
+    {
+        return $this->timing_mode === TimingMode::PrayerRelative;
+    }
+
+    /**
+     * Get the human-readable timing display text.
+     * Returns prayer-relative text (e.g., "Selepas Maghrib") or formatted time.
+     */
+    public function getTimingDisplayAttribute(): string
+    {
+        if ($this->isPrayerRelative() && $this->prayer_display_text) {
+            return $this->prayer_display_text;
+        }
+
+        // Fallback to formatted time
+        return $this->starts_at?->format('g:i A') ?? '';
+    }
+
+    /**
+     * Get the full timing display with date context.
+     */
+    public function getFullTimingDisplayAttribute(): string
+    {
+        $date = $this->starts_at?->translatedFormat('l, j F Y') ?? '';
+        $time = $this->timing_display;
+
+        return "{$date} - {$time}";
+    }
+
+    /**
+     * Get coordinates for prayer time calculation.
+     * Falls back to venue coordinates if specific coords not set.
+     */
+    public function getPrayerCoordinatesAttribute(): ?array
+    {
+        // Use event-specific coordinates if set
+        if ($this->prayer_calc_lat && $this->prayer_calc_lng) {
+            return [
+                'lat' => (float) $this->prayer_calc_lat,
+                'lng' => (float) $this->prayer_calc_lng,
+            ];
+        }
+
+        // Fall back to venue coordinates
+        if ($this->venue && $this->venue->lat && $this->venue->lng) {
+            return [
+                'lat' => (float) $this->venue->lat,
+                'lng' => (float) $this->venue->lng,
+            ];
+        }
+
+        return null;
     }
 }

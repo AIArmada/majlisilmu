@@ -11,12 +11,10 @@ return new class extends Migration
         Schema::create('institution_members', function (Blueprint $table) {
             $table->uuid('institution_id');
             $table->uuid('user_id');
-            $table->enum('role', ['owner', 'admin', 'editor'])->default('editor')->index();
             $table->timestamps();
 
             $table->primary(['institution_id', 'user_id']);
-            $table->foreign('institution_id')->references('id')->on('institutions')->cascadeOnDelete();
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+
         });
     }
 

@@ -10,17 +10,16 @@ return new class extends Migration
     {
         Schema::create('moderation_reviews', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('event_id')->index();
-            $table->uuid('reviewer_id')->nullable()->index();
+            $table->foreignUuid('event_id')->index();
+            $table->foreignUuid('reviewer_id')->nullable()->index();
+            $table->foreignUuid('moderator_id')->nullable()->index();
 
-            $table->enum('decision', ['approved', 'rejected', 'needs_changes'])->index();
+            $table->string('decision')->index();
             $table->text('note')->nullable();
             $table->string('reason_code')->nullable()->index();
 
             $table->timestamps();
 
-            $table->foreign('event_id')->references('id')->on('events')->cascadeOnDelete();
-            $table->foreign('reviewer_id')->references('id')->on('users')->nullOnDelete();
         });
     }
 

@@ -19,16 +19,48 @@ class InstitutionFactory extends Factory
     {
         $type = fake()->randomElement(['masjid', 'surau', 'others']);
         $arabicNames = [
-            'Al-Ikhlas', 'Al-Amin', 'An-Nur', 'As-Salam', 'At-Taqwa', 'Al-Hidayah',
-            'Al-Falah', 'Al-Muttaqin', 'Ar-Rahman', 'Al-Munawwarah', 'Al-Ansar',
-            'Al-Mukminin', 'Al-Azhar', 'Al-Kauthar', 'Al-Istiqamah',
+            'Al-Ikhlas',
+            'Al-Amin',
+            'An-Nur',
+            'As-Salam',
+            'At-Taqwa',
+            'Al-Hidayah',
+            'Al-Falah',
+            'Al-Muttaqin',
+            'Ar-Rahman',
+            'Al-Munawwarah',
+            'Al-Ansar',
+            'Al-Mukminin',
+            'Al-Azhar',
+            'Al-Kauthar',
+            'Al-Istiqamah',
         ];
         $locations = [
-            'Taman Melawati', 'Taman Daya', 'Taman Universiti', 'Taman Tun Dr Ismail',
-            'Bandar Baru Bangi', 'Setia Alam', 'Kota Damansara', 'Shah Alam', 'Gombak',
-            'Putrajaya', 'Cyberjaya', 'Wangsa Maju', 'Seri Kembangan', 'Kajang',
-            'Rawang', 'Ampang', 'Cheras', 'Subang Jaya', 'Klang', 'Batu Caves',
-            'Sungai Buloh', 'Puchong', 'Senawang', 'Melaka Tengah', 'Johor Bahru',
+            'Taman Melawati',
+            'Taman Daya',
+            'Taman Universiti',
+            'Taman Tun Dr Ismail',
+            'Bandar Baru Bangi',
+            'Setia Alam',
+            'Kota Damansara',
+            'Shah Alam',
+            'Gombak',
+            'Putrajaya',
+            'Cyberjaya',
+            'Wangsa Maju',
+            'Seri Kembangan',
+            'Kajang',
+            'Rawang',
+            'Ampang',
+            'Cheras',
+            'Subang Jaya',
+            'Klang',
+            'Batu Caves',
+            'Sungai Buloh',
+            'Puchong',
+            'Senawang',
+            'Melaka Tengah',
+            'Johor Bahru',
         ];
         $arabicName = fake()->randomElement($arabicNames);
         $location = fake()->randomElement($locations);
@@ -72,19 +104,32 @@ class InstitutionFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name.'-'.fake()->unique()->numerify('###')),
             'description' => fake()->optional()->paragraph(),
-            'phone' => fake()->optional()->phoneNumber(),
-            'email' => fake()->optional()->safeEmail(),
-            'website_url' => fake()->optional()->url(),
-            'state_id' => null,
-            'district_id' => null,
-            'address_line1' => fake()->streetAddress(),
-            'address_line2' => fake()->optional()->secondaryAddress(),
-            'postcode' => fake()->postcode(),
-            'city' => fake()->city(),
-            'lat' => fake()->optional()->randomFloat(7, 1.0, 7.0),
-            'lng' => fake()->optional()->randomFloat(7, 99.0, 119.0),
-            'verification_status' => fake()->randomElement(['unverified', 'pending', 'verified']),
-            'trust_score' => fake()->numberBetween(0, 100),
+            'status' => fake()->randomElement(['unverified', 'pending', 'verified']),
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (\App\Models\Institution $institution) {
+            $institution->address()->create([
+                'address1' => fake()->streetAddress(),
+                'address2' => fake()->optional()->secondaryAddress(),
+                'postcode' => fake()->postcode(),
+                'lat' => fake()->randomFloat(7, 1.0, 7.0),
+                'lng' => fake()->randomFloat(7, 99.0, 119.0),
+            ]);
+
+            $institution->contacts()->create([
+                'category' => 'email',
+                'value' => fake()->safeEmail(),
+                'type' => 'work',
+            ]);
+
+            $institution->contacts()->create([
+                'category' => 'phone',
+                'value' => fake()->phoneNumber(),
+                'type' => 'work',
+            ]);
+        });
     }
 }

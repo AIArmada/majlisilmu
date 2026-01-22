@@ -13,6 +13,7 @@ class VenuesTable
 {
     public static function configure(Table $table): Table
     {
+        // Configuration for Venues Table
         return $table
             ->columns([
                 TextColumn::make('name')
@@ -21,11 +22,28 @@ class VenuesTable
                 TextColumn::make('institution.name')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('state.name')
+                TextColumn::make('type')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'main_hall' => 'Main Hall',
+                        'seminar_room' => 'Seminar Room',
+                        'classroom' => 'Classroom',
+                        'meeting_room' => 'Meeting Room',
+                        'auditorium' => 'Auditorium',
+                        'field' => 'Field',
+                        'foyer' => 'Foyer',
+                        'other' => 'Other',
+                        default => $state,
+                    })
                     ->sortable(),
-                TextColumn::make('district.name')
+                TextColumn::make('address.state.name')
+                    ->label('State')
                     ->sortable(),
-                TextColumn::make('city')
+                TextColumn::make('address.district.name')
+                    ->label('District')
+                    ->sortable(),
+                TextColumn::make('address.city.name')
+                    ->label('City')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -35,8 +53,17 @@ class VenuesTable
             ->filters([
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),
-                SelectFilter::make('state')
-                    ->relationship('state', 'name'),
+                SelectFilter::make('type')
+                    ->options([
+                        'main_hall' => 'Main Hall',
+                        'seminar_room' => 'Seminar Room',
+                        'classroom' => 'Classroom',
+                        'meeting_room' => 'Meeting Room',
+                        'auditorium' => 'Auditorium',
+                        'field' => 'Field',
+                        'foyer' => 'Foyer',
+                        'other' => 'Other',
+                    ]),
             ])
             ->recordActions([
                 EditAction::make(),

@@ -9,17 +9,17 @@ use App\Filament\Resources\Series\Schemas\SeriesForm;
 use App\Filament\Resources\Series\Tables\SeriesTable;
 use App\Models\Series;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class SeriesResource extends Resource
 {
     protected static ?string $model = Series::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
     protected static ?string $recordTitleAttribute = 'title';
 

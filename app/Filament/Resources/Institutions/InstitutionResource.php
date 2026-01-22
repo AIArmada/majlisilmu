@@ -5,25 +5,25 @@ namespace App\Filament\Resources\Institutions;
 use App\Filament\Resources\Institutions\Pages\CreateInstitution;
 use App\Filament\Resources\Institutions\Pages\EditInstitution;
 use App\Filament\Resources\Institutions\Pages\ListInstitutions;
-use App\Filament\Resources\Institutions\RelationManagers\DonationAccountsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\EventsRelationManager;
+use App\Filament\Resources\Institutions\RelationManagers\MembersRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\SeriesRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\VenuesRelationManager;
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm;
 use App\Filament\Resources\Institutions\Tables\InstitutionsTable;
 use App\Models\Institution;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class InstitutionResource extends Resource
 {
     protected static ?string $model = Institution::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingLibrary;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -42,9 +42,9 @@ class InstitutionResource extends Resource
     public static function getRelations(): array
     {
         return [
+            MembersRelationManager::class,
             VenuesRelationManager::class,
             EventsRelationManager::class,
-            DonationAccountsRelationManager::class,
             SeriesRelationManager::class,
         ];
     }
