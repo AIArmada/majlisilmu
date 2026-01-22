@@ -24,13 +24,19 @@ class EventSubmissionSeeder extends Seeder
             $isPublic = random_int(0, 4) === 0;
             $submitter = $isPublic || $users->isEmpty() ? null : $users->random();
 
-            EventSubmission::factory()->create([
+            $submission = EventSubmission::factory()->create([
                 'event_id' => $event->id,
                 'submitted_by' => $submitter?->id,
-                'source' => $isPublic ? 'public' : 'institution',
-                'submitter_name' => $submitter?->name ?? fake()->name(),
-                'submitter_contact' => $submitter?->email ?? fake()->safeEmail(),
+                'submitter_name' => $submitter ? null : fake()->name(),
             ]);
+
+            if (! $submitter) {
+                $submission->contacts()->create([
+                    'type' => 'main',
+                    'category' => 'email',
+                    'value' => fake()->safeEmail(),
+                ]);
+            }
         });
     }
 }

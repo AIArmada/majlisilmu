@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\Reports\Schemas;
 
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -21,7 +21,7 @@ class ReportForm
                                 'event' => 'Event',
                                 'institution' => 'Institution',
                                 'speaker' => 'Speaker',
-                                'donation_account' => 'Donation Account',
+                                'donation' => 'Donation',
                             ])
                             ->required(),
                         TextInput::make('entity_id')

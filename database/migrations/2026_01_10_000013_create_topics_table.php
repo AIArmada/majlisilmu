@@ -10,11 +10,19 @@ return new class extends Migration
     {
         Schema::create('topics', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name')->unique();
+            $table->uuid('parent_id')->nullable()->index();
+            $table->string('name');
             $table->string('slug')->unique();
-            $table->string('category')->nullable()->index();
             $table->boolean('is_official')->default(false)->index();
+            $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestamps();
+
+            // Unique name within same parent (allows same name in different branches)
+            $table->unique(['parent_id', 'name']);
+        });
+
+        Schema::table('topics', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('topics')->nullOnDelete();
         });
     }
 

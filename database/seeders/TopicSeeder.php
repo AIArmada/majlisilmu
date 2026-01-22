@@ -13,23 +13,116 @@ class TopicSeeder extends Seeder
      */
     public function run(): void
     {
-        $topics = [
-            ['name' => 'Aqidah', 'category' => 'aqidah', 'is_official' => true],
-            ['name' => 'Fiqh Ibadah', 'category' => 'fiqh', 'is_official' => true],
-            ['name' => 'Sirah Nabawiyyah', 'category' => 'sirah', 'is_official' => true],
-            ['name' => 'Akhlak', 'category' => 'akhlak', 'is_official' => true],
-            ['name' => 'Tafsir Al-Quran', 'category' => 'quran', 'is_official' => true],
-            ['name' => 'Hadith', 'category' => 'hadith', 'is_official' => true],
-            ['name' => 'Tarbiah', 'category' => 'tarbiah', 'is_official' => true],
-            ['name' => 'Keluarga & Parenting', 'category' => 'family', 'is_official' => false],
-            ['name' => 'Muamalat', 'category' => 'fiqh', 'is_official' => false],
-            ['name' => 'Sirah Sahabah', 'category' => 'sirah', 'is_official' => false],
+        // Define hierarchical topics structure
+        // Format: 'Category' => ['child1', 'child2', ...]
+        // Or nested: 'Category' => ['Subcategory' => ['child1', ...]]
+        $hierarchy = [
+            'Aqidah' => [
+                'Tauhid' => [
+                    'Tauhid Rububiyyah',
+                    'Tauhid Uluhiyyah',
+                    'Asma wa Sifat',
+                ],
+                'Rukun Iman',
+                'Aqidah Ahlus Sunnah',
+            ],
+            'Fiqh' => [
+                'Ibadah' => [
+                    'Solat',
+                    'Puasa',
+                    'Zakat',
+                    'Haji & Umrah',
+                ],
+                'Muamalat',
+                'Munakahat',
+                'Jenayah',
+            ],
+            'Sirah' => [
+                'Sirah Nabawiyyah' => [
+                    'Mekah',
+                    'Madinah',
+                ],
+                'Sirah Sahabah',
+                'Sirah Khulafa Ar-Rasyidin',
+            ],
+            'Akhlak' => [
+                'Adab' => [
+                    'Adab Menuntut Ilmu',
+                    'Adab Berjiran',
+                    'Adab Dalam Masjid',
+                ],
+                'Akhlak Rasulullah',
+            ],
+            'Al-Quran' => [
+                'Tafsir' => [
+                    'Tafsir Al-Fatihah',
+                    'Tafsir Al-Kahfi',
+                    'Tafsir Juz Amma',
+                ],
+                'Tadabbur' => [
+                    'Tadabbur Surah Yasin',
+                    'Tadabbur Surah Al-Mulk',
+                ],
+                'Ulumul Quran',
+                'Tajwid',
+            ],
+            'Hadith' => [
+                'Hadis Arba\'in',
+                'Riyadus Salihin',
+                'Bulughul Maram',
+            ],
+            'Tarbiah' => [
+                'Tarbiah Remaja',
+                'Tarbiah Keluarga',
+                'Tazkiyah An-Nafs',
+            ],
+            'Keluarga' => [
+                'Parenting Islami',
+                'Pendidikan Anak',
+                'Komunikasi Suami Isteri',
+            ],
         ];
 
-        foreach ($topics as $topic) {
-            Topic::query()->updateOrCreate([
-                'slug' => Str::slug($topic['name']),
-            ], $topic);
+        $this->seedTopics($hierarchy);
+    }
+
+    /**
+     * Recursively seed topics with their children.
+     *
+     * @param  array<string, mixed>  $items
+     */
+    private function seedTopics(array $items, ?Topic $parent = null, int &$sortOrder = 0): void
+    {
+        foreach ($items as $key => $value) {
+            $sortOrder++;
+
+            // If key is numeric, then value is a leaf topic name
+            if (is_int($key)) {
+                $name = $value;
+                $children = [];
+            } else {
+                // Key is the topic name, value may be children array
+                $name = $key;
+                $children = is_array($value) ? $value : [];
+            }
+
+            $topic = Topic::query()->updateOrCreate(
+                [
+                    'slug' => Str::slug($name),
+                ],
+                [
+                    'parent_id' => $parent?->id,
+                    'name' => $name,
+                    'is_official' => $parent === null, // Root topics are official
+                    'sort_order' => $sortOrder,
+                ]
+            );
+
+            // Recursively create children
+            if (! empty($children)) {
+                $childSortOrder = 0;
+                $this->seedTopics($children, $topic, $childSortOrder);
+            }
         }
     }
 }

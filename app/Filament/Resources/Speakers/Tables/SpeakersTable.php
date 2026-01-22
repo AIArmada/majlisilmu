@@ -18,11 +18,8 @@ class SpeakersTable
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('verification_status')
+                TextColumn::make('status')
                     ->badge()
-                    ->sortable(),
-                TextColumn::make('trust_score')
-                    ->numeric()
                     ->sortable(),
                 TextColumn::make('email')
                     ->searchable()
@@ -35,7 +32,7 @@ class SpeakersTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('verification_status')
+                SelectFilter::make('status')
                     ->options([
                         'unverified' => 'Unverified',
                         'pending' => 'Pending',

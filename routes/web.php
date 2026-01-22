@@ -1,23 +1,60 @@
 <?php
 
-use App\Http\Controllers\Public\EventsController;
-use App\Http\Controllers\Public\HomeController;
-use App\Http\Controllers\Public\InstitutionsController;
-use App\Http\Controllers\Public\SeriesController;
-use App\Http\Controllers\Public\SpeakersController;
+use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\Public\EventsController;
+use App\Http\Controllers\Public\EventSubmissionController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', HomeController::class)->name('home');
+Route::livewire('/', 'pages.home')->name('home');
 Route::get('/locale/{locale}', LocaleController::class)->name('locale.switch');
 
-Route::get('/events', [EventsController::class, 'index'])->name('events.index');
-Route::get('/events/{event:slug}', [EventsController::class, 'show'])->name('events.show');
+// Socialite OAuth Routes
+Route::get('/oauth/{provider}/redirect', [SocialiteController::class, 'redirect'])
+    ->name('socialite.redirect')
+    ->whereIn('provider', ['google']);
+Route::get('/oauth/{provider}/callback', [SocialiteController::class, 'callback'])
+    ->name('socialite.callback')
+    ->whereIn('provider', ['google']);
 
-Route::get('/institutions', [InstitutionsController::class, 'index'])->name('institutions.index');
-Route::get('/institutions/{institution:slug}', [InstitutionsController::class, 'show'])->name('institutions.show');
+// Authentication is handled by Fortify
 
-Route::get('/speakers', [SpeakersController::class, 'index'])->name('speakers.index');
-Route::get('/speakers/{speaker:slug}', [SpeakersController::class, 'show'])->name('speakers.show');
+// Events (with search rate limiting)
+Route::livewire('/events', 'pages.events.index')
+    ->middleware('throttle:search')
+    ->name('events.index');
+Route::livewire('/events/{event:slug}', 'pages.events.show')->name('events.show');
+Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar'])->name('events.calendar');
 
-Route::get('/series/{series:slug}', [SeriesController::class, 'show'])->name('series.show');
+// Event Submission (Public) - Rate limited to prevent spam
+Route::livewire('/submit-event', 'pages.submit-event.create')->name('submit-event.create');
+Route::post('/submit-event', [EventSubmissionController::class, 'store'])
+    ->middleware('throttle:event-submission')
+    ->name('submit-event.store');
+Route::livewire('/submit-event/success', 'pages.submit-event.success')->name('submit-event.success');
+
+// Event Registration - Rate limited
+Route::post('/events/{event:slug}/register', [EventsController::class, 'register'])
+    ->middleware('throttle:registration')
+    ->name('events.register');
+
+// Institutions (with search rate limiting)
+Route::livewire('/institutions', 'pages.institutions.index')
+    ->middleware('throttle:search')
+    ->name('institutions.index');
+Route::livewire('/institutions/{institution:slug}', 'pages.institutions.show')->name('institutions.show');
+
+// Speakers (with search rate limiting)
+Route::livewire('/speakers', 'pages.speakers.index')
+    ->middleware('throttle:search')
+    ->name('speakers.index');
+Route::livewire('/speakers/{speaker:slug}', 'pages.speakers.show')->name('speakers.show');
+
+// Series
+Route::livewire('/series/{series:slug}', 'pages.series.show')->name('series.show');
+
+// Sitemap
+Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap.index');
+Route::get('/sitemap-events.xml', [\App\Http\Controllers\SitemapController::class, 'events'])->name('sitemap.events');
+Route::get('/sitemap-institutions.xml', [\App\Http\Controllers\SitemapController::class, 'institutions'])->name('sitemap.institutions');
+Route::get('/sitemap-speakers.xml', [\App\Http\Controllers\SitemapController::class, 'speakers'])->name('sitemap.speakers');

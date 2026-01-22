@@ -15,8 +15,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->primary(['event_id', 'speaker_id']);
-            $table->foreign('event_id')->references('id')->on('events')->cascadeOnDelete();
-            $table->foreign('speaker_id')->references('id')->on('speakers')->cascadeOnDelete();
+
             $table->index(['speaker_id', 'event_id']);
         });
     }

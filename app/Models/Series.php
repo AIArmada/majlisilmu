@@ -22,18 +22,24 @@ class Series extends Model
      */
     protected $fillable = [
         'institution_id',
+        'speaker_id',
         'venue_id',
         'title',
         'slug',
         'description',
         'visibility',
-        'default_language',
-        'default_audience',
+        'language',
+        'audience',
     ];
 
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
+    }
+
+    public function speaker(): BelongsTo
+    {
+        return $this->belongsTo(Speaker::class);
     }
 
     public function venue(): BelongsTo

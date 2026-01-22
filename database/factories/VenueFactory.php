@@ -36,17 +36,16 @@ class VenueFactory extends Factory
         return [
             'institution_id' => Institution::factory(),
             'name' => $name,
+            'type' => fake()->randomElement([
+                'main_hall',
+                'seminar_room',
+                'classroom',
+                'auditorium',
+                'field',
+                'foyer',
+                'other',
+            ]),
             'slug' => $slug,
-            'state_id' => null,
-            'district_id' => null,
-            'address_line1' => fake()->streetAddress(),
-            'address_line2' => fake()->optional()->secondaryAddress(),
-            'postcode' => fake()->postcode(),
-            'city' => fake()->city(),
-            'lat' => fake()->optional()->randomFloat(7, 1.0, 7.0),
-            'lng' => fake()->optional()->randomFloat(7, 99.0, 119.0),
-            'google_maps_place_id' => fake()->optional()->numerify('ChI###########'),
-            'waze_place_url' => fake()->optional()->url(),
             'facilities' => [
                 'parking' => fake()->boolean(),
                 'oku' => fake()->boolean(),
@@ -54,5 +53,20 @@ class VenueFactory extends Factory
                 'ablution_area' => fake()->boolean(),
             ],
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (\App\Models\Venue $venue) {
+            $venue->address()->create([
+                'address1' => fake()->streetAddress(),
+                'address2' => fake()->optional()->secondaryAddress(),
+                'postcode' => fake()->postcode(),
+                'lat' => fake()->randomFloat(7, 1.0, 7.0),
+                'lng' => fake()->randomFloat(7, 99.0, 119.0),
+                'google_place_id' => fake()->optional()->numerify('ChI###########'),
+                'waze_url' => fake()->optional()->url(),
+            ]);
+        });
     }
 }

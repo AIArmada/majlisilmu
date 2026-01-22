@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Topics\Schemas;
 
+use App\Models\Topic;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -16,6 +17,17 @@ class TopicForm
             ->components([
                 Section::make('Topic')
                     ->components([
+                        Select::make('parent_id')
+                            ->label('Parent Topic')
+                            ->relationship(
+                                name: 'parent',
+                                titleAttribute: 'name',
+                            )
+                            ->getOptionLabelFromRecordUsing(fn (Topic $record) => $record->getFullPath())
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('None (Root Topic)')
+                            ->helperText('Leave empty to create a root-level topic.'),
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
@@ -23,20 +35,14 @@ class TopicForm
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
-                        Select::make('category')
-                            ->options([
-                                'aqidah' => 'Aqidah',
-                                'fiqh' => 'Fiqh',
-                                'sirah' => 'Sirah',
-                                'akhlak' => 'Akhlak',
-                                'quran' => 'Quran',
-                                'hadith' => 'Hadith',
-                                'tarbiah' => 'Tarbiah',
-                                'family' => 'Family',
-                            ])
-                            ->required(),
+                        TextInput::make('sort_order')
+                            ->label('Sort Order')
+                            ->numeric()
+                            ->default(0)
+                            ->helperText('Lower numbers appear first within the same parent.'),
                         Toggle::make('is_official')
-                            ->label('Official topic'),
+                            ->label('Official topic')
+                            ->helperText('Official topics are curated by the platform.'),
                     ])
                     ->columns(2),
             ]);

@@ -40,7 +40,7 @@ class ReportsTable
                         'event' => 'Event',
                         'institution' => 'Institution',
                         'speaker' => 'Speaker',
-                        'donation_account' => 'Donation Account',
+                        'donation' => 'Donation',
                     ]),
                 SelectFilter::make('category')
                     ->options([

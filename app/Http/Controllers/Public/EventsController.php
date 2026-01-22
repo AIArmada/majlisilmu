@@ -4,23 +4,106 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use Illuminate\Contracts\View\View;
+use App\Models\Registration;
+use App\Services\CalendarService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class EventsController extends Controller
 {
-    public function index(): View
-    {
-        return view('pages.events.index');
-    }
+    public function __construct(
+        protected CalendarService $calendarService
+    ) {}
 
-    public function show(Event $event): View
+    /**
+     * Download ICS calendar file for an event.
+     */
+    public function calendar(Event $event): Response
     {
-        if ($event->status !== 'approved' || $event->visibility !== 'public' || $event->published_at === null) {
+        if ($event->status !== 'approved' || $event->visibility !== 'public') {
             abort(404);
         }
 
-        return view('pages.events.show', [
-            'event' => $event,
+        $icsContent = $this->calendarService->generateIcs($event);
+        $filename = \Illuminate\Support\Str::slug($event->title).'.ics';
+
+        return response($icsContent)
+            ->header('Content-Type', 'text/calendar; charset=utf-8')
+            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+    }
+
+    public function register(Request $request, Event $event): RedirectResponse
+    {
+        // Validate event is eligible for registration (per B4b)
+        if ($event->status !== 'approved') {
+            return back()->withErrors(['registration' => 'This event is not available for registration.']);
+        }
+
+        if ($event->status === 'cancelled' || $event->status === 'rejected') {
+            return back()->withErrors(['registration' => 'This event has been cancelled.']);
+        }
+
+        if (! $event->registration_required) {
+            return back()->withErrors(['registration' => 'This event does not require registration.']);
+        }
+
+        // Check registration window
+        if ($event->registration_opens_at && $event->registration_opens_at->isFuture()) {
+            return back()->withErrors(['registration' => 'Registration has not opened yet.']);
+        }
+
+        if ($event->registration_closes_at && $event->registration_closes_at->isPast()) {
+            return back()->withErrors(['registration' => 'Registration has closed.']);
+        }
+
+        // Check capacity
+        if ($event->capacity && $event->registrations_count >= $event->capacity) {
+            return back()->withErrors(['registration' => 'This event is full.']);
+        }
+
+        // Validate request
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
         ]);
+
+        // Require at least email or phone for guest
+        if (! auth()->check() && empty($validated['email']) && empty($validated['phone'])) {
+            return back()->withErrors(['contact' => 'Please provide either email or phone number.']);
+        }
+
+        // Check for duplicate registration
+        $existingRegistration = Registration::where('event_id', $event->id)
+            ->where(function ($query) use ($validated) {
+                if (! empty($validated['email'])) {
+                    $query->where('email', $validated['email']);
+                }
+                if (! empty($validated['phone'])) {
+                    $query->orWhere('phone', $validated['phone']);
+                }
+            })
+            ->where('status', '!=', 'cancelled')
+            ->first();
+
+        if ($existingRegistration) {
+            return back()->withErrors(['registration' => 'You are already registered for this event.']);
+        }
+
+        // Create registration
+        $registration = Registration::create([
+            'event_id' => $event->id,
+            'user_id' => auth()->id(),
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'status' => 'registered',
+        ]);
+
+        // Increment registrations count
+        $event->increment('registrations_count');
+
+        return back()->with('success', 'You have been registered for this event!');
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\Tables;
 
+use App\Enums\TimingMode;
+use App\Models\Event;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -24,12 +26,28 @@ class EventsTable
                     ->searchable(),
                 TextColumn::make('starts_at')
                     ->dateTime()
+                    ->description(fn (Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'draft' => 'gray',
+                        'pending' => 'warning',
+                        'approved' => 'success',
+                        'rejected' => 'danger',
+                        'cancelled' => 'danger',
+                        'postponed' => 'info',
+                        default => 'gray',
+                    })
                     ->sortable(),
                 TextColumn::make('visibility')
                     ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'public' => 'success',
+                        'unlisted' => 'warning',
+                        'private' => 'danger',
+                        default => 'gray',
+                    })
                     ->sortable(),
                 IconColumn::make('registration_required')
                     ->boolean()
@@ -56,8 +74,6 @@ class EventsTable
                     ]),
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),
-                SelectFilter::make('state')
-                    ->relationship('state', 'name'),
             ])
             ->recordActions([
                 EditAction::make(),

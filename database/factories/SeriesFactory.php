@@ -20,13 +20,23 @@ class SeriesFactory extends Factory
     public function definition(): array
     {
         $topics = [
-            'Tafsir Al-Fatihah', 'Tafsir Al-Kahfi', 'Fiqh Solat', 'Fiqh Muamalat',
-            'Sirah Nabawiyyah', 'Hadis Arba\'in', 'Akhlak & Adab', 'Tazkiyah An-Nafs',
-            'Keluarga Sakinah', 'Tarbiah Remaja',
+            'Tafsir Al-Fatihah',
+            'Tafsir Al-Kahfi',
+            'Fiqh Solat',
+            'Fiqh Muamalat',
+            'Sirah Nabawiyyah',
+            'Hadis Arba\'in',
+            'Akhlak & Adab',
+            'Tazkiyah An-Nafs',
+            'Keluarga Sakinah',
+            'Tarbiah Remaja',
         ];
         $books = [
-            'Riyadus Salihin', 'Bulughul Maram', 'Al-Arba\'in An-Nawawiyyah',
-            'Tafsir Ibnu Kathir', 'Fiqh Manhaji',
+            'Riyadus Salihin',
+            'Bulughul Maram',
+            'Al-Arba\'in An-Nawawiyyah',
+            'Tafsir Ibnu Kathir',
+            'Fiqh Manhaji',
         ];
 
         $topic = fake()->randomElement($topics);
@@ -43,12 +53,13 @@ class SeriesFactory extends Factory
         return [
             'institution_id' => Institution::factory(),
             'venue_id' => fake()->boolean(60) ? Venue::factory() : null,
+            'speaker_id' => null, // Default to null, can be overridden
             'title' => $title,
             'slug' => Str::slug($title.'-'.fake()->unique()->numerify('###')),
             'description' => fake()->optional()->paragraph(),
             'visibility' => fake()->randomElement(['public', 'unlisted', 'private']),
-            'default_language' => fake()->randomElement(['Bahasa Melayu', 'English', 'Mandarin', 'Tamil', 'Javanese', 'Arabic']),
-            'default_audience' => fake()->randomElement(['Umum', 'Belia', 'Muslimah', 'Keluarga', 'Pelajar IPT', 'Profesional']),
+            'language' => fake()->randomElement(['Bahasa Melayu', 'English', 'Mandarin', 'Tamil', 'Javanese', 'Arabic']),
+            'audience' => fake()->randomElement(['Umum', 'Belia', 'Muslimah', 'Keluarga', 'Pelajar IPT', 'Profesional']),
         ];
     }
 }

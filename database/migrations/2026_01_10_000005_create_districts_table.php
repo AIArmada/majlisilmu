@@ -10,12 +10,11 @@ return new class extends Migration
     {
         Schema::create('districts', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedSmallInteger('state_id');
+            $table->unsignedInteger('state_id');
             $table->string('name');
             $table->string('slug');
             $table->timestamps();
 
-            $table->foreign('state_id')->references('id')->on('states')->cascadeOnDelete();
             $table->unique(['state_id', 'slug']);
             $table->index(['state_id', 'name']);
         });

@@ -9,17 +9,17 @@ use App\Filament\Resources\Topics\Schemas\TopicForm;
 use App\Filament\Resources\Topics\Tables\TopicsTable;
 use App\Models\Topic;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class TopicResource extends Resource
 {
     protected static ?string $model = Topic::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
 
     protected static ?string $recordTitleAttribute = 'name';
 

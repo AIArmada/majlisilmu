@@ -2,17 +2,17 @@
     "agents": [
         "codex",
         "copilot",
-        "gemini",
-        "opencode",
-        "phpstorm"
+        "opencode"
     ],
     "editors": [
         "codex",
-        "gemini",
         "opencode",
-        "phpstorm",
         "vscode"
     ],
-    "guidelines": [],
+    "guidelines": [
+        "filament/filament",
+        "laravel/fortify",
+        "filament/blueprint"
+    ],
     "herd_mcp": true
 }

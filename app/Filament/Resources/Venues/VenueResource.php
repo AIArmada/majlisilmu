@@ -9,17 +9,17 @@ use App\Filament\Resources\Venues\Schemas\VenueForm;
 use App\Filament\Resources\Venues\Tables\VenuesTable;
 use App\Models\Venue;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class VenueResource extends Resource
 {
     protected static ?string $model = Venue::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMapPin;
 
     protected static ?string $recordTitleAttribute = 'name';
 
