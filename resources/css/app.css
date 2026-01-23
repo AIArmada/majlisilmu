@@ -99,7 +99,7 @@
     }
 
     .bg-pattern-islamic {
-        background-image: url('/images/pattern-bg.png');
+        background-image: url('../images/pattern-bg.png');
         background-repeat: repeat;
         background-size: 300px;
     }

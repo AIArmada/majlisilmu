@@ -11,37 +11,15 @@ use Livewire\Component;
 
 new class extends Component
 {
-    private array $queryTimings = [];
-
     public function mount(): void
     {
-        DB::listen(function ($query): void {
-            $this->queryTimings[] = [
-                'sql' => $query->sql,
-                'bindings' => $query->bindings,
-                'time_ms' => $query->time,
-            ];
-        });
-
-        app()->terminating(function (): void {
-            if ($this->queryTimings === []) {
-                return;
-            }
-
-            $totalMs = array_sum(array_column($this->queryTimings, 'time_ms'));
-
-            Log::info('Events page query timings', [
-                'count' => count($this->queryTimings),
-                'total_ms' => $totalMs,
-                'queries' => $this->queryTimings,
-            ]);
-        });
+        //
     }
 
     #[Computed]
     public function states(): Collection
     {
-        return State::query()->orderBy('name')->get();
+        return cache()->remember('states_all', 3600, fn() => State::query()->orderBy('name')->get());
     }
 
     #[Computed]
@@ -112,7 +90,6 @@ new class extends Component
 
 @section('content')
     @php
-        $events = $this->events;
         $states = $this->states;
     @endphp
 
@@ -128,7 +105,14 @@ new class extends Component
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    {{ $events->total() }} Upcoming Gatherings
+                    @island(name: 'count', lazy: true)
+                        @placeholder
+                            <span class="inline-flex items-center gap-1.5 animate-pulse">
+                                <span class="h-4 w-8 bg-slate-200 rounded"></span> {{ __('Gatherings') }}
+                            </span>
+                        @endplaceholder
+                        {{ $this->events->total() }} {{ __('Upcoming Gatherings') }}
+                    @endisland
                 </span>
                 
                 <h1 class="font-heading text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight text-balance mb-6">
@@ -318,105 +302,119 @@ new class extends Component
 
             <!-- Results Grid -->
             <div class="mt-16">
-                 @if($events->isEmpty())
-                    <div class="flex flex-col items-center justify-center py-24 text-center">
-                        <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                            <svg class="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                 @island(name: 'grid', lazy: true)
+                    @placeholder
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            @foreach(range(1, 6) as $i)
+                                <div class="h-[450px] bg-slate-100 animate-pulse rounded-3xl"></div>
+                            @endforeach
                         </div>
-                        <h3 class="font-heading text-xl font-bold text-slate-900 mb-2">{{ __('No events found') }}</h3>
-                        <p class="text-slate-500 max-w-md">{{ __('Try adjusting your search terms or filters to find what you\'re looking for.') }}</p>
-                        <button type="button" @click="window.location.href='{{ route('events.index') }}'" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
-                            {{ __('View all events') }} &rarr;
-                        </button>
-                    </div>
-                @else
-                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        @foreach($events as $event)
-                            <article class="group h-full flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 border border-slate-100">
-                                <!-- Image/Date -->
-                                <a href="{{ route('events.show', $event) }}" wire:navigate class="relative aspect-[3/2] overflow-hidden bg-slate-100 block">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70"></div>
-                                    <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-300 group-hover:scale-105 transition-transform duration-700">
-                                        <!-- Placeholder Pattern -->
-                                        <svg class="w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                            <pattern id="grid-{{ $event->id }}" width="20" height="20" patternUnits="userSpaceOnUse">
-                                                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" stroke-width="1"/>
-                                            </pattern>
-                                            <rect width="100%" height="100%" fill="url(#grid-{{ $event->id }})" />
-                                        </svg>
-                                        <svg class="absolute w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                    </div>
-                                    
-                                    <!-- Badges -->
-                                    <div class="absolute top-4 left-4 z-20 flex flex-col gap-2">
-                                        <div class="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 text-center shadow-sm border border-black/5 min-w-[3.5rem]">
-                                            <div class="text-[0.6rem] font-bold uppercase tracking-wider text-slate-500">{{ $event->starts_at?->format('M') }}</div>
-                                            <div class="text-xl font-bold font-heading text-slate-900 leading-none">{{ $event->starts_at?->format('d') }}</div>
-                                        </div>
-                                    </div>
-                                    
-                                    @if(isset($event->distance_km))
-                                        <div class="absolute top-4 right-4 z-20">
-                                            <span class="inline-flex items-center gap-1 bg-emerald-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-xs font-semibold shadow-lg">
-                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
-                                                {{ number_format($event->distance_km, 1) }} km
-                                            </span>
-                                        </div>
-                                    @endif
-                                    
-                                    <!-- Category Pill -->
-                                    <div class="absolute bottom-4 left-4 z-20">
-                                        <span class="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-white/30 transition-colors">
-                                           {{ ucfirst($event->genre ?? 'General') }}
-                                        </span>
-                                    </div>
-                                </a>
+                    @endplaceholder
 
-                                <div class="flex-1 p-6 flex flex-col">
-                                    <div class="flex justify-between items-start mb-3 gap-4">
-                                        <a href="{{ route('events.show', $event) }}" wire:navigate class="group-hover:text-emerald-700 transition-colors">
-                                            <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
-                                                {{ $event->title }}
-                                            </h3>
-                                        </a>
-                                    </div>
+                    @php
+                        $events = $this->events;
+                    @endphp
 
-                                    <div class="space-y-3 mb-6">
-                                        <div class="flex items-start gap-2.5 text-sm text-slate-600">
-                                            <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                            <span class="line-clamp-1">{{ $event->venue?->name ?? ($event->institution?->name ?? __('Online')) }}</span>
+                    @if($events->isEmpty())
+                        <div class="flex flex-col items-center justify-center py-24 text-center">
+                            <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                                <svg class="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <h3 class="font-heading text-xl font-bold text-slate-900 mb-2">{{ __('No events found') }}</h3>
+                            <p class="text-slate-500 max-w-md">{{ __('Try adjusting your search terms or filters to find what you\'re looking for.') }}</p>
+                            <button type="button" @click="window.location.href='{{ route('events.index') }}'" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
+                                {{ __('View all events') }} &rarr;
+                            </button>
+                        </div>
+                    @else
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            @foreach($events as $event)
+                                <article class="group h-full flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 border border-slate-100">
+                                    <!-- Image/Date -->
+                                    <a href="{{ route('events.show', $event) }}" wire:navigate class="relative aspect-[3/2] overflow-hidden bg-slate-100 block">
+                                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70"></div>
+                                        <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-300 group-hover:scale-105 transition-transform duration-700">
+                                            <!-- Placeholder Pattern -->
+                                            <svg class="w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                                <pattern id="grid-{{ $event->id }}" width="20" height="20" patternUnits="userSpaceOnUse">
+                                                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" stroke-width="1"/>
+                                                </pattern>
+                                                <rect width="100%" height="100%" fill="url(#grid-{{ $event->id }})" />
+                                            </svg>
+                                            <svg class="absolute w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
                                         </div>
-                                        <div class="flex items-center gap-2.5 text-sm text-slate-600">
-                                            <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                             {{ $event->starts_at?->format('h:i A') }}
+                                        
+                                        <!-- Badges -->
+                                        <div class="absolute top-4 left-4 z-20 flex flex-col gap-2">
+                                            <div class="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 text-center shadow-sm border border-black/5 min-w-[3.5rem]">
+                                                <div class="text-[0.6rem] font-bold uppercase tracking-wider text-slate-500">{{ $event->starts_at?->format('M') }}</div>
+                                                <div class="text-xl font-bold font-heading text-slate-900 leading-none">{{ $event->starts_at?->format('d') }}</div>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
-                                         @if($event->language) 
-                                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">{{ $event->language }}</span>
-                                        @else
-                                            <span></span>
+                                        
+                                        @if(isset($event->distance_km))
+                                            <div class="absolute top-4 right-4 z-20">
+                                                <span class="inline-flex items-center gap-1 bg-emerald-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-xs font-semibold shadow-lg">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                                                    {{ number_format($event->distance_km, 1) }} km
+                                                </span>
+                                            </div>
                                         @endif
                                         
-                                        <a href="{{ route('events.show', $event) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">
-                                            {{ __('Join') }}
-                                            <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                                        </a>
+                                        <!-- Category Pill -->
+                                        <div class="absolute bottom-4 left-4 z-20">
+                                            <span class="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-white/30 transition-colors">
+                                               {{ ucfirst($event->genre ?? 'General') }}
+                                            </span>
+                                        </div>
+                                    </a>
+
+                                    <div class="flex-1 p-6 flex flex-col">
+                                        <div class="flex justify-between items-start mb-3 gap-4">
+                                            <a href="{{ route('events.show', $event) }}" wire:navigate class="group-hover:text-emerald-700 transition-colors">
+                                                <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
+                                                    {{ $event->title }}
+                                                </h3>
+                                            </a>
+                                        </div>
+
+                                        <div class="space-y-3 mb-6">
+                                            <div class="flex items-start gap-2.5 text-sm text-slate-600">
+                                                <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                <span class="line-clamp-1">{{ $event->venue?->name ?? ($event->institution?->name ?? __('Online')) }}</span>
+                                            </div>
+                                            <div class="flex items-center gap-2.5 text-sm text-slate-600">
+                                                <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                 {{ $event->starts_at?->format('h:i A') }}
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
+                                             @if($event->language) 
+                                                <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">{{ $event->language }}</span>
+                                            @else
+                                                <span></span>
+                                            @endif
+                                            
+                                            <a href="{{ route('events.show', $event) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">
+                                                {{ __('Join') }}
+                                                <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                            </a>
+                                        </div>
                                     </div>
-                                </div>
-                            </article>
-                        @endforeach
-                    </div>
-                    
-                    <div class="mt-16">
-                        {{ $events->withQueryString()->links() }}
-                    </div>
-                @endif
+                                </article>
+                            @endforeach
+                        </div>
+                        
+                        <div class="mt-16">
+                            {{ $events->withQueryString()->links() }}
+                        </div>
+                    @endif
+                 @endisland
             </div>
         </div>
     </div>

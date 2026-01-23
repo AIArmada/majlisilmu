@@ -79,7 +79,7 @@ class MasjidSeeder extends Seeder
             if ($daerah && $state->districts) {
                 $district = collect($state->districts)->first(function ($d) use ($daerah) {
                     return Str::contains(strtolower($d->name), strtolower($daerah)) ||
-                        Str::contains(strtolower($daerah), strtolower($d->name));
+                           Str::contains(strtolower($daerah), strtolower($d->name));
                 });
             }
 
@@ -151,10 +151,6 @@ class MasjidSeeder extends Seeder
 
             $count++;
 
-            if ($count >= 50) {
-                break;
-            }
-
             if ($count % 100 === 0) {
                 $this->command->info("Seeded {$count} mosques...");
             }
@@ -190,9 +186,9 @@ class MasjidSeeder extends Seeder
             $negeriLower = strtolower($negeri);
 
             return Str::contains($stateLower, $searchLower) ||
-                Str::contains($searchLower, $stateLower) ||
-                Str::contains($stateLower, $negeriLower) ||
-                Str::contains($negeriLower, $stateLower);
+                   Str::contains($searchLower, $stateLower) ||
+                   Str::contains($stateLower, $negeriLower) ||
+                   Str::contains($negeriLower, $stateLower);
         });
     }
 

@@ -13,11 +13,7 @@ new class extends Component
 
     public bool $isInterested = false;
 
-    public bool $isGoing = false;
-
     public int $interestsCount = 0;
-
-    public int $goingCount = 0;
 
     public function mount(Event $event): void
     {
@@ -109,56 +105,15 @@ new class extends Component
         $this->isInterested = true;
     }
 
-    public function toggleGoing(): void
-    {
-        $user = auth()->user();
-
-        if (! $user) {
-            $this->redirectRoute('login');
-            return;
-        }
-
-        if ($this->event->status !== 'approved' || $this->event->visibility !== 'public' || $this->event->published_at === null) {
-            abort(403);
-        }
-
-        if ($this->event->starts_at && $this->event->starts_at->isPast()) {
-            abort(403);
-        }
-
-        if ($this->isGoing) {
-            $detached = $user->goingEvents()->detach($this->event->id);
-
-            if ($detached) {
-                $this->event->decrement('going_count');
-                $this->goingCount = max(0, $this->goingCount - 1);
-            }
-
-            $this->isGoing = false;
-            return;
-        }
-
-        $changes = $user->goingEvents()->syncWithoutDetaching([$this->event->id]);
-
-        if (! empty($changes['attached'])) {
-            $this->event->increment('going_count');
-            $this->goingCount++;
-        }
-
-        $this->isGoing = true;
-    }
-
     protected function syncEngagementStates(): void
     {
         $this->interestsCount = max(0, (int) ($this->event->interests_count ?? 0));
-        $this->goingCount = max(0, (int) ($this->event->going_count ?? 0));
 
         $user = auth()->user();
 
         if (! $user) {
             $this->isSaved = false;
             $this->isInterested = false;
-            $this->isGoing = false;
             return;
         }
 
@@ -167,10 +122,6 @@ new class extends Component
             ->exists();
 
         $this->isInterested = $user->interestedEvents()
-            ->where('event_id', $this->event->id)
-            ->exists();
-
-        $this->isGoing = $user->goingEvents()
             ->where('event_id', $this->event->id)
             ->exists();
     }
@@ -200,9 +151,7 @@ new class extends Component
         $calendarLinks = $this->calendarLinks;
         $isSaved = $this->isSaved;
         $isInterested = $this->isInterested;
-        $isGoing = $this->isGoing;
         $interestsCount = $this->interestsCount;
-        $goingCount = $this->goingCount;
         $shareData = [
             'title' => $event->title,
             'text' => Str::limit(strip_tags($event->description), 100),
@@ -705,44 +654,6 @@ new class extends Component
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     {{ __('Log Masuk untuk Berminat') }}
-                                </a>
-                            @endauth
-                        </div>
-                    @endif
-
-                    <!-- Going Section -->
-                    @if(!$eventIsPast)
-                        <div class="mt-6 pt-6 border-t border-slate-100">
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-sm font-semibold text-slate-700">{{ __('Akan Hadir?') }}</h3>
-                                <div class="flex items-center gap-1.5 text-sm text-slate-500">
-                                    <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                                    </svg>
-                                    <span>{{ $goingCount }}</span>
-                                    <span>{{ __('akan hadir') }}</span>
-                                </div>
-                            </div>
-                            @auth
-                                <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
-                                    wire:loading.class="opacity-70" wire:target="toggleGoing"
-                                    class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all group
-                                    {{ $isGoing 
-                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-inner' 
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-500 hover:text-emerald-600' }}">
-                                    <svg class="w-5 h-5 transition-transform group-hover:scale-110 {{ $isGoing ? 'text-emerald-500' : '' }}" 
-                                        fill="{{ $isGoing ? 'currentColor' : 'none' }}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    <span>{{ $isGoing ? __('Anda Akan Hadir') : __('Saya Akan Hadir') }}</span>
-                                </button>
-                            @else
-                                <a href="{{ route('login') }}"
-                                    class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:border-emerald-500 hover:text-emerald-600 transition-all group">
-                                    <svg class="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    {{ __('Log Masuk untuk Hadir') }}
                                 </a>
                             @endauth
                         </div>
