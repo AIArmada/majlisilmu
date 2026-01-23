@@ -160,7 +160,7 @@ class SpeakerFactory extends Factory
 
         return [
             'name' => $name,
-            'slug' => Str::slug($name.'-'.fake()->unique()->numerify('###')),
+            'slug' => Str::slug($name.'-'.Str::random(8)),
             'bio' => fake()->optional()->paragraph(),
             'avatar_url' => null,
             'status' => fake()->randomElement(['unverified', 'pending', 'verified']),

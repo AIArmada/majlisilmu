@@ -147,6 +147,16 @@ class VenueForm
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
+                Section::make('Gallery')
+                    ->components([
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                            ->collection('gallery')
+                            ->multiple()
+                            ->image()
+                            ->imageEditor()
+                            ->reorderable()
+                            ->columnSpanFull(),
+                    ]),
                 Section::make('Social Media')
                     ->components([
                         \Filament\Forms\Components\Repeater::make('socialMedia')

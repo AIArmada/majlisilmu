@@ -28,6 +28,7 @@ class EventSeeder extends Seeder
 
         $institutions = Institution::query()
             ->with(['venues.address', 'address', 'donations', 'series'])
+            ->limit(50)
             ->get();
         $speakers = Speaker::query()->get();
         $topics = Topic::query()->get();

@@ -39,42 +39,6 @@ class InstitutionSeeder extends Seeder
                 'lng' => 101.6841203,
             ],
             [
-                'name' => 'Masjid Putra',
-                'type' => 'masjid',
-                'address1' => 'Presint 1',
-                'city' => 'Putrajaya',
-                'state_name' => 'Putrajaya',
-                'lat' => 2.9360156,
-                'lng' => 101.6891044,
-            ],
-            [
-                'name' => 'Masjid Negeri Shah Alam',
-                'type' => 'masjid',
-                'address1' => 'Seksyen 14',
-                'city' => 'Shah Alam',
-                'state_name' => 'Selangor',
-                'lat' => 3.078864,
-                'lng' => 101.5186083,
-            ],
-            [
-                'name' => 'Masjid Al-Hasanah',
-                'type' => 'masjid',
-                'address1' => 'Bandar Baru Bangi',
-                'city' => 'Bangi',
-                'state_name' => 'Selangor',
-                'lat' => 2.9592534,
-                'lng' => 101.7588031,
-            ],
-            [
-                'name' => 'Masjid Bandar Tun Hussein Onn',
-                'type' => 'masjid',
-                'address1' => 'Cheras',
-                'city' => 'Cheras',
-                'state_name' => 'Selangor',
-                'lat' => 3.0378953,
-                'lng' => 101.7602058,
-            ],
-            [
                 'name' => 'Pusat Islam Petaling Jaya',
                 'type' => 'educational_center',
                 'address1' => 'Jalan Gasing',
@@ -100,7 +64,9 @@ class InstitutionSeeder extends Seeder
 
         $malaysia = $countries->where('iso2', 'MY')->first() ?? $countries->first();
 
-        // 1. Seed Real Institutions
+        $this->command->info('Seeding featured institutions with coordinates...');
+
+        // 1. Seed Real Institutions with coordinates (skip mosques that are already in CSV)
         foreach ($realInstitutions as $data) {
             $stateMatch = $states->filter(function ($s) use ($data) {
                 return Str::contains(strtolower($s->name), strtolower($data['state_name']));
@@ -143,26 +109,37 @@ class InstitutionSeeder extends Seeder
                 'lng' => $data['lng'] ?? null,
             ]);
 
-            $inst->ensureAuthzScope();
-            $this->seedInstitutionRoles($inst);
+            // Skip authorization for speed
+            // $inst->ensureAuthzScope();
+            // $this->seedInstitutionRoles($inst);
 
             // Attach random owner
-            if ($users->isNotEmpty()) {
-                $owner = $users->random();
-
-                $inst->members()->syncWithoutDetaching([$owner->id]);
-                $this->syncMemberRoles($inst, $owner, ['owner']);
-            }
+            // if ($users->isNotEmpty()) {
+            //     $owner = $users->random();
+            //     $inst->members()->syncWithoutDetaching([$owner->id]);
+            //     $this->syncMemberRoles($inst, $owner, ['owner']);
+            // }
         }
 
-        // 2. Seed Fake Institutions (if we need more filler)
-        // We only create if total count is low, or just add some random ones regardless.
-        // Let's ensure we have at least 20 institutions.
-        $currentCount = Institution::query()->count();
-        if ($currentCount < 20) {
-            $institutions = Institution::factory()->count(20 - $currentCount)->create();
+        $this->command->info('Completed seeding featured institutions.');
 
-            $institutions->each(function (Institution $institution, int $index) use ($malaysia, $states, $users): void {
+        // 2. Seed Additional Fake Institutions (surau, educational centers, etc.)
+        // Add variety to complement the real mosque data
+        $additionalTypes = [
+            'surau' => 30,
+            'educational_center' => 15,
+            'community_center' => 10,
+        ];
+
+        $this->command->info('Seeding additional institutions...');
+
+        foreach ($additionalTypes as $type => $count) {
+            $institutions = Institution::factory()->count($count)->create([
+                'type' => $type,
+                'status' => 'verified',
+            ]);
+
+            $institutions->each(function (Institution $institution, int $index) use ($malaysia, $states): void {
                 if ($states->isNotEmpty()) {
                     $state = $states->random();
                     $district = collect($state->districts)->isNotEmpty() ? collect($state->districts)->random() : null;
@@ -176,20 +153,19 @@ class InstitutionSeeder extends Seeder
                     ]);
                 }
 
-                $status = $index < 2 ? 'verified' : 'unverified';
+                // Skip authorization setup for speed - will be set up on first access
+                // $institution->ensureAuthzScope();
+                // $this->seedInstitutionRoles($institution);
 
-                $institution->forceFill(['status' => $status])->save();
-
-                $institution->ensureAuthzScope();
-                $this->seedInstitutionRoles($institution);
-
-                if ($users->isNotEmpty()) {
-                    $owner = $users->random();
-                    $institution->members()->syncWithoutDetaching([$owner->id]);
-                    $this->syncMemberRoles($institution, $owner, ['owner']);
-                }
+                // if ($users->isNotEmpty()) {
+                //     $owner = $users->random();
+                //     $institution->members()->syncWithoutDetaching([$owner->id]);
+                //     $this->syncMemberRoles($institution, $owner, ['owner']);
+                // }
             });
         }
+
+        $this->command->info('Completed seeding additional institutions.');
     }
 
     /**

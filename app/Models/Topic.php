@@ -10,11 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 
 class Topic extends Model
 {
     /** @use HasFactory<\Database\Factories\TopicFactory> */
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -59,6 +60,11 @@ class Topic extends Model
             ->withPivot('sort_order')
             ->withTimestamps()
             ->orderByPivot('sort_order');
+    }
+
+    public function references(): BelongsToMany
+    {
+        return $this->belongsToMany(Reference::class, 'reference_topic');
     }
 
     // ─────────────────────────────────────────────────────────────

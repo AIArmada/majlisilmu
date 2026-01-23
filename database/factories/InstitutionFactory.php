@@ -102,7 +102,7 @@ class InstitutionFactory extends Factory
         return [
             'type' => $type,
             'name' => $name,
-            'slug' => Str::slug($name.'-'.fake()->unique()->numerify('###')),
+            'slug' => Str::slug($name.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraph(),
             'status' => fake()->randomElement(['unverified', 'pending', 'verified']),
         ];

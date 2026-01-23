@@ -113,6 +113,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->belongsToMany(Event::class, 'event_interests')->withTimestamps();
     }
 
+    public function goingEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(Event::class, 'event_attendees')->withTimestamps();
+    }
+
     public function ownedEvents(): HasMany
     {
         return $this->hasMany(Event::class);

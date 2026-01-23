@@ -55,7 +55,7 @@ class SeriesFactory extends Factory
             'venue_id' => fake()->boolean(60) ? Venue::factory() : null,
             'speaker_id' => null, // Default to null, can be overridden
             'title' => $title,
-            'slug' => Str::slug($title.'-'.fake()->unique()->numerify('###')),
+            'slug' => Str::slug($title.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraph(),
             'visibility' => fake()->randomElement(['public', 'unlisted', 'private']),
             'language' => fake()->randomElement(['Bahasa Melayu', 'English', 'Mandarin', 'Tamil', 'Javanese', 'Arabic']),

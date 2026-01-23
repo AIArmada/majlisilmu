@@ -97,7 +97,7 @@ class EventFactory extends Factory
             'speaker_id' => null,
             'series_id' => fake()->boolean(25) ? Series::factory() : null,
             'title' => $title,
-            'slug' => Str::slug($title.'-'.fake()->unique()->numerify('###')),
+            'slug' => Str::slug($title.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraphs(2, true),
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,

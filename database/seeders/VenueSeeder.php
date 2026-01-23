@@ -17,7 +17,10 @@ class VenueSeeder extends Seeder
             return;
         }
 
-        $institutions = Institution::query()->with('address')->get();
+        $institutions = Institution::query()
+            ->with('address')
+            ->limit(50)
+            ->get();
 
         if ($institutions->isEmpty()) {
             $institutions = Institution::factory()->count(3)->create();

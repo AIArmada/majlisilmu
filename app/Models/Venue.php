@@ -7,11 +7,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Venue extends Model
+class Venue extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\VenueFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasSocialMedia, HasFactory, HasUuids;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasSocialMedia, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 

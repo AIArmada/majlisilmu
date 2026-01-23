@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->count(50)->create();
 
         $this->call([
+            MasjidSeeder::class,
             InstitutionSeeder::class,
             VenueSeeder::class,
             SpeakerSeeder::class,
