@@ -20,11 +20,17 @@ new class extends Component {
     <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-32 pb-20">
         <!-- Background Layer -->
         <div class="absolute inset-0 z-0 bg-slate-950">
+            <!-- Islamic Pattern Base -->
+            <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay"></div>
+
             <!-- Aurora Gradients -->
             <div
-                class="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-emerald-900/30 blur-[120px] mix-blend-screen animate-float">
+                class="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-emerald-900/40 blur-[120px] mix-blend-screen animate-float">
             </div>
-            <div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-teal-900/20 blur-[100px] mix-blend-screen animate-float"
+            <!-- Golden Glow (Nur) -->
+            <div class="absolute top-[20%] left-[30%] w-[40vw] h-[40vw] rounded-full bg-gold-600/10 blur-[100px] mix-blend-screen animate-float"
+                style="animation-delay: -3s"></div>
+            <div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-teal-900/30 blur-[100px] mix-blend-screen animate-float"
                 style="animation-delay: -5s"></div>
 
             <!-- Pattern Overlay -->
@@ -52,7 +58,7 @@ new class extends Component {
                     <span class="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">Cari Majlis
                         Ilmu</span>
                     <span
-                        class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-200 to-emerald-400 animate-gradient-x bg-[length:200%_auto]">
+                        class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-gold-300 to-emerald-400 animate-gradient-x bg-[length:200%_auto]">
                         Berdekatan Anda
                     </span>
                 </h1>
@@ -64,26 +70,26 @@ new class extends Component {
 
                 <!-- Search Interface -->
                 <div class="w-full max-w-3xl relative group" x-data="{
-                            locating: false,
-                            locate() {
-                                if (this.locating) return;
-                                if (!navigator.geolocation) {
-                                    alert('{{ __("Pelayar anda tidak menyokong geolokasi.") }}');
-                                    return;
+                                locating: false,
+                                locate() {
+                                    if (this.locating) return;
+                                    if (!navigator.geolocation) {
+                                        alert('{{ __("Pelayar anda tidak menyokong geolokasi.") }}');
+                                        return;
+                                    }
+                                    this.locating = true;
+                                    navigator.geolocation.getCurrentPosition((position) => {
+                                        this.$refs.lat.value = position.coords.latitude;
+                                        this.$refs.lng.value = position.coords.longitude;
+                                        this.$refs.form.submit();
+                                    }, () => {
+                                        this.locating = false;
+                                        alert('{{ __("Tidak dapat mendapatkan lokasi anda. Sila aktifkan perkhidmatan lokasi.") }}');
+                                    });
                                 }
-                                this.locating = true;
-                                navigator.geolocation.getCurrentPosition((position) => {
-                                    this.$refs.lat.value = position.coords.latitude;
-                                    this.$refs.lng.value = position.coords.longitude;
-                                    this.$refs.form.submit();
-                                }, () => {
-                                    this.locating = false;
-                                    alert('{{ __("Tidak dapat mendapatkan lokasi anda. Sila aktifkan perkhidmatan lokasi.") }}');
-                                });
-                            }
-                        }">
+                            }">
                     <div
-                        class="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 rounded-2xl opacity-50 group-hover:opacity-100 blur transition duration-500 group-hover:duration-200 animate-tilt">
+                        class="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-gold-400 to-emerald-500 rounded-2xl opacity-50 group-hover:opacity-100 blur transition duration-500 group-hover:duration-200 animate-tilt">
                     </div>
                     <form action="{{ route('events.index') }}" method="GET" x-ref="form"
                         class="relative bg-slate-900/90 rounded-2xl p-2 flex flex-col sm:flex-row items-center gap-2 border border-white/10 shadow-2xl backdrop-blur-xl">
@@ -143,7 +149,7 @@ new class extends Component {
                 <div class="mt-8 flex flex-wrap justify-center gap-4 text-sm font-medium text-slate-400">
                     <span class="hidden sm:inline">{{ __('Cadangan:') }}</span>
                     <a href="{{ route('events.index', ['date' => 'today']) }}" wire:navigate
-                        class="hover:text-amber-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        class="hover:text-gold-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                         {{ __('Malam Ini') }}
                     </a>
@@ -194,8 +200,12 @@ new class extends Component {
     <!-- CTA Section -->
     <section class="relative py-24 overflow-hidden bg-slate-950">
         <!-- Background Effects -->
+        <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay"></div>
         <div
             class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-900/20 rounded-full blur-[120px]">
+        </div>
+        <div
+            class="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold-900/10 rounded-full blur-[100px]">
         </div>
         <div
             class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay">
@@ -214,12 +224,12 @@ new class extends Component {
 
                     <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
                         <a href="{{ route('submit-event.create') }}" wire:navigate
-                            class="inline-flex items-center gap-2 px-8 py-4 font-bold text-white transition-all transform rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xl shadow-emerald-900/40 hover:shadow-emerald-500/25 hover:-translate-y-1 group">
+                            class="inline-flex items-center gap-2 px-8 py-4 font-bold text-white transition-all transform rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xl shadow-emerald-900/40 hover:shadow-emerald-500/25 hover:-translate-y-1 group border border-gold-500/20">
                             <svg class="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                             </svg>
-                            {{ __('Hantar Majlis Sekaramg') }}
+                            {{ __('Hantar Majlis Sekarang') }}
                         </a>
                         <!-- Optional Secondary Button (e.g. Learn More) -->
                         <a href="#"
