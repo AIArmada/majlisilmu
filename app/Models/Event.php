@@ -16,13 +16,14 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Event extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\EventFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonations, Auditable, HasFactory, HasUuids, InteractsWithMedia, Searchable;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonations, Auditable, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     public $incrementing = false;
 
@@ -65,6 +66,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'saves_count',
         'registrations_count',
         'interests_count',
+        'going_count',
         'published_at',
         'escalated_at',
         'is_priority',
@@ -88,6 +90,7 @@ class Event extends Model implements AuditableContract, HasMedia
             'saves_count' => 'integer',
             'registrations_count' => 'integer',
             'interests_count' => 'integer',
+            'going_count' => 'integer',
             'published_at' => 'datetime',
             'escalated_at' => 'datetime',
             'is_priority' => 'boolean',
@@ -225,6 +228,11 @@ class Event extends Model implements AuditableContract, HasMedia
     public function interestedBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_interests')->withTimestamps();
+    }
+
+    public function goingBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'event_attendees')->withTimestamps();
     }
 
     public function reports(): MorphMany

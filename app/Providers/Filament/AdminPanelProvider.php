@@ -28,6 +28,8 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandLogo(asset('images/milogo.webp'))
+            ->brandLogoHeight('3rem')
             ->login()
             ->colors([
                 'primary' => Color::Emerald,

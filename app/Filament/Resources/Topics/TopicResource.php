@@ -38,7 +38,7 @@ class TopicResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\Topics\RelationManagers\ReferencesRelationManager::class,
         ];
     }
 

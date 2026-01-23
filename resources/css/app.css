@@ -9,100 +9,68 @@
     --font-heading: 'Outfit', ui-sans-serif, system-ui, sans-serif;
     --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
 
-    --color-emerald-50: oklch(0.979 0.021 166.113);
-    --color-emerald-100: oklch(0.95 0.043 167.206);
-    --color-emerald-200: oklch(0.905 0.093 164.15);
-    --color-emerald-300: oklch(0.845 0.143 164.978);
-    --color-emerald-400: oklch(0.765 0.177 163.223);
-    --color-emerald-500: oklch(0.69 0.202 165.636);
-    --color-emerald-600: oklch(0.577 0.245 167.885);
-    --color-emerald-700: oklch(0.475 0.213 169.664);
-    --color-emerald-800: oklch(0.395 0.165 170.83);
-    --color-emerald-900: oklch(0.325 0.123 171.378);
-    --color-emerald-950: oklch(0.25 0.08 172.0);
+    /* Premium Emerald Palette - Deep & Rich */
+    --color-emerald-50: oklch(0.985 0.012 165);
+    --color-emerald-100: oklch(0.96 0.03 165);
+    --color-emerald-200: oklch(0.92 0.06 165);
+    --color-emerald-300: oklch(0.86 0.1 165);
+    --color-emerald-400: oklch(0.78 0.15 165);
+    --color-emerald-500: oklch(0.68 0.19 165);
+    --color-emerald-600: oklch(0.58 0.2 165);
+    --color-emerald-700: oklch(0.48 0.18 165);
+    --color-emerald-800: oklch(0.38 0.14 165);
+    --color-emerald-900: oklch(0.28 0.1 165);
+    --color-emerald-950: oklch(0.18 0.06 165);
 
-    --color-slate-50: oklch(0.984 0.003 247.858);
-    --color-slate-100: oklch(0.968 0.007 247.896);
-    --color-slate-200: oklch(0.929 0.013 255.508);
-    --color-slate-300: oklch(0.869 0.022 252.894);
-    --color-slate-400: oklch(0.704 0.04 256.788);
-    --color-slate-500: oklch(0.554 0.046 257.417);
-    --color-slate-600: oklch(0.446 0.043 257.281);
-    --color-slate-700: oklch(0.372 0.044 257.287);
-    --color-slate-800: oklch(0.279 0.041 260.031);
-    --color-slate-900: oklch(0.208 0.042 265.755);
-    --color-slate-950: oklch(0.129 0.042 264.695);
+    /* Sophisticated Slate - Cool & crisp */
+    --color-slate-50: oklch(0.99 0.002 250);
+    --color-slate-100: oklch(0.97 0.005 250);
+    --color-slate-200: oklch(0.92 0.01 250);
+    --color-slate-300: oklch(0.86 0.02 250);
+    --color-slate-400: oklch(0.72 0.035 250);
+    --color-slate-500: oklch(0.58 0.045 250);
+    --color-slate-600: oklch(0.45 0.045 250);
+    --color-slate-700: oklch(0.35 0.04 250);
+    --color-slate-800: oklch(0.25 0.035 250);
+    --color-slate-900: oklch(0.18 0.03 250);
+    --color-slate-950: oklch(0.12 0.025 250);
 
+    /* Semantic Colors */
     --color-primary: var(--color-emerald-600);
     --color-primary-dark: var(--color-emerald-800);
     --color-primary-light: var(--color-emerald-400);
     --color-background: var(--color-slate-50);
-    --color-surface: oklch(1 0 0);
+    --color-surface: var(--color-white);
     --color-text-main: var(--color-slate-900);
     --color-text-muted: var(--color-slate-500);
+
+    /* Accents for that "Premium" feel */
+    --color-accent-gold: oklch(0.85 0.15 85);
+    --color-accent-purple: oklch(0.7 0.18 300);
 }
 
 [x-cloak] {
     display: none !important;
 }
 
-@keyframes rise {
-    from {
-        opacity: 0;
-        transform: translateY(18px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes float-slow {
-
-    0%,
-    100% {
-        transform: translateY(0) scale(1);
-    }
-
-    50% {
-        transform: translateY(-14px) scale(1.02);
-    }
-}
-
 @layer utilities {
-    .animate-rise {
-        animation: rise 0.7s ease-out both;
+    .glass {
+        @apply bg-white/70 backdrop-blur-lg border border-white/20 shadow-xl shadow-slate-200/20;
     }
 
-    .animate-rise-delay {
-        animation: rise 0.7s ease-out 0.12s both;
+    .glass-dark {
+        @apply bg-slate-900/80 backdrop-blur-lg border border-white/10 shadow-2xl;
     }
 
-    .animate-rise-delay-lg {
-        animation: rise 0.8s ease-out 0.2s both;
+    .card-hover {
+        @apply transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-900/5 hover:-translate-y-1;
     }
 
-    .animate-float {
-        animation: float-slow 12s ease-in-out infinite;
+    .text-balance {
+        text-wrap: balance;
     }
 
-    .stagger-children>* {
-        animation: rise 0.7s ease-out both;
-    }
-
-    .stagger-children>*:nth-child(2) {
-        animation-delay: 0.08s;
-    }
-
-    .stagger-children>*:nth-child(3) {
-        animation-delay: 0.16s;
-    }
-
-    .stagger-children>*:nth-child(4) {
-        animation-delay: 0.24s;
-    }
-
+    /* Refined Scrollbar */
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
@@ -111,78 +79,65 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+
+    .mask-gradient-b {
+        mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+    }
 }
 
-/* Force light mode text colors for Flux UI components on auth pages */
-/* Flux uses text-zinc-800 for light mode, but we need to ensure dark variants don't apply */
-html.light [data-flux-heading],
-html.light [data-flux-subheading],
-html.light [data-flux-label] {
-    color: rgb(39 39 42) !important;
-    /* zinc-800 */
+/* Animations */
+@keyframes fade-in-up {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-html.light [data-flux-subheading] {
-    color: rgb(113 113 122) !important;
-    /* zinc-500 */
+@keyframes scale-in {
+    0% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
-/* Override Flux input text and placeholder colors */
-html.light [data-flux-input] input,
-html.light [data-flux-control] input,
-html.light input[type="email"],
-html.light input[type="password"],
-html.light input[type="text"] {
-    color: rgb(39 39 42) !important;
-    /* zinc-800 */
+.animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
 }
 
-html.light input::placeholder {
-    color: rgb(161 161 170) !important;
-    /* zinc-400 */
+.animate-scale-in {
+    animation: scale-in 0.4s ease-out forwards;
 }
 
-/* Flux checkbox label */
-html.light [data-flux-checkbox] span,
-html.light [data-flux-checkbox] label {
-    color: rgb(63 63 70) !important;
-    /* zinc-700 */
+.delay-100 {
+    animation-delay: 100ms;
 }
 
-/* Flux link colors - force emerald */
-html.light [data-flux-link] {
-    color: rgb(5 150 105) !important;
-    /* emerald-600 */
+.delay-200 {
+    animation-delay: 200ms;
 }
 
-html.light [data-flux-link]:hover {
-    color: rgb(4 120 87) !important;
-    /* emerald-700 */
+.delay-300 {
+    animation-delay: 300ms;
 }
 
-/* Flux button primary - ensure visible text */
-html.light [data-flux-button] {
-    color: rgb(39 39 42) !important;
-    /* zinc-800 for default buttons */
-}
-
-html.light [data-flux-button][data-variant="primary"],
-html.light button[data-flux-button].bg-zinc-800,
-html.light button.bg-zinc-800 {
-    background-color: rgb(5 150 105) !important;
-    /* emerald-600 */
+/* Flux UI Overrides for Premium Feel */
+html.light [data-flux-button][data-variant="primary"] {
+    background-color: var(--color-emerald-600) !important;
     color: white !important;
+    box-shadow: 0 4px 12px -2px rgba(5, 150, 105, 0.4);
 }
 
-/* General text fix for auth container */
-html.light .text-zinc-100,
-html.light .text-zinc-200,
-html.light .text-zinc-300 {
-    color: rgb(63 63 70) !important;
-    /* zinc-700 */
-}
-
-html.light .text-white {
-    color: rgb(39 39 42) !important;
-    /* zinc-800 - only in light context */
+html.light [data-flux-button][data-variant="primary"]:hover {
+    background-color: var(--color-emerald-700) !important;
+    transform: translateY(-1px);
 }

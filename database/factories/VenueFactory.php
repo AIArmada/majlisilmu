@@ -31,7 +31,7 @@ class VenueFactory extends Factory
             'Dewan Kuliah',
             'Dewan Seminar',
         ]);
-        $slug = Str::slug($name.'-'.fake()->unique()->numerify('###'));
+        $slug = Str::slug($name.'-'.Str::random(8));
 
         return [
             'institution_id' => Institution::factory(),
