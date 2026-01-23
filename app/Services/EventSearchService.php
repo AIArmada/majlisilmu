@@ -19,6 +19,22 @@ class EventSearchService
         int $perPage = 20,
         string $sort = 'time'
     ): LengthAwarePaginator {
+        // Cache the default search for a short time
+        if (empty($query) && empty($filters) && $perPage === 12 && $sort === 'time') {
+            return cache()->remember('default_events_search', 60, function () use ($query, $filters, $perPage, $sort) {
+                return $this->performSearch($query, $filters, $perPage, $sort);
+            });
+        }
+
+        return $this->performSearch($query, $filters, $perPage, $sort);
+    }
+
+    protected function performSearch(
+        ?string $query = null,
+        array $filters = [],
+        int $perPage = 20,
+        string $sort = 'time'
+    ): LengthAwarePaginator {
         // Use Scout/Typesense when driver is typesense
         if (config('scout.driver') === 'typesense') {
             try {
