@@ -27,11 +27,12 @@
     <div class="relative min-h-screen overflow-hidden">
         <!-- Background Gradients -->
         <div class="pointer-events-none absolute inset-0 z-0">
-            <div class="absolute inset-0 opacity-[0.03]"
-                style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 400px;">
-            </div>
+            <div class="absolute inset-0 bg-pattern-islamic opacity-[0.08]"></div>
             <div
                 class="absolute -top-40 left-[10%] h-[35rem] w-[35rem] rounded-full bg-emerald-500/10 blur-[100px] animate-pulse">
+            </div>
+            <div
+                class="absolute top-[40%] left-[50%] -translate-x-1/2 h-[45rem] w-[45rem] rounded-full bg-gold-500/5 blur-[120px]">
             </div>
             <div class="absolute top-20 right-[5%] h-[30rem] w-[30rem] rounded-full bg-teal-500/10 blur-[100px]"></div>
             <div
@@ -47,7 +48,7 @@
 
             <!-- Premium Header -->
             <header
-                class="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-md transition-all">
+                class="sticky top-0 z-50 w-full border-b border-gold-500/10 bg-white/70 backdrop-blur-md transition-all">
                 <nav class="container mx-auto flex h-20 items-center justify-between px-6 lg:px-12">
                     <a href="{{ route('home') }}" wire:navigate class="flex items-center gap-3 group">
                         <img src="{{ asset('images/milogo.webp') }}" alt="Majlis Ilmu"

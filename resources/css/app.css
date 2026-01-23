@@ -22,6 +22,18 @@
     --color-emerald-900: oklch(0.28 0.1 165);
     --color-emerald-950: oklch(0.18 0.06 165);
 
+    /* Royal Gold & Warm Sand - The Islamic Aesthetic */
+    --color-gold-50: oklch(0.97 0.02 85);
+    --color-gold-100: oklch(0.95 0.05 85);
+    --color-gold-200: oklch(0.90 0.08 85);
+    --color-gold-300: oklch(0.84 0.12 85);
+    --color-gold-400: oklch(0.75 0.15 85);
+    --color-gold-500: oklch(0.65 0.18 85);
+    --color-gold-600: oklch(0.55 0.16 85);
+    --color-gold-700: oklch(0.45 0.14 85);
+    --color-gold-800: oklch(0.35 0.10 85);
+    --color-gold-900: oklch(0.25 0.08 85);
+
     /* Sophisticated Slate - Cool & crisp */
     --color-slate-50: oklch(0.99 0.002 250);
     --color-slate-100: oklch(0.97 0.005 250);
@@ -39,13 +51,15 @@
     --color-primary: var(--color-emerald-600);
     --color-primary-dark: var(--color-emerald-800);
     --color-primary-light: var(--color-emerald-400);
+    --color-secondary: var(--color-gold-500);
+    --color-secondary-dark: var(--color-gold-600);
     --color-background: var(--color-slate-50);
     --color-surface: var(--color-white);
     --color-text-main: var(--color-slate-900);
     --color-text-muted: var(--color-slate-500);
 
     /* Accents for that "Premium" feel */
-    --color-accent-gold: oklch(0.85 0.15 85);
+    --color-accent-gold: var(--color-gold-500);
     --color-accent-purple: oklch(0.7 0.18 300);
 }
 
@@ -83,6 +97,18 @@
     .mask-gradient-b {
         mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
     }
+
+    .bg-pattern-islamic {
+        background-image: url('/images/pattern-bg.png');
+        background-repeat: repeat;
+        background-size: 300px;
+    }
+
+    .border-b-arch {
+        border-bottom-left-radius: 50% 20px;
+        border-bottom-right-radius: 50% 20px;
+    }
+
 }
 
 /* Animations */
