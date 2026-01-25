@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+
+class DonationChannel extends Model implements AuditableContract, HasMedia
+{
+    /** @use HasFactory<\Database\Factories\DonationChannelFactory> */
+    use Auditable, HasFactory, HasUuids, InteractsWithMedia;
+
+    protected $table = 'donation_channels';
+
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
+    /**
+     * @var list<string>
+     */
+    protected $fillable = [
+        'donatable_type',
+        'donatable_id',
+        'label',
+        'recipient_name',
+        'method',
+        'bank_code',
+        'bank_name',
+        'account_number',
+        'duitnow_type',
+        'duitnow_value',
+        'ewallet_provider',
+        'ewallet_handle',
+        'ewallet_qr_payload',
+        'reference_note',
+        'status',
+        'verified_at',
+        'verified_by',
+        'is_default',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'verified_at' => 'datetime',
+            'is_default' => 'boolean',
+        ];
+    }
+
+    public function donatable(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function reports(): MorphMany
+    {
+        return $this->morphMany(Report::class, 'entity');
+    }
+
+    /**
+     * Get the account name (alias for recipient_name).
+     */
+    public function getAccountNameAttribute(): string
+    {
+        return $this->recipient_name;
+    }
+
+    /**
+     * Get display name for the payment method.
+     */
+    public function getMethodDisplayAttribute(): string
+    {
+        return match ($this->method) {
+            'bank_account' => 'Bank Account',
+            'duitnow' => 'DuitNow',
+            'ewallet' => 'E-Wallet',
+            default => $this->method,
+        };
+    }
+
+    /**
+     * Get the payment details based on method.
+     */
+    public function getPaymentDetailsAttribute(): string
+    {
+        return match ($this->method) {
+            'bank_account' => "{$this->bank_name} - {$this->account_number}",
+            'duitnow' => "{$this->duitnow_type}: {$this->duitnow_value}",
+            'ewallet' => "{$this->ewallet_provider}: {$this->ewallet_handle}",
+            default => '',
+        };
+    }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('qr')
+            ->singleFile();
+    }
+}

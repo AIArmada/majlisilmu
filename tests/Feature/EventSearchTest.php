@@ -21,12 +21,13 @@ describe('Event Search Filters', function () {
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(1),
         ]);
 
         $response = $this->get('/events');
 
         $response->assertOk()
-            ->assertSee('Browse Events');
+            ->assertSee('Circle of');
     });
 
     it('searches events by title', function () {
@@ -35,6 +36,7 @@ describe('Event Search Filters', function () {
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(1),
         ]);
 
         Event::factory()->create([
@@ -42,57 +44,69 @@ describe('Event Search Filters', function () {
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(2),
         ]);
 
         $response = $this->get('/events?search=Maghrib');
 
         $response->assertOk()
-            ->assertSee('Kuliah Maghrib Special');
+            ->assertSee('Kuliah Maghrib Special')
+            ->assertDontSee('Ceramah Subuh');
     });
 
     it('filters events by language', function () {
-        Event::factory()->create([
+        $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
+        $english = \Nnjeim\World\Models\Language::where('code', 'en')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
+
+        $event1 = Event::factory()->create([
             'title' => 'Malay Event',
-            'language' => 'malay',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(1),
         ]);
+        $event1->languages()->attach($malay);
 
-        Event::factory()->create([
+        $event2 = Event::factory()->create([
             'title' => 'English Event',
-            'language' => 'english',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(2),
         ]);
+        $event2->languages()->attach($english);
 
-        $response = $this->get('/events?language=english');
+        $response = $this->get('/events?language=en');
 
         $response->assertOk()
-            ->assertSee('English Event');
+            ->assertSee('English Event')
+            ->assertDontSee('Malay Event');
     });
 
     it('filters events by genre', function () {
         Event::factory()->create([
             'title' => 'Kuliah Event',
-            'genre' => 'kuliah',
+            'event_type' => 'kuliah',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(1),
         ]);
 
         Event::factory()->create([
             'title' => 'Forum Event',
-            'genre' => 'forum',
+            'event_type' => 'forum',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?genre=forum');
+        $response = $this->get('/events?event_type=forum');
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertSee('Forum Event')
+            ->assertDontSee('Kuliah Event');
     });
 
     it('only shows approved public events', function () {
@@ -101,12 +115,14 @@ describe('Event Search Filters', function () {
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(1),
         ]);
 
         Event::factory()->create([
             'title' => 'Pending Event',
             'status' => 'pending',
             'visibility' => 'public',
+            'starts_at' => now()->addDays(2),
         ]);
 
         Event::factory()->create([
@@ -114,6 +130,7 @@ describe('Event Search Filters', function () {
             'status' => 'approved',
             'visibility' => 'private',
             'published_at' => now(),
+            'starts_at' => now()->addDays(3),
         ]);
 
         $response = $this->get('/events');
@@ -147,13 +164,14 @@ describe('Event Search Filters', function () {
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
+            'starts_at' => now()->addDays(1),
         ]);
 
         $response = $this->get('/events');
 
         $response->assertOk()
             ->assertSee('5')
-            ->assertSee('events found');
+            ->assertSee('Upcoming Gatherings');
     });
 });
 

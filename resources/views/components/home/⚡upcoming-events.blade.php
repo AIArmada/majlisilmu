@@ -27,7 +27,9 @@ new class extends Component {
         <div class="flex items-center justify-center py-12">
             <svg class="animate-spin h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
             </svg>
         </div>
     </div>
@@ -108,14 +110,14 @@ new class extends Component {
                                             d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                     </svg>
                                     <span
-                                        class="truncate">{{ $event->venue?->name ?? $event->institution?->name ?? 'Online' }}</span>
+                                        class="truncate">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}</span>
                                 </div>
 
                                 <!-- Tags -->
                                 <div class="mt-4 flex flex-wrap gap-2">
                                     <span
                                         class="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                        {{ ucfirst($event->genre ?? 'Kuliah') }}
+                                        {{ $event->event_type?->getLabel() ?? __('Kuliah') }}
                                     </span>
                                     @if($event->speakers->isNotEmpty())
                                         <span
@@ -133,7 +135,8 @@ new class extends Component {
                                     class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
                                     {{ __('Butiran') }}
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 5l7 7-7 7" />
                                     </svg>
                                 </a>
                             </div>

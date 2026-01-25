@@ -33,8 +33,6 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'phone',
         'password',
-        'google_id',
-        'avatar',
         'email_verified_at',
     ];
 
@@ -96,6 +94,11 @@ class User extends Authenticatable implements FilamentUser
     public function registrations(): HasMany
     {
         return $this->hasMany(Registration::class);
+    }
+
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(SocialAccount::class);
     }
 
     public function savedSearches(): HasMany

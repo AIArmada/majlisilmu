@@ -40,6 +40,7 @@ class SpeakerResource extends Resource
     {
         return [
             MembersRelationManager::class,
+            RelationManagers\InstitutionsRelationManager::class,
         ];
     }
 

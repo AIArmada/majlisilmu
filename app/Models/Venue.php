@@ -52,4 +52,15 @@ class Venue extends Model implements HasMedia
     {
         return $this->hasMany(Series::class);
     }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('main')
+            ->singleFile();
+
+        $this->addMediaCollection('gallery');
+    }
 }

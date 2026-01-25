@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('events', function (Blueprint $table) {
@@ -14,7 +13,6 @@ return new class extends Migration
             $table->foreignUuid('user_id')->nullable()->index();
             $table->foreignUuid('institution_id')->nullable()->index();
             $table->foreignUuid('submitter_id')->nullable()->index();
-            $table->foreignUuid('speaker_id')->nullable()->index();
             $table->foreignUuid('venue_id')->nullable()->index();
             $table->foreignUuid('series_id')->nullable()->index();
 
@@ -33,9 +31,10 @@ return new class extends Migration
             $table->decimal('prayer_calc_lat', 10, 8)->nullable();
             $table->decimal('prayer_calc_lng', 11, 8)->nullable();
 
-            $table->string('language')->nullable()->index();
-            $table->string('genre')->nullable()->index();
-            $table->string('audience')->nullable()->index();
+            $table->string('event_type')->nullable()->index();
+            $table->string('gender_restriction')->default('all');
+            $table->string('age_group')->default('all_ages');
+            $table->boolean('children_allowed')->default(true);
 
             $table->string('visibility')->default('public')->index();
 
@@ -53,6 +52,7 @@ return new class extends Migration
             $table->unsignedInteger('saves_count')->default(0);
             $table->unsignedInteger('registrations_count')->default(0);
             $table->unsignedInteger('interests_count')->default(0);
+            $table->unsignedInteger('going_count')->default(0);
 
             $table->timestamp('published_at')->nullable()->index();
             $table->timestamp('escalated_at')->nullable();

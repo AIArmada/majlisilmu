@@ -34,7 +34,7 @@ class EventForm
                                     ->required()
                                     ->maxLength(255)
                                     ->live(onBlur: true)
-                                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('slug', Str::slug($state))),
+                                    ->afterStateUpdated(fn(Set $set, ?string $state) => $set('slug', Str::slug($state))),
                                 TextInput::make('slug')
                                     ->required()
                                     ->maxLength(255)
@@ -66,11 +66,11 @@ class EventForm
                                     ->schema([
                                         Select::make('timing_mode')
                                             ->label('Mode Waktu')
-                                            ->options(collect(TimingMode::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
+                                            ->options(collect(TimingMode::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
                                             ->default(TimingMode::Absolute->value)
                                             ->required()
                                             ->live()
-                                            ->helperText(fn (Get $get): string => match ($get('timing_mode')) {
+                                            ->helperText(fn(Get $get): string => match ($get('timing_mode')) {
                                                 TimingMode::PrayerRelative->value => 'Waktu akan dikira berdasarkan waktu solat di lokasi majlis',
                                                 default => 'Tetapkan waktu yang tepat',
                                             }),
@@ -80,17 +80,17 @@ class EventForm
                                             ->schema([
                                                 Select::make('prayer_reference')
                                                     ->label('Waktu Solat')
-                                                    ->options(collect(PrayerReference::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
+                                                    ->options(collect(PrayerReference::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
                                                     ->required()
                                                     ->live()
-                                                    ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePrayerDisplayText($get, $set)),
+                                                    ->afterStateUpdated(fn(Get $get, Set $set) => self::updatePrayerDisplayText($get, $set)),
                                                 Select::make('prayer_offset')
                                                     ->label('Masa')
-                                                    ->options(collect(PrayerOffset::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
+                                                    ->options(collect(PrayerOffset::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
                                                     ->default(PrayerOffset::Immediately->value)
                                                     ->required()
                                                     ->live()
-                                                    ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePrayerDisplayText($get, $set)),
+                                                    ->afterStateUpdated(fn(Get $get, Set $set) => self::updatePrayerDisplayText($get, $set)),
                                                 TextInput::make('prayer_display_text')
                                                     ->label('Paparan Waktu')
                                                     ->disabled()
@@ -98,19 +98,19 @@ class EventForm
                                                     ->helperText('Teks ini akan dipaparkan kepada pengguna'),
                                             ])
                                             ->columns(3)
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
 
                                         // Absolute timing fields
                                         DateTimePicker::make('starts_at')
                                             ->label('Waktu Mula')
                                             ->required()
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value),
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value),
 
                                         // Event date (for prayer-relative mode)
                                         DatePicker::make('event_date')
                                             ->label('Tarikh Majlis')
                                             ->required()
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
                                             ->dehydrated(false)
                                             ->helperText('Pilih tarikh majlis. Waktu sebenar akan dikira berdasarkan waktu solat pada tarikh ini.'),
 
@@ -192,6 +192,11 @@ class EventForm
                                             // In form, usually we force a selection for admin.
                                             // But let's leave default removed if we want.
                                             ->placeholder('Select Status'),
+                                        Toggle::make('is_featured')
+                                            ->label('Featured Event')
+                                            ->onColor('success')
+                                            ->offColor('gray')
+                                            ->helperText('Featured events appear at the top of lists.'),
                                         DateTimePicker::make('published_at'),
                                     ])->columns(2),
                                 Section::make('Registration')
@@ -205,7 +210,7 @@ class EventForm
                                         DateTimePicker::make('registration_closes_at'),
                                     ])->columns(2),
                             ]),
-                        Tab::make('Media & Donation')
+                        Tab::make('Media & Donation Channels')
                             ->icon('heroicon-m-video-camera')
                             ->schema([
                                 TextInput::make('live_url')

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('type')->default('main'); // main, work, home, whatsapp
             $table->string('category')->default('phone'); // email, phone, fax, website? No website usually separate or in social. Let's stick to email/phone.
             $table->string('value');
+            $table->boolean('is_public')->default(true);
 
             $table->timestamps();
         });

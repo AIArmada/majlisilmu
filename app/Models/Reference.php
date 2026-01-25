@@ -37,4 +37,14 @@ class Reference extends Model implements HasMedia
     {
         return $this->belongsToMany(Topic::class, 'reference_topic');
     }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('cover')
+            ->useDisk('public')
+            ->singleFile();
+    }
 }

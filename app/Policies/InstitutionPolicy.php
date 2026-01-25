@@ -86,14 +86,14 @@ class InstitutionPolicy
     }
 
     /**
-     * Determine whether the user can manage donations.
+     * Determine whether the user can manage donation channels.
      */
-    public function manageDonations(User $user, Institution $institution): bool
+    public function manageDonationChannels(User $user, Institution $institution): bool
     {
         if ($user->hasRole('super_admin')) {
             return true;
         }
 
-        return Authz::userCanInScope($user, 'institution.manage-donations', $institution);
+        return Authz::userCanInScope($user, 'institution.manage-donation-channels', $institution);
     }
 }

@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Report extends Model
+class Report extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\ReportFactory> */
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -44,5 +46,14 @@ class Report extends Model
     public function entity(): MorphTo
     {
         return $this->morphTo('entity');
+    }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('evidence')
+            ->useDisk('public');
     }
 }

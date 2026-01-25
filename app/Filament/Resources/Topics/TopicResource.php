@@ -23,7 +23,7 @@ class TopicResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Taxonomy';
+    protected static string|UnitEnum|null $navigationGroup = 'Directory';
 
     public static function form(Schema $schema): Schema
     {

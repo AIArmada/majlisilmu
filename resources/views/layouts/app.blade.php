@@ -56,9 +56,7 @@
                             <span
                                 class="font-heading text-xl font-bold tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">Majlis
                                 Ilmu</span>
-                            <span
-                                class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-semibold">Community
-                                Atlas</span>
+
                         </div>
                     </a>
 
@@ -148,6 +146,7 @@
             </header>
 
             <main class="flex-grow">
+                {{ $slot ?? '' }}
                 @yield('content')
             </main>
 

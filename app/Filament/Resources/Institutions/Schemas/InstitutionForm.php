@@ -36,6 +36,30 @@ class InstitutionForm
                             ->maxLength(5000),
                     ])
                     ->columns(2),
+                Section::make('Media')
+                    ->components([
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('logo')
+                            ->collection('logo')
+                            ->image()
+                            ->imageEditor()
+                            ->avatar()
+                            ->helperText('Institution logo (recommended: 400x400)'),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('main')
+                            ->collection('main')
+                            ->label('Main Image')
+                            ->image()
+                            ->imageEditor()
+                            ->responsiveImages()
+                            ->helperText('Main image (recommended: 1200x800)'),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                            ->collection('gallery')
+                            ->multiple()
+                            ->reorderable()
+                            ->image()
+                            ->columnSpanFull()
+                            ->helperText('Additional images for gallery'),
+                    ])
+                    ->columns(2),
                 Section::make('Contact')
                     ->components([
                         \Filament\Forms\Components\Repeater::make('contacts')
@@ -67,8 +91,11 @@ class InstitutionForm
                                     ])
                                     ->default('main')
                                     ->required(),
+                                \Filament\Forms\Components\Toggle::make('is_public')
+                                    ->label('Public')
+                                    ->default(true),
                             ])
-                            ->columns(3)
+                            ->columns(4)
                             ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
                     ]),
                 Section::make('Location')

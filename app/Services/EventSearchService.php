@@ -83,6 +83,10 @@ class EventSearchService
             $filterParts[] = 'language:='.$filters['language'];
         }
 
+        if (! empty($filters['event_type'])) {
+            $filterParts[] = 'genre:='.$filters['event_type'];
+        }
+
         if (! empty($filters['genre'])) {
             $filterParts[] = 'genre:='.$filters['genre'];
         }
@@ -158,15 +162,21 @@ class EventSearchService
         }
 
         if (! empty($filters['language'])) {
-            $queryBuilder->where('language', $filters['language']);
+            $queryBuilder->whereHas('languages', function ($q) use ($filters) {
+                $q->where('code', $filters['language']);
+            });
+        }
+
+        if (! empty($filters['event_type'])) {
+            $queryBuilder->where('event_type', $filters['event_type']);
         }
 
         if (! empty($filters['genre'])) {
-            $queryBuilder->where('genre', $filters['genre']);
+            $queryBuilder->where('event_type', $filters['genre']);
         }
 
         if (! empty($filters['audience'])) {
-            $queryBuilder->where('audience', $filters['audience']);
+            $queryBuilder->where('age_group', $filters['audience']);
         }
 
         if (! empty($filters['institution_id'])) {

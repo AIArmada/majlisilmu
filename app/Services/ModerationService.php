@@ -10,7 +10,6 @@ use App\Notifications\EventApprovedNotification;
 use App\Notifications\EventNeedsChangesNotification;
 use App\Notifications\EventRejectedNotification;
 use App\Notifications\EventSubmittedNotification;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
@@ -24,14 +23,7 @@ class ModerationService
      */
     public function submitForModeration(Event $event): void
     {
-        // Set to pending
-        $event->update(['status' => 'pending']);
-
-        // Notify moderators
-        $moderators = User::role(['moderator', 'super_admin'])->get();
-        Notification::send($moderators, new EventSubmittedNotification($event));
-
-        Log::info('Event submitted for moderation', ['event_id' => $event->id]);
+        $event->status->transitionTo(\App\States\EventStatus\Pending::class);
     }
 
     /**
@@ -41,35 +33,8 @@ class ModerationService
         Event $event,
         ?User $moderator = null,
         ?string $note = null
-    ): ModerationReview {
-        return DB::transaction(function () use ($event, $moderator, $note) {
-            // Create review record
-            $review = ModerationReview::create([
-                'event_id' => $event->id,
-                'moderator_id' => $moderator?->id,
-                'decision' => 'approved',
-                'note' => $note,
-            ]);
-
-            // Update event status
-            $event->update([
-                'status' => 'approved',
-                'published_at' => now(),
-            ]);
-
-            // Make searchable (Scout)
-            $event->searchable();
-
-            // Notify submitter and institution admins
-            $this->notifyApproval($event);
-
-            Log::info('Event approved', [
-                'event_id' => $event->id,
-                'moderator_id' => $moderator?->id,
-            ]);
-
-            return $review;
-        });
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\Approved::class, $moderator, $note);
     }
 
     /**
@@ -80,31 +45,8 @@ class ModerationService
         User $moderator,
         string $reasonCode,
         ?string $note = null
-    ): ModerationReview {
-        return DB::transaction(function () use ($event, $moderator, $reasonCode, $note) {
-            // Create review record
-            $review = ModerationReview::create([
-                'event_id' => $event->id,
-                'moderator_id' => $moderator->id,
-                'decision' => 'needs_changes',
-                'reason_code' => $reasonCode,
-                'note' => $note,
-            ]);
-
-            // Keep status as pending
-            $event->update(['status' => 'pending']);
-
-            // Notify submitter and institution admins
-            $this->notifyNeedsChanges($event, $review);
-
-            Log::info('Event needs changes', [
-                'event_id' => $event->id,
-                'moderator_id' => $moderator->id,
-                'reason_code' => $reasonCode,
-            ]);
-
-            return $review;
-        });
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\NeedsChanges::class, $moderator, $reasonCode, $note);
     }
 
     /**
@@ -115,34 +57,8 @@ class ModerationService
         User $moderator,
         string $reasonCode,
         ?string $note = null
-    ): ModerationReview {
-        return DB::transaction(function () use ($event, $moderator, $reasonCode, $note) {
-            // Create review record
-            $review = ModerationReview::create([
-                'event_id' => $event->id,
-                'moderator_id' => $moderator->id,
-                'decision' => 'rejected',
-                'reason_code' => $reasonCode,
-                'note' => $note,
-            ]);
-
-            // Update event status
-            $event->update(['status' => 'rejected']);
-
-            // Remove from search
-            $event->unsearchable();
-
-            // Notify submitter
-            $this->notifyRejection($event, $review);
-
-            Log::info('Event rejected', [
-                'event_id' => $event->id,
-                'moderator_id' => $moderator->id,
-                'reason_code' => $reasonCode,
-            ]);
-
-            return $review;
-        });
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\Rejected::class, $moderator, $reasonCode, $note);
     }
 
     /**
@@ -156,7 +72,7 @@ class ModerationService
         }
 
         // Set to pending for re-review
-        $event->update(['status' => 'pending']);
+        $event->status->transitionTo(\App\States\EventStatus\Pending::class);
 
         // Remove from search temporarily
         $event->unsearchable();

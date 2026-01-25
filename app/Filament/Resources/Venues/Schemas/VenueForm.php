@@ -74,8 +74,11 @@ class VenueForm
                                     ])
                                     ->default('main')
                                     ->required(),
+                                \Filament\Forms\Components\Toggle::make('is_public')
+                                    ->label('Public')
+                                    ->default(true),
                             ])
-                            ->columns(3)
+                            ->columns(4)
                             ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
                     ]),
                 Section::make('Location')
@@ -147,16 +150,23 @@ class VenueForm
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
-                Section::make('Gallery')
+                Section::make('Media')
                     ->components([
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('main')
+                            ->collection('main')
+                            ->image()
+                            ->imageEditor()
+                            ->responsiveImages()
+                            ->helperText('Main venue image (recommended: 1200x800)'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
                             ->image()
                             ->imageEditor()
                             ->reorderable()
-                            ->columnSpanFull(),
-                    ]),
+                            ->helperText('Additional images for gallery'),
+                    ])
+                    ->columns(2),
                 Section::make('Social Media')
                     ->components([
                         \Filament\Forms\Components\Repeater::make('socialMedia')

@@ -51,7 +51,7 @@ class IndexEventsToTypesense extends Command
 
         // Count searchable events
         $total = Event::query()
-            ->where('status', 'approved')
+            ->whereState('status', \App\States\EventStatus\Approved::class)
             ->where('visibility', 'public')
             ->count();
 
@@ -71,7 +71,7 @@ class IndexEventsToTypesense extends Command
         $indexed = 0;
 
         Event::query()
-            ->where('status', 'approved')
+            ->whereState('status', \App\States\EventStatus\Approved::class)
             ->where('visibility', 'public')
             ->with(['institution', 'venue', 'speakers', 'topics', 'state'])
             ->chunkById($chunk, function ($events) use (&$indexed, $bar) {

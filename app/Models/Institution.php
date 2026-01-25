@@ -18,7 +18,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 class Institution extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\InstitutionFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonations, \App\Models\Concerns\HasSocialMedia, Auditable, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -56,6 +56,13 @@ class Institution extends Model implements AuditableContract, HasMedia
         return $this->hasMany(Series::class);
     }
 
+    public function speakers(): BelongsToMany
+    {
+        return $this->belongsToMany(Speaker::class, 'institution_speaker')
+            ->withPivot(['position', 'is_primary', 'joined_at'])
+            ->withTimestamps();
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'institution_members')
@@ -81,6 +88,6 @@ class Institution extends Model implements AuditableContract, HasMedia
 
     public function getAuthzScopeLabel(): string
     {
-        return 'Institution: '.$this->name;
+        return 'Institution: ' . $this->name;
     }
 }

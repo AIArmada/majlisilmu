@@ -8,6 +8,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 class SpeakerForm
 {
@@ -20,7 +21,32 @@ class SpeakerForm
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
-                        TextInput::make('title')
+                        Select::make('gender')
+                            ->options([
+                                'male' => 'Male',
+                                'female' => 'Female',
+                            ])
+                            ->default('male')
+                            ->required(),
+                        \Filament\Forms\Components\Toggle::make('is_freelance')
+                            ->label('Freelance / Independent')
+                            ->live(),
+                        TextInput::make('job_title')
+                            ->label('Job Title / Primary Designation')
+                            ->placeholder('e.g. Freelance Da\'i, Independent Researcher')
+                            ->maxLength(255)
+                            ->visible(fn (Get $get) => $get('is_freelance')),
+                        TextInput::make('honorific')
+                            ->label('Honorific')
+                            ->placeholder('e.g. Dato’, Datin, Tan Sri')
+                            ->maxLength(255),
+                        TextInput::make('pre_nominal')
+                            ->label('Pre-nominal')
+                            ->placeholder('e.g. Dr, Prof, Ir, Ustaz')
+                            ->maxLength(255),
+                        TextInput::make('post_nominal')
+                            ->label('Post-nominal')
+                            ->placeholder('e.g. PhD, HONS, MSc')
                             ->maxLength(255),
                         TextInput::make('slug')
                             ->required()
@@ -29,8 +55,56 @@ class SpeakerForm
                         Textarea::make('bio')
                             ->columnSpanFull()
                             ->maxLength(5000),
+
+                        // Address Components
+                        Section::make('Location / Base')
+                            ->relationship('address')
+                            ->schema([
+                                Select::make('state_id')
+                                    ->label('State')
+                                    ->relationship('state', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->live(),
+                                Select::make('district_id')
+                                    ->label('District')
+                                    ->relationship('district', 'name', fn (Builder $query, Get $get) => $query->where('state_id', $get('state_id')))
+                                    ->searchable()
+                                    ->preload()
+                                    ->visible(fn (Get $get) => $get('state_id')),
+                            ])
+                            ->columns(2),
+
+                        Select::make('topics')
+                            ->relationship('topics', 'name')
+                            ->multiple()
+                            ->preload()
+                            ->searchable(),
+                        Select::make('languages')
+                            ->relationship('languages', 'name')
+                            ->multiple()
+                            ->preload()
+                            ->searchable(),
                     ])
                     ->columns(2),
+                Section::make('Education')
+                    ->components([
+                        \Filament\Forms\Components\Repeater::make('qualifications')
+                            ->schema([
+                                TextInput::make('institution')
+                                    ->required(),
+                                TextInput::make('degree')
+                                    ->label('Degree / Level')
+                                    ->required(),
+                                TextInput::make('field')
+                                    ->label('Field of Study'),
+                                TextInput::make('year')
+                                    ->numeric()
+                                    ->length(4),
+                            ])
+                            ->columns(2)
+                            ->itemLabel(fn (array $state): ?string => ($state['degree'] ?? '').' - '.($state['institution'] ?? '')),
+                    ]),
                 Section::make('Contact')
                     ->components([
                         \Filament\Forms\Components\Repeater::make('contacts')
@@ -62,17 +136,36 @@ class SpeakerForm
                                     ])
                                     ->default('main')
                                     ->required(),
+                                \Filament\Forms\Components\Toggle::make('is_public')
+                                    ->label('Public')
+                                    ->default(true),
                             ])
-                            ->columns(3)
+                            ->columns(4)
                             ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
                     ]),
-                Section::make('Avatar')
+                Section::make('Media')
                     ->components([
-                        TextInput::make('avatar_url')
-                            ->url()
-                            ->maxLength(255)
-                            ->columnSpanFull(),
-                    ]),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('avatar')
+                            ->collection('avatar')
+                            ->image()
+                            ->imageEditor()
+                            ->avatar()
+                            ->helperText('Speaker photo (recommended: 400x400)'),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('main')
+                            ->collection('main')
+                            ->label('Main Image')
+                            ->image()
+                            ->imageEditor()
+                            ->responsiveImages()
+                            ->helperText('Main featured image'),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                            ->collection('gallery')
+                            ->multiple()
+                            ->reorderable()
+                            ->image()
+                            ->helperText('Additional images'),
+                    ])
+                    ->columns(2),
                 Section::make('Social Media')
                     ->components([
                         \Filament\Forms\Components\Repeater::make('socialMedia')

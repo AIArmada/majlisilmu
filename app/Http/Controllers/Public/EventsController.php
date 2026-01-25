@@ -21,7 +21,7 @@ class EventsController extends Controller
      */
     public function calendar(Event $event): Response
     {
-        if ($event->status !== 'approved' || $event->visibility !== 'public') {
+        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== 'public') {
             abort(404);
         }
 
@@ -36,11 +36,11 @@ class EventsController extends Controller
     public function register(Request $request, Event $event): RedirectResponse
     {
         // Validate event is eligible for registration (per B4b)
-        if ($event->status !== 'approved') {
+        if (! $event->status?->equals(\App\States\EventStatus\Approved::class)) {
             return back()->withErrors(['registration' => 'This event is not available for registration.']);
         }
 
-        if ($event->status === 'cancelled' || $event->status === 'rejected') {
+        if ($event->status?->equals(\App\States\EventStatus\Rejected::class)) {
             return back()->withErrors(['registration' => 'This event has been cancelled.']);
         }
 
