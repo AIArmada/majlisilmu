@@ -27,7 +27,7 @@ class EventSeeder extends Seeder
         }
 
         $institutions = Institution::query()
-            ->with(['venues.address', 'address', 'donations', 'series'])
+            ->with(['venues.address', 'address', 'donationChannels', 'series'])
             ->limit(50)
             ->get();
         $speakers = Speaker::query()->get();
@@ -39,8 +39,8 @@ class EventSeeder extends Seeder
 
         $institutions->each(function (Institution $institution) use ($speakers, $topics): void {
             $venue = $institution->venues->isNotEmpty() ? $institution->venues->random() : null;
-            $donation = $institution->donations->isNotEmpty()
-                ? $institution->donations->random()
+            $donation = $institution->donationChannels->isNotEmpty()
+                ? $institution->donationChannels->random()
                 : null;
             $series = $institution->series->isNotEmpty() ? $institution->series->random() : null;
 
@@ -279,9 +279,8 @@ class EventSeeder extends Seeder
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'timezone' => 'Asia/Kuala_Lumpur',
-                'language' => 'Bahasa Melayu',
-                'genre' => $entry['slot'],
-                'audience' => 'Umum',
+                // 'language' has been removed; genre/audience are now event_type/age_group etc
+                'event_type' => \App\Enums\EventType::Kuliah, // Default to Kuliah for standard lectures
                 'visibility' => 'public',
                 'status' => 'approved',
                 'published_at' => $startsAt->copy()->subDays(7),
@@ -290,6 +289,14 @@ class EventSeeder extends Seeder
                 'prayer_offset' => $prayerOffset,
                 'prayer_display_text' => $prayerDisplayText,
             ]);
+
+            // Attach default language (Malay) if exists
+            if (class_exists(\Nnjeim\World\Models\Language::class)) {
+                $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first();
+                if ($malay) {
+                    $event->languages()->syncWithoutDetaching([$malay->id]);
+                }
+            }
 
             if (! empty($entry['speaker'])) {
                 $speakerName = $entry['speaker'];

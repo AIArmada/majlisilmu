@@ -21,7 +21,7 @@ class ReportForm
                                 'event' => 'Event',
                                 'institution' => 'Institution',
                                 'speaker' => 'Speaker',
-                                'donation' => 'Donation',
+                                'donation_channel' => 'Donation Channel',
                             ])
                             ->required(),
                         TextInput::make('entity_id')
@@ -33,7 +33,7 @@ class ReportForm
                                 'cancelled_not_updated' => 'Cancelled not updated',
                                 'fake_speaker' => 'Fake speaker',
                                 'inappropriate_content' => 'Inappropriate content',
-                                'donation_scam' => 'Donation scam',
+                                'donation_scam' => 'Donation channel scam',
                                 'other' => 'Other',
                             ])
                             ->required(),

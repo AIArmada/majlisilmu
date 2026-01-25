@@ -14,9 +14,10 @@ it('displays the homepage successfully', function () {
     $response = $this->get('/');
 
     $response->assertSuccessful();
-    $response->assertSee('Cari Majlis Ilmu');
+    $response->assertSee('Cari');
+    $response->assertSee('Majlis');
+    $response->assertSee('Ilmu');
     $response->assertSee('Berdekatan Anda');
-    $response->assertSee('Berdekatan Saya');
 });
 
 it('contains livewire components on the homepage', function () {

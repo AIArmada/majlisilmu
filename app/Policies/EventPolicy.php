@@ -22,7 +22,7 @@ class EventPolicy
     public function view(?User $user, Event $event): bool
     {
         // Public events are viewable by anyone
-        if ($event->visibility === 'public' && $event->status === 'approved') {
+        if ($event->visibility === 'public' && $event->status !== null && $event->status->equals(\App\States\EventStatus\Approved::class)) {
             return true;
         }
 
@@ -74,7 +74,7 @@ class EventPolicy
         }
 
         // Submitter can update their draft/pending submissions
-        if ($event->submitter_id === $user->id && in_array($event->status, ['draft', 'pending', 'needs_changes'])) {
+        if ($event->submitter_id === $user->id && in_array((string) $event->status, ['draft', 'pending', 'needs_changes'])) {
             return true;
         }
 
@@ -92,7 +92,7 @@ class EventPolicy
         }
 
         // Institution admins can delete draft events
-        if ($event->status === 'draft' && $event->institution_id) {
+        if ($event->status !== null && $event->status->equals(\App\States\EventStatus\Draft::class) && $event->institution_id) {
             return Authz::userCanInScope($user, 'event.delete', $event->institution);
         }
 

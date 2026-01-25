@@ -11,11 +11,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\Tags\HasTags;
 
-class Topic extends Model
+class Topic extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\TopicFactory> */
-    use HasFactory, HasUuids, KeepsDeletedModels;
+    use HasFactory, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -134,5 +137,55 @@ class Topic extends Model
     public function getDepth(): int
     {
         return $this->ancestors()->count();
+    }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('icon')
+            ->useDisk('public')
+            ->singleFile();
+
+        $this->addMediaCollection('banner')
+            ->useDisk('public')
+            ->singleFile();
+    }
+
+    /**
+     * Get the default tag type for this model.
+     */
+    public static function getTagClassName(): string
+    {
+        return \App\Models\Tag::class;
+    }
+
+    /**
+     * Sync islamic discipline tags (e.g., 'hadis', 'fiqah', 'sirah').
+     *
+     * @param  array<string>|string  $tags
+     */
+    public function syncIslamicTags(array|string $tags): static
+    {
+        return $this->syncTagsWithType($tags, 'islamic');
+    }
+
+    /**
+     * Attach islamic discipline tags.
+     *
+     * @param  array<string>|string  $tags
+     */
+    public function attachIslamicTags(array|string $tags): static
+    {
+        return $this->attachTags($tags, 'islamic');
+    }
+
+    /**
+     * Scope to filter topics by islamic discipline tag.
+     */
+    public function scopeWithIslamicTag(Builder $query, string $tag): Builder
+    {
+        return $query->withAnyTags([$tag], 'islamic');
     }
 }

@@ -7,9 +7,12 @@ use App\Models\Topic;
 use App\Models\Venue;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-new class extends Component
+new
+    #[Layout('layouts.app')]
+    class extends Component
 {
     #[Computed]
     public function states(): Collection
@@ -43,11 +46,8 @@ new class extends Component
 };
 ?>
 
-@extends('layouts.app')
-
 @section('title', __('Submit Event') . ' - ' . config('app.name'))
 
-@section('content')
     @php
         $states = $this->states;
         $institutions = $this->institutions;
@@ -113,40 +113,47 @@ new class extends Component
                                 placeholder="{{ __('Describe the event, topics to be covered, etc.') }}">{{ old('description') }}</textarea>
                         </div>
 
-                        <div class="grid md:grid-cols-3 gap-6">
+                        <div class="grid md:grid-cols-2 gap-6">
                             <div>
-                                <label for="language" class="block text-sm font-semibold text-slate-700 mb-2">{{ __('Language') }}</label>
-                                <select name="language" id="language"
+                                <label for="event_type" class="block text-sm font-semibold text-slate-700 mb-2">{{ __('Event Type') }}</label>
+                                <select name="event_type" id="event_type"
                                     class="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all">
-                                    <option value="malay" {{ old('language') == 'malay' ? 'selected' : '' }}>{{ __('Malay') }}</option>
-                                    <option value="english" {{ old('language') == 'english' ? 'selected' : '' }}>{{ __('English') }}</option>
-                                    <option value="arabic" {{ old('language') == 'arabic' ? 'selected' : '' }}>{{ __('Arabic') }}</option>
-                                    <option value="mixed" {{ old('language') == 'mixed' ? 'selected' : '' }}>{{ __('Mixed') }}</option>
+                                    @foreach(\App\Enums\EventType::getGroupedOptions() as $group => $options)
+                                        <optgroup label="{{ $group }}">
+                                            @foreach($options as $value => $label)
+                                                <option value="{{ $value }}" {{ old('event_type') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
                                 </select>
                             </div>
                             <div>
-                                <label for="genre" class="block text-sm font-semibold text-slate-700 mb-2">{{ __('Type') }}</label>
-                                <select name="genre" id="genre"
+                                <label for="gender_restriction" class="block text-sm font-semibold text-slate-700 mb-2">{{ __('Gender') }}</label>
+                                <select name="gender_restriction" id="gender_restriction"
                                     class="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all">
-                                    <option value="kuliah" {{ old('genre') == 'kuliah' ? 'selected' : '' }}>{{ __('Kuliah') }}</option>
-                                    <option value="ceramah" {{ old('genre') == 'ceramah' ? 'selected' : '' }}>{{ __('Ceramah') }}</option>
-                                    <option value="tazkirah" {{ old('genre') == 'tazkirah' ? 'selected' : '' }}>{{ __('Tazkirah') }}</option>
-                                    <option value="forum" {{ old('genre') == 'forum' ? 'selected' : '' }}>{{ __('Forum') }}</option>
-                                    <option value="halaqah" {{ old('genre') == 'halaqah' ? 'selected' : '' }}>{{ __('Halaqah') }}</option>
-                                    <option value="other" {{ old('genre') == 'other' ? 'selected' : '' }}>{{ __('Other') }}</option>
+                                    @foreach(\App\Enums\EventGenderRestriction::cases() as $case)
+                                        <option value="{{ $case->value }}" {{ old('gender_restriction', 'all') == $case->value ? 'selected' : '' }}>{{ $case->getLabel() }}</option>
+                                    @endforeach
                                 </select>
                             </div>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-6 mt-6">
                             <div>
-                                <label for="audience" class="block text-sm font-semibold text-slate-700 mb-2">{{ __('Audience') }}</label>
-                                <select name="audience" id="audience"
+                                <label for="age_group" class="block text-sm font-semibold text-slate-700 mb-2">{{ __('Age Group') }}</label>
+                                <select name="age_group" id="age_group"
                                     class="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all">
-                                    <option value="general" {{ old('audience') == 'general' ? 'selected' : '' }}>{{ __('General') }}</option>
-                                    <option value="men_only" {{ old('audience') == 'men_only' ? 'selected' : '' }}>{{ __('Men Only') }}</option>
-                                    <option value="women_only" {{ old('audience') == 'women_only' ? 'selected' : '' }}>{{ __('Women Only') }}</option>
-                                    <option value="youth" {{ old('audience') == 'youth' ? 'selected' : '' }}>{{ __('Youth') }}</option>
-                                    <option value="children" {{ old('audience') == 'children' ? 'selected' : '' }}>{{ __('Children') }}</option>
-                                    <option value="families" {{ old('audience') == 'families' ? 'selected' : '' }}>{{ __('Families') }}</option>
+                                    @foreach(\App\Enums\EventAgeGroup::cases() as $case)
+                                        <option value="{{ $case->value }}" {{ old('age_group', 'all_ages') == $case->value ? 'selected' : '' }}>{{ $case->getLabel() }}</option>
+                                    @endforeach
                                 </select>
+                            </div>
+                            <div class="flex items-center pt-8">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="children_allowed" value="1" {{ old('children_allowed', true) ? 'checked' : '' }}
+                                        class="sr-only peer">
+                                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                    <span class="ml-3 text-sm font-semibold text-slate-700">{{ __('Children Allowed') }}</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -263,4 +270,3 @@ new class extends Component
             </div>
         </div>
     </div>
-@endsection

@@ -1,21 +1,20 @@
 <?php
 
 use Livewire\Component;
+use Livewire\Attributes\Title;
 
-new class extends Component {
+new
+    #[Title('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')]
+    class extends Component {
 };
 ?>
 
-@extends('layouts.app')
-
-@section('title', 'Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')
-
 @push('head')
     <meta name="description"
-        content="Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.">
+        content="{{ __('Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.') }}">
 @endpush
 
-@section('content')
+<div>
     <!-- Hero Section -->
     <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-32 pb-20">
         <!-- Background Layer -->
@@ -55,11 +54,11 @@ new class extends Component {
                 <!-- Main Heading -->
                 <h1
                     class="font-heading font-extrabold text-5xl sm:text-7xl lg:text-8xl tracking-tight text-white mb-8 leading-[0.9]">
-                    <span class="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">Cari Majlis
-                        Ilmu</span>
+                    <span
+                        class="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">{{ __('Cari Majlis Ilmu') }}</span>
                     <span
                         class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-gold-300 to-emerald-400 animate-gradient-x bg-[length:200%_auto]">
-                        Berdekatan Anda
+                        {{ __('Berdekatan Anda') }}
                     </span>
                 </h1>
 
@@ -215,7 +214,8 @@ new class extends Component {
             <div
                 class="max-w-4xl mx-auto overflow-hidden text-center border shadow-2xl bg-white/5 backdrop-blur-2xl rounded-3xl border-white/10 ring-1 ring-white/10">
                 <div class="px-8 py-16 sm:px-16 sm:py-20">
-                    <h2 class="mb-6 text-3xl font-extrabold tracking-tight text-white font-heading sm:text-4xl lg:text-5xl">
+                    <h2
+                        class="mb-6 text-3xl font-extrabold tracking-tight text-white font-heading sm:text-4xl lg:text-5xl">
                         {{ __('Ada Majlis Ilmu?') }}
                     </h2>
                     <p class="max-w-2xl mx-auto mb-10 text-lg leading-relaxed text-slate-300">
@@ -225,9 +225,10 @@ new class extends Component {
                     <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
                         <a href="{{ route('submit-event.create') }}" wire:navigate
                             class="inline-flex items-center gap-2 px-8 py-4 font-bold text-white transition-all transform rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xl shadow-emerald-900/40 hover:shadow-emerald-500/25 hover:-translate-y-1 group border border-gold-500/20">
-                            <svg class="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            <svg class="w-5 h-5 transition-transform group-hover:rotate-12" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4" />
                             </svg>
                             {{ __('Hantar Majlis Sekarang') }}
                         </a>
@@ -241,5 +242,4 @@ new class extends Component {
             </div>
         </div>
     </section>
-
-@endsection
+</div>

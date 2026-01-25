@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
             InstitutionSeeder::class,
             VenueSeeder::class,
             SpeakerSeeder::class,
-            DonationSeeder::class,
+            DonationChannelSeeder::class,
             SeriesSeeder::class,
             EventSeeder::class,
             EventMediaSeeder::class,

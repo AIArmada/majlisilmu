@@ -136,10 +136,20 @@ class SpeakerFactory extends Factory
             'Abdul Wahid',
             'Abdul Karim',
         ];
-        $honorificsMale = ['Ustaz', 'Dr.', 'Prof.', 'Tuan Haji'];
-        $honorificsFemale = ['Ustazah', 'Dr.', 'Prof.', 'Puan Hajah'];
+        // Pre-nominals (Professional/Religious titles)
+        $preNominalsMale = ['Ustaz', 'Dr.', 'Prof.', 'Ir.', 'Tuan Guru'];
+        $preNominalsFemale = ['Ustazah', 'Dr.', 'Prof.', 'Ir.'];
+
+        // Honorifics (State awards)
+        $honorificsMale = ['Dato\'', 'Datuk', 'Tan Sri', 'Tun'];
+        $honorificsFemale = ['Datin', 'Datin Paduka', 'Puan Sri', 'Toh Puan'];
+
+        // Post-nominals (Academic qualifications)
+        $postNominals = ['PhD', 'MSc', 'MA', 'BSc', 'BA', 'HONS'];
 
         $isFemale = fake()->boolean(45);
+
+        // Generate Name
         $firstName = $isFemale
             ? fake()->randomElement($femaleFirstNames)
             : fake()->randomElement($maleFirstNames);
@@ -149,20 +159,59 @@ class SpeakerFactory extends Factory
         $givenName = trim(implode(' ', array_filter([$firstName, $secondName])));
         $connector = $isFemale ? 'binti' : 'bin';
         $parentName = fake()->randomElement($parentNames);
-        $name = $givenName.' '.$connector.' '.$parentName;
+        $name = $givenName . ' ' . $connector . ' ' . $parentName;
 
-        if (fake()->boolean(25)) {
-            $honorific = $isFemale
-                ? fake()->randomElement($honorificsFemale)
-                : fake()->randomElement($honorificsMale);
-            $name = $honorific.' '.$name;
+        // Populate new fields
+        $preNominal = fake()->boolean(30)
+            ? fake()->randomElement($isFemale ? $preNominalsFemale : $preNominalsMale)
+            : null;
+
+        $honorific = fake()->boolean(10)
+            ? fake()->randomElement($isFemale ? $honorificsFemale : $honorificsMale)
+            : null;
+
+        $postNominal = fake()->boolean(20)
+            ? fake()->randomElement($postNominals)
+            : null;
+
+        $universities = [
+            'Universiti Az-Zaitunah',
+            'Al-Azhar University',
+            'Universiti Islam Madinah',
+            'Universiti Malaya',
+            'Universiti Kebangsaan Malaysia',
+            'Universiti Islam Antarabangsa Malaysia',
+            'Universiti Sains Islam Malaysia',
+            'Universiti Yarmouk',
+            'Kolej Universiti Islam Antarabangsa Selangor',
+        ];
+
+        $degrees = ['Bachelor', 'Masters', 'PhD', 'Diploma'];
+        $fields = ['Syariah', 'Usuluddin', 'Dakwah', 'Islamic Finance', 'Fiqh Fatwa', 'Tafsir', 'Hadith'];
+
+        $qualifications = [];
+        if (fake()->boolean(70)) {
+            $count = fake()->numberBetween(1, 3);
+            for ($i = 0; $i < $count; $i++) {
+                $qualifications[] = [
+                    'institution' => fake()->randomElement($universities),
+                    'degree' => fake()->randomElement($degrees),
+                    'field' => fake()->randomElement($fields),
+                    'year' => fake()->numberBetween(1990, 2023),
+                ];
+            }
         }
 
         return [
             'name' => $name,
-            'slug' => Str::slug($name.'-'.Str::random(8)),
+            'gender' => $isFemale ? 'female' : 'male',
+            'honorific' => $honorific,
+            'pre_nominal' => $preNominal,
+            'post_nominal' => $postNominal,
+            'is_freelance' => fake()->boolean(20),
+            'qualifications' => $qualifications,
+            'slug' => Str::slug($name . '-' . Str::random(8)),
             'bio' => fake()->optional()->paragraph(),
-            'avatar_url' => null,
             'status' => fake()->randomElement(['unverified', 'pending', 'verified']),
         ];
     }
@@ -170,6 +219,15 @@ class SpeakerFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function (\App\Models\Speaker $speaker) {
+            // Create Address
+            $state = \App\Models\State::inRandomOrder()->first();
+            if ($state) {
+                $speaker->address()->create([
+                    'state_id' => $state->id,
+                    'district_id' => $state->districts()->inRandomOrder()->first()?->id,
+                ]);
+            }
+
             $speaker->contacts()->create([
                 'category' => 'email',
                 'value' => fake()->safeEmail(),
@@ -181,6 +239,32 @@ class SpeakerFactory extends Factory
                 'value' => fake()->phoneNumber(),
                 'type' => 'work',
             ]);
+
+            // Attach Topics
+            $topics = \App\Models\Topic::inRandomOrder()->limit(rand(1, 5))->pluck('id');
+            $speaker->topics()->attach($topics);
+
+            // Attach Languages
+            if (class_exists(\Nnjeim\World\Models\Language::class)) {
+                $languages = \Nnjeim\World\Models\Language::inRandomOrder()->limit(rand(1, 3))->pluck('id');
+                $speaker->languages()->attach($languages);
+            }
+
+            // Attach Institutions
+            if (!$speaker->is_freelance) {
+                $institutions = \App\Models\Institution::inRandomOrder()->limit(rand(1, 2))->get();
+                foreach ($institutions as $institution) {
+                    $speaker->institutions()->attach($institution->id, [
+                        'position' => fake()->randomElement(['Imam', 'Lecturer', 'Guest Speaker', 'Advisor']),
+                        'is_primary' => fake()->boolean(30),
+                        'joined_at' => fake()->date(),
+                    ]);
+                }
+            } else {
+                $speaker->update([
+                    'job_title' => fake()->randomElement(['Freelance Da\'i', 'Independent Scholar', 'Religious Columnist', 'Motivation Speaker']),
+                ]);
+            }
         });
     }
 }

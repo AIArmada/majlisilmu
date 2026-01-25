@@ -30,7 +30,7 @@ new class extends Component {
 
             $dates->push([
                 'date' => $date,
-                'day_name' => $i === 0 ? 'Hari Ini' : ($i === 1 ? 'Esok' : $date->translatedFormat('l')),
+                'day_name' => $i === 0 ? __('Hari Ini') : ($i === 1 ? __('Esok') : $date->translatedFormat('l')),
                 'day_short' => $date->format('d'),
                 'month_short' => $date->translatedFormat('M'),
                 'count' => $eventCounts[$dateKey] ?? 0,
@@ -56,7 +56,8 @@ new class extends Component {
 
 <div class="flex flex-wrap items-center justify-center gap-3">
     @foreach($this->upcomingDates as $dateItem)
-        <a wire:key="date-{{ $dateItem['date']->format('Y-m-d') }}" href="{{ route('events.index', ['date' => $dateItem['date']->format('Y-m-d')]) }}" wire:navigate
+        <a wire:key="date-{{ $dateItem['date']->format('Y-m-d') }}"
+            href="{{ route('events.index', ['date' => $dateItem['date']->format('Y-m-d')]) }}" wire:navigate
             class="group flex flex-col items-center p-4 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all min-w-[100px] {{ $loop->first ? 'bg-emerald-50 border-emerald-500' : '' }}">
             <span
                 class="text-xs font-semibold text-slate-400 uppercase tracking-wide group-hover:text-emerald-600 {{ $loop->first ? 'text-emerald-600' : '' }}">

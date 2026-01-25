@@ -22,7 +22,6 @@ class SpeakersTable
                     ->badge()
                     ->sortable(),
                 TextColumn::make('email')
-                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')
                     ->toggleable(isToggledHiddenByDefault: true),

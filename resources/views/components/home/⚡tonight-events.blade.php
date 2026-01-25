@@ -9,13 +9,14 @@ new class extends Component {
     #[Computed]
     public function events(): Collection
     {
-        $now = now();
-        $tonight = $now->copy()->endOfDay();
+        $now = now('Asia/Kuala_Lumpur');
+        $start = $now->copy()->setTimezone('UTC'); // From current moment in KL
+        $end = $now->copy()->endOfDay()->setTimezone('UTC');
 
         return Event::query()
             ->where('status', 'approved')
             ->where('visibility', 'public')
-            ->whereBetween('starts_at', [$now, $tonight])
+            ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at')
             ->with(['institution', 'venue'])
             ->take(4)
@@ -34,14 +35,17 @@ new class extends Component {
         <div class="flex items-center justify-center py-8">
             <svg class="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
             </svg>
         </div>
     </div>
 </section>
 @endplaceholder
 
-<section class="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 py-8" @if(!$hasEvents) style="display: none;" @endif>
+<section class="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 py-8" @if(!$hasEvents)
+style="display: none;" @endif>
     <div class="container mx-auto px-6 lg:px-12">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
@@ -74,13 +78,14 @@ new class extends Component {
                         <div class="flex items-start gap-3">
                             <div
                                 class="flex-shrink-0 w-14 h-14 rounded-lg bg-amber-100 flex flex-col items-center justify-center">
-                                <span class="text-lg font-bold text-amber-600">{{ $event->starts_at?->format('h:i') }}</span>
+                                <span
+                                    class="text-lg font-bold text-amber-600">{{ $event->starts_at?->format('h:i') }}</span>
                                 <span class="text-xs text-amber-500">{{ $event->starts_at?->format('A') }}</span>
                             </div>
                             <div class="min-w-0">
                                 <h3 class="font-bold text-slate-900 truncate">{{ $event->title }}</h3>
                                 <p class="text-sm text-slate-500 truncate">
-                                    {{ $event->venue?->name ?? $event->institution?->name ?? 'Online' }}
+                                    {{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}
                                 </p>
                             </div>
                         </div>

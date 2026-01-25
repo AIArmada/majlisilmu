@@ -4,12 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
-use App\Models\ModerationReview;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -52,13 +50,13 @@ class ModerationQueue extends Page implements HasTable
             'pending' => [
                 'label' => 'Pending',
                 'icon' => 'heroicon-o-clock',
-                'count' => Event::where('status', 'pending')->count(),
+                'count' => Event::whereState('status', \App\States\EventStatus\Pending::class)->count(),
                 'badgeColor' => 'warning',
             ],
             'needs_changes' => [
                 'label' => 'Needs Changes',
                 'icon' => 'heroicon-o-pencil-square',
-                'count' => Event::whereHas('moderationReviews', fn ($q) => $q->where('decision', 'needs_changes')->latest()->limit(1))->where('status', 'pending')->count(),
+                'count' => Event::whereHas('moderationReviews', fn ($q) => $q->where('decision', 'needs_changes')->latest()->limit(1))->whereState('status', \App\States\EventStatus\Pending::class)->count(),
                 'badgeColor' => 'info',
             ],
             'reports' => [
@@ -70,7 +68,7 @@ class ModerationQueue extends Page implements HasTable
             'recently_rejected' => [
                 'label' => 'Recently Rejected',
                 'icon' => 'heroicon-o-x-circle',
-                'count' => Event::where('status', 'rejected')->where('updated_at', '>=', now()->subDays(7))->count(),
+                'count' => Event::whereState('status', \App\States\EventStatus\Rejected::class)->where('updated_at', '>=', now()->subDays(7))->count(),
                 'badgeColor' => 'gray',
             ],
         ];
@@ -122,10 +120,10 @@ class ModerationQueue extends Page implements HasTable
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->requiresConfirmation()
-                    ->action(function (Event $record): void {
-                        $this->approveEvent($record);
+                    ->action(function (Event $record, \App\Services\ModerationService $service): void {
+                        $service->approve($record, auth()->user());
                     })
-                    ->visible(fn (Event $record) => $record->status === 'pending'),
+                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
 
                 Action::make('reject')
                     ->label('Reject')
@@ -148,10 +146,10 @@ class ModerationQueue extends Page implements HasTable
                             ->required()
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data): void {
-                        $this->rejectEvent($record, $data['reason_code'], $data['note']);
+                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                        $service->reject($record, auth()->user(), $data['reason_code'], $data['note']);
                     })
-                    ->visible(fn (Event $record) => $record->status === 'pending'),
+                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
 
                 Action::make('needs_changes')
                     ->label('Request Changes')
@@ -163,10 +161,10 @@ class ModerationQueue extends Page implements HasTable
                             ->required()
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data): void {
-                        $this->requestChanges($record, $data['note']);
+                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                        $service->requestChanges($record, auth()->user(), 'needs_changes', $data['note']);
                     })
-                    ->visible(fn (Event $record) => $record->status === 'pending'),
+                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
 
                 Action::make('view')
                     ->label('View')
@@ -182,63 +180,11 @@ class ModerationQueue extends Page implements HasTable
         $query = Event::query()->with(['institution', 'state']);
 
         return match ($this->activeTab) {
-            'pending' => $query->where('status', 'pending'),
-            'needs_changes' => $query->whereHas('moderationReviews', fn ($q) => $q->where('decision', 'needs_changes'))->where('status', 'pending'),
-            'recently_rejected' => $query->where('status', 'rejected')->where('updated_at', '>=', now()->subDays(7)),
-            default => $query->where('status', 'pending'),
+            'pending' => $query->whereState('status', \App\States\EventStatus\Pending::class),
+            'needs_changes' => $query->whereHas('moderationReviews', fn ($q) => $q->where('decision', 'needs_changes'))->whereState('status', \App\States\EventStatus\Pending::class),
+            'recently_rejected' => $query->whereState('status', \App\States\EventStatus\Rejected::class)->where('updated_at', '>=', now()->subDays(7)),
+            default => $query->whereState('status', \App\States\EventStatus\Pending::class),
         };
-    }
-
-    protected function approveEvent(Event $event): void
-    {
-        $event->update([
-            'status' => 'approved',
-            'published_at' => now(),
-        ]);
-
-        ModerationReview::create([
-            'event_id' => $event->id,
-            'reviewer_id' => auth()->id(),
-            'decision' => 'approved',
-        ]);
-
-        Notification::make()
-            ->title('Event Approved')
-            ->success()
-            ->send();
-    }
-
-    protected function rejectEvent(Event $event, string $reasonCode, string $note): void
-    {
-        $event->update(['status' => 'rejected']);
-
-        ModerationReview::create([
-            'event_id' => $event->id,
-            'reviewer_id' => auth()->id(),
-            'decision' => 'rejected',
-            'reason_code' => $reasonCode,
-            'note' => $note,
-        ]);
-
-        Notification::make()
-            ->title('Event Rejected')
-            ->warning()
-            ->send();
-    }
-
-    protected function requestChanges(Event $event, string $note): void
-    {
-        ModerationReview::create([
-            'event_id' => $event->id,
-            'reviewer_id' => auth()->id(),
-            'decision' => 'needs_changes',
-            'note' => $note,
-        ]);
-
-        Notification::make()
-            ->title('Changes Requested')
-            ->info()
-            ->send();
     }
 
     public static function canAccess(): bool

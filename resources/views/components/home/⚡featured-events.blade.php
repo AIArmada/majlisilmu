@@ -16,9 +16,10 @@ new class extends Component {
             ->where('visibility', 'public')
             ->where('starts_at', '>=', $now)
             ->where('starts_at', '<=', $now->copy()->addDays(7))
-            ->orderByDesc('views_count')
+            ->orderByDesc('is_featured')
+            ->orderByRaw('(going_count * 5 + interests_count * 3 + saves_count * 2 + views_count * 0.1) DESC')
             ->orderBy('starts_at')
-            ->with(['institution', 'venue', 'speakers'])
+            ->with(['media', 'institution.media', 'venue.media', 'speakers.media'])
             ->take(8)
             ->get();
     }
@@ -66,21 +67,13 @@ new class extends Component {
                         <div wire:key="featured-{{ $event->id }}" class="flex-shrink-0">
                             <article class="w-80 lg:w-96 snap-start">
                                 <div
-                                    class="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow border border-slate-100 h-full flex flex-col">
+                                    class="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow border border-slate-100 h-full flex flex-col">
                                     <!-- Image -->
-                                    <div class="relative h-44 bg-gradient-to-br from-emerald-100 to-teal-50">
-                                        @if($event->getFirstMediaUrl('posters'))
-                                            <img src="{{ $event->getFirstMediaUrl('posters', 'thumb') }}" alt="{{ $event->title }}"
-                                                class="w-full h-full object-cover">
-                                        @else
-                                            <div class="absolute inset-0 flex items-center justify-center">
-                                                <svg class="w-16 h-16 text-emerald-200" fill="none" viewBox="0 0 24 24"
-                                                    stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                                </svg>
-                                            </div>
-                                        @endif
+                                    <div class="relative h-44 bg-slate-100 overflow-hidden">
+                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy"
+                                            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                                        <!-- Gradient Overlay -->
+                                        <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                                         <!-- Date Badge -->
                                         <div class="absolute top-4 left-4 bg-white rounded-xl px-3 py-2 shadow-md">
                                             <div class="text-xs font-bold text-slate-400 uppercase">
@@ -100,12 +93,12 @@ new class extends Component {
                                         <div class="flex items-center gap-2 mb-3">
                                             <span
                                                 class="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                                {{ ucfirst($event->genre ?? 'Kuliah') }}
+                                                {{ $event->event_type?->getLabel() ?? __('Kuliah') }}
                                             </span>
-                                            @if($event->language && $event->language !== 'Bahasa Melayu')
+                                            @if($event->gender_restriction && $event->gender_restriction->value !== 'all')
                                                 <span
                                                     class="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                                    {{ $event->language }}
+                                                    {{ $event->gender_restriction->getLabel() }}
                                                 </span>
                                             @endif
                                         </div>
@@ -130,7 +123,7 @@ new class extends Component {
                                                         d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                                 </svg>
                                                 <span
-                                                    class="truncate max-w-[120px]">{{ $event->venue?->name ?? $event->institution?->name ?? 'Online' }}</span>
+                                                    class="truncate max-w-[120px]">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}</span>
                                             </div>
                                             <span class="text-sm font-semibold text-emerald-600">
                                                 {{ $event->starts_at?->format('h:i A') }}

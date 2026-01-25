@@ -5,79 +5,47 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Guards
+    | Defaults
     |--------------------------------------------------------------------------
     */
-    'guards' => ['web'],
+    'guards' => ['web', 'api'],
 
     /*
     |--------------------------------------------------------------------------
-    | Super Admin
+    | Features
     |--------------------------------------------------------------------------
-    | Role name that bypasses ALL permission checks via Gate::before.
     */
     'super_admin_role' => 'super_admin',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Panel User Role
-    |--------------------------------------------------------------------------
-    | Baseline role automatically assigned to new users for basic panel access.
-    */
     'panel_user' => [
         'enabled' => false,
         'name' => 'panel_user',
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Wildcard Permissions
-    |--------------------------------------------------------------------------
-    | Support for 'orders.*' to match 'orders.view', etc. UNIQUE to Authz.
-    */
     'wildcard_permissions' => true,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Authz Scopes
-    |--------------------------------------------------------------------------
-    */
     'scoped_to_tenant' => true,
 
-    'central_app' => true,
+    'central_app' => false,
 
     'authz_scopes' => [
-        'enabled' => true,
+        'enabled' => false,
         'auto_create' => true,
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Permission Key Builder
-    |--------------------------------------------------------------------------
-    | case: snake, kebab, camel, pascal, upper_snake, lower
-    */
     'permissions' => [
         'separator' => '.',
-        'case' => 'kebab',
+        'case' => 'camel',
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Resources
-    |--------------------------------------------------------------------------
-    */
     'resources' => [
         'subject' => 'model',
         'actions' => ['viewAny', 'view', 'create', 'update', 'delete', 'restore', 'forceDelete'],
+        'extra_actions' => [],
+        'action_labels' => [],
         'exclude' => [],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pages
-    |--------------------------------------------------------------------------
-    */
     'pages' => [
         'prefix' => 'page',
         'exclude' => [
@@ -85,11 +53,6 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Widgets
-    |--------------------------------------------------------------------------
-    */
     'widgets' => [
         'prefix' => 'widget',
         'exclude' => [
@@ -98,28 +61,11 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Custom Permissions
-    |--------------------------------------------------------------------------
-    | Additional permissions beyond resources/pages/widgets.
-    | Examples: 'approve_posts', 'export_data' => 'Export Data'
-    */
-    'custom_permissions' => [
-        'institution.manage-members' => 'Manage Institution Members',
-        'institution.manage-donation-accounts' => 'Manage Donation Accounts',
-        'speaker.manage-members' => 'Manage Speaker Members',
-        'event.view-registrations' => 'View Event Registrations',
-        'event.export-registrations' => 'Export Event Registrations',
-    ],
+    'custom_permissions' => [],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Policies
-    |--------------------------------------------------------------------------
-    */
-    'policies' => [
-        'path' => null,
+    'sync' => [
+        'permissions' => [],
+        'roles' => [],
     ],
 
     /*
@@ -128,17 +74,24 @@ return [
     |--------------------------------------------------------------------------
     */
     'navigation' => [
-        'group' => 'Settings',
+        'register' => true,
+        'group' => 'Authz',
         'sort' => 99,
+        'label' => null,
+        'badge' => null,
+        'badge_color' => null,
+        'parent_item' => null,
+        'cluster' => null,
         'icons' => [
             'roles' => 'heroicon-o-shield-check',
+            'roles_active' => null,
             'permissions' => 'heroicon-o-key',
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Role Resource UI
+    | Resources
     |--------------------------------------------------------------------------
     */
     'role_resource' => [
@@ -151,15 +104,38 @@ return [
         ],
         'grid_columns' => 2,
         'checkbox_columns' => 3,
+        'section_column_span' => 1,
+    ],
+
+    'user_resource' => [
+        'enabled' => true,
+        'auto_register' => true,
+        'model' => null,
+        'slug' => 'authz/users',
+        'navigation' => [
+            'group' => 'Authz',
+            'sort' => 98,
+            'icon' => 'heroicon-o-user-group',
+        ],
+        'form' => [
+            'fields' => ['name', 'email', 'password'],
+            'roles' => true,
+            'permissions' => true,
+        ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Sync Configuration
+    | Impersonation
     |--------------------------------------------------------------------------
+    |
+    | - enabled: Enable/disable impersonation feature
+    | - guard: The authentication guard to use for impersonation
+    | - Redirect destination is selected in the modal form
+    | - Leave impersonation always returns to origin panel
     */
-    'sync' => [
-        'permissions' => [],
-        'roles' => [],
+    'impersonate' => [
+        'enabled' => true,
+        'guard' => 'web',
     ],
 ];

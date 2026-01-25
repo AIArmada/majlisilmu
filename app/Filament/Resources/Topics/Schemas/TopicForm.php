@@ -45,6 +45,22 @@ class TopicForm
                             ->helperText('Official topics are curated by the platform.'),
                     ])
                     ->columns(2),
+                Section::make('Media')
+                    ->components([
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('icon')
+                            ->collection('icon')
+                            ->image()
+                            ->imageEditor()
+                            ->avatar()
+                            ->helperText('Topic icon (recommended: square)'),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('banner')
+                            ->collection('banner')
+                            ->image()
+                            ->imageEditor()
+                            ->responsiveImages()
+                            ->helperText('Topic banner/header image'),
+                    ])
+                    ->columns(2),
             ]);
     }
 }

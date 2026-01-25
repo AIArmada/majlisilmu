@@ -132,11 +132,11 @@ class EventJsonLd extends Component
      */
     protected function getEventStatus(): string
     {
-        return match ($this->event->status) {
-            'cancelled' => 'https://schema.org/EventCancelled',
-            'postponed' => 'https://schema.org/EventPostponed',
-            default => 'https://schema.org/EventScheduled',
-        };
+        if ($this->event->status?->equals(\App\States\EventStatus\Rejected::class)) { // Or cancelled if you have a Cancelled state
+            return 'https://schema.org/EventCancelled';
+        }
+
+        return 'https://schema.org/EventScheduled';
     }
 
     /**
@@ -158,7 +158,7 @@ class EventJsonLd extends Component
     {
         $event = $this->event;
 
-        if ($event->status === 'cancelled') {
+        if ($event->status?->equals(\App\States\EventStatus\Rejected::class)) {
             return 'https://schema.org/Discontinued';
         }
 

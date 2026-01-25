@@ -58,6 +58,21 @@ class SeriesForm
                             ->label('Default audience'),
                     ])
                     ->columns(2),
+                Section::make('Media')
+                    ->components([
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                            ->collection('cover')
+                            ->image()
+                            ->imageEditor()
+                            ->columnSpanFull(),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                            ->collection('gallery')
+                            ->multiple()
+                            ->reorderable()
+                            ->image()
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(1),
             ]);
     }
 }

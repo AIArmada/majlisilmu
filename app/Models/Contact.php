@@ -16,7 +16,15 @@ class Contact extends Model
         'type',
         'category',
         'value',
+        'is_public',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_public' => 'boolean',
+        ];
+    }
 
     public function contactable(): MorphTo
     {

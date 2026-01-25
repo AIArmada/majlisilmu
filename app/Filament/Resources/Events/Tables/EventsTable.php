@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\Tables;
 
+use A909M\FilamentStateFusion\Tables\Columns\StateFusionSelectColumn;
+use A909M\FilamentStateFusion\Tables\Filters\StateFusionSelectFilter;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use Filament\Actions\BulkActionGroup;
@@ -26,29 +28,21 @@ class EventsTable
                     ->searchable(),
                 TextColumn::make('starts_at')
                     ->dateTime()
-                    ->description(fn (Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
+                    ->description(fn(Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
                     ->sortable(),
-                TextColumn::make('status')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'draft' => 'gray',
-                        'pending' => 'warning',
-                        'approved' => 'success',
-                        'rejected' => 'danger',
-                        'cancelled' => 'danger',
-                        'postponed' => 'info',
-                        default => 'gray',
-                    })
+                StateFusionSelectColumn::make('status')
                     ->sortable(),
                 TextColumn::make('visibility')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'public' => 'success',
                         'unlisted' => 'warning',
                         'private' => 'danger',
                         default => 'gray',
                     })
                     ->sortable(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_featured')
+                    ->label('Featured'),
                 IconColumn::make('registration_required')
                     ->boolean()
                     ->label('Reg?'),
@@ -57,15 +51,7 @@ class EventsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->options([
-                        'draft' => 'Draft',
-                        'pending' => 'Pending',
-                        'approved' => 'Approved',
-                        'rejected' => 'Rejected',
-                        'cancelled' => 'Cancelled',
-                        'postponed' => 'Postponed',
-                    ]),
+                StateFusionSelectFilter::make('status'),
                 SelectFilter::make('visibility')
                     ->options([
                         'public' => 'Public',

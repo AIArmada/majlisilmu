@@ -28,6 +28,8 @@ describe('Event Submission', function () {
 
         $institution = Institution::factory()->create();
 
+        // Create with initial state string, factory should handle this if cast properly
+        // However, factory sets string. Spatie writes string to DB.
         $event = Event::factory()->create([
             'institution_id' => $institution->id,
             'status' => 'draft',
@@ -36,7 +38,7 @@ describe('Event Submission', function () {
 
         $this->service->submitForModeration($event);
 
-        expect($event->fresh()->status)->toBe('pending');
+        expect((string) $event->fresh()->status)->toBe('pending');
         Notification::assertSentTo($moderator, EventSubmittedNotification::class);
     });
 
@@ -53,7 +55,7 @@ describe('Event Submission', function () {
 
         $this->service->submitForModeration($event);
 
-        expect($event->fresh()->status)->toBe('pending');
+        expect((string) $event->fresh()->status)->toBe('pending');
         expect($event->fresh()->published_at)->toBeNull();
     });
 });
@@ -67,11 +69,14 @@ describe('Event Approval', function () {
             'status' => 'pending',
         ]);
 
-        $review = $this->service->approve($event, $moderator, 'Looks good!');
+        // Service returns void now (transitions handle logic), so we check DB for review
+        $this->service->approve($event, $moderator, 'Looks good!');
+
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
 
         expect($review)->toBeInstanceOf(ModerationReview::class);
         expect($review->decision)->toBe('approved');
-        expect($event->fresh()->status)->toBe('approved');
+        expect((string) $event->fresh()->status)->toBe('approved');
         expect($event->fresh()->published_at)->not->toBeNull();
     });
 
@@ -101,16 +106,18 @@ describe('Event Needs Changes', function () {
             'submitter_id' => $submitter->id,
         ]);
 
-        $review = $this->service->requestChanges(
+        $this->service->requestChanges(
             $event,
             $moderator,
             'incomplete_info',
             'Please add speaker details'
         );
 
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+
         expect($review->decision)->toBe('needs_changes');
         expect($review->reason_code)->toBe('incomplete_info');
-        expect($event->fresh()->status)->toBe('pending');
+        expect((string) $event->fresh()->status)->toBe('needs_changes');
 
         Notification::assertSentTo($submitter, EventNeedsChangesNotification::class);
     });
@@ -128,15 +135,17 @@ describe('Event Rejection', function () {
             'submitter_id' => $submitter->id,
         ]);
 
-        $review = $this->service->reject(
+        $this->service->reject(
             $event,
             $moderator,
             'spam',
             'This appears to be spam.'
         );
 
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+
         expect($review->decision)->toBe('rejected');
-        expect($event->fresh()->status)->toBe('rejected');
+        expect((string) $event->fresh()->status)->toBe('rejected');
 
         Notification::assertSentTo($submitter, EventRejectedNotification::class);
     });
@@ -156,7 +165,7 @@ describe('Sensitive Change Handling', function () {
             'venue_id' => 'new-venue-id',
         ]);
 
-        expect($event->fresh()->status)->toBe('pending');
+        expect((string) $event->fresh()->status)->toBe('pending');
 
         Notification::assertSentTo($moderator, EventSubmittedNotification::class);
     });
@@ -187,6 +196,6 @@ describe('Sensitive Change Handling', function () {
         ]);
 
         // Status should remain approved
-        expect($event->fresh()->status)->toBe('approved');
+        expect((string) $event->fresh()->status)->toBe('approved');
     });
 });

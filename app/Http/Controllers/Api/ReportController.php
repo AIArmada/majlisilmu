@@ -18,7 +18,7 @@ class ReportController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => ['required', Rule::in(['event', 'institution', 'speaker', 'donation'])],
+            'entity_type' => ['required', Rule::in(['event', 'institution', 'speaker', 'donation_channel'])],
             'entity_id' => ['required', 'uuid'],
             'category' => [
                 'required',
@@ -138,7 +138,7 @@ class ReportController extends Controller
             'event' => \App\Models\Event::class,
             'institution' => \App\Models\Institution::class,
             'speaker' => \App\Models\Speaker::class,
-            'donation' => \App\Models\Donation::class,
+            'donation_channel' => \App\Models\DonationChannel::class,
         };
     }
 }

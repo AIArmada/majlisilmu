@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Series extends Model
+class Series extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\SeriesFactory> */
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -50,5 +52,18 @@ class Series extends Model
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
+    }
+
+    /**
+     * Register media collections for Spatie Media Library.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('cover')
+            ->useDisk('public')
+            ->singleFile();
+
+        $this->addMediaCollection('gallery')
+            ->useDisk('public');
     }
 }

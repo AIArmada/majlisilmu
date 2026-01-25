@@ -17,7 +17,7 @@ class PermissionSeeder extends Seeder
             'institution.update',
             'institution.delete',
             'institution.manage-members',
-            'institution.manage-donation-accounts',
+            'institution.manage-donation-channels',
             'event.view',
             'event.create',
             'event.update',

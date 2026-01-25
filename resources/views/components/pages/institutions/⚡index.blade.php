@@ -2,22 +2,30 @@
 
 use App\Models\Institution;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
-new class extends Component
+use Livewire\Attributes\Title;
+
+new 
+#[Title('Institutions - Majlis Ilmu')]
+class extends Component
 {
     #[Computed]
     public function institutions(): LengthAwarePaginator
     {
         $search = request('search');
+        $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         return Institution::query()
             ->withCount('events')
             ->with(['address.state'])
-            ->when($search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+            ->when($search, function ($query, $search) use ($operator) {
+                $query->where(function ($q) use ($search, $operator) {
+                    $q->where('name', $operator, "%{$search}%")
+                        ->orWhere('description', $operator, "%{$search}%");
+                });
             })
             ->orderBy('name', 'asc')
             ->paginate(12);
@@ -25,16 +33,11 @@ new class extends Component
 };
 ?>
 
-@extends('layouts.app')
+@php
+    $institutions = $this->institutions;
+@endphp
 
-@section('title', __('Institutions') . ' - ' . config('app.name'))
-
-@section('content')
-    @php
-        $institutions = $this->institutions;
-    @endphp
-
-    <div class="relative min-h-screen pb-32">
+<div class="relative min-h-screen pb-32">
         <!-- Hero Section -->
         <div class="relative pt-24 pb-16 bg-white border-b border-slate-100 overflow-hidden">
              <div class="absolute inset-0 bg-emerald-50/50"></div>
@@ -103,8 +106,9 @@ new class extends Component
                                      @if($logoUrl)
                                         <img src="{{ $logoUrl }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
                                     @else
-                                        <div class="w-full h-full bg-emerald-500 flex items-center justify-center text-white text-2xl font-bold font-heading">
-                                            {{ substr($institution->name, 0, 1) }}
+                                        <div class="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white relative group-hover:scale-105 transition-transform duration-500">
+                                            <div class="absolute inset-0 opacity-20 bg-[url('/images/pattern-bg.png')] bg-repeat"></div>
+                                            <span class="font-heading font-bold text-3xl shadow-sm relative z-10 select-none">{{ substr($institution->name, 0, 1) }}</span>
                                         </div>
                                     @endif
                                 </div>
@@ -144,4 +148,3 @@ new class extends Component
             @endif
         </div>
     </div>
-@endsection

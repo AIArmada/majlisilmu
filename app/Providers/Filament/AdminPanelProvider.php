@@ -28,6 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandLogo(asset('images/milogo.webp'))
             ->brandLogoHeight('3rem')
             ->login()
@@ -63,6 +64,7 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            ->topNavigation()
             ->authMiddleware([
                 Authenticate::class,
             ]);
