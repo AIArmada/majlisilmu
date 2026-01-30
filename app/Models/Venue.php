@@ -26,15 +26,19 @@ class Venue extends Model implements HasMedia
     protected $fillable = [
         'institution_id',
         'name',
-        'type',
         'slug',
+        'description',
+        'type',
         'facilities',
+        'status',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
             'facilities' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -51,6 +55,11 @@ class Venue extends Model implements HasMedia
     public function series(): HasMany
     {
         return $this->hasMany(Series::class);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     /**

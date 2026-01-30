@@ -15,6 +15,10 @@ new class extends Component {
 
     public function mount(Institution $institution): void
     {
+        if ($institution->status !== 'verified' && ! auth()->user()?->hasAnyRole(['super_admin', 'moderator'])) {
+            abort(404);
+        }
+
         $this->institution = $institution->load([
             'address.state',
             'address.city',
@@ -161,8 +165,8 @@ new class extends Component {
                                             <div class="flex-1">
                                                 <span class="block text-slate-500 text-xs font-semibold uppercase">{{ __('Address') }}</span>
                                                 <p class="font-medium text-slate-800 leading-snug">
-                                                    {{ $institution->addressModel->address1 }}
-                                                    {{ $institution->addressModel->address2 ? ', ' . $institution->addressModel->address2 : '' }}
+                                                    {{ $institution->addressModel->line1 }}
+                                                    {{ $institution->addressModel->line2 ? ', ' . $institution->addressModel->line2 : '' }}
                                                     <br>
                                                     {{ $institution->addressModel->postcode }} {{ $institution->addressModel->city?->name }}
                                                 </p>

@@ -18,14 +18,16 @@ class TopicFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->words(rand(2, 4), true);
+        $name = fake()->words(rand(2, 4), true);
 
         return [
             'parent_id' => null,
             'name' => ucwords($name),
-            'slug' => Str::slug($name),
+            'slug' => Str::slug($name).'-'.Str::random(5),
             'is_official' => fake()->boolean(30),
-            'sort_order' => fake()->numberBetween(0, 100),
+            'order_column' => fake()->numberBetween(0, 100),
+            'status' => 'verified',
+            'is_active' => true,
         ];
     }
 

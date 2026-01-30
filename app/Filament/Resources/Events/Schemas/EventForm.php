@@ -69,11 +69,11 @@ class EventForm
                                             ->options(collect(TimingMode::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
                                             ->default(TimingMode::Absolute->value)
                                             ->required()
-                                            ->live()
-                                            ->helperText(fn(Get $get): string => match ($get('timing_mode')) {
-                                                TimingMode::PrayerRelative->value => 'Waktu akan dikira berdasarkan waktu solat di lokasi majlis',
-                                                default => 'Tetapkan waktu yang tepat',
-                                            }),
+                                            ->helperText(\Filament\Schemas\JsContent::make(<<<'JS'
+                                                $get('timing_mode') === 'prayer_relative'
+                                                    ? 'Waktu akan dikira berdasarkan waktu solat di lokasi majlis'
+                                                    : 'Tetapkan waktu yang tepat'
+                                            JS)),
 
                                         // Prayer-relative timing fields
                                         Fieldset::make('Waktu Solat')
@@ -81,36 +81,63 @@ class EventForm
                                                 Select::make('prayer_reference')
                                                     ->label('Waktu Solat')
                                                     ->options(collect(PrayerReference::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
-                                                    ->required()
-                                                    ->live()
-                                                    ->afterStateUpdated(fn(Get $get, Set $set) => self::updatePrayerDisplayText($get, $set)),
+                                                    ->required(),
                                                 Select::make('prayer_offset')
                                                     ->label('Masa')
                                                     ->options(collect(PrayerOffset::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
                                                     ->default(PrayerOffset::Immediately->value)
-                                                    ->required()
-                                                    ->live()
-                                                    ->afterStateUpdated(fn(Get $get, Set $set) => self::updatePrayerDisplayText($get, $set)),
-                                                TextInput::make('prayer_display_text')
+                                                    ->required(),
+                                                \Filament\Forms\Components\Placeholder::make('prayer_display_text_placeholder')
                                                     ->label('Paparan Waktu')
-                                                    ->disabled()
-                                                    ->dehydrated()
+                                                    ->content(\Filament\Schemas\JsContent::make(<<<'JS'
+                                                        const prayer = $get('prayer_reference');
+                                                        const offset = $get('prayer_offset');
+                                                        if (!prayer || !offset) return '';
+                                                        
+                                                        // Mapping logic roughly matching PrayerOffset::displayText
+                                                        // This is a simplified client-side preview.
+                                                        const prayerLabel = {
+                                                            'fajr': 'Subuh', 'syuruk': 'Syuruk', 'dhuha': 'Dhuha', 
+                                                            'zuhur': 'Zuhur', 'asar': 'Asar', 'maghrib': 'Maghrib', 'isyak': 'Isyak'
+                                                        }[prayer] || prayer;
+
+                                                        const offsetLabels = {
+                                                            'before_30': `30 minit sebelum ${prayerLabel}`,
+                                                            'before_15': `15 minit sebelum ${prayerLabel}`,
+                                                            'immediately': `Sejurus selepas ${prayerLabel}`, # Check wording in PrayerOffset
+                                                            'after_15': `15 minit selepas ${prayerLabel}`,
+                                                            'after_30': `30 minit selepas ${prayerLabel}`,
+                                                            'after_45': `45 minit selepas ${prayerLabel}`,
+                                                            'after_60': `1 jam selepas ${prayerLabel}`
+                                                        };
+                                                        
+                                                        return offsetLabels[offset] || (`${offset} ${prayerLabel}`);
+                                                    JS))
                                                     ->helperText('Teks ini akan dipaparkan kepada pengguna'),
                                             ])
                                             ->columns(3)
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                                            ->visibleJs(<<<'JS'
+                                                $get('timing_mode') === 'prayer_relative'
+                                            JS),
 
                                         // Absolute timing fields
                                         DateTimePicker::make('starts_at')
                                             ->label('Waktu Mula')
                                             ->required()
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value),
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
+                                            ->visibleJs(<<<'JS'
+                                                $get('timing_mode') === 'absolute'
+                                            JS),
 
                                         // Event date (for prayer-relative mode)
                                         DatePicker::make('event_date')
                                             ->label('Tarikh Majlis')
                                             ->required()
                                             ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                                            ->visibleJs(<<<'JS'
+                                                $get('timing_mode') === 'prayer_relative'
+                                            JS)
                                             ->dehydrated(false)
                                             ->helperText('Pilih tarikh majlis. Waktu sebenar akan dikira berdasarkan waktu solat pada tarikh ini.'),
 
@@ -153,13 +180,11 @@ class EventForm
                                                 'en' => 'English',
                                                 'ar' => 'Arabic',
                                             ]),
-                                        Select::make('genre')
-                                            ->options([
-                                                'kuliah' => 'Kuliah',
-                                                'ceramah' => 'Ceramah',
-                                                'tazkirah' => 'Tazkirah',
-                                                'forum' => 'Forum',
-                                            ]),
+                                        Select::make('event_type_id')
+                                            ->label('Event Type')
+                                            ->relationship('eventType', 'name')
+                                            ->searchable()
+                                            ->preload(),
                                         Select::make('audience')
                                             ->options([
                                                 'general' => 'General',
@@ -226,21 +251,4 @@ class EventForm
             ]);
     }
 
-    /**
-     * Update the prayer display text based on selected prayer and offset.
-     */
-    protected static function updatePrayerDisplayText(Get $get, Set $set): void
-    {
-        $prayerValue = $get('prayer_reference');
-        $offsetValue = $get('prayer_offset');
-
-        if ($prayerValue && $offsetValue) {
-            $prayer = PrayerReference::tryFrom($prayerValue);
-            $offset = PrayerOffset::tryFrom($offsetValue);
-
-            if ($prayer && $offset) {
-                $set('prayer_display_text', $offset->displayText($prayer));
-            }
-        }
-    }
 }

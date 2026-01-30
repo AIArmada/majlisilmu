@@ -12,14 +12,22 @@ class District extends Model
     /** @use HasFactory<\Database\Factories\DistrictFactory> */
     use HasFactory;
 
+    public $timestamps = false;
+
     /**
      * @var list<string>
      */
     protected $fillable = [
+        'country_id',
         'state_id',
+        'country_code',
         'name',
-        'slug',
     ];
+
+    public function country(): BelongsTo
+    {
+        return $this->belongsTo(Country::class);
+    }
 
     public function state(): BelongsTo
     {

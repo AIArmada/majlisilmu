@@ -9,9 +9,9 @@ return new class extends Migration {
     {
         Schema::create('speakers', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name')->index();
+            $table->string('name');
             $table->string('gender')->nullable()->default('male'); // male, female
-            $table->string('honorific')->nullable()->index(); // Dato’, Datin, Tan Sri, Tun
+            $table->string('honorific')->nullable(); // Dato', Datin, Tan Sri, Tun
             $table->string('pre_nominal')->nullable(); // Dr, Prof, Ir, Ustaz
             $table->string('post_nominal')->nullable(); // PhD, HONS, MSc
             $table->string('slug')->unique();
@@ -21,9 +21,23 @@ return new class extends Migration {
             $table->boolean('is_freelance')->default(false);
             $table->string('job_title')->nullable();
 
-            $table->string('status')->nullable()->index();
+            $table->string('status')->nullable();
+            $table->boolean('is_active')->default(true);
 
             $table->timestamps();
+
+            // Optimized composite indexes for common query patterns
+            // Main listing: WHERE status='verified' AND is_active=true ORDER BY name
+            $table->index(['status', 'is_active', 'name'], 'speakers_status_active_name');
+            
+            // Gender filtering: WHERE gender='male' AND is_active=true ORDER BY name
+            $table->index(['gender', 'is_active', 'name'], 'speakers_gender_active_name');
+            
+            // Combined filters: WHERE gender='X' AND status='Y' AND is_active=true ORDER BY name
+            $table->index(['gender', 'status', 'is_active', 'name'], 'speakers_gender_status_active');
+            
+            // Sitemap generation: ORDER BY updated_at DESC
+            $table->index('updated_at', 'speakers_sitemap');
         });
     }
 

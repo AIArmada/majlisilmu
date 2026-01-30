@@ -46,25 +46,20 @@ new
         <div class="container relative z-10 px-6 mx-auto">
             <div class="flex flex-col items-center max-w-5xl mx-auto text-center stagger-children">
 
-                <!-- Badge -->
-                <div class="mb-8 transform hover:scale-105 transition-transform duration-300">
-                    <livewire:home.tonight-badge defer.bundle />
-                </div>
+
 
                 <!-- Main Heading -->
                 <h1
-                    class="font-heading font-extrabold text-5xl sm:text-7xl lg:text-8xl tracking-tight text-white mb-8 leading-[0.9]">
+                    class="font-heading font-extrabold text-4xl sm:text-6xl lg:text-8xl tracking-tight text-white mb-3 leading-tight whitespace-nowrap">
                     <span
-                        class="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">{{ __('Cari Majlis Ilmu') }}</span>
+                        class="text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">{{ __('Jom ke') }}</span>
                     <span
-                        class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-gold-300 to-emerald-400 animate-gradient-x bg-[length:200%_auto]">
-                        {{ __('Berdekatan Anda') }}
-                    </span>
+                        class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-gold-300 to-emerald-400 animate-gradient-x bg-[length:200%_auto]">{{ __('Majlis Ilmu!') }}</span>
                 </h1>
 
                 <!-- Subheading -->
                 <p class="max-w-2xl mx-auto mb-12 text-lg sm:text-xl text-slate-300/90 font-light leading-relaxed">
-                    {{ __('Temui kuliah, ceramah, dan majlis ilmu di seluruh Malaysia. Dari masjid ke masjid, diimarahkan oleh para asatizah.') }}
+                    {{ __('Ketahui & hadiri majlis ilmu berdekatan atau di mana-mana sahaja pada bila-bila masa. Pilih penceramah atau topik kegemaran anda.') }}
                 </p>
 
                 <!-- Search Interface -->
@@ -108,26 +103,27 @@ new
                         </div>
 
                         <!-- Locate Button -->
-                        <button type="button" @click="locate" :disabled="locating"
-                            class="hidden sm:flex items-center justify-center w-14 h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-400 hover:text-emerald-400 transition-all custom-tooltip"
-                            title="{{ __('Cari berdekatan saya') }}">
-                            <div x-show="!locating">
-                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </div>
-                            <div x-show="locating" x-cloak>
-                                <svg class="animate-spin w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                        stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
-                            </div>
-                        </button>
+                        <flux:tooltip content="{{ __('Cari majlis berdekatan anda') }}" position="top">
+                            <button type="button" @click="locate" :disabled="locating"
+                                class="hidden sm:flex items-center justify-center w-14 h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-400 hover:text-emerald-400 transition-all">
+                                <div x-show="!locating">
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </div>
+                                <div x-show="locating" x-cloak>
+                                    <svg class="animate-spin w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                </div>
+                            </button>
+                        </flux:tooltip>
 
                         <!-- Search Button -->
                         <button type="submit"
@@ -145,20 +141,44 @@ new
                 </div>
 
                 <!-- Quick Links -->
-                <div class="mt-8 flex flex-wrap justify-center gap-4 text-sm font-medium text-slate-400">
-                    <span class="hidden sm:inline">{{ __('Cadangan:') }}</span>
+                <div class="mt-10 flex flex-wrap justify-center gap-3 text-sm font-medium">
                     <a href="{{ route('events.index', ['date' => 'today']) }}" wire:navigate
-                        class="hover:text-gold-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        class="text-slate-400 hover:text-gold-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-gold-500/30">
                         <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                         {{ __('Malam Ini') }}
                     </a>
                     <a href="{{ route('events.index', ['date' => 'friday']) }}" wire:navigate
-                        class="hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        class="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-emerald-500/30">
                         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                         {{ __('Jumaat Ini') }}
                     </a>
+                    <a href="{{ route('events.index', ['date' => 'this-week']) }}" wire:navigate
+                        class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        {{ __('Minggu Ini') }}
+                    </a>
+                    <a href="{{ route('events.index', ['date' => 'weekend']) }}" wire:navigate
+                        class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        {{ __('Hujung Minggu') }}
+                    </a>
+                    <a href="{{ route('events.index', ['search' => 'Tazkirah']) }}" wire:navigate
+                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        #Tazkirah
+                    </a>
+                    <a href="{{ route('events.index', ['search' => 'Tafsir']) }}" wire:navigate
+                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        #Tafsir
+                    </a>
+                    <a href="{{ route('events.index', ['search' => 'Fiqh']) }}" wire:navigate
+                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        #Fiqh
+                    </a>
+                    <a href="{{ route('events.index', ['search' => 'Aqidah']) }}" wire:navigate
+                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        #Aqidah
+                    </a>
+
                     <button type="button" @click="document.querySelector('[x-data]').__x.$data.locate()"
-                        class="sm:hidden hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        class="sm:hidden text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -175,11 +195,14 @@ new
         </div>
     </section>
 
-    <!-- Tonight's Events - Lazy loaded component -->
-    <livewire:home.tonight-events lazy.bundle />
+    <!-- Upcoming Contextual Events (Replaces Tonight) -->
+    <livewire:home.upcoming-prayer-events lazy.bundle />
 
     <!-- Featured Events - Lazy loaded component -->
     <livewire:home.featured-events lazy.bundle />
+
+    <!-- Personal Dashboard (My Majlis) - Lazy loaded, only shows if auth -->
+    <livewire:home.my-majlis lazy.bundle />
 
     <!-- Browse by Date Quick Filter -->
     <section class="bg-slate-50 pb-20 pt-10">

@@ -11,9 +11,7 @@ new class extends Component {
     {
         $now = now();
 
-        return Event::query()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+        return Event::active()
             ->where('starts_at', '>=', $now)
             ->where('starts_at', '<=', $now->copy()->addDays(7))
             ->orderByDesc('is_featured')
@@ -93,12 +91,12 @@ new class extends Component {
                                         <div class="flex items-center gap-2 mb-3">
                                             <span
                                                 class="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                                {{ $event->event_type?->getLabel() ?? __('Kuliah') }}
+                                                {{ $event->eventType?->name ?? __('Kuliah') }}
                                             </span>
-                                            @if($event->gender_restriction && $event->gender_restriction->value !== 'all')
+                                            @if($event->gender && $event->gender->value !== 'all')
                                                 <span
                                                     class="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                                    {{ $event->gender_restriction->getLabel() }}
+                                                    {{ $event->gender->getLabel() }}
                                                 </span>
                                             @endif
                                         </div>

@@ -36,6 +36,8 @@ class VenueFactory extends Factory
         return [
             'institution_id' => Institution::factory(),
             'name' => $name,
+            'slug' => $slug,
+            'description' => fake()->paragraph(),
             'type' => fake()->randomElement([
                 'main_hall',
                 'seminar_room',
@@ -45,13 +47,14 @@ class VenueFactory extends Factory
                 'foyer',
                 'other',
             ]),
-            'slug' => $slug,
             'facilities' => [
                 'parking' => fake()->boolean(),
                 'oku' => fake()->boolean(),
                 'women_section' => fake()->boolean(),
                 'ablution_area' => fake()->boolean(),
             ],
+            'status' => 'verified',
+            'is_active' => true,
         ];
     }
 
@@ -59,8 +62,8 @@ class VenueFactory extends Factory
     {
         return $this->afterCreating(function (\App\Models\Venue $venue) {
             $venue->address()->create([
-                'address1' => fake()->streetAddress(),
-                'address2' => fake()->optional()->secondaryAddress(),
+                'line1' => fake()->streetAddress(),
+                'line2' => fake()->optional()->secondaryAddress(),
                 'postcode' => fake()->postcode(),
                 'lat' => fake()->randomFloat(7, 1.0, 7.0),
                 'lng' => fake()->randomFloat(7, 99.0, 119.0),

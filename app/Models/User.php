@@ -23,6 +23,27 @@ class User extends Authenticatable implements FilamentUser
 
     protected $keyType = 'string';
 
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user) {
+            $user->socialAccounts()->each(fn ($account) => $account->delete());
+            $user->institutions()->detach();
+            $user->speakers()->detach();
+            $user->memberEvents()->detach();
+            $user->savedEvents()->detach();
+            $user->interestedEvents()->detach();
+            $user->goingEvents()->detach();
+
+            $user->ownedEvents()->update(['user_id' => null]);
+            $user->eventSubmissions()->update(['submitted_by' => null]);
+            $user->moderationReviews()->update(['reviewer_id' => null]);
+            $user->reports()->update(['reporter_id' => null]);
+            $user->handledReports()->update(['handled_by' => null]);
+            $user->registrations()->each(fn ($reg) => $reg->delete());
+            $user->savedSearches()->each(fn ($search) => $search->delete());
+        });
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -129,6 +150,7 @@ class User extends Authenticatable implements FilamentUser
     public function memberEvents(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_members')
+            ->using(EventMember::class)
             ->withPivot(['role', 'joined_at'])
             ->withTimestamps();
     }

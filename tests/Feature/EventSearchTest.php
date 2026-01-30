@@ -2,6 +2,7 @@
 
 use App\Models\Event;
 use App\Models\State;
+use App\Services\EventSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -84,9 +85,12 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by genre', function () {
+        $kuliah = \App\Models\EventType::factory()->create(['slug' => 'kuliah']);
+        $forum = \App\Models\EventType::factory()->create(['slug' => 'forum']);
+
         Event::factory()->create([
             'title' => 'Kuliah Event',
-            'event_type' => 'kuliah',
+            'event_type_id' => $kuliah->id,
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -95,7 +99,7 @@ describe('Event Search Filters', function () {
 
         Event::factory()->create([
             'title' => 'Forum Event',
-            'event_type' => 'forum',
+            'event_type_id' => $forum->id,
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -157,6 +161,50 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Event 12')
             ->assertDontSee('Event 13');
+    });
+
+    it('eager loads event card relationships', function () {
+        config(['scout.driver' => 'database']);
+
+        $eventType = \App\Models\EventType::factory()->create();
+        $venue = \App\Models\Venue::factory()->create();
+        $institution = $venue->institution;
+
+        Event::factory()
+            ->for($eventType, 'eventType')
+            ->for($institution)
+            ->for($venue)
+            ->hasSpeakers(1)
+            ->create([
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+                'starts_at' => now()->addDays(1),
+            ]);
+
+        $events = app(EventSearchService::class)->search(
+            query: null,
+            filters: [],
+            perPage: 20,
+            sort: 'time'
+        );
+
+        $event = $events->first();
+
+        expect($event)->not->toBeNull()
+            ->and($event->relationLoaded('eventType'))->toBeTrue()
+            ->and($event->relationLoaded('institution'))->toBeTrue()
+            ->and($event->relationLoaded('venue'))->toBeTrue()
+            ->and($event->relationLoaded('speakers'))->toBeTrue()
+            ->and($event->relationLoaded('media'))->toBeTrue();
+
+        if ($event->institution) {
+            expect($event->institution->relationLoaded('media'))->toBeTrue();
+        }
+
+        if ($event->speakers->isNotEmpty()) {
+            expect($event->speakers->first()->relationLoaded('media'))->toBeTrue();
+        }
     });
 
     it('displays event count', function () {

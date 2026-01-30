@@ -11,24 +11,35 @@ new class extends Component {
     #[Computed]
     public function events(): int
     {
-        return Cache::remember('home.stats.events', 300, function () {
-            return Event::where('status', 'approved')->count();
+        return Cache::remember('home.stats.events.upcoming', 300, function () {
+            // Only count approved events starting from now onwards
+            return Event::active()
+                ->where('starts_at', '>=', now())
+                ->count('id');
         });
     }
 
     #[Computed]
     public function speakers(): int
     {
-        return Cache::remember('home.stats.speakers', 300, function () {
-            return Speaker::count();
+        return Cache::remember('home.stats.speakers.upcoming', 300, function () {
+            return Speaker::active()
+                ->whereHas('events', function ($query) {
+                    $query->active()
+                        ->where('starts_at', '>=', now());
+                })->count('id');
         });
     }
 
     #[Computed]
     public function institutions(): int
     {
-        return Cache::remember('home.stats.institutions', 300, function () {
-            return Institution::count();
+        return Cache::remember('home.stats.institutions.upcoming', 300, function () {
+            return Institution::active()
+                ->whereHas('events', function ($query) {
+                    $query->active()
+                        ->where('starts_at', '>=', now());
+                })->count('id');
         });
     }
 };
@@ -38,15 +49,15 @@ new class extends Component {
 <div class="mt-16 grid grid-cols-3 gap-4 max-w-lg mx-auto">
     <div class="text-center">
         <div class="h-10 w-16 bg-white/20 rounded animate-pulse mx-auto"></div>
-        <div class="text-sm text-slate-400 mt-1">{{ __('Majlis') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Majlis Akan Datang') }}</div>
     </div>
     <div class="text-center border-x border-white/10">
         <div class="h-10 w-16 bg-white/20 rounded animate-pulse mx-auto"></div>
-        <div class="text-sm text-slate-400 mt-1">{{ __('Penceramah') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Penceramah') }}</div>
     </div>
     <div class="text-center">
         <div class="h-10 w-16 bg-white/20 rounded animate-pulse mx-auto"></div>
-        <div class="text-sm text-slate-400 mt-1">{{ __('Institusi') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Institusi') }}</div>
     </div>
 </div>
 @endplaceholder
@@ -54,14 +65,14 @@ new class extends Component {
 <div class="mt-16 grid grid-cols-3 gap-4 max-w-lg mx-auto">
     <div class="text-center">
         <div class="text-3xl sm:text-4xl font-bold text-white">{{ number_format($this->events) }}</div>
-        <div class="text-sm text-slate-400 mt-1">{{ __('Majlis') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Majlis Akan Datang') }}</div>
     </div>
     <div class="text-center border-x border-white/10">
         <div class="text-3xl sm:text-4xl font-bold text-white">{{ number_format($this->speakers) }}</div>
-        <div class="text-sm text-slate-400 mt-1">{{ __('Penceramah') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Penceramah') }}</div>
     </div>
     <div class="text-center">
         <div class="text-3xl sm:text-4xl font-bold text-white">{{ number_format($this->institutions) }}</div>
-        <div class="text-sm text-slate-400 mt-1">{{ __('Institusi') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Institusi') }}</div>
     </div>
 </div>

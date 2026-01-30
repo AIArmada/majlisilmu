@@ -17,14 +17,39 @@ class SavedSearchSeeder extends Seeder
             return;
         }
 
-        $users = User::query()->get();
+        SavedSearch::unsetEventDispatcher();
 
-        $users->each(function (User $user): void {
-            SavedSearch::factory()
-                ->count(2)
-                ->create([
-                    'user_id' => $user->id,
-                ]);
+        \Illuminate\Support\Facades\DB::transaction(function (): void {
+            $userIds = User::query()->pluck('id')->toArray();
+
+            $searchesToInsert = [];
+
+            foreach ($userIds as $userId) {
+                for ($i = 0; $i < 2; $i++) {
+                    $searchData = SavedSearch::factory()->make([
+                        'user_id' => $userId,
+                    ])->toArray();
+
+                    if (isset($searchData['filters']) && is_array($searchData['filters'])) {
+                        $searchData['filters'] = json_encode($searchData['filters']);
+                    }
+
+                    $searchesToInsert[] = array_merge(
+                        $searchData,
+                        [
+                            'id' => (string) \Illuminate\Support\Str::uuid(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                }
+            }
+
+            foreach (array_chunk($searchesToInsert, 200) as $chunk) {
+                SavedSearch::insert($chunk);
+            }
         });
+
+        SavedSearch::setEventDispatcher(app('events'));
     }
 }

@@ -8,16 +8,12 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        if (Schema::hasTable('donation_channels')) {
-            return;
-        }
-
         Schema::create('donation_channels', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuidMorphs('donatable');
 
             $table->string('label')->nullable();
-            $table->string('recipient_name');
+            $table->string('recipient');
 
             // bank_account | duitnow | ewallet
             $table->string('method');
@@ -47,83 +43,9 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->index(['donatable_type', 'donatable_id', 'method']);
-            $table->index(['recipient_name']);
+            $table->index(['recipient']);
             $table->index(['status']);
         });
-
-        if (DB::getDriverName() !== 'sqlite') {
-            // Add CHECK constraint for method
-            DB::statement("
-                ALTER TABLE donation_channels
-                ADD CONSTRAINT donation_channels_method_chk
-                CHECK (method IN ('bank_account','duitnow','ewallet'))
-            ");
-
-            // Add CHECK constraint for status
-            DB::statement("
-                ALTER TABLE donation_channels
-                ADD CONSTRAINT donation_channels_status_chk
-                CHECK (status IN ('unverified','verified','rejected','inactive'))
-            ");
-
-            // Add CHECK constraint to enforce required fields by method
-            DB::statement("
-                ALTER TABLE donation_channels
-                ADD CONSTRAINT donation_channels_require_fields_chk
-                CHECK (
-                    (method = 'bank_account' AND bank_code IS NOT NULL AND account_number IS NOT NULL
-                        AND duitnow_type IS NULL AND duitnow_value IS NULL
-                        AND ewallet_provider IS NULL AND ewallet_handle IS NULL AND ewallet_qr_payload IS NULL
-                    )
-                    OR
-                    (method = 'duitnow' AND duitnow_type IS NOT NULL AND duitnow_value IS NOT NULL
-                        AND bank_code IS NULL AND bank_name IS NULL AND account_number IS NULL
-                        AND ewallet_provider IS NULL AND ewallet_handle IS NULL AND ewallet_qr_payload IS NULL
-                    )
-                    OR
-                    (method = 'ewallet' AND ewallet_provider IS NOT NULL
-                        AND (ewallet_handle IS NOT NULL OR ewallet_qr_payload IS NOT NULL)
-                        AND bank_code IS NULL AND bank_name IS NULL AND account_number IS NULL
-                        AND duitnow_type IS NULL AND duitnow_value IS NULL
-                    )
-                )
-            ");
-
-            // Partial unique index: prevent duplicate bank accounts
-            DB::statement("
-                CREATE UNIQUE INDEX donation_channels_unique_bank
-                ON donation_channels (donatable_type, donatable_id, bank_code, account_number)
-                WHERE method = 'bank_account'
-            ");
-
-            // Partial unique index: prevent duplicate DuitNow
-            DB::statement("
-                CREATE UNIQUE INDEX donation_channels_unique_duitnow
-                ON donation_channels (donatable_type, donatable_id, duitnow_type, duitnow_value)
-                WHERE method = 'duitnow'
-            ");
-
-            // Partial unique index: prevent duplicate e-wallet by handle
-            DB::statement("
-                CREATE UNIQUE INDEX donation_channels_unique_ewallet
-                ON donation_channels (donatable_type, donatable_id, ewallet_provider, ewallet_handle)
-                WHERE method = 'ewallet' AND ewallet_handle IS NOT NULL
-            ");
-
-            // Partial unique index: prevent duplicate e-wallet by QR payload
-            DB::statement("
-                CREATE UNIQUE INDEX donation_channels_unique_ewallet_qr
-                ON donation_channels (donatable_type, donatable_id, ewallet_provider, md5(ewallet_qr_payload))
-                WHERE method = 'ewallet' AND ewallet_qr_payload IS NOT NULL
-            ");
-
-            // Partial unique index: only one default per method per donatable
-            DB::statement('
-                CREATE UNIQUE INDEX donation_channels_one_default_per_method
-                ON donation_channels (donatable_type, donatable_id, method)
-                WHERE is_default = true
-            ');
-        }
     }
 
     public function down(): void

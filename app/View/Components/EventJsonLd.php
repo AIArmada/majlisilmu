@@ -162,8 +162,8 @@ class EventJsonLd extends Component
             return 'https://schema.org/Discontinued';
         }
 
-        if ($event->registration_required && $event->capacity) {
-            if ($event->registrations_count >= $event->capacity) {
+        if ($event->settings?->registration_required && $event->settings?->capacity) {
+            if ($event->registrations_count >= $event->settings->capacity) {
                 return 'https://schema.org/SoldOut';
             }
         }

@@ -159,7 +159,7 @@ class SpeakerFactory extends Factory
         $givenName = trim(implode(' ', array_filter([$firstName, $secondName])));
         $connector = $isFemale ? 'binti' : 'bin';
         $parentName = fake()->randomElement($parentNames);
-        $name = $givenName . ' ' . $connector . ' ' . $parentName;
+        $name = $givenName.' '.$connector.' '.$parentName;
 
         // Populate new fields
         $preNominal = fake()->boolean(30)
@@ -210,9 +210,10 @@ class SpeakerFactory extends Factory
             'post_nominal' => $postNominal,
             'is_freelance' => fake()->boolean(20),
             'qualifications' => $qualifications,
-            'slug' => Str::slug($name . '-' . Str::random(8)),
+            'slug' => Str::slug($name.'-'.Str::random(8)),
             'bio' => fake()->optional()->paragraph(),
-            'status' => fake()->randomElement(['unverified', 'pending', 'verified']),
+            'status' => 'verified',
+            'is_active' => true,
         ];
     }
 
@@ -251,7 +252,7 @@ class SpeakerFactory extends Factory
             }
 
             // Attach Institutions
-            if (!$speaker->is_freelance) {
+            if (! $speaker->is_freelance) {
                 $institutions = \App\Models\Institution::inRandomOrder()->limit(rand(1, 2))->get();
                 foreach ($institutions as $institution) {
                     $speaker->institutions()->attach($institution->id, [

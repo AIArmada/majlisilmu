@@ -9,9 +9,7 @@ new class extends Component {
     #[Computed]
     public function events(): Collection
     {
-        return Event::query()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+        return Event::active()
             ->where('starts_at', '>=', now())
             ->orderBy('starts_at')
             ->with(['institution', 'venue', 'speakers'])
@@ -117,7 +115,7 @@ new class extends Component {
                                 <div class="mt-4 flex flex-wrap gap-2">
                                     <span
                                         class="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                        {{ $event->event_type?->getLabel() ?? __('Kuliah') }}
+                                        {{ $event->eventType?->name ?? __('Kuliah') }}
                                     </span>
                                     @if($event->speakers->isNotEmpty())
                                         <span

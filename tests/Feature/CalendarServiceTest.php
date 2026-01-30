@@ -86,7 +86,7 @@ describe('CalendarService', function () {
             'name' => 'Masjid Negara',
         ]);
         $venue->address()->update([
-            'address1' => 'Jalan Perdana, KL',
+            'line1' => 'Jalan Perdana, KL',
         ]);
 
         $event = Event::factory()->create([
@@ -104,7 +104,7 @@ describe('CalendarService', function () {
             'name' => 'Masjid Jamek',
         ]);
         $institution->address()->update([
-            'address1' => 'Jalan Tun Perak',
+            'line1' => 'Jalan Tun Perak',
         ]);
 
         $event = Event::factory()->create([

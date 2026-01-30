@@ -12,4 +12,11 @@ class Tag extends SpatieTag
     public $incrementing = false;
 
     protected $keyType = 'string';
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Tag $tag) {
+            \Illuminate\Support\Facades\DB::table('taggables')->where('tag_id', $tag->id)->delete();
+        });
+    }
 }

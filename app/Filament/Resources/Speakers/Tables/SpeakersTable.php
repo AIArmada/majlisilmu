@@ -21,6 +21,8 @@ class SpeakersTable
                 TextColumn::make('status')
                     ->badge()
                     ->sortable(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Active'),
                 TextColumn::make('email')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')

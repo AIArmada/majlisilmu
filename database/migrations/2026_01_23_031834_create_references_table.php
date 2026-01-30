@@ -19,14 +19,13 @@ return new class extends Migration
             $table->string('publication_year')->nullable();
             $table->string('publisher')->nullable();
             $table->text('description')->nullable();
-            $table->string('external_link')->nullable(); // Link to buy or view
             $table->boolean('is_canonical')->default(false)->index(); // Generic/Official reference
             $table->timestamps();
         });
 
         Schema::create('reference_topic', function (Blueprint $table) {
-            $table->foreignUuid('reference_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('topic_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('reference_id');
+            $table->foreignUuid('topic_id');
             $table->primary(['reference_id', 'topic_id']);
         });
     }

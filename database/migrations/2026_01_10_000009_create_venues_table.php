@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('venues', function (Blueprint $table) {
@@ -14,7 +13,9 @@ return new class extends Migration
             $table->string('type')->nullable()->index();
             $table->string('name');
             $table->string('slug')->unique();
-
+            $table->text('description')->nullable();
+            $table->string('status')->nullable()->index();
+            $table->boolean('is_active')->default(true)->index();
             $table->jsonb('facilities')->nullable();
             $table->timestamps();
         });

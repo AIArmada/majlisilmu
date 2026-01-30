@@ -1,6 +1,11 @@
 @import 'tailwindcss';
+@import '../../vendor/livewire/flux/dist/flux.css';
+@import '../../vendor/filament/schemas/resources/css/index.css';
+@import '../../public/css/filament/filament/app.css';
 
+@source '../../vendor/filament/**/*.blade.php';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../vendor/livewire/flux/stubs/resources/views/flux/**/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
@@ -8,6 +13,19 @@
 @theme {
     --font-heading: 'Outfit', ui-sans-serif, system-ui, sans-serif;
     --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+
+    /* Filament compatibility - 'color' is used internally */
+    --color-color-50: oklch(0.985 0 0);
+    --color-color-100: oklch(0.97 0 0);
+    --color-color-200: oklch(0.92 0 0);
+    --color-color-300: oklch(0.87 0 0);
+    --color-color-400: oklch(0.71 0 0);
+    --color-color-500: oklch(0.55 0 0);
+    --color-color-600: oklch(0.44 0 0);
+    --color-color-700: oklch(0.37 0 0);
+    --color-color-800: oklch(0.27 0 0);
+    --color-color-900: oklch(0.21 0 0);
+    --color-color-950: oklch(0.14 0 0);
 
     /* Premium Emerald Palette - Deep & Rich */
     --color-emerald-50: oklch(0.985 0.012 165);
@@ -49,11 +67,22 @@
 
     /* Semantic Colors */
     --color-primary: var(--color-emerald-600);
+    --color-primary-50: var(--color-emerald-50);
+    --color-primary-100: var(--color-emerald-100);
+    --color-primary-200: var(--color-emerald-200);
+    --color-primary-300: var(--color-emerald-300);
+    --color-primary-400: var(--color-emerald-400);
+    --color-primary-500: var(--color-emerald-500);
+    --color-primary-600: var(--color-emerald-600);
+    --color-primary-700: var(--color-emerald-700);
+    --color-primary-800: var(--color-emerald-800);
+    --color-primary-900: var(--color-emerald-900);
+    --color-primary-950: var(--color-emerald-950);
     --color-primary-dark: var(--color-emerald-800);
     --color-primary-light: var(--color-emerald-400);
     --color-secondary: var(--color-gold-500);
     --color-secondary-dark: var(--color-gold-600);
-    --color-background: var(--color-slate-50);
+    --color-background: var(--color-emerald-100);
     --color-surface: var(--color-white);
     --color-text-main: var(--color-slate-900);
     --color-text-muted: var(--color-slate-500);

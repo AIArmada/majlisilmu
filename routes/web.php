@@ -3,10 +3,9 @@
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
-use App\Http\Controllers\Public\EventSubmissionController;
 use Illuminate\Support\Facades\Route;
 
-Route::livewire('/', 'pages.home')->name('home');
+Route::livewire('/', 'pages.⚡home')->name('home');
 Route::get('/locale/{locale}', LocaleController::class)->name('locale.switch');
 
 // Socialite OAuth Routes
@@ -28,9 +27,6 @@ Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calen
 
 // Event Submission (Public) - Rate limited to prevent spam
 Route::livewire('/submit-event', 'pages.submit-event.create')->name('submit-event.create');
-Route::post('/submit-event', [EventSubmissionController::class, 'store'])
-    ->middleware('throttle:event-submission')
-    ->name('submit-event.store');
 Route::livewire('/submit-event/success', 'pages.submit-event.success')->name('submit-event.success');
 
 // Event Registration - Rate limited

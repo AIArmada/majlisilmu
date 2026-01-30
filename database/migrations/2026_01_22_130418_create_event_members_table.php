@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('event_members', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('event_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('event_id')->index();
+            $table->foreignUuid('user_id')->index();
             $table->string('role')->default('member')->index();
             $table->timestamp('joined_at')->nullable();
             $table->timestamps();

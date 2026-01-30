@@ -38,6 +38,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         'qualifications',
         'is_freelance',
         'job_title',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -45,6 +46,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         return [
             'qualifications' => 'array',
             'is_freelance' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -76,7 +78,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
                     // De-duplicate
                     $parts = array_unique($parts);
 
-                    if (!empty($parts)) {
+                    if (! empty($parts)) {
                         $speaker->post_nominal = implode(', ', $parts);
                     }
                 }
@@ -93,12 +95,42 @@ class Speaker extends Model implements AuditableContract, HasMedia
         return null;
     }
 
+    public function getDefaultAvatarUrlAttribute(): string
+    {
+        if ($this->avatar_url) {
+            return $this->avatar_url;
+        }
+
+        if ($this->gender === 'female') {
+            return asset('images/avatar-female.png');
+        }
+
+        return asset('images/avatar-male.png');
+    }
+
+    public function getFormattedNameAttribute(): string
+    {
+        $parts = array_filter([
+            $this->honorific,
+            $this->pre_nominal,
+            $this->name,
+        ], fn ($value) => filled($value));
+
+        $formatted = trim(implode(' ', $parts));
+
+        if (filled($this->post_nominal)) {
+            $formatted = trim($formatted.', '.$this->post_nominal);
+        }
+
+        return $formatted;
+    }
+
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_speakers')
-            ->withPivot('sort_order')
+            ->withPivot('order_column')
             ->withTimestamps()
-            ->orderByPivot('sort_order');
+            ->orderByPivot('order_column');
     }
 
     public function topics(): BelongsToMany
@@ -140,7 +172,15 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
     public function getAuthzScopeLabel(): string
     {
-        return 'Speaker: ' . $this->name;
+        return 'Speaker: '.$this->name;
+    }
+
+    /**
+     * Scope a query to only include active speakers.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     /**

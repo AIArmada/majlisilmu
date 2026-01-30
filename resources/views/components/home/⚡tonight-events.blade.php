@@ -13,9 +13,7 @@ new class extends Component {
         $start = $now->copy()->setTimezone('UTC'); // From current moment in KL
         $end = $now->copy()->endOfDay()->setTimezone('UTC');
 
-        return Event::query()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+        return Event::active()
             ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at')
             ->with(['institution', 'venue'])

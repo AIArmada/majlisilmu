@@ -6,14 +6,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Series extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\SeriesFactory> */
-    use HasFactory, HasUuids, InteractsWithMedia;
+    use \App\Models\Concerns\HasLanguages, HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -25,14 +25,19 @@ class Series extends Model implements HasMedia
     protected $fillable = [
         'institution_id',
         'speaker_id',
-        'venue_id',
         'title',
         'slug',
         'description',
         'visibility',
-        'language',
-        'audience',
+        'is_active',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function institution(): BelongsTo
     {
@@ -44,14 +49,12 @@ class Series extends Model implements HasMedia
         return $this->belongsTo(Speaker::class);
     }
 
-    public function venue(): BelongsTo
+    public function events(): BelongsToMany
     {
-        return $this->belongsTo(Venue::class);
-    }
-
-    public function events(): HasMany
-    {
-        return $this->hasMany(Event::class);
+        return $this->belongsToMany(Event::class, 'event_series')
+            ->withPivot('order_column')
+            ->withTimestamps()
+            ->orderByPivot('order_column');
     }
 
     /**
@@ -65,5 +68,10 @@ class Series extends Model implements HasMedia
 
         $this->addMediaCollection('gallery')
             ->useDisk('public');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

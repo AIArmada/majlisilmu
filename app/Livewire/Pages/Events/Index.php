@@ -35,10 +35,10 @@ class Index extends Component
     public ?string $event_type = null;
 
     #[Url]
-    public ?string $gender_restriction = null;
+    public ?string $gender = null;
 
     #[Url]
-    public ?string $age_group = null;
+    public array $age_group = [];
 
     #[Url]
     public ?bool $children_allowed = null;
@@ -83,7 +83,7 @@ class Index extends Component
             'district_id' => $this->district_id,
             'language' => $this->language,
             'event_type' => $this->event_type,
-            'gender_restriction' => $this->gender_restriction,
+            'gender' => $this->gender,
             'age_group' => $this->age_group,
             'children_allowed' => $this->children_allowed,
             'institution_id' => $this->institution_id,

@@ -35,7 +35,16 @@ class TopicForm
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
-                        TextInput::make('sort_order')
+                        Select::make('status')
+                            ->options([
+                                'unverified' => 'Unverified',
+                                'pending' => 'Pending',
+                                'verified' => 'Verified',
+                                'rejected' => 'Rejected',
+                            ])
+                            ->required()
+                            ->default('verified'),
+                        TextInput::make('order_column')
                             ->label('Sort Order')
                             ->numeric()
                             ->default(0)

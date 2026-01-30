@@ -5,7 +5,7 @@ namespace App\Filament\Resources\Events;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
-use App\Filament\Resources\Events\RelationManagers\EventMediaRelationManager;
+use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventMembersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventSubmissionsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
@@ -43,7 +43,7 @@ class EventResource extends Resource
     public static function getRelations(): array
     {
         return [
-            EventMediaRelationManager::class,
+            MediaLinksRelationManager::class,
             EventMembersRelationManager::class,
             EventSubmissionsRelationManager::class,
             ModerationReviewsRelationManager::class,

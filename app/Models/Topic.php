@@ -11,14 +11,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\EloquentSortable\Sortable;
+use Spatie\EloquentSortable\SortableTrait;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Tags\HasTags;
 
-class Topic extends Model implements HasMedia
+class Topic extends Model implements HasMedia, Sortable
 {
     /** @use HasFactory<\Database\Factories\TopicFactory> */
-    use HasFactory, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use HasFactory, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, SortableTrait;
 
     public $incrementing = false;
 
@@ -32,14 +34,27 @@ class Topic extends Model implements HasMedia
         'name',
         'slug',
         'is_official',
-        'sort_order',
+        'order_column',
+        'status',
     ];
+
+    public array $sortable = [
+        'order_column_name' => 'order_column',
+        'sort_when_creating' => true,
+    ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Topic $topic) {
+            $topic->children()->update(['parent_id' => null]);
+        });
+    }
 
     protected function casts(): array
     {
         return [
             'is_official' => 'boolean',
-            'sort_order' => 'integer',
+            'order_column' => 'integer',
         ];
     }
 
@@ -54,15 +69,15 @@ class Topic extends Model implements HasMedia
 
     public function children(): HasMany
     {
-        return $this->hasMany(Topic::class, 'parent_id')->orderBy('sort_order');
+        return $this->hasMany(Topic::class, 'parent_id')->ordered();
     }
 
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_topics')
-            ->withPivot('sort_order')
+            ->withPivot('order_column')
             ->withTimestamps()
-            ->orderByPivot('sort_order');
+            ->orderByPivot('order_column');
     }
 
     public function references(): BelongsToMany

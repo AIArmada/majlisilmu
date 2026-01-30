@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('event_speakers', function (Blueprint $table) {
             $table->uuid('event_id');
             $table->uuid('speaker_id');
-            $table->unsignedSmallInteger('sort_order')->default(0);
+            $table->unsignedSmallInteger('order_column')->default(0);
             $table->timestamps();
 
             $table->primary(['event_id', 'speaker_id']);

@@ -15,6 +15,13 @@ class Reference extends Model implements HasMedia
     /** @use HasFactory<\Database\Factories\ReferenceFactory> */
     use HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Reference $reference) {
+            $reference->topics()->detach();
+        });
+    }
+
     protected $fillable = [
         'title',
         'author',

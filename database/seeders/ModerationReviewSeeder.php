@@ -18,27 +18,48 @@ class ModerationReviewSeeder extends Seeder
             return;
         }
 
-        $reviewers = User::query()->get();
+        $reviewerIds = User::query()->pluck('id')->toArray();
 
-        if ($reviewers->isEmpty()) {
+        if (empty($reviewerIds)) {
             return;
         }
 
-        Event::query()
-            ->whereIn('status', ['approved', 'rejected', 'pending'])
-            ->get()
-            ->each(function (Event $event) use ($reviewers): void {
+        ModerationReview::unsetEventDispatcher();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($reviewerIds): void {
+            $events = Event::query()
+                ->whereIn('status', ['approved', 'rejected', 'pending'])
+                ->select(['id', 'status'])
+                ->get();
+
+            $reviewsToInsert = [];
+
+            foreach ($events as $event) {
                 $decision = match ($event->status) {
                     'approved' => 'approved',
                     'rejected' => 'rejected',
                     default => 'needs_changes',
                 };
 
-                ModerationReview::factory()->create([
-                    'event_id' => $event->id,
-                    'reviewer_id' => $reviewers->random()->id,
-                    'decision' => $decision,
-                ]);
-            });
+                $reviewsToInsert[] = array_merge(
+                    ModerationReview::factory()->make([
+                        'event_id' => $event->id,
+                        'reviewer_id' => $reviewerIds[array_rand($reviewerIds)],
+                        'decision' => $decision,
+                    ])->toArray(),
+                    [
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            }
+
+            foreach (array_chunk($reviewsToInsert, 200) as $chunk) {
+                ModerationReview::insert($chunk);
+            }
+        });
+
+        ModerationReview::setEventDispatcher(app('events'));
     }
 }

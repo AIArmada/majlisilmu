@@ -15,8 +15,8 @@ class Address extends Model
         'addressable_type',
         'addressable_id',
         'type',
-        'address1',
-        'address2',
+        'line1',
+        'line2',
         'postcode',
         'country_id',
         'state_id',
@@ -24,6 +24,7 @@ class Address extends Model
         'city_id',
         'lat',
         'lng',
+        'google_maps_url',
         'google_place_id',
         'waze_url',
     ];

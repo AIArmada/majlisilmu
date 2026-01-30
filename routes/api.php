@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventInterestController;
 use App\Http\Controllers\Api\EventSaveController;
 use App\Http\Controllers\Api\RegistrationExportController;
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\Route;
 
 // Public API endpoints
 Route::prefix('v1')->group(function () {
+    // Events API with query builder
+    Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
+    Route::get('/events/{event}', [EventController::class, 'show'])->name('api.events.show');
+    
     // Reports (per documentation B5b) - Rate limited
     Route::post('/reports', [ReportController::class, 'store'])
         ->middleware('throttle:reports')

@@ -17,6 +17,18 @@ class SpeakerSeeder extends Seeder
      */
     public function run(): void
     {
+        // Disable model events for faster seeding
+        Speaker::unsetEventDispatcher();
+
+        \Illuminate\Support\Facades\DB::transaction(function (): void {
+            $this->seedSpeakers();
+        });
+
+        Speaker::setEventDispatcher(app('events'));
+    }
+
+    private function seedSpeakers(): void
+    {
         $realSpeakers = [
             'Ustaz Azhar Idrus',
             'Dr. MAZA (Dr. Mohd Asri Zainul Abidin)',
@@ -35,8 +47,11 @@ class SpeakerSeeder extends Seeder
             'Prof. Dr. Muhaya Mohamad',
         ];
 
-        $users = User::query()->get();
+        $userIds = User::query()->pluck('id')->toArray();
+        $contactsToInsert = [];
+        $memberAttachments = [];
 
+        // Create real speakers
         foreach ($realSpeakers as $name) {
             $speaker = Speaker::firstOrCreate(
                 ['name' => $name],
@@ -44,45 +59,63 @@ class SpeakerSeeder extends Seeder
                     'slug' => Str::slug($name),
                     'bio' => fake()->paragraph(),
                     'status' => 'verified',
+                    'is_active' => true,
                 ]
             );
 
-            // Create contacts
-            $speaker->contacts()->firstOrCreate(
-                ['category' => 'email'],
-                ['value' => Str::slug($name).'@example.com', 'type' => 'work']
-            );
+            $contactsToInsert[] = [
+                'id' => (string) Str::uuid(),
+                'contactable_type' => 'speaker',
+                'contactable_id' => $speaker->id,
+                'category' => 'email',
+                'value' => Str::slug($name).'@example.com',
+                'type' => 'work',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
 
-            $speaker->contacts()->firstOrCreate(
-                ['category' => 'phone'],
-                ['value' => '01'.fake()->numberBetween(10000000, 99999999), 'type' => 'work']
-            );
+            $contactsToInsert[] = [
+                'id' => (string) Str::uuid(),
+                'contactable_type' => 'speaker',
+                'contactable_id' => $speaker->id,
+                'category' => 'phone',
+                'value' => '01'.fake()->numberBetween(10000000, 99999999),
+                'type' => 'work',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
 
-            $speaker->ensureAuthzScope();
-            $this->seedSpeakerRoles($speaker);
-
-            if ($users->isNotEmpty()) {
-                $owner = $users->random();
-                $speaker->members()->syncWithoutDetaching([$owner->id]);
-                $this->syncMemberRoles($speaker, $owner, ['owner']);
+            if (!empty($userIds)) {
+                $memberAttachments[] = [
+                    'speaker_id' => $speaker->id,
+                    'user_id' => $userIds[array_rand($userIds)],
+                ];
             }
         }
 
-        // Add some filler fake speakers if needed
+        // Add filler speakers if needed
         $currentCount = Speaker::count();
         if ($currentCount < 30) {
             $speakers = Speaker::factory()->count(30 - $currentCount)->create();
 
-            if ($users->isNotEmpty()) {
-                $speakers->each(function (Speaker $speaker) use ($users): void {
-                    $owner = $users->random();
-
-                    $speaker->ensureAuthzScope();
-                    $this->seedSpeakerRoles($speaker);
-                    $speaker->members()->syncWithoutDetaching([$owner->id]);
-                    $this->syncMemberRoles($speaker, $owner, ['owner']);
-                });
+            foreach ($speakers as $speaker) {
+                if (!empty($userIds)) {
+                    $memberAttachments[] = [
+                        'speaker_id' => $speaker->id,
+                        'user_id' => $userIds[array_rand($userIds)],
+                    ];
+                }
             }
+        }
+
+        // Bulk insert contacts
+        if (!empty($contactsToInsert)) {
+            \Illuminate\Support\Facades\DB::table('contacts')->insert($contactsToInsert);
+        }
+
+        // Bulk insert member attachments
+        if (!empty($memberAttachments)) {
+            \Illuminate\Support\Facades\DB::table('speaker_members')->insertOrIgnore($memberAttachments);
         }
     }
 

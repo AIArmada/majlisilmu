@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             DistrictSeeder::class,
+            EventTypeSeeder::class,
             TopicSeeder::class,
             UserSeeder::class,
         ]);
@@ -32,7 +33,7 @@ class DatabaseSeeder extends Seeder
             DonationChannelSeeder::class,
             SeriesSeeder::class,
             EventSeeder::class,
-            EventMediaSeeder::class,
+            MediaLinkSeeder::class,
             EventSubmissionSeeder::class,
             ModerationReviewSeeder::class,
             ReportSeeder::class,

@@ -52,14 +52,12 @@ class SeriesFactory extends Factory
 
         return [
             'institution_id' => Institution::factory(),
-            'venue_id' => fake()->boolean(60) ? Venue::factory() : null,
             'speaker_id' => null, // Default to null, can be overridden
             'title' => $title,
             'slug' => Str::slug($title.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraph(),
             'visibility' => fake()->randomElement(['public', 'unlisted', 'private']),
-            'language' => fake()->randomElement(['Bahasa Melayu', 'English', 'Mandarin', 'Tamil', 'Javanese', 'Arabic']),
-            'audience' => fake()->randomElement(['Umum', 'Belia', 'Muslimah', 'Keluarga', 'Pelajar IPT', 'Profesional']),
+            'is_active' => true,
         ];
     }
 }

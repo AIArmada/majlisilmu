@@ -23,7 +23,7 @@ class InstitutionSeeder extends Seeder
             [
                 'name' => 'Masjid Wilayah Persekutuan',
                 'type' => 'masjid',
-                'address1' => 'Jalan Duta',
+                'line1' => 'Jalan Duta',
                 'city' => 'Kuala Lumpur',
                 'state_name' => 'Kuala Lumpur',
                 'lat' => 3.1614755,
@@ -32,7 +32,7 @@ class InstitutionSeeder extends Seeder
             [
                 'name' => 'Masjid Tuanku Mizan Zainal Abidin (Masjid Besi)',
                 'type' => 'masjid',
-                'address1' => 'Presint 3',
+                'line1' => 'Presint 3',
                 'city' => 'Putrajaya',
                 'state_name' => 'Putrajaya',
                 'lat' => 2.9221376,
@@ -41,7 +41,7 @@ class InstitutionSeeder extends Seeder
             [
                 'name' => 'Pusat Islam Petaling Jaya',
                 'type' => 'educational_center',
-                'address1' => 'Jalan Gasing',
+                'line1' => 'Jalan Gasing',
                 'city' => 'Petaling Jaya',
                 'state_name' => 'Selangor',
                 'lat' => 3.1026,
@@ -50,7 +50,7 @@ class InstitutionSeeder extends Seeder
             [
                 'name' => 'Surau Ar-Raudhah',
                 'type' => 'surau',
-                'address1' => 'Seksyen 7',
+                'line1' => 'Seksyen 7',
                 'city' => 'Shah Alam',
                 'state_name' => 'Selangor',
                 'lat' => 3.0746,
@@ -83,6 +83,7 @@ class InstitutionSeeder extends Seeder
                     'slug' => Str::slug($data['name']),
                     'type' => $data['type'],
                     'status' => 'verified',
+                    'is_active' => true,
                 ]
             );
 
@@ -99,7 +100,7 @@ class InstitutionSeeder extends Seeder
 
             // Create or update address
             $inst->address()->updateOrCreate([], [
-                'address1' => $data['address1'],
+                'line1' => $data['line1'],
                 'postcode' => fake()->postcode(),
                 'country_id' => $malaysia?->id,
                 'state_id' => $state->id,

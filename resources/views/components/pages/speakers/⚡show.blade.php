@@ -8,6 +8,10 @@ new class extends Component {
 
     public function mount(Speaker $speaker): void
     {
+        if ($speaker->status !== 'verified' && ! auth()->user()?->hasAnyRole(['super_admin', 'moderator'])) {
+            abort(404);
+        }
+
         $speaker->load([
             'events' => function ($query) {
                 $query->where('status', 'approved')
@@ -31,8 +35,6 @@ new class extends Component {
 
 @php
     $speaker = $this->speaker;
-    $avatarUrl = $speaker->avatar_url ?: $speaker->getFirstMediaUrl('avatar');
-    $shouldRenderAvatar = $avatarUrl && !str_contains($avatarUrl, 'via.placeholder.com');
     $mainUrl = $speaker->getFirstMediaUrl('main');
     $gallery = $speaker->getMedia('gallery');
     $websiteUrl = $speaker->socialMedia->firstWhere('platform', 'website')?->url;
@@ -57,13 +59,9 @@ new class extends Component {
             class="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col md:flex-row gap-8 items-start">
             <!-- Photo -->
             <div
-                class="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white border-4 border-white shadow-lg flex-shrink-0 overflow-hidden relative">
-                @if($shouldRenderAvatar)
-                    <img src="{{ $avatarUrl }}" alt="{{ $speaker->name }}" class="w-full h-full object-cover">
-                @else
-                    <img src="{{ $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
-                        class="w-full h-full object-cover">
-                @endif
+                class="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white border-4 border-white shadow-lg flex-shrink-0 overflow-hidden relative bg-slate-100">
+                <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
+                    class="w-full h-full object-cover">
             </div>
 
             <div class="flex-grow pt-4">

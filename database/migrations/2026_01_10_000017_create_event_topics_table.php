@@ -11,13 +11,13 @@ return new class extends Migration
         Schema::create('event_topics', function (Blueprint $table) {
             $table->uuid('event_id');
             $table->uuid('topic_id');
-            $table->unsignedSmallInteger('sort_order')->default(0);
+            $table->unsignedSmallInteger('order_column')->default(0);
             $table->timestamps();
 
             $table->primary(['event_id', 'topic_id']);
 
             $table->index(['topic_id', 'event_id']);
-            $table->index(['event_id', 'sort_order']);
+            $table->index(['event_id', 'order_column']);
         });
     }
 
