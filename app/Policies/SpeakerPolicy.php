@@ -21,8 +21,8 @@ class SpeakerPolicy
      */
     public function view(?User $user, Speaker $speaker): bool
     {
-        // Verified and pending speakers are publicly viewable
-        if (in_array($speaker->verification_status, ['verified', 'pending'])) {
+        // Verified speakers are publicly viewable
+        if ($speaker->status === 'verified') {
             return true;
         }
 

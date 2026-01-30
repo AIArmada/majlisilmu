@@ -9,6 +9,21 @@ use Illuminate\Support\Facades\Log;
 class EventSearchService
 {
     /**
+     * @return array<int, string>
+     */
+    protected function cardRelationships(): array
+    {
+        return [
+            'eventType',
+            'institution.media',
+            'venue.address.state',
+            'venue.address.district',
+            'speakers.media',
+            'media',
+        ];
+    }
+
+    /**
      * Search events using Typesense if available, otherwise fallback to database.
      *
      * @param  array<string, mixed>  $filters
@@ -61,7 +76,8 @@ class EventSearchService
         int $perPage,
         string $sort
     ): LengthAwarePaginator {
-        $search = Event::search($query ?? '');
+        $search = Event::search($query ?? '')
+            ->query(fn ($builder) => $builder->with($this->cardRelationships()));
 
         // Build filter_by string for Typesense
         $filterParts = [
@@ -84,15 +100,21 @@ class EventSearchService
         }
 
         if (! empty($filters['event_type'])) {
-            $filterParts[] = 'genre:='.$filters['event_type'];
+            $filterParts[] = 'event_type:='.$filters['event_type'];
         }
 
         if (! empty($filters['genre'])) {
-            $filterParts[] = 'genre:='.$filters['genre'];
+            $filterParts[] = 'event_type:='.$filters['genre'];
+        }
+
+        if (! empty($filters['age_group'])) {
+            $ageGroups = is_array($filters['age_group']) ? $filters['age_group'] : [$filters['age_group']];
+            $filterParts[] = 'age_group:['.implode(',', $ageGroups).']';
         }
 
         if (! empty($filters['audience'])) {
-            $filterParts[] = 'audience:='.$filters['audience'];
+            $ageGroups = is_array($filters['audience']) ? $filters['audience'] : [$filters['audience']];
+            $filterParts[] = 'audience:['.implode(',', $ageGroups).']';
         }
 
         // Topic filter
@@ -168,15 +190,41 @@ class EventSearchService
         }
 
         if (! empty($filters['event_type'])) {
-            $queryBuilder->where('event_type', $filters['event_type']);
+            $queryBuilder->whereHas('eventType', function ($q) use ($filters) {
+                $q->where('slug', $filters['event_type']);
+            });
         }
 
         if (! empty($filters['genre'])) {
-            $queryBuilder->where('event_type', $filters['genre']);
+            $queryBuilder->whereHas('eventType', function ($q) use ($filters) {
+                $q->where('slug', $filters['genre']);
+            });
+        }
+
+        if (! empty($filters['age_group'])) {
+            $ageGroups = is_array($filters['age_group']) ? $filters['age_group'] : [$filters['age_group']];
+            $ageGroups = array_values(array_filter($ageGroups));
+
+            if ($ageGroups !== []) {
+                $queryBuilder->where(function ($query) use ($ageGroups) {
+                    foreach ($ageGroups as $ageGroup) {
+                        $query->orWhereJsonContains('age_group', $ageGroup);
+                    }
+                });
+            }
         }
 
         if (! empty($filters['audience'])) {
-            $queryBuilder->where('age_group', $filters['audience']);
+            $ageGroups = is_array($filters['audience']) ? $filters['audience'] : [$filters['audience']];
+            $ageGroups = array_values(array_filter($ageGroups));
+
+            if ($ageGroups !== []) {
+                $queryBuilder->where(function ($query) use ($ageGroups) {
+                    foreach ($ageGroups as $ageGroup) {
+                        $query->orWhereJsonContains('age_group', $ageGroup);
+                    }
+                });
+            }
         }
 
         if (! empty($filters['institution_id'])) {
@@ -197,8 +245,8 @@ class EventSearchService
             });
         }
 
-        // Eager load relationships (venue.address.state instead of direct state)
-        $queryBuilder->with(['institution', 'venue.address.state', 'venue.address.district', 'speakers']);
+        // Eager load relationships used by the cards
+        $queryBuilder->with($this->cardRelationships());
 
         // Sort
         $operator = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
@@ -233,6 +281,8 @@ class EventSearchService
         if (config('scout.driver') === 'typesense') {
             try {
                 $search = Event::search('');
+
+                $search->query(fn ($builder) => $builder->with($this->cardRelationships()));
 
                 // Geo filter
                 $search->options([

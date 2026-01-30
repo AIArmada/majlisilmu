@@ -35,6 +35,9 @@ class EventsController extends Controller
 
     public function register(Request $request, Event $event): RedirectResponse
     {
+        // Eager load settings
+        $event->load('settings');
+
         // Validate event is eligible for registration (per B4b)
         if (! $event->status?->equals(\App\States\EventStatus\Approved::class)) {
             return back()->withErrors(['registration' => 'This event is not available for registration.']);
@@ -44,21 +47,21 @@ class EventsController extends Controller
             return back()->withErrors(['registration' => 'This event has been cancelled.']);
         }
 
-        if (! $event->registration_required) {
+        if (! $event->settings?->registration_required) {
             return back()->withErrors(['registration' => 'This event does not require registration.']);
         }
 
         // Check registration window
-        if ($event->registration_opens_at && $event->registration_opens_at->isFuture()) {
+        if ($event->settings?->registration_opens_at && $event->settings->registration_opens_at->isFuture()) {
             return back()->withErrors(['registration' => 'Registration has not opened yet.']);
         }
 
-        if ($event->registration_closes_at && $event->registration_closes_at->isPast()) {
+        if ($event->settings?->registration_closes_at && $event->settings->registration_closes_at->isPast()) {
             return back()->withErrors(['registration' => 'Registration has closed.']);
         }
 
         // Check capacity
-        if ($event->capacity && $event->registrations_count >= $event->capacity) {
+        if ($event->settings?->capacity && $event->registrations_count >= $event->settings->capacity) {
             return back()->withErrors(['registration' => 'This event is full.']);
         }
 

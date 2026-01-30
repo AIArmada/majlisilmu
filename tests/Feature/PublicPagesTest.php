@@ -1,17 +1,23 @@
 <?php
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventGenderRestriction;
 use App\Models\Event;
+use App\Models\EventType;
+use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Series;
 use App\Models\Speaker;
+use App\Models\Topic;
+use Livewire\Livewire;
 
 it('loads public index pages', function () {
-    $this->get('/')->assertSuccessful()->assertSee('Cari Majlis Ilmu');
-    $this->get('/events')->assertSuccessful()->assertSee('Browse Events');
-    $this->get('/institutions')->assertSuccessful()->assertSee('Centers of knowledge and community.');
-    $this->get('/speakers')->assertSuccessful()->assertSee('Scholars and teachers sharing their knowledge.');
-    $this->get('/submit-event')->assertSuccessful()->assertSee('Submit an Event');
-    $this->get('/submit-event/success')->assertSuccessful()->assertSee('Event Submitted!');
+    $this->get('/')->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get('/events')->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get('/institutions')->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get('/speakers')->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get('/submit-event')->assertSuccessful()->assertSee('Hantar Majlis');
+    $this->get('/submit-event/success')->assertSuccessful()->assertSee(__('Event Submitted!'));
 });
 
 it('loads public detail pages', function () {
@@ -22,8 +28,8 @@ it('loads public detail pages', function () {
         'starts_at' => now()->addDay(),
     ]);
 
-    $institution = Institution::factory()->create();
-    $speaker = Speaker::factory()->create();
+    $institution = Institution::factory()->create(['status' => 'verified']);
+    $speaker = Speaker::factory()->create(['status' => 'verified']);
     $series = Series::factory()->create([
         'visibility' => 'public',
     ]);
@@ -32,4 +38,54 @@ it('loads public detail pages', function () {
     $this->get(route('institutions.show', $institution))->assertSuccessful()->assertSee($institution->name);
     $this->get(route('speakers.show', $speaker))->assertSuccessful()->assertSee($speaker->name);
     $this->get(route('series.show', $series))->assertSuccessful()->assertSee($series->title);
+});
+
+it('hides unverified speakers and institutions from public pages', function () {
+    $institution = Institution::factory()->create(['status' => 'pending']);
+    $speaker = Speaker::factory()->create(['status' => 'pending']);
+
+    $this->get(route('institutions.show', $institution))->assertNotFound();
+    $this->get(route('speakers.show', $speaker))->assertNotFound();
+});
+
+it('updates submit event age group without error', function () {
+    Livewire::test('pages.submit-event.create')
+        ->set('data.age_group', [EventAgeGroup::Children->value])
+        ->assertSet('data.age_group', [EventAgeGroup::Children->value]);
+});
+
+it('records guest submissions without a submitter id', function () {
+    $title = 'Guest Submission '.uniqid();
+    $email = 'guest@example.com';
+
+    // Create some test data
+    $topic = Topic::factory()->create(['status' => 'verified']);
+    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $eventType = EventType::factory()->create();
+
+    Livewire::test('pages.submit-event.create')
+        ->set('data.title', $title)
+        ->set('data.description', 'Test event description')
+        ->set('data.starts_at', now()->addDay())
+        ->set('data.ends_at', now()->addDay()->addHours(2))
+        ->set('data.event_type_id', $eventType->id)
+        ->set('data.gender', EventGenderRestriction::All->value)
+        ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.topics', [$topic->id])
+        ->set('data.speakers', [$speaker->id])
+        ->set('data.submitter_name', 'Guest User')
+        ->set('data.submitter_email', $email)
+        ->call('submit')
+        ->assertRedirect(route('submit-event.success'));
+
+    $event = Event::query()->where('title', $title)->first();
+
+    expect($event)->not->toBeNull();
+    expect($event?->submitter_id)->toBeNull();
+
+    $submission = EventSubmission::query()->where('event_id', $event->id)->first();
+
+    expect($submission)->not->toBeNull();
+    expect($submission->submitted_by)->toBeNull();
+    expect($submission->contacts()->where('category', 'email')->where('value', $email)->exists())->toBeTrue();
 });

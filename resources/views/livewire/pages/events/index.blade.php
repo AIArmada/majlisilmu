@@ -56,7 +56,7 @@
         <!-- Search & Filter Card -->
         <form action="{{ route('events.index') }}" method="GET" x-ref="form" x-data="{
                     locating: false,
-                    showFilters: {{ request()->hasAny(['state_id', 'language', 'event_type', 'gender_restriction', 'age_group']) ? 'true' : 'false' }},
+                    showFilters: {{ request()->hasAny(['state_id', 'language', 'event_type', 'gender', 'age_group']) ? 'true' : 'false' }},
                     locate() {
                         if (this.locating) return;
                         if (! navigator.geolocation) {
@@ -192,7 +192,7 @@
                         <select name="event_type" onchange="this.form.submit()"
                             class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
                             <option value="">{{ __('Any Type') }}</option>
-                            @foreach(\App\Enums\EventType::getGroupedOptions() as $groupLabel => $options)
+                            @foreach(\App\Models\EventType::getGroupedOptions() as $groupLabel => $options)
                                 <optgroup label="{{ $groupLabel }}">
                                     @foreach($options as $value => $label)
                                         <option value="{{ $value }}" @selected(request('event_type') == $value)>{{ $label }}
@@ -207,12 +207,12 @@
                     <div class="space-y-2">
                         <label
                             class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Gender') }}</label>
-                        <select name="gender_restriction" onchange="this.form.submit()"
+                        <select name="gender" onchange="this.form.submit()"
                             class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
                             <option value="">{{ __('Any') }}</option>
                             @foreach(\App\Enums\EventGenderRestriction::cases() as $gender)
                                 <option value="{{ $gender->value }}"
-                                    @selected(request('gender_restriction') == $gender->value)>{{ $gender->getLabel() }}
+                                    @selected(request('gender') == $gender->value)>{{ $gender->getLabel() }}
                                 </option>
                             @endforeach
                         </select>
@@ -222,11 +222,13 @@
                     <div class="space-y-2">
                         <label
                             class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Age Group') }}</label>
-                        <select name="age_group" onchange="this.form.submit()"
-                            class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                            <option value="">{{ __('Any Age') }}</option>
+                        @php
+                            $selectedAgeGroups = (array) request('age_group', []);
+                        @endphp
+                        <select name="age_group[]" multiple onchange="this.form.submit()"
+                            class="w-full min-h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
                             @foreach(\App\Enums\EventAgeGroup::cases() as $age)
-                                <option value="{{ $age->value }}" @selected(request('age_group') == $age->value)>
+                                <option value="{{ $age->value }}" @selected(in_array($age->value, $selectedAgeGroups, true))>
                                     {{ $age->getLabel() }}
                                 </option>
                             @endforeach
@@ -236,7 +238,7 @@
             </div>
 
             <!-- Active Filters Bar -->
-            @if(request()->hasAny(['search', 'state_id', 'language', 'event_type', 'gender_restriction', 'age_group', 'lat']))
+            @if(request()->hasAny(['search', 'state_id', 'language', 'event_type', 'gender', 'age_group', 'lat']))
                 <div class="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100">
                     <span class="text-xs font-bold text-slate-400 uppercase mr-2">{{ __('Active:') }}</span>
                     @if(request('search'))
@@ -341,7 +343,7 @@
                                 <div class="absolute bottom-4 left-4 z-20">
                                     <span
                                         class="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-white/30 transition-colors">
-                                        {{ $event->event_type instanceof \App\Enums\EventType ? $event->event_type->getLabel() : ucfirst($event->event_type ?? __('Kuliah')) }}
+                                        {{ $event->eventType?->name ?? __('Kuliah') }}
                                     </span>
                                 </div>
                             </a>
@@ -379,9 +381,9 @@
                                 </div>
 
                                 <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
-                                    @if($event->gender_restriction && $event->gender_restriction->value !== 'all')
+                                    @if($event->gender && $event->gender->value !== 'all')
                                         <span
-                                            class="text-xs font-semibold text-slate-400 uppercase tracking-widest">{{ $event->gender_restriction->getLabel() }}</span>
+                                            class="text-xs font-semibold text-slate-400 uppercase tracking-widest">{{ $event->gender->getLabel() }}</span>
                                     @else
                                         <span></span>
                                     @endif

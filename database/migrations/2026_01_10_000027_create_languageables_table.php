@@ -13,9 +13,12 @@ return new class extends Migration {
 
         Schema::create('languageables', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('language_id')->index();
+            $table->foreignId('language_id');
             $table->uuidMorphs('languageable');
             $table->timestamps();
+
+            // Composite index for polymorphic relationship lookups
+            $table->index(['language_id', 'languageable_type', 'languageable_id'], 'languageables_lookup');
         });
     }
 

@@ -34,8 +34,6 @@ class EventObserver
                 'prayer_reference',
                 'prayer_offset',
                 'venue_id',
-                'prayer_calc_lat',
-                'prayer_calc_lng',
             ])
         ) {
             $this->calculatePrayerRelativeTime($event);
@@ -114,20 +112,12 @@ class EventObserver
      */
     protected function getCoordinates(Event $event): ?array
     {
-        // Use event-specific coordinates if set
-        if ($event->prayer_calc_lat && $event->prayer_calc_lng) {
-            return [
-                'lat' => (float) $event->prayer_calc_lat,
-                'lng' => (float) $event->prayer_calc_lng,
-            ];
-        }
-
         // Load venue if not loaded (with address)
         if ($event->venue_id && ! $event->relationLoaded('venue')) {
             $event->load('venue.address');
         }
 
-        // Fall back to venue coordinates via address
+        // Use venue coordinates via address
         if ($event->venue && $event->venue->address && $event->venue->address->lat && $event->venue->address->lng) {
             return [
                 'lat' => (float) $event->venue->address->lat,

@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\State;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\District>
@@ -18,12 +17,11 @@ class DistrictFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->city();
-
         return [
+            'country_id' => 132, // Malaysia default in World package usually
             'state_id' => State::factory(),
-            'name' => $name,
-            'slug' => Str::slug($name),
+            'country_code' => 'MY',
+            'name' => fake()->unique()->city(),
         ];
     }
 }

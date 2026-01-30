@@ -16,6 +16,7 @@ new
         $search = request('search');
 
         return Speaker::query()
+            ->where('status', 'verified')
             ->withCount('events')
             ->when($search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -93,11 +94,6 @@ new
         @else
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                 @foreach($speakers as $speaker)
-                    @php
-                        $avatarUrl = $speaker->avatar_url ?: $speaker->getFirstMediaUrl('avatar');
-                        // Ensure URL is valid (basic check) and not a placeholder unless we specifically want to handle that
-                        $shouldRenderAvatar = !empty($avatarUrl);
-                    @endphp
                     <a href="{{ route('speakers.show', $speaker) }}" wire:navigate
                         class="group relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center p-8 overflow-hidden z-10">
 
@@ -109,12 +105,8 @@ new
                         <div
                             class="h-32 w-32 rounded-full p-1 bg-white border border-slate-100 shadow-lg mb-6 relative group-hover:scale-105 transition-transform duration-500">
                             <div class="w-full h-full rounded-full overflow-hidden bg-slate-100 relative">
-                                @if($shouldRenderAvatar)
-                                    <img src="{{ $avatarUrl }}" alt="{{ $speaker->name }}" class="w-full h-full object-cover">
-                                @else
-                                    <img src="{{ $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
-                                        class="w-full h-full object-cover">
-                                @endif
+                                <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
+                                    class="w-full h-full object-cover">
                             </div>
                             <div
                                 class="absolute bottom-1 right-1 bg-emerald-500 border-2 border-white rounded-full p-1.5 text-white">

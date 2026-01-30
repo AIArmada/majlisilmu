@@ -12,6 +12,7 @@ enum EventAgeGroup: string implements HasColor, HasIcon, HasLabel
     case Adults = 'adults';
     case Youth = 'youth';
     case Children = 'children';
+    case Seniors = 'warga_emas';
 
     public function getLabel(): string
     {
@@ -20,6 +21,7 @@ enum EventAgeGroup: string implements HasColor, HasIcon, HasLabel
             self::Adults => __('Dewasa'),
             self::Youth => __('Remaja / Belia'),
             self::Children => __('Kanak-kanak'),
+            self::Seniors => __('Warga Emas'),
         };
     }
 
@@ -30,6 +32,7 @@ enum EventAgeGroup: string implements HasColor, HasIcon, HasLabel
             self::Adults => 'info',
             self::Youth => 'warning',
             self::Children => 'pink',
+            self::Seniors => 'amber',
         };
     }
 
@@ -40,6 +43,7 @@ enum EventAgeGroup: string implements HasColor, HasIcon, HasLabel
             self::Adults => 'heroicon-o-user',
             self::Youth => 'heroicon-o-academic-cap',
             self::Children => 'heroicon-o-face-smile',
+            self::Seniors => 'heroicon-o-user-group',
         };
     }
 }

@@ -38,7 +38,17 @@ class TopicsTable
                 IconColumn::make('is_official')
                     ->boolean()
                     ->label('Official'),
-                TextColumn::make('sort_order')
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'verified' => 'success',
+                        'pending' => 'warning',
+                        'rejected' => 'danger',
+                        'unverified' => 'gray',
+                        default => 'gray',
+                    })
+                    ->toggleable(),
+                TextColumn::make('order_column')
                     ->label('Order')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -49,7 +59,8 @@ class TopicsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('sort_order')
+            ->defaultSort('order_column')
+            ->reorderable('order_column')
             ->filters([
                 SelectFilter::make('parent_id')
                     ->label('Parent Topic')
@@ -68,6 +79,13 @@ class TopicsTable
                     ->placeholder('All')
                     ->trueLabel('Official Only')
                     ->falseLabel('Community Only'),
+                SelectFilter::make('status')
+                    ->options([
+                        'unverified' => 'Unverified',
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                        'rejected' => 'Rejected',
+                    ]),
             ])
             ->recordActions([
                 EditAction::make(),

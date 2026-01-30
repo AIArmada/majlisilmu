@@ -50,46 +50,77 @@
         }
     }'>
         <!-- Header / Banner -->
-        <div class="relative h-64 lg:h-96 bg-slate-900 overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/50 to-slate-900/90 z-10"></div>
-            <!-- Institution Image or Default -->
-            @php
-                $heroImage = $event->getFirstMediaUrl('poster');
-                if (!$heroImage) {
-                    $heroImage = $event->institution?->getFirstMediaUrl('cover');
-                }
-                if (!$heroImage) {
-                    $heroImage = asset('images/placeholders/event.png');
-                }
-            @endphp
-            <img
-                src="{{ $heroImage }}"
-                alt="{{ $event->institution?->name ?? $event->title }}"
-                class="absolute inset-0 w-full h-full object-cover"
-            >
+        <div class="relative min-h-[50vh] flex items-end bg-slate-900 overflow-hidden">
+            <!-- Background Layer -->
+            <div class="absolute inset-0 z-0">
+                @php
+                    $heroImage = $event->getFirstMediaUrl('poster');
+                    if (!$heroImage) {
+                        $heroImage = $event->institution?->getFirstMediaUrl('cover');
+                    }
+                    if (!$heroImage) {
+                        $heroImage = $event->venue?->getFirstMediaUrl('cover');
+                    }
+                @endphp
 
-            <div class="container mx-auto px-6 lg:px-12 relative z-20 h-full flex flex-col justify-end pb-12">
-                <div class="flex flex-wrap gap-2 mb-4">
-                    <span
-                        class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-3 py-1 text-sm font-medium text-emerald-300 backdrop-blur-sm">
-                        {{ $event->event_type?->getLabel() ?? __('General') }}
-                    </span>
-                    @if($event->gender_restriction && $event->gender_restriction->value !== 'all')
-                        <span
-                            class="inline-flex items-center rounded-full bg-white/10 border border-white/20 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm">
-                            {{ $event->gender_restriction->getLabel() }}
-                        </span>
+                @if($heroImage)
+                    <!-- Real Image with Gradient Overlay -->
+                    <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('{{ $heroImage }}');"></div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent"></div>
+                    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"></div>
+                @else
+                    <!-- Fallback: Beautiful Gradient & Pattern -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900 to-slate-950"></div>
+                    <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+                    <div class="absolute top-[-50%] left-[-50%] w-[100%] h-[100%] rounded-full bg-emerald-500/10 blur-[120px] animate-blob"></div>
+                    <div class="absolute bottom-[-50%] right-[-50%] w-[100%] h-[100%] rounded-full bg-teal-500/10 blur-[120px] animate-blob animation-delay-2000"></div>
+                    
+                    <!-- Islamic Pattern Overlay -->
+                    <div class="absolute inset-0 bg-pattern-islamic opacity-[0.03] mix-blend-overlay"></div>
+                @endif
+            </div>
+
+            <!-- Content -->
+            <div class="container mx-auto px-6 lg:px-12 relative z-20 pb-12 pt-24">
+                <div class="flex flex-col lg:flex-row gap-6 lg:items-end">
+                    <!-- Optional: Square Thumbnail / Poster (if available, distinct from background) -->
+                    @if($heroImage)
+                        <div class="hidden lg:block w-48 h-64 shrink-0 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/10 relative group">
+                            <img src="{{ $heroImage }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                                <span class="text-xs font-bold text-white uppercase tracking-wider">{{ __('Poster') }}</span>
+                            </div>
+                        </div>
                     @endif
-                    @if($event->institution)
-                        <a href="{{ route('institutions.show', $event->institution) }}" wire:navigate
-                            class="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/20 transition-colors">
-                            {{ $event->institution->name }}
-                        </a>
-                    @endif
+
+                    <div class="flex-1 space-y-4">
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-3 py-1 text-sm font-medium text-emerald-300 backdrop-blur-md shadow-lg shadow-emerald-900/20">
+                                {{ $event->eventType?->name ?? __('General') }}
+                            </span>
+                            
+                            @if($event->gender && $event->gender->value !== 'all')
+                                <span class="inline-flex items-center rounded-full bg-white/10 border border-white/20 px-3 py-1 text-sm font-medium text-white backdrop-blur-md">
+                                    {{ $event->gender->getLabel() }}
+                                </span>
+                            @endif
+                            
+                            @if($event->institution)
+                                <a href="{{ route('institutions.show', $event->institution) }}" wire:navigate
+                                    class="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-sm font-medium text-white backdrop-blur-md hover:bg-white/20 transition-all hover:scale-105">
+                                    @if($event->institution->getFirstMediaUrl('logo'))
+                                        <img src="{{ $event->institution->getFirstMediaUrl('logo') }}" class="w-4 h-4 rounded-full bg-white object-cover">
+                                    @endif
+                                    {{ $event->institution->name }}
+                                </a>
+                            @endif
+                        </div>
+
+                        <h1 class="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-white shadow-sm leading-[1.1] tracking-tight">
+                            {{ $event->title }}
+                        </h1>
+                    </div>
                 </div>
-                <h1 class="font-heading text-3xl lg:text-5xl font-bold text-white shadow-sm max-w-4xl leading-tight">
-                    {{ $event->title }}
-                </h1>
             </div>
         </div>
 
@@ -128,9 +159,9 @@
                             @foreach($event->speakers as $speaker)
                                 <a href="{{ route('speakers.show', $speaker) }}" wire:navigate
                                     class="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-colors">
-                                    <div
-                                        class="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">
-                                        {{ substr($speaker->name, 0, 1) }}
+                                    <div class="h-14 w-14 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
+                                        <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
+                                            class="w-full h-full object-cover">
                                     </div>
                                     <div>
                                         <h4 class="font-bold text-slate-900">{{ $speaker->name }}</h4>
@@ -240,10 +271,10 @@
                                         {{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}
                                     @endif
                                 </p>
-                                @if($venueAddress?->address1)
-                                    <p class="text-sm text-slate-500 mt-1">{{ $venueAddress->address1 }}</p>
-                                @elseif($institutionAddress?->address1)
-                                    <p class="text-sm text-slate-500 mt-1">{{ $institutionAddress->address1 }}</p>
+                                @if($venueAddress?->line1)
+                                    <p class="text-sm text-slate-500 mt-1">{{ $venueAddress->line1 }}</p>
+                                @elseif($institutionAddress?->line1)
+                                    <p class="text-sm text-slate-500 mt-1">{{ $institutionAddress->line1 }}</p>
                                 @endif
                             </div>
                         </div>
@@ -445,11 +476,11 @@
 
                     <!-- Registration CTA -->
                     <div class="mt-6 pt-6 border-t border-slate-100">
-                        @if($event->registration_required)
+                        @if($event->settings?->registration_required)
                             @php
-                                $regOpen = !$event->registration_opens_at || $event->registration_opens_at <= now();
-                                $regClosed = $event->registration_closes_at && $event->registration_closes_at < now();
-                                $atCapacity = $event->capacity && $event->registrations_count >= $event->capacity;
+                                $regOpen = !$event->settings?->registration_opens_at || $event->settings->registration_opens_at <= now();
+                                $regClosed = $event->settings?->registration_closes_at && $event->settings->registration_closes_at < now();
+                                $atCapacity = $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity;
                             @endphp
 
                             @if($regClosed)
@@ -493,7 +524,7 @@
         </div>
 
         <!-- Registration Form Modal (if needed) -->
-        @if($event->registration_required)
+        @if($event->settings?->registration_required)
             <div id="registerModal" x-show="registerOpen" x-cloak x-transition.opacity
                 class="fixed inset-0 z-50 items-center justify-center bg-black/50 backdrop-blur-sm">
                 <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">

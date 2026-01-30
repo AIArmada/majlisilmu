@@ -31,7 +31,7 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
         'donatable_type',
         'donatable_id',
         'label',
-        'recipient_name',
+        'recipient',
         'method',
         'bank_code',
         'bank_name',
@@ -72,11 +72,11 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * Get the account name (alias for recipient_name).
+     * Get the account name (alias for recipient).
      */
     public function getAccountNameAttribute(): string
     {
-        return $this->recipient_name;
+        return $this->recipient;
     }
 
     /**

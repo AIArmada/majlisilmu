@@ -27,9 +27,12 @@ class SeriesTable
                 TextColumn::make('visibility')
                     ->badge()
                     ->sortable(),
-                TextColumn::make('default_language')
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Active'),
+                TextColumn::make('languages.name')
+                    ->badge()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('default_audience')
+                TextColumn::make('audience')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()

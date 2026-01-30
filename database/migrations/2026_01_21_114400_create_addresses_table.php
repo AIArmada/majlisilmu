@@ -17,23 +17,29 @@ return new class extends Migration
 
             $table->string('type')->default('main')->index(); // e.g. main, billing, shipping
 
-            $table->string('address1')->nullable();
-            $table->string('address2')->nullable();
+            $table->string('line1')->nullable();
+            $table->string('line2')->nullable();
             $table->string('postcode', 16)->nullable();
 
-            $table->unsignedInteger('country_id')->nullable()->index();
-            $table->unsignedInteger('state_id')->nullable()->index();
-            $table->unsignedInteger('district_id')->nullable()->index();
-            $table->unsignedInteger('city_id')->nullable()->index();
+            $table->foreignId('country_id')->nullable()->index();
+            $table->foreignId('state_id')->nullable()->index();
+            $table->foreignId('district_id')->nullable()->index();
+            $table->foreignId('city_id')->nullable()->index();
 
             $table->decimal('lat', 10, 7)->nullable()->index();
             $table->decimal('lng', 10, 7)->nullable()->index();
 
+            $table->string('google_maps_url')->nullable();
             $table->string('google_place_id')->nullable()->index();
             $table->string('waze_url')->nullable();
 
             $table->timestamps();
 
+            // Composite indexes for common queries
+            $table->index(['addressable_type', 'addressable_id'], 'addresses_morphs_index');
+            $table->index(['country_id', 'state_id'], 'addresses_country_state_index');
+            $table->index(['state_id', 'city_id'], 'addresses_state_city_index');
+            $table->index('postcode', 'addresses_postcode_index');
         });
     }
 

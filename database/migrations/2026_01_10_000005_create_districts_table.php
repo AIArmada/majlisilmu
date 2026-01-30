@@ -9,14 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('districts', function (Blueprint $table) {
-            $table->increments('id');
-            $table->unsignedInteger('state_id');
+            $table->id();
+            $table->foreignId('country_id');
+            $table->foreignId('state_id');
             $table->string('name');
-            $table->string('slug');
-            $table->timestamps();
-
-            $table->unique(['state_id', 'slug']);
-            $table->index(['state_id', 'name']);
+            $table->string('country_code', 3)->nullable();
         });
     }
 

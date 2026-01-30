@@ -2,9 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Enums\EventFormat;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
+use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Series;
 use App\Models\Venue;
@@ -75,28 +77,59 @@ class EventFactory extends Factory
         $topic = fake()->randomElement($topics);
         $book = fake()->randomElement($books);
         $title = fake()->randomElement([
-            $type . ': ' . $topic,
-            $type . ' - ' . $topic,
-            $topic . ' (' . $type . ')',
-            'Kelas Kitab: ' . $book,
-            'Halaqah ' . $book,
-            'Tadabbur: ' . $topic,
-            $type . ' bersama Asatizah',
+            $type.': '.$topic,
+            $type.' - '.$topic,
+            $topic.' ('.$type.')',
+            'Kelas Kitab: '.$book,
+            'Halaqah '.$book,
+            'Tadabbur: '.$topic,
+            $type.' bersama Asatizah',
         ]);
-        $registrationRequired = fake()->boolean(30);
-        $registrationOpensAt = $registrationRequired ? (clone $startsAt)->subDays(7) : null;
-        $registrationClosesAt = $registrationRequired ? (clone $startsAt)->subDays(1) : null;
         $status = fake()->randomElement(['approved', 'approved', 'pending', 'draft']);
         $publishedAt = $status === 'approved' ? (clone $startsAt)->subDays(fake()->numberBetween(1, 14)) : null;
         $livestreamUrl = fake()->optional()->url();
         $recordingUrl = fake()->optional()->url();
 
+        // Determine event format: 60% physical, 25% online, 15% hybrid
+        $eventFormat = fake()->randomElement([
+            EventFormat::Physical,
+            EventFormat::Physical,
+            EventFormat::Physical,
+            EventFormat::Physical,
+            EventFormat::Physical,
+            EventFormat::Physical,
+            EventFormat::Online,
+            EventFormat::Online,
+            EventFormat::Online,
+            EventFormat::Hybrid,
+            EventFormat::Hybrid,
+            EventFormat::Hybrid,
+        ]);
+
+        // Adjust venue_id and URLs based on format
+        $venueId = null;
+        $liveUrl = null;
+        $recordingUrlFinal = null;
+
+        if ($eventFormat === EventFormat::Physical) {
+            $venueId = Venue::factory();
+            $liveUrl = null;
+            $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
+        } elseif ($eventFormat === EventFormat::Online) {
+            $venueId = null;
+            $liveUrl = $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
+            $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
+        } else { // Hybrid
+            $venueId = fake()->boolean(75) ? Venue::factory() : null;
+            $liveUrl = $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
+            $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
+        }
+
         return [
             'institution_id' => Institution::factory(),
-            'venue_id' => fake()->boolean(75) ? Venue::factory() : null,
-            'series_id' => fake()->boolean(25) ? Series::factory() : null,
+            'venue_id' => $venueId,
             'title' => $title,
-            'slug' => Str::slug($title . '-' . Str::random(8)),
+            'slug' => Str::slug($title.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraphs(2, true),
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
@@ -105,29 +138,38 @@ class EventFactory extends Factory
             'prayer_reference' => null,
             'prayer_offset' => null,
             'prayer_display_text' => null,
-            'prayer_calc_lat' => null,
-            'prayer_calc_lng' => null,
-            'event_type' => fake()->randomElement(\App\Enums\EventType::cases()),
-            'gender_restriction' => fake()->randomElement(\App\Enums\EventGenderRestriction::cases()),
-            'age_group' => fake()->randomElement(\App\Enums\EventAgeGroup::cases()),
+            'event_type_id' => EventType::query()->inRandomOrder()->value('id') ?? EventType::factory(),
+            'gender' => fake()->randomElement(\App\Enums\EventGenderRestriction::cases()),
+            'age_group' => [fake()->randomElement(\App\Enums\EventAgeGroup::cases())->value],
             'children_allowed' => fake()->boolean(80), // 80% allow children
+            'event_format' => $eventFormat,
             'visibility' => fake()->randomElement(['public', 'public', 'unlisted']),
             'status' => $status,
-            'live_url' => $livestreamUrl
-                ? Str::replaceFirst('http://', 'https://', $livestreamUrl)
-                : null,
-            'recording_url' => $recordingUrl
-                ? Str::replaceFirst('http://', 'https://', $recordingUrl)
-                : null,
-            'registration_required' => $registrationRequired,
-            'capacity' => $registrationRequired ? fake()->numberBetween(30, 300) : null,
-            'registration_opens_at' => $registrationOpensAt,
-            'registration_closes_at' => $registrationClosesAt,
+            'live_url' => $liveUrl,
+            'recording_url' => $recordingUrlFinal,
             'views_count' => fake()->numberBetween(0, 2000),
             'saves_count' => fake()->numberBetween(0, 500),
             'registrations_count' => fake()->numberBetween(0, 200),
             'published_at' => $publishedAt,
         ];
+    }
+
+    /**
+     * Configure the model factory.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (\App\Models\Event $event) {
+            // 30% of events have registration settings
+            if (fake()->boolean(30)) {
+                $event->settings()->create([
+                    'registration_required' => true,
+                    'capacity' => fake()->numberBetween(30, 300),
+                    'registration_opens_at' => $event->starts_at->copy()->subDays(7),
+                    'registration_closes_at' => $event->starts_at->copy()->subDays(1),
+                ]);
+            }
+        });
     }
 
     /**
@@ -144,7 +186,7 @@ class EventFactory extends Factory
             PrayerOffset::After30,
         ]);
 
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'timing_mode' => TimingMode::PrayerRelative->value,
             'prayer_reference' => $prayer->value,
             'prayer_offset' => $offset->value,
@@ -160,13 +202,13 @@ class EventFactory extends Factory
         return $this->prayerRelative(
             PrayerReference::Maghrib,
             PrayerOffset::Immediately
-        )->state(fn(array $attributes) => [
-                'title' => 'Kuliah Maghrib: ' . fake()->randomElement([
-                    'Tafsir Al-Kahfi',
-                    'Sirah Nabawiyyah',
-                    'Fiqh Solat',
-                ]),
-            ]);
+        )->state(fn (array $attributes) => [
+            'title' => 'Kuliah Maghrib: '.fake()->randomElement([
+                'Tafsir Al-Kahfi',
+                'Sirah Nabawiyyah',
+                'Fiqh Solat',
+            ]),
+        ]);
     }
 
     /**
@@ -177,13 +219,13 @@ class EventFactory extends Factory
         return $this->prayerRelative(
             PrayerReference::Isha,
             PrayerOffset::After15
-        )->state(fn(array $attributes) => [
-                'title' => 'Kuliah Isya: ' . fake()->randomElement([
-                    'Hadis Arba\'in',
-                    'Riyadus Salihin',
-                    'Aqidah Ahlus Sunnah',
-                ]),
-            ]);
+        )->state(fn (array $attributes) => [
+            'title' => 'Kuliah Isya: '.fake()->randomElement([
+                'Hadis Arba\'in',
+                'Riyadus Salihin',
+                'Aqidah Ahlus Sunnah',
+            ]),
+        ]);
     }
 
     /**
@@ -194,12 +236,12 @@ class EventFactory extends Factory
         return $this->prayerRelative(
             PrayerReference::Fajr,
             PrayerOffset::Immediately
-        )->state(fn(array $attributes) => [
-                'title' => 'Tazkirah Subuh: ' . fake()->randomElement([
-                    'Tazkiyah An-Nafs',
-                    'Adab Menuntut Ilmu',
-                    'Zikir Pagi',
-                ]),
-            ]);
+        )->state(fn (array $attributes) => [
+            'title' => 'Tazkirah Subuh: '.fake()->randomElement([
+                'Tazkiyah An-Nafs',
+                'Adab Menuntut Ilmu',
+                'Zikir Pagi',
+            ]),
+        ]);
     }
 }

@@ -41,21 +41,22 @@ class SeriesForm
                                 'private' => 'Private',
                             ])
                             ->required(),
-                        Select::make('default_language')
+                        Select::make('languages')
+                            ->relationship('languages', 'name')
+                            ->multiple()
+                            ->preload()
+                            ->searchable()
+                            ->label('Languages'),
+                        Select::make('audience')
                             ->options([
-                                'bm' => 'Bahasa Melayu',
-                                'en' => 'English',
-                                'ar' => 'Arabic',
+                                'Umum' => 'Umum',
+                                'Belia' => 'Belia',
+                                'Muslimah' => 'Muslimah',
+                                'Keluarga' => 'Keluarga',
+                                'Pelajar IPT' => 'Pelajar IPT',
+                                'Profesional' => 'Profesional',
                             ])
-                            ->label('Default language'),
-                        Select::make('default_audience')
-                            ->options([
-                                'general' => 'General',
-                                'youth' => 'Youth',
-                                'muslimah' => 'Muslimah',
-                                'family' => 'Family',
-                            ])
-                            ->label('Default audience'),
+                            ->label('Audience'),
                     ])
                     ->columns(2),
                 Section::make('Media')

@@ -104,7 +104,8 @@ class InstitutionFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraph(),
-            'status' => fake()->randomElement(['unverified', 'pending', 'verified']),
+            'status' => 'verified',
+            'is_active' => true,
         ];
     }
 
@@ -112,8 +113,8 @@ class InstitutionFactory extends Factory
     {
         return $this->afterCreating(function (\App\Models\Institution $institution) {
             $institution->address()->create([
-                'address1' => fake()->streetAddress(),
-                'address2' => fake()->optional()->secondaryAddress(),
+                'line1' => fake()->streetAddress(),
+                'line2' => fake()->optional()->secondaryAddress(),
                 'postcode' => fake()->postcode(),
                 'lat' => fake()->randomFloat(7, 1.0, 7.0),
                 'lng' => fake()->randomFloat(7, 99.0, 119.0),

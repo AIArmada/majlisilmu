@@ -26,6 +26,10 @@ class EventsTable
                 TextColumn::make('institution.name')
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('eventType.name')
+                    ->label('Type')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('starts_at')
                     ->dateTime()
                     ->description(fn(Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
@@ -60,6 +64,9 @@ class EventsTable
                     ]),
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),
+                SelectFilter::make('event_type_id')
+                    ->label('Event Type')
+                    ->relationship('eventType', 'name'),
             ])
             ->recordActions([
                 EditAction::make(),

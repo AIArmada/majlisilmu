@@ -33,12 +33,9 @@ new class extends Component
     $series = $this->series;
 @endphp
 
-@extends('layouts.app')
-
 @section('title', $series->title . ' - ' . config('app.name'))
 
-@section('content')
-    <div class="bg-slate-50 min-h-screen">
+<div class="bg-slate-50 min-h-screen">
         <!-- Banner -->
         <div class="h-64 lg:h-80 bg-slate-900 relative overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/50 to-slate-900/90 z-10"></div>
@@ -120,4 +117,4 @@ new class extends Component
             </div>
         </div>
     </div>
-@endsection
+</div>

@@ -36,6 +36,16 @@ class VenuesTable
                         default => $state,
                     })
                     ->sortable(),
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'verified' => 'success',
+                        'pending' => 'warning',
+                        'rejected' => 'danger',
+                        'unverified' => 'gray',
+                        default => 'gray',
+                    })
+                    ->sortable(),
                 TextColumn::make('address.state.name')
                     ->label('State')
                     ->sortable(),
@@ -63,6 +73,13 @@ class VenuesTable
                         'field' => 'Field',
                         'foyer' => 'Foyer',
                         'other' => 'Other',
+                    ]),
+                SelectFilter::make('status')
+                    ->options([
+                        'unverified' => 'Unverified',
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                        'rejected' => 'Rejected',
                     ]),
             ])
             ->recordActions([

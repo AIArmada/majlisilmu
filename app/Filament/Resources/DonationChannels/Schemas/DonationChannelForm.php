@@ -42,7 +42,7 @@ class DonationChannelForm
                     ->schema([
                         TextInput::make('label')
                             ->placeholder('e.g. Tabung Masjid, Dana Pembangunan'),
-                        TextInput::make('recipient_name')
+                        TextInput::make('recipient')
                             ->required()
                             ->placeholder('Full name on account'),
                         \Filament\Forms\Components\Select::make('method')

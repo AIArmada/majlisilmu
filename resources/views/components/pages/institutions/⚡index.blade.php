@@ -19,6 +19,7 @@ class extends Component
         $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         return Institution::query()
+            ->where('status', 'verified')
             ->withCount('events')
             ->with(['address.state'])
             ->when($search, function ($query, $search) use ($operator) {

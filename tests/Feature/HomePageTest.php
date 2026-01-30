@@ -17,7 +17,7 @@ it('displays the homepage successfully', function () {
     $response->assertSee('Cari');
     $response->assertSee('Majlis');
     $response->assertSee('Ilmu');
-    $response->assertSee('Berdekatan Anda');
+    $response->assertSee('Berdekatan Saya');
 });
 
 it('contains livewire components on the homepage', function () {
@@ -26,6 +26,7 @@ it('contains livewire components on the homepage', function () {
     $response->assertSuccessful();
     // The page should contain Livewire component markers
     $response->assertSee('wire:snapshot', false);
+    $response->assertSee('livewire.js', false);
 });
 
 it('loads the stats component', function () {

@@ -16,6 +16,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class ModerationQueue extends Page implements HasTable
@@ -86,6 +87,48 @@ class ModerationQueue extends Page implements HasTable
                 TextColumn::make('institution.name')
                     ->label('Institution')
                     ->limit(20),
+                TextColumn::make('institution.status')
+                    ->label('Institution Status')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state ? Str::title(str_replace('_', ' ', $state)) : 'None')
+                    ->color(fn (?string $state): string => match ($state) {
+                        'verified' => 'success',
+                        'pending' => 'warning',
+                        'rejected' => 'danger',
+                        'unverified' => 'gray',
+                        default => 'gray',
+                    }),
+                TextColumn::make('venue.status')
+                    ->label('Venue Status')
+                    ->badge()
+                    ->state(fn (Event $record): string => $record->venue?->status ?? 'none')
+                    ->formatStateUsing(fn (string $state): string => $state === 'none' ? 'None' : Str::title(str_replace('_', ' ', $state)))
+                    ->color(fn (string $state): string => match ($state) {
+                        'verified' => 'success',
+                        'pending' => 'warning',
+                        'rejected' => 'danger',
+                        'unverified' => 'gray',
+                        default => 'gray',
+                    }),
+                TextColumn::make('speakers_status')
+                    ->label('Speakers Status')
+                    ->badge()
+                    ->state(function (Event $record): string {
+                        $total = $record->speakers->count();
+
+                        if ($total === 0) {
+                            return 'None';
+                        }
+
+                        $unverified = $record->speakers->where('status', '!=', 'verified')->count();
+
+                        return $unverified === 0 ? 'All verified' : $unverified.' unverified';
+                    })
+                    ->color(fn (string $state): string => match (true) {
+                        $state === 'All verified' => 'success',
+                        $state === 'None' => 'gray',
+                        default => 'warning',
+                    }),
                 TextColumn::make('starts_at')
                     ->label('Event Date')
                     ->dateTime('M d, Y H:i')
@@ -107,7 +150,7 @@ class ModerationQueue extends Page implements HasTable
             ->filters([
                 SelectFilter::make('state_id')
                     ->label('State')
-                    ->relationship('state', 'name'),
+                    ->relationship('address.state', 'name'),
                 SelectFilter::make('institution_id')
                     ->label('Institution')
                     ->relationship('institution', 'name')
@@ -177,7 +220,7 @@ class ModerationQueue extends Page implements HasTable
 
     protected function getTableQuery(): Builder
     {
-        $query = Event::query()->with(['institution', 'state']);
+        $query = Event::query()->with(['institution', 'venue', 'speakers', 'address.state']);
 
         return match ($this->activeTab) {
             'pending' => $query->whereState('status', \App\States\EventStatus\Pending::class),

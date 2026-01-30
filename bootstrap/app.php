@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             SetLocale::class,
         ]);
+
+        // Set default Filament timezone for every request (fixes Octane state persistence)
+        $middleware->append(\App\Http\Middleware\SetFilamentTimezone::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -37,6 +37,15 @@ class VenueForm
                             ])
                             ->default('main_hall')
                             ->required(),
+                        Select::make('status')
+                            ->options([
+                                'unverified' => 'Unverified',
+                                'pending' => 'Pending',
+                                'verified' => 'Verified',
+                                'rejected' => 'Rejected',
+                            ])
+                            ->required()
+                            ->default('verified'),
                         TextInput::make('slug')
                             ->required()
                             ->maxLength(255)
@@ -106,9 +115,9 @@ class VenueForm
                             ->searchable()
                             ->preload()
                             ->hidden(fn ($get) => ! $get('state_id')),
-                        TextInput::make('address1')
+                        TextInput::make('line1')
                             ->maxLength(255),
-                        TextInput::make('address2')
+                        TextInput::make('line2')
                             ->maxLength(255),
                         TextInput::make('postcode')
                             ->maxLength(16),
@@ -120,9 +129,17 @@ class VenueForm
                             ->numeric()
                             ->minValue(-180)
                             ->maxValue(180),
+                        TextInput::make('google_maps_url')
+                            ->label('Google Maps URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->helperText('Paste the full Google Maps link from your browser'),
                         TextInput::make('google_place_id')
-                            ->maxLength(255),
+                            ->label('Google Place ID')
+                            ->maxLength(255)
+                            ->helperText('Optional: For advanced integrations'),
                         TextInput::make('waze_url')
+                            ->label('Waze URL')
                             ->url()
                             ->maxLength(255),
                     ])

@@ -18,62 +18,117 @@ class EventSeeder extends Seeder
      */
     public function run(): void
     {
+        // Temporarily disable the EventObserver to speed up seeding
+        Event::unsetEventDispatcher();
+
         $hadEvents = Event::query()->exists();
 
         $this->seedMajlisIlmuSchedule();
 
-        if ($hadEvents) {
-            return;
+        if (!$hadEvents) {
+            $this->seedBulkEvents();
         }
 
-        $institutions = Institution::query()
-            ->with(['venues.address', 'address', 'donationChannels', 'series'])
-            ->limit(50)
-            ->get();
-        $speakers = Speaker::query()->get();
-        $topics = Topic::query()->get();
+        // Re-enable event dispatcher after seeding
+        Event::setEventDispatcher(app('events'));
+    }
 
-        if ($institutions->isEmpty()) {
-            return;
-        }
+    private function seedBulkEvents(): void
+    {
 
-        $institutions->each(function (Institution $institution) use ($speakers, $topics): void {
-            $venue = $institution->venues->isNotEmpty() ? $institution->venues->random() : null;
-            $donation = $institution->donationChannels->isNotEmpty()
-                ? $institution->donationChannels->random()
-                : null;
-            $series = $institution->series->isNotEmpty() ? $institution->series->random() : null;
+        \Illuminate\Support\Facades\DB::transaction(function (): void {
+            $institutions = Institution::query()
+                ->with(['venues', 'series'])
+                ->limit(90)
+                ->get();
+            $speakerIds = Speaker::query()->pluck('id')->toArray();
+            $topicIds = Topic::query()->pluck('id')->toArray();
 
-            $baseAttributes = [
-                'institution_id' => $institution->id,
-                'venue_id' => $venue?->id,
-                'series_id' => $series?->id,
-            ];
+            if ($institutions->isEmpty()) {
+                return;
+            }
 
-            // 4 General/Absolute events
-            $events = Event::factory()->count(4)->create($baseAttributes);
+            $count = 0;
+            $limit = 850; // We already have ~50 from seedMajlisIlmuSchedule
 
-            // 3 Kuliah Maghrib events
-            $events = $events->merge(Event::factory()->count(3)->kuliahMaghrib()->create($baseAttributes));
-
-            // 3 Tazkirah Subuh events
-            $events = $events->merge(Event::factory()->count(3)->tazkirahSubuh()->create($baseAttributes));
-
-            $events->each(function (Event $event) use ($speakers, $topics): void {
-                if ($speakers->isNotEmpty()) {
-                    $speakerCount = min(3, $speakers->count());
-                    $event->speakers()->attach(
-                        $speakers->random(random_int(1, $speakerCount))->pluck('id')->all()
-                    );
+            foreach ($institutions as $institution) {
+                if ($count >= $limit) {
+                    break;
                 }
 
-                if ($topics->isNotEmpty()) {
-                    $topicCount = min(3, $topics->count());
-                    $event->topics()->attach(
-                        $topics->random(random_int(1, $topicCount))->pluck('id')->all()
-                    );
+                $venue = $institution->venues->isNotEmpty() ? $institution->venues->random() : null;
+                $series = $institution->series->isNotEmpty() ? $institution->series->random() : null;
+
+                $baseAttributes = [
+                    'institution_id' => $institution->id,
+                ];
+
+                // Create 10 events per institution
+                // Factory will determine venue_id based on event_format
+                $events = Event::factory()->count(10)->create($baseAttributes);
+                
+                // For physical/hybrid events that need a venue, assign this institution's venue
+                foreach ($events as $event) {
+                    if ($event->event_format !== \App\Enums\EventFormat::Online && !$event->venue_id && $venue) {
+                        $event->update(['venue_id' => $venue->id]);
+                    }
                 }
-            });
+
+                // If there's a series, attach events to it via pivot table
+                if ($series) {
+                    $order = 1;
+                    foreach ($events as $event) {
+                        \Illuminate\Support\Facades\DB::table('event_series')->insert([
+                            'id' => (string) \Illuminate\Support\Str::uuid(),
+                            'event_id' => $event->id,
+                            'series_id' => $series->id,
+                            'order_column' => $order++,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                // Prepare bulk relationship data
+                $speakerAttachments = [];
+                $topicAttachments = [];
+
+                foreach ($events as $event) {
+                    // Randomly select 1-3 speakers
+                    if (!empty($speakerIds)) {
+                        $numSpeakers = min(random_int(1, 3), count($speakerIds));
+                        $selectedSpeakers = (array) array_rand(array_flip($speakerIds), $numSpeakers);
+                        foreach ($selectedSpeakers as $speakerId) {
+                            $speakerAttachments[] = [
+                                'event_id' => $event->id,
+                                'speaker_id' => $speakerId,
+                            ];
+                        }
+                    }
+
+                    // Randomly select 1-3 topics
+                    if (!empty($topicIds)) {
+                        $numTopics = min(random_int(1, 3), count($topicIds));
+                        $selectedTopics = (array) array_rand(array_flip($topicIds), $numTopics);
+                        foreach ($selectedTopics as $topicId) {
+                            $topicAttachments[] = [
+                                'event_id' => $event->id,
+                                'topic_id' => $topicId,
+                            ];
+                        }
+                    }
+                }
+
+                // Bulk insert relationships
+                if (!empty($speakerAttachments)) {
+                    \Illuminate\Support\Facades\DB::table('event_speakers')->insert($speakerAttachments);
+                }
+                if (!empty($topicAttachments)) {
+                    \Illuminate\Support\Facades\DB::table('event_topics')->insert($topicAttachments);
+                }
+
+                $count += 10;
+            }
         });
     }
 
@@ -100,9 +155,9 @@ class EventSeeder extends Seeder
             ['value' => '03-78313641', 'type' => 'work']
         );
 
-        if (! $institution->address) {
+        if (!$institution->address) {
             $institution->address()->create([
-                'address1' => 'Bukit Jelutong',
+                'line1' => 'Bukit Jelutong',
                 'lat' => 3.0991666,
                 'lng' => 101.529892,
                 'country_id' => $malaysia?->id,
@@ -134,9 +189,9 @@ class EventSeeder extends Seeder
             'name' => 'Dewan Solat Utama',
         ]);
 
-        if (! $venue->address) {
+        if (!$venue->address) {
             $venue->address()->create([
-                'address1' => $institution->address?->address1,
+                'line1' => $institution->address?->line1,
                 'country_id' => $institution->address?->country_id,
                 'state_id' => $institution->address?->state_id,
                 'district_id' => $institution->address?->district_id,
@@ -214,31 +269,31 @@ class EventSeeder extends Seeder
         ];
 
         foreach ($schedule as $entry) {
-            $startsAt = \Illuminate\Support\Carbon::parse($entry['date'].' '.$entry['time'], 'Asia/Kuala_Lumpur');
+            $startsAt = \Illuminate\Support\Carbon::parse($entry['date'] . ' ' . $entry['time'], 'Asia/Kuala_Lumpur');
             $endsAt = $startsAt->copy()->addMinutes(90);
             $topic = $entry['topic'] ?? null;
             $note = $entry['note'] ?? null;
 
             $title = $entry['slot'];
             if ($topic) {
-                $title = $entry['slot'].': '.$topic;
+                $title = $entry['slot'] . ': ' . $topic;
             }
             if ($note) {
-                $title .= ' - '.$note;
+                $title .= ' - ' . $note;
             }
 
             $descriptionParts = [];
             if ($topic) {
                 $descriptionParts[] = $topic;
             }
-            if (! empty($entry['speaker'])) {
-                $descriptionParts[] = 'Bersama '.$entry['speaker'];
+            if (!empty($entry['speaker'])) {
+                $descriptionParts[] = 'Bersama ' . $entry['speaker'];
             }
             if ($note) {
                 $descriptionParts[] = $note;
             }
 
-            $slug = \Illuminate\Support\Str::slug($title.'-'.$entry['date']);
+            $slug = \Illuminate\Support\Str::slug($title . '-' . $entry['date']);
 
             // Determine timing mode
             $timingMode = TimingMode::Absolute->value;
@@ -280,7 +335,7 @@ class EventSeeder extends Seeder
                 'ends_at' => $endsAt,
                 'timezone' => 'Asia/Kuala_Lumpur',
                 // 'language' has been removed; genre/audience are now event_type/age_group etc
-                'event_type' => \App\Enums\EventType::Kuliah, // Default to Kuliah for standard lectures
+                'event_type_id' => \App\Models\EventType::where('slug', 'kuliah')->first()?->id,
                 'visibility' => 'public',
                 'status' => 'approved',
                 'published_at' => $startsAt->copy()->subDays(7),
@@ -298,7 +353,7 @@ class EventSeeder extends Seeder
                 }
             }
 
-            if (! empty($entry['speaker'])) {
+            if (!empty($entry['speaker'])) {
                 $speakerName = $entry['speaker'];
                 $speaker = \App\Models\Speaker::query()->firstOrCreate([
                     'slug' => \Illuminate\Support\Str::slug($speakerName),
@@ -308,11 +363,11 @@ class EventSeeder extends Seeder
                 ]);
 
                 $event->speakers()->syncWithoutDetaching([
-                    $speaker->id => ['sort_order' => 1],
+                    $speaker->id => ['order_column' => 1],
                 ]);
             }
 
-            if ($topic && ! $note) {
+            if ($topic && !$note) {
                 $categorySlug = null;
                 $topicLower = mb_strtolower($topic);
                 if (str_contains($topicLower, 'tafsir') || str_contains($topicLower, 'juz') || str_contains($topicLower, 'quran')) {

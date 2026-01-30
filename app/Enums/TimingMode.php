@@ -10,16 +10,16 @@ enum TimingMode: string
     public function label(): string
     {
         return match ($this) {
-            self::Absolute => 'Waktu Tertentu',
-            self::PrayerRelative => 'Waktu Solat',
+            self::Absolute => __('Exact Time'),
+            self::PrayerRelative => __('Prayer Time'),
         };
     }
 
     public function description(): string
     {
         return match ($this) {
-            self::Absolute => 'Tetapkan waktu yang tepat (cth: 10:00 pagi)',
-            self::PrayerRelative => 'Berkaitan dengan waktu solat (cth: selepas Maghrib)',
+            self::Absolute => __('Set a specific time (e.g., 10:00 AM)'),
+            self::PrayerRelative => __('Relative to prayer times (e.g., after Maghrib)'),
         };
     }
 }

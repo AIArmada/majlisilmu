@@ -23,7 +23,7 @@ class DonationChannelFactory extends Factory
             'donatable_type' => Institution::class,
             'donatable_id' => Institution::factory(),
             'label' => fake()->optional()->randomElement(['Tabung Masjid', 'Infaq', 'Dana Pembangunan', 'Zakat', 'Sedekah']),
-            'recipient_name' => fake()->name(),
+            'recipient' => fake()->name(),
             'method' => $method,
             'reference_note' => fake()->optional()->sentence(),
             'status' => fake()->randomElement(['unverified', 'verified']),

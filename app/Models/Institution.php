@@ -34,11 +34,14 @@ class Institution extends Model implements AuditableContract, HasMedia
         'description',
 
         'status',
+        'is_active',
     ];
 
     protected function casts(): array
     {
-        return [];
+        return [
+            'is_active' => 'boolean',
+        ];
     }
 
     public function venues(): HasMany
@@ -89,5 +92,10 @@ class Institution extends Model implements AuditableContract, HasMedia
     public function getAuthzScopeLabel(): string
     {
         return 'Institution: ' . $this->name;
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

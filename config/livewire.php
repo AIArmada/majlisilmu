@@ -172,6 +172,8 @@ return [
     | <head> and <body> of pages containing Livewire components. By disabling
     | this behavior, you need to use @livewireStyles and @livewireScripts.
     |
+    | NOTE: Disabled because Filament bundles its own Livewire/Alpine.
+    |
     */
 
     'inject_assets' => true,

@@ -30,6 +30,8 @@ class InstitutionsTable
                 TextColumn::make('status')
                     ->badge()
                     ->sortable(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Active'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

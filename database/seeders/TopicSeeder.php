@@ -114,7 +114,8 @@ class TopicSeeder extends Seeder
                     'parent_id' => $parent?->id,
                     'name' => $name,
                     'is_official' => $parent === null, // Root topics are official
-                    'sort_order' => $sortOrder,
+                    'order_column' => $sortOrder,
+                    'is_active' => true,
                 ]
             );
 

@@ -17,11 +17,12 @@ new class extends Component {
 
         // Count events per state through venue->address relationship
         $eventCountsByState = Event::query()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
-            ->where('starts_at', '>=', $now)
-            ->whereNotNull('venue_id')
+            ->where('events.status', 'approved')
+            ->where('events.visibility', 'public')
+            ->where('events.starts_at', '>=', $now)
+            ->whereNotNull('events.venue_id')
             ->join('venues', 'events.venue_id', '=', 'venues.id')
+            ->where('venues.status', 'verified')
             ->join('addresses', function ($join) {
                 $join->on('addresses.addressable_id', '=', 'venues.id')
                     ->where('addresses.addressable_type', '=', Venue::class);
@@ -54,6 +55,7 @@ new class extends Component {
         $now = now();
 
         return Topic::query()
+            ->where('status', 'verified')
             ->withCount([
                 'events' => function ($query) use ($now) {
                     $query->where('events.status', 'approved')

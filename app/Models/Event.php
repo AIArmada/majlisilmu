@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventType;
+use App\Models\EventType;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -23,15 +24,36 @@ use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\ModelStates\HasStates;
+use Spatie\Tags\HasTags;
 
 class Event extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\EventFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasLanguages, Auditable, HasFactory, HasStates, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
+    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasLanguages, Auditable, HasFactory, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     public $incrementing = false;
 
     protected $keyType = 'string';
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Event $event) {
+            $event->members()->detach();
+            $event->speakers()->detach();
+            $event->topics()->detach();
+            $event->savedBy()->detach();
+            $event->interestedBy()->detach();
+            $event->goingBy()->detach();
+
+            $event->registrations()->each(fn ($registration) => $registration->delete());
+            $event->submissions()->each(fn ($submission) => $submission->delete());
+            $event->moderationReviews()->each(fn ($review) => $review->delete());
+            $event->mediaLinks()->each(fn ($mediaLink) => $mediaLink->delete());
+            
+            // Note: MediaLibrary works automatically via InteractsWithMedia if we delete the model, 
+            // but we can also be explicit if needed.
+        });
+    }
 
     /**
      * @var list<string>
@@ -41,7 +63,6 @@ class Event extends Model implements AuditableContract, HasMedia
         'institution_id',
         'submitter_id',
         'venue_id',
-        'series_id',
 
         'title',
         'slug',
@@ -53,20 +74,15 @@ class Event extends Model implements AuditableContract, HasMedia
         'prayer_reference',
         'prayer_offset',
         'prayer_display_text',
-        'prayer_calc_lat',
-        'prayer_calc_lng',
-        'event_type',
-        'gender_restriction',
+        'event_type_id',
+        'gender',
         'age_group',
         'children_allowed',
+        'event_format',
         'visibility',
         'status',
         'live_url',
         'recording_url',
-        'registration_required',
-        'capacity',
-        'registration_opens_at',
-        'registration_closes_at',
         'views_count',
         'saves_count',
         'registrations_count',
@@ -87,16 +103,10 @@ class Event extends Model implements AuditableContract, HasMedia
             'timing_mode' => TimingMode::class,
             'prayer_reference' => PrayerReference::class,
             'prayer_offset' => PrayerOffset::class,
-            'prayer_calc_lat' => 'decimal:8',
-            'prayer_calc_lng' => 'decimal:8',
-            'event_type' => EventType::class,
-            'gender_restriction' => EventGenderRestriction::class,
-            'age_group' => EventAgeGroup::class,
+            'gender' => EventGenderRestriction::class,
+            'age_group' => 'array',
+            'event_format' => EventFormat::class,
             'children_allowed' => 'boolean',
-            'registration_required' => 'boolean',
-            'registration_opens_at' => 'datetime',
-            'registration_closes_at' => 'datetime',
-            'capacity' => 'integer',
             'views_count' => 'integer',
             'saves_count' => 'integer',
             'registrations_count' => 'integer',
@@ -107,6 +117,15 @@ class Event extends Model implements AuditableContract, HasMedia
             'is_priority' => 'boolean',
             'is_featured' => 'boolean',
         ];
+    }
+
+    /**
+     * Scope a query to only include active events.
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereState('status', \App\States\EventStatus\Approved::class)
+                     ->where('visibility', 'public');
     }
 
     /**
@@ -126,7 +145,19 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'venue', 'speakers', 'topics', 'address']);
+        $this->loadMissing(['institution', 'venue', 'speakers', 'topics', 'address', 'eventType']);
+
+        $ageGroupValues = $this->age_group;
+
+        if ($ageGroupValues instanceof EventAgeGroup) {
+            $ageGroupValues = [$ageGroupValues->value];
+        } elseif (is_string($ageGroupValues)) {
+            $ageGroupValues = [$ageGroupValues];
+        }
+
+        $ageGroupValues = is_array($ageGroupValues) && $ageGroupValues !== []
+            ? $ageGroupValues
+            : ['all_ages'];
 
         $array = [
             'id' => $this->id,
@@ -136,11 +167,16 @@ class Event extends Model implements AuditableContract, HasMedia
             'speaker_names' => $this->speakers->pluck('name')->implode(', '),
             'institution_name' => $this->institution?->name ?? '',
             'venue_name' => $this->venue?->name ?? '',
-            'event_type' => $this->event_type?->value ?? 'kuliah',
-            'gender_restriction' => $this->gender_restriction?->value ?? 'all',
-            'age_group' => $this->age_group?->value ?? 'all_ages',
+            'state_id' => $this->venue?->address?->state_id ?? ($this->address?->state_id ?? ''),
+            'district_id' => $this->venue?->address?->district_id ?? ($this->address?->district_id ?? ''),
+            'language' => $this->language,
+            'event_type' => $this->eventType?->slug ?? 'kuliah',
+            'gender' => $this->gender?->value ?? 'all',
+            'age_group' => $ageGroupValues,
+            'audience' => $ageGroupValues,
+            'event_format' => $this->event_format?->value ?? 'physical',
             'children_allowed' => $this->children_allowed ?? true,
-            'status' => $this->status,
+            'status' => (string) $this->status,
             'visibility' => $this->visibility,
             'topic_ids' => $this->topics->pluck('id')->toArray(),
             'speaker_ids' => $this->speakers->pluck('id')->toArray(),
@@ -173,6 +209,7 @@ class Event extends Model implements AuditableContract, HasMedia
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_members')
+            ->using(EventMember::class)
             ->withPivot(['role', 'joined_at'])
             ->withTimestamps();
     }
@@ -187,32 +224,43 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->belongsTo(Venue::class);
     }
 
-    public function series(): BelongsTo
+    public function series(): BelongsToMany
     {
-        return $this->belongsTo(Series::class);
+        return $this->belongsToMany(Series::class, 'event_series')
+            ->withPivot('order_column')
+            ->withTimestamps()
+            ->orderByPivot('sort_order');
     }
 
+    public function eventType(): BelongsTo
+    {
+        return $this->belongsTo(EventType::class);
+    }
 
+    public function settings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EventSettings::class);
+    }
 
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'event_speakers')
-            ->withPivot('sort_order')
+            ->withPivot('order_column')
             ->withTimestamps()
-            ->orderByPivot('sort_order');
+            ->orderByPivot('order_column');
     }
 
     public function topics(): BelongsToMany
     {
         return $this->belongsToMany(Topic::class, 'event_topics')
-            ->withPivot('sort_order')
+            ->withPivot('order_column')
             ->withTimestamps()
-            ->orderByPivot('sort_order');
+            ->orderByPivot('order_column');
     }
 
     public function mediaLinks(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
-        return $this->morphMany(\App\Models\EventMedia::class, 'mediable');
+        return $this->morphMany(\App\Models\MediaLink::class, 'mediable');
     }
 
     public function submissions(): HasMany
@@ -306,15 +354,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function getPrayerCoordinatesAttribute(): ?array
     {
-        // Use event-specific coordinates if set
-        if ($this->prayer_calc_lat && $this->prayer_calc_lng) {
-            return [
-                'lat' => (float) $this->prayer_calc_lat,
-                'lng' => (float) $this->prayer_calc_lng,
-            ];
-        }
-
-        // Fall back to venue coordinates
+        // Use venue coordinates
         if ($this->venue && $this->venue->lat && $this->venue->lng) {
             return [
                 'lat' => (float) $this->venue->lat,
@@ -355,7 +395,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function getGenreAttribute(): mixed
     {
-        return $this->event_type;
+        return $this->eventType?->slug;
     }
 
     /**

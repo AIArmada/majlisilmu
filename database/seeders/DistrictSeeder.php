@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\District;
 use App\Models\State;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 use Nnjeim\World\Models\Country;
 
 class DistrictSeeder extends Seeder
@@ -134,9 +133,10 @@ class DistrictSeeder extends Seeder
             foreach ($districts as $districtName) {
                 District::query()->updateOrCreate([
                     'state_id' => $state->id,
-                    'slug' => Str::slug($districtName),
-                ], [
                     'name' => $districtName,
+                ], [
+                    'country_id' => $malaysia->id,
+                    'country_code' => 'MY',
                 ]);
             }
         }

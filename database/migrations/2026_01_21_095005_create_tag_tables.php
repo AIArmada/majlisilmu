@@ -20,7 +20,7 @@ return new class extends Migration
         });
 
         Schema::create('taggables', function (Blueprint $table) {
-            $table->foreignUuid('tag_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('tag_id')->index();
 
             $table->uuidMorphs('taggable');
 
