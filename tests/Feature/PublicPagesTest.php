@@ -2,9 +2,10 @@
 
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
 use App\Models\Event;
-use App\Models\EventType;
 use App\Models\EventSubmission;
+use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Series;
 use App\Models\Speaker;
@@ -58,21 +59,23 @@ it('records guest submissions without a submitter id', function () {
     $title = 'Guest Submission '.uniqid();
     $email = 'guest@example.com';
 
-    // Create some test data
     $topic = Topic::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
     $eventType = EventType::factory()->create();
+    $institution = Institution::factory()->create(['status' => 'verified']);
 
     Livewire::test('pages.submit-event.create')
         ->set('data.title', $title)
         ->set('data.description', 'Test event description')
-        ->set('data.starts_at', now()->addDay())
-        ->set('data.ends_at', now()->addDay()->addHours(2))
+        ->set('data.event_date', now()->addDay()->toDateString())
+        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.event_type_id', $eventType->id)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.topics', [$topic->id])
         ->set('data.speakers', [$speaker->id])
+        ->set('data.organizer_type', 'institution')
+        ->set('data.organizer_institution_id', $institution->id)
         ->set('data.submitter_name', 'Guest User')
         ->set('data.submitter_email', $email)
         ->call('submit')

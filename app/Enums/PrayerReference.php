@@ -22,7 +22,7 @@ enum PrayerReference: string
 
         return match ($this) {
             self::Fajr => 'Subuh',
-            self::Dhuhr => 'Zohor',
+            self::Dhuhr => 'Zuhur',
             self::Asr => 'Asar',
             self::Maghrib => 'Maghrib',
             self::Isha => 'Isyak',

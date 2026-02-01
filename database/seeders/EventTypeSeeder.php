@@ -13,79 +13,98 @@ class EventTypeSeeder extends Seeder
      */
     public function run(): void
     {
+        // Define 3-level hierarchical event types structure
+        // Root → Category → Subcategory
         $types = [
-            'Ilmu' => [
-                'kuliah' => 'Kuliah',
-                'ceramah' => 'Ceramah',
-                'tazkirah' => 'Tazkirah',
-                'forum' => 'Forum',
-                'daurah' => 'Daurah',
-                'halaqah' => 'Halaqah',
-                'seminar' => 'Seminar',
-                'kelas_kitab' => 'Kelas Kitab',
+            'Islamic Events' => [
+                'Ilmu' => [
+                    'kuliah' => 'Kuliah',
+                    'ceramah' => 'Ceramah',
+                    'tazkirah' => 'Tazkirah',
+                    'forum' => 'Forum',
+                    'daurah' => 'Daurah',
+                    'halaqah' => 'Halaqah',
+                    'seminar' => 'Seminar',
+                    'kelas_kitab' => 'Kelas Kitab',
+                ],
+                'Tilawah' => [
+                    'bacaan_yasin' => 'Bacaan Yasin',
+                    'khatam_quran' => 'Khatam Quran',
+                    'majlis_tilawah' => 'Majlis Tilawah',
+                    'tadabbur_quran' => 'Tadabbur Quran',
+                ],
+                'Ibadah' => [
+                    'qiamullail' => 'Qiamullail',
+                    'solat_hajat' => 'Solat Hajat',
+                    'tahlil' => 'Tahlil',
+                ],
+                'Zikir & Doa' => [
+                    'majlis_zikir' => 'Majlis Zikir',
+                    'majlis_selawat' => 'Majlis Selawat',
+                    'doa_selamat' => 'Doa Selamat',
+                    'maulid' => 'Maulid',
+                ],
+                'Komuniti' => [
+                    'gotong_royong' => 'Gotong Royong',
+                    'kenduri' => 'Kenduri',
+                    'iftar' => 'Iftar',
+                    'sahur' => 'Sahur',
+                    'korban' => 'Korban',
+                    'aqiqah' => 'Aqiqah',
+                ],
             ],
-            'Tilawah' => [
-                'bacaan_yasin' => 'Bacaan Yasin',
-                'khatam_quran' => 'Khatam Quran',
-                'majlis_tilawah' => 'Majlis Tilawah',
-                'tadabbur_quran' => 'Tadabbur Quran',
-            ],
-            'Ibadah' => [
-                'qiamullail' => 'Qiamullail',
-                'solat_hajat' => 'Solat Hajat',
-                'tahlil' => 'Tahlil',
-            ],
-            'Zikir & Doa' => [
-                'majlis_zikir' => 'Majlis Zikir',
-                'majlis_selawat' => 'Majlis Selawat',
-                'doa_selamat' => 'Doa Selamat',
-                'maulid' => 'Maulid',
-            ],
-            'Komuniti' => [
-                'gotong_royong' => 'Gotong Royong',
-                'kenduri' => 'Kenduri',
-                'iftar' => 'Iftar',
-                'sahur' => 'Sahur',
-                'korban' => 'Korban',
-                'aqiqah' => 'Aqiqah',
-            ],
-            'Umum' => [
-                'academic' => 'Akademik',
-                'technology' => 'Teknologi',
-                'business' => 'Perniagaan',
-                'health' => 'Kesihatan',
-                'arts' => 'Kesenian',
-                'sports' => 'Sukan',
-            ],
-            'Lain-lain' => [
-                'other' => 'Lain-lain',
+            'General Events' => [
+                'Umum' => [
+                    'academic' => 'Akademik',
+                    'technology' => 'Teknologi',
+                    'business' => 'Perniagaan',
+                    'health' => 'Kesihatan',
+                    'arts' => 'Kesenian',
+                    'sports' => 'Sukan',
+                ],
+                'Lain-lain' => [
+                    'other' => 'Lain-lain',
+                ],
             ],
         ];
 
-        $sortOrder = 0;
+        $rootSortOrder = 0;
 
-        foreach ($types as $categoryName => $items) {
-            $parent = EventType::updateOrCreate(
-                ['slug' => Str::slug($categoryName)],
+        foreach ($types as $rootName => $categories) {
+            $root = EventType::updateOrCreate(
+                ['slug' => Str::slug($rootName)],
                 [
-                    'name' => $categoryName,
+                    'name' => $rootName,
                     'parent_id' => null,
-                    'order_column' => $sortOrder++,
+                    'order_column' => $rootSortOrder++,
                     'is_active' => true,
                 ]
             );
 
-            $childSortOrder = 0;
-            foreach ($items as $slug => $name) {
-                EventType::updateOrCreate(
-                    ['slug' => $slug],
+            $categorySortOrder = 0;
+            foreach ($categories as $categoryName => $items) {
+                $category = EventType::updateOrCreate(
+                    ['slug' => Str::slug($categoryName)],
                     [
-                        'name' => $name,
-                        'parent_id' => $parent->id,
-                        'order_column' => $childSortOrder++,
+                        'name' => $categoryName,
+                        'parent_id' => $root->id,
+                        'order_column' => $categorySortOrder++,
                         'is_active' => true,
                     ]
                 );
+
+                $itemSortOrder = 0;
+                foreach ($items as $slug => $name) {
+                    EventType::updateOrCreate(
+                        ['slug' => $slug],
+                        [
+                            'name' => $name,
+                            'parent_id' => $category->id,
+                            'order_column' => $itemSortOrder++,
+                            'is_active' => true,
+                        ]
+                    );
+                }
             }
         }
     }

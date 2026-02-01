@@ -116,7 +116,7 @@ class EventForm
                                                     ->helperText('Teks ini akan dipaparkan kepada pengguna'),
                                             ])
                                             ->columns(3)
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'prayer_relative'
                                             JS),
@@ -125,7 +125,7 @@ class EventForm
                                         DateTimePicker::make('starts_at')
                                             ->label('Waktu Mula')
                                             ->required()
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::Absolute)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'absolute'
                                             JS),
@@ -134,7 +134,7 @@ class EventForm
                                         DatePicker::make('event_date')
                                             ->label('Tarikh Majlis')
                                             ->required()
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'prayer_relative'
                                             JS)

@@ -87,6 +87,8 @@ class Institution extends Model implements AuditableContract, HasMedia
 
         $this->addMediaCollection('cover')
             ->singleFile();
+
+        $this->addMediaCollection('gallery');
     }
 
     public function getAuthzScopeLabel(): string

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -63,6 +64,8 @@ class Event extends Model implements AuditableContract, HasMedia
         'institution_id',
         'submitter_id',
         'venue_id',
+        'organizer_type',
+        'organizer_id',
 
         'title',
         'slug',
@@ -82,6 +85,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'visibility',
         'status',
         'live_url',
+        'event_url',
         'recording_url',
         'views_count',
         'saves_count',
@@ -417,5 +421,93 @@ class Event extends Model implements AuditableContract, HasMedia
         }
 
         return $this->languages->first()?->code ?? 'ms';
+    }
+
+    /**
+     * Get the organizer model (Institution or Speaker).
+     */
+    public function organizer(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Check if a user can manage this event.
+     * Uses hybrid approach: event membership OR organizer scope permissions.
+     */
+    public function userCanManage(User $user): bool
+    {
+        // 1. Check direct event membership with management role
+        $membership = $this->members()
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($membership?->pivot?->role && in_array($membership->pivot->role, ['organizer', 'co-organizer'])) {
+            return true;
+        }
+
+        // 2. Check organizer scope permissions (if organizer is set)
+        if ($this->organizer_id && $this->organizer) {
+            return Authz::userCanInScope($user, 'event.update', $this->organizer);
+        }
+
+        // 3. Fallback to institution scope (legacy support)
+        if ($this->institution_id && $this->institution) {
+            return Authz::userCanInScope($user, 'event.update', $this->institution);
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a user can delete this event.
+     * More restrictive than manage: only organizer-level admins or direct event organizer.
+     */
+    public function userCanDelete(User $user): bool
+    {
+        // 1. Check direct event membership - only 'organizer' role (not co-organizer)
+        $isDirectOrganizer = $this->members()
+            ->where('user_id', $user->id)
+            ->where('role', 'organizer')
+            ->exists();
+
+        if ($isDirectOrganizer) {
+            return true;
+        }
+
+        // 2. Check organizer scope delete permission
+        if ($this->organizer_id && $this->organizer) {
+            return Authz::userCanInScope($user, 'event.delete', $this->organizer);
+        }
+
+        // 3. Fallback to institution scope
+        if ($this->institution_id && $this->institution) {
+            return Authz::userCanInScope($user, 'event.delete', $this->institution);
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a user can view this event (private events).
+     */
+    public function userCanView(User $user): bool
+    {
+        // Event members can view
+        if ($this->members()->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        // Check organizer scope
+        if ($this->organizer_id && $this->organizer) {
+            return Authz::userCanInScope($user, 'event.view', $this->organizer);
+        }
+
+        // Fallback to institution scope
+        if ($this->institution_id && $this->institution) {
+            return Authz::userCanInScope($user, 'event.view', $this->institution);
+        }
+
+        return false;
     }
 }
