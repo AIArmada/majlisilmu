@@ -136,13 +136,13 @@ class SpeakerFactory extends Factory
             'Abdul Wahid',
             'Abdul Karim',
         ];
-        // Pre-nominals (Professional/Religious titles)
-        $preNominalsMale = ['Ustaz', 'Dr.', 'Prof.', 'Ir.', 'Tuan Guru'];
-        $preNominalsFemale = ['Ustazah', 'Dr.', 'Prof.', 'Ir.'];
+        // Pre-nominals (Professional/Religious titles) - using enum values
+        $preNominalsMale = ['ustaz', 'dr', 'prof', 'ir', 'tuan_guru', 'syeikh', 'hafiz', 'mufti'];
+        $preNominalsFemale = ['ustazah', 'dr', 'prof', 'ir', 'hafizah', 'qariah'];
 
-        // Honorifics (State awards)
-        $honorificsMale = ['Dato\'', 'Datuk', 'Tan Sri', 'Tun'];
-        $honorificsFemale = ['Datin', 'Datin Paduka', 'Puan Sri', 'Toh Puan'];
+        // Honorifics (State awards) - using enum values
+        $honorificsMale = ['dato', 'datuk', 'tan_sri', 'tun', 'datuk_seri', 'datuk_wira'];
+        $honorificsFemale = ['datin', 'datin_paduka', 'puan_sri', 'toh_puan'];
 
         // Post-nominals (Academic qualifications)
         $postNominals = ['PhD', 'MSc', 'MA', 'BSc', 'BA', 'HONS'];
@@ -159,20 +159,30 @@ class SpeakerFactory extends Factory
         $givenName = trim(implode(' ', array_filter([$firstName, $secondName])));
         $connector = $isFemale ? 'binti' : 'bin';
         $parentName = fake()->randomElement($parentNames);
-        $name = $givenName.' '.$connector.' '.$parentName;
+        $name = $givenName.' '.$connector.' ' .$parentName;
 
-        // Populate new fields
-        $preNominal = fake()->boolean(30)
-            ? fake()->randomElement($isFemale ? $preNominalsFemale : $preNominalsMale)
-            : null;
+        // Populate new fields - honorific can have multiple values
+        $honorific = null;
+        if (fake()->boolean(10)) {
+            $availableHonorifics = $isFemale ? $honorificsFemale : $honorificsMale;
+            $count = fake()->numberBetween(1, min(2, count($availableHonorifics)));
+            $honorific = fake()->randomElements($availableHonorifics, $count);
+        }
 
-        $honorific = fake()->boolean(10)
-            ? fake()->randomElement($isFemale ? $honorificsFemale : $honorificsMale)
-            : null;
+        // Pre-nominal can also have multiple values
+        $preNominal = null;
+        if (fake()->boolean(30)) {
+            $availablePreNominals = $isFemale ? $preNominalsFemale : $preNominalsMale;
+            $count = fake()->numberBetween(1, min(2, count($availablePreNominals)));
+            $preNominal = fake()->randomElements($availablePreNominals, $count);
+        }
 
-        $postNominal = fake()->boolean(20)
-            ? fake()->randomElement($postNominals)
-            : null;
+        // Post-nominal can also have multiple values
+        $postNominal = null;
+        if (fake()->boolean(20)) {
+            $count = fake()->numberBetween(1, min(3, count($postNominals)));
+            $postNominal = fake()->randomElements($postNominals, $count);
+        }
 
         $universities = [
             'Universiti Az-Zaitunah',

@@ -44,6 +44,9 @@ class Speaker extends Model implements AuditableContract, HasMedia
     protected function casts(): array
     {
         return [
+            'honorific' => 'array',
+            'pre_nominal' => 'array',
+            'post_nominal' => 'array',
             'qualifications' => 'array',
             'is_freelance' => 'boolean',
             'is_active' => 'boolean',
@@ -72,14 +75,11 @@ class Speaker extends Model implements AuditableContract, HasMedia
                             $parts[] = $qual['degree'];
                         }
                     }
-                    // If parts exist, join them. If not, don't overwrite if manual?
-                    // User said "lock one as derived-only". So we overwrite.
-
                     // De-duplicate
                     $parts = array_unique($parts);
 
                     if (! empty($parts)) {
-                        $speaker->post_nominal = implode(', ', $parts);
+                        $speaker->post_nominal = array_values($parts);
                     }
                 }
             }
@@ -110,15 +110,37 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
     public function getFormattedNameAttribute(): string
     {
+        $honorificLabels = null;
+        $preNominalLabels = null;
+
+        // Convert honorific enum values to labels
+        if (is_array($this->honorific) && ! empty($this->honorific)) {
+            $honorificLabels = collect($this->honorific)
+                ->map(fn ($value) => \App\Enums\Honorific::tryFrom($value)?->getLabel())
+                ->filter()
+                ->implode(', ');
+        }
+
+        // Convert pre_nominal enum values to labels
+        if (is_array($this->pre_nominal) && ! empty($this->pre_nominal)) {
+            $preNominalLabels = collect($this->pre_nominal)
+                ->map(fn ($value) => \App\Enums\PreNominal::tryFrom($value)?->getLabel())
+                ->filter()
+                ->implode(' ');
+        }
+
         $parts = array_filter([
-            $this->honorific,
-            $this->pre_nominal,
+            $honorificLabels,
+            $preNominalLabels,
             $this->name,
         ], fn ($value) => filled($value));
 
         $formatted = trim(implode(' ', $parts));
 
-        if (filled($this->post_nominal)) {
+        if (is_array($this->post_nominal) && ! empty($this->post_nominal)) {
+            $postNominalStr = implode(', ', $this->post_nominal);
+            $formatted = trim($formatted.', '.$postNominalStr);
+        } elseif (filled($this->post_nominal)) {
             $formatted = trim($formatted.', '.$this->post_nominal);
         }
 

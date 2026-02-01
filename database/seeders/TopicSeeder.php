@@ -13,73 +13,74 @@ class TopicSeeder extends Seeder
      */
     public function run(): void
     {
-        // Define hierarchical topics structure
-        // Format: 'Category' => ['child1', 'child2', ...]
-        // Or nested: 'Category' => ['Subcategory' => ['child1', ...]]
+        // Define 3-level hierarchical topics structure
+        // Root → Category → Subcategory
         $hierarchy = [
-            'Aqidah' => [
-                'Tauhid' => [
-                    'Tauhid Rububiyyah',
-                    'Tauhid Uluhiyyah',
-                    'Asma wa Sifat',
+            'Islamic' => [
+                'Aqidah' => [
+                    'Tauhid' => [
+                        'Tauhid Rububiyyah',
+                        'Tauhid Uluhiyyah',
+                        'Asma wa Sifat',
+                    ],
+                    'Rukun Iman',
+                    'Aqidah Ahlus Sunnah',
                 ],
-                'Rukun Iman',
-                'Aqidah Ahlus Sunnah',
-            ],
-            'Fiqh' => [
-                'Ibadah' => [
-                    'Solat',
-                    'Puasa',
-                    'Zakat',
-                    'Haji & Umrah',
+                'Fiqh' => [
+                    'Ibadah' => [
+                        'Solat',
+                        'Puasa',
+                        'Zakat',
+                        'Haji & Umrah',
+                    ],
+                    'Muamalat',
+                    'Munakahat',
+                    'Jenayah',
                 ],
-                'Muamalat',
-                'Munakahat',
-                'Jenayah',
-            ],
-            'Sirah' => [
-                'Sirah Nabawiyyah' => [
-                    'Mekah',
-                    'Madinah',
+                'Sirah' => [
+                    'Sirah Nabawiyyah' => [
+                        'Mekah',
+                        'Madinah',
+                    ],
+                    'Sirah Sahabah',
+                    'Sirah Khulafa Ar-Rasyidin',
                 ],
-                'Sirah Sahabah',
-                'Sirah Khulafa Ar-Rasyidin',
-            ],
-            'Akhlak' => [
-                'Adab' => [
-                    'Adab Menuntut Ilmu',
-                    'Adab Berjiran',
-                    'Adab Dalam Masjid',
+                'Akhlak' => [
+                    'Adab' => [
+                        'Adab Menuntut Ilmu',
+                        'Adab Berjiran',
+                        'Adab Dalam Masjid',
+                    ],
+                    'Akhlak Rasulullah',
                 ],
-                'Akhlak Rasulullah',
-            ],
-            'Al-Quran' => [
-                'Tafsir' => [
-                    'Tafsir Al-Fatihah',
-                    'Tafsir Al-Kahfi',
-                    'Tafsir Juz Amma',
+                'Al-Quran' => [
+                    'Tafsir' => [
+                        'Tafsir Al-Fatihah',
+                        'Tafsir Al-Kahfi',
+                        'Tafsir Juz Amma',
+                    ],
+                    'Tadabbur' => [
+                        'Tadabbur Surah Yasin',
+                        'Tadabbur Surah Al-Mulk',
+                    ],
+                    'Ulumul Quran',
+                    'Tajwid',
                 ],
-                'Tadabbur' => [
-                    'Tadabbur Surah Yasin',
-                    'Tadabbur Surah Al-Mulk',
+                'Hadith' => [
+                    'Hadis Arba\'in',
+                    'Riyadus Salihin',
+                    'Bulughul Maram',
                 ],
-                'Ulumul Quran',
-                'Tajwid',
-            ],
-            'Hadith' => [
-                'Hadis Arba\'in',
-                'Riyadus Salihin',
-                'Bulughul Maram',
-            ],
-            'Tarbiah' => [
-                'Tarbiah Remaja',
-                'Tarbiah Keluarga',
-                'Tazkiyah An-Nafs',
-            ],
-            'Keluarga' => [
-                'Parenting Islami',
-                'Pendidikan Anak',
-                'Komunikasi Suami Isteri',
+                'Tarbiah' => [
+                    'Tarbiah Remaja',
+                    'Tarbiah Keluarga',
+                    'Tazkiyah An-Nafs',
+                ],
+                'Keluarga' => [
+                    'Parenting Islami',
+                    'Pendidikan Anak',
+                    'Komunikasi Suami Isteri',
+                ],
             ],
         ];
 

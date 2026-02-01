@@ -11,9 +11,9 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->string('name');
             $table->string('gender')->nullable()->default('male'); // male, female
-            $table->string('honorific')->nullable(); // Dato', Datin, Tan Sri, Tun
-            $table->string('pre_nominal')->nullable(); // Dr, Prof, Ir, Ustaz
-            $table->string('post_nominal')->nullable(); // PhD, HONS, MSc
+            $table->jsonb('honorific')->nullable(); // Multiple honorifics: ["dr", "prof", "ustaz"]
+            $table->jsonb('pre_nominal')->nullable(); // Multiple pre-nominals: ["tun", "datuk_seri"]
+            $table->jsonb('post_nominal')->nullable(); // Multiple post-nominals: ["phd", "msc", "ma"]
             $table->string('slug')->unique();
             $table->text('bio')->nullable();
 
