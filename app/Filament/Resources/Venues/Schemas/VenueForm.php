@@ -27,8 +27,7 @@ class VenueForm
                             ->maxLength(255),
                         Select::make('type')
                             ->options(VenueType::class)
-                            ->required()
-                            ->default(VenueType::Hall),
+                            ->required(),
                         Select::make('status')
                             ->options([
                                 'unverified' => 'Unverified',
