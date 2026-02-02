@@ -7,10 +7,6 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        if (Schema::hasTable('institution_speaker')) {
-            return;
-        }
-
         Schema::create('institution_speaker', function (Blueprint $table) {
             $table->id();
             $table->foreignUuid('institution_id')->index();

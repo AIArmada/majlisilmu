@@ -8,20 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('event_speakers', function (Blueprint $table) {
+        Schema::create('event_topic', function (Blueprint $table) {
             $table->uuid('event_id');
-            $table->uuid('speaker_id');
+            $table->uuid('topic_id');
             $table->unsignedSmallInteger('order_column')->default(0);
             $table->timestamps();
 
-            $table->primary(['event_id', 'speaker_id']);
+            $table->primary(['event_id', 'topic_id']);
 
-            $table->index(['speaker_id', 'event_id']);
+            $table->index(['topic_id', 'event_id']);
+            $table->index(['event_id', 'order_column']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('event_speakers');
+        Schema::dropIfExists('event_topic');
     }
 };

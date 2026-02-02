@@ -250,16 +250,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->native()
                                                     ->timezone('Asia/Kuala_Lumpur')
                                                     ->minDate(now()->startOfDay())
-                                                    ->live(debounce: 500)
-                                                    ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
-                                                        $this->selectedDate = $state;
-                                                        $this->updatePrayerTimeOptions();
-                                                        $current = $get('prayer_time');
-
-                                                        if (! $current || ! array_key_exists($current, $this->prayerTimeOptions)) {
-                                                            $set('prayer_time', array_key_first($this->prayerTimeOptions));
-                                                        }
-                                                    })
                                                     ->extraFieldWrapperAttributes([
                                                         'x-data' => '{}',
                                                         'x-on:change' => '$wire.updateDateAndPrayerTimes($event.target.value)',
@@ -268,17 +258,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 Select::make('prayer_time')
                                                     ->label(__('Waktu'))
                                                     ->required()
-                                                    ->options(fn (): array => $this->prayerTimeOptions)
-                                                    ->live(),
+                                                    ->options(fn (): array => $this->prayerTimeOptions),
 
                                                 TimePicker::make('custom_time')
                                                     ->label(__('Masa'))
                                                     ->native()
                                                     ->timezone('Asia/Kuala_Lumpur')
-                                                    ->visible(function (Get $get): bool {
-                                                        $prayerTime = $get('prayer_time');
-                                                        return $prayerTime === EventPrayerTime::LainWaktu;
-                                                    })
+                                                    ->visibleJs(<<<'JS'
+                                                        $get('prayer_time') === 'lain_waktu'
+                                                        JS)
                                                     ->required(function (Get $get): bool {
                                                         $prayerTime = $get('prayer_time');
                                                         return $prayerTime === EventPrayerTime::LainWaktu;
@@ -319,8 +307,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->required()
                                                     ->options(EventFormat::class)
                                                     ->default(EventFormat::Physical)
-                                                    ->inline()
-                                                    ->live(),
+                                                    ->inline(),
 
                                                 TextInput::make('event_url')
                                                     ->label(__('Event URL'))
@@ -333,7 +320,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->url()
                                                     ->maxLength(255)
                                                     ->placeholder(__('https://youtube.com/...'))
-                                                    ->visible(fn (Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true))
+                                                    ->visibleJs(<<<'JS'
+                                                ['online', 'hybrid'].includes($get('event_format'))
+                                                JS)
                                                     ->required(fn (Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true)),
                                             ]),
 
@@ -351,40 +340,23 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->options(EventAgeGroup::class)
                                                     ->multiple()
                                                     // ->default([EventAgeGroup::AllAges->value, EventAgeGroup::Adults->value])
-                                                    ->live()
-                                                    ->afterStateUpdated(function (Set $set, array|string|null $state): void {
-                                                        $ageGroups = collect(is_array($state) ? $state : [$state])
-                                                            ->filter()
-                                                            ->values();
-
-                                                        if ($ageGroups->contains(EventAgeGroup::Children) || 
-                                                            $ageGroups->contains(EventAgeGroup::AllAges)) {
-                                                            $set('children_allowed', true);
+                                                    ->afterStateUpdatedJs(<<<'JS'
+                                                        const ageGroups = $state || []
+                                                        if (ageGroups.includes('children') || ageGroups.includes('all_ages')) {
+                                                            $set('children_allowed', true)
                                                         }
-                                                    }),
+                                                        JS),
 
                                                 Toggle::make('children_allowed')
                                                     ->label(__('Children Allowed'))
                                                     ->default(true)
                                                     ->inline(false)
-                                                    ->live()
-                        
                                                     ->disabled(function (Get $get): bool {
                                                         $ageGroups = $get('age_group') ?? [];
                                                         return in_array(EventAgeGroup::Children, $ageGroups, true) || 
                                                                in_array(EventAgeGroup::AllAges, $ageGroups, true);
                                                     })
-                                                    ->dehydrated()
-                                                    ->afterStateUpdated(function (Set $set, Get $get, $state): void {
-                                                        // Force children_allowed to true if age_group contains Children or AllAges
-                                                        $ageGroups = $get('age_group') ?? [];
-                                                        $shouldBeTrue = in_array(EventAgeGroup::Children, $ageGroups, true) ||
-                                                                       in_array(EventAgeGroup::AllAges, $ageGroups, true);
-                                                        
-                                                        if ($shouldBeTrue && ! $state) {
-                                                            $set('children_allowed', true);
-                                                        }
-                                                    }),
+                                                    ->dehydrated(),
                                             ]),
                                     ]),
 
@@ -398,15 +370,16 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 'speaker' => __('Speaker'),
                                             ])
                                             ->default('institution')
-                                            ->inline()
-                                            ->live(),
+                                            ->inline(),
 
                                         Select::make('organizer_institution_id')
                                             ->label(__('Institution'))
                                             ->relationship('institution', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending']))
                                             ->searchable()
                                             ->preload()
-                                            ->visible(fn (Get $get): bool => $get('organizer_type') === 'institution')
+                                            ->visibleJs(<<<'JS'
+                                                $get('organizer_type') === 'institution'
+                                                JS)
                                             ->required(fn (Get $get): bool => $get('organizer_type') === 'institution')
                                             ->createOptionForm([
                                                 TextInput::make('name')
@@ -459,11 +432,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
                                                     ->searchable()
                                                     ->preload()
-                                                    ->live()
-                                                    ->afterStateUpdated(function (Set $set): void {
-                                                        $set('district_id', null);
-                                                        $set('subdistrict_id', null);
-                                                    }),
+                                                    ->afterStateUpdatedJs(<<<'JS'
+                                                        $set('district_id', null)
+                                                        $set('subdistrict_id', null)
+                                                        JS),
 
                                                 Select::make('district_id')
                                                     ->label(__('Daerah'))
@@ -478,9 +450,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ->pluck('name', 'id');
                                                     })
                                                     ->searchable()
-                                                    ->live()
-                                                    ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null))
-                                                    ->visible(fn (Get $get): bool => filled($get('state_id'))),
+                                                    ->afterStateUpdatedJs(<<<'JS'
+                                                        $set('subdistrict_id', null)
+                                                        JS)
+                                                    ->visibleJs(<<<'JS'
+                                                        $get('state_id') != null && $get('state_id') !== ''
+                                                        JS),
 
                                                 Select::make('subdistrict_id')
                                                     ->label(__('Daerah Kecil / Bandar / Mukim'))
@@ -495,7 +470,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ->pluck('name', 'id');
                                                     })
                                                     ->searchable()
-                                                    ->visible(fn (Get $get): bool => filled($get('district_id'))),
+                                                    ->visibleJs(<<<'JS'
+                                                        $get('district_id') != null && $get('district_id') !== ''
+                                                        JS),
 
                                                 TextInput::make('google_maps_url')
                                                     ->label(__('Google Maps URL'))
@@ -589,17 +566,18 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->pluck('name', 'id'))
                                             ->searchable()
                                             ->preload()
-                                            ->visible(fn (Get $get): bool => $get('organizer_type') === 'speaker')
+                                            ->visibleJs(<<<'JS'
+                                                $get('organizer_type') === 'speaker'
+                                                JS)
                                             ->required(fn (Get $get): bool => $get('organizer_type') === 'speaker')
-                                            ->live()
-                                            ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                                            ->afterStateUpdatedJs(<<<'JS'
                                                 if ($state) {
-                                                    $currentSpeakers = $get('speakers') ?? [];
-                                                    if (! in_array($state, $currentSpeakers, true)) {
-                                                        $set('speakers', array_merge($currentSpeakers, [$state]));
+                                                    const currentSpeakers = $get('speakers') || []
+                                                    if (!currentSpeakers.includes($state)) {
+                                                        $set('speakers', [...currentSpeakers, $state])
                                                     }
                                                 }
-                                            })
+                                                JS)
                                             ->createOptionForm([
                                                 TextInput::make('name')
                                                     ->label(__('Speaker Name'))
@@ -632,7 +610,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                                 Select::make('pre_nominal')
                                                     ->label(__('Pre-nominal'))
-                                                    ->multiple()
                                                     ->options(PreNominal::class)
                                                     ->searchable()
                                                     ->placeholder(__('Select pre-nominals')),
@@ -650,7 +627,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                                 Select::make('institutions')
                                                     ->label(__('Affiliated Institutions'))
-                                                    ->relationship('institutions', 'name')
+                                                    ->options(fn () => Institution::query()
+                                                        ->whereIn('status', ['verified', 'pending'])
+                                                        ->orderBy('name')
+                                                        ->pluck('name', 'id'))
                                                     ->multiple()
                                                     ->searchable()
                                                     ->preload(),
@@ -681,14 +661,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     ]),
 
                                 Section::make(__('Location'))
-                                    ->visible(fn (Get $get): bool => $get('event_format') !== EventFormat::Online)
+                                    ->visibleJs(<<<'JS'
+                                        $get('event_format') !== 'online'
+                                        JS)
                                     ->schema([
                                         Toggle::make('location_same_as_institution')
                                             ->label(__('Same as organizer institution'))
                                             ->default(true)
                                             ->inline(false)
-                                            ->live()
-                                            ->visible(fn (Get $get): bool => $get('organizer_type') === 'institution'),
+                                            ->visibleJs(<<<'JS'
+                                                $get('organizer_type') === 'institution'
+                                                JS),
 
                                         Select::make('location_id')
                                             ->label(__('Location'))
@@ -731,7 +714,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             })
                                             ->searchable()
                                             ->preload()
-                                            ->visible(fn (Get $get): bool => $get('organizer_type') === 'speaker' || ! $get('location_same_as_institution'))
+                                            ->visibleJs(<<<'JS'
+                                                $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
+                                                JS)
                                             ->required(fn (Get $get): bool => $get('organizer_type') === 'speaker' || ! $get('location_same_as_institution'))
                                             ->createOptionForm([
                                                 TextInput::make('name')
@@ -784,11 +769,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
                                                     ->searchable()
                                                     ->preload()
-                                                    ->live()
-                                                    ->afterStateUpdated(function (Set $set): void {
-                                                        $set('district_id', null);
-                                                        $set('subdistrict_id', null);
-                                                    }),
+                                                    ->afterStateUpdatedJs(<<<'JS'
+                                                        $set('district_id', null)
+                                                        $set('subdistrict_id', null)
+                                                        JS),
 
                                                 Select::make('district_id')
                                                     ->label(__('Daerah'))
@@ -803,9 +787,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ->pluck('name', 'id');
                                                     })
                                                     ->searchable()
-                                                    ->live()
-                                                    ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null))
-                                                    ->visible(fn (Get $get): bool => filled($get('state_id'))),
+                                                    ->afterStateUpdatedJs(<<<'JS'
+                                                        $set('subdistrict_id', null)
+                                                        JS)
+                                                    ->visibleJs(<<<'JS'
+                                                        $get('state_id') != null && $get('state_id') !== ''
+                                                        JS),
 
                                                 Select::make('subdistrict_id')
                                                     ->label(__('Daerah Kecil / Bandar / Mukim'))
@@ -820,7 +807,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ->pluck('name', 'id');
                                                     })
                                                     ->searchable()
-                                                    ->visible(fn (Get $get): bool => filled($get('district_id'))),
+                                                    ->visibleJs(<<<'JS'
+                                                        $get('district_id') != null && $get('district_id') !== ''
+                                                        JS),
 
                                                 TextInput::make('google_maps_url')
                                                     ->label(__('Google Maps URL'))
@@ -949,7 +938,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                                 Select::make('pre_nominal')
                                                     ->label(__('Pre-nominal'))
-                                                    ->multiple()
                                                     ->options(PreNominal::class)
                                                     ->searchable()
                                                     ->placeholder(__('Select pre-nominals')),
@@ -967,7 +955,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                                 Select::make('institutions')
                                                     ->label(__('Affiliated Institutions'))
-                                                    ->relationship('institutions', 'name')
+                                                    ->options(fn () => Institution::query()
+                                                        ->whereIn('status', ['verified', 'pending'])
+                                                        ->orderBy('name')
+                                                        ->pluck('name', 'id'))
                                                     ->multiple()
                                                     ->searchable()
                                                     ->preload(),

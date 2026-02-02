@@ -74,7 +74,7 @@ class Topic extends Model implements HasMedia, Sortable
 
     public function events(): BelongsToMany
     {
-        return $this->belongsToMany(Event::class, 'event_topics')
+        return $this->belongsToMany(Event::class, 'event_topic')
             ->withPivot('order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');

@@ -39,13 +39,11 @@ class VenueFactory extends Factory
             'slug' => $slug,
             'description' => fake()->paragraph(),
             'type' => fake()->randomElement([
-                'main_hall',
-                'seminar_room',
-                'classroom',
+                'dewan',
                 'auditorium',
-                'field',
-                'foyer',
-                'other',
+                'stadium',
+                'perpustakaan',
+                'padang',
             ]),
             'facilities' => [
                 'parking' => fake()->boolean(),

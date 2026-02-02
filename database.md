@@ -171,9 +171,9 @@ return new class extends Migration
         });
 
         /**
-         * INSTITUTION MEMBERS (scoped roles)
+         * INSTITUTION USER (scoped roles)
          */
-        Schema::create('institution_members', function (Blueprint $table) {
+        Schema::create('institution_user', function (Blueprint $table) {
             $table->uuid('institution_id');
             $table->uuid('user_id');
             $table->enum('role', ['owner', 'admin', 'editor'])->default('editor')->index();
@@ -243,9 +243,9 @@ return new class extends Migration
         });
 
         /**
-         * SPEAKER MEMBERS (scoped roles)
+         * SPEAKER USER (scoped roles)
          */
-        Schema::create('speaker_members', function (Blueprint $table) {
+        Schema::create('speaker_user', function (Blueprint $table) {
             $table->uuid('speaker_id');
             $table->uuid('user_id');
             $table->enum('role', ['owner', 'admin', 'editor'])->default('editor')->index();
@@ -378,9 +378,9 @@ return new class extends Migration
         });
 
         /**
-         * EVENT SPEAKERS (many-to-many)
+         * EVENT SPEAKER (many-to-many)
          */
-        Schema::create('event_speakers', function (Blueprint $table) {
+        Schema::create('event_speaker', function (Blueprint $table) {
             $table->uuid('event_id');
             $table->uuid('speaker_id');
             $table->unsignedSmallInteger('sort_order')->default(0);
@@ -393,9 +393,9 @@ return new class extends Migration
         });
 
         /**
-         * EVENT TOPICS (many-to-many)
+         * EVENT TOPIC (many-to-many)
          */
-        Schema::create('event_topics', function (Blueprint $table) {
+        Schema::create('event_topic', function (Blueprint $table) {
             $table->uuid('event_id');
             $table->uuid('topic_id');
             $table->timestamps();
@@ -586,16 +586,16 @@ return new class extends Migration
         Schema::dropIfExists('moderation_reviews');
         Schema::dropIfExists('event_submissions');
         Schema::dropIfExists('event_media_links');
-        Schema::dropIfExists('event_topics');
-        Schema::dropIfExists('event_speakers');
+        Schema::dropIfExists('event_topic');
+        Schema::dropIfExists('event_speaker');
         Schema::dropIfExists('events');
         Schema::dropIfExists('series');
         Schema::dropIfExists('topics');
         Schema::dropIfExists('donation_accounts');
-        Schema::dropIfExists('speaker_members');
+        Schema::dropIfExists('speaker_user');
         Schema::dropIfExists('speakers');
         Schema::dropIfExists('venues');
-        Schema::dropIfExists('institution_members');
+        Schema::dropIfExists('institution_user');
         Schema::dropIfExists('institutions');
         Schema::dropIfExists('media_assets');
         Schema::dropIfExists('districts');
