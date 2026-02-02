@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Institutions\Schemas;
 
+use App\Enums\InstitutionType;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -18,11 +19,7 @@ class InstitutionForm
                 Section::make('Profile')
                     ->components([
                         Select::make('type')
-                            ->options([
-                                'masjid' => 'Masjid',
-                                'surau' => 'Surau',
-                                'others' => 'Others',
-                            ])
+                            ->options(InstitutionType::class)
                             ->required(),
                         TextInput::make('name')
                             ->required()

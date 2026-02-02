@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\VenueType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,7 @@ class Venue extends Model implements HasMedia
     protected function casts(): array
     {
         return [
+            'type' => VenueType::class,
             'facilities' => 'array',
             'is_active' => 'boolean',
         ];

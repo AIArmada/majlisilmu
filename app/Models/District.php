@@ -34,6 +34,11 @@ class District extends Model
         return $this->belongsTo(State::class);
     }
 
+    public function subdistricts(): HasMany
+    {
+        return $this->hasMany(Subdistrict::class);
+    }
+
     public function institutions(): HasMany
     {
         return $this->hasMany(Institution::class);

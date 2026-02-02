@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Venues\Schemas;
 
+use App\Enums\VenueType;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -25,18 +26,9 @@ class VenueForm
                             ->required()
                             ->maxLength(255),
                         Select::make('type')
-                            ->options([
-                                'main_hall' => 'Main Hall',
-                                'seminar_room' => 'Seminar Room',
-                                'classroom' => 'Classroom',
-                                'meeting_room' => 'Meeting Room',
-                                'auditorium' => 'Auditorium',
-                                'field' => 'Field',
-                                'foyer' => 'Foyer',
-                                'other' => 'Other',
-                            ])
-                            ->default('main_hall')
-                            ->required(),
+                            ->options(VenueType::class)
+                            ->required()
+                            ->default(VenueType::Hall),
                         Select::make('status')
                             ->options([
                                 'unverified' => 'Unverified',

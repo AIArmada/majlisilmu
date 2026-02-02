@@ -24,98 +24,22 @@ class DistrictSeeder extends Seeder
         }
 
         $districtsByState = [
-            'Johor' => [
-                'Johor Bahru',
-                'Batu Pahat',
-                'Muar',
-                'Kluang',
-                'Kota Tinggi',
-                'Pontian',
-            ],
-            'Kedah' => [
-                'Kota Setar',
-                'Kuala Muda',
-                'Kulim',
-                'Kubang Pasu',
-                'Langkawi',
-            ],
-            'Kelantan' => [
-                'Kota Bharu',
-                'Pasir Mas',
-                'Bachok',
-                'Tanah Merah',
-            ],
-            'Malacca' => [
-                'Melaka Tengah',
-                'Alor Gajah',
-                'Jasin',
-            ],
-            'Negeri Sembilan' => [
-                'Seremban',
-                'Port Dickson',
-                'Tampin',
-                'Jempol',
-            ],
-            'Pahang' => [
-                'Kuantan',
-                'Temerloh',
-                'Bentong',
-                'Pekan',
-            ],
-            'Perak' => [
-                'Kinta',
-                'Manjung',
-                'Kuala Kangsar',
-                'Hilir Perak',
-                'Larut Matang dan Selama',
-            ],
-            'Perlis' => [
-                'Kangar',
-            ],
-            'Penang' => [
-                'Timur Laut',
-                'Barat Daya',
-                'Seberang Perai Utara',
-                'Seberang Perai Tengah',
-                'Seberang Perai Selatan',
-            ],
-            'Sabah' => [
-                'Kota Kinabalu',
-                'Sandakan',
-                'Tawau',
-                'Lahad Datu',
-                'Keningau',
-            ],
-            'Sarawak' => [
-                'Kuching',
-                'Miri',
-                'Sibu',
-                'Bintulu',
-                'Samarahan',
-            ],
-            'Selangor' => [
-                'Petaling',
-                'Gombak',
-                'Hulu Langat',
-                'Klang',
-                'Kuala Langat',
-                'Sepang',
-            ],
-            'Terengganu' => [
-                'Kuala Terengganu',
-                'Kemaman',
-                'Dungun',
-                'Besut',
-            ],
-            'Kuala Lumpur' => [
-                'Kuala Lumpur',
-            ],
-            'Putrajaya' => [
-                'Putrajaya',
-            ],
-            'Labuan' => [
-                'Labuan',
-            ],
+            'Johor' => ['Johor Bahru', 'Batu Pahat', 'Kluang', 'Kulai', 'Muar', 'Kota Tinggi', 'Segamat', 'Pontian', 'Tangkak', 'Mersing'],
+            'Kedah' => ['Kuala Muda', 'Kota Setar', 'Kulim', 'Kubang Pasu', 'Baling', 'Pendang', 'Langkawi', 'Yan', 'Sik', 'Padang Terap', 'Pokok Sena', 'Bandar Baharu'],
+            'Kelantan' => ['Kota Bharu', 'Pasir Mas', 'Tumpat', 'Bachok', 'Tanah Merah', 'Pasir Puteh', 'Kuala Krai', 'Machang', 'Gua Musang', 'Jeli', 'Lojing'],
+            'Malacca' => ['Melaka Tengah', 'Alor Gajah', 'Jasin'],
+            'Negeri Sembilan' => ['Seremban', 'Jempol', 'Port Dickson', 'Tampin', 'Kuala Pilah', 'Rembau', 'Jelebu'],
+            'Pahang' => ['Kuantan', 'Temerloh', 'Bentong', 'Maran', 'Rompin', 'Pekan', 'Bera', 'Raub', 'Jerantut', 'Lipis', 'Cameron Highlands'],
+            'Perak' => ['Kinta', 'Larut, Matang dan Selama', 'Manjung', 'Hilir Perak', 'Kerian', 'Batang Padang', 'Kuala Kangsar', 'Perak Tengah', 'Hulu Perak', 'Kampar', 'Muallim', 'Bagan Datuk'],
+            'Perlis' => ['Perlis'],
+            'Penang' => ['Timur Laut', 'Seberang Perai Tengah', 'Seberang Perai Utara', 'Barat Daya', 'Seberang Perai Selatan'],
+            'Sabah' => ['Kota Kinabalu', 'Tawau', 'Sandakan', 'Lahad Datu', 'Keningau', 'Kinabatangan', 'Semporna', 'Papar', 'Penampang', 'Beluran', 'Tuaran', 'Ranau', 'Kota Belud', 'Kudat', 'Kota Marudu', 'Beaufort', 'Kunak', 'Tenom', 'Putatan', 'Pitas', 'Tambunan', 'Tongod', 'Sipitang', 'Nabawan', 'Kuala Penyu', 'Telupid', 'Kalabakan'],
+            'Sarawak' => ['Kuching', 'Miri', 'Sibu', 'Bintulu', 'Serian', 'Kota Samarahan', 'Sri Aman', 'Marudi', 'Betong', 'Sarikei', 'Kapit', 'Bau', 'Limbang', 'Saratok', 'Mukah', 'Simunjan', 'Lawas', 'Belaga', 'Lundu', 'Asajaya', 'Daro', 'Tatau', 'Meradong', 'Kanowit', 'Lubok Antu', 'Selangau', 'Song', 'Dalat', 'Matu', 'Julau', 'Pakan', 'Tanjung Manis', 'Bukit Mabong', 'Telang Usan', 'Tebedu', 'Subis', 'Sebauh', 'Beluru', 'Kabong', 'Gedong', 'Siburan', 'Pantu', 'Lingga', 'Sebuyau'],
+            'Selangor' => ['Petaling', 'Hulu Langat', 'Klang', 'Gombak', 'Kuala Langat', 'Sepang', 'Kuala Selangor', 'Hulu Selangor', 'Sabak Bernam'],
+            'Terengganu' => ['Kuala Terengganu', 'Kemaman', 'Dungun', 'Besut', 'Marang', 'Hulu Terengganu', 'Setiu', 'Kuala Nerus'],
+            'Kuala Lumpur' => ['Kuala Lumpur'],
+            'Putrajaya' => ['Putrajaya'],
+            'Labuan' => ['Labuan'],
         ];
 
         foreach ($districtsByState as $stateName => $districts) {

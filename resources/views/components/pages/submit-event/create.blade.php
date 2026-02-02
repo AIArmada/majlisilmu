@@ -6,8 +6,11 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Enums\Gender;
 use App\Enums\Honorific;
+use App\Enums\InstitutionType;
 use App\Enums\PreNominal;
+use App\Enums\VenueType;
 use App\Models\District;
+use App\Models\Subdistrict;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\EventType;
@@ -415,13 +418,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 Select::make('type')
                                                     ->label(__('Institution Type'))
                                                     ->required()
-                                                    ->options([
-                                                        'masjid' => __('Masjid'),
-                                                        'surau' => __('Surau'),
-                                                        'educational_center' => __('Educational Center'),
-                                                        'community_center' => __('Community Center'),
-                                                        'others' => __('Others'),
-                                                    ])
+                                                    ->options(InstitutionType::class)
                                                     ->placeholder(__('Select type...')),
 
                                                 SpatieMediaLibraryFileUpload::make('cover')
@@ -462,13 +459,43 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
                                                     ->searchable()
                                                     ->preload()
-                                                    ->live(),
+                                                    ->live()
+                                                    ->afterStateUpdated(function (Set $set): void {
+                                                        $set('district_id', null);
+                                                        $set('subdistrict_id', null);
+                                                    }),
 
                                                 Select::make('district_id')
-                                                    ->label(__('District'))
-                                                    ->options(fn (Get $get) => District::where('state_id', $get('state_id'))->pluck('name', 'id'))
+                                                    ->label(__('Daerah'))
+                                                    ->options(function (Get $get) {
+                                                        $stateId = $get('state_id');
+                                                        if (! $stateId) {
+                                                            return [];
+                                                        }
+
+                                                        return District::where('state_id', $stateId)
+                                                            ->orderBy('name')
+                                                            ->pluck('name', 'id');
+                                                    })
                                                     ->searchable()
+                                                    ->live()
+                                                    ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null))
                                                     ->visible(fn (Get $get): bool => filled($get('state_id'))),
+
+                                                Select::make('subdistrict_id')
+                                                    ->label(__('Daerah Kecil / Bandar / Mukim'))
+                                                    ->options(function (Get $get) {
+                                                        $districtId = $get('district_id');
+                                                        if (! $districtId) {
+                                                            return [];
+                                                        }
+
+                                                        return Subdistrict::where('district_id', $districtId)
+                                                            ->orderBy('name')
+                                                            ->pluck('name', 'id');
+                                                    })
+                                                    ->searchable()
+                                                    ->visible(fn (Get $get): bool => filled($get('district_id'))),
 
                                                 TextInput::make('google_maps_url')
                                                     ->label(__('Google Maps URL'))
@@ -533,6 +560,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                         'country_id' => 132, // Malaysia
                                                         'state_id' => $data['state_id'] ?? null,
                                                         'district_id' => $data['district_id'] ?? null,
+                                                        'subdistrict_id' => $data['subdistrict_id'] ?? null,
                                                         'google_maps_url' => $data['google_maps_url'] ?? null,
                                                         'waze_url' => $data['waze_url'] ?? null,
                                                     ]);
@@ -708,27 +736,173 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             ->createOptionForm([
                                                 TextInput::make('name')
                                                     ->label(__('Venue Name'))
-                                                    ->required(),
-                                                TextInput::make('address_line1')
-                                                    ->label(__('Address')),
+                                                    ->required()
+                                                    ->maxLength(255)
+                                                    ->placeholder(__('e.g., Dewan Serbaguna, Hall A')),
+                                                    
+                                                Select::make('type')
+                                                    ->label(__('Venue Type'))
+                                                    ->required()
+                                                    ->options(VenueType::class)
+                                                    ->placeholder(__('Select type...')),
+
+                                                SpatieMediaLibraryFileUpload::make('cover')
+                                                    ->label(__('Cover Image'))
+                                                    ->collection('main')
+                                                    ->image()
+                                                    ->imageEditor()
+                                                    ->maxSize(5120)
+                                                    ->helperText(__('Header or banner image')),
+
+                                                SpatieMediaLibraryFileUpload::make('gallery')
+                                                    ->label(__('Gallery'))
+                                                    ->collection('gallery')
+                                                    ->multiple()
+                                                    ->image()
+                                                    ->imageEditor()
+                                                    ->maxSize(5120)
+                                                    ->maxFiles(10)
+                                                    ->helperText(__('Up to 10 photos of the venue')),
+
+                                                TextInput::make('line1')
+                                                    ->label(__('Address Line 1'))
+                                                    ->maxLength(255)
+                                                    ->placeholder(__('e.g., No. 123, Jalan Utama')),
+
+                                                TextInput::make('line2')
+                                                    ->label(__('Address Line 2'))
+                                                    ->maxLength(255)
+                                                    ->placeholder(__('e.g., Taman Indah')),
+
+                                                TextInput::make('postcode')
+                                                    ->label(__('Postcode'))
+                                                    ->maxLength(16)
+                                                    ->placeholder(__('e.g., 50000')),
+
                                                 Select::make('state_id')
                                                     ->label(__('State'))
-                                                    ->options(State::pluck('name', 'id'))
-                                                    ->searchable(),
+                                                    ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->live()
+                                                    ->afterStateUpdated(function (Set $set): void {
+                                                        $set('district_id', null);
+                                                        $set('subdistrict_id', null);
+                                                    }),
+
+                                                Select::make('district_id')
+                                                    ->label(__('Daerah'))
+                                                    ->options(function (Get $get) {
+                                                        $stateId = $get('state_id');
+                                                        if (! $stateId) {
+                                                            return [];
+                                                        }
+
+                                                        return District::where('state_id', $stateId)
+                                                            ->orderBy('name')
+                                                            ->pluck('name', 'id');
+                                                    })
+                                                    ->searchable()
+                                                    ->live()
+                                                    ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null))
+                                                    ->visible(fn (Get $get): bool => filled($get('state_id'))),
+
+                                                Select::make('subdistrict_id')
+                                                    ->label(__('Daerah Kecil / Bandar / Mukim'))
+                                                    ->options(function (Get $get) {
+                                                        $districtId = $get('district_id');
+                                                        if (! $districtId) {
+                                                            return [];
+                                                        }
+
+                                                        return Subdistrict::where('district_id', $districtId)
+                                                            ->orderBy('name')
+                                                            ->pluck('name', 'id');
+                                                    })
+                                                    ->searchable()
+                                                    ->visible(fn (Get $get): bool => filled($get('district_id'))),
+
+                                                TextInput::make('google_maps_url')
+                                                    ->label(__('Google Maps URL'))
+                                                    ->url()
+                                                    ->maxLength(255)
+                                                    ->placeholder(__('https://maps.google.com/...')),
+
+                                                TextInput::make('waze_url')
+                                                    ->label(__('Waze URL'))
+                                                    ->url()
+                                                    ->maxLength(255)
+                                                    ->placeholder(__('https://waze.com/ul/...')),
+
+                                                Repeater::make('social_media')
+                                                    ->label(__('Social Media'))
+                                                    ->schema([
+                                                        Select::make('platform')
+                                                            ->label(__('Platform'))
+                                                            ->required()
+                                                            ->options([
+                                                                'facebook' => 'Facebook',
+                                                                'twitter' => 'Twitter / X',
+                                                                'instagram' => 'Instagram',
+                                                                'youtube' => 'YouTube',
+                                                                'tiktok' => 'TikTok',
+                                                                'telegram' => 'Telegram',
+                                                                'whatsapp' => 'WhatsApp',
+                                                                'website' => 'Website',
+                                                            ])
+                                                            ->searchable(),
+                                                        TextInput::make('url')
+                                                            ->label(__('URL'))
+                                                            ->required()
+                                                            ->url()
+                                                            ->maxLength(255)
+                                                            ->placeholder(__('https://...')),
+                                                        TextInput::make('username')
+                                                            ->label(__('Username'))
+                                                            ->maxLength(255)
+                                                            ->placeholder(__('@username')),
+                                                    ])
+                                                    ->collapsible()
+                                                    ->defaultItems(0)
+                                                    ->addActionLabel(__('Add Social Media'))
+                                                    ->helperText(__('Add social media links for this venue')),
                                             ])
                                             ->createOptionUsing(function (array $data): string {
                                                 $venue = Venue::create([
                                                     'name' => $data['name'],
                                                     'slug' => Str::slug($data['name']).'-'.Str::random(6),
+                                                    'type' => $data['type'],
                                                     'status' => 'pending',
                                                 ]);
 
-                                                if (! empty($data['address_line1']) || ! empty($data['state_id'])) {
+                                                // Create address if provided
+                                                if (! empty($data['line1']) || ! empty($data['state_id'])) {
                                                     $venue->address()->create([
-                                                        'line1' => $data['address_line1'] ?? null,
+                                                        'type' => 'main',
+                                                        'line1' => $data['line1'] ?? null,
+                                                        'line2' => $data['line2'] ?? null,
+                                                        'postcode' => $data['postcode'] ?? null,
+                                                        'country_id' => 132, // Malaysia
                                                         'state_id' => $data['state_id'] ?? null,
+                                                        'district_id' => $data['district_id'] ?? null,
+                                                        'subdistrict_id' => $data['subdistrict_id'] ?? null,
+                                                        'google_maps_url' => $data['google_maps_url'] ?? null,
+                                                        'waze_url' => $data['waze_url'] ?? null,
                                                     ]);
                                                 }
+
+                                                // Create social media entries if provided
+                                                if (! empty($data['social_media'])) {
+                                                    foreach ($data['social_media'] as $social) {
+                                                        $venue->socialMedia()->create([
+                                                            'platform' => $social['platform'],
+                                                            'url' => $social['url'],
+                                                            'username' => $social['username'] ?? null,
+                                                        ]);
+                                                    }
+                                                }
+
+                                                // Media (cover, gallery) are handled automatically by Filament/Spatie integration
 
                                                 return 'venue:' . (string) $venue->getKey();
                                             }),
