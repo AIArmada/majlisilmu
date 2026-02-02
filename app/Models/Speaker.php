@@ -149,7 +149,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
     public function events(): BelongsToMany
     {
-        return $this->belongsToMany(Event::class, 'event_speakers')
+        return $this->belongsToMany(Event::class, 'event_speaker')
             ->withPivot('order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');
@@ -174,7 +174,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'speaker_members')
+        return $this->belongsToMany(User::class, 'speaker_user')
             ->withTimestamps();
     }
 

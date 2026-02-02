@@ -82,13 +82,13 @@ class User extends Authenticatable implements FilamentUser
 
     public function institutions(): BelongsToMany
     {
-        return $this->belongsToMany(Institution::class, 'institution_members')
+        return $this->belongsToMany(Institution::class, 'institution_user')
             ->withTimestamps();
     }
 
     public function speakers(): BelongsToMany
     {
-        return $this->belongsToMany(Speaker::class, 'speaker_members')
+        return $this->belongsToMany(Speaker::class, 'speaker_user')
             ->withTimestamps();
     }
 

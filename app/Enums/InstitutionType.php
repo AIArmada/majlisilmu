@@ -32,10 +32,10 @@ enum InstitutionType: string implements HasLabel
             self::Madrasah => __('Madrasah'),
             self::Maahad => __('Maahad'),
             self::Pondok => __('Pondok'),
-            self::SekolahAgama => __('Sekolah Agama'),
-            self::KolejIslam => __('Kolej Islam'),
+            self::Sekolah => __('Sekolah'),
+            self::Kolej => __('Kolej'),
             self::Universiti => __('Universiti'),
-            self::PertubuhanIslam => __('Pertubuhan Islam (NGO)'),
+            self::Pertubuhan => __('Pertubuhan'),
             self::Yayasan => __('Yayasan'),
             self::Persatuan => __('Persatuan'),
             self::Kelab => __('Kelab'),
@@ -43,6 +43,7 @@ enum InstitutionType: string implements HasLabel
             self::Perniagaan => __('Perniagaan'),
             self::Syarikat => __('Syarikat'),
             self::Koperasi => __('Koperasi'),
+            self::Hotel => __('Hotel'),
         };
     }
 }

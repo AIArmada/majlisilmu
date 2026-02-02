@@ -115,7 +115,7 @@ class SpeakerSeeder extends Seeder
 
         // Bulk insert member attachments
         if (!empty($memberAttachments)) {
-            \Illuminate\Support\Facades\DB::table('speaker_members')->insertOrIgnore($memberAttachments);
+            \Illuminate\Support\Facades\DB::table('speaker_user')->insertOrIgnore($memberAttachments);
         }
     }
 

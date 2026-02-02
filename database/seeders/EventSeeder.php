@@ -121,10 +121,10 @@ class EventSeeder extends Seeder
 
                 // Bulk insert relationships
                 if (!empty($speakerAttachments)) {
-                    \Illuminate\Support\Facades\DB::table('event_speakers')->insert($speakerAttachments);
+                    \Illuminate\Support\Facades\DB::table('event_speaker')->insert($speakerAttachments);
                 }
                 if (!empty($topicAttachments)) {
-                    \Illuminate\Support\Facades\DB::table('event_topics')->insert($topicAttachments);
+                    \Illuminate\Support\Facades\DB::table('event_topic')->insert($topicAttachments);
                 }
 
                 $count += 10;

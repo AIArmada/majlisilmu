@@ -70,7 +70,7 @@ class Institution extends Model implements AuditableContract, HasMedia
 
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'institution_members')
+        return $this->belongsToMany(User::class, 'institution_user')
             ->withTimestamps();
     }
 

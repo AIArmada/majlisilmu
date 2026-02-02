@@ -391,7 +391,7 @@ Reports (`POST /reports`):
 
 ## B6) Authorization
 - Global roles: spatie/laravel-permission (`super_admin`, `moderator`)
-- Scoped roles: `institution_members`, `speaker_members`
+- Scoped roles: `institution_user`, `speaker_user`
 - Laravel Policies enforce all access.
 
 ## B6a) Authorization matrix (high level)

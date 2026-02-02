@@ -8,20 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('institution_members', function (Blueprint $table) {
-            $table->uuid('institution_id')->index();
-            $table->uuid('user_id')->index();
+        Schema::create('user_venue', function (Blueprint $table) {
+            $table->foreignUuid('user_id')->index();
+            $table->foreignUuid('venue_id')->index();
             $table->string('role')->default('member')->index();
             $table->timestamp('joined_at')->nullable();
             $table->timestamps();
 
-            $table->primary(['institution_id', 'user_id']);
-
+            $table->primary(['user_id', 'venue_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('institution_members');
+        Schema::dropIfExists('user_venue');
     }
 };
