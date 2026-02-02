@@ -24,6 +24,7 @@ return new class extends Migration
             $table->foreignId('country_id')->nullable()->index();
             $table->foreignId('state_id')->nullable()->index();
             $table->foreignId('district_id')->nullable()->index();
+            $table->foreignId('subdistrict_id')->nullable();
             $table->foreignId('city_id')->nullable()->index();
 
             $table->decimal('lat', 10, 7)->nullable()->index();

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
+use App\Enums\InstitutionType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -40,6 +41,7 @@ class Institution extends Model implements AuditableContract, HasMedia
     protected function casts(): array
     {
         return [
+            'type' => InstitutionType::class,
             'is_active' => 'boolean',
         ];
     }
