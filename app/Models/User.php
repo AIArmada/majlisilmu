@@ -149,8 +149,8 @@ class User extends Authenticatable implements FilamentUser
 
     public function memberEvents(): BelongsToMany
     {
-        return $this->belongsToMany(Event::class, 'event_members')
-            ->using(EventMember::class)
+        return $this->belongsToMany(Event::class, 'event_user')
+            ->using(EventUser::class)
             ->withPivot(['role', 'joined_at'])
             ->withTimestamps();
     }

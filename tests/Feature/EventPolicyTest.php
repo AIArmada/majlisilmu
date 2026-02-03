@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Event;
-use App\Models\EventMember;
+use App\Models\EventUser;
 use App\Models\Institution;
 use App\Models\User;
 use App\States\EventStatus\Approved;
@@ -70,7 +70,7 @@ describe('view', function () {
         ]);
         $user = User::factory()->create();
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->volunteer()
@@ -151,7 +151,7 @@ describe('update', function () {
             'status' => Approved::class,
         ]);
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->organizer()
@@ -166,7 +166,7 @@ describe('update', function () {
             'status' => Approved::class,
         ]);
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->coOrganizer()
@@ -181,7 +181,7 @@ describe('update', function () {
             'status' => Approved::class,
         ]);
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->volunteer()
@@ -227,7 +227,7 @@ describe('delete', function () {
             'status' => Draft::class,
         ]);
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->organizer()
@@ -242,7 +242,7 @@ describe('delete', function () {
             'status' => Draft::class,
         ]);
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->coOrganizer()
@@ -257,7 +257,7 @@ describe('delete', function () {
             'status' => Approved::class,
         ]);
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->organizer()
@@ -305,7 +305,7 @@ describe('manageMembers', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->organizer()
@@ -318,7 +318,7 @@ describe('manageMembers', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->coOrganizer()
@@ -333,7 +333,7 @@ describe('userCanManage helper', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->organizer()
@@ -346,7 +346,7 @@ describe('userCanManage helper', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->coOrganizer()
@@ -359,7 +359,7 @@ describe('userCanManage helper', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventMember::factory()
+        EventUser::factory()
             ->for($event)
             ->for($user)
             ->volunteer()

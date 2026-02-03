@@ -458,7 +458,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                         JS),
 
                                                 Select::make('subdistrict_id')
-                                                    ->label(__('Daerah Kecil / Bandar / Mukim'))
+                                                    ->label(__('Daerah Kecil / Bandar / Mukim / Pekan'))
                                                     ->options(function (Get $get) {
                                                         $districtId = $get('district_id');
                                                         if (! $districtId) {
@@ -795,7 +795,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                         JS),
 
                                                 Select::make('subdistrict_id')
-                                                    ->label(__('Daerah Kecil / Bandar / Mukim'))
+                                                    ->label(__('Daerah Kecil / Bandar / Mukim / Pekan'))
                                                     ->options(function (Get $get) {
                                                         $districtId = $get('district_id');
                                                         if (! $districtId) {
