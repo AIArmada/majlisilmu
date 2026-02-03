@@ -1,12 +1,6 @@
 <?php
 
-use App\Enums\EventAgeGroup;
-use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
-use App\Models\EventType;
-use App\Models\Institution;
-use App\Models\Speaker;
-use App\Models\Topic;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 

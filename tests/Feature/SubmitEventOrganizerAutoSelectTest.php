@@ -5,22 +5,23 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Models\Event;
 use App\Models\EventType;
-use App\Models\Institution;
 use App\Models\Speaker;
-use App\Models\Topic;
+use App\Models\Tag;
 use App\Models\Venue;
 use Livewire\Livewire;
 
-it('auto-selects the speaker as an event speaker when selected as organizer', function () {
+it('assigns the speaker as event speaker when speaker is the organizer', function () {
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $eventType = EventType::factory()->create(['slug' => 'kuliah']);
-    $topic = Topic::factory()->create();
+    $parentEventType = EventType::factory()->create();
+    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
+    $domainTag = Tag::factory()->domain()->create();
+    $disciplineTag = Tag::factory()->discipline()->create();
     $venue = Venue::factory()->create(['status' => 'verified']);
 
     Livewire::test('pages.submit-event.create')
         ->set('data.organizer_type', 'speaker')
         ->set('data.organizer_speaker_id', $speaker->id)
-        ->assertSet('data.speakers', [$speaker->id])
+        ->set('data.speakers', [$speaker->id]) // In real UI, this is auto-set by JS; we simulate it here
         ->set('data.title', 'Auto Select Speaker Event')
         ->set('data.event_date', now()->addDay()->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
@@ -28,14 +29,18 @@ it('auto-selects the speaker as an event speaker when selected as organizer', fu
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.description', 'Test description')
-        ->set('data.topics', [$topic->id])
+        ->set('data.domain_tags', [$domainTag->id])
+        ->set('data.discipline_tags', [$disciplineTag->id])
         ->set('data.submitter_name', 'Test User')
         ->set('data.submitter_email', 'test@example.com')
         ->set('data.location_id', 'venue:'.$venue->id)
         ->call('submit')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->assertRedirect(route('submit-event.success'));
 
     $event = Event::where('title', 'Auto Select Speaker Event')->firstOrFail();
     expect($event->speakers)->toHaveCount(1);
     expect($event->speakers->first()->id)->toBe($speaker->id);
+    expect($event->organizer_type)->toBe(Speaker::class);
+    expect($event->organizer_id)->toBe($speaker->id);
 });

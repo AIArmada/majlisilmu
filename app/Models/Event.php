@@ -42,6 +42,7 @@ class Event extends Model implements AuditableContract, HasMedia
             $event->members()->detach();
             $event->speakers()->detach();
             $event->topics()->detach();
+            $event->references()->detach();
             $event->savedBy()->detach();
             $event->interestedBy()->detach();
             $event->goingBy()->detach();
@@ -257,6 +258,14 @@ class Event extends Model implements AuditableContract, HasMedia
     public function topics(): BelongsToMany
     {
         return $this->belongsToMany(Topic::class, 'event_topic')
+            ->withPivot('order_column')
+            ->withTimestamps()
+            ->orderByPivot('order_column');
+    }
+
+    public function references(): BelongsToMany
+    {
+        return $this->belongsToMany(Reference::class, 'event_reference')
             ->withPivot('order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');

@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             DistrictSeeder::class,
             EventTypeSeeder::class,
+            TagSeeder::class,
             TopicSeeder::class,
             UserSeeder::class,
         ]);
