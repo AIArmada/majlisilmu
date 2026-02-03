@@ -126,14 +126,14 @@
             "type": "path",
             "url": "../commerce/packages/commerce-support",
             "options": {
-                "symlink": true
+                "symlink": false
             }
         },
         {
             "type": "path",
             "url": "../commerce/packages/filament-authz",
             "options": {
-                "symlink": true
+                "symlink": false
             }
         },
         {

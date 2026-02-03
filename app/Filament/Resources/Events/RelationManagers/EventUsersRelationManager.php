@@ -9,7 +9,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class EventMembersRelationManager extends RelationManager
+class EventUsersRelationManager extends RelationManager
 {
     protected static string $relationship = 'members';
 

@@ -2,20 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class EventMember extends Pivot
+class EventUser extends Pivot
 {
-    use HasFactory, HasUuids;
-
-    protected $table = 'event_members';
-
-    public $incrementing = false;
-
-    protected $keyType = 'string';
+    use HasFactory;
 
     /**
      * @var list<string>

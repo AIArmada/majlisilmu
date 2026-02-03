@@ -1,6 +1,6 @@
 # Majlisilmu MVP Feature Checklist
 
-**Last Updated:** 2026-01-11
+**Last Updated:** 2026-02-02
 **Document Purpose:** Track implementation progress for MVP features based on Product Documentation
 
 ---
@@ -9,14 +9,14 @@
 
 | Category | Completed | Total | Progress |
 |----------|-----------|-------|----------|
-| Public Pages | 9 | 11 | 82% |
-| User Features | 4 | 7 | 57% |
-| Admin/Filament | 8 | 10 | 80% |
-| API Endpoints | 8 | 8 | 100% |
-| Search & Discovery | 5 | 8 | 63% |
-| Moderation | 2 | 4 | 50% |
-| Infrastructure | 6 | 7 | 86% |
-| **Overall** | **42** | **55** | **76%** |
+| Public Pages | 11 | 13 | 85% |
+| User Features | 5 | 8 | 63% |
+| Admin/Filament | 12 | 16 | 75% |
+| API Endpoints | 12 | 13 | 92% |
+| Search & Discovery | 6 | 10 | 60% |
+| Moderation | 2 | 5 | 40% |
+| Infrastructure | 8 | 10 | 80% |
+| **Overall** | **56** | **75** | **75%** |
 
 ---
 
@@ -33,9 +33,9 @@
 - [x] JSON-LD structured data (SEO)
 - [x] OpenGraph / Twitter Cards
 - [x] Share button (native Web Share API)
-- [x] **Add to Calendar** (Google, Apple/iCal, Outlook, Office 365, Yahoo) ✨ NEW
-- [x] Prayer-relative timing display ✨ NEW
-- [x] "Near me tonight" geo-location button ✨ NEW
+- [x] **Add to Calendar** (Google, Apple/iCal, Outlook, Office 365, Yahoo) ✨
+- [x] Prayer-relative timing display ✨
+- [x] "Near me tonight" geo-location button ✨
 - [ ] Event distance display in search results
 
 ### Institutions & Speakers
@@ -57,19 +57,20 @@
 ## 👤 User Features (Requires Authentication)
 
 ### Authentication
-- [x] User registration page ✨ NEW
-- [x] User login page ✨ NEW
-- [x] Password reset flow ✨ NEW
+- [x] User registration page ✨
+- [x] User login page ✨
+- [x] Password reset flow ✨
 - [x] Email verification (Built-in Laravel)
-- [ ] Social login (Google/Facebook) - Optional
+- [x] Social login (Google) ✨
 
 ### Saved Events & Searches
-- [x] Save/bookmark events (AJAX call) ✨ NEW
+- [x] Save/bookmark events (AJAX call) ✨
 - [x] View saved events list (via API / Dashboard)
 - [x] Saved searches CRUD API (backend exists)
+- [x] Event interest marking API (going/interested) ✨
 - [ ] Saved searches UI page
-- [ ] Daily digest email job
-- [ ] Weekly digest email job
+- [ ] Daily digest email job (scheduled, needs verification)
+- [ ] Weekly digest email job (scheduled, needs verification)
 - [ ] Email preference settings
 
 ### User Dashboard
@@ -107,8 +108,10 @@
 - [x] VenueResource (CRUD)
 - [x] TopicResource (CRUD)
 - [x] SeriesResource (CRUD)
-- [x] DonationAccountResource (CRUD)
+- [x] DonationChannelResource (CRUD) ✨
 - [x] ReportResource (CRUD)
+- [x] EventTypeResource (CRUD) ✨
+- [x] ReferenceResource (CRUD) ✨
 
 ### Moderation Workflow
 - [x] Moderation Queue page
@@ -118,10 +121,10 @@
 - [ ] Duplicate detection hints
 
 ### Trust & Auto-approval
-- [x] Trust score model (on institutions/speakers)
+- [ ] Trust score model implementation (job exists but empty)
 - [ ] Auto-approval based on trust score
 - [ ] Trust score weekly adjustment job
-- [ ] High-risk report escalation
+- [ ] High-risk report escalation (partial - in ReportController)
 
 ---
 
@@ -130,18 +133,21 @@
 ### Public API
 - [x] `GET /events` - Search/list events
 - [x] `GET /events/{slug}` - Event details
-- [x] `GET /events/{slug}/calendar.ics` - ICS download ✨ NEW
+- [x] `GET /events/{slug}/calendar.ics` - ICS download ✨
 - [x] `GET /institutions` - List institutions
 - [x] `GET /speakers` - List speakers
-- [ ] `GET /api/events` - JSON API for events
+- [x] `GET /api/v1/events` - JSON API for events ✨
+- [x] `GET /api/v1/events/{id}` - Single event JSON API ✨
+- [x] `POST /api/v1/reports` - Report content ✨
 
 ### Authenticated API
 - [x] `POST /events/{slug}/register` - Event registration
-- [x] `POST /api/event-saves` - Save event
-- [x] `DELETE /api/event-saves/{id}` - Unsave event ✨ NEW
-- [x] Saved searches CRUD (backend exists)
-- [ ] `POST /reports` - Report content
-- [ ] `GET /api/user/registrations` - User's registrations
+- [x] `POST /api/v1/event-saves` - Save event
+- [x] `DELETE /api/v1/event-saves/{id}` - Unsave event ✨
+- [x] `GET/POST/DELETE /api/v1/event-interests` - Event interest (going/interested) ✨
+- [x] Saved searches CRUD API (`/api/v1/saved-searches`)
+- [x] `GET /api/v1/events/{id}/registrations/export` - Export registrations ✨
+- [ ] `GET /api/v1/user/registrations` - User's registrations
 
 ---
 
@@ -152,17 +158,18 @@
 - [x] Filter by state/district
 - [x] Filter by language/genre/audience
 - [x] Filter by institution/speaker
-- [ ] Date range filter
-- [ ] Topic filter UI
-- [ ] Geo-distance sorting ("Near me")
-- [ ] Typesense integration (Scout driver configured)
+- [x] Date range filter (API only - starts_after, starts_before, etc.) ✨
+- [ ] Date range filter UI
+- [ ] Topic filter UI (exists in browse-by only)
+- [x] Geo-distance sorting ("Near me") via Typesense
+- [x] Typesense integration (Scout driver configured)
 
 ### Search UI
 - [x] Basic search input
 - [ ] Advanced filters dropdown/modal
 - [ ] Filter chips (active filters display)
-- [ ] Sort options (time, relevance, distance)
-- [x] "Near me" button with geolocation ✨ NEW
+- [ ] Sort options UI (time, relevance, distance)
+- [x] "Near me" button with geolocation ✨
 
 ---
 
@@ -174,7 +181,7 @@
 - [x] Speakers sitemap (`/sitemap-speakers.xml`)
 - [x] Canonical URLs on event pages
 - [x] noindex for draft/pending/private events
-- [ ] robots.txt configuration
+- [x] robots.txt configuration ✨
 - [ ] Meta title/description optimization
 
 ---
@@ -186,17 +193,18 @@
 - [x] Event submission rate limiting
 - [x] Registration rate limiting
 - [x] Rate limit service provider
+- [x] Reports rate limiting ✨
 
 ### Audit & Logging
 - [x] Audit logging (owen-it/laravel-auditing)
 - [x] Model observers for events
 
 ### Queue & Jobs
-- [ ] Horizon dashboard setup
-- [x] Event escalation job
-- [ ] Digest email job (daily/weekly)
-- [ ] Trust score recalculation job
-- [ ] Search indexing job
+- [ ] Horizon dashboard setup (not installed)
+- [x] Event escalation job (EscalatePendingEvents)
+- [x] Digest email job (SendSavedSearchDigest - daily/weekly scheduled)
+- [ ] Trust score recalculation job (exists but empty)
+- [x] Search indexing job (via Scout)
 
 ### Notifications
 - [x] Event approved notification
@@ -204,7 +212,8 @@
 - [x] Event needs changes notification
 - [x] Event submitted notification (moderators)
 - [x] Event escalation notification
-- [ ] Digest email notifications
+- [x] Report resolved notification ✨
+- [x] Saved search digest notification ✨
 
 ---
 
@@ -212,27 +221,28 @@
 
 ### Event Page
 - [x] Premium card design
-- [x] Prayer-relative timing badge ✨ NEW
-- [x] Add to Calendar dropdown ✨ NEW
+- [x] Prayer-relative timing badge ✨
+- [x] Add to Calendar dropdown ✨
+- [x] wire:loading states (minimal) ✨
 - [ ] Image gallery/slider
 - [ ] Related events section
 - [ ] Share preview modal
 
 ### Home Page
-- [x] Hero section with search ✨ NEW
-- [x] "Near me tonight" quick access ✨ NEW
-- [x] Featured events carousel ✨ NEW
-- [x] Browse by state/topic ✨ NEW
-- [x] Upcoming events grid ✨ NEW
-- [x] 7-day date quick filter ✨ NEW
-- [x] Tonight's events banner ✨ NEW
-- [x] Submit event CTA section ✨ NEW
+- [x] Hero section with search ✨
+- [x] "Near me tonight" quick access ✨
+- [x] Featured events carousel ✨
+- [x] Browse by state/topic ✨
+- [x] Upcoming events grid ✨
+- [x] 7-day date quick filter ✨
+- [x] Tonight's events banner ✨
+- [x] Submit event CTA section ✨
 
 ### General
 - [x] Responsive mobile design
 - [x] Dark mode support (Tailwind)
-- [ ] Loading states/skeletons
-- [ ] Toast notifications
+- [ ] Loading states/skeletons (comprehensive)
+- [ ] Toast notifications (system-wide)
 - [ ] Error pages (404, 500)
 
 ---
@@ -260,6 +270,7 @@ These are documented but not for MVP:
 
 ## 🔧 Technical Debt & Improvements
 
+- [x] Test suite established (37 test files - Feature & Unit)
 - [ ] Comprehensive test coverage (target: >80%)
 - [ ] PHPStan level 5+ compliance
 - [ ] API documentation (OpenAPI/Swagger)
@@ -271,19 +282,36 @@ These are documented but not for MVP:
 
 ## 📝 Notes
 
-### Recently Completed (This Session)
-1. ✅ Prayer-relative timing feature
-2. ✅ Add to Calendar feature
-3. ✅ Complete Home Page redesign
-4. ✅ User Authentication (Login, Register, Password Reset)
-5. ✅ Save Event functionality (API + UI with AJAX)
-6. ✅ Renamed "Bahasa Melayu" to "Melayu", "Basa Jawa" to "Jawa"
+### Recently Verified (This Review - 2026-02-02)
+1. ✅ Social login (Google) via SocialiteController
+2. ✅ robots.txt properly configured
+3. ✅ JSON API endpoints (/api/v1/events)
+4. ✅ Report API with high-risk handling
+5. ✅ Event interests API (going/interested)
+6. ✅ Registration export API
+7. ✅ Date range filter in API (starts_after, starts_before)
+8. ✅ Additional Filament Resources: EventTypeResource, ReferenceResource
+9. ✅ SendSavedSearchDigest job with daily/weekly scheduling
+10. ✅ 37 test files covering features
+
+### Corrections Made
+- "DonationAccountResource" → "DonationChannelResource"
+- Trust score model marked as NOT implemented (job is empty)
+- Digest email jobs marked as scheduled (exist in routes/console.php)
+- Horizon NOT installed
 
 ### Next Priority Items
-1. 🔴 Search filters UI enhancement (advanced filters modal)
-2. 🟡 Institution dashboard for admins
-3. 🟡 Digest email implementation
-4. 🟡 Event distance display in search results
+1. 🔴 User & Institution dashboards (profile, my-events, my-registrations)
+2. 🔴 Date range filter UI in Events listing
+3. 🔴 Advanced filters modal/dropdown
+4. 🟡 Trust score implementation
+5. 🟡 Error pages (404, 500)
+
+### Technical Observations
+- Tests: 37 test files (34 Feature, 3 Unit)
+- Services: CalendarService, EventSearchService, ModerationService, PrayerTimeService
+- Jobs: AdjustTrustScores (empty), EscalatePendingEvents, SendSavedSearchDigest
+- Scheduled: Daily digest at 8am, Weekly digest Monday 8am, Hourly escalation checks
 
 ### Blockers
 - None currently identified
@@ -293,6 +321,6 @@ These are documented but not for MVP:
 **Legend:**
 - [x] Completed
 - [ ] Not started
+- ✨ Verified/Added this review
 - 🔴 High priority
 - 🟡 Medium priority
-- ✨ Recently added

@@ -212,8 +212,8 @@ class Event extends Model implements AuditableContract, HasMedia
 
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'event_members')
-            ->using(EventMember::class)
+        return $this->belongsToMany(User::class, 'event_user')
+            ->using(EventUser::class)
             ->withPivot(['role', 'joined_at'])
             ->withTimestamps();
     }

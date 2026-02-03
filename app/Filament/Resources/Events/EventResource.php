@@ -6,7 +6,7 @@ use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
 use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
-use App\Filament\Resources\Events\RelationManagers\EventMembersRelationManager;
+use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventSubmissionsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
@@ -44,7 +44,7 @@ class EventResource extends Resource
     {
         return [
             MediaLinksRelationManager::class,
-            EventMembersRelationManager::class,
+            EventUsersRelationManager::class,
             EventSubmissionsRelationManager::class,
             ModerationReviewsRelationManager::class,
             RegistrationsRelationManager::class,

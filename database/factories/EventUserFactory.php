@@ -3,16 +3,16 @@
 namespace Database\Factories;
 
 use App\Models\Event;
-use App\Models\EventMember;
+use App\Models\EventUser;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\EventMember>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\EventUser>
  */
-class EventMemberFactory extends Factory
+class EventUserFactory extends Factory
 {
-    protected $model = EventMember::class;
+    protected $model = EventUser::class;
 
     /**
      * Define the model's default state.

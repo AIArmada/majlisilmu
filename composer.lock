@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "43cb0064cf96abd218ed28e69f383d46",
+    "content-hash": "be0d9506ab325280e7fb7be9baa344e5",
     "packages": [
         {
             "name": "a909m/filament-statefusion",
@@ -100,7 +100,7 @@
             "dist": {
                 "type": "path",
                 "url": "../commerce/packages/commerce-support",
-                "reference": "c9bc3c2eb5f8283d77115058f7326e38ae56d1fb"
+                "reference": "b7f1aa9c149c2b515a4445befd81c8a1728045f5"
             },
             "require": {
                 "akaunting/laravel-money": "^6.0",
@@ -121,6 +121,9 @@
                 "spatie/laravel-sluggable": "^3.7",
                 "spatie/laravel-tags": "^4.2",
                 "spatie/laravel-webhook-client": "^3.4"
+            },
+            "suggest": {
+                "laravel/octane": "Required for high-performance Octane support"
             },
             "type": "library",
             "extra": {
@@ -148,7 +151,7 @@
                 "source": "https://github.com/aiarmada/commerce"
             },
             "transport-options": {
-                "symlink": true,
+                "symlink": false,
                 "relative": true
             }
         },
@@ -158,7 +161,7 @@
             "dist": {
                 "type": "path",
                 "url": "../commerce/packages/filament-authz",
-                "reference": "fcd730695963169d800872be5d072d253d3c65d5"
+                "reference": "a9b928263ffb441016e7239089be54e5630b1fef"
             },
             "require": {
                 "aiarmada/commerce-support": "self.version",
@@ -193,7 +196,7 @@
                 "source": "https://github.com/aiarmada/commerce"
             },
             "transport-options": {
-                "symlink": true,
+                "symlink": false,
                 "relative": true
             }
         },
