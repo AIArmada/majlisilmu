@@ -16,8 +16,10 @@ use App\Models\EventSubmission;
 use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Enums\TagType;
+use App\Models\Reference;
 use App\Models\State;
-use App\Models\Topic;
+use App\Models\Tag;
 use App\Models\Venue;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -125,71 +127,126 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             ->createOptionUsing(fn (array $data): string => $data['title'])
                                             ->placeholder(__('Search or enter event title...')),
 
-                                        Grid::make(2)
+                                        Section::make(__('Kategori & Bidang'))
+                                            ->description(__('Pilih kategori dan bidang ilmu untuk memudahkan pencarian.'))
                                             ->schema([
-                                                Select::make('topics')
-                                                    ->label(__('Topics'))
-                                                    ->required()
+                                                Grid::make(2)
+                                                    ->schema([
+                                                        Select::make('domain_tags')
+                                                            ->label(__('Kategori (Domain)'))
+                                                            ->helperText(__('Pilih kategori ceramah utama. Boleh pilih lebih daripada satu.'))
+                                                            ->placeholder(__('Pilih kategori…'))
+                                                            ->multiple()
+                                                            ->required()
+                                                            ->searchable()
+                                                            ->preload()
+                                                            ->native(false)
+                                                            ->options(fn () => Tag::query()
+                                                                ->where('type', TagType::Domain->value)
+                                                                ->orderBy('order_column')
+                                                                ->get()
+                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))
+                                                            ->rules(['min:1', 'max:3'])
+                                                            ->validationMessages([
+                                                                'required' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
+                                                                'min' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
+                                                                'max' => __('Maksimum 3 kategori sahaja.'),
+                                                            ]),
+
+                                                        Select::make('discipline_tags')
+                                                            ->label(__('Bidang Ilmu'))
+                                                            ->helperText(__('Pilih bidang yang menggambarkan isi ceramah.'))
+                                                            ->placeholder(__('Pilih bidang…'))
+                                                            ->multiple()
+                                                            ->required()
+                                                            ->searchable()
+                                                            ->preload()
+                                                            ->native(false)
+                                                            ->options(fn () => Tag::query()
+                                                                ->where('type', TagType::Discipline->value)
+                                                                ->orderBy('order_column')
+                                                                ->get()
+                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))
+                                                            ->rules(['min:1'])
+                                                            ->validationMessages([
+                                                                'required' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
+                                                                'min' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
+                                                            ]),
+                                                    ]),
+
+                                                Grid::make(2)
+                                                    ->schema([
+                                                        Select::make('source_tags')
+                                                            ->label(__('Sumber Utama'))
+                                                            ->helperText(__('Pilih sumber rujukan utama (jika ada).'))
+                                                            ->placeholder(__('Pilih sumber…'))
+                                                            ->multiple()
+                                                            ->searchable()
+                                                            ->preload()
+                                                            ->native(false)
+                                                            ->options(fn () => Tag::query()
+                                                                ->where('type', TagType::Source->value)
+                                                                ->orderBy('order_column')
+                                                                ->get()
+                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])),
+
+                                                        Select::make('issue_tags')
+                                                            ->label(__('Tema / Isu'))
+                                                            ->helperText(__('Pilih tema supaya mudah dicari.'))
+                                                            ->placeholder(__('Pilih tema…'))
+                                                            ->multiple()
+                                                            ->searchable()
+                                                            ->preload()
+                                                            ->native(false)
+                                                            ->options(fn () => Tag::query()
+                                                                ->where('type', TagType::Issue->value)
+                                                                ->orderBy('order_column')
+                                                                ->get()
+                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])),
+                                                    ]),
+
+                                                Select::make('references')
+                                                    ->label(__('Rujukan Kitab'))
+                                                    ->helperText(__('Pilih kitab atau buku rujukan yang digunakan (jika ada).'))
+                                                    ->placeholder(__('Cari atau pilih rujukan…'))
                                                     ->multiple()
-                                                    ->options(function (): array {
-                                                        $topics = Topic::where('status', 'verified')
-                                                            ->with(['parent.parent.parent'])
-                                                            ->get();
-                                                        
-                                                        $grouped = [];
-                                                        
-                                                        foreach ($topics as $topic) {
-                                                            // Skip root level topics (they're just group headers)
-                                                            if ($topic->parent_id === null) {
-                                                                continue;
-                                                            }
-                                                            
-                                                            // Traverse up to find the root ancestor for grouping
-                                                            $current = $topic->parent;
-                                                            while ($current && $current->parent_id !== null) {
-                                                                $current = $current->parent;
-                                                            }
-                                                            $groupName = $current->name;
-                                                            
-                                                            if (!isset($grouped[$groupName])) {
-                                                                $grouped[$groupName] = [];
-                                                            }
-                                                            
-                                                            // Format the label based on depth (Level 2 = plain, Level 3+ = arrow)
-                                                            if ($topic->parent->parent_id === null) {
-                                                                // This is a category (level 2, child of root)
-                                                                $label = $topic->name;
-                                                            } else {
-                                                                // This is a subcategory or deeper (level 3+)
-                                                                $label = '  → ' . $topic->name;
-                                                            }
-                                                            
-                                                            $grouped[$groupName][$topic->id] = $label;
-                                                        }
-                                                        
-                                                        return $grouped;
-                                                    })
                                                     ->searchable()
                                                     ->preload()
+                                                    ->native(false)
+                                                    ->relationship('references', 'title')
                                                     ->createOptionForm([
-                                                        TextInput::make('name')
-                                                            ->label(__('Topic Name'))
+                                                        TextInput::make('title')
+                                                            ->label(__('Tajuk Kitab / Buku'))
                                                             ->required()
-                                                            ->maxLength(100)
-                                                            ->placeholder(__('e.g., Tafsir, Hadis, Akhlak')),
+                                                            ->maxLength(255)
+                                                            ->placeholder(__('e.g., Riyadhus Solihin, Ihya Ulumiddin')),
+                                                        TextInput::make('author')
+                                                            ->label(__('Pengarang'))
+                                                            ->maxLength(255)
+                                                            ->placeholder(__('e.g., Imam Nawawi, Imam Ghazali')),
+                                                        Select::make('type')
+                                                            ->label(__('Jenis'))
+                                                            ->options([
+                                                                'kitab' => __('Kitab Turath'),
+                                                                'book' => __('Buku Moden'),
+                                                                'article' => __('Artikel'),
+                                                            ])
+                                                            ->default('kitab'),
                                                     ])
                                                     ->createOptionUsing(function (array $data): string {
-                                                        $topic = Topic::create([
-                                                            'name' => $data['name'],
-                                                            'slug' => Str::slug($data['name']).'-'.Str::random(6),
-                                                            'status' => 'pending',
-                                                            'is_official' => false,
-                                                            'parent_id' => null,
+                                                        $reference = Reference::create([
+                                                            'title' => $data['title'],
+                                                            'author' => $data['author'] ?? null,
+                                                            'type' => $data['type'] ?? 'kitab',
+                                                            'is_canonical' => false,
                                                         ]);
 
-                                                        return (string) $topic->getKey();
+                                                        return (string) $reference->getKey();
                                                     }),
+                                            ]),
 
+                                        Grid::make(2)
+                                            ->schema([
                                                 Select::make('event_type_id')
                                                     ->label(__('Jenis Majlis'))
                                                     ->required()
@@ -1034,6 +1091,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     ])
                                     ->visible(fn () => ! auth()->check()),
 
+                                Section::make(__('Notes for Admin'))
+                                    ->description(__('Optional: Add any additional information or special requests for the moderators.'))
+                                    ->schema([
+                                        Textarea::make('notes')
+                                            ->label(__('Notes'))
+                                            ->rows(3)
+                                            ->maxLength(1000)
+                                            ->placeholder(__('e.g., Special requirements, additional context, or anything the moderator should know...'))
+                                            ->helperText(__('Maximum 1000 characters')),
+                                    ]),
+
                                 Section::make(__('Submit'))
                                     ->schema([
                                         Grid::make(1)
@@ -1180,8 +1248,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $event->speakers()->attach($validated['speakers']);
         }
 
-        if (! empty($validated['topics'])) {
-            $event->topics()->attach($validated['topics']);
+        // Attach tags (merge all selected tags from 4 type fields)
+        $allTagIds = array_merge(
+            $validated['domain_tags'] ?? [],
+            $validated['discipline_tags'] ?? [],
+            $validated['source_tags'] ?? [],
+            $validated['issue_tags'] ?? []
+        );
+
+        if (! empty($allTagIds)) {
+            $tags = Tag::whereIn('id', $allTagIds)->get();
+            $event->syncTags($tags);
         }
 
         $this->form->model($event);
@@ -1193,6 +1270,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'event_id' => $event->id,
             'submitter_name' => $submitterName,
             'submitted_by' => auth()->id(),
+            'notes' => $validated['notes'] ?? null,
         ]);
 
         if (! auth()->check()) {

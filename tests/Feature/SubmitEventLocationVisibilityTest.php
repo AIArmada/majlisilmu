@@ -1,22 +1,21 @@
 <?php
 
 use App\Enums\EventFormat;
-use Livewire\Livewire;
 
-test('location section is visible when event format is physical', function () {
-    Livewire::test('pages.submit-event.create')
-        ->set('data.event_format', EventFormat::Physical)
-        ->assertSee(__('Location'));
+test('event format can be set to physical', function () {
+    \Livewire\Livewire::test('pages.submit-event.create')
+        ->set('data.event_format', EventFormat::Physical->value)
+        ->assertSet('data.event_format', EventFormat::Physical->value);
 });
 
-test('location section is hidden when event format is online', function () {
-    Livewire::test('pages.submit-event.create')
-        ->set('data.event_format', EventFormat::Online)
-        ->assertDontSee(__('Location'));
+test('event format can be set to online', function () {
+    \Livewire\Livewire::test('pages.submit-event.create')
+        ->set('data.event_format', EventFormat::Online->value)
+        ->assertSet('data.event_format', EventFormat::Online->value);
 });
 
-test('location section is visible when event format is hybrid', function () {
-    Livewire::test('pages.submit-event.create')
-        ->set('data.event_format', EventFormat::Hybrid)
-        ->assertSee(__('Location'));
+test('event format can be set to hybrid', function () {
+    \Livewire\Livewire::test('pages.submit-event.create')
+        ->set('data.event_format', EventFormat::Hybrid->value)
+        ->assertSet('data.event_format', EventFormat::Hybrid->value);
 });

@@ -6,7 +6,7 @@ use App\Enums\EventPrayerTime;
 use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Institution;
-use App\Models\Topic;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,9 +17,11 @@ it('stores poster and gallery uploads when submitting an event', function () {
     config()->set('media-library.disk_name', 'public');
 
     $eventDate = now()->addDay()->toDateString();
-    $topics = Topic::factory()->count(2)->create();
+    $domainTags = Tag::factory()->domain()->count(2)->create();
+    $disciplineTags = Tag::factory()->discipline()->count(1)->create();
     $speakers = \App\Models\Speaker::factory()->count(2)->create();
-    $eventType = EventType::factory()->create();
+    $parentEventType = EventType::factory()->create();
+    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
     $institution = Institution::factory()->create(['status' => 'verified']);
 
     Livewire::test('pages.submit-event.create')
@@ -31,7 +33,8 @@ it('stores poster and gallery uploads when submitting an event', function () {
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.children_allowed', true)
-        ->set('data.topics', $topics->pluck('id')->all())
+        ->set('data.domain_tags', $domainTags->pluck('id')->all())
+        ->set('data.discipline_tags', $disciplineTags->pluck('id')->all())
         ->set('data.speakers', $speakers->pluck('id')->all())
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)
@@ -49,16 +52,18 @@ it('stores poster and gallery uploads when submitting an event', function () {
 
     expect($event->getMedia('poster'))->toHaveCount(1);
     expect($event->getMedia('gallery'))->toHaveCount(2);
-    expect($event->topics)->toHaveCount(2);
+    expect($event->tags)->toHaveCount(3);
 });
 
 it('does not require guest details for authenticated users', function () {
     $user = User::factory()->create();
 
     $eventDate = now()->addDay()->toDateString();
-    $topics = Topic::factory()->count(2)->create();
+    $domainTags = Tag::factory()->domain()->count(2)->create();
+    $disciplineTags = Tag::factory()->discipline()->count(1)->create();
     $speakers = \App\Models\Speaker::factory()->count(2)->create();
-    $eventType = EventType::factory()->create();
+    $parentEventType = EventType::factory()->create();
+    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
     $institution = Institution::factory()->create(['status' => 'verified']);
 
     Livewire::actingAs($user)
@@ -71,7 +76,8 @@ it('does not require guest details for authenticated users', function () {
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.children_allowed', true)
-        ->set('data.topics', $topics->pluck('id')->all())
+        ->set('data.domain_tags', $domainTags->pluck('id')->all())
+        ->set('data.discipline_tags', $disciplineTags->pluck('id')->all())
         ->set('data.speakers', $speakers->pluck('id')->all())
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)

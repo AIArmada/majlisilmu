@@ -80,3 +80,146 @@ Then check `storage/logs/laravel.log` to see if you're dealing with enum objects
 
 ### Key Takeaway
 **Filament automatically converts between enum objects (for PHP logic) and strings (for storage/transport).** Always check your context to know which format you're working with.
+
+---
+
+# Model Sorting with Spatie Eloquent Sortable
+
+## Overview
+This application uses `spatie/eloquent-sortable` for consistent model ordering. Always use this package instead of manually managing sort columns.
+
+## Implementation Pattern
+
+### Model Setup
+```php
+use Spatie\EloquentSortable\Sortable;
+use Spatie\EloquentSortable\SortableTrait;
+
+class MyModel extends Model implements Sortable
+{
+    use SortableTrait;
+
+    public array $sortable = [
+        'order_column_name' => 'order_column',
+        'sort_when_creating' => true,
+    ];
+
+    protected $fillable = [
+        'name',
+        'order_column', // Always include in fillable
+    ];
+}
+```
+
+### Migration
+```php
+Schema::create('my_models', function (Blueprint $table) {
+    $table->uuid('id')->primary();
+    $table->string('name');
+    $table->unsignedInteger('order_column')->nullable(); // Always nullable
+    $table->timestamps();
+});
+```
+
+### Querying Sorted Records
+```php
+// Use the ->ordered() scope provided by the trait
+$records = MyModel::ordered()->get();
+
+// In relationships
+public function items(): HasMany
+{
+    return $this->hasMany(Item::class)->ordered();
+}
+```
+
+### Key Rules
+1. **Column name**: Always use `order_column` for consistency across models
+2. **Nullable**: The column should be nullable (SortableTrait handles auto-assignment)
+3. **No manual sorting**: Don't manually set `order_column` values; let the trait manage it
+4. **Use `->ordered()` scope**: Always use the provided scope instead of `->orderBy('order_column')`
+
+### Models Using Sortable
+- `Tag` (inherited from Spatie Tags, scoped by type)
+- `Topic`
+- `EventType`
+
+---
+
+# Unified Tag System Architecture
+
+## Overview
+This application uses **Spatie Tags** with a **TagType enum** for organizing tags by category. All tag functionality uses Spatie's native polymorphic `taggables` table.
+
+## TagType Enum
+Located at `App\Enums\TagType`, provides metadata for each tag type:
+
+```php
+TagType::Domain->label();       // "Domain"
+TagType::Domain->color();       // "primary"
+TagType::Domain->icon();        // "heroicon-o-academic-cap"
+TagType::Domain->description(); // "Core Islamic knowledge areas..."
+TagType::Domain->order();       // 10
+```
+
+## Type Storage & Access
+
+The `type` column stores string values ('domain', 'discipline', 'source', 'issue') to maintain compatibility with Spatie's native methods:
+
+```php
+$tag->type;        // Returns: 'domain' (string)
+$tag->type_enum;   // Returns: TagType::Domain (enum instance)
+```
+
+**Why not cast to enum?** Spatie's `tagsWithType()` method does strict string comparison, so the type must remain a string in the model. Use the `type_enum` accessor when you need enum functionality.
+
+## Tag Types
+| Type | Value | Purpose |
+|------|-------|---------|
+| Domain | `domain` | Core Islamic knowledge areas (Aqidah, Syariah, Akhlak) |
+| Discipline | `discipline` | Specific fields of study (Tafsir, Sirah, Fiqh, etc.) |
+| Source | `source` | Reference sources (Quran, Hadith, Turath, etc.) |
+| Issue | `issue` | Contemporary themes/topics (Rasuah, Kepimpinan, etc.) |
+
+## Usage
+
+### Tagging Events
+```php
+// Attach tags to an event
+$event->attachTag($tag);
+$event->attachTags([$tag1, $tag2]);
+
+// Sync tags (replaces all existing tags)
+$event->syncTags([$tag1, $tag2]);
+
+// Detach tags
+$event->detachTag($tag);
+$event->detachTags();
+```
+
+### Querying Tags
+```php
+// Get all tags of a specific type
+$domainTags = Tag::ofType(TagType::Domain)->get();
+$issueTags = Tag::ofType('issue')->get(); // Also accepts string
+
+// Spatie's native method
+$domainTags = Tag::getWithType('domain');
+
+// Get event's tags of specific type
+$domainTags = $event->tagsWithType('domain');
+
+// Get all tags ordered
+$tags = Tag::ordered()->get();
+```
+
+### Tag Sorting
+- Tags use Spatie Eloquent Sortable with `order_column`
+- Sorting is scoped by `type` (tags within same type are ordered independently)
+- Auto-assigns order when created
+
+## Key Principles
+1. **Use native Spatie methods**: `attachTag()`, `syncTags()`, `tagsWithType()`, etc.
+2. **No custom pivot**: Everything uses `taggables` table (polymorphic)
+3. **Type-based organization**: Use `TagType` enum for categorization and metadata
+4. **Keep it simple**: No extra fields like `is_active`, `is_system`, `description`, `weight`, or `is_primary`

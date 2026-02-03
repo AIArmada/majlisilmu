@@ -23,6 +23,7 @@ class EventSubmission extends Model
         'event_id',
         'submitted_by',
         'submitter_name',
+        'notes',
     ];
 
     public function event(): BelongsTo
