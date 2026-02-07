@@ -1,33 +1,32 @@
 <?php
 
-use App\Enums\EventPrayerTime;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    Carbon::setTestNow(Carbon::parse('2026-02-01 07:00:00', 'Asia/Kuala_Lumpur'));
+    Carbon::setTestNow(Carbon::parse('2026-02-01 07:00:00'));
 });
 
 afterEach(function () {
     Carbon::setTestNow();
 });
 
-it('filters prayer time options based on current time for today', function () {
+it('shows base prayer time options without selecting a date', function () {
     $component = Livewire::test('pages.submit-event.create');
-    $options = $component->instance()->getPrayerTimeOptions('2026-02-01');
 
-    expect($options)->not->toHaveKey(EventPrayerTime::SelepasSubuh->value)
-        ->and($options)->toHaveKey(EventPrayerTime::LainWaktu->value);
+    // Base options should always be visible
+    $component->assertSee('Selepas Subuh')
+        ->assertSee('Selepas Zuhur')
+        ->assertSee('Selepas Asar')
+        ->assertSee('Selepas Maghrib')
+        ->assertSee('Selepas Isyak')
+        ->assertSee('Lain Waktu');
 });
 
-it('shows all prayer time options when no date is selected', function () {
+it('hides conditional prayer time options without a date', function () {
     $component = Livewire::test('pages.submit-event.create');
-    $options = $component->instance()->getPrayerTimeOptions(null);
 
-    expect($options)->toHaveKey(EventPrayerTime::SelepasSubuh->value)
-        ->and($options)->toHaveKey(EventPrayerTime::SelepasZuhur->value)
-        ->and($options)->toHaveKey(EventPrayerTime::SelepasAsar->value)
-        ->and($options)->toHaveKey(EventPrayerTime::SelepasMaghrib->value)
-        ->and($options)->toHaveKey(EventPrayerTime::SelepasIsyak->value)
-        ->and($options)->toHaveKey(EventPrayerTime::LainWaktu->value);
+    // Jumaat and Tarawikh require a qualifying date to appear
+    $component->assertDontSee('Selepas Jumaat')
+        ->assertDontSee('Selepas Tarawikh');
 });

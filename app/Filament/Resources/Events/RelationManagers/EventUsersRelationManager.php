@@ -2,12 +2,16 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\Role;
+use App\Models\Event;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Spatie\Permission\PermissionRegistrar;
 
 class EventUsersRelationManager extends RelationManager
 {
@@ -25,17 +29,15 @@ class EventUsersRelationManager extends RelationManager
                 TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('pivot.role')
-                    ->label('Role')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'organizer' => 'success',
-                        'co-organizer' => 'info',
-                        'moderator' => 'warning',
-                        'volunteer' => 'gray',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing(fn (string $state): string => ucwords(str_replace('-', ' ', $state))),
+                TextColumn::make('roles')
+                    ->label('Roles')
+                    ->getStateUsing(function (User $record): string {
+                        $event = $this->getOwnerRecord();
+
+                        return Authz::withScope($event, function () use ($record): string {
+                            return $record->getRoleNames()->implode(', ');
+                        }, $record) ?: '—';
+                    }),
                 TextColumn::make('pivot.joined_at')
                     ->label('Joined')
                     ->dateTime('d M Y')
@@ -58,50 +60,42 @@ class EventUsersRelationManager extends RelationManager
                             })
                             ->searchable()
                             ->required(),
-                        Forms\Components\Select::make('role')
-                            ->label('Role')
-                            ->options([
-                                'organizer' => 'Organizer',
-                                'co-organizer' => 'Co-Organizer',
-                                'moderator' => 'Moderator',
-                                'volunteer' => 'Volunteer',
-                                'member' => 'Member',
-                            ])
-                            ->default('member')
+                        Forms\Components\Select::make('role_ids')
+                            ->label('Roles')
+                            ->options(fn () => $this->getScopedRoleOptions())
+                            ->multiple()
                             ->required(),
                     ])
                     ->action(function (array $data): void {
-                        $this->getOwnerRecord()->members()->attach($data['user_id'], [
-                            'role' => $data['role'],
+                        $event = $this->getOwnerRecord();
+                        $user = User::findOrFail($data['user_id']);
+
+                        $event->members()->syncWithoutDetaching([$user->id => [
                             'joined_at' => now(),
-                        ]);
+                        ]]);
+                        $this->syncMemberRoles($event, $user, $data['role_ids'] ?? []);
                     }),
             ])
             ->actions([
-                Action::make('changeRole')
-                    ->label('Change Role')
+                Action::make('manageRoles')
+                    ->label('Roles')
                     ->icon('heroicon-o-pencil')
                     ->form([
-                        Forms\Components\Select::make('role')
-                            ->label('Role')
-                            ->options([
-                                'organizer' => 'Organizer',
-                                'co-organizer' => 'Co-Organizer',
-                                'moderator' => 'Moderator',
-                                'volunteer' => 'Volunteer',
-                                'member' => 'Member',
-                            ])
+                        Forms\Components\Select::make('role_ids')
+                            ->label('Roles')
+                            ->options(fn () => $this->getScopedRoleOptions())
+                            ->multiple()
                             ->required(),
                     ])
                     ->mountUsing(function (Action $action, User $record): void {
                         $action->fillForm([
-                            'role' => $record->pivot->role,
+                            'role_ids' => $this->getMemberRoleIds($record),
                         ]);
                     })
                     ->action(function (array $data, User $record): void {
-                        $this->getOwnerRecord()->members()->updateExistingPivot($record->id, [
-                            'role' => $data['role'],
-                        ]);
+                        $event = $this->getOwnerRecord();
+
+                        $this->syncMemberRoles($event, $record, $data['role_ids'] ?? []);
                     }),
                 Action::make('removeMember')
                     ->label('Remove')
@@ -109,8 +103,50 @@ class EventUsersRelationManager extends RelationManager
                     ->color('danger')
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $this->getOwnerRecord()->members()->detach($record->id);
+                        $event = $this->getOwnerRecord();
+
+                        $event->members()->detach($record->id);
+                        $this->syncMemberRoles($event, $record, []);
                     }),
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function getScopedRoleOptions(): array
+    {
+        $event = $this->getOwnerRecord();
+        $teamsKey = app(PermissionRegistrar::class)->teamsKey;
+
+        return Authz::withScope($event, function () use ($teamsKey): array {
+            return Role::query()
+                ->where($teamsKey, getPermissionsTeamId())
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->all();
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function getMemberRoleIds(User $user): array
+    {
+        $event = $this->getOwnerRecord();
+
+        return Authz::withScope($event, function () use ($user): array {
+            return $user->roles()->pluck('id')->all();
+        }, $user);
+    }
+
+    /**
+     * @param  list<string>  $roleIds
+     */
+    protected function syncMemberRoles(Event $event, User $user, array $roleIds): void
+    {
+        Authz::withScope($event, function () use ($user, $roleIds): void {
+            $user->syncRoles($roleIds);
+        }, $user);
     }
 }

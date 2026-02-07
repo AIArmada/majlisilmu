@@ -151,7 +151,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->belongsToMany(Event::class, 'event_user')
             ->using(EventUser::class)
-            ->withPivot(['role', 'joined_at'])
+            ->withPivot(['joined_at'])
             ->withTimestamps();
     }
 

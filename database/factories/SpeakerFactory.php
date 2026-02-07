@@ -159,7 +159,7 @@ class SpeakerFactory extends Factory
         $givenName = trim(implode(' ', array_filter([$firstName, $secondName])));
         $connector = $isFemale ? 'binti' : 'bin';
         $parentName = fake()->randomElement($parentNames);
-        $name = $givenName.' '.$connector.' ' .$parentName;
+        $name = $givenName.' '.$connector.' '.$parentName;
 
         // Populate new fields - honorific can have multiple values
         $honorific = null;
@@ -250,10 +250,6 @@ class SpeakerFactory extends Factory
                 'value' => fake()->phoneNumber(),
                 'type' => 'work',
             ]);
-
-            // Attach Topics
-            $topics = \App\Models\Topic::inRandomOrder()->limit(rand(1, 5))->pluck('id');
-            $speaker->topics()->attach($topics);
 
             // Attach Languages
             if (class_exists(\Nnjeim\World\Models\Language::class)) {

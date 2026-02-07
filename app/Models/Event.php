@@ -6,7 +6,8 @@ use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Models\EventType;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -41,18 +42,17 @@ class Event extends Model implements AuditableContract, HasMedia
         static::deleting(function (Event $event) {
             $event->members()->detach();
             $event->speakers()->detach();
-            $event->topics()->detach();
             $event->references()->detach();
             $event->savedBy()->detach();
             $event->interestedBy()->detach();
             $event->goingBy()->detach();
 
-            $event->registrations()->each(fn ($registration) => $registration->delete());
-            $event->submissions()->each(fn ($submission) => $submission->delete());
-            $event->moderationReviews()->each(fn ($review) => $review->delete());
-            $event->mediaLinks()->each(fn ($mediaLink) => $mediaLink->delete());
-            
-            // Note: MediaLibrary works automatically via InteractsWithMedia if we delete the model, 
+            $event->registrations()->each(fn (\App\Models\Registration $registration) => $registration->delete());
+            $event->submissions()->each(fn (\App\Models\EventSubmission $submission) => $submission->delete());
+            $event->moderationReviews()->each(fn (\App\Models\ModerationReview $review) => $review->delete());
+            $event->mediaLinks()->each(fn (\App\Models\MediaLink $mediaLink) => $mediaLink->delete());
+
+            // Note: MediaLibrary works automatically via InteractsWithMedia if we delete the model,
             // but we can also be explicit if needed.
         });
     }
@@ -65,6 +65,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'institution_id',
         'submitter_id',
         'venue_id',
+        'space_id',
         'organizer_type',
         'organizer_id',
 
@@ -78,7 +79,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'prayer_reference',
         'prayer_offset',
         'prayer_display_text',
-        'event_type_id',
+        'event_type',
         'gender',
         'age_group',
         'children_allowed',
@@ -97,6 +98,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'escalated_at',
         'is_priority',
         'is_featured',
+        'is_muslim_only',
     ];
 
     protected function casts(): array
@@ -109,8 +111,10 @@ class Event extends Model implements AuditableContract, HasMedia
             'prayer_reference' => PrayerReference::class,
             'prayer_offset' => PrayerOffset::class,
             'gender' => EventGenderRestriction::class,
-            'age_group' => 'array',
+            'age_group' => \Illuminate\Database\Eloquent\Casts\AsEnumCollection::of(EventAgeGroup::class),
             'event_format' => EventFormat::class,
+            'event_type' => \Illuminate\Database\Eloquent\Casts\AsEnumCollection::of(EventType::class),
+            'visibility' => EventVisibility::class,
             'children_allowed' => 'boolean',
             'views_count' => 'integer',
             'saves_count' => 'integer',
@@ -121,6 +125,7 @@ class Event extends Model implements AuditableContract, HasMedia
             'escalated_at' => 'datetime',
             'is_priority' => 'boolean',
             'is_featured' => 'boolean',
+            'is_muslim_only' => 'boolean',
         ];
     }
 
@@ -130,7 +135,7 @@ class Event extends Model implements AuditableContract, HasMedia
     public function scopeActive($query)
     {
         return $query->whereState('status', \App\States\EventStatus\Approved::class)
-                     ->where('visibility', 'public');
+            ->where('visibility', EventVisibility::Public);
     }
 
     /**
@@ -139,7 +144,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function shouldBeSearchable(): bool
     {
-        return $this->status->equals(\App\States\EventStatus\Approved::class) && $this->visibility === 'public';
+        return $this->status->equals(\App\States\EventStatus\Approved::class) && $this->visibility === EventVisibility::Public;
     }
 
     /**
@@ -150,18 +155,12 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'venue', 'speakers', 'topics', 'address', 'eventType']);
+        $this->loadMissing(['institution', 'venue', 'speakers', 'address']);
 
-        $ageGroupValues = $this->age_group;
+        $ageGroupCollection = $this->age_group;
 
-        if ($ageGroupValues instanceof EventAgeGroup) {
-            $ageGroupValues = [$ageGroupValues->value];
-        } elseif (is_string($ageGroupValues)) {
-            $ageGroupValues = [$ageGroupValues];
-        }
-
-        $ageGroupValues = is_array($ageGroupValues) && $ageGroupValues !== []
-            ? $ageGroupValues
+        $ageGroupValues = $ageGroupCollection instanceof \Illuminate\Support\Collection && $ageGroupCollection->isNotEmpty()
+            ? $ageGroupCollection->map(fn ($e) => $e instanceof EventAgeGroup ? $e->value : $e)->toArray()
             : ['all_ages'];
 
         $array = [
@@ -175,15 +174,14 @@ class Event extends Model implements AuditableContract, HasMedia
             'state_id' => $this->venue?->address?->state_id ?? ($this->address?->state_id ?? ''),
             'district_id' => $this->venue?->address?->district_id ?? ($this->address?->district_id ?? ''),
             'language' => $this->language,
-            'event_type' => $this->eventType?->slug ?? 'kuliah',
+            'event_type' => $this->event_type?->map(fn ($e) => $e->value)->toArray() ?? [],
             'gender' => $this->gender?->value ?? 'all',
             'age_group' => $ageGroupValues,
             'audience' => $ageGroupValues,
             'event_format' => $this->event_format?->value ?? 'physical',
             'children_allowed' => $this->children_allowed ?? true,
             'status' => (string) $this->status,
-            'visibility' => $this->visibility,
-            'topic_ids' => $this->topics->pluck('id')->toArray(),
+            'visibility' => $this->visibility?->value ?? 'public',
             'speaker_ids' => $this->speakers->pluck('id')->toArray(),
             'starts_at' => $this->starts_at?->timestamp ?? 0,
             'ends_at' => $this->ends_at?->timestamp,
@@ -215,7 +213,7 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         return $this->belongsToMany(User::class, 'event_user')
             ->using(EventUser::class)
-            ->withPivot(['role', 'joined_at'])
+            ->withPivot(['joined_at'])
             ->withTimestamps();
     }
 
@@ -229,6 +227,11 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->belongsTo(Venue::class);
     }
 
+    public function space(): BelongsTo
+    {
+        return $this->belongsTo(Space::class);
+    }
+
     public function series(): BelongsToMany
     {
         return $this->belongsToMany(Series::class, 'event_series')
@@ -237,10 +240,7 @@ class Event extends Model implements AuditableContract, HasMedia
             ->orderByPivot('sort_order');
     }
 
-    public function eventType(): BelongsTo
-    {
-        return $this->belongsTo(EventType::class);
-    }
+    // EventType relationship removed in favor of Enum
 
     public function settings(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
@@ -250,14 +250,6 @@ class Event extends Model implements AuditableContract, HasMedia
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'event_speaker')
-            ->withPivot('order_column')
-            ->withTimestamps()
-            ->orderByPivot('order_column');
-    }
-
-    public function topics(): BelongsToMany
-    {
-        return $this->belongsToMany(Topic::class, 'event_topic')
             ->withPivot('order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');
@@ -408,15 +400,22 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function getGenreAttribute(): mixed
     {
-        return $this->eventType?->slug;
+        return $this->event_type?->map(fn ($e) => $e->value)->toArray();
     }
 
     /**
      * Map 'audience' to 'age_group' for compatibility.
+     * Returns string values for search indexing.
      */
-    public function getAudienceAttribute(): mixed
+    public function getAudienceAttribute(): array
     {
-        return $this->age_group;
+        $ageGroup = $this->age_group;
+
+        if ($ageGroup instanceof \Illuminate\Support\Collection) {
+            return $ageGroup->map(fn ($e) => $e instanceof EventAgeGroup ? $e->value : $e)->toArray();
+        }
+
+        return is_array($ageGroup) ? $ageGroup : ['all_ages'];
     }
 
     /**
@@ -442,16 +441,12 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Check if a user can manage this event.
-     * Uses hybrid approach: event membership OR organizer scope permissions.
+     * Uses Authz scoped roles via event membership or organizer/institution scope.
      */
     public function userCanManage(User $user): bool
     {
-        // 1. Check direct event membership with management role
-        $membership = $this->members()
-            ->where('user_id', $user->id)
-            ->first();
-
-        if ($membership?->pivot?->role && in_array($membership->pivot->role, ['organizer', 'co-organizer'])) {
+        // 1. Check event-scoped roles via Authz
+        if (Authz::userCanInScope($user, 'event.update', $this)) {
             return true;
         }
 
@@ -460,7 +455,7 @@ class Event extends Model implements AuditableContract, HasMedia
             return Authz::userCanInScope($user, 'event.update', $this->organizer);
         }
 
-        // 3. Fallback to institution scope (legacy support)
+        // 3. Fallback to institution scope
         if ($this->institution_id && $this->institution) {
             return Authz::userCanInScope($user, 'event.update', $this->institution);
         }
@@ -470,17 +465,12 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Check if a user can delete this event.
-     * More restrictive than manage: only organizer-level admins or direct event organizer.
+     * More restrictive than manage: requires event.delete permission in scope.
      */
     public function userCanDelete(User $user): bool
     {
-        // 1. Check direct event membership - only 'organizer' role (not co-organizer)
-        $isDirectOrganizer = $this->members()
-            ->where('user_id', $user->id)
-            ->where('role', 'organizer')
-            ->exists();
-
-        if ($isDirectOrganizer) {
+        // 1. Check event-scoped delete permission via Authz
+        if (Authz::userCanInScope($user, 'event.delete', $this)) {
             return true;
         }
 

@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('event_user', function (Blueprint $table) {
             $table->foreignUuid('event_id')->index();
             $table->foreignUuid('user_id')->index();
-            $table->string('role')->default('member')->index();
             $table->timestamp('joined_at')->nullable();
             $table->timestamps();
 

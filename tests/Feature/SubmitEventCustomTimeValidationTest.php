@@ -7,7 +7,6 @@ use App\Enums\EventPrayerTime;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Event;
-use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -19,17 +18,16 @@ it('can submit event with custom prayer time (lain_waktu)', function () {
     $disciplineTag = Tag::factory()->discipline()->create();
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
 
     // Submit with LainWaktu which represents custom time mode
     Livewire::test('pages.submit-event.create')
         ->set('data.title', 'Custom Time Event')
         ->set('data.domain_tags', [$domainTag->id])
         ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.event_date', now()->addDays(5)->toDateString())
         ->set('data.prayer_time', EventPrayerTime::LainWaktu->value)
+        ->set('data.custom_time', '10:00') // Required for LainWaktu
         ->set('data.description', 'Test description')
         ->set('data.event_format', EventFormat::Physical->value)
         ->set('data.gender', EventGenderRestriction::All->value)
@@ -53,15 +51,13 @@ it('saves timing mode as prayer_relative when using prayer time', function () {
     $disciplineTag = Tag::factory()->discipline()->create();
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
 
     // Submit with a standard prayer time
     Livewire::test('pages.submit-event.create')
         ->set('data.title', 'Prayer Time Event')
         ->set('data.domain_tags', [$domainTag->id])
         ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.event_date', now()->addDays(5)->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.description', 'Test description')
@@ -88,8 +84,6 @@ it('can submit event for future dates', function () {
     $disciplineTag = Tag::factory()->discipline()->create();
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
 
     // Submit event for next week
     $futureDate = now()->addWeek()->toDateString();
@@ -98,7 +92,7 @@ it('can submit event for future dates', function () {
         ->set('data.title', 'Future Event')
         ->set('data.domain_tags', [$domainTag->id])
         ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.event_date', $futureDate)
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.description', 'Test description')

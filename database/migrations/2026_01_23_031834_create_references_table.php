@@ -22,12 +22,6 @@ return new class extends Migration
             $table->boolean('is_canonical')->default(false)->index(); // Generic/Official reference
             $table->timestamps();
         });
-
-        Schema::create('reference_topic', function (Blueprint $table) {
-            $table->foreignUuid('reference_id');
-            $table->foreignUuid('topic_id');
-            $table->primary(['reference_id', 'topic_id']);
-        });
     }
 
     /**
@@ -35,7 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('reference_topic');
         Schema::dropIfExists('references');
     }
 };

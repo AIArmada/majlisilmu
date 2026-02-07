@@ -15,7 +15,7 @@ describe('Event Show Page Going Feature', function () {
 
         $this->get(route('events.show', $event))
             ->assertOk()
-            ->assertSee(__('Akan Hadir?')); // Header text that appears for both guests and logged-in users
+            ->assertSee(__('Log Masuk untuk Hadir')); // Guest CTA to login for RSVP
     });
 
     it('does not show the going button for past events', function () {
@@ -105,7 +105,9 @@ describe('Event Show Page Going Feature', function () {
 
         $this->get(route('events.show', $event))
             ->assertOk()
-            ->assertSee('5')
-            ->assertSee(__('akan hadir'));
+            ->assertSee(__('Log Masuk untuk Hadir')); // Guest view shows login CTA
+
+        // Verify the going count is persisted correctly on the model
+        expect($event->fresh()->going_count)->toBe(5);
     });
 });

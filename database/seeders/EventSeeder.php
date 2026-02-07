@@ -8,7 +8,6 @@ use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
-use App\Models\Topic;
 use Illuminate\Database\Seeder;
 
 class EventSeeder extends Seeder
@@ -25,7 +24,7 @@ class EventSeeder extends Seeder
 
         $this->seedMajlisIlmuSchedule();
 
-        if (!$hadEvents) {
+        if (! $hadEvents) {
             $this->seedBulkEvents();
         }
 
@@ -42,7 +41,6 @@ class EventSeeder extends Seeder
                 ->limit(90)
                 ->get();
             $speakerIds = Speaker::query()->pluck('id')->toArray();
-            $topicIds = Topic::query()->pluck('id')->toArray();
 
             if ($institutions->isEmpty()) {
                 return;
@@ -66,10 +64,10 @@ class EventSeeder extends Seeder
                 // Create 10 events per institution
                 // Factory will determine venue_id based on event_format
                 $events = Event::factory()->count(10)->create($baseAttributes);
-                
+
                 // For physical/hybrid events that need a venue, assign this institution's venue
                 foreach ($events as $event) {
-                    if ($event->event_format !== \App\Enums\EventFormat::Online && !$event->venue_id && $venue) {
+                    if ($event->event_format !== \App\Enums\EventFormat::Online && ! $event->venue_id && $venue) {
                         $event->update(['venue_id' => $venue->id]);
                     }
                 }
@@ -91,11 +89,10 @@ class EventSeeder extends Seeder
 
                 // Prepare bulk relationship data
                 $speakerAttachments = [];
-                $topicAttachments = [];
 
                 foreach ($events as $event) {
                     // Randomly select 1-3 speakers
-                    if (!empty($speakerIds)) {
+                    if (! empty($speakerIds)) {
                         $numSpeakers = min(random_int(1, 3), count($speakerIds));
                         $selectedSpeakers = (array) array_rand(array_flip($speakerIds), $numSpeakers);
                         foreach ($selectedSpeakers as $speakerId) {
@@ -105,26 +102,11 @@ class EventSeeder extends Seeder
                             ];
                         }
                     }
-
-                    // Randomly select 1-3 topics
-                    if (!empty($topicIds)) {
-                        $numTopics = min(random_int(1, 3), count($topicIds));
-                        $selectedTopics = (array) array_rand(array_flip($topicIds), $numTopics);
-                        foreach ($selectedTopics as $topicId) {
-                            $topicAttachments[] = [
-                                'event_id' => $event->id,
-                                'topic_id' => $topicId,
-                            ];
-                        }
-                    }
                 }
 
                 // Bulk insert relationships
-                if (!empty($speakerAttachments)) {
+                if (! empty($speakerAttachments)) {
                     \Illuminate\Support\Facades\DB::table('event_speaker')->insert($speakerAttachments);
-                }
-                if (!empty($topicAttachments)) {
-                    \Illuminate\Support\Facades\DB::table('event_topic')->insert($topicAttachments);
                 }
 
                 $count += 10;
@@ -155,7 +137,7 @@ class EventSeeder extends Seeder
             ['value' => '03-78313641', 'type' => 'work']
         );
 
-        if (!$institution->address) {
+        if (! $institution->address) {
             $institution->address()->create([
                 'line1' => 'Bukit Jelutong',
                 'lat' => 3.0991666,
@@ -189,7 +171,7 @@ class EventSeeder extends Seeder
             'name' => 'Dewan Solat Utama',
         ]);
 
-        if (!$venue->address) {
+        if (! $venue->address) {
             $venue->address()->create([
                 'line1' => $institution->address?->line1,
                 'country_id' => $institution->address?->country_id,
@@ -269,31 +251,31 @@ class EventSeeder extends Seeder
         ];
 
         foreach ($schedule as $entry) {
-            $startsAt = \Illuminate\Support\Carbon::parse($entry['date'] . ' ' . $entry['time'], 'Asia/Kuala_Lumpur');
+            $startsAt = \Illuminate\Support\Carbon::parse($entry['date'].' '.$entry['time'], 'Asia/Kuala_Lumpur');
             $endsAt = $startsAt->copy()->addMinutes(90);
             $topic = $entry['topic'] ?? null;
             $note = $entry['note'] ?? null;
 
             $title = $entry['slot'];
             if ($topic) {
-                $title = $entry['slot'] . ': ' . $topic;
+                $title = $entry['slot'].': '.$topic;
             }
             if ($note) {
-                $title .= ' - ' . $note;
+                $title .= ' - '.$note;
             }
 
             $descriptionParts = [];
             if ($topic) {
                 $descriptionParts[] = $topic;
             }
-            if (!empty($entry['speaker'])) {
-                $descriptionParts[] = 'Bersama ' . $entry['speaker'];
+            if (! empty($entry['speaker'])) {
+                $descriptionParts[] = 'Bersama '.$entry['speaker'];
             }
             if ($note) {
                 $descriptionParts[] = $note;
             }
 
-            $slug = \Illuminate\Support\Str::slug($title . '-' . $entry['date']);
+            $slug = \Illuminate\Support\Str::slug($title.'-'.$entry['date']);
 
             // Determine timing mode
             $timingMode = TimingMode::Absolute->value;
@@ -335,7 +317,7 @@ class EventSeeder extends Seeder
                 'ends_at' => $endsAt,
                 'timezone' => 'Asia/Kuala_Lumpur',
                 // 'language' has been removed; genre/audience are now event_type/age_group etc
-                'event_type_id' => \App\Models\EventType::where('slug', 'kuliah')->first()?->id,
+                'event_type' => \App\Enums\EventType::KuliahCeramah,
                 'visibility' => 'public',
                 'status' => 'approved',
                 'published_at' => $startsAt->copy()->subDays(7),
@@ -353,7 +335,7 @@ class EventSeeder extends Seeder
                 }
             }
 
-            if (!empty($entry['speaker'])) {
+            if (! empty($entry['speaker'])) {
                 $speakerName = $entry['speaker'];
                 $speaker = \App\Models\Speaker::query()->firstOrCreate([
                     'slug' => \Illuminate\Support\Str::slug($speakerName),
@@ -367,35 +349,6 @@ class EventSeeder extends Seeder
                 ]);
             }
 
-            if ($topic && !$note) {
-                $categorySlug = null;
-                $topicLower = mb_strtolower($topic);
-                if (str_contains($topicLower, 'tafsir') || str_contains($topicLower, 'juz') || str_contains($topicLower, 'quran')) {
-                    $categorySlug = 'al-quran';
-                } elseif (str_contains($topicLower, 'hadis') || str_contains($topicLower, 'hadith')) {
-                    $categorySlug = 'hadith';
-                } elseif (str_contains($topicLower, 'fiqh')) {
-                    $categorySlug = 'fiqh';
-                } elseif (str_contains($topicLower, 'sirah')) {
-                    $categorySlug = 'sirah';
-                } elseif (str_contains($topicLower, 'adab') || str_contains($topicLower, 'akhlak')) {
-                    $categorySlug = 'akhlak';
-                }
-
-                $parentId = $categorySlug
-                    ? \App\Models\Topic::where('slug', $categorySlug)->value('id')
-                    : null;
-
-                $topicModel = \App\Models\Topic::query()->firstOrCreate([
-                    'slug' => \Illuminate\Support\Str::slug($topic),
-                ], [
-                    'name' => $topic,
-                    'parent_id' => $parentId,
-                    'is_official' => false,
-                ]);
-
-                $event->topics()->syncWithoutDetaching([$topicModel->id]);
-            }
         }
     }
 }

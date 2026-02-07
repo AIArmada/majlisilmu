@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -17,9 +16,7 @@ class Reference extends Model implements HasMedia
 
     protected static function booted(): void
     {
-        static::deleting(function (Reference $reference) {
-            $reference->topics()->detach();
-        });
+        //
     }
 
     protected $fillable = [
@@ -38,11 +35,6 @@ class Reference extends Model implements HasMedia
         return [
             'is_canonical' => 'boolean',
         ];
-    }
-
-    public function topics(): BelongsToMany
-    {
-        return $this->belongsToMany(Topic::class, 'reference_topic');
     }
 
     /**

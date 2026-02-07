@@ -43,17 +43,28 @@ class SpaceFactory extends Factory
             'Al-Quran',
             'Al-Hadith',
             'Al-Falah',
-            'Al-Hidayah'
+            'Al-Hidayah',
         ]);
 
-        $name = fake()->unique()->regexify($prefix . ' ' . $suffix . ' (Alpha|Beta|Gamma|A|B|C|1|2|3)');
-        $slug = Str::slug($name . '-' . Str::random(5));
+        $name = fake()->unique()->regexify($prefix.' '.$suffix.' (Alpha|Beta|Gamma|A|B|C|1|2|3)');
+        $slug = Str::slug($name.'-'.Str::random(5));
 
         return [
+            'institution_id' => null,
             'name' => $name,
-            'slug' => Str::slug($name . '-' . Str::random(5)),
+            'slug' => Str::slug($name.'-'.Str::random(5)),
             'capacity' => fake()->randomElement([10, 20, 30, 50, 100, 200]),
             'is_active' => true,
         ];
+    }
+
+    /**
+     * Associate the space with an institution.
+     */
+    public function forInstitution(\App\Models\Institution $institution): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'institution_id' => $institution->id,
+        ]);
     }
 }

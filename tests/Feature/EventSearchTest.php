@@ -85,12 +85,9 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by genre', function () {
-        $kuliah = \App\Models\EventType::factory()->create(['slug' => 'kuliah']);
-        $forum = \App\Models\EventType::factory()->create(['slug' => 'forum']);
-
         Event::factory()->create([
             'title' => 'Kuliah Event',
-            'event_type_id' => $kuliah->id,
+            'event_type' => [\App\Enums\EventType::KuliahCeramah],
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -99,7 +96,7 @@ describe('Event Search Filters', function () {
 
         Event::factory()->create([
             'title' => 'Forum Event',
-            'event_type_id' => $forum->id,
+            'event_type' => [\App\Enums\EventType::Forum],
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -166,12 +163,10 @@ describe('Event Search Filters', function () {
     it('eager loads event card relationships', function () {
         config(['scout.driver' => 'database']);
 
-        $eventType = \App\Models\EventType::factory()->create();
         $venue = \App\Models\Venue::factory()->create();
         $institution = $venue->institution;
 
         Event::factory()
-            ->for($eventType, 'eventType')
             ->for($institution)
             ->for($venue)
             ->hasSpeakers(1)
@@ -180,6 +175,7 @@ describe('Event Search Filters', function () {
                 'visibility' => 'public',
                 'published_at' => now(),
                 'starts_at' => now()->addDays(1),
+                'event_type' => [\App\Enums\EventType::KuliahCeramah],
             ]);
 
         $events = app(EventSearchService::class)->search(
@@ -192,7 +188,6 @@ describe('Event Search Filters', function () {
         $event = $events->first();
 
         expect($event)->not->toBeNull()
-            ->and($event->relationLoaded('eventType'))->toBeTrue()
             ->and($event->relationLoaded('institution'))->toBeTrue()
             ->and($event->relationLoaded('venue'))->toBeTrue()
             ->and($event->relationLoaded('speakers'))->toBeTrue()
@@ -317,13 +312,14 @@ describe('Event Registration', function () {
     });
 
     it('shows registration button for events requiring registration', function () {
-        $event = Event::factory()->create([
-            'title' => 'Registration Event',
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'registration_required' => true,
-        ]);
+        $event = Event::factory()
+            ->has(\App\Models\EventSettings::factory()->state(['registration_required' => true]), 'settings')
+            ->create([
+                'title' => 'Registration Event',
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+            ]);
 
         $response = $this->get("/events/{$event->slug}");
 
@@ -332,12 +328,13 @@ describe('Event Registration', function () {
     });
 
     it('shows no registration message for open events', function () {
-        $event = Event::factory()->create([
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'registration_required' => false,
-        ]);
+        $event = Event::factory()
+            ->has(\App\Models\EventSettings::factory()->state(['registration_required' => false]), 'settings')
+            ->create([
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+            ]);
 
         $response = $this->get("/events/{$event->slug}");
 
@@ -346,16 +343,19 @@ describe('Event Registration', function () {
     });
 
     it('allows guest registration', function () {
-        $event = Event::factory()->create([
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'registration_required' => true,
-            'registration_opens_at' => now()->subDay(),
-            'registration_closes_at' => now()->addDay(),
-            'capacity' => 100,
-            'registrations_count' => 0,
-        ]);
+        $event = Event::factory()
+            ->has(\App\Models\EventSettings::factory()->state([
+                'registration_required' => true,
+                'registration_opens_at' => now()->subDay(),
+                'registration_closes_at' => now()->addDay(),
+                'capacity' => 100,
+            ]), 'settings')
+            ->create([
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+                'registrations_count' => 0,
+            ]);
 
         $response = $this->post("/events/{$event->slug}/register", [
             'name' => 'Ahmad',
@@ -371,14 +371,17 @@ describe('Event Registration', function () {
     });
 
     it('prevents duplicate registration', function () {
-        $event = Event::factory()->create([
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'registration_required' => true,
-            'registration_opens_at' => now()->subDay(),
-            'registration_closes_at' => now()->addDay(),
-        ]);
+        $event = Event::factory()
+            ->has(\App\Models\EventSettings::factory()->state([
+                'registration_required' => true,
+                'registration_opens_at' => now()->subDay(),
+                'registration_closes_at' => now()->addDay(),
+            ]), 'settings')
+            ->create([
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+            ]);
 
         // First registration
         $this->post("/events/{$event->slug}/register", [
@@ -396,16 +399,19 @@ describe('Event Registration', function () {
     });
 
     it('enforces capacity limits', function () {
-        $event = Event::factory()->create([
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'registration_required' => true,
-            'registration_opens_at' => now()->subDay(),
-            'registration_closes_at' => now()->addDay(),
-            'capacity' => 1,
-            'registrations_count' => 1,
-        ]);
+        $event = Event::factory()
+            ->has(\App\Models\EventSettings::factory()->state([
+                'registration_required' => true,
+                'registration_opens_at' => now()->subDay(),
+                'registration_closes_at' => now()->addDay(),
+                'capacity' => 1,
+            ]), 'settings')
+            ->create([
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+                'registrations_count' => 1,
+            ]);
 
         $response = $this->post("/events/{$event->slug}/register", [
             'name' => 'Late Registrant',

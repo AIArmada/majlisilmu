@@ -48,7 +48,7 @@ class EventSaveController extends Controller
         $event = Event::find($validated['event_id']);
 
         // Only allow saving public, approved events
-        if ($event->status !== 'approved' || $event->visibility !== 'public') {
+        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== \App\Enums\EventVisibility::Public) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',

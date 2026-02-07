@@ -17,7 +17,7 @@ class InstitutionFactory extends Factory
      */
     public function definition(): array
     {
-        $type = fake()->randomElement(['masjid', 'surau', 'madrasah', 'pertubuhan']);
+        $type = fake()->randomElement(['masjid', 'surau', 'madrasah']);
         $arabicNames = [
             'Al-Ikhlas',
             'Al-Amin',
@@ -96,7 +96,7 @@ class InstitutionFactory extends Factory
         $name = match ($type) {
             'masjid' => fake()->randomElement($masjidNames),
             'surau' => fake()->randomElement($surauNames),
-            'madrasah', 'pertubuhan' => fake()->randomElement($otherNames),
+            'madrasah' => fake()->randomElement($otherNames),
             default => fake()->randomElement($otherNames),
         };
 

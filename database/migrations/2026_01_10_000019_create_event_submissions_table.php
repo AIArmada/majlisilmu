@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignUuid('event_id')->index();
             $table->foreignUuid('submitted_by')->nullable()->index();
             $table->string('submitter_name')->nullable();
+            $table->text('notes')->nullable();
 
             $table->timestamps();
 

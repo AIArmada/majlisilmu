@@ -1,29 +1,64 @@
 <?php
 
+use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\Permission;
+use AIArmada\FilamentAuthz\Models\Role;
 use App\Models\Event;
 use App\Models\EventUser;
-use App\Models\Institution;
 use App\Models\User;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
-    // Disable teams to simplify role lookup for these tests
-    config(['permission.teams' => false]);
-    app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+    // Ensure teams mode is ON for Authz scoping
+    config(['permission.teams' => true]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    // Get the configured Role class
-    $roleClass = app(\Spatie\Permission\PermissionRegistrar::class)->getRoleClass();
+    // Create global roles (unscoped) for admin/moderator
+    $previousTeam = getPermissionsTeamId();
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    // Create roles using the correct model
-    if (! $roleClass::where('name', 'super_admin')->exists()) {
+    $roleClass = app(PermissionRegistrar::class)->getRoleClass();
+
+    if (! $roleClass::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
         $roleClass::create(['name' => 'super_admin', 'guard_name' => 'web']);
     }
-    if (! $roleClass::where('name', 'moderator')->exists()) {
+    if (! $roleClass::where('name', 'moderator')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
         $roleClass::create(['name' => 'moderator', 'guard_name' => 'web']);
     }
+
+    setPermissionsTeamId($previousTeam);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
+
+/**
+ * Helper: assign a scoped role with the given permission to a user on an event.
+ */
+function assignEventScopedRole(User $user, Event $event, string $roleName, string $permissionName): void
+{
+    $permission = Permission::findOrCreate($permissionName, 'web');
+
+    Authz::withScope($event, function () use ($user, $roleName, $permission): void {
+        $role = Role::findOrCreate($roleName, 'web');
+        $role->givePermissionTo($permission);
+        $user->assignRole($role);
+    }, $user);
+}
+
+/**
+ * Helper: make a user an event member with a scoped role.
+ */
+function makeEventMember(User $user, Event $event, ?string $roleName = null, ?string $permissionName = null): void
+{
+    EventUser::factory()->for($event)->for($user)->create();
+
+    if ($roleName && $permissionName) {
+        assignEventScopedRole($user, $event, $roleName, $permissionName);
+    }
+}
 
 describe('viewAny', function () {
     it('allows anyone to view event list', function () {
@@ -60,7 +95,6 @@ describe('view', function () {
             'visibility' => 'private',
         ]);
 
-        // Use Gate facade to test as guest (null user)
         expect(\Illuminate\Support\Facades\Gate::forUser(null)->allows('view', $event))->toBeFalse();
     });
 
@@ -73,7 +107,6 @@ describe('view', function () {
         EventUser::factory()
             ->for($event)
             ->for($user)
-            ->volunteer()
             ->create();
 
         expect($user->can('view', $event))->toBeTrue();
@@ -101,6 +134,8 @@ describe('create', function () {
 describe('update', function () {
     it('allows super_admin to update any event', function () {
         $admin = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $admin->assignRole('super_admin');
         $event = Event::factory()->create();
 
@@ -109,6 +144,8 @@ describe('update', function () {
 
     it('allows moderator to update any event', function () {
         $moderator = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $moderator->assignRole('moderator');
         $event = Event::factory()->create();
 
@@ -145,46 +182,27 @@ describe('update', function () {
         expect($user->can('update', $event))->toBeFalse();
     });
 
-    it('allows event organizer to update event', function () {
+    it('allows event member with event.update permission to update event', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create([
             'status' => Approved::class,
         ]);
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->organizer()
-            ->create();
+        makeEventMember($user, $event, 'organizer', 'event.update');
 
         expect($user->can('update', $event))->toBeTrue();
     });
 
-    it('allows event co-organizer to update event', function () {
+    it('denies event member without event.update permission from updating event', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create([
             'status' => Approved::class,
         ]);
 
+        // Member without any scoped role
         EventUser::factory()
             ->for($event)
             ->for($user)
-            ->coOrganizer()
-            ->create();
-
-        expect($user->can('update', $event))->toBeTrue();
-    });
-
-    it('denies volunteer from updating event', function () {
-        $user = User::factory()->create();
-        $event = Event::factory()->create([
-            'status' => Approved::class,
-        ]);
-
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->volunteer()
             ->create();
 
         expect($user->can('update', $event))->toBeFalse();
@@ -203,6 +221,8 @@ describe('update', function () {
 describe('delete', function () {
     it('allows super_admin to delete any event', function () {
         $admin = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $admin->assignRole('super_admin');
         $event = Event::factory()->create([
             'status' => Approved::class,
@@ -213,6 +233,8 @@ describe('delete', function () {
 
     it('denies moderator from deleting approved events', function () {
         $moderator = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $moderator->assignRole('moderator');
         $event = Event::factory()->create([
             'status' => Approved::class,
@@ -221,47 +243,36 @@ describe('delete', function () {
         expect($moderator->can('delete', $event))->toBeFalse();
     });
 
-    it('allows event organizer to delete draft events', function () {
+    it('allows event member with event.delete permission to delete draft events', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create([
             'status' => Draft::class,
         ]);
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->organizer()
-            ->create();
+        makeEventMember($user, $event, 'organizer', 'event.delete');
 
         expect($user->can('delete', $event))->toBeTrue();
     });
 
-    it('denies co-organizer from deleting draft events', function () {
+    it('denies event member without event.delete permission from deleting draft events', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create([
             'status' => Draft::class,
         ]);
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->coOrganizer()
-            ->create();
+        // Member with event.update but not event.delete
+        makeEventMember($user, $event, 'co-organizer', 'event.update');
 
         expect($user->can('delete', $event))->toBeFalse();
     });
 
-    it('denies organizer from deleting approved events', function () {
+    it('denies member with event.delete from deleting approved events', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create([
             'status' => Approved::class,
         ]);
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->organizer()
-            ->create();
+        makeEventMember($user, $event, 'organizer', 'event.delete');
 
         expect($user->can('delete', $event))->toBeFalse();
     });
@@ -270,6 +281,8 @@ describe('delete', function () {
 describe('moderate', function () {
     it('allows super_admin to moderate events', function () {
         $admin = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $admin->assignRole('super_admin');
         $event = Event::factory()->create();
 
@@ -278,6 +291,8 @@ describe('moderate', function () {
 
     it('allows moderator to moderate events', function () {
         $moderator = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $moderator->assignRole('moderator');
         $event = Event::factory()->create();
 
@@ -295,74 +310,51 @@ describe('moderate', function () {
 describe('manageMembers', function () {
     it('allows super_admin to manage event members', function () {
         $admin = User::factory()->create();
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $admin->assignRole('super_admin');
         $event = Event::factory()->create();
 
         expect($admin->can('manageMembers', $event))->toBeTrue();
     });
 
-    it('allows event organizer to manage members', function () {
+    it('allows event member with event.manage-members permission', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->organizer()
-            ->create();
+        makeEventMember($user, $event, 'organizer', 'event.manage-members');
 
         expect($user->can('manageMembers', $event))->toBeTrue();
     });
 
-    it('denies co-organizer from managing members', function () {
+    it('denies event member without event.manage-members permission', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->coOrganizer()
-            ->create();
+        // Member with different permission
+        makeEventMember($user, $event, 'co-organizer', 'event.update');
 
         expect($user->can('manageMembers', $event))->toBeFalse();
     });
 });
 
 describe('userCanManage helper', function () {
-    it('returns true for organizer member', function () {
+    it('returns true for member with event.update permission in event scope', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->organizer()
-            ->create();
+        assignEventScopedRole($user, $event, 'organizer', 'event.update');
 
         expect($event->userCanManage($user))->toBeTrue();
     });
 
-    it('returns true for co-organizer member', function () {
+    it('returns false for member without event.update permission', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
         EventUser::factory()
             ->for($event)
             ->for($user)
-            ->coOrganizer()
-            ->create();
-
-        expect($event->userCanManage($user))->toBeTrue();
-    });
-
-    it('returns false for volunteer member', function () {
-        $user = User::factory()->create();
-        $event = Event::factory()->create();
-
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->volunteer()
             ->create();
 
         expect($event->userCanManage($user))->toBeFalse();

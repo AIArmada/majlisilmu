@@ -134,16 +134,16 @@
                         {!! nl2br(e($event->description)) !!}
                     </div>
 
-                    <!-- Topics -->
-                    @if($event->topics->isNotEmpty())
+                    <!-- Tags -->
+                    @if($event->tags->isNotEmpty())
                         <div class="mt-8 pt-6 border-t border-slate-100">
-                            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">{{ __('Topics') }}
+                            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">{{ __('Tags') }}
                             </h3>
                             <div class="flex flex-wrap gap-2">
-                                @foreach($event->topics as $topic)
+                                @foreach($event->tags as $tag)
                                     <span
                                         class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600">
-                                        {{ $topic->name }}
+                                        {{ $tag->name }}
                                     </span>
                                 @endforeach
                             </div>
@@ -271,6 +271,9 @@
                                         {{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}
                                     @endif
                                 </p>
+                                @if($event->space)
+                                    <p class="text-sm font-medium text-slate-600 mt-0.5">{{ $event->space->name }}</p>
+                                @endif
                                 @if($venueAddress?->line1)
                                     <p class="text-sm text-slate-500 mt-1">{{ $venueAddress->line1 }}</p>
                                 @elseif($institutionAddress?->line1)
@@ -496,14 +499,14 @@
                             @elseif(!$regOpen)
                                 <button disabled
                                     class="flex w-full items-center justify-center rounded-xl bg-slate-100 px-6 py-3.5 text-sm font-bold text-slate-500 cursor-not-allowed">
-                                    {{ __('Opens') }} {{ $event->registration_opens_at->format('M d, h:i A') }}
+                                    {{ __('Opens') }} {{ $event->settings->registration_opens_at->format('M d, h:i A') }}
                                 </button>
                             @else
                                 <a href="#register" @click.prevent="registerOpen = true"
                                     class="flex w-full items-center justify-center rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
                                     {{ __('Register Now') }}
-                                    @if($event->capacity)
-                                        <span class="ml-2 text-xs opacity-75">({{ $event->capacity - $event->registrations_count }}
+                                    @if($event->settings?->capacity)
+                                        <span class="ml-2 text-xs opacity-75">({{ $event->settings->capacity - $event->registrations_count }}
                                             {{ __('spots left') }})</span>
                                     @endif
                                 </a>

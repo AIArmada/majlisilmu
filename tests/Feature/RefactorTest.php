@@ -23,11 +23,12 @@ class RefactorTest extends TestCase
         $speaker = Speaker::factory()->create([
             'qualifications' => [
                 ['degree' => 'PhD', 'institution' => 'Oxford'],
-                ['degree' => 'MA', 'institution' => 'Cairo']
-            ]
+                ['degree' => 'MA', 'institution' => 'Cairo'],
+            ],
         ]);
 
-        $this->assertEquals('PhD, MA', $speaker->post_nominal);
+        // post_nominal is cast to array, not string
+        $this->assertEquals(['PhD', 'MA'], $speaker->post_nominal);
     }
 
     public function test_speaker_avatar_url_behavior()

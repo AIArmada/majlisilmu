@@ -51,6 +51,11 @@ class Institution extends Model implements AuditableContract, HasMedia
         return $this->hasMany(Venue::class);
     }
 
+    public function spaces(): HasMany
+    {
+        return $this->hasMany(Space::class);
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
@@ -95,7 +100,7 @@ class Institution extends Model implements AuditableContract, HasMedia
 
     public function getAuthzScopeLabel(): string
     {
-        return 'Institution: ' . $this->name;
+        return 'Institution: '.$this->name;
     }
 
     public function scopeActive($query)

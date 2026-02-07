@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('institution_user', function (Blueprint $table) {
             $table->uuid('institution_id')->index();
             $table->uuid('user_id')->index();
-            $table->string('role')->default('member')->index();
             $table->timestamp('joined_at')->nullable();
             $table->timestamps();
 

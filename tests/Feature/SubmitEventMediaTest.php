@@ -4,7 +4,6 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Models\Event;
-use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Tag;
 use App\Models\User;
@@ -20,8 +19,6 @@ it('stores poster and gallery uploads when submitting an event', function () {
     $domainTags = Tag::factory()->domain()->count(2)->create();
     $disciplineTags = Tag::factory()->discipline()->count(1)->create();
     $speakers = \App\Models\Speaker::factory()->count(2)->create();
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
     $institution = Institution::factory()->create(['status' => 'verified']);
 
     Livewire::test('pages.submit-event.create')
@@ -29,7 +26,7 @@ it('stores poster and gallery uploads when submitting an event', function () {
         ->set('data.description', 'Event description')
         ->set('data.event_date', $eventDate)
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.children_allowed', true)
@@ -62,8 +59,6 @@ it('does not require guest details for authenticated users', function () {
     $domainTags = Tag::factory()->domain()->count(2)->create();
     $disciplineTags = Tag::factory()->discipline()->count(1)->create();
     $speakers = \App\Models\Speaker::factory()->count(2)->create();
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
     $institution = Institution::factory()->create(['status' => 'verified']);
 
     Livewire::actingAs($user)
@@ -72,7 +67,7 @@ it('does not require guest details for authenticated users', function () {
         ->set('data.description', 'Event description')
         ->set('data.event_date', $eventDate)
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.children_allowed', true)

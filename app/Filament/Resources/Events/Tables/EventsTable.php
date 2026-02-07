@@ -26,19 +26,20 @@ class EventsTable
                 TextColumn::make('institution.name')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('eventType.name')
+                TextColumn::make('event_type')
                     ->label('Type')
+                    ->badge()
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('starts_at')
                     ->dateTime()
-                    ->description(fn(Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
+                    ->description(fn (Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
                     ->sortable(),
                 StateFusionSelectColumn::make('status')
                     ->sortable(),
                 TextColumn::make('visibility')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'public' => 'success',
                         'unlisted' => 'warning',
                         'private' => 'danger',
@@ -47,6 +48,10 @@ class EventsTable
                     ->sortable(),
                 \Filament\Tables\Columns\ToggleColumn::make('is_featured')
                     ->label('Featured'),
+                IconColumn::make('is_muslim_only')
+                    ->boolean()
+                    ->label('Muslim Only')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('registration_required')
                     ->boolean()
                     ->label('Reg?'),
@@ -64,9 +69,16 @@ class EventsTable
                     ]),
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),
-                SelectFilter::make('event_type_id')
+                SelectFilter::make('event_type')
                     ->label('Event Type')
-                    ->relationship('eventType', 'name'),
+                    ->options(\App\Enums\EventType::class)
+                    ->query(
+                        fn (\Illuminate\Database\Eloquent\Builder $query, array $data) => $query
+                            ->when(
+                                $data['value'],
+                                fn ($q, $value) => $q->whereJsonContains('event_type', $value)
+                            )
+                    ),
             ])
             ->recordActions([
                 EditAction::make(),

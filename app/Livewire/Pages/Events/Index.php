@@ -47,9 +47,6 @@ class Index extends Component
     public ?string $institution_id = null;
 
     #[Url]
-    public ?array $topic_ids = [];
-
-    #[Url]
     public ?array $speaker_ids = [];
 
     #[Url]
@@ -87,7 +84,6 @@ class Index extends Component
             'age_group' => $this->age_group,
             'children_allowed' => $this->children_allowed,
             'institution_id' => $this->institution_id,
-            'topic_ids' => $this->topic_ids,
             'speaker_ids' => $this->speaker_ids,
         ];
 

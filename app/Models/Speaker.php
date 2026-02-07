@@ -155,11 +155,6 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->orderByPivot('order_column');
     }
 
-    public function topics(): BelongsToMany
-    {
-        return $this->belongsToMany(Topic::class, 'speaker_topic');
-    }
-
     public function institutions(): BelongsToMany
     {
         return $this->belongsToMany(Institution::class, 'institution_speaker')
