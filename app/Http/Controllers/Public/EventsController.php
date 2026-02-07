@@ -21,7 +21,7 @@ class EventsController extends Controller
      */
     public function calendar(Event $event): Response
     {
-        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== 'public') {
+        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== \App\Enums\EventVisibility::Public) {
             abort(404);
         }
 

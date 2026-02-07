@@ -44,8 +44,6 @@ class SavedSearchController extends Controller
             'filters.language' => ['nullable', Rule::in(['malay', 'english', 'arabic', 'mixed'])],
             'filters.genre' => ['nullable', Rule::in(['kuliah', 'ceramah', 'tazkirah', 'forum', 'halaqah', 'other'])],
             'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
-            'filters.topic_ids' => 'nullable|array',
-            'filters.topic_ids.*' => 'uuid|exists:topics,id',
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
             'radius_km' => 'nullable|integer|min:1|max:500',

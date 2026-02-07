@@ -4,7 +4,6 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Models\Event;
-use App\Models\EventType;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\Venue;
@@ -12,8 +11,6 @@ use Livewire\Livewire;
 
 it('assigns the speaker as event speaker when speaker is the organizer', function () {
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
     $domainTag = Tag::factory()->domain()->create();
     $disciplineTag = Tag::factory()->discipline()->create();
     $venue = Venue::factory()->create(['status' => 'verified']);
@@ -25,7 +22,7 @@ it('assigns the speaker as event speaker when speaker is the organizer', functio
         ->set('data.title', 'Auto Select Speaker Event')
         ->set('data.event_date', now()->addDay()->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.description', 'Test description')
@@ -33,7 +30,8 @@ it('assigns the speaker as event speaker when speaker is the organizer', functio
         ->set('data.discipline_tags', [$disciplineTag->id])
         ->set('data.submitter_name', 'Test User')
         ->set('data.submitter_email', 'test@example.com')
-        ->set('data.location_id', 'venue:'.$venue->id)
+        ->set('data.location_type', 'venue')
+        ->set('data.location_venue_id', $venue->id)
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

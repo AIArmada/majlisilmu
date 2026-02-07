@@ -9,11 +9,14 @@ use App\Enums\Honorific;
 use App\Enums\InstitutionType;
 use App\Enums\PreNominal;
 use App\Enums\VenueType;
+use App\Forms\InstitutionFormSchema;
+use App\Forms\SpeakerFormSchema;
+use App\Forms\VenueFormSchema;
 use App\Models\District;
 use App\Models\Subdistrict;
+use App\Models\Space;
 use App\Models\Event;
 use App\Models\EventSubmission;
-use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Enums\TagType;
@@ -25,7 +28,6 @@ use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -37,13 +39,19 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\Wizard;
+use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -55,15 +63,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     use WithFileUploads;
 
     public ?array $data = [];
-    public ?string $selectedDate = null;
-    public array $prayerTimeOptions = [];
 
     public function mount(): void
     {
-        $this->selectedDate = null;
-        $this->updatePrayerTimeOptions();
-        $defaultPrayerTime = array_key_first($this->prayerTimeOptions) ?? EventPrayerTime::SelepasMaghrib->value;
-
         $this->form->fill([
             'submitter_name' => auth()->user()?->name,
             'submitter_email' => auth()->user()?->email,
@@ -72,25 +74,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'age_group' => [EventAgeGroup::AllAges],
             'event_format' => EventFormat::Physical,
             'location_same_as_institution' => true,
+            'location_type' => 'institution',
+            'is_muslim_only' => false,
         ]);
-    }
-
-    public function updatePrayerTimeOptions(): void
-    {
-        $this->prayerTimeOptions = $this->getPrayerTimeOptions($this->selectedDate);
-    }
-
-    public function updateDateAndPrayerTimes(?string $newDate): void
-    {
-        $this->selectedDate = $newDate;
-        $this->updatePrayerTimeOptions();
-        $this->data['event_date'] = $newDate;
-        
-        // Update prayer_time if current selection is no longer valid
-        $currentPrayerTime = $this->data['prayer_time'] ?? null;
-        if (! $currentPrayerTime || ! array_key_exists($currentPrayerTime, $this->prayerTimeOptions)) {
-            $this->data['prayer_time'] = array_key_first($this->prayerTimeOptions);
-        }
     }
 
     public function form(Schema $schema): Schema
@@ -98,1084 +84,674 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         return $schema
             ->model(new Event())
             ->schema([
-                Grid::make(3)
-                    ->schema([
-                        Grid::make(1)
-                            ->columnSpan(2)
-                            ->schema([
-                                Section::make(__('Event Details'))
-                                    ->schema([
-                                        Select::make('title')
-                                            ->label(__('Tajuk Majlis'))
-                                            ->required()
-                                            ->searchable()
-                                            ->getSearchResultsUsing(fn (string $search): array => Event::query()
-                                                ->whereRaw('LOWER(title) LIKE ?', ['%'.strtolower($search).'%'])
-                                                ->where('status', 'approved')
-                                                ->limit(10)
-                                                ->pluck('title', 'title')
-                                                ->toArray())
-                                            ->getOptionLabelUsing(fn ($value): ?string => $value)
-                                            ->allowHtml(false)
-                                            ->createOptionForm([
-                                                TextInput::make('title')
-                                                    ->label(__('Event Title'))
-                                                    ->required()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Kuliah Maghrib: Tafsir Surah Al-Kahfi')),
-                                            ])
-                                            ->createOptionUsing(fn (array $data): string => $data['title'])
-                                            ->placeholder(__('Search or enter event title...')),
+                Wizard::make([
+                                    Step::make(__('Maklumat Majlis'))
+                                        ->icon('heroicon-o-document-text')
+                                        ->description(__('Maklumat asas tentang majlis'))
+                                        ->schema([
+                                            Select::make('event_type')
+                                                ->label(__('Jenis Majlis'))
+                                                ->required()
+                                                ->multiple()
+                                                ->options(function (): array {
+                                                    return collect(\App\Enums\EventType::cases())
+                                                        ->mapToGroups(fn(\App\Enums\EventType $type) => [
+                                                            $type->getGroup() => [$type->value => $type->getLabel()]
+                                                        ])
+                                                        ->map(fn($group) => $group->collapse())
+                                                        ->toArray();
+                                                })
+                                                ->searchable(),
 
-                                        Section::make(__('Kategori & Bidang'))
-                                            ->description(__('Pilih kategori dan bidang ilmu untuk memudahkan pencarian.'))
-                                            ->schema([
-                                                Grid::make(2)
-                                                    ->schema([
-                                                        Select::make('domain_tags')
-                                                            ->label(__('Kategori (Domain)'))
-                                                            ->helperText(__('Pilih kategori ceramah utama. Boleh pilih lebih daripada satu.'))
-                                                            ->placeholder(__('Pilih kategori…'))
-                                                            ->multiple()
-                                                            ->required()
-                                                            ->searchable()
-                                                            ->preload()
-                                                            ->native(false)
-                                                            ->options(fn () => Tag::query()
-                                                                ->where('type', TagType::Domain->value)
-                                                                ->orderBy('order_column')
-                                                                ->get()
-                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))
-                                                            ->rules(['min:1', 'max:3'])
-                                                            ->validationMessages([
-                                                                'required' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
-                                                                'min' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
-                                                                'max' => __('Maksimum 3 kategori sahaja.'),
-                                                            ]),
+                                            Select::make('title')
+                                                ->label(__('Tajuk Majlis'))
+                                                ->required()
+                                                ->searchable()
+                                                ->getSearchResultsUsing(fn(string $search): array => Event::query()
+                                                    ->whereRaw('LOWER(title) LIKE ?', ['%' . strtolower($search) . '%'])
+                                                    ->where('status', 'approved')
+                                                    ->limit(10)
+                                                    ->pluck('title', 'title')
+                                                    ->toArray())
+                                                ->getOptionLabelUsing(fn($value): ?string => $value)
+                                                ->allowHtml(false)
+                                                ->createOptionForm([
+                                                    TextInput::make('title')
+                                                        ->label(__('Tajuk Majlis'))
+                                                        ->required()
+                                                        ->maxLength(255)
+                                                        ->placeholder(__('cth: Kuliah Maghrib: Tafsir Surah Al-Kahfi')),
+                                                ])
+                                                ->createOptionUsing(fn(array $data): string => $data['title'])
+                                                ->placeholder(__('Cari atau masukkan tajuk majlis...')),
 
-                                                        Select::make('discipline_tags')
-                                                            ->label(__('Bidang Ilmu'))
-                                                            ->helperText(__('Pilih bidang yang menggambarkan isi ceramah.'))
-                                                            ->placeholder(__('Pilih bidang…'))
-                                                            ->multiple()
-                                                            ->required()
-                                                            ->searchable()
-                                                            ->preload()
-                                                            ->native(false)
-                                                            ->options(fn () => Tag::query()
-                                                                ->where('type', TagType::Discipline->value)
-                                                                ->orderBy('order_column')
-                                                                ->get()
-                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))
-                                                            ->rules(['min:1'])
-                                                            ->validationMessages([
-                                                                'required' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
-                                                                'min' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
-                                                            ]),
-                                                    ]),
+                                            Textarea::make('description')
+                                                ->label(__('Keterangan'))
+                                                ->required()
+                                                ->maxLength(5000)
+                                                ->rows(4)
+                                                ->placeholder(__('Terangkan mengenai majlis, topik yang akan dikupas, dll.')),
 
-                                                Grid::make(2)
-                                                    ->schema([
-                                                        Select::make('source_tags')
-                                                            ->label(__('Sumber Utama'))
-                                                            ->helperText(__('Pilih sumber rujukan utama (jika ada).'))
-                                                            ->placeholder(__('Pilih sumber…'))
-                                                            ->multiple()
-                                                            ->searchable()
-                                                            ->preload()
-                                                            ->native(false)
-                                                            ->options(fn () => Tag::query()
-                                                                ->where('type', TagType::Source->value)
-                                                                ->orderBy('order_column')
-                                                                ->get()
-                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])),
+                                            Grid::make(['default' => 1, 'sm' => 2, 'md' => 3])
+                                                ->schema([
+                                                    DatePicker::make('event_date')
+                                                        ->label(__('Tarikh'))
+                                                        ->required()
+                                                        ->native()
+                                                        ->minDate(now()->startOfDay())
+                                                        ->live()
+                                                        ->afterStateUpdatedJs(<<<'JS'
+                                                            $set('prayer_time', null)
+                                                        JS),
 
-                                                        Select::make('issue_tags')
-                                                            ->label(__('Tema / Isu'))
-                                                            ->helperText(__('Pilih tema supaya mudah dicari.'))
-                                                            ->placeholder(__('Pilih tema…'))
-                                                            ->multiple()
-                                                            ->searchable()
-                                                            ->preload()
-                                                            ->native(false)
-                                                            ->options(fn () => Tag::query()
-                                                                ->where('type', TagType::Issue->value)
-                                                                ->orderBy('order_column')
-                                                                ->get()
-                                                                ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])),
-                                                    ]),
-
-                                                Select::make('references')
-                                                    ->label(__('Rujukan Kitab'))
-                                                    ->helperText(__('Pilih kitab atau buku rujukan yang digunakan (jika ada).'))
-                                                    ->placeholder(__('Cari atau pilih rujukan…'))
-                                                    ->multiple()
-                                                    ->searchable()
-                                                    ->preload()
-                                                    ->native(false)
-                                                    ->relationship('references', 'title')
-                                                    ->createOptionForm([
-                                                        TextInput::make('title')
-                                                            ->label(__('Tajuk Kitab / Buku'))
-                                                            ->required()
-                                                            ->maxLength(255)
-                                                            ->placeholder(__('e.g., Riyadhus Solihin, Ihya Ulumiddin')),
-                                                        TextInput::make('author')
-                                                            ->label(__('Pengarang'))
-                                                            ->maxLength(255)
-                                                            ->placeholder(__('e.g., Imam Nawawi, Imam Ghazali')),
-                                                        Select::make('type')
-                                                            ->label(__('Jenis'))
-                                                            ->options([
-                                                                'kitab' => __('Kitab Turath'),
-                                                                'book' => __('Buku Moden'),
-                                                                'article' => __('Artikel'),
-                                                            ])
-                                                            ->default('kitab'),
-                                                    ])
-                                                    ->createOptionUsing(function (array $data): string {
-                                                        $reference = Reference::create([
-                                                            'title' => $data['title'],
-                                                            'author' => $data['author'] ?? null,
-                                                            'type' => $data['type'] ?? 'kitab',
-                                                            'is_canonical' => false,
-                                                        ]);
-
-                                                        return (string) $reference->getKey();
-                                                    }),
-                                            ]),
-
-                                        Grid::make(2)
-                                            ->schema([
-                                                Select::make('event_type_id')
-                                                    ->label(__('Jenis Majlis'))
-                                                    ->required()
-                                                    ->options(function (): array {
-                                                        $types = EventType::where('is_active', true)
-                                                            ->with(['parent.parent.parent'])
-                                                            ->get();
-                                                        
-                                                        $grouped = [];
-                                                        
-                                                        foreach ($types as $type) {
-                                                            // Skip root level types (they're just group headers)
-                                                            if ($type->parent_id === null) {
-                                                                continue;
-                                                            }
-                                                            
-                                                            // Traverse up to find the root ancestor for grouping
-                                                            $current = $type->parent;
-                                                            while ($current && $current->parent_id !== null) {
-                                                                $current = $current->parent;
-                                                            }
-                                                            $groupName = $current->name;
-                                                            
-                                                            if (!isset($grouped[$groupName])) {
-                                                                $grouped[$groupName] = [];
-                                                            }
-                                                            
-                                                            // Format the label based on depth (Level 2 = plain, Level 3+ = arrow)
-                                                            if ($type->parent->parent_id === null) {
-                                                                // This is a category (level 2, child of root)
-                                                                $label = $type->name;
-                                                            } else {
-                                                                // This is a subcategory or deeper (level 3+)
-                                                                $label = '  → ' . $type->name;
-                                                            }
-                                                            
-                                                            $grouped[$groupName][$type->id] = $label;
-                                                        }
-                                                        
-                                                        return $grouped;
-                                                    })
-                                                    ->searchable()
-                                                    ->preload(),
-                                            ]),
-
-                                        Textarea::make('description')
-                                            ->label(__('Description'))
-                                            ->required()
-                                            ->maxLength(5000)
-                                            ->rows(4)
-                                            ->placeholder(__('Describe the event, topics to be covered, etc.')),    
-
-                                        Grid::make(3)
-                                            ->schema([
-                                                DatePicker::make('event_date')
-                                                    ->label(__('Tarikh'))
-                                                    ->required()
-                                                    ->native()
-                                                    ->timezone('Asia/Kuala_Lumpur')
-                                                    ->minDate(now()->startOfDay())
-                                                    ->extraFieldWrapperAttributes([
-                                                        'x-data' => '{}',
-                                                        'x-on:change' => '$wire.updateDateAndPrayerTimes($event.target.value)',
-                                                    ]),
-
-                                                Select::make('prayer_time')
-                                                    ->label(__('Waktu'))
-                                                    ->required()
-                                                    ->options(fn (): array => $this->prayerTimeOptions),
-
-                                                TimePicker::make('custom_time')
-                                                    ->label(__('Masa'))
-                                                    ->native()
-                                                    ->timezone('Asia/Kuala_Lumpur')
-                                                    ->visibleJs(<<<'JS'
-                                                        $get('prayer_time') === 'lain_waktu'
-                                                        JS)
-                                                    ->required(function (Get $get): bool {
-                                                        $prayerTime = $get('prayer_time');
-                                                        return $prayerTime === EventPrayerTime::LainWaktu;
-                                                    })
-                                                    ->rule(function (Get $get): Closure {
-                                                        return function (string $attribute, $value, Closure $fail) use ($get) {
+                                                    Select::make('prayer_time')
+                                                        ->label(__('Waktu'))
+                                                        ->required()
+                                                        ->options(function (Get $get): array {
                                                             $eventDate = $get('event_date');
-                                                            $timezone = 'Asia/Kuala_Lumpur';
-                                                            $now = Carbon::now($timezone);
-                                                            
-                                                            if (! $eventDate) {
-                                                                return;
-                                                            }
 
-                                                            $eventDay = Carbon::parse($eventDate, $timezone)->startOfDay();
-                                                            
-                                                            // Only validate if event is today
-                                                            if ($eventDay->isSameDay($now)) {
-                                                                // Parse the time value (format: HH:MM or HH:MM:SS)
-                                                                $timeParts = explode(':', $value);
-                                                                $selectedTime = $eventDay->copy()
-                                                                    ->setHour((int) $timeParts[0])
-                                                                    ->setMinute((int) $timeParts[1]);
-                                                                
-                                                                // Check if selected time is in the past
-                                                                if ($selectedTime->lessThan($now)) {
-                                                                    $fail(__('Masa yang dipilih tidak boleh pada masa lalu untuk majlis hari ini.'));
+                                                            return collect(EventPrayerTime::cases())
+                                                                ->filter(function (EventPrayerTime $case) use ($eventDate) {
+                                                                    if (!$eventDate) {
+                                                                        // No date selected — show base options only (no Jumaat/Tarawikh)
+                                                                        return !in_array($case, [EventPrayerTime::SelepasJumaat, EventPrayerTime::SelepasTarawikh], true);
+                                                                    }
+
+                                                                    $date = Carbon::parse($eventDate, 'Asia/Kuala_Lumpur')->startOfDay();
+
+                                                                    if ($case === EventPrayerTime::SelepasJumaat) {
+                                                                        return $date->isFriday();
+                                                                    }
+
+                                                                    if ($case === EventPrayerTime::SelepasTarawikh) {
+                                                                        return $this->isRamadhan($date);
+                                                                    }
+
+                                                                    return true;
+                                                                })
+                                                                ->mapWithKeys(fn(EventPrayerTime $case) => [$case->value => $case->getLabel()])
+                                                                ->toArray();
+                                                        }),
+
+                                                    TimePicker::make('custom_time')
+                                                        ->label(__('Masa'))
+                                                        ->native()
+                                                        ->visibleJs(<<<'JS'
+                                                            $get('prayer_time') === 'lain_waktu'
+                                                            JS)
+                                                        ->required(function (Get $get): bool {
+                                                            $prayerTime = $get('prayer_time');
+                                                            return $prayerTime === EventPrayerTime::LainWaktu;
+                                                        })
+                                                        ->rule(function (Get $get): Closure {
+                                                            return function (string $attribute, $value, Closure $fail) use ($get) {
+                                                                $eventDate = $get('event_date');
+                                                                $timezone = 'Asia/Kuala_Lumpur';
+                                                                $now = Carbon::now($timezone);
+
+                                                                if (!$eventDate) {
+                                                                    return;
+                                                                }
+
+                                                                $eventDay = Carbon::parse($eventDate, $timezone)->startOfDay();
+
+                                                                // Only validate if event is today
+                                                                if ($eventDay->isSameDay($now)) {
+                                                                    $timeParts = explode(':', $value);
+                                                                    $selectedTime = $eventDay->copy()
+                                                                        ->setHour((int) $timeParts[0])
+                                                                        ->setMinute((int) $timeParts[1]);
+
+                                                                    if ($selectedTime->lessThan($now)) {
+                                                                        $fail(__('Masa yang dipilih tidak boleh pada masa lalu untuk majlis hari ini.'));
+                                                                    }
+                                                                }
+                                                            };
+                                                        }),
+
+                                                    Grid::make(2)
+                                                        ->schema([
+                                                            Select::make('duration_hours')
+                                                                ->label(__('Jam'))
+                                                                ->options(collect(range(0, 12))->mapWithKeys(fn ($h) => [$h => $h . ' ' . __('jam')]))
+                                                                ->placeholder('0')
+                                                                ->default(1),
+
+                                                            Select::make('duration_minutes')
+                                                                ->label(__('Minit'))
+                                                                ->options(collect(range(0, 55, 5))->mapWithKeys(fn ($m) => [$m => str_pad($m, 2, '0', STR_PAD_LEFT) . ' ' . __('minit')]))
+                                                                ->placeholder('00')
+                                                                ->default(0),
+                                                        ])
+                                                        ->columnSpanFull(),
+                                                ]),
+
+                                            Grid::make(['default' => 1, 'sm' => 2])
+                                                ->schema([
+                                                    Radio::make('event_format')
+                                                        ->label(__('Format Majlis'))
+                                                        ->required()
+                                                        ->options(EventFormat::class)
+                                                        ->default(EventFormat::Physical)
+                                                        ->inline(),
+
+                                                    TextInput::make('event_url')
+                                                        ->label(__('Pautan Majlis'))
+                                                        ->url()
+                                                        ->maxLength(255)
+                                                        ->placeholder(__('https://example.com/event')),
+
+                                                    TextInput::make('live_url')
+                                                        ->label(__('Pautan Siaran Langsung'))
+                                                        ->url()
+                                                        ->maxLength(255)
+                                                        ->placeholder(__('https://youtube.com/...'))
+                                                        ->visibleJs(<<<'JS'
+                                                    ['online', 'hybrid'].includes($get('event_format'))
+                                                    JS)
+                                                        ->required(fn(Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true)),
+                                                ]),
+
+                                            Grid::make(['default' => 1, 'sm' => 2])
+                                                ->schema([
+                                                    Select::make('gender')
+                                                        ->label(__('Jantina'))
+                                                        ->required()
+                                                        ->options(EventGenderRestriction::class)
+                                                        ->default(EventGenderRestriction::All),
+
+                                                    Select::make('age_group')
+                                                        ->label(__('Peringkat Umur'))
+                                                        ->required()
+                                                        ->options(EventAgeGroup::class)
+                                                        ->multiple()
+                                                        ->afterStateUpdatedJs(<<<'JS'
+                                                            const ageGroups = $state || []
+                                                            if (ageGroups.includes('children') || ageGroups.includes('all_ages')) {
+                                                                $set('children_allowed', true)
+                                                            }
+                                                            JS),
+
+                                                    Toggle::make('children_allowed')
+                                                        ->label(__('Kanak-kanak Dibenarkan'))
+                                                        ->helperText(__('Adakah ibu bapa boleh membawa anak kecil ke majlis ini?'))
+                                                        ->default(true)
+                                                        ->inline(false)
+                                                        ->disabled(function (Get $get): bool {
+                                                            $ageGroups = $get('age_group') ?? [];
+                                                            return in_array(EventAgeGroup::Children, $ageGroups, true) ||
+                                                                in_array(EventAgeGroup::AllAges, $ageGroups, true);
+                                                        })
+                                                        ->dehydrated(),
+
+                                                    Toggle::make('is_muslim_only')
+                                                        ->label(__('Terbuka untuk Muslim Sahaja'))
+                                                        ->helperText(__('Pilih jika majlis ini hanya terbuka untuk penganut agama Islam.'))
+                                                        ->inline(false)
+                                                        ->default(false),
+                                                ]),
+                                        ]),
+
+                                    Step::make(__('Kategori & Bidang'))
+                                        ->icon('heroicon-o-tag')
+                                        ->description(__('Kategori ilmu dan rujukan'))
+                                        ->schema([
+                                            Grid::make(['default' => 1, 'sm' => 2])
+                                                ->schema([
+                                                    Select::make('domain_tags')
+                                                        ->label(__('Kategori'))
+                                                        ->helperText(__('Pilih kategori ceramah utama. Boleh pilih lebih daripada satu.'))
+                                                        ->placeholder(__('Pilih kategori…'))
+                                                        ->multiple()
+                                                        ->required()
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->native(false)
+                                                        ->options(fn() => Cache::remember('submit_tags_domain_' . app()->getLocale(), 60, fn() => Tag::query()
+                                                            ->where('type', TagType::Domain->value)
+                                                            ->orderBy('order_column')
+                                                            ->get()
+                                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                                        ->rules(['min:1', 'max:3'])
+                                                        ->validationMessages([
+                                                            'required' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
+                                                            'min' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
+                                                            'max' => __('Maksimum 3 kategori sahaja.'),
+                                                        ]),
+
+                                                    Select::make('discipline_tags')
+                                                        ->label(__('Bidang Ilmu'))
+                                                        ->helperText(__('Pilih bidang yang menggambarkan isi ceramah.'))
+                                                        ->placeholder(__('Pilih bidang…'))
+                                                        ->multiple()
+                                                        ->required()
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->native(false)
+                                                        ->options(fn() => Cache::remember('submit_tags_discipline_' . app()->getLocale(), 60, fn() => Tag::query()
+                                                            ->where('type', TagType::Discipline->value)
+                                                            ->orderBy('order_column')
+                                                            ->get()
+                                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                                        ->rules(['min:1'])
+                                                        ->validationMessages([
+                                                            'required' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
+                                                            'min' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
+                                                        ])
+                                                        ->createOptionForm([
+                                                            TextInput::make('name')
+                                                                ->label(__('Nama Bidang'))
+                                                                ->required()
+                                                                ->maxLength(255)
+                                                                ->placeholder(__('cth: Fiqh, Tasawuf')),
+                                                        ])
+                                                        ->createOptionUsing(function (array $data): string {
+                                                            $tag = Tag::create([
+                                                                'name' => ['ms' => $data['name'], 'en' => $data['name']],
+                                                                'type' => TagType::Discipline->value,
+                                                            ]);
+                                                            return (string) $tag->getKey();
+                                                        }),
+                                                ]),
+
+                                            Grid::make(['default' => 1, 'sm' => 2])
+                                                ->schema([
+                                                    Select::make('source_tags')
+                                                        ->label(__('Sumber Utama'))
+                                                        ->helperText(__('Pilih sumber rujukan utama (jika ada).'))
+                                                        ->placeholder(__('Pilih sumber…'))
+                                                        ->multiple()
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->native(false)
+                                                        ->options(fn() => Cache::remember('submit_tags_source_' . app()->getLocale(), 60, fn() => Tag::query()
+                                                            ->where('type', TagType::Source->value)
+                                                            ->orderBy('order_column')
+                                                            ->get()
+                                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))),
+
+                                                    Select::make('issue_tags')
+                                                        ->label(__('Tema / Isu'))
+                                                        ->helperText(__('Pilih tema supaya mudah dicari.'))
+                                                        ->placeholder(__('Pilih tema…'))
+                                                        ->multiple()
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->native(false)
+                                                        ->options(fn() => Cache::remember('submit_tags_issue_' . app()->getLocale(), 60, fn() => Tag::query()
+                                                            ->where('type', TagType::Issue->value)
+                                                            ->orderBy('order_column')
+                                                            ->get()
+                                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                                        ->createOptionForm([
+                                                            TextInput::make('name')
+                                                                ->label(__('Nama Tema'))
+                                                                ->required()
+                                                                ->maxLength(255)
+                                                                ->placeholder(__('cth: Palestin, Riba')),
+                                                        ])
+                                                        ->createOptionUsing(function (array $data): string {
+                                                            $tag = Tag::create([
+                                                                'name' => ['ms' => $data['name'], 'en' => $data['name']],
+                                                                'type' => TagType::Issue->value,
+                                                            ]);
+                                                            return (string) $tag->getKey();
+                                                        }),
+                                                ]),
+
+                                            Select::make('references')
+                                                ->label(__('Rujukan Kitab'))
+                                                ->helperText(__('Pilih kitab atau buku rujukan yang digunakan (jika ada).'))
+                                                ->placeholder(__('Cari atau pilih rujukan…'))
+                                                ->multiple()
+                                                ->searchable()
+                                                ->preload()
+                                                ->native(false)
+                                                ->relationship('references', 'title')
+                                                ->createOptionForm([
+                                                    TextInput::make('title')
+                                                        ->label(__('Tajuk Kitab / Buku'))
+                                                        ->required()
+                                                        ->maxLength(255)
+                                                        ->placeholder(__('cth: Riyadhus Solihin, Ihya Ulumiddin')),
+                                                    TextInput::make('author')
+                                                        ->label(__('Pengarang'))
+                                                        ->maxLength(255)
+                                                        ->placeholder(__('cth: Imam Nawawi, Imam Ghazali')),
+                                                    Select::make('type')
+                                                        ->label(__('Jenis'))
+                                                        ->options([
+                                                            'kitab' => __('Kitab Turath'),
+                                                            'book' => __('Buku Moden'),
+                                                            'article' => __('Artikel'),
+                                                        ])
+                                                        ->default('kitab'),
+                                                ])
+                                                ->createOptionUsing(function (array $data): string {
+                                                    $reference = Reference::create([
+                                                        'title' => $data['title'],
+                                                        'author' => $data['author'] ?? null,
+                                                        'type' => $data['type'] ?? 'kitab',
+                                                        'is_canonical' => false,
+                                                    ]);
+
+                                                    return (string) $reference->getKey();
+                                                }),
+                                        ]),
+
+                                    Step::make(__('Penganjur & Lokasi'))
+                                        ->icon('heroicon-o-building-office')
+                                        ->description(__('Penganjur dan lokasi majlis'))
+                                        ->schema([
+                                            Section::make(__('Penganjur'))
+                                                ->schema([
+                                                    Radio::make('organizer_type')
+                                                        ->label(__('Jenis Penganjur'))
+                                                        ->required()
+                                                        ->options([
+                                                            'institution' => __('Institusi'),
+                                                            'speaker' => __('Penceramah'),
+                                                        ])
+                                                        ->default('institution')
+                                                        ->inline(),
+
+                                                    Select::make('organizer_institution_id')
+                                                        ->label(__('Institusi'))
+                                                        ->options(fn() => Cache::remember('submit_institutions', 60, fn() => Institution::whereIn('status', ['verified', 'pending'])->pluck('name', 'id')))
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->visibleJs(<<<'JS'
+                                                            $get('organizer_type') === 'institution'
+                                                            JS)
+                                                        ->required(fn(Get $get): bool => $get('organizer_type') === 'institution')
+                                                        ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                                                        ->createOptionUsing(fn (array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+
+                                                    Select::make('organizer_speaker_id')
+                                                        ->label(__('Penceramah'))
+                                                        ->options(fn() => Cache::remember('submit_speakers', 60, fn() => Speaker::query()
+                                                            ->whereIn('status', ['verified', 'pending'])
+                                                            ->pluck('name', 'id')))
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->visibleJs(<<<'JS'
+                                                            $get('organizer_type') === 'speaker'
+                                                            JS)
+                                                        ->required(fn(Get $get): bool => $get('organizer_type') === 'speaker')
+                                                        ->afterStateUpdatedJs(<<<'JS'
+                                                            if ($state) {
+                                                                const currentSpeakers = $get('speakers') || []
+                                                                if (!currentSpeakers.includes($state)) {
+                                                                    $set('speakers', [...currentSpeakers, $state])
                                                                 }
                                                             }
-                                                        };
-                                                    }),
-                                            ]),
-
-                                        Grid::make(2)
-                                            ->schema([
-                                                Radio::make('event_format')
-                                                    ->label(__('Event Format'))
-                                                    ->required()
-                                                    ->options(EventFormat::class)
-                                                    ->default(EventFormat::Physical)
-                                                    ->inline(),
-
-                                                TextInput::make('event_url')
-                                                    ->label(__('Event URL'))
-                                                    ->url()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('https://example.com/event')),
-
-                                                TextInput::make('live_url')
-                                                    ->label(__('Live URL'))
-                                                    ->url()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('https://youtube.com/...'))
-                                                    ->visibleJs(<<<'JS'
-                                                ['online', 'hybrid'].includes($get('event_format'))
-                                                JS)
-                                                    ->required(fn (Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true)),
-                                            ]),
-
-                                        Grid::make(2)
-                                            ->schema([
-                                                Select::make('gender')
-                                                    ->label(__('Gender'))
-                                                    ->required()
-                                                    ->options(EventGenderRestriction::class)
-                                                    ->default(EventGenderRestriction::All),
-
-                                                Select::make('age_group')
-                                                    ->label(__('Age Group'))
-                                                    ->required()
-                                                    ->options(EventAgeGroup::class)
-                                                    ->multiple()
-                                                    // ->default([EventAgeGroup::AllAges->value, EventAgeGroup::Adults->value])
-                                                    ->afterStateUpdatedJs(<<<'JS'
-                                                        const ageGroups = $state || []
-                                                        if (ageGroups.includes('children') || ageGroups.includes('all_ages')) {
-                                                            $set('children_allowed', true)
-                                                        }
-                                                        JS),
-
-                                                Toggle::make('children_allowed')
-                                                    ->label(__('Children Allowed'))
-                                                    ->default(true)
-                                                    ->inline(false)
-                                                    ->disabled(function (Get $get): bool {
-                                                        $ageGroups = $get('age_group') ?? [];
-                                                        return in_array(EventAgeGroup::Children, $ageGroups, true) || 
-                                                               in_array(EventAgeGroup::AllAges, $ageGroups, true);
-                                                    })
-                                                    ->dehydrated(),
-                                            ]),
-                                    ]),
-
-                                Section::make(__('Organizer'))
-                                    ->schema([
-                                        Radio::make('organizer_type')
-                                            ->label(__('Organizer Type'))
-                                            ->required()
-                                            ->options([
-                                                'institution' => __('Institution'),
-                                                'speaker' => __('Speaker'),
-                                            ])
-                                            ->default('institution')
-                                            ->inline(),
-
-                                        Select::make('organizer_institution_id')
-                                            ->label(__('Institution'))
-                                            ->relationship('institution', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending']))
-                                            ->searchable()
-                                            ->preload()
-                                            ->visibleJs(<<<'JS'
-                                                $get('organizer_type') === 'institution'
-                                                JS)
-                                            ->required(fn (Get $get): bool => $get('organizer_type') === 'institution')
-                                            ->createOptionForm([
-                                                TextInput::make('name')
-                                                    ->label(__('Institution Name'))
-                                                    ->required()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Masjid Al-Falah, Surau An-Nur')),
-                                                    
-                                                Select::make('type')
-                                                    ->label(__('Institution Type'))
-                                                    ->required()
-                                                    ->options(InstitutionType::class)
-                                                    ->placeholder(__('Select type...')),
-
-                                                SpatieMediaLibraryFileUpload::make('cover')
-                                                    ->label(__('Cover Image'))
-                                                    ->collection('cover')
-                                                    ->image()
-                                                    ->imageEditor()
-                                                    ->maxSize(5120)
-                                                    ->helperText(__('Header or banner image')),
-
-                                                SpatieMediaLibraryFileUpload::make('gallery')
-                                                    ->label(__('Gallery'))
-                                                    ->collection('gallery')
-                                                    ->multiple()
-                                                    ->image()
-                                                    ->imageEditor()
-                                                    ->maxSize(5120)
-                                                    ->maxFiles(10)
-                                                    ->helperText(__('Up to 10 photos of the institution')),
-
-                                                TextInput::make('line1')
-                                                    ->label(__('Address Line 1'))
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., No. 123, Jalan Masjid')),
-
-                                                TextInput::make('line2')
-                                                    ->label(__('Address Line 2'))
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Taman Indah')),
-
-                                                TextInput::make('postcode')
-                                                    ->label(__('Postcode'))
-                                                    ->maxLength(16)
-                                                    ->placeholder(__('e.g., 50000')),
-
-                                                Select::make('state_id')
-                                                    ->label(__('State'))
-                                                    ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
-                                                    ->searchable()
-                                                    ->preload()
-                                                    ->afterStateUpdatedJs(<<<'JS'
-                                                        $set('district_id', null)
-                                                        $set('subdistrict_id', null)
-                                                        JS),
-
-                                                Select::make('district_id')
-                                                    ->label(__('Daerah'))
-                                                    ->options(function (Get $get) {
-                                                        $stateId = $get('state_id');
-                                                        if (! $stateId) {
-                                                            return [];
-                                                        }
-
-                                                        return District::where('state_id', $stateId)
-                                                            ->orderBy('name')
-                                                            ->pluck('name', 'id');
-                                                    })
-                                                    ->searchable()
-                                                    ->afterStateUpdatedJs(<<<'JS'
-                                                        $set('subdistrict_id', null)
-                                                        JS)
-                                                    ->visibleJs(<<<'JS'
-                                                        $get('state_id') != null && $get('state_id') !== ''
-                                                        JS),
-
-                                                Select::make('subdistrict_id')
-                                                    ->label(__('Daerah Kecil / Bandar / Mukim / Pekan'))
-                                                    ->options(function (Get $get) {
-                                                        $districtId = $get('district_id');
-                                                        if (! $districtId) {
-                                                            return [];
-                                                        }
-
-                                                        return Subdistrict::where('district_id', $districtId)
-                                                            ->orderBy('name')
-                                                            ->pluck('name', 'id');
-                                                    })
-                                                    ->searchable()
-                                                    ->visibleJs(<<<'JS'
-                                                        $get('district_id') != null && $get('district_id') !== ''
-                                                        JS),
-
-                                                TextInput::make('google_maps_url')
-                                                    ->label(__('Google Maps URL'))
-                                                    ->url()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('https://maps.google.com/...')),
-
-                                                TextInput::make('waze_url')
-                                                    ->label(__('Waze URL'))
-                                                    ->url()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('https://waze.com/ul/...')),
-
-                                                Repeater::make('social_media')
-                                                    ->label(__('Social Media'))
-                                                    ->schema([
-                                                        Select::make('platform')
-                                                            ->label(__('Platform'))
-                                                            ->required()
-                                                            ->options([
-                                                                'facebook' => 'Facebook',
-                                                                'twitter' => 'Twitter / X',
-                                                                'instagram' => 'Instagram',
-                                                                'youtube' => 'YouTube',
-                                                                'tiktok' => 'TikTok',
-                                                                'telegram' => 'Telegram',
-                                                                'whatsapp' => 'WhatsApp',
-                                                                'website' => 'Website',
-                                                            ])
-                                                            ->searchable(),
-                                                        TextInput::make('url')
-                                                            ->label(__('URL'))
-                                                            ->required()
-                                                            ->url()
-                                                            ->maxLength(255)
-                                                            ->placeholder(__('https://...')),
-                                                        TextInput::make('username')
-                                                            ->label(__('Username'))
-                                                            ->maxLength(255)
-                                                            ->placeholder(__('@username')),
-                                                    ])
-                                                    ->collapsible()
-                                                    ->defaultItems(0)
-                                                    ->addActionLabel(__('Add Social Media'))
-                                                    ->helperText(__('Add social media links for this institution')),
-                                            ])
-                                            ->createOptionUsing(function (array $data): string {
-                                                $institution = Institution::create([
-                                                    'name' => $data['name'],
-                                                    'slug' => Str::slug($data['name']).'-'.Str::random(6),
-                                                    'type' => $data['type'],
-                                                    'status' => 'pending',
-                                                ]);
-
-                                                // Create address if provided
-                                                if (! empty($data['line1']) || ! empty($data['state_id'])) {
-                                                    $institution->address()->create([
-                                                        'type' => 'main',
-                                                        'line1' => $data['line1'] ?? null,
-                                                        'line2' => $data['line2'] ?? null,
-                                                        'postcode' => $data['postcode'] ?? null,
-                                                        'country_id' => 132, // Malaysia
-                                                        'state_id' => $data['state_id'] ?? null,
-                                                        'district_id' => $data['district_id'] ?? null,
-                                                        'subdistrict_id' => $data['subdistrict_id'] ?? null,
-                                                        'google_maps_url' => $data['google_maps_url'] ?? null,
-                                                        'waze_url' => $data['waze_url'] ?? null,
-                                                    ]);
-                                                }
-
-                                                // Create social media entries if provided
-                                                if (! empty($data['social_media'])) {
-                                                    foreach ($data['social_media'] as $social) {
-                                                        $institution->socialMedia()->create([
-                                                            'platform' => $social['platform'],
-                                                            'url' => $social['url'],
-                                                            'username' => $social['username'] ?? null,
-                                                        ]);
-                                                    }
-                                                }
-
-                                                // Media (logo, cover, gallery) are handled automatically by Filament/Spatie integration
-
-                                                return (string) $institution->getKey();
-                                            }),
-
-                                        Select::make('organizer_speaker_id')
-                                            ->label(__('Speaker'))
-                                            ->options(fn () => Speaker::query()
-                                                ->whereIn('status', ['verified', 'pending'])
-                                                ->pluck('name', 'id'))
-                                            ->searchable()
-                                            ->preload()
-                                            ->visibleJs(<<<'JS'
-                                                $get('organizer_type') === 'speaker'
-                                                JS)
-                                            ->required(fn (Get $get): bool => $get('organizer_type') === 'speaker')
-                                            ->afterStateUpdatedJs(<<<'JS'
-                                                if ($state) {
-                                                    const currentSpeakers = $get('speakers') || []
-                                                    if (!currentSpeakers.includes($state)) {
-                                                        $set('speakers', [...currentSpeakers, $state])
-                                                    }
-                                                }
-                                                JS)
-                                            ->createOptionForm([
-                                                TextInput::make('name')
-                                                    ->label(__('Speaker Name'))
-                                                    ->required()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Ustaz Ahmad bin Hassan')),
-                                                
-                                                Radio::make('gender')
-                                                    ->label(__('Gender'))
-                                                    ->required()
-                                                    ->options(Gender::class)
-                                                    ->default(Gender::Male->value)
-                                                    ->inline(),
-
-                                                SpatieMediaLibraryFileUpload::make('avatar')
-                                                    ->label(__('Avatar'))
-                                                    ->collection('avatar')
-                                                    ->avatar()
-                                                    ->imageEditor()
-                                                    ->image()
-                                                    ->maxSize(5120)
-                                                    ->helperText(__('Recommended: Square image, at least 400x400px')),
-
-                                                Select::make('honorific')
-                                                    ->label(__('Honorific'))
-                                                    ->multiple()
-                                                    ->options(Honorific::class)
-                                                    ->searchable()
-                                                    ->placeholder(__('Select honorifics')),
-
-                                                Select::make('pre_nominal')
-                                                    ->label(__('Pre-nominal'))
-                                                    ->options(PreNominal::class)
-                                                    ->searchable()
-                                                    ->placeholder(__('Select pre-nominals')),
-
-                                                TextInput::make('job_title')
-                                                    ->label(__('Job Title'))
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Imam, Lecturer')),
-
-                                                Select::make('state_id')
-                                                    ->label(__('State'))
-                                                    ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
-                                                    ->searchable()
-                                                    ->preload(),
-
-                                                Select::make('institutions')
-                                                    ->label(__('Affiliated Institutions'))
-                                                    ->options(fn () => Institution::query()
-                                                        ->whereIn('status', ['verified', 'pending'])
-                                                        ->orderBy('name')
-                                                        ->pluck('name', 'id'))
-                                                    ->multiple()
-                                                    ->searchable()
-                                                    ->preload(),
-                                            ])
-                                            ->createOptionUsing(function (array $data, Set $set, Get $get): string {
-                                                $speaker = Speaker::create([
-                                                    'name' => $data['name'],
-                                                    'gender' => $data['gender'] ?? Gender::Male->value,
-                                                    'honorific' => ! empty($data['honorific']) ? $data['honorific'] : null,
-                                                    'pre_nominal' => ! empty($data['pre_nominal']) ? $data['pre_nominal'] : null,
-                                                    'job_title' => $data['job_title'] ?? null,
-                                                    'slug' => Str::slug($data['name']).'-'.Str::random(6),
-                                                    'status' => 'pending',
-                                                ]);
-
-                                                if (! empty($data['state_id'])) {
-                                                    $speaker->address()->create([
-                                                        'state_id' => $data['state_id'],
-                                                    ]);
-                                                }
-
-                                                if (! empty($data['institutions'])) {
-                                                    $speaker->institutions()->attach($data['institutions']);
-                                                }
-
-                                                return (string) $speaker->getKey();
-                                            }),
-                                    ]),
-
-                                Section::make(__('Location'))
-                                    ->visibleJs(<<<'JS'
-                                        $get('event_format') !== 'online'
-                                        JS)
-                                    ->schema([
-                                        Toggle::make('location_same_as_institution')
-                                            ->label(__('Same as organizer institution'))
-                                            ->default(true)
-                                            ->inline(false)
-                                            ->visibleJs(<<<'JS'
-                                                $get('organizer_type') === 'institution'
-                                                JS),
-
-                                        Select::make('location_id')
-                                            ->label(__('Location'))
-                                            ->options(function (Get $get): array {
-                                                $options = [];
-
-                                                if ($get('organizer_type') === 'institution') {
-                                                    $institutionId = $get('organizer_institution_id');
-
-                                                    if ($institutionId) {
-                                                        $institution = Institution::query()
-                                                            ->whereKey($institutionId)
-                                                            ->first();
-
-                                                        if ($institution) {
-                                                            $options['institution:' . $institution->id] = __('Institution: :name', ['name' => $institution->name]);
-                                                        }
-                                                    }
-                                                } else {
-                                                    $institutions = Institution::query()
-                                                        ->whereIn('status', ['verified', 'pending'])
-                                                        ->orderBy('name')
-                                                        ->get(['id', 'name']);
-
-                                                    foreach ($institutions as $institution) {
-                                                        $options['institution:' . $institution->id] = __('Institution: :name', ['name' => $institution->name]);
-                                                    }
-                                                }
-
-                                                $venues = Venue::query()
-                                                    ->whereIn('status', ['verified', 'pending'])
-                                                    ->orderBy('name')
-                                                    ->get(['id', 'name']);
-
-                                                foreach ($venues as $venue) {
-                                                    $options['venue:' . $venue->id] = __('Venue: :name', ['name' => $venue->name]);
-                                                }
-
-                                                return $options;
-                                            })
-                                            ->searchable()
-                                            ->preload()
-                                            ->visibleJs(<<<'JS'
-                                                $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
-                                                JS)
-                                            ->required(fn (Get $get): bool => $get('organizer_type') === 'speaker' || ! $get('location_same_as_institution'))
-                                            ->createOptionForm([
-                                                TextInput::make('name')
-                                                    ->label(__('Venue Name'))
-                                                    ->required()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Dewan Serbaguna, Hall A')),
-                                                    
-                                                Select::make('type')
-                                                    ->label(__('Venue Type'))
-                                                    ->required()
-                                                    ->options(VenueType::class)
-                                                    ->placeholder(__('Select type...')),
-
-                                                SpatieMediaLibraryFileUpload::make('cover')
-                                                    ->label(__('Cover Image'))
-                                                    ->collection('main')
-                                                    ->image()
-                                                    ->imageEditor()
-                                                    ->maxSize(5120)
-                                                    ->helperText(__('Header or banner image')),
-
-                                                SpatieMediaLibraryFileUpload::make('gallery')
-                                                    ->label(__('Gallery'))
-                                                    ->collection('gallery')
-                                                    ->multiple()
-                                                    ->image()
-                                                    ->imageEditor()
-                                                    ->maxSize(5120)
-                                                    ->maxFiles(10)
-                                                    ->helperText(__('Up to 10 photos of the venue')),
-
-                                                TextInput::make('line1')
-                                                    ->label(__('Address Line 1'))
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., No. 123, Jalan Utama')),
-
-                                                TextInput::make('line2')
-                                                    ->label(__('Address Line 2'))
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Taman Indah')),
-
-                                                TextInput::make('postcode')
-                                                    ->label(__('Postcode'))
-                                                    ->maxLength(16)
-                                                    ->placeholder(__('e.g., 50000')),
-
-                                                Select::make('state_id')
-                                                    ->label(__('State'))
-                                                    ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
-                                                    ->searchable()
-                                                    ->preload()
-                                                    ->afterStateUpdatedJs(<<<'JS'
-                                                        $set('district_id', null)
-                                                        $set('subdistrict_id', null)
-                                                        JS),
-
-                                                Select::make('district_id')
-                                                    ->label(__('Daerah'))
-                                                    ->options(function (Get $get) {
-                                                        $stateId = $get('state_id');
-                                                        if (! $stateId) {
-                                                            return [];
-                                                        }
-
-                                                        return District::where('state_id', $stateId)
-                                                            ->orderBy('name')
-                                                            ->pluck('name', 'id');
-                                                    })
-                                                    ->searchable()
-                                                    ->afterStateUpdatedJs(<<<'JS'
-                                                        $set('subdistrict_id', null)
-                                                        JS)
-                                                    ->visibleJs(<<<'JS'
-                                                        $get('state_id') != null && $get('state_id') !== ''
-                                                        JS),
-
-                                                Select::make('subdistrict_id')
-                                                    ->label(__('Daerah Kecil / Bandar / Mukim / Pekan'))
-                                                    ->options(function (Get $get) {
-                                                        $districtId = $get('district_id');
-                                                        if (! $districtId) {
-                                                            return [];
-                                                        }
-
-                                                        return Subdistrict::where('district_id', $districtId)
-                                                            ->orderBy('name')
-                                                            ->pluck('name', 'id');
-                                                    })
-                                                    ->searchable()
-                                                    ->visibleJs(<<<'JS'
-                                                        $get('district_id') != null && $get('district_id') !== ''
-                                                        JS),
-
-                                                TextInput::make('google_maps_url')
-                                                    ->label(__('Google Maps URL'))
-                                                    ->url()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('https://maps.google.com/...')),
-
-                                                TextInput::make('waze_url')
-                                                    ->label(__('Waze URL'))
-                                                    ->url()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('https://waze.com/ul/...')),
-
-                                                Repeater::make('social_media')
-                                                    ->label(__('Social Media'))
-                                                    ->schema([
-                                                        Select::make('platform')
-                                                            ->label(__('Platform'))
-                                                            ->required()
-                                                            ->options([
-                                                                'facebook' => 'Facebook',
-                                                                'twitter' => 'Twitter / X',
-                                                                'instagram' => 'Instagram',
-                                                                'youtube' => 'YouTube',
-                                                                'tiktok' => 'TikTok',
-                                                                'telegram' => 'Telegram',
-                                                                'whatsapp' => 'WhatsApp',
-                                                                'website' => 'Website',
-                                                            ])
-                                                            ->searchable(),
-                                                        TextInput::make('url')
-                                                            ->label(__('URL'))
-                                                            ->required()
-                                                            ->url()
-                                                            ->maxLength(255)
-                                                            ->placeholder(__('https://...')),
-                                                        TextInput::make('username')
-                                                            ->label(__('Username'))
-                                                            ->maxLength(255)
-                                                            ->placeholder(__('@username')),
-                                                    ])
-                                                    ->collapsible()
-                                                    ->defaultItems(0)
-                                                    ->addActionLabel(__('Add Social Media'))
-                                                    ->helperText(__('Add social media links for this venue')),
-                                            ])
-                                            ->createOptionUsing(function (array $data): string {
-                                                $venue = Venue::create([
-                                                    'name' => $data['name'],
-                                                    'slug' => Str::slug($data['name']).'-'.Str::random(6),
-                                                    'type' => $data['type'],
-                                                    'status' => 'pending',
-                                                ]);
-
-                                                // Create address if provided
-                                                if (! empty($data['line1']) || ! empty($data['state_id'])) {
-                                                    $venue->address()->create([
-                                                        'type' => 'main',
-                                                        'line1' => $data['line1'] ?? null,
-                                                        'line2' => $data['line2'] ?? null,
-                                                        'postcode' => $data['postcode'] ?? null,
-                                                        'country_id' => 132, // Malaysia
-                                                        'state_id' => $data['state_id'] ?? null,
-                                                        'district_id' => $data['district_id'] ?? null,
-                                                        'subdistrict_id' => $data['subdistrict_id'] ?? null,
-                                                        'google_maps_url' => $data['google_maps_url'] ?? null,
-                                                        'waze_url' => $data['waze_url'] ?? null,
-                                                    ]);
-                                                }
-
-                                                // Create social media entries if provided
-                                                if (! empty($data['social_media'])) {
-                                                    foreach ($data['social_media'] as $social) {
-                                                        $venue->socialMedia()->create([
-                                                            'platform' => $social['platform'],
-                                                            'url' => $social['url'],
-                                                            'username' => $social['username'] ?? null,
-                                                        ]);
-                                                    }
-                                                }
-
-                                                // Media (cover, gallery) are handled automatically by Filament/Spatie integration
-
-                                                return 'venue:' . (string) $venue->getKey();
-                                            }),
-                                    ]),
-
-                                Section::make(__('Speakers'))
-                                    ->schema([
-                                        Select::make('speakers')
-                                            ->label(__('Select Speakers'))
-                                            ->required()
-                                            ->multiple()
-                                            ->relationship('speakers', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending']))
-                                            ->searchable()
-                                            ->preload()
-                                            ->createOptionForm([
-                                                TextInput::make('name')
-                                                    ->label(__('Speaker Name'))
-                                                    ->required()
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Ustaz Ahmad bin Hassan')),
-                                                
-                                                Radio::make('gender')
-                                                    ->label(__('Gender'))
-                                                    ->required()
-                                                    ->options(Gender::class)
-                                                    ->default(Gender::Male->value)
-                                                    ->inline(),
-
-                                                SpatieMediaLibraryFileUpload::make('avatar')
-                                                    ->label(__('Avatar'))
-                                                    ->collection('avatar')
-                                                    ->avatar()
-                                                    ->imageEditor()
-                                                    ->image()
-                                                    ->maxSize(5120)
-                                                    ->helperText(__('Recommended: Square image, at least 400x400px')),
-
-                                                Select::make('honorific')
-                                                    ->label(__('Honorific'))
-                                                    ->multiple()
-                                                    ->options(Honorific::class)
-                                                    ->searchable()
-                                                    ->placeholder(__('Select honorifics')),
-
-                                                Select::make('pre_nominal')
-                                                    ->label(__('Pre-nominal'))
-                                                    ->options(PreNominal::class)
-                                                    ->searchable()
-                                                    ->placeholder(__('Select pre-nominals')),
-
-                                                TextInput::make('job_title')
-                                                    ->label(__('Job Title'))
-                                                    ->maxLength(255)
-                                                    ->placeholder(__('e.g., Imam, Lecturer')),
-
-                                                Select::make('state_id')
-                                                    ->label(__('State'))
-                                                    ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
-                                                    ->searchable()
-                                                    ->preload(),
-
-                                                Select::make('institutions')
-                                                    ->label(__('Affiliated Institutions'))
-                                                    ->options(fn () => Institution::query()
-                                                        ->whereIn('status', ['verified', 'pending'])
-                                                        ->orderBy('name')
-                                                        ->pluck('name', 'id'))
-                                                    ->multiple()
-                                                    ->searchable()
-                                                    ->preload(),
-                                            ])
-                                            ->createOptionUsing(function (array $data): string {
-                                                $speaker = Speaker::create([
-                                                    'name' => $data['name'],
-                                                    'gender' => $data['gender'] ?? Gender::Male->value,
-                                                    'honorific' => ! empty($data['honorific']) ? $data['honorific'] : null,
-                                                    'pre_nominal' => ! empty($data['pre_nominal']) ? $data['pre_nominal'] : null,
-                                                    'job_title' => $data['job_title'] ?? null,
-                                                    'slug' => Str::slug($data['name']).'-'.Str::random(6),
-                                                    'status' => 'pending',
-                                                ]);
-
-                                                if (! empty($data['state_id'])) {
-                                                    $speaker->address()->create([
-                                                        'state_id' => $data['state_id'],
-                                                    ]);
-                                                }
-
-                                                if (! empty($data['institutions'])) {
-                                                    $speaker->institutions()->attach($data['institutions']);
-                                                }
-
-                                                return (string) $speaker->getKey();
-                                            }),
-                                    ]),
-
-                                Section::make(__('Media'))
-                                    ->schema([
-                                        SpatieMediaLibraryFileUpload::make('poster')
-                                            ->label(__('Main Image'))
-                                            ->collection('poster')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->responsiveImages()
-                                            ->helperText(__('Main featured image for the event.')),
-                                        SpatieMediaLibraryFileUpload::make('gallery')
-                                            ->label(__('Gallery'))
-                                            ->collection('gallery')
-                                            ->multiple()
-                                            ->reorderable()
-                                            ->image()
-                                            ->imageEditor()
-                                            ->responsiveImages()
-                                            ->helperText(__('Additional images for the event gallery.')),
-                                    ])
-                                    ->columns(2),
-                            ]),
-
-                        Grid::make(1)
-                            ->columnSpan(1)
-                            ->schema([
-                                Section::make(__('Your Details'))
-                                    ->schema([
-                                        TextInput::make('submitter_name')
-                                            ->label(__('Your Name'))
-                                            ->required()
-                                            ->maxLength(100),
-
-                                        TextInput::make('submitter_email')
-                                            ->label(__('Email'))
-                                            ->email()
-                                            ->maxLength(255)
-                                            ->required(fn (Get $get) => ! auth()->check() && empty($get('submitter_phone'))),
-
-                                        TextInput::make('submitter_phone')
-                                            ->label(__('Phone'))
-                                            ->tel()
-                                            ->maxLength(20)
-                                            ->required(fn (Get $get) => ! auth()->check() && empty($get('submitter_email'))),
-                                    ])
-                                    ->visible(fn () => ! auth()->check()),
-
-                                Section::make(__('Notes for Admin'))
-                                    ->description(__('Optional: Add any additional information or special requests for the moderators.'))
-                                    ->schema([
-                                        Textarea::make('notes')
-                                            ->label(__('Notes'))
-                                            ->rows(3)
-                                            ->maxLength(1000)
-                                            ->placeholder(__('e.g., Special requirements, additional context, or anything the moderator should know...'))
-                                            ->helperText(__('Maximum 1000 characters')),
-                                    ]),
-
-                                Section::make(__('Submit'))
-                                    ->schema([
-                                        Grid::make(1)
-                                            ->schema([
-                                                Actions::make([
-                                                    Action::make('submit')
-                                                        ->label(__('Submit Event for Review'))
-                                                        ->size('lg')
-                                                        ->color('success')
-                                                        ->action('submit')
-                                                        ->extraAttributes(['class' => 'w-full']),
+                                                            JS)
+                                                        ->createOptionForm(SpeakerFormSchema::createOptionForm())
+                                                        ->createOptionUsing(function (array $data, Set $set, Get $get): string {
+                                                            return SpeakerFormSchema::createOptionUsing($data);
+                                                        }),
                                                 ]),
-                                            ]),
-                                    ]),
 
-                                Section::make(__('Submission Info'))
-                                    ->schema([
-                                        Placeholder::make('info')
-                                            ->hiddenLabel()
-                                            ->content(__('Your event will be reviewed by our moderators within 24-48 hours.')),
-                                    ]),
-                            ]),
-                    ]),
+                                            Section::make(__('Lokasi'))
+                                                ->visibleJs(<<<'JS'
+                                                    $get('event_format') !== 'online' && $get('organizer_type')
+                                                    JS)
+                                                ->schema([
+                                                    Toggle::make('location_same_as_institution')
+                                                        ->label(__('Sama seperti institusi penganjur'))
+                                                        ->default(true)
+                                                        ->inline(false)
+                                                        ->visibleJs(<<<'JS'
+                                                            $get('organizer_type') === 'institution'
+                                                            JS),
+
+                                                    Radio::make('location_type')
+                                                        ->label(__('Jenis Lokasi'))
+                                                        ->options([
+                                                            'institution' => __('Institusi'),
+                                                            'venue' => __('Tempat'),
+                                                        ])
+                                                        ->inline()
+                                                        ->default('institution')
+                                                        ->visibleJs(<<<'JS'
+                                                            $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
+                                                            JS)
+                                                        ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('event_format') !== 'online'),
+
+                                                    Select::make('location_institution_id')
+                                                        ->label(__('Institusi'))
+                                                        ->options(fn() => Cache::remember('submit_institutions', 60, fn() => Institution::whereIn('status', ['verified', 'pending'])->pluck('name', 'id')))
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->visibleJs(<<<'JS'
+                                                            ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution'
+                                                            JS)
+                                                        ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution')
+                                                        ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                                                        ->createOptionUsing(fn (array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+
+                                                    Select::make('location_venue_id')
+                                                        ->label(__('Lokasi'))
+                                                        ->options(fn() => Cache::remember('submit_venues', 60, fn() => Venue::whereIn('status', ['verified', 'pending'])->pluck('name', 'id')))
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->visibleJs(<<<'JS'
+                                                            ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue'
+                                                            JS)
+                                                        ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue')
+                                                        ->createOptionForm(VenueFormSchema::createOptionForm())
+                                                        ->createOptionUsing(fn (array $data): string => VenueFormSchema::createOptionUsing($data)),
+
+                                                    Select::make('space_id')
+                                                        ->label(__('Ruang'))
+                                                        ->helperText(__('Pilihan: Pilih ruang tertentu di dalam institusi (cth: Dewan Utama, Ruang Solat).'))
+                                                        ->placeholder(__('Pilih ruang…'))
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->live()
+                                                        ->options(function (Get $get): array {
+                                                            $institutionId = null;
+
+                                                            if ($get('organizer_type') === 'institution' && ($get('location_same_as_institution') ?? true)) {
+                                                                $institutionId = $get('organizer_institution_id');
+                                                            } elseif ($get('location_type') === 'institution') {
+                                                                $institutionId = $get('location_institution_id');
+                                                            }
+
+                                                            if (! $institutionId) {
+                                                                return [];
+                                                            }
+
+                                                            return Space::query()
+                                                                ->where('institution_id', $institutionId)
+                                                                ->where('is_active', true)
+                                                                ->pluck('name', 'id')
+                                                                ->toArray();
+                                                        }),
+                                                ]),
+                                        ]),
+
+                                    Step::make(__('Penceramah & Media'))
+                                        ->icon('heroicon-o-user-group')
+                                        ->description(__('Penceramah dan media majlis'))
+                                        ->schema([
+                                            Section::make(__('Penceramah'))
+                                                ->schema([
+                                                    Select::make('speakers')
+                                                        ->label(__('Pilih Penceramah'))
+                                                        ->required()
+                                                        ->multiple()
+                                                        ->relationship('speakers', 'name', fn(Builder $query) => $query->whereIn('status', ['verified', 'pending']))
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->createOptionForm(SpeakerFormSchema::createOptionForm())
+                                                        ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
+                                                ]),
+
+                                            Section::make(__('Media'))
+                                                ->schema([
+                                                    SpatieMediaLibraryFileUpload::make('poster')
+                                                        ->label(__('Gambar Utama'))
+                                                        ->collection('poster')
+                                                        ->image()
+                                                        ->imageEditor()
+                                                        ->responsiveImages()
+                                                        ->helperText(__('Gambar utama untuk paparan majlis.')),
+                                                    SpatieMediaLibraryFileUpload::make('gallery')
+                                                        ->label(__('Galeri'))
+                                                        ->collection('gallery')
+                                                        ->multiple()
+                                                        ->reorderable()
+                                                        ->image()
+                                                        ->imageEditor()
+                                                        ->responsiveImages()
+                                                        ->helperText(__('Gambar tambahan untuk galeri majlis.')),
+                                                ])
+                                                ->columns(['default' => 1, 'sm' => 2]),
+                                        ]),
+
+                                    Step::make(__('Semak & Hantar'))
+                                        ->icon('heroicon-o-paper-airplane')
+                                        ->description(__('Semak maklumat dan hantar'))
+                                        ->schema([
+                                            Section::make(__('Maklumat Anda'))
+                                                ->schema([
+                                                    Grid::make(['default' => 1, 'sm' => 2])
+                                                        ->schema([
+                                                            TextInput::make('submitter_name')
+                                                                ->label(__('Nama Anda'))
+                                                                ->required()
+                                                                ->maxLength(100),
+
+                                                            TextInput::make('submitter_email')
+                                                                ->label(__('Email'))
+                                                                ->email()
+                                                                ->maxLength(255)
+                                                                ->required(fn (Get $get) => ! auth()->check() && empty($get('submitter_phone'))),
+
+                                                            TextInput::make('submitter_phone')
+                                                                ->label(__('Telefon'))
+                                                                ->tel()
+                                                                ->maxLength(20)
+                                                                ->required(fn (Get $get) => ! auth()->check() && empty($get('submitter_email'))),
+                                                        ]),
+                                                ])
+                                                ->visible(fn () => ! auth()->check()),
+
+                                            Section::make(__('Nota untuk Pentadbir'))
+                                                ->description(__('Pilihan: Tambah maklumat atau permintaan khas untuk moderator.'))
+                                                ->schema([
+                                                    Textarea::make('notes')
+                                                        ->label(__('Nota'))
+                                                        ->rows(3)
+                                                        ->maxLength(1000)
+                                                        ->placeholder(__('cth: Keperluan khas, maklumat tambahan, atau apa sahaja yang perlu diketahui moderator...'))
+                                                        ->helperText(__('Maksimum 1000 aksara')),
+                                                ]),
+
+                                            Callout::make(__('Semakan Moderator'))
+                                                ->description(__('Majlis anda akan disemak oleh moderator kami dalam tempoh 24-48 jam. Anda akan dimaklumkan melalui e-mel setelah majlis diluluskan.'))
+                                                ->info(),
+                                        ]),
+                                ])
+                                    ->skippable()
+                                    ->persistStepInQueryString()
+                                    ->submitAction(new HtmlString(Blade::render(<<<'BLADE'
+                                        <x-filament::button
+                                            type="submit"
+                                            size="lg"
+                                            color="success"
+                                            class="w-full"
+                                        >
+                                            {{ __('Hantar Majlis untuk Semakan') }}
+                                        </x-filament::button>
+                                    BLADE))),
             ])
             ->statePath('data');
     }
 
-    public function submit(): ?\Livewire\Features\SupportRedirects\Redirector
+    public function submit(): mixed
     {
         $validated = $this->form->getState();
 
         // Enforce children_allowed when AllAges or Children is selected
         $ageGroups = $validated['age_group'] ?? [];
-        if (in_array(EventAgeGroup::Children->value, $ageGroups, true) || 
-            in_array(EventAgeGroup::AllAges->value, $ageGroups, true)) {
+        if (
+            in_array(EventAgeGroup::Children->value, $ageGroups, true) ||
+            in_array(EventAgeGroup::AllAges->value, $ageGroups, true)
+        ) {
             $validated['children_allowed'] = true;
         }
 
         $startsAt = $this->resolveStartsAt($validated);
 
+        // Validate contextual prayer time constraints (client-side filtering removed)
+        $prayerTimeRaw = $validated['prayer_time'] ?? '';
+        $selectedPrayer = $prayerTimeRaw instanceof EventPrayerTime
+            ? $prayerTimeRaw
+            : EventPrayerTime::tryFrom($prayerTimeRaw);
+        $eventDate = Carbon::parse($validated['event_date'], 'Asia/Kuala_Lumpur')->startOfDay();
+
+        if ($selectedPrayer === EventPrayerTime::SelepasJumaat && !$eventDate->isFriday()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.prayer_time' => __('Selepas Jumaat hanya boleh dipilih untuk hari Jumaat.'),
+            ]);
+        }
+
+        if ($selectedPrayer === EventPrayerTime::SelepasTarawikh && !$this->isRamadhan($eventDate)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.prayer_time' => __('Selepas Tarawikh hanya boleh dipilih semasa bulan Ramadhan.'),
+            ]);
+        }
+
         $organizerType = null;
         $organizerId = null;
-        $institutionId = null;
-        $venueId = null;
+        $targetInstitutionId = null;
+        $targetVenueId = null;
         $locationInstitutionId = null;
 
-        $locationValue = $validated['location_id'] ?? null;
-        if (is_string($locationValue)) {
-            if (str_starts_with($locationValue, 'venue:')) {
-                $venueId = substr($locationValue, strlen('venue:'));
-            }
+        $locationType = $validated['location_type'] ?? 'institution';
+        $locationInstitutionId = $this->data['location_institution_id'] ?? null;
+        $venueId = $this->data['location_venue_id'] ?? null;
 
-            if (str_starts_with($locationValue, 'institution:')) {
-                $locationInstitutionId = substr($locationValue, strlen('institution:'));
-            }
+        // If it was institution, we check if it was pre-selected or created
+        if ($locationType === 'institution' && $locationInstitutionId) {
+            $venueId = null;
+        } elseif ($locationType === 'venue' && $venueId) {
+            $locationInstitutionId = null;
         }
 
-        if (($validated['organizer_type'] ?? null) === 'institution' && ! empty($validated['organizer_institution_id'])) {
+        if (($validated['organizer_type'] ?? null) === 'institution' && !empty($validated['organizer_institution_id'])) {
             $organizerType = Institution::class;
             $organizerId = $validated['organizer_institution_id'];
-            $institutionId = $validated['organizer_institution_id'];
-        } elseif (($validated['organizer_type'] ?? null) === 'speaker' && ! empty($validated['organizer_speaker_id'])) {
+
+            \Illuminate\Support\Facades\Log::info('Location logic check', [
+                'location_same_as_institution' => $validated['location_same_as_institution'] ?? 'not set',
+                'organizer_type' => $validated['organizer_type'] ?? 'not set',
+            ]);
+            if (($validated['location_same_as_institution'] ?? true) == true) {
+                $targetInstitutionId = $this->data['organizer_institution_id'];
+                $targetVenueId = null;
+            } else {
+                if (($validated['location_type'] ?? null) === 'institution') {
+                    $targetInstitutionId = $this->data['location_institution_id'] ?? null;
+                    $targetVenueId = null;
+                } else {
+                    $targetVenueId = $this->data['location_venue_id'] ?? null;
+                    $targetInstitutionId = null;
+                }
+            }
+        } elseif (($validated['organizer_type'] ?? null) === 'speaker' && !empty($validated['organizer_speaker_id'])) {
             $organizerType = Speaker::class;
             $organizerId = $validated['organizer_speaker_id'];
-        }
 
-        $useInstitutionLocation = ($validated['location_same_as_institution'] ?? false) && ($validated['organizer_type'] ?? null) === 'institution';
-        if (! $useInstitutionLocation) {
             if ($locationInstitutionId) {
-                $institutionId = $locationInstitutionId;
-                $venueId = null;
+                $targetInstitutionId = $locationInstitutionId;
+                $targetVenueId = null;
+            } elseif ($venueId) {
+                $targetInstitutionId = null;
+                $targetVenueId = $venueId;
             }
-        } else {
-            $venueId = null;
         }
 
         $prayerTimeValue = $validated['prayer_time'] ?? '';
@@ -1184,52 +760,31 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             : EventPrayerTime::tryFrom($prayerTimeValue);
         $prayerReference = $prayerTime?->toPrayerReference();
         $prayerOffset = $prayerTime?->getDefaultOffset();
-        $prayerDisplayText = $prayerTime && ! $prayerTime->isCustomTime() ? $prayerTime->getLabel() : null;
+        $prayerDisplayText = $prayerTime && !$prayerTime->isCustomTime() ? $prayerTime->getLabel() : null;
 
-        $timezone = 'Asia/Kuala_Lumpur';
-        $now = Carbon::now($timezone);
-        $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
-        if ($eventDate->isSameDay($now)) {
-            if ($prayerTime?->isCustomTime()) {
-                $customTimeValue = $validated['custom_time'] ?? null;
-                if ($customTimeValue) {
-                    $customTime = Carbon::parse($customTimeValue, 'Asia/Kuala_Lumpur');
-                    $customDateTime = $eventDate->copy()->setTime($customTime->hour, $customTime->minute);
-
-                    if (! $customDateTime->greaterThan($now)) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
-                            'data.custom_time' => __('Please select a time after now.'),
-                        ]);
-                    }
-                }
-            } else {
-                $defaultTimes = $this->getDefaultPrayerTimes();
-                $timeString = $defaultTimes[$prayerTime?->value ?? ''] ?? null;
-
-                if ($timeString) {
-                    $candidate = Carbon::parse($eventDate->toDateString().' '.$timeString, 'Asia/Kuala_Lumpur');
-
-                    if (! $candidate->greaterThan($now)) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
-                            'data.prayer_time' => __('Please select a time after now.'),
-                        ]);
-                    }
-                }
-            }
+        // Validate that the resolved start time is not in the past
+        $now = Carbon::now('Asia/Kuala_Lumpur');
+        if ($startsAt->lessThanOrEqualTo($now)) {
+            $errorField = $prayerTime?->isCustomTime() ? 'data.custom_time' : 'data.prayer_time';
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $errorField => __('Waktu majlis yang dipilih telah berlalu. Sila pilih waktu lain.'),
+            ]);
         }
 
         $event = Event::create([
             'title' => $validated['title'],
-            'slug' => Str::slug($validated['title']).'-'.Str::random(6),
+            'slug' => Str::slug($validated['title']) . '-' . Str::random(6),
             'description' => $validated['description'] ?? null,
             'starts_at' => $startsAt,
-            'ends_at' => null,
-            'institution_id' => $institutionId,
-            'venue_id' => $venueId,
-            'event_type_id' => $validated['event_type_id'] ?? EventType::getDefault()?->id,
+            'ends_at' => (($durationMinutes = ((int) ($validated['duration_hours'] ?? 0)) * 60 + ((int) ($validated['duration_minutes'] ?? 0))) > 0) ? $startsAt->copy()->addMinutes($durationMinutes) : null,
+            'institution_id' => $targetInstitutionId,
+            'venue_id' => $targetVenueId,
+            'space_id' => $validated['space_id'] ?? null,
+            'event_type' => $validated['event_type'] ?? [\App\Enums\EventType::KuliahCeramah],
             'gender' => $validated['gender'] ?? EventGenderRestriction::All->value,
-            'age_group' => $validated['age_group'] ?? [EventAgeGroup::AllAges->value],
+            'age_group' => $validated['age_group'] ?? [EventAgeGroup::AllAges],
             'children_allowed' => $validated['children_allowed'] ?? true,
+            'is_muslim_only' => $validated['is_muslim_only'] ?? false,
             'timing_mode' => $prayerTime?->isCustomTime() ? 'absolute' : 'prayer_relative',
             'prayer_reference' => $prayerReference?->value,
             'prayer_offset' => $prayerOffset?->value,
@@ -1240,11 +795,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'event_url' => $validated['event_url'] ?? null,
             'live_url' => $validated['live_url'] ?? null,
             'status' => 'pending',
-            'visibility' => 'public',
+            'visibility' => \App\Enums\EventVisibility::Public,
             'submitter_id' => auth()->id(),
         ]);
 
-        if (! empty($validated['speakers'])) {
+        if (!empty($validated['speakers'])) {
             $event->speakers()->attach($validated['speakers']);
         }
 
@@ -1256,13 +811,14 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $validated['issue_tags'] ?? []
         );
 
-        if (! empty($allTagIds)) {
+        if (!empty($allTagIds)) {
             $tags = Tag::whereIn('id', $allTagIds)->get();
             $event->syncTags($tags);
         }
 
         $this->form->model($event);
         $this->form->saveRelationships();
+
 
         $submitterName = $validated['submitter_name'] ?? auth()->user()?->name;
 
@@ -1273,7 +829,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        if (! auth()->check()) {
+        if (!auth()->check()) {
             $this->storeSubmitterContacts($submission, $validated);
         }
 
@@ -1295,7 +851,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ? $prayerTimeValue
             : EventPrayerTime::tryFrom($prayerTimeValue);
 
-        if ($prayerTime?->isCustomTime() && ! empty($validated['custom_time'])) {
+        if ($prayerTime?->isCustomTime() && !empty($validated['custom_time'])) {
             $time = Carbon::parse($validated['custom_time']);
 
             return $eventDate->setTime($time->hour, $time->minute);
@@ -1332,7 +888,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     protected function isRamadhan(Carbon $date): bool
     {
         $year = $date->year;
-        
+
         // Ramadhan dates for common years (approximate)
         $ramadhanPeriods = [
             2026 => ['start' => '02-18', 'end' => '03-19'],
@@ -1351,59 +907,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $endDate = Carbon::parse("{$year}-{$period['end']}", 'Asia/Kuala_Lumpur')->endOfDay();
 
         return $date->between($startDate, $endDate);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function getPrayerTimeOptions(?string $eventDate): array
-    {
-        $options = [];
-        $timezone = 'Asia/Kuala_Lumpur';
-        $now = Carbon::now($timezone);
-        $eventDay = $eventDate ? Carbon::parse($eventDate, $timezone)->startOfDay() : null;
-        $isFriday = $eventDay && $eventDay->isFriday();
-        $isRamadhan = $eventDay && $this->isRamadhan($eventDay);
-
-        foreach (EventPrayerTime::cases() as $case) {
-            // Skip Selepas Jumaat if not Friday
-            if ($case === EventPrayerTime::SelepasJumaat && !$isFriday) {
-                continue;
-            }
-
-            // Skip Selepas Tarawikh if not Ramadhan
-            if ($case === EventPrayerTime::SelepasTarawikh && !$isRamadhan) {
-                continue;
-            }
-
-            if ($case === EventPrayerTime::LainWaktu) {
-                $options[$case->value] = $case->getLabel();
-                continue;
-            }
-
-            if (! $eventDate) {
-                $options[$case->value] = $case->getLabel();
-                continue;
-            }
-
-            if (! $eventDay->isSameDay($now)) {
-                $options[$case->value] = $case->getLabel();
-                continue;
-            }
-
-            $timeString = $this->getDefaultPrayerTimes()[$case->value] ?? null;
-            if (! $timeString) {
-                $options[$case->value] = $case->getLabel();
-                continue;
-            }
-
-            $candidate = Carbon::parse($eventDay->toDateString().' '.$timeString, 'Asia/Kuala_Lumpur');
-            if ($candidate->greaterThan($now)) {
-                $options[$case->value] = $case->getLabel();
-            }
-        }
-
-        return $options;
     }
 
     /**
@@ -1435,16 +938,40 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 };
 ?>
 
-@section('title', __('Submit Event') . ' - ' . config('app.name'))
+@section('title', __('Hantar Majlis') . ' - ' . config('app.name'))
+
+<style>
+    /* Ensure wizard stepper header doesn't clip */
+    .fi-sc-wizard-header {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .fi-sc-wizard-header::-webkit-scrollbar {
+        height: 3px;
+    }
+
+    .fi-sc-wizard-header::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 9999px;
+    }
+
+    /* Hide step descriptions — 5 steps with descriptions exceed
+       the fixed max-w-6xl (1152px) container width */
+    .fi-sc-wizard-header-step-description {
+        display: none;
+    }
+</style>
 
 <div class="bg-slate-50 min-h-screen py-12 pb-32">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="max-w-6xl mx-auto">
             <!-- Header -->
             <div class="text-center mb-12">
-                <h1 class="font-heading text-4xl font-bold text-slate-900">{{ __('Submit an Event') }}</h1>
+                <h1 class="font-heading text-4xl font-bold text-slate-900">{{ __('Hantar Majlis Ilmu') }}</h1>
                 <p class="text-slate-500 mt-4 text-lg">
-                    {{ __('Share a Majlis Ilmu with the community. Your submission will be reviewed before publishing.') }}
+                    {{ __('Kongsi majlis ilmu dengan komuniti. Penghantaran anda akan disemak sebelum diterbitkan.') }}
                 </p>
             </div>
 

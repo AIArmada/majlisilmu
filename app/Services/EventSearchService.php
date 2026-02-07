@@ -14,7 +14,6 @@ class EventSearchService
     protected function cardRelationships(): array
     {
         return [
-            'eventType',
             'institution.media',
             'venue.address.state',
             'venue.address.district',
@@ -117,12 +116,6 @@ class EventSearchService
             $filterParts[] = 'audience:['.implode(',', $ageGroups).']';
         }
 
-        // Topic filter
-        if (! empty($filters['topic_ids'])) {
-            $topicFilter = 'topic_ids:['.implode(',', $filters['topic_ids']).']';
-            $filterParts[] = $topicFilter;
-        }
-
         // Speaker filter
         if (! empty($filters['speaker_ids'])) {
             $speakerFilter = 'speaker_ids:['.implode(',', $filters['speaker_ids']).']';
@@ -190,14 +183,20 @@ class EventSearchService
         }
 
         if (! empty($filters['event_type'])) {
-            $queryBuilder->whereHas('eventType', function ($q) use ($filters) {
-                $q->where('slug', $filters['event_type']);
+            $eventTypes = is_array($filters['event_type']) ? $filters['event_type'] : [$filters['event_type']];
+            $queryBuilder->where(function ($q) use ($eventTypes) {
+                foreach ($eventTypes as $eventType) {
+                    $q->orWhereJsonContains('event_type', $eventType);
+                }
             });
         }
 
         if (! empty($filters['genre'])) {
-            $queryBuilder->whereHas('eventType', function ($q) use ($filters) {
-                $q->where('slug', $filters['genre']);
+            $genres = is_array($filters['genre']) ? $filters['genre'] : [$filters['genre']];
+            $queryBuilder->where(function ($q) use ($genres) {
+                foreach ($genres as $genre) {
+                    $q->orWhereJsonContains('event_type', $genre);
+                }
             });
         }
 
@@ -229,13 +228,6 @@ class EventSearchService
 
         if (! empty($filters['institution_id'])) {
             $queryBuilder->where('institution_id', $filters['institution_id']);
-        }
-
-        // Topic filter
-        if (! empty($filters['topic_ids'])) {
-            $queryBuilder->whereHas('topics', function ($q) use ($filters) {
-                $q->whereIn('topics.id', $filters['topic_ids']);
-            });
         }
 
         // Speaker filter

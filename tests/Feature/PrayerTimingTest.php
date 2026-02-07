@@ -41,7 +41,7 @@ describe('PrayerReference Enum', function () {
 
     it('has Malay labels', function () {
         expect(PrayerReference::Fajr->label())->toBe('Subuh');
-        expect(PrayerReference::Dhuhr->label())->toBe('Zohor');
+        expect(PrayerReference::Dhuhr->label())->toBe('Zuhur');
         expect(PrayerReference::Maghrib->label())->toBe('Maghrib');
     });
 

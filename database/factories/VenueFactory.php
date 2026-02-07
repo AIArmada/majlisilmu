@@ -44,6 +44,7 @@ class VenueFactory extends Factory
                 'stadium',
                 'perpustakaan',
                 'padang',
+                'hotel',
             ]),
             'facilities' => [
                 'parking' => fake()->boolean(),

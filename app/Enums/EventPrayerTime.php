@@ -64,7 +64,7 @@ enum EventPrayerTime: string implements HasLabel
         }
 
         if ($this === self::SelepasTarawikh) {
-            return PrayerOffset::Custom;
+            return PrayerOffset::After60;
         }
 
         return PrayerOffset::Immediately;

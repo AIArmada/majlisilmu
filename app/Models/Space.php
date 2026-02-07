@@ -13,6 +13,7 @@ class Space extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'institution_id',
         'name',
         'slug',
         'capacity',
@@ -23,8 +24,18 @@ class Space extends Model
         'is_active' => 'boolean',
     ];
 
+    public function institution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class);
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

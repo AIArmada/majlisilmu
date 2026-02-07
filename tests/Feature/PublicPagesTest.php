@@ -5,11 +5,10 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Models\Event;
 use App\Models\EventSubmission;
-use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Series;
 use App\Models\Speaker;
-use App\Models\Topic;
+use App\Models\Tag;
 use Livewire\Livewire;
 
 it('loads public index pages', function () {
@@ -59,26 +58,27 @@ it('records guest submissions without a submitter id', function () {
     $title = 'Guest Submission '.uniqid();
     $email = 'guest@example.com';
 
-    $topic = Topic::factory()->create(['status' => 'verified']);
+    $domainTag = Tag::factory()->domain()->create();
+    $disciplineTag = Tag::factory()->discipline()->create();
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $eventType = EventType::factory()->create();
     $institution = Institution::factory()->create(['status' => 'verified']);
-
     Livewire::test('pages.submit-event.create')
         ->set('data.title', $title)
         ->set('data.description', 'Test event description')
         ->set('data.event_date', now()->addDay()->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.topics', [$topic->id])
+        ->set('data.domain_tags', [$domainTag->id])
+        ->set('data.discipline_tags', [$disciplineTag->id])
         ->set('data.speakers', [$speaker->id])
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)
         ->set('data.submitter_name', 'Guest User')
         ->set('data.submitter_email', $email)
         ->call('submit')
+        ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
 
     $event = Event::query()->where('title', $title)->first();

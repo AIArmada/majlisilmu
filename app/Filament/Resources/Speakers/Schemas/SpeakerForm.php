@@ -75,11 +75,6 @@ class SpeakerForm
                             ])
                             ->columns(2),
 
-                        Select::make('topics')
-                            ->relationship('topics', 'name')
-                            ->multiple()
-                            ->preload()
-                            ->searchable(),
                         Select::make('languages')
                             ->relationship('languages', 'name')
                             ->multiple()
@@ -172,16 +167,7 @@ class SpeakerForm
                             ->relationship()
                             ->schema([
                                 Select::make('platform')
-                                    ->options([
-                                        'facebook' => 'Facebook',
-                                        'instagram' => 'Instagram',
-                                        'youtube' => 'YouTube',
-                                        'tiktok' => 'TikTok',
-                                        'twitter' => 'X (Twitter)',
-                                        'linkedin' => 'LinkedIn',
-                                        'website' => 'Website',
-                                        'other' => 'Other',
-                                    ])
+                                    ->options(\App\Enums\SocialMediaPlatform::class)
                                     ->searchable()
                                     ->required()
                                     ->columnSpan(1),

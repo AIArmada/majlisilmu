@@ -6,7 +6,6 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Models\Event;
 use App\Models\EventSubmission;
-use App\Models\EventType;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -17,8 +16,6 @@ it('saves notes to event submission when provided', function () {
     $disciplineTag = Tag::factory()->discipline()->create();
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
 
     $notes = 'This event requires special audio equipment and accessibility ramps.';
 
@@ -26,7 +23,7 @@ it('saves notes to event submission when provided', function () {
         ->set('data.title', 'Event With Notes')
         ->set('data.domain_tags', [$domainTag->id])
         ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.event_date', now()->addDays(5)->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.description', 'Test description')
@@ -45,7 +42,7 @@ it('saves notes to event submission when provided', function () {
 
     $event = Event::where('title', 'Event With Notes')->firstOrFail();
     $submission = EventSubmission::where('event_id', $event->id)->firstOrFail();
-    
+
     expect($submission->notes)->toBe($notes);
 });
 
@@ -54,14 +51,12 @@ it('allows submitting event without notes', function () {
     $disciplineTag = Tag::factory()->discipline()->create();
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $parentEventType = EventType::factory()->create();
-    $eventType = EventType::factory()->create(['parent_id' => $parentEventType->id]);
 
     Livewire::test('pages.submit-event.create')
         ->set('data.title', 'Event Without Notes')
         ->set('data.domain_tags', [$domainTag->id])
         ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type_id', $eventType->id)
+        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.event_date', now()->addDays(5)->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.description', 'Test description')
@@ -79,6 +74,6 @@ it('allows submitting event without notes', function () {
 
     $event = Event::where('title', 'Event Without Notes')->firstOrFail();
     $submission = EventSubmission::where('event_id', $event->id)->firstOrFail();
-    
+
     expect($submission->notes)->toBeNull();
 });

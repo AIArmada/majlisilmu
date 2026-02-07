@@ -26,3 +26,6 @@ class EventSettingsFactory extends Factory
             'requires_approval' => fake()->boolean(20),
             'allow_waitlist' => fake()->boolean(40),
             'max_per_user' => fake()->optional()->randomElement([1, 2, 4, 5]),
+        ];
+    }
+}

@@ -192,7 +192,7 @@
                         <select name="event_type" onchange="this.form.submit()"
                             class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
                             <option value="">{{ __('Any Type') }}</option>
-                            @foreach(\App\Models\EventType::getGroupedOptions() as $groupLabel => $options)
+                            @foreach(collect(\App\Enums\EventType::cases())->mapToGroups(fn(\App\Enums\EventType $type) => [$type->getGroup() => [$type->value => $type->getLabel()]])->map(fn($group) => $group->collapse()) as $groupLabel => $options)
                                 <optgroup label="{{ $groupLabel }}">
                                     @foreach($options as $value => $label)
                                         <option value="{{ $value }}" @selected(request('event_type') == $value)>{{ $label }}

@@ -40,7 +40,7 @@ class InstitutionSeeder extends Seeder
             ],
             [
                 'name' => 'Pusat Islam Petaling Jaya',
-                'type' => 'pertubuhan',
+                'type' => 'masjid',
                 'line1' => 'Jalan Gasing',
                 'city' => 'Petaling Jaya',
                 'state_name' => 'Selangor',
@@ -129,7 +129,7 @@ class InstitutionSeeder extends Seeder
         $additionalTypes = [
             'surau' => 30,
             'madrasah' => 15,
-            'pertubuhan' => 10,
+            'masjid' => 10,
         ];
 
         $this->command->info('Seeding additional institutions...');

@@ -107,11 +107,11 @@ class EventJsonLd extends Component
             'url' => route('events.show', $event->slug),
         ];
 
-        // Keywords/About
-        if ($event->topics->isNotEmpty()) {
-            $jsonLd['about'] = $event->topics->map(fn ($topic) => [
+        // Keywords/About from tags
+        if ($event->tags->isNotEmpty()) {
+            $jsonLd['about'] = $event->tags->map(fn ($tag) => [
                 '@type' => 'Thing',
-                'name' => $topic->name,
+                'name' => $tag->name,
             ])->toArray();
         }
 

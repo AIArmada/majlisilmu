@@ -3,7 +3,6 @@
 use App\Models\Address;
 use App\Models\Event;
 use App\Models\State;
-use App\Models\Topic;
 use App\Models\Venue;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -50,24 +49,19 @@ new class extends Component {
     }
 
     #[Computed]
-    public function popularTopics(): Collection
+    public function popularTitles(): Collection
     {
         $now = now();
 
-        return Topic::query()
-            ->where('status', 'verified')
-            ->withCount([
-                'events' => function ($query) use ($now) {
-                    $query->where('events.status', 'approved')
-                        ->where('events.visibility', 'public')
-                        ->where('events.starts_at', '>=', $now);
-                },
-            ])
-            ->get()
-            ->filter(fn($topic) => $topic->events_count > 0)
-            ->sortByDesc('events_count')
-            ->take(12)
-            ->values();
+        return Event::query()
+            ->where('status', 'approved')
+            ->where('visibility', 'public')
+            ->where('starts_at', '>=', $now)
+            ->selectRaw('title, count(*) as events_count')
+            ->groupBy('title')
+            ->orderByDesc('events_count')
+            ->limit(12)
+            ->get();
     }
 };
 ?>
@@ -126,7 +120,7 @@ new class extends Component {
                 </a>
             </div>
 
-            <!-- Browse by Topic -->
+            <!-- Browse by Title -->
             <div>
                 <div class="flex items-center gap-3 mb-8">
                     <div class="p-3 rounded-xl bg-purple-100 text-purple-600">
@@ -136,19 +130,21 @@ new class extends Component {
                         </svg>
                     </div>
                     <div>
-                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Cari Mengikut Topik') }}</h2>
-                        <p class="text-slate-500 text-sm">{{ __('Berdasarkan minat anda') }}</p>
+                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Cari Mengikut Tajuk') }}</h2>
+                        <p class="text-slate-500 text-sm">{{ __('Majlis popular berdasarkan tajuk') }}</p>
                     </div>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
-                    @foreach($this->popularTopics as $topic)
-                        <div wire:key="topic-{{ $topic->id }}">
-                            <a href="{{ route('events.index', ['topic_ids' => [$topic->id]]) }}" wire:navigate
+                    @foreach($this->popularTitles as $item)
+                        <div wire:key="title-{{ $loop->index }}">
+                            <a href="{{ route('events.index', ['search' => $item->title]) }}" wire:navigate
                                 class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-50 text-purple-700 font-medium hover:bg-purple-100 border border-purple-100 hover:border-purple-200 transition-all">
-                                {{ $topic->name }}
-                                <span
-                                    class="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">{{ $topic->events_count }}</span>
+                                {{ $item->title }}
+                                @if($item->events_count > 1)
+                                    <span
+                                        class="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">{{ $item->events_count }}</span>
+                                @endif
                             </a>
                         </div>
                     @endforeach
@@ -156,7 +152,7 @@ new class extends Component {
 
                 <a href="{{ route('events.index') }}" wire:navigate
                     class="inline-flex items-center gap-2 mt-6 text-purple-600 font-semibold hover:text-purple-700">
-                    {{ __('Lihat semua topik') }}
+                    {{ __('Lihat semua majlis') }}
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17 8l4 4m0 0l-4 4m4-4H3" />

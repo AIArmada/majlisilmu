@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Forms;
+
+use App\Enums\InstitutionType;
+use App\Models\Institution;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\TextInput;
+use Illuminate\Support\Str;
+
+class InstitutionFormSchema
+{
+    /**
+     * Shared createOptionForm for Institution selects.
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function createOptionForm(): array
+    {
+        return [
+            TextInput::make('name')
+                ->label(__('Institution Name'))
+                ->required()
+                ->maxLength(255)
+                ->placeholder(__('e.g., Masjid Al-Falah, Surau An-Nur')),
+
+            Select::make('type')
+                ->label(__('Institution Type'))
+                ->required()
+                ->options(InstitutionType::class)
+                ->placeholder(__('Select type...')),
+
+            SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Cover Image'))
+                ->collection('cover')
+                ->image()
+                ->imageEditor()
+                ->maxSize(5120)
+                ->helperText(__('Header or banner image')),
+
+            SpatieMediaLibraryFileUpload::make('gallery')
+                ->label(__('Gallery'))
+                ->collection('gallery')
+                ->multiple()
+                ->image()
+                ->imageEditor()
+                ->maxSize(5120)
+                ->maxFiles(10)
+                ->helperText(__('Up to 10 photos of the institution')),
+
+            ...SharedFormSchema::addressFields(),
+
+            SharedFormSchema::socialMediaRepeater('Add social media links for this institution'),
+        ];
+    }
+
+    /**
+     * Shared createOptionUsing callback for Institution selects.
+     */
+    public static function createOptionUsing(array $data): string
+    {
+        $institution = Institution::create([
+            'name' => $data['name'],
+            'slug' => Str::slug($data['name']).'-'.Str::random(6),
+            'type' => $data['type'],
+            'status' => 'pending',
+        ]);
+
+        SharedFormSchema::createAddressFromData($institution, $data);
+        SharedFormSchema::createSocialMediaFromData($institution, $data);
+
+        return (string) $institution->getKey();
+    }
+}

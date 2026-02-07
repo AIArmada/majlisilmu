@@ -14,15 +14,6 @@ enum InstitutionType: string implements HasLabel
     case Sekolah = 'sekolah';
     case Kolej = 'kolej';
     case Universiti = 'universiti';
-    case Pertubuhan = 'pertubuhan';
-    case Yayasan = 'yayasan';
-    case Persatuan = 'persatuan';
-    case Kelab = 'kelab';
-    case Usrah = 'usrah';
-    case Perniagaan = 'perniagaan';
-    case Syarikat = 'syarikat';
-    case Koperasi = 'koperasi';
-    case Hotel = 'hotel';
 
     public function getLabel(): string
     {
@@ -35,15 +26,6 @@ enum InstitutionType: string implements HasLabel
             self::Sekolah => __('Sekolah'),
             self::Kolej => __('Kolej'),
             self::Universiti => __('Universiti'),
-            self::Pertubuhan => __('Pertubuhan'),
-            self::Yayasan => __('Yayasan'),
-            self::Persatuan => __('Persatuan'),
-            self::Kelab => __('Kelab'),
-            self::Usrah => __('Usrah'),
-            self::Perniagaan => __('Perniagaan'),
-            self::Syarikat => __('Syarikat'),
-            self::Koperasi => __('Koperasi'),
-            self::Hotel => __('Hotel'),
         };
     }
 }

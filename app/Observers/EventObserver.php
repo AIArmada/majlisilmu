@@ -14,9 +14,6 @@ class EventObserver
         protected PrayerTimeService $prayerTimeService
     ) {}
 
-    /**
-     * Handle the Event "creating" event.
-     */
     public function creating(Event $event): void
     {
         $this->calculatePrayerRelativeTime($event);

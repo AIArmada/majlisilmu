@@ -181,16 +181,7 @@ class VenueForm
                             ->relationship()
                             ->schema([
                                 Select::make('platform')
-                                    ->options([
-                                        'facebook' => 'Facebook',
-                                        'instagram' => 'Instagram',
-                                        'youtube' => 'YouTube',
-                                        'tiktok' => 'TikTok',
-                                        'twitter' => 'X (Twitter)',
-                                        'linkedin' => 'LinkedIn',
-                                        'website' => 'Website',
-                                        'other' => 'Other',
-                                    ])
+                                    ->options(\App\Enums\SocialMediaPlatform::class)
                                     ->searchable()
                                     ->required()
                                     ->columnSpan(1),

@@ -9,7 +9,6 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
-use App\Models\Topic;
 use App\Models\User;
 use App\Models\Venue;
 use App\Observers\EventObserver;
@@ -51,7 +50,6 @@ class AppServiceProvider extends ServiceProvider
             'series' => Series::class,
             'venue' => Venue::class,
             'donation_channel' => DonationChannel::class,
-            'topic' => Topic::class,
             'reference' => Reference::class,
         ]);
     }

@@ -4,7 +4,6 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
-use App\Models\Topic;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -92,16 +91,7 @@ it('loads the browse by location component', function () {
         'state_id' => $state->id,
     ]);
 
-    // Create a topic with events
-    $topic = Topic::factory()->create();
-    $event = Event::factory()->create([
-        'status' => 'approved',
-        'visibility' => 'public',
-        'starts_at' => now()->addDays(1),
-    ]);
-    $event->topics()->attach($topic);
-
     Livewire::test('home.browse-by-location')
         ->assertSee('Cari Mengikut Negeri')
-        ->assertSee('Cari Mengikut Topik');
+        ->assertSee('Cari Mengikut Tajuk');
 });

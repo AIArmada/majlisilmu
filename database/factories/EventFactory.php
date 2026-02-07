@@ -6,9 +6,7 @@ use App\Enums\EventFormat;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
-use App\Models\EventType;
 use App\Models\Institution;
-use App\Models\Series;
 use App\Models\Venue;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
@@ -27,18 +25,13 @@ class EventFactory extends Factory
     public function definition(): array
     {
         $eventTypes = [
-            'Kuliah Maghrib',
-            'Tazkirah Subuh',
-            'Kuliah Dhuha',
-            'Halaqah Al-Quran',
-            'Kelas Fiqh',
-            'Kelas Kitab',
+            'Kuliah / Ceramah',
+            'Tazkirah',
+            'Kelas / Daurah',
             'Forum Perdana',
+            'Seminar / Konvensyen',
             'Sesi Tadabbur',
             'Majlis Ilmu',
-            'Daurah Ilmiah',
-            'Seminar Ilmu',
-            'Kuliah Isya',
         ];
         $topics = [
             'Tafsir Al-Fatihah',
@@ -80,7 +73,7 @@ class EventFactory extends Factory
             $type.': '.$topic,
             $type.' - '.$topic,
             $topic.' ('.$type.')',
-            'Kelas Kitab: '.$book,
+            'Kelas / Daurah: '.$book,
             'Halaqah '.$book,
             'Tadabbur: '.$topic,
             $type.' bersama Asatizah',
@@ -138,12 +131,16 @@ class EventFactory extends Factory
             'prayer_reference' => null,
             'prayer_offset' => null,
             'prayer_display_text' => null,
-            'event_type_id' => EventType::query()->inRandomOrder()->value('id') ?? EventType::factory(),
+            'event_type' => [fake()->randomElement(\App\Enums\EventType::cases())],
             'gender' => fake()->randomElement(\App\Enums\EventGenderRestriction::cases()),
-            'age_group' => [fake()->randomElement(\App\Enums\EventAgeGroup::cases())->value],
+            'age_group' => [fake()->randomElement(\App\Enums\EventAgeGroup::cases())],
             'children_allowed' => fake()->boolean(80), // 80% allow children
             'event_format' => $eventFormat,
-            'visibility' => fake()->randomElement(['public', 'public', 'unlisted']),
+            'visibility' => fake()->randomElement([
+                \App\Enums\EventVisibility::Public,
+                \App\Enums\EventVisibility::Public,
+                \App\Enums\EventVisibility::Unlisted,
+            ]),
             'status' => $status,
             'live_url' => $liveUrl,
             'recording_url' => $recordingUrlFinal,
@@ -151,6 +148,7 @@ class EventFactory extends Factory
             'saves_count' => fake()->numberBetween(0, 500),
             'registrations_count' => fake()->numberBetween(0, 200),
             'published_at' => $publishedAt,
+            'is_muslim_only' => fake()->boolean(90), // 90% are muslim only
         ];
     }
 
@@ -161,7 +159,7 @@ class EventFactory extends Factory
     {
         return $this->afterCreating(function (\App\Models\Event $event) {
             // 30% of events have registration settings
-            if (fake()->boolean(30)) {
+            if (fake()->boolean(30) && ! $event->settings()->exists()) {
                 $event->settings()->create([
                     'registration_required' => true,
                     'capacity' => fake()->numberBetween(30, 300),

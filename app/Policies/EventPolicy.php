@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\User;
 
@@ -22,12 +23,12 @@ class EventPolicy
     public function view(?User $user, Event $event): bool
     {
         // Public events are viewable by anyone
-        if ($event->visibility === 'public' && $event->status !== null && $event->status->equals(\App\States\EventStatus\Approved::class)) {
+        if ($event->visibility === EventVisibility::Public && $event->status !== null && $event->status->equals(\App\States\EventStatus\Approved::class)) {
             return true;
         }
 
         // Unlisted events are viewable by direct link
-        if ($event->visibility === 'unlisted') {
+        if ($event->visibility === EventVisibility::Unlisted) {
             return true;
         }
 
@@ -136,13 +137,8 @@ class EventPolicy
             return true;
         }
 
-        // Only organizers (not co-organizers) can manage members
-        $isDirectOrganizer = $event->members()
-            ->where('user_id', $user->id)
-            ->where('role', 'organizer')
-            ->exists();
-
-        if ($isDirectOrganizer) {
+        // Check event-scoped permission via Authz
+        if (Authz::userCanInScope($user, 'event.manage-members', $event)) {
             return true;
         }
 

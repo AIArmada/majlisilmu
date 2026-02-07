@@ -46,20 +46,4 @@ class SavedSearchPolicy
     {
         return $user->id === $savedSearch->user_id;
     }
-
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, SavedSearch $savedSearch): bool
-    {
-        return $user->id === $savedSearch->user_id;
-    }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, SavedSearch $savedSearch): bool
-    {
-        return $user->id === $savedSearch->user_id;
-    }
 }

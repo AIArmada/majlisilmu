@@ -11,6 +11,7 @@ enum VenueType: string implements HasLabel
     case Stadium = 'stadium';
     case Perpustakaan = 'perpustakaan';
     case Padang = 'padang';
+    case Hotel = 'hotel';
 
     public function getLabel(): string
     {
@@ -20,6 +21,7 @@ enum VenueType: string implements HasLabel
             self::Stadium => __('Stadium'),
             self::Perpustakaan => __('Perpustakaan'),
             self::Padang => __('Padang'),
+            self::Hotel => __('Hotel'),
         };
     }
 }

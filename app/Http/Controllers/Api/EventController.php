@@ -13,12 +13,12 @@ class EventController extends Controller
 {
     /**
      * List events with filtering, sorting, and includes.
-     * 
+     *
      * Example API calls:
      * /api/v1/events?filter[status]=published
      * /api/v1/events?filter[event_format]=online
      * /api/v1/events?filter[starts_after]=2026-02-01
-     * /api/v1/events?include=venue,speakers,topics
+     * /api/v1/events?include=venue,speakers
      * /api/v1/events?sort=-starts_at
      * /api/v1/events?filter[search]=kuliah
      */
@@ -32,46 +32,34 @@ class EventController extends Controller
                 AllowedFilter::exact('event_type_id'),
                 AllowedFilter::exact('institution_id'),
                 AllowedFilter::exact('venue_id'),
-                
+
                 // Date filters
-                AllowedFilter::callback('starts_after', fn (Builder $query, $value) => 
-                    $query->where('starts_at', '>=', Carbon::parse($value))
+                AllowedFilter::callback('starts_after', fn (Builder $query, $value) => $query->where('starts_at', '>=', Carbon::parse($value))
                 ),
-                AllowedFilter::callback('starts_before', fn (Builder $query, $value) => 
-                    $query->where('starts_at', '<=', Carbon::parse($value))
+                AllowedFilter::callback('starts_before', fn (Builder $query, $value) => $query->where('starts_at', '<=', Carbon::parse($value))
                 ),
-                AllowedFilter::callback('ends_after', fn (Builder $query, $value) => 
-                    $query->where('ends_at', '>=', Carbon::parse($value))
+                AllowedFilter::callback('ends_after', fn (Builder $query, $value) => $query->where('ends_at', '>=', Carbon::parse($value))
                 ),
-                AllowedFilter::callback('ends_before', fn (Builder $query, $value) => 
-                    $query->where('ends_at', '<=', Carbon::parse($value))
+                AllowedFilter::callback('ends_before', fn (Builder $query, $value) => $query->where('ends_at', '<=', Carbon::parse($value))
                 ),
-                
+
                 // Location filters
-                AllowedFilter::callback('state_id', fn (Builder $query, $value) => 
-                    $query->whereHas('venue.address', fn ($q) => $q->where('state_id', $value))
+                AllowedFilter::callback('state_id', fn (Builder $query, $value) => $query->whereHas('venue.address', fn ($q) => $q->where('state_id', $value))
                 ),
-                AllowedFilter::callback('city_id', fn (Builder $query, $value) => 
-                    $query->whereHas('venue.address', fn ($q) => $q->where('city_id', $value))
+                AllowedFilter::callback('city_id', fn (Builder $query, $value) => $query->whereHas('venue.address', fn ($q) => $q->where('city_id', $value))
                 ),
-                
+
                 // Relationship filters
-                AllowedFilter::callback('speaker', fn (Builder $query, $value) => 
-                    $query->whereHas('speakers', fn ($q) => $q->where('speaker_id', $value))
+                AllowedFilter::callback('speaker', fn (Builder $query, $value) => $query->whereHas('speakers', fn ($q) => $q->where('speaker_id', $value))
                 ),
-                AllowedFilter::callback('topic', fn (Builder $query, $value) => 
-                    $query->whereHas('topics', fn ($q) => $q->where('topic_id', $value))
+                AllowedFilter::callback('series', fn (Builder $query, $value) => $query->whereHas('series', fn ($q) => $q->where('series_id', $value))
                 ),
-                AllowedFilter::callback('series', fn (Builder $query, $value) => 
-                    $query->whereHas('series', fn ($q) => $q->where('series_id', $value))
-                ),
-                
+
                 // Search filter
-                AllowedFilter::callback('search', fn (Builder $query, $value) => 
-                    $query->where(function ($q) use ($value) {
-                        $q->where('title', 'ILIKE', "%{$value}%")
-                          ->orWhere('description', 'ILIKE', "%{$value}%");
-                    })
+                AllowedFilter::callback('search', fn (Builder $query, $value) => $query->where(function ($q) use ($value) {
+                    $q->where('title', 'ILIKE', "%{$value}%")
+                        ->orWhere('description', 'ILIKE', "%{$value}%");
+                })
                 ),
             ])
             ->allowedIncludes([
@@ -79,7 +67,6 @@ class EventController extends Controller
                 'venue.address',
                 'institution',
                 'speakers',
-                'topics',
                 'eventType',
                 'series',
                 'mediaLinks',
@@ -117,7 +104,6 @@ class EventController extends Controller
                 'institution',
                 'institution.address',
                 'speakers',
-                'topics',
                 'eventType',
                 'series',
                 'mediaLinks',
@@ -127,7 +113,7 @@ class EventController extends Controller
             ])
             ->where(function ($query) use ($eventIdentifier) {
                 $query->where('id', $eventIdentifier)
-                      ->orWhere('slug', $eventIdentifier);
+                    ->orWhere('slug', $eventIdentifier);
             })
             ->where('status', 'published')
             ->where('visibility', 'public')
