@@ -37,7 +37,7 @@ class SharedFormSchema
                 ->placeholder(__('e.g., 50000')),
 
             Select::make('state_id')
-                ->label(__('State'))
+                ->label(__('Negeri'))
                 ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
                 ->searchable()
                 ->preload()
@@ -67,7 +67,7 @@ class SharedFormSchema
                     JS),
 
             Select::make('subdistrict_id')
-                ->label(__('Daerah Kecil / Bandar / Mukim / Pekan'))
+                ->label(__('Daerah Kecil / Bandar / Mukim'))
                 ->options(function (Get $get) {
                     $districtId = $get('district_id');
                     if (! $districtId) {

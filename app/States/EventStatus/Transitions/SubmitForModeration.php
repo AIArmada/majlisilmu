@@ -25,8 +25,14 @@ class SubmitForModeration extends Transition implements HasColor, HasIcon, HasLa
         $this->event->save();
 
         // Notify moderators
-        $moderators = User::role(['moderator', 'super_admin'])->get();
-        Notification::send($moderators, new EventSubmittedNotification($this->event));
+        try {
+            $moderators = User::role(['moderator', 'super_admin'])->get();
+            if ($moderators->isNotEmpty()) {
+                Notification::send($moderators, new EventSubmittedNotification($this->event));
+            }
+        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            Log::warning('Could not notify moderators: roles not found', ['event_id' => $this->event->id]);
+        }
 
         Log::info('Event submitted for moderation', ['event_id' => $this->event->id]);
 

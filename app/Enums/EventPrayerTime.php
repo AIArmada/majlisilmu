@@ -12,7 +12,7 @@ enum EventPrayerTime: string implements HasLabel
     case SelepasAsar = 'selepas_asar';
     case SelepasMaghrib = 'selepas_maghrib';
     case SelepasIsyak = 'selepas_isyak';
-    case SelepasTarawikh = 'selepas_tarawikh';
+    case SelepasTarawih = 'selepas_tarawih';
     case LainWaktu = 'lain_waktu';
 
     public function getLabel(): string
@@ -24,7 +24,7 @@ enum EventPrayerTime: string implements HasLabel
             self::SelepasAsar => 'Selepas Asar',
             self::SelepasMaghrib => 'Selepas Maghrib',
             self::SelepasIsyak => 'Selepas Isyak',
-            self::SelepasTarawikh => 'Selepas Tarawikh',
+            self::SelepasTarawih => 'Selepas Tarawih',
             self::LainWaktu => 'Lain Waktu',
         };
     }
@@ -49,7 +49,7 @@ enum EventPrayerTime: string implements HasLabel
             self::SelepasAsar => PrayerReference::Asr,
             self::SelepasMaghrib => PrayerReference::Maghrib,
             self::SelepasIsyak => PrayerReference::Isha,
-            self::SelepasTarawikh => PrayerReference::Isha,
+            self::SelepasTarawih => PrayerReference::Isha,
             self::LainWaktu => null,
         };
     }
@@ -63,7 +63,7 @@ enum EventPrayerTime: string implements HasLabel
             return null;
         }
 
-        if ($this === self::SelepasTarawikh) {
+        if ($this === self::SelepasTarawih) {
             return PrayerOffset::After60;
         }
 

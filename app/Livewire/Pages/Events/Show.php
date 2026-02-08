@@ -27,7 +27,10 @@ class Show extends Component
 
     public function mount(Event $event): void
     {
-        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== \App\Enums\EventVisibility::Public || $event->published_at === null) {
+        $isViewable = $event->status?->equals(\App\States\EventStatus\Approved::class)
+            || $event->status?->equals(\App\States\EventStatus\Pending::class);
+
+        if (! $isViewable || $event->visibility !== \App\Enums\EventVisibility::Public) {
             abort(404);
         }
 
@@ -68,7 +71,9 @@ class Show extends Component
             return;
         }
 
-        if (! $this->event->status?->equals(\App\States\EventStatus\Approved::class) || $this->event->visibility !== \App\Enums\EventVisibility::Public || $this->event->published_at === null) {
+        if (! $this->event->status?->equals(\App\States\EventStatus\Approved::class)
+            && ! $this->event->status?->equals(\App\States\EventStatus\Pending::class)
+            || $this->event->visibility !== \App\Enums\EventVisibility::Public) {
             abort(403);
         }
 

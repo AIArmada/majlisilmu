@@ -21,7 +21,9 @@ class EventsController extends Controller
      */
     public function calendar(Event $event): Response
     {
-        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== \App\Enums\EventVisibility::Public) {
+        if ((! $event->status?->equals(\App\States\EventStatus\Approved::class)
+            && ! $event->status?->equals(\App\States\EventStatus\Pending::class))
+            || $event->visibility !== \App\Enums\EventVisibility::Public) {
             abort(404);
         }
 
@@ -39,7 +41,8 @@ class EventsController extends Controller
         $event->load('settings');
 
         // Validate event is eligible for registration (per B4b)
-        if (! $event->status?->equals(\App\States\EventStatus\Approved::class)) {
+        if (! $event->status?->equals(\App\States\EventStatus\Approved::class)
+            && ! $event->status?->equals(\App\States\EventStatus\Pending::class)) {
             return back()->withErrors(['registration' => 'This event is not available for registration.']);
         }
 

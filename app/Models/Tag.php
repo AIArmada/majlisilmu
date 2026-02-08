@@ -23,6 +23,14 @@ class Tag extends SpatieTag implements Sortable
         'sort_when_creating' => true,
     ];
 
+    protected $fillable = [
+        'name',
+        'slug',
+        'type',
+        'order_column',
+        'status',
+    ];
+
     protected function casts(): array
     {
         return [

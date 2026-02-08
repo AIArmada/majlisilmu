@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\Institutions\RelationManagers;
 
 use App\Filament\Resources\Series\SeriesResource;
+use Filament\Actions\CreateAction;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Table;
 
 class SeriesRelationManager extends RelationManager

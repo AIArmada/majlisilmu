@@ -130,21 +130,23 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * Scope a query to only include active events.
+     * Scope a query to only include active events (approved + pending public events).
      */
     public function scopeActive($query)
     {
-        return $query->whereState('status', \App\States\EventStatus\Approved::class)
+        return $query->whereIn('status', ['approved', 'pending'])
             ->where('visibility', EventVisibility::Public);
     }
 
     /**
      * Determine if the model should be searchable.
-     * Only index approved public events per documentation B8a.
+     * Index approved and pending public events.
      */
     public function shouldBeSearchable(): bool
     {
-        return $this->status->equals(\App\States\EventStatus\Approved::class) && $this->visibility === EventVisibility::Public;
+        return ($this->status->equals(\App\States\EventStatus\Approved::class)
+            || $this->status->equals(\App\States\EventStatus\Pending::class))
+            && $this->visibility === EventVisibility::Public;
     }
 
     /**
@@ -237,7 +239,7 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->belongsToMany(Series::class, 'event_series')
             ->withPivot('order_column')
             ->withTimestamps()
-            ->orderByPivot('sort_order');
+            ->orderByPivot('order_column');
     }
 
     // EventType relationship removed in favor of Enum

@@ -95,6 +95,12 @@
 
                     <div class="flex-1 space-y-4">
                         <div class="flex flex-wrap gap-2">
+                            @if($event->status instanceof \App\States\EventStatus\Pending)
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-sm font-semibold text-amber-300 backdrop-blur-md shadow-lg shadow-amber-900/20 animate-pulse">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    {{ __('Menunggu Kelulusan') }}
+                                </span>
+                            @endif
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-3 py-1 text-sm font-medium text-emerald-300 backdrop-blur-md shadow-lg shadow-emerald-900/20">
                                 {{ $event->eventType?->name ?? __('General') }}
                             </span>
@@ -123,6 +129,20 @@
                 </div>
             </div>
         </div>
+
+        @if($event->status instanceof \App\States\EventStatus\Pending)
+            <div class="container mx-auto px-6 lg:px-12 relative z-30 -mt-4 mb-0">
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                    <svg class="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                    </svg>
+                    <div>
+                        <p class="font-bold text-amber-800 text-sm">{{ __('Menunggu Kelulusan') }}</p>
+                        <p class="text-amber-700 text-sm mt-0.5">{{ __('Majlis ini belum disahkan oleh pentadbir. Sila pastikan sendiri kesahihan majlis ini sebelum hadir.') }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div class="container mx-auto px-6 lg:px-12 -mt-8 relative z-30 grid lg:grid-cols-3 gap-8">
             <!-- Main Content -->

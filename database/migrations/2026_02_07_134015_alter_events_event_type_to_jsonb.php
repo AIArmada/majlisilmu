@@ -18,15 +18,32 @@ return new class extends Migration
         $driver = Schema::getConnection()->getDriverName();
 
         if ($driver === 'pgsql') {
-            // PostgreSQL: Convert existing string values to JSON arrays
-            DB::statement(<<<'SQL'
-                UPDATE events
-                SET event_type = CASE
-                    WHEN event_type IS NULL THEN '[]'::text
-                    WHEN event_type::text LIKE '[%' THEN event_type::text
-                    ELSE jsonb_build_array(event_type)::text
-                END
-            SQL);
+            // Check the current column type
+            $columnType = DB::selectOne(
+                "SELECT data_type FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'event_type'"
+            )?->data_type;
+
+            if ($columnType === 'json' || $columnType === 'jsonb') {
+                // Column is already JSON/JSONB — convert any plain-string values to arrays
+                DB::statement(<<<'SQL'
+                    UPDATE events
+                    SET event_type = CASE
+                        WHEN event_type IS NULL THEN '[]'::jsonb
+                        WHEN event_type::text LIKE '[%' THEN event_type
+                        ELSE jsonb_build_array(event_type::text)
+                    END
+                SQL);
+            } else {
+                // Column is text/varchar — convert string values to JSON arrays
+                DB::statement(<<<'SQL'
+                    UPDATE events
+                    SET event_type = CASE
+                        WHEN event_type IS NULL THEN '[]'::text
+                        WHEN event_type::text LIKE '[%' THEN event_type::text
+                        ELSE jsonb_build_array(event_type)::text
+                    END
+                SQL);
+            }
 
             // Alter the column type to jsonb
             Schema::table('events', function (Blueprint $table) {

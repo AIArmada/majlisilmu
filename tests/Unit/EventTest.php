@@ -9,21 +9,21 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-it('active scope filters approved and public events', function () {
-    // Active event
-    $activeEvent = Event::factory()->create([
+it('active scope filters approved and pending public events', function () {
+    // Active events (approved + pending)
+    $approvedEvent = Event::factory()->create([
         'status' => Approved::class,
+        'visibility' => 'public',
+    ]);
+
+    $pendingEvent = Event::factory()->create([
+        'status' => Pending::class,
         'visibility' => 'public',
     ]);
 
     // Inactive events
     $draftEvent = Event::factory()->create([
         'status' => Draft::class,
-        'visibility' => 'public',
-    ]);
-
-    $pendingEvent = Event::factory()->create([
-        'status' => Pending::class,
         'visibility' => 'public',
     ]);
 
@@ -34,6 +34,9 @@ it('active scope filters approved and public events', function () {
 
     $results = Event::active()->get();
 
-    expect($results)->toHaveCount(1)
-        ->and($results->first()->id)->toBe($activeEvent->id);
+    expect($results)->toHaveCount(2)
+        ->and($results->pluck('id')->toArray())->toContain($approvedEvent->id)
+        ->and($results->pluck('id')->toArray())->toContain($pendingEvent->id)
+        ->and($results->pluck('id')->toArray())->not->toContain($draftEvent->id)
+        ->and($results->pluck('id')->toArray())->not->toContain($privateEvent->id);
 });

@@ -24,21 +24,10 @@ class VenuesTable
                     ->searchable(),
                 TextColumn::make('type')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'main_hall' => 'Main Hall',
-                        'seminar_room' => 'Seminar Room',
-                        'classroom' => 'Classroom',
-                        'meeting_room' => 'Meeting Room',
-                        'auditorium' => 'Auditorium',
-                        'field' => 'Field',
-                        'foyer' => 'Foyer',
-                        'other' => 'Other',
-                        default => $state,
-                    })
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn ($state): string => match ($state) {
                         'verified' => 'success',
                         'pending' => 'warning',
                         'rejected' => 'danger',

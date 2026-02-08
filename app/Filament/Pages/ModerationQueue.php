@@ -90,8 +90,8 @@ class ModerationQueue extends Page implements HasTable
                 TextColumn::make('institution.status')
                     ->label('Institution Status')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => $state ? Str::title(str_replace('_', ' ', $state)) : 'None')
-                    ->color(fn (?string $state): string => match ($state) {
+                    ->formatStateUsing(fn ($state): string => $state ? Str::title(str_replace('_', ' ', (string) $state)) : 'None')
+                    ->color(fn ($state): string => match ((string) $state) {
                         'verified' => 'success',
                         'pending' => 'warning',
                         'rejected' => 'danger',
@@ -101,9 +101,9 @@ class ModerationQueue extends Page implements HasTable
                 TextColumn::make('venue.status')
                     ->label('Venue Status')
                     ->badge()
-                    ->state(fn (Event $record): string => $record->venue?->status ?? 'none')
-                    ->formatStateUsing(fn (string $state): string => $state === 'none' ? 'None' : Str::title(str_replace('_', ' ', $state)))
-                    ->color(fn (string $state): string => match ($state) {
+                    ->state(fn (Event $record): string => (string) ($record->venue?->status ?? 'none'))
+                    ->formatStateUsing(fn ($state): string => $state === 'none' ? 'None' : Str::title(str_replace('_', ' ', (string) $state)))
+                    ->color(fn ($state): string => match ((string) $state) {
                         'verified' => 'success',
                         'pending' => 'warning',
                         'rejected' => 'danger',
@@ -124,7 +124,7 @@ class ModerationQueue extends Page implements HasTable
 
                         return $unverified === 0 ? 'All verified' : $unverified.' unverified';
                     })
-                    ->color(fn (string $state): string => match (true) {
+                    ->color(fn ($state): string => match (true) {
                         $state === 'All verified' => 'success',
                         $state === 'None' => 'gray',
                         default => 'warning',
@@ -135,7 +135,7 @@ class ModerationQueue extends Page implements HasTable
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn ($state): string => match ((string) $state) {
                         'pending' => 'warning',
                         'approved' => 'success',
                         'rejected' => 'danger',

@@ -324,6 +324,12 @@
                                             {{ $event->starts_at?->format('d') }}
                                         </div>
                                     </div>
+                                    @if($event->status instanceof \App\States\EventStatus\Pending)
+                                        <span class="inline-flex items-center gap-1 bg-amber-500/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-[0.65rem] font-bold shadow-lg uppercase tracking-wide">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            {{ __('Menunggu Kelulusan') }}
+                                        </span>
+                                    @endif
                                 </div>
 
                                 @if(isset($event->distance_km))
