@@ -13,12 +13,19 @@ return new class extends Migration
     {
         Schema::create('spaces', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('institution_id')->nullable()->index();
             $table->string('name');
             $table->string('slug')->unique();
             $table->unsignedInteger('capacity')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+        });
+
+        Schema::create('institution_space', function (Blueprint $table) {
+            $table->foreignUuid('institution_id')->index();
+            $table->foreignUuid('space_id')->index();
+            $table->timestamps();
+
+            $table->primary(['institution_id', 'space_id']);
         });
     }
 
@@ -27,6 +34,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('institution_space');
         Schema::dropIfExists('spaces');
     }
 };

@@ -8,6 +8,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -28,6 +29,9 @@ class EventSubmissionsRelationManager extends RelationManager
                     ->preload(),
                 TextInput::make('submitter_name')
                     ->maxLength(255),
+                Textarea::make('notes')
+                    ->columnSpanFull()
+                    ->maxLength(2000),
             ])
             ->columns(1);
     }
@@ -44,7 +48,15 @@ class EventSubmissionsRelationManager extends RelationManager
                     ->label('Guest Name')
                     ->searchable(),
                 TextColumn::make('email')
-                    ->label('Guest Email'),
+                    ->label('Guest Email')
+                    ->searchable(),
+                TextColumn::make('phone')
+                    ->label('Guest Phone')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('notes')
+                    ->limit(80)
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

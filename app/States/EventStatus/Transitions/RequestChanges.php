@@ -13,26 +13,39 @@ use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Spatie\ModelStates\Transition;
 
 class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
 {
     public function __construct(
         public Event $event,
-        public User $moderator,
-        public string $reasonCode,
+        public ?User $moderator = null,
+        public ?string $reasonCode = null,
         public ?string $note = null
     ) {}
 
+    public function canTransition(): bool
+    {
+        return $this->moderator !== null && filled($this->reasonCode);
+    }
+
     public function handle(): Event
     {
-        return DB::transaction(function () {
+        $this->assertTransitionContext();
+        $moderator = $this->moderator;
+        $reasonCode = $this->reasonCode;
+        if (! $moderator instanceof User || ! is_string($reasonCode)) {
+            throw new LogicException('Moderator and reason code are required to request event changes.');
+        }
+
+        return DB::transaction(function () use ($moderator, $reasonCode) {
             // Create review record
             $review = ModerationReview::create([
                 'event_id' => $this->event->id,
-                'moderator_id' => $this->moderator->id,
+                'moderator_id' => $moderator->id,
                 'decision' => 'needs_changes',
-                'reason_code' => $this->reasonCode,
+                'reason_code' => $reasonCode,
                 'note' => $this->note,
             ]);
 
@@ -45,12 +58,19 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
 
             Log::info('Event needs changes', [
                 'event_id' => $this->event->id,
-                'moderator_id' => $this->moderator->id,
-                'reason_code' => $this->reasonCode,
+                'moderator_id' => $moderator->id,
+                'reason_code' => $reasonCode,
             ]);
 
             return $this->event;
         });
+    }
+
+    protected function assertTransitionContext(): void
+    {
+        if (! $this->canTransition()) {
+            throw new LogicException('Moderator and reason code are required to request event changes.');
+        }
     }
 
     protected function notifyNeedsChanges(Event $event, ModerationReview $review): void

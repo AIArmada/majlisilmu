@@ -2,12 +2,18 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventType;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
+use App\Models\Event;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -37,7 +43,7 @@ class EventForm
                                     ->required()
                                     ->maxLength(255)
                                     ->live(onBlur: true)
-                                    ->afterStateUpdated(fn(Set $set, ?string $state) => $set('slug', Str::slug($state))),
+                                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('slug', Str::slug($state))),
                                 TextInput::make('slug')
                                     ->required()
                                     ->maxLength(255)
@@ -69,6 +75,27 @@ class EventForm
                                     ->searchable()
                                     ->preload()
                                     ->quickAdd(),
+                                Select::make('references')
+                                    ->relationship('references', 'title')
+                                    ->multiple()
+                                    ->searchable()
+                                    ->preload()
+                                    ->quickAdd(),
+                                Placeholder::make('domain_tags_preview')
+                                    ->label('Domain Tags')
+                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'domain')),
+                                Placeholder::make('discipline_tags_preview')
+                                    ->label('Discipline Tags')
+                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'discipline')),
+                                Placeholder::make('source_tags_preview')
+                                    ->label('Source Tags')
+                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'source')),
+                                Placeholder::make('issue_tags_preview')
+                                    ->label('Issue Tags')
+                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'issue')),
+                                Placeholder::make('all_tags_preview')
+                                    ->label('All Tags')
+                                    ->content(fn (?Event $record): string => self::formatTagList($record)),
                             ])
                             ->columns(2),
                         Tab::make('Logistics')
@@ -79,7 +106,7 @@ class EventForm
                                     ->schema([
                                         Select::make('timing_mode')
                                             ->label('Mode Waktu')
-                                            ->options(collect(TimingMode::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
+                                            ->options(collect(TimingMode::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
                                             ->default(TimingMode::Absolute->value)
                                             ->required()
                                             ->helperText(\Filament\Schemas\JsContent::make(<<<'JS'
@@ -92,7 +119,7 @@ class EventForm
                                         Callout::make('Waktu akan dikira secara automatik')
                                             ->description('Pastikan venue telah ditetapkan di bahagian Location supaya waktu solat dapat dikira berdasarkan koordinat lokasi.')
                                             ->warning()
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
+                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'prayer_relative'
                                             JS),
@@ -100,11 +127,11 @@ class EventForm
                                             ->schema([
                                                 Select::make('prayer_reference')
                                                     ->label('Waktu Solat')
-                                                    ->options(collect(PrayerReference::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
+                                                    ->options(collect(PrayerReference::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
                                                     ->required(),
                                                 Select::make('prayer_offset')
                                                     ->label('Masa')
-                                                    ->options(collect(PrayerOffset::cases())->mapWithKeys(fn($case) => [$case->value => $case->label()]))
+                                                    ->options(collect(PrayerOffset::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
                                                     ->default(PrayerOffset::Immediately->value)
                                                     ->required(),
                                                 \Filament\Forms\Components\Placeholder::make('prayer_display_text_placeholder')
@@ -136,7 +163,7 @@ class EventForm
                                                     ->helperText('Teks ini akan dipaparkan kepada pengguna'),
                                             ])
                                             ->columns(3)
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
+                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'prayer_relative'
                                             JS),
@@ -145,7 +172,7 @@ class EventForm
                                         DateTimePicker::make('starts_at')
                                             ->label('Waktu Mula')
                                             ->required()
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::Absolute)
+                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'absolute'
                                             JS),
@@ -154,7 +181,7 @@ class EventForm
                                         DatePicker::make('event_date')
                                             ->label('Tarikh Majlis')
                                             ->required()
-                                            ->visible(fn(Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
+                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
                                             ->visibleJs(<<<'JS'
                                                 $get('timing_mode') === 'prayer_relative'
                                             JS)
@@ -184,8 +211,8 @@ class EventForm
                                             ->preload()
                                             ->quickAdd(),
                                         Select::make('space_id')
-                                            ->relationship('space', 'name', fn($query, \Filament\Schemas\Components\Utilities\Get $get) => $get('institution_id')
-                                                ? $query->where('institution_id', $get('institution_id'))->where('is_active', true)
+                                            ->relationship('space', 'name', fn ($query, \Filament\Schemas\Components\Utilities\Get $get) => $get('institution_id')
+                                                ? $query->whereHas('institutions', fn ($q) => $q->where('institutions.id', $get('institution_id')))->where('is_active', true)
                                                 : $query->where('is_active', true))
                                             ->searchable()
                                             ->preload()
@@ -206,9 +233,22 @@ class EventForm
                                             ]),
                                         Select::make('event_type')
                                             ->label('Event Type')
-                                            ->options(\App\Enums\EventType::class)
+                                            ->options(EventType::class)
                                             ->multiple()
                                             ->searchable(),
+                                        Select::make('event_format')
+                                            ->label('Event Format')
+                                            ->options(collect(EventFormat::cases())->mapWithKeys(fn (EventFormat $case): array => [$case->value => $case->label()])),
+                                        Select::make('gender')
+                                            ->label('Gender')
+                                            ->options(EventGenderRestriction::class),
+                                        Select::make('age_group')
+                                            ->label('Age Group')
+                                            ->options(EventAgeGroup::class)
+                                            ->multiple()
+                                            ->searchable(),
+                                        Toggle::make('children_allowed')
+                                            ->label('Children Allowed'),
                                         Select::make('audience')
                                             ->options([
                                                 'general' => 'General',
@@ -265,6 +305,10 @@ class EventForm
                         Tab::make('Media & Donation Channels')
                             ->icon('heroicon-m-video-camera')
                             ->schema([
+                                TextInput::make('event_url')
+                                    ->url()
+                                    ->label('Event URL')
+                                    ->maxLength(255),
                                 TextInput::make('live_url')
                                     ->url()
                                     ->label('Live URL')
@@ -276,5 +320,29 @@ class EventForm
                     ])
                     ->persistTabInQueryString(),
             ]);
+    }
+
+    protected static function formatTagList(?Event $event, ?string $type = null): string
+    {
+        if (! $event instanceof Event) {
+            return '-';
+        }
+
+        $tags = $event->tags;
+
+        if ($type !== null) {
+            $tags = $tags->where('type', $type);
+        }
+
+        $values = $tags
+            ->pluck('name')
+            ->filter()
+            ->values();
+
+        if ($values->isEmpty()) {
+            return '-';
+        }
+
+        return $values->implode(', ');
     }
 }

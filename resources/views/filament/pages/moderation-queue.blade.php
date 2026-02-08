@@ -14,7 +14,7 @@
                         <span @class([
                             'inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 text-xs font-bold rounded-full',
                             'bg-white/20 text-white' => $this->activeTab === $key,
-                            'bg-' . $tab['badgeColor'] . '-100 text-' . $tab['badgeColor'] . '-700 dark:bg-' . $tab['badgeColor'] . '-500/20 dark:text-' . $tab['badgeColor'] . '-400' => $this->activeTab !== $key,
+                            $this->getTabBadgeColorClasses($tab['badgeColor']) => $this->activeTab !== $key,
                         ])>
                             {{ $tab['count'] }}
                         </span>

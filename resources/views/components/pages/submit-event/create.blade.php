@@ -32,6 +32,7 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
@@ -77,6 +78,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'age_group' => [EventAgeGroup::AllAges],
             'languages' => [101], // Malay as default
             'event_format' => EventFormat::Physical,
+            'visibility' => EventVisibility::Public->value,
             'location_same_as_institution' => true,
             'location_type' => 'institution',
             'is_muslim_only' => false,
@@ -96,6 +98,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->label(__('Jenis Majlis'))
                                 ->required()
                                 ->multiple()
+                                ->closeOnSelect()
                                 ->options(function (): array {
                                     return collect(\App\Enums\EventType::cases())
                                         ->mapToGroups(fn(\App\Enums\EventType $type) => [
@@ -110,6 +113,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->label(__('Tajuk Majlis'))
                                 ->required()
                                 ->searchable()
+                                ->allowHtml()
                                 ->getSearchResultsUsing(function (string $search): array {
                                     if (empty($search)) {
                                         return [];
@@ -131,20 +135,24 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     return $results;
                                 })
-                                ->getOptionLabelUsing(fn($value): ?string => $value)
-                                ->afterStateUpdated(function (Select $component, $state) {
-                                    if ($state && str_starts_with($state, '__quick_add__')) {
-                                        $newTitle = substr($state, strlen('__quick_add__'));
-                                        $component->state($newTitle);
+                                ->getOptionLabelUsing(function ($value): ?string {
+                                    // Clean up the quick_add prefix for display
+                                    if (str_starts_with($value, '__quick_add__')) {
+                                        return substr($value, strlen('__quick_add__'));
                                     }
+                                    return $value;
                                 })
+                                ->afterStateUpdatedJs(<<<'JS'
+                                    if ($state && $state.startsWith('__quick_add__')) {
+                                        $set('title', $state.substring('__quick_add__'.length))
+                                    }
+                                JS)
                                 ->placeholder(__('Cari atau masukkan tajuk majlis...')),
 
-                            Textarea::make('description')
+                            RichEditor::make('description')
                                 ->label(__('Keterangan'))
                                 ->required()
                                 ->maxLength(5000)
-                                ->rows(4)
                                 ->placeholder(__('Terangkan mengenai majlis, topik yang akan dikupas, dll.')),
 
                             Grid::make(['default' => 1, 'sm' => 2, 'md' => 6])
@@ -304,18 +312,32 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->label(__('Peringkat Umur'))
                                         ->required()
                                         ->options(EventAgeGroup::class)
+                                        ->closeOnSelect()
                                         ->multiple()
                                         ->afterStateUpdatedJs(<<<'JS'
                                                             const ageGroups = $state || []
                                                             if (ageGroups.includes('children') || ageGroups.includes('all_ages')) {
                                                                 $set('children_allowed', true)
                                                             }
-                                                            JS),
+                                                            JS)
+                                        ->afterStateUpdated(function ($state, Set $set) {
+                                            // Server-side hook for tests (JavaScript doesn't execute in Livewire tests)
+                                            if (! $state) {
+                                                return;
+                                            }
+                                            
+                                            // In form closures, enum instances are passed, not strings
+                                            if (in_array(EventAgeGroup::Children, $state, true) ||
+                                                in_array(EventAgeGroup::AllAges, $state, true)) {
+                                                $set('children_allowed', true);
+                                            }
+                                        }),
 
                                     Select::make('languages')
                                         ->label(__('Bahasa'))
                                         ->helperText(__('Bahasa yang akan digunakan dalam majlis.'))
                                         ->placeholder(__('Pilih bahasa…'))
+                                        ->closeOnSelect()
                                         ->multiple()
                                         ->required()
                                         ->searchable()
@@ -366,6 +388,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     Select::make('domain_tags')
                                         ->label(__('Kategori'))
                                         ->helperText(__('Pilih kategori ceramah utama. Boleh pilih lebih daripada satu.'))
+                                        ->closeOnSelect()
                                         ->placeholder(__('Pilih kategori…'))
                                         ->multiple()
                                         ->required()
@@ -387,6 +410,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('discipline_tags')
                                         ->label(__('Bidang Ilmu'))
+                                        ->closeOnSelect()
                                         ->helperText(__('Pilih bidang yang menggambarkan isi ceramah.'))
                                         ->placeholder(__('Pilih bidang…'))
                                         ->multiple()
@@ -425,6 +449,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                             Grid::make(['default' => 1, 'sm' => 2])
                                 ->schema([
                                     Select::make('source_tags')
+                                        ->closeOnSelect()
                                         ->label(__('Sumber Utama'))
                                         ->helperText(__('Pilih sumber rujukan utama (jika ada).'))
                                         ->placeholder(__('Pilih sumber…'))
@@ -444,6 +469,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->helperText(__('Pilih tema supaya mudah dicari.'))
                                         ->placeholder(__('Pilih tema…'))
                                         ->multiple()
+                                        ->closeOnSelect()
                                         ->searchable()
                                         ->preload()
                                         ->native(false)
@@ -475,6 +501,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->helperText(__('Pilih kitab atau buku rujukan yang digunakan (jika ada).'))
                                 ->placeholder(__('Cari atau pilih rujukan…'))
                                 ->multiple()
+                                ->closeOnSelect()
                                 ->searchable()
                                 ->preload()
                                 ->native(false)
@@ -571,6 +598,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->label(__('Sama seperti institusi penganjur'))
                                         ->default(true)
                                         ->inline(false)
+                                        ->live()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'institution'
                                                             JS),
@@ -583,6 +611,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ])
                                         ->inline()
                                         ->default('institution')
+                                        ->live()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
                                                             JS)
@@ -619,25 +648,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->searchable()
                                         ->preload()
                                         ->live()
-                                        ->options(function (Get $get): array {
-                                            $institutionId = null;
-
-                                            if ($get('organizer_type') === 'institution' && ($get('location_same_as_institution') ?? true)) {
-                                                $institutionId = $get('organizer_institution_id');
-                                            } elseif ($get('location_type') === 'institution') {
-                                                $institutionId = $get('location_institution_id');
-                                            }
-
-                                            if (!$institutionId) {
-                                                return [];
-                                            }
-
-                                            return Space::query()
-                                                ->where('institution_id', $institutionId)
-                                                ->where('is_active', true)
-                                                ->pluck('name', 'id')
-                                                ->toArray();
-                                        }),
+                                        ->visibleJs(<<<'JS'
+                                                            // Show space only for institution locations, not venues
+                                                            ($get('organizer_type') === 'institution' && ($get('location_same_as_institution') !== false)) || 
+                                                            (($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution')
+                                                            JS)
+                                        ->options(fn (): array => Space::query()
+                                            ->where('is_active', true)
+                                            ->orderBy('name')
+                                            ->pluck('name', 'id')
+                                            ->toArray()
+                                        ),
                                 ]),
                         ]),
 
@@ -650,6 +671,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->label(__('Pilih Penceramah'))
                                         ->required()
                                         ->multiple()
+                                        ->closeOnSelect()
                                         ->relationship('speakers', 'name', fn(Builder $query) => $query->whereIn('status', ['verified', 'pending']))
                                         ->searchable()
                                         ->preload()
@@ -865,6 +887,14 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'visibility' => $validated['visibility'] ?? EventVisibility::Public ,
             'submitter_id' => auth()->id(),
         ]);
+
+        // Attach selected space to institution if not already attached
+        if (!empty($validated['space_id']) && !empty($event->institution_id)) {
+            $institution = Institution::find($event->institution_id);
+            if ($institution && !$institution->spaces()->where('spaces.id', $validated['space_id'])->exists()) {
+                $institution->spaces()->attach($validated['space_id']);
+            }
+        }
 
         if (!empty($validated['speakers'])) {
             $event->speakers()->attach($validated['speakers']);

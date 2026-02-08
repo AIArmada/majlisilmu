@@ -351,6 +351,46 @@ $tags = Tag::ordered()->get();
 4. **Status-based moderation**: User-created tags start as `'pending'`, auto-verify on event approval
 5. **Keep it simple**: No extra fields like `is_active`, `is_system`, `description`, `weight`, or `is_primary`
 
+---
+
+# Testing Best Practices
+
+## Running Tests
+
+Always use **parallel execution** for faster test runs:
+
+```bash
+# Run all tests in parallel
+vendor/bin/pest --parallel
+
+# Run specific tests in parallel
+vendor/bin/pest --parallel --filter=SubmitEvent
+
+# Run tests with compact output in parallel
+vendor/bin/pest --parallel --compact
+```
+
+### Why Parallel?
+- **Speed**: Tests run significantly faster by utilizing multiple CPU cores
+- **Efficiency**: Reduces CI/CD pipeline time
+- **Best practice**: Pest's parallel mode handles database isolation automatically
+
+### Alternative Commands
+While `php artisan test` can be used, prefer `vendor/bin/pest --parallel` for optimal performance:
+
+```bash
+# ❌ Slower (sequential)
+php artisan test --filter=SubmitEvent
+
+# ✅ Faster (parallel)
+vendor/bin/pest --parallel --filter=SubmitEvent
+```
+
+### Key Points
+- Parallel execution is safe for all tests (Pest handles isolation)
+- No need to modify existing tests to support parallel mode
+- Default behavior - no additional configuration required
+
 === foundation rules ===
 
 # Laravel Boost Guidelines
