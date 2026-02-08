@@ -26,7 +26,7 @@ return new class extends Migration
 
             $table->string('title');
             $table->string('slug')->unique();
-            $table->text('description')->nullable();
+            $table->jsonb('description')->nullable();
 
             $table->dateTime('starts_at');
             $table->dateTime('ends_at')->nullable();

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Space extends Model
@@ -13,7 +13,6 @@ class Space extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'institution_id',
         'name',
         'slug',
         'capacity',
@@ -24,9 +23,10 @@ class Space extends Model
         'is_active' => 'boolean',
     ];
 
-    public function institution(): BelongsTo
+    public function institutions(): BelongsToMany
     {
-        return $this->belongsTo(Institution::class);
+        return $this->belongsToMany(Institution::class, 'institution_space')
+            ->withTimestamps();
     }
 
     public function events(): HasMany

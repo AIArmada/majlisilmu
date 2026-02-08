@@ -41,6 +41,7 @@ class SharedFormSchema
                 ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
                 ->searchable()
                 ->preload()
+                ->live()
                 ->afterStateUpdatedJs(<<<'JS'
                     $set('district_id', null)
                     $set('subdistrict_id', null)
@@ -59,12 +60,11 @@ class SharedFormSchema
                         ->pluck('name', 'id');
                 })
                 ->searchable()
+                ->live()
                 ->afterStateUpdatedJs(<<<'JS'
                     $set('subdistrict_id', null)
                     JS)
-                ->visibleJs(<<<'JS'
-                    $get('state_id') != null && $get('state_id') !== ''
-                    JS),
+                ->visible(fn (Get $get): bool => filled($get('state_id'))),
 
             Select::make('subdistrict_id')
                 ->label(__('Daerah Kecil / Bandar / Mukim'))
@@ -79,9 +79,7 @@ class SharedFormSchema
                         ->pluck('name', 'id');
                 })
                 ->searchable()
-                ->visibleJs(<<<'JS'
-                    $get('district_id') != null && $get('district_id') !== ''
-                    JS),
+                ->visible(fn (Get $get): bool => filled($get('district_id'))),
 
             TextInput::make('google_maps_url')
                 ->label(__('Google Maps URL'))

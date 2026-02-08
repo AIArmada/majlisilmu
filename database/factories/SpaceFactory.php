@@ -50,21 +50,10 @@ class SpaceFactory extends Factory
         $slug = Str::slug($name.'-'.Str::random(5));
 
         return [
-            'institution_id' => null,
             'name' => $name,
             'slug' => Str::slug($name.'-'.Str::random(5)),
             'capacity' => fake()->randomElement([10, 20, 30, 50, 100, 200]),
             'is_active' => true,
         ];
-    }
-
-    /**
-     * Associate the space with an institution.
-     */
-    public function forInstitution(\App\Models\Institution $institution): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'institution_id' => $institution->id,
-        ]);
     }
 }

@@ -14,9 +14,12 @@ return new class extends Migration
             $table->json('name');
             $table->json('slug');
             $table->string('type')->nullable();
+            $table->string('status')->default('verified');
             $table->integer('order_column')->nullable();
 
             $table->timestamps();
+
+            $table->index(['type', 'status', 'order_column'], 'tags_type_status_order');
         });
 
         Schema::create('taggables', function (Blueprint $table) {

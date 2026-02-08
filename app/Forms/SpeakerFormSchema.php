@@ -122,7 +122,8 @@ class SpeakerFormSchema
                     ->pluck('name', 'id'))
                 ->multiple()
                 ->searchable()
-                ->preload(),
+                ->preload()
+                ->closeOnSelect(),
         ];
     }
 

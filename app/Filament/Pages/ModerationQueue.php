@@ -4,6 +4,9 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
+use App\States\EventStatus\NeedsChanges;
+use App\States\EventStatus\Pending;
+use App\States\EventStatus\Rejected;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -17,6 +20,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use UnitEnum;
 
 class ModerationQueue extends Page implements HasTable
@@ -33,16 +37,40 @@ class ModerationQueue extends Page implements HasTable
 
     protected string $view = 'filament.pages.moderation-queue';
 
+    /**
+     * @var list<string>
+     */
+    protected const AVAILABLE_TABS = [
+        'pending',
+        'needs_changes',
+        'reports',
+        'recently_rejected',
+    ];
+
+    #[Url(as: 'tab')]
     public string $activeTab = 'pending';
 
     public function mount(): void
     {
-        $this->activeTab = request()->query('tab', 'pending');
+        $this->activeTab = $this->normalizeActiveTab($this->activeTab);
     }
 
     public function setActiveTab(string $tab): void
     {
-        $this->activeTab = $tab;
+        $this->activeTab = $this->normalizeActiveTab($tab);
+
+        $this->resetPage();
+        $this->flushCachedTableRecords();
+    }
+
+    public function getTabBadgeColorClasses(string $badgeColor): string
+    {
+        return match ($badgeColor) {
+            'warning' => 'bg-warning-100 text-warning-700 dark:bg-warning-500/20 dark:text-warning-400',
+            'info' => 'bg-info-100 text-info-700 dark:bg-info-500/20 dark:text-info-400',
+            'danger' => 'bg-danger-100 text-danger-700 dark:bg-danger-500/20 dark:text-danger-400',
+            default => 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400',
+        };
     }
 
     public function getTabs(): array
@@ -51,25 +79,25 @@ class ModerationQueue extends Page implements HasTable
             'pending' => [
                 'label' => 'Pending',
                 'icon' => 'heroicon-o-clock',
-                'count' => Event::whereState('status', \App\States\EventStatus\Pending::class)->count(),
+                'count' => Event::whereState('status', Pending::class)->count(),
                 'badgeColor' => 'warning',
             ],
             'needs_changes' => [
                 'label' => 'Needs Changes',
                 'icon' => 'heroicon-o-pencil-square',
-                'count' => Event::whereHas('moderationReviews', fn ($q) => $q->where('decision', 'needs_changes')->latest()->limit(1))->whereState('status', \App\States\EventStatus\Pending::class)->count(),
+                'count' => Event::whereState('status', NeedsChanges::class)->count(),
                 'badgeColor' => 'info',
             ],
             'reports' => [
                 'label' => 'Reports',
                 'icon' => 'heroicon-o-flag',
-                'count' => \App\Models\Report::where('status', 'open')->count(),
+                'count' => Event::whereHas('reports', fn (Builder $query) => $query->where('status', 'open'))->count(),
                 'badgeColor' => 'danger',
             ],
             'recently_rejected' => [
                 'label' => 'Recently Rejected',
                 'icon' => 'heroicon-o-x-circle',
-                'count' => Event::whereState('status', \App\States\EventStatus\Rejected::class)->where('updated_at', '>=', now()->subDays(7))->count(),
+                'count' => Event::whereState('status', Rejected::class)->where('updated_at', '>=', now()->subDays(7))->count(),
                 'badgeColor' => 'gray',
             ],
         ];
@@ -78,7 +106,7 @@ class ModerationQueue extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query($this->getTableQuery())
+            ->query(fn (): Builder => $this->getTableQuery())
             ->columns([
                 TextColumn::make('title')
                     ->searchable()
@@ -129,6 +157,13 @@ class ModerationQueue extends Page implements HasTable
                         $state === 'None' => 'gray',
                         default => 'warning',
                     }),
+                TextColumn::make('open_reports_count')
+                    ->label('Open Reports')
+                    ->badge()
+                    ->state(fn (Event $record): int => (int) $record->open_reports_count)
+                    ->color(fn (int $state): string => $state > 0 ? 'danger' : 'gray')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
                 TextColumn::make('starts_at')
                     ->label('Event Date')
                     ->dateTime('M d, Y H:i')
@@ -220,14 +255,28 @@ class ModerationQueue extends Page implements HasTable
 
     protected function getTableQuery(): Builder
     {
-        $query = Event::query()->with(['institution', 'venue', 'speakers', 'address.state']);
+        $query = Event::query()
+            ->with(['institution', 'venue', 'speakers', 'address.state'])
+            ->withCount([
+                'reports as open_reports_count' => fn (Builder $reportQuery) => $reportQuery->where('status', 'open'),
+            ]);
 
         return match ($this->activeTab) {
-            'pending' => $query->whereState('status', \App\States\EventStatus\Pending::class),
-            'needs_changes' => $query->whereHas('moderationReviews', fn ($q) => $q->where('decision', 'needs_changes'))->whereState('status', \App\States\EventStatus\Pending::class),
-            'recently_rejected' => $query->whereState('status', \App\States\EventStatus\Rejected::class)->where('updated_at', '>=', now()->subDays(7)),
-            default => $query->whereState('status', \App\States\EventStatus\Pending::class),
+            'pending' => $query->whereState('status', Pending::class),
+            'needs_changes' => $query->whereState('status', NeedsChanges::class),
+            'reports' => $query->whereHas('reports', fn (Builder $reportQuery) => $reportQuery->where('status', 'open')),
+            'recently_rejected' => $query->whereState('status', Rejected::class)->where('updated_at', '>=', now()->subDays(7)),
+            default => $query->whereState('status', Pending::class),
         };
+    }
+
+    protected function normalizeActiveTab(string $tab): string
+    {
+        if (in_array($tab, self::AVAILABLE_TABS, true)) {
+            return $tab;
+        }
+
+        return 'pending';
     }
 
     public static function canAccess(): bool

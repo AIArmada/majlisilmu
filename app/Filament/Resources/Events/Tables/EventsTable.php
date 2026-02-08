@@ -4,8 +4,14 @@ namespace App\Filament\Resources\Events\Tables;
 
 use A909M\FilamentStateFusion\Tables\Columns\StateFusionSelectColumn;
 use A909M\FilamentStateFusion\Tables\Filters\StateFusionSelectFilter;
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
 use App\Enums\TimingMode;
 use App\Models\Event;
+use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -13,6 +19,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class EventsTable
 {
@@ -28,27 +35,58 @@ class EventsTable
                     ->searchable(),
                 TextColumn::make('event_type')
                     ->label('Type')
-                    ->badge()
-                    ->sortable()
-                    ->searchable(),
+                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumCollection($state, EventType::class))
+                    ->wrap()
+                    ->searchable(query: fn ($query, string $search) => $query->whereJsonContains('event_type', EventType::tryFrom($search)?->value ?? $search)),
                 TextColumn::make('starts_at')
                     ->dateTime()
-                    ->description(fn (Event $record) => $record->timing_mode === TimingMode::PrayerRelative->value ? $record->prayer_display_text : null)
+                    ->description(fn (Event $record): ?string => $record->timing_mode === TimingMode::PrayerRelative ? $record->prayer_display_text : null)
                     ->sortable(),
                 StateFusionSelectColumn::make('status')
                     ->sortable(),
                 TextColumn::make('visibility')
                     ->badge()
+                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state, EventVisibility::class))
                     ->sortable(),
+                TextColumn::make('event_format')
+                    ->label('Format')
+                    ->badge()
+                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state, EventFormat::class))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('gender')
+                    ->badge()
+                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state, EventGenderRestriction::class))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('age_group')
+                    ->label('Age Group')
+                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumCollection($state, EventAgeGroup::class))
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 \Filament\Tables\Columns\ToggleColumn::make('is_featured')
                     ->label('Featured'),
                 IconColumn::make('is_muslim_only')
                     ->boolean()
                     ->label('Muslim Only')
                     ->toggleable(isToggledHiddenByDefault: true),
-                IconColumn::make('registration_required')
+                IconColumn::make('settings.registration_required')
                     ->boolean()
                     ->label('Reg?'),
+                TextColumn::make('event_url')
+                    ->label('Event URL')
+                    ->url(fn (Event $record): ?string => $record->event_url)
+                    ->openUrlInNewTab()
+                    ->limit(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('live_url')
+                    ->label('Live URL')
+                    ->url(fn (Event $record): ?string => $record->live_url)
+                    ->openUrlInNewTab()
+                    ->limit(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('submitter.email')
+                    ->label('Submitter')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('published_at')
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -82,5 +120,48 @@ class EventsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    protected static function formatEnumCollection(mixed $state, string $enumClass): string
+    {
+        $items = $state instanceof Collection
+            ? $state->all()
+            : (is_array($state) ? $state : [$state]);
+
+        return collect($items)
+            ->filter(fn (mixed $value): bool => filled($value))
+            ->map(fn (mixed $value): string => self::formatEnumValue($value, $enumClass))
+            ->filter()
+            ->implode(', ');
+    }
+
+    protected static function formatEnumValue(mixed $state, ?string $enumClass = null): string
+    {
+        if ($state instanceof BackedEnum) {
+            return self::resolveEnumLabel($state);
+        }
+
+        if (is_string($state) && $enumClass !== null && is_subclass_of($enumClass, BackedEnum::class)) {
+            $enum = $enumClass::tryFrom($state);
+
+            if ($enum instanceof BackedEnum) {
+                return self::resolveEnumLabel($enum);
+            }
+        }
+
+        return is_scalar($state) ? (string) $state : '';
+    }
+
+    protected static function resolveEnumLabel(BackedEnum $enum): string
+    {
+        if (method_exists($enum, 'getLabel')) {
+            return (string) $enum->getLabel();
+        }
+
+        if (method_exists($enum, 'label')) {
+            return (string) $enum->label();
+        }
+
+        return (string) $enum->value;
     }
 }

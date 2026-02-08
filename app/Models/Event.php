@@ -105,6 +105,7 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         return [
             'status' => \App\States\EventStatus\EventStatus::class,
+            'description' => 'array',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'timing_mode' => TimingMode::class,

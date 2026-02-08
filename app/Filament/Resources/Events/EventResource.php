@@ -5,9 +5,9 @@ namespace App\Filament\Resources\Events;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
-use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
-use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventSubmissionsRelationManager;
+use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
+use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
 use App\Filament\Resources\Events\Schemas\EventForm;
@@ -18,6 +18,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 class EventResource extends Resource
@@ -38,6 +39,16 @@ class EventResource extends Resource
     public static function table(Table $table): Table
     {
         return EventsTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'institution',
+                'settings',
+                'submitter',
+            ]);
     }
 
     public static function getRelations(): array

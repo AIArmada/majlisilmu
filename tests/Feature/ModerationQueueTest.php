@@ -9,10 +9,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('shows verification warnings in moderation queue', function () {
+beforeEach(function () {
     $this->seed(\Database\Seeders\RoleSeeder::class);
     $this->seed(\Database\Seeders\PermissionSeeder::class);
+});
 
+it('shows verification warnings in moderation queue', function () {
     $moderator = User::factory()->create();
     $moderator->assignRole('moderator');
 
@@ -32,4 +34,71 @@ it('shows verification warnings in moderation queue', function () {
         ->assertSuccessful()
         ->assertSee('Unverified')
         ->assertSee('1 unverified');
+});
+
+it('shows only needs changes events on the needs changes tab', function () {
+    $moderator = User::factory()->create();
+    $moderator->assignRole('moderator');
+
+    $pendingEvent = Event::factory()->create([
+        'title' => 'Pending Queue Event',
+        'status' => 'pending',
+    ]);
+
+    $needsChangesEvent = Event::factory()->create([
+        'title' => 'Needs Changes Queue Event',
+        'status' => 'needs_changes',
+    ]);
+
+    $needsChangesEvent->moderationReviews()->create([
+        'moderator_id' => $moderator->id,
+        'decision' => 'needs_changes',
+        'reason_code' => 'incomplete_info',
+        'note' => 'Please update venue details.',
+    ]);
+
+    $this->actingAs($moderator)
+        ->get('/admin/moderation-queue?tab=needs_changes')
+        ->assertSuccessful()
+        ->assertSee($needsChangesEvent->title)
+        ->assertDontSee($pendingEvent->title);
+});
+
+it('shows only events with open reports on the reports tab', function () {
+    $moderator = User::factory()->create();
+    $moderator->assignRole('moderator');
+
+    $reporter = User::factory()->create();
+
+    $reportedEvent = Event::factory()->create([
+        'title' => 'Reported Approved Event',
+        'status' => 'approved',
+    ]);
+
+    $reportedEvent->reports()->create([
+        'reporter_id' => $reporter->id,
+        'category' => 'other',
+        'description' => 'Potentially misleading event information.',
+        'status' => 'open',
+    ]);
+
+    $notOpenReportedEvent = Event::factory()->create([
+        'title' => 'Resolved Report Event',
+        'status' => 'pending',
+    ]);
+
+    $notOpenReportedEvent->reports()->create([
+        'reporter_id' => $reporter->id,
+        'handled_by' => $moderator->id,
+        'category' => 'other',
+        'description' => 'Already handled.',
+        'status' => 'resolved',
+        'resolution_note' => 'Reviewed and resolved.',
+    ]);
+
+    $this->actingAs($moderator)
+        ->get('/admin/moderation-queue?tab=reports')
+        ->assertSuccessful()
+        ->assertSee($reportedEvent->title)
+        ->assertDontSee($notOpenReportedEvent->title);
 });
