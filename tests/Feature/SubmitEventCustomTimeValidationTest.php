@@ -4,6 +4,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventVisibility;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Event;
@@ -30,8 +31,10 @@ it('can submit event with custom prayer time (lain_waktu)', function () {
         ->set('data.custom_time', '10:00') // Required for LainWaktu
         ->set('data.description', 'Test description')
         ->set('data.event_format', EventFormat::Physical->value)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)
         ->set('data.speakers', [$speaker->id])
@@ -62,8 +65,10 @@ it('saves timing mode as prayer_relative when using prayer time', function () {
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.description', 'Test description')
         ->set('data.event_format', EventFormat::Physical->value)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)
         ->set('data.speakers', [$speaker->id])
@@ -97,8 +102,10 @@ it('can submit event for future dates', function () {
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
         ->set('data.description', 'Test description')
         ->set('data.event_format', EventFormat::Physical->value)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)
         ->set('data.speakers', [$speaker->id])

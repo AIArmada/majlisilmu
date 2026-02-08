@@ -3,6 +3,7 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Tag;
@@ -29,6 +30,7 @@ it('stores poster and gallery uploads when submitting an event', function () {
         ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.children_allowed', true)
         ->set('data.domain_tags', $domainTags->pluck('id')->all())
         ->set('data.discipline_tags', $disciplineTags->pluck('id')->all())
@@ -42,6 +44,7 @@ it('stores poster and gallery uploads when submitting an event', function () {
             UploadedFile::fake()->image('gallery-1.jpg', 1200, 800),
             UploadedFile::fake()->image('gallery-2.jpg', 1200, 800),
         ])
+        ->set('data.visibility', EventVisibility::Public->value)
         ->call('submit')
         ->assertRedirect(route('submit-event.success'));
 
@@ -70,12 +73,14 @@ it('does not require guest details for authenticated users', function () {
         ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.children_allowed', true)
         ->set('data.domain_tags', $domainTags->pluck('id')->all())
         ->set('data.discipline_tags', $disciplineTags->pluck('id')->all())
         ->set('data.speakers', $speakers->pluck('id')->all())
         ->set('data.organizer_type', 'institution')
         ->set('data.organizer_institution_id', $institution->id)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->call('submit')
         ->assertRedirect(route('submit-event.success'));
 

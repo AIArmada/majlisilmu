@@ -21,6 +21,7 @@ class Address extends Model
         'country_id',
         'state_id',
         'district_id',
+        'subdistrict_id',
         'city_id',
         'lat',
         'lng',
@@ -52,6 +53,11 @@ class Address extends Model
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);
+    }
+
+    public function subdistrict(): BelongsTo
+    {
+        return $this->belongsTo(Subdistrict::class);
     }
 
     public function city(): BelongsTo

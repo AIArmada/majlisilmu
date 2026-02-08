@@ -39,6 +39,9 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
             $this->event->published_at = now();
             $this->event->save();
 
+            // Auto-verify pending related records (by approving the event, moderator implicitly verifies these entities)
+            $this->verifyPendingRelatedRecords($this->event);
+
             // Make searchable (Scout)
             $this->event->searchable();
 
@@ -75,6 +78,55 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
         $notifiables->filter()->unique('id')->each(function ($user) use ($event) {
             $user->notify(new EventApprovedNotification($event));
         });
+    }
+
+    /**
+     * Auto-verify pending Speaker/Institution/Venue records.
+     * By approving the event, the moderator implicitly verifies these related entities.
+     */
+    protected function verifyPendingRelatedRecords(Event $event): void
+    {
+        // Verify speakers
+        $event->speakers()
+            ->where('status', 'pending')
+            ->update(['status' => 'verified']);
+
+        // Verify organizer if Speaker
+        if ($event->organizer_type === \App\Models\Speaker::class && $event->organizer_id) {
+            \App\Models\Speaker::where('id', $event->organizer_id)
+                ->where('status', 'pending')
+                ->update(['status' => 'verified']);
+        }
+
+        // Verify organizer if Institution
+        if ($event->organizer_type === \App\Models\Institution::class && $event->organizer_id) {
+            \App\Models\Institution::where('id', $event->organizer_id)
+                ->where('status', 'pending')
+                ->update(['status' => 'verified']);
+        }
+
+        // Verify location institution
+        if ($event->institution_id) {
+            \App\Models\Institution::where('id', $event->institution_id)
+                ->where('status', 'pending')
+                ->update(['status' => 'verified']);
+        }
+
+        // Verify venue
+        if ($event->venue_id) {
+            \App\Models\Venue::where('id', $event->venue_id)
+                ->where('status', 'pending')
+                ->update(['status' => 'verified']);
+        }
+
+        // Verify tags
+        \App\Models\Tag::whereIn('id', $event->tags->pluck('id'))
+            ->where('status', 'pending')
+            ->update(['status' => 'verified']);
+
+        Log::info('Auto-verified pending related records', [
+            'event_id' => $event->id,
+        ]);
     }
 
     public function getLabel(): string

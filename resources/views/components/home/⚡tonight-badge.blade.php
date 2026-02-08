@@ -17,7 +17,7 @@ new class extends Component {
         $end = $now->copy()->endOfDay()->setTimezone('UTC');
 
         return Event::query()
-            ->where('status', 'approved')
+            ->whereIn('status', ['approved', 'pending'])
             ->where('visibility', 'public')
             ->whereBetween('starts_at', [$start, $end])
             ->count();

@@ -3,6 +3,7 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventVisibility;
 use App\Enums\TagType;
 use App\Models\Event;
 use App\Models\Institution;
@@ -38,8 +39,10 @@ it('can submit an event as a speaker with an institution location', function () 
         ->set('data.location_type', 'institution')
         ->set('data.location_institution_id', $institution->id)
         ->set('data.event_format', EventFormat::Physical->value)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.domain_tags', [$this->domainTag->id])
         ->set('data.discipline_tags', [$this->disciplineTag->id])
         ->call('submit')
@@ -70,8 +73,10 @@ it('can submit an event as a speaker with a venue location', function () {
         ->set('data.location_type', 'venue')
         ->set('data.location_venue_id', $venue->id)
         ->set('data.event_format', EventFormat::Physical->value)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.domain_tags', [$this->domainTag->id])
         ->set('data.discipline_tags', [$this->disciplineTag->id])
         ->call('submit')
@@ -104,9 +109,10 @@ it('automatically sets location to institution when organizer is an institution'
         ->set('data.organizer_institution_id', $institution->id)
         ->set('data.speakers', [$speaker->id])
         ->set('data.event_format', EventFormat::Physical->value)
-
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.domain_tags', [$this->domainTag->id])
         ->set('data.discipline_tags', [$this->disciplineTag->id])
         ->call('submit')
@@ -127,6 +133,7 @@ it('requires location type when organizer is speaker', function () {
         ->test('pages.submit-event.create')
         ->set('data.organizer_type', 'speaker')
         ->set('data.location_type', null)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->call('submit')
         ->assertHasErrors(['data.location_type' => 'required']);
 });
@@ -153,8 +160,10 @@ it('allows institution organizer to choose a different location', function () {
         ->set('data.location_venue_id', $otherVenue->id)
         ->set('data.speakers', [$speaker->id])
         ->set('data.event_format', EventFormat::Physical->value)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.domain_tags', [$this->domainTag->id])
         ->set('data.discipline_tags', [$this->disciplineTag->id])
         ->call('submit')

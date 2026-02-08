@@ -92,6 +92,88 @@ describe('Event Approval', function () {
 
         Notification::assertSentTo($submitter, EventApprovedNotification::class);
     });
+
+    it('auto-verifies pending related records on approval', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        // Create pending speaker
+        $speaker = \App\Models\Speaker::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        // Create pending institution (organizer)
+        $organizerInstitution = Institution::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        // Create pending institution (location)
+        $locationInstitution = Institution::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        // Create pending venue
+        $venue = \App\Models\Venue::factory()->create([
+            'status' => 'pending',
+            'institution_id' => $locationInstitution->id,
+        ]);
+
+        // Create pending tags
+        $disciplineTag = \App\Models\Tag::create([
+            'name' => ['ms' => 'Pending Fiqh', 'en' => 'Pending Fiqh'],
+            'type' => 'discipline',
+            'status' => 'pending',
+        ]);
+
+        $issueTag = \App\Models\Tag::create([
+            'name' => ['ms' => 'Pending Issue', 'en' => 'Pending Issue'],
+            'type' => 'issue',
+            'status' => 'pending',
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'pending',
+            'organizer_type' => Institution::class,
+            'organizer_id' => $organizerInstitution->id,
+            'institution_id' => $locationInstitution->id,
+            'venue_id' => $venue->id,
+        ]);
+
+        $event->speakers()->attach($speaker->id);
+        $event->syncTags([$disciplineTag, $issueTag]);
+
+        // Approve event
+        $this->service->approve($event, $moderator);
+
+        // Verify all related records are now verified
+        expect($speaker->fresh()->status)->toBe('verified')
+            ->and($organizerInstitution->fresh()->status)->toBe('verified')
+            ->and($locationInstitution->fresh()->status)->toBe('verified')
+            ->and($venue->fresh()->status)->toBe('verified')
+            ->and($disciplineTag->fresh()->status)->toBe('verified')
+            ->and($issueTag->fresh()->status)->toBe('verified');
+    });
+
+    it('does not change already verified records on approval', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        // Create already verified speaker
+        $speaker = \App\Models\Speaker::factory()->create([
+            'status' => 'verified',
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        $event->speakers()->attach($speaker->id);
+
+        $this->service->approve($event, $moderator);
+
+        // Should remain verified
+        expect($speaker->fresh()->status)->toBe('verified');
+    });
 });
 
 describe('Event Needs Changes', function () {

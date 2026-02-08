@@ -21,7 +21,7 @@ test('base prayer time options are visible without date selected', function () {
         ->assertSee('Selepas Isyak')
         ->assertSee('Lain Waktu')
         ->assertDontSee('Selepas Jumaat')
-        ->assertDontSee('Selepas Tarawikh');
+        ->assertDontSee('Selepas Tarawih');
 });
 
 test('selepas jumaat appears on friday', function () {
@@ -38,26 +38,26 @@ test('selepas jumaat does not appear on non-friday', function () {
         ->assertDontSee('Selepas Jumaat');
 });
 
-test('selepas tarawikh appears during ramadhan', function () {
+test('selepas tarawih appears during ramadhan', function () {
     // Feb 25, 2026 is during Ramadhan (Feb 18 - Mar 19, 2026)
     Livewire::test('pages.submit-event.create')
         ->set('data.event_date', '2026-02-25')
-        ->assertSee('Selepas Tarawikh');
+        ->assertSee('Selepas Tarawih');
 });
 
-test('selepas tarawikh does not appear outside ramadhan', function () {
+test('selepas tarawih does not appear outside ramadhan', function () {
     // Apr 1, 2026 is after Ramadhan
     Livewire::test('pages.submit-event.create')
         ->set('data.event_date', '2026-04-01')
-        ->assertDontSee('Selepas Tarawikh');
+        ->assertDontSee('Selepas Tarawih');
 });
 
-test('both selepas jumaat and tarawikh appear on friday during ramadhan', function () {
+test('both selepas jumaat and tarawih appear on friday during ramadhan', function () {
     // Feb 27, 2026 is a Friday during Ramadhan
     Livewire::test('pages.submit-event.create')
         ->set('data.event_date', '2026-02-27')
         ->assertSee('Selepas Jumaat')
-        ->assertSee('Selepas Tarawikh');
+        ->assertSee('Selepas Tarawih');
 });
 
 test('zohor is now spelled as zuhur', function () {

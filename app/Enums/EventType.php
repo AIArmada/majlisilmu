@@ -57,7 +57,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
             self::Selawat => 'Selawat',
             self::DoaSelamat => 'Doa Selamat',
             self::BacaanYasin => 'Bacaan Yasin',
-            self::KhatamQuran => 'Khatam Quran',
+            self::KhatamQuran => 'Khatam Al-Quran',
             self::Tilawah => 'Tilawah Al-Quran',
             self::HafazanQuran => 'Hafazan Al-Quran',
             self::GotongRoyong => 'Gotong Royong',

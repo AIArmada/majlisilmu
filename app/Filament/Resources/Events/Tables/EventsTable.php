@@ -39,12 +39,6 @@ class EventsTable
                     ->sortable(),
                 TextColumn::make('visibility')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'public' => 'success',
-                        'unlisted' => 'warning',
-                        'private' => 'danger',
-                        default => 'gray',
-                    })
                     ->sortable(),
                 \Filament\Tables\Columns\ToggleColumn::make('is_featured')
                     ->label('Featured'),

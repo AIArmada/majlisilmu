@@ -110,7 +110,7 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Kuliah Event');
     });
 
-    it('only shows approved public events', function () {
+    it('shows approved and pending public events', function () {
         Event::factory()->create([
             'title' => 'Approved Event',
             'status' => 'approved',
@@ -127,18 +127,27 @@ describe('Event Search Filters', function () {
         ]);
 
         Event::factory()->create([
+            'title' => 'Draft Event',
+            'status' => 'draft',
+            'visibility' => 'public',
+            'starts_at' => now()->addDays(3),
+        ]);
+
+        Event::factory()->create([
             'title' => 'Private Event',
             'status' => 'approved',
             'visibility' => 'private',
             'published_at' => now(),
-            'starts_at' => now()->addDays(3),
+            'starts_at' => now()->addDays(4),
         ]);
 
         $response = $this->get('/events');
 
         $response->assertOk()
             ->assertSee('Approved Event')
-            ->assertDontSee('Pending Event')
+            ->assertSee('Pending Event')
+            ->assertSee('Menunggu Kelulusan')
+            ->assertDontSee('Draft Event')
             ->assertDontSee('Private Event');
     });
 
@@ -239,9 +248,23 @@ describe('Event Detail Page', function () {
             ->assertSee('This is the description');
     });
 
-    it('shows 404 for unapproved events', function () {
+    it('shows pending events on detail page with warning banner', function () {
         $event = Event::factory()->create([
+            'title' => 'Pending Detail Event',
             'status' => 'pending',
+            'visibility' => 'public',
+        ]);
+
+        $response = $this->get("/events/{$event->slug}");
+
+        $response->assertOk()
+            ->assertSee('Pending Detail Event')
+            ->assertSee('Menunggu Kelulusan');
+    });
+
+    it('shows 404 for draft events', function () {
+        $event = Event::factory()->create([
+            'status' => 'draft',
             'visibility' => 'public',
         ]);
 

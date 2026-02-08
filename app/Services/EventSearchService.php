@@ -80,7 +80,7 @@ class EventSearchService
 
         // Build filter_by string for Typesense
         $filterParts = [
-            'status:approved',
+            'status:[approved, pending]',
             'visibility:public',
             'starts_at:>='.now()->timestamp,
         ];
@@ -150,7 +150,7 @@ class EventSearchService
         string $sort
     ): LengthAwarePaginator {
         $queryBuilder = Event::query()
-            ->where('status', 'approved')
+            ->whereIn('status', ['approved', 'pending'])
             ->where('visibility', 'public')
             ->where('starts_at', '>=', now());
 
@@ -278,7 +278,7 @@ class EventSearchService
 
                 // Geo filter
                 $search->options([
-                    'filter_by' => "location:({$lat}, {$lng}, {$radiusKm} km) && status:approved && visibility:public",
+                    'filter_by' => "location:({$lat}, {$lng}, {$radiusKm} km) && status:[approved, pending] && visibility:public",
                     'sort_by' => "location({$lat}, {$lng}):asc",
                 ]);
 

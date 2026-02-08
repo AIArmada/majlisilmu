@@ -16,7 +16,7 @@ new class extends Component {
 
         // Count events per state through venue->address relationship
         $eventCountsByState = Event::query()
-            ->where('events.status', 'approved')
+            ->whereIn('events.status', ['approved', 'pending'])
             ->where('events.visibility', 'public')
             ->where('events.starts_at', '>=', $now)
             ->whereNotNull('events.venue_id')
@@ -54,7 +54,7 @@ new class extends Component {
         $now = now();
 
         return Event::query()
-            ->where('status', 'approved')
+            ->whereIn('status', ['approved', 'pending'])
             ->where('visibility', 'public')
             ->where('starts_at', '>=', $now)
             ->selectRaw('title, count(*) as events_count')

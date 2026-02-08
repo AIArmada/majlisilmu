@@ -3,6 +3,7 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -77,6 +78,7 @@ it('records guest submissions without a submitter id', function () {
         ->set('data.organizer_institution_id', $institution->id)
         ->set('data.submitter_name', 'Guest User')
         ->set('data.submitter_email', $email)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

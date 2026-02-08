@@ -5,13 +5,16 @@ namespace App\Forms;
 use App\Enums\Gender;
 use App\Enums\Honorific;
 use App\Enums\PreNominal;
+use App\Models\District;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
+use App\Models\Subdistrict;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Str;
 
 class SpeakerFormSchema
@@ -65,10 +68,51 @@ class SpeakerFormSchema
                 ->placeholder(__('e.g., Imam, Lecturer')),
 
             Select::make('state_id')
-                ->label(__('State'))
+                ->label(__('Negeri'))
                 ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
                 ->searchable()
-                ->preload(),
+                ->preload()
+                ->afterStateUpdatedJs(<<<'JS'
+                    $set('district_id', null)
+                    $set('subdistrict_id', null)
+                    JS),
+
+            Select::make('district_id')
+                ->label(__('Daerah'))
+                ->options(function (Get $get) {
+                    $stateId = $get('state_id');
+                    if (! $stateId) {
+                        return [];
+                    }
+
+                    return District::where('state_id', $stateId)
+                        ->orderBy('name')
+                        ->pluck('name', 'id');
+                })
+                ->searchable()
+                ->afterStateUpdatedJs(<<<'JS'
+                    $set('subdistrict_id', null)
+                    JS)
+                ->visibleJs(<<<'JS'
+                    $get('state_id') != null && $get('state_id') !== ''
+                    JS),
+
+            Select::make('subdistrict_id')
+                ->label(__('Daerah Kecil / Bandar / Mukim'))
+                ->options(function (Get $get) {
+                    $districtId = $get('district_id');
+                    if (! $districtId) {
+                        return [];
+                    }
+
+                    return Subdistrict::where('district_id', $districtId)
+                        ->orderBy('name')
+                        ->pluck('name', 'id');
+                })
+                ->searchable()
+                ->visibleJs(<<<'JS'
+                    $get('district_id') != null && $get('district_id') !== ''
+                    JS),
 
             Select::make('institutions')
                 ->label(__('Affiliated Institutions'))
@@ -100,6 +144,8 @@ class SpeakerFormSchema
         if (! empty($data['state_id'])) {
             $speaker->address()->create([
                 'state_id' => $data['state_id'],
+                'district_id' => $data['district_id'] ?? null,
+                'subdistrict_id' => $data['subdistrict_id'] ?? null,
             ]);
         }
 

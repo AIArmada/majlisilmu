@@ -38,7 +38,7 @@ class DonationChannelsTable
                     ->searchable(['bank_name', 'account_number', 'duitnow_value', 'ewallet_handle']),
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn ($state): string => match ($state) {
                         'verified' => 'success',
                         'unverified' => 'warning',
                         'rejected' => 'danger',

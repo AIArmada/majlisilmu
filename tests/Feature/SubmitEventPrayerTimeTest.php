@@ -26,7 +26,7 @@ it('shows base prayer time options without selecting a date', function () {
 it('hides conditional prayer time options without a date', function () {
     $component = Livewire::test('pages.submit-event.create');
 
-    // Jumaat and Tarawikh require a qualifying date to appear
+    // Jumaat and Tarawih require a qualifying date to appear
     $component->assertDontSee('Selepas Jumaat')
-        ->assertDontSee('Selepas Tarawikh');
+        ->assertDontSee('Selepas Tarawih');
 });

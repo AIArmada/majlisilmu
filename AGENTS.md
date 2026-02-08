@@ -7,10 +7,12 @@
 - **Never** add DB-level constraints or cascades: no `->constrained()`, no `->cascadeOnDelete()`, no FK constraints.
 - **Cascades/integrity**: enforce in application logic (models/actions/services).
 - **Migrations**: keep safe/idempotent; no `down()` required.
+- **No SoftDeletes**: never use Laravel's `SoftDeletes` trait or `$table->softDeletes()` in migrations. This application uses `spatie/laravel-deleted-models` (`KeepsDeletedModels` trait) instead, which stores a full copy of the deleted model in a separate `deleted_models` table.
 - Ensure no constraints/cascades slipped in: `rg -n -- "constrained\(|cascadeOnDelete\(" packages/*/database`
 
 ## Verification
 - Ensure no constraints/cascades slipped in: `rg -n -- "constrained\(|cascadeOnDelete\(" packages/*/database`
+- Ensure no SoftDeletes slipped in: `rg -n -- "softDeletes\(\)|SoftDeletes" database/ app/Models/`
 
 === .ai/livewire rules ===
 
@@ -316,12 +318,12 @@ $event->detachTags();
 
 ### Querying Tags
 ```php
-// Get all tags of a specific type
-$domainTags = Tag::ofType(TagType::Domain)->get();
-$issueTags = Tag::ofType('issue')->get(); // Also accepts string
+// Get all tags of a specific type (verified + pending)
+$domainTags = Tag::ofType(TagType::Domain)->whereIn('status', ['verified', 'pending'])->get();
+$issueTags = Tag::ofType('issue')->whereIn('status', ['verified', 'pending'])->get();
 
-// Spatie's native method
-$domainTags = Tag::getWithType('domain');
+// Spatie's native method (use with status filter)
+$domainTags = Tag::getWithType('domain')->filter(fn($tag) => in_array($tag->status, ['verified', 'pending']));
 
 // Get event's tags of specific type
 $domainTags = $event->tagsWithType('domain');
@@ -329,6 +331,13 @@ $domainTags = $event->tagsWithType('domain');
 // Get all tags ordered
 $tags = Tag::ordered()->get();
 ```
+
+### Tag Status & Moderation
+- Tags have a `status` column with values: `'pending'`, `'verified'`
+- Pre-seeded tags are `'verified'` (Domain, Source types are pre-seeded only)
+- User-created tags (Discipline, Issue) are created as `'pending'`
+- When an event is approved, all attached pending tags are auto-verified
+- Show both `'verified'` and `'pending'` tags in form dropdowns (similar to Speaker/Institution/Venue)
 
 ### Tag Sorting
 - Tags use Spatie Eloquent Sortable with `order_column`
@@ -339,7 +348,8 @@ $tags = Tag::ordered()->get();
 1. **Use native Spatie methods**: `attachTag()`, `syncTags()`, `tagsWithType()`, etc.
 2. **No custom pivot**: Everything uses `taggables` table (polymorphic)
 3. **Type-based organization**: Use `TagType` enum for categorization and metadata
-4. **Keep it simple**: No extra fields like `is_active`, `is_system`, `description`, `weight`, or `is_primary`
+4. **Status-based moderation**: User-created tags start as `'pending'`, auto-verify on event approval
+5. **Keep it simple**: No extra fields like `is_active`, `is_system`, `description`, `weight`, or `is_primary`
 
 === foundation rules ===
 

@@ -3,6 +3,7 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -25,6 +26,7 @@ it('assigns the speaker as event speaker when speaker is the organizer', functio
         ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
+        ->set('data.languages', [101])
         ->set('data.description', 'Test description')
         ->set('data.domain_tags', [$domainTag->id])
         ->set('data.discipline_tags', [$disciplineTag->id])
@@ -32,6 +34,7 @@ it('assigns the speaker as event speaker when speaker is the organizer', functio
         ->set('data.submitter_email', 'test@example.com')
         ->set('data.location_type', 'venue')
         ->set('data.location_venue_id', $venue->id)
+        ->set('data.visibility', EventVisibility::Public->value)
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
