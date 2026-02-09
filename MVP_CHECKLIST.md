@@ -50,7 +50,7 @@
 - [x] Submission success page
 - [x] Rate limiting on submissions
 - [x] CAPTCHA integration (reCAPTCHA/Turnstile) ✨
-- [ ] Poster upload on submission (Phase 3)
+- [x] Poster upload on submission ✨
 
 ---
 
