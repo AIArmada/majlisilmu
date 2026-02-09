@@ -71,7 +71,14 @@ class SpeakerForm
                                     ->relationship('district', 'name', fn (Builder $query, Get $get) => $query->where('state_id', $get('state_id')))
                                     ->searchable()
                                     ->preload()
+                                    ->live()
                                     ->visible(fn (Get $get) => $get('state_id')),
+                                Select::make('subdistrict_id')
+                                    ->label('Subdistrict / Mukim')
+                                    ->relationship('subdistrict', 'name', fn (Builder $query, Get $get) => $query->where('district_id', $get('district_id')))
+                                    ->searchable()
+                                    ->preload()
+                                    ->visible(fn (Get $get) => $get('district_id')),
                             ])
                             ->columns(2),
 

@@ -77,10 +77,35 @@ it('shows typed event fields on the admin edit form', function () {
     $this->actingAs($administrator)
         ->get("/admin/events/{$event->id}/edit")
         ->assertSuccessful()
-        ->assertSee('Event Format')
-        ->assertSee('Gender')
-        ->assertSee('Age Group')
-        ->assertSee('Children Allowed')
-        ->assertSee('Event URL')
-        ->assertSee('Live URL');
+        ->assertSee('Maklumat Majlis')
+        ->assertSee('Kategori & Bidang')
+        ->assertSee('Penganjur & Lokasi')
+        ->assertSee('Penceramah & Media')
+        ->assertSee('Semak & Moderasi')
+        ->assertSee('Bahasa')
+        ->assertSee('Kategori')
+        ->assertSee('Bidang Ilmu')
+        ->assertSee('Sumber Utama')
+        ->assertSee('Tema / Isu');
+});
+
+it('renders the admin event view page with infolist tabs', function () {
+    $this->seed(\Database\Seeders\PermissionSeeder::class);
+    $this->seed(\Database\Seeders\RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($administrator)
+        ->get("/admin/events/{$event->id}")
+        ->assertSuccessful()
+        ->assertSee('Maklumat Majlis')
+        ->assertSee('Kategori & Bidang')
+        ->assertSee('Penganjur & Lokasi')
+        ->assertSee('Penceramah & Media')
+        ->assertSee('Semak & Moderasi');
 });

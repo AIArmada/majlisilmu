@@ -102,3 +102,18 @@ it('shows only events with open reports on the reports tab', function () {
         ->assertSee($reportedEvent->title)
         ->assertDontSee($notOpenReportedEvent->title);
 });
+
+it('links moderation queue view action to the event infolist page', function () {
+    $moderator = User::factory()->create();
+    $moderator->assignRole('moderator');
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+        'title' => 'Pending Event For View Link',
+    ]);
+
+    $this->actingAs($moderator)
+        ->get('/admin/moderation-queue')
+        ->assertSuccessful()
+        ->assertSee("/admin/events/{$event->id}");
+});

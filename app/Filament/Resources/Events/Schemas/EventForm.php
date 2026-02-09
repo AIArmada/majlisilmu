@@ -6,15 +6,22 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventType;
+use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\TagType;
 use App\Enums\TimingMode;
-use App\Models\Event;
+use App\Forms\InstitutionFormSchema;
+use App\Forms\SpeakerFormSchema;
+use App\Forms\VenueFormSchema;
+use App\Models\Institution;
+use App\Models\Speaker;
+use App\Models\Tag;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Callout;
@@ -26,7 +33,9 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Nnjeim\World\Models\Language;
 
 class EventForm
 {
@@ -36,313 +45,406 @@ class EventForm
             ->components([
                 Tabs::make('EventTabs')
                     ->tabs([
-                        Tab::make('Overview')
-                            ->icon('heroicon-m-information-circle')
+                        Tab::make('Maklumat Majlis')
+                            ->icon('heroicon-m-document-text')
                             ->schema([
-                                TextInput::make('title')
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('slug', Str::slug($state))),
-                                TextInput::make('slug')
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->unique(ignoreRecord: true)
-                                    ->suffixAction(
-                                        Action::make('generateSlug')
-                                            ->icon(Heroicon::ArrowPath)
-                                            ->tooltip('Jana semula slug daripada tajuk')
-                                            ->actionJs(<<<'JS'
-                                                const title = $get('title') || '';
-                                                $set('slug', title.toLowerCase()
-                                                    .replace(/[^\w\s-]/g, '')
-                                                    .replace(/\s+/g, '-')
-                                                    .replace(/-+/g, '-')
-                                                    .replace(/^-|-$/g, ''))
-                                            JS),
-                                    ),
-                                \Filament\Forms\Components\RichEditor::make('description')
-                                    ->columnSpanFull()
-                                    ->maxLength(5000),
-                                Select::make('series_id')
-                                    ->relationship('series', 'title')
-                                    ->searchable()
-                                    ->preload()
-                                    ->quickAdd(),
-                                Select::make('speakers')
-                                    ->relationship('speakers', 'name')
-                                    ->multiple()
-                                    ->searchable()
-                                    ->preload()
-                                    ->quickAdd(),
-                                Select::make('references')
-                                    ->relationship('references', 'title')
-                                    ->multiple()
-                                    ->searchable()
-                                    ->preload()
-                                    ->quickAdd(),
-                                Placeholder::make('domain_tags_preview')
-                                    ->label('Domain Tags')
-                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'domain')),
-                                Placeholder::make('discipline_tags_preview')
-                                    ->label('Discipline Tags')
-                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'discipline')),
-                                Placeholder::make('source_tags_preview')
-                                    ->label('Source Tags')
-                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'source')),
-                                Placeholder::make('issue_tags_preview')
-                                    ->label('Issue Tags')
-                                    ->content(fn (?Event $record): string => self::formatTagList($record, 'issue')),
-                                Placeholder::make('all_tags_preview')
-                                    ->label('All Tags')
-                                    ->content(fn (?Event $record): string => self::formatTagList($record)),
-                            ])
-                            ->columns(2),
-                        Tab::make('Logistics')
-                            ->icon('heroicon-m-map')
-                            ->schema([
-                                Section::make('Waktu / Jadual')
-                                    ->description('Tetapkan waktu majlis berdasarkan waktu solat atau waktu tertentu')
+                                Section::make('Maklumat Utama')
+                                    ->schema([
+                                        TextInput::make('title')
+                                            ->label('Tajuk Majlis')
+                                            ->required()
+                                            ->maxLength(255)
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(fn (Set $set, ?string $state): mixed => $set('slug', Str::slug($state))),
+                                        TextInput::make('slug')
+                                            ->label('Slug')
+                                            ->required()
+                                            ->maxLength(255)
+                                            ->unique(ignoreRecord: true)
+                                            ->suffixAction(
+                                                Action::make('generateSlug')
+                                                    ->icon(Heroicon::ArrowPath)
+                                                    ->tooltip('Jana semula slug daripada tajuk')
+                                                    ->actionJs(<<<'JS'
+                                                        const title = $get('title') || '';
+                                                        $set('slug', title.toLowerCase()
+                                                            .replace(/[^\w\s-]/g, '')
+                                                            .replace(/\s+/g, '-')
+                                                            .replace(/-+/g, '-')
+                                                            .replace(/^-|-$/g, ''))
+                                                    JS),
+                                            ),
+                                        RichEditor::make('description')
+                                            ->label('Keterangan')
+                                            ->columnSpanFull()
+                                            ->maxLength(5000),
+                                    ])
+                                    ->columns(2),
+                                Section::make('Waktu & Format')
                                     ->schema([
                                         Select::make('timing_mode')
                                             ->label('Mode Waktu')
-                                            ->options(collect(TimingMode::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
+                                            ->options(
+                                                collect(TimingMode::cases())
+                                                    ->mapWithKeys(fn (TimingMode $case): array => [$case->value => $case->label()])
+                                                    ->toArray(),
+                                            )
                                             ->default(TimingMode::Absolute->value)
                                             ->required()
-                                            ->helperText(\Filament\Schemas\JsContent::make(<<<'JS'
-                                                $get('timing_mode') === 'prayer_relative'
-                                                    ? 'Waktu akan dikira berdasarkan waktu solat di lokasi majlis'
-                                                    : 'Tetapkan waktu yang tepat'
-                                            JS)),
-
-                                        // Prayer-relative timing fields
+                                            ->live(),
                                         Callout::make('Waktu akan dikira secara automatik')
-                                            ->description('Pastikan venue telah ditetapkan di bahagian Location supaya waktu solat dapat dikira berdasarkan koordinat lokasi.')
+                                            ->description('Pilih jenis waktu solat dan offset untuk memaparkan waktu relatif.')
                                             ->warning()
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
-                                            ->visibleJs(<<<'JS'
-                                                $get('timing_mode') === 'prayer_relative'
-                                            JS),
+                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
                                         Fieldset::make('Waktu Solat')
                                             ->schema([
                                                 Select::make('prayer_reference')
                                                     ->label('Waktu Solat')
-                                                    ->options(collect(PrayerReference::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
-                                                    ->required(),
+                                                    ->options(
+                                                        collect(PrayerReference::cases())
+                                                            ->mapWithKeys(fn (PrayerReference $case): array => [$case->value => $case->label()])
+                                                            ->toArray(),
+                                                    )
+                                                    ->required(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
                                                 Select::make('prayer_offset')
-                                                    ->label('Masa')
-                                                    ->options(collect(PrayerOffset::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()]))
-                                                    ->default(PrayerOffset::Immediately->value)
-                                                    ->required(),
-                                                \Filament\Forms\Components\Placeholder::make('prayer_display_text_placeholder')
-                                                    ->label('Paparan Waktu')
-                                                    ->content(\Filament\Schemas\JsContent::make(<<<'JS'
-                                                        const prayer = $get('prayer_reference');
-                                                        const offset = $get('prayer_offset');
-                                                        if (!prayer || !offset) return '';
-                                                        
-                                                        // Mapping logic roughly matching PrayerOffset::displayText
-                                                        // This is a simplified client-side preview.
-                                                        const prayerLabel = {
-                                                            'fajr': 'Subuh', 'syuruk': 'Syuruk', 'dhuha': 'Dhuha', 
-                                                            'zuhur': 'Zuhur', 'asar': 'Asar', 'maghrib': 'Maghrib', 'isyak': 'Isyak'
-                                                        }[prayer] || prayer;
-
-                                                        const offsetLabels = {
-                                                            'before_30': `30 minit sebelum ${prayerLabel}`,
-                                                            'before_15': `15 minit sebelum ${prayerLabel}`,
-                                                            'immediately': `Sejurus selepas ${prayerLabel}`, # Check wording in PrayerOffset
-                                                            'after_15': `15 minit selepas ${prayerLabel}`,
-                                                            'after_30': `30 minit selepas ${prayerLabel}`,
-                                                            'after_45': `45 minit selepas ${prayerLabel}`,
-                                                            'after_60': `1 jam selepas ${prayerLabel}`
-                                                        };
-                                                        
-                                                        return offsetLabels[offset] || (`${offset} ${prayerLabel}`);
-                                                    JS))
-                                                    ->helperText('Teks ini akan dipaparkan kepada pengguna'),
+                                                    ->label('Offset')
+                                                    ->options(
+                                                        collect(PrayerOffset::cases())
+                                                            ->mapWithKeys(fn (PrayerOffset $case): array => [$case->value => $case->label()])
+                                                            ->toArray(),
+                                                    )
+                                                    ->required(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
                                             ])
-                                            ->columns(3)
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
-                                            ->visibleJs(<<<'JS'
-                                                $get('timing_mode') === 'prayer_relative'
-                                            JS),
-
-                                        // Absolute timing fields
+                                            ->columns(2)
+                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
                                         DateTimePicker::make('starts_at')
                                             ->label('Waktu Mula')
-                                            ->required()
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute)
-                                            ->visibleJs(<<<'JS'
-                                                $get('timing_mode') === 'absolute'
-                                            JS),
-
-                                        // Event date (for prayer-relative mode)
-                                        DatePicker::make('event_date')
-                                            ->label('Tarikh Majlis')
-                                            ->required()
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative)
-                                            ->visibleJs(<<<'JS'
-                                                $get('timing_mode') === 'prayer_relative'
-                                            JS)
-                                            ->dehydrated(false)
-                                            ->helperText('Pilih tarikh majlis. Waktu sebenar akan dikira berdasarkan waktu solat pada tarikh ini.'),
-
+                                            ->required(),
                                         DateTimePicker::make('ends_at')
                                             ->label('Waktu Tamat'),
-
                                         TextInput::make('timezone')
+                                            ->label('Timezone')
                                             ->default('Asia/Kuala_Lumpur')
                                             ->required()
                                             ->maxLength(64),
+                                        Select::make('event_format')
+                                            ->label('Format Majlis')
+                                            ->options(
+                                                collect(EventFormat::cases())
+                                                    ->mapWithKeys(fn (EventFormat $case): array => [$case->value => $case->label()])
+                                                    ->toArray(),
+                                            )
+                                            ->required(),
+                                        Select::make('visibility')
+                                            ->label('Keterlihatan')
+                                            ->options(EventVisibility::class)
+                                            ->default(EventVisibility::Public->value)
+                                            ->required(),
+                                        TextInput::make('event_url')
+                                            ->label('Pautan Majlis')
+                                            ->url()
+                                            ->maxLength(255),
+                                        TextInput::make('live_url')
+                                            ->label('Pautan Siaran Langsung')
+                                            ->url()
+                                            ->maxLength(255),
+                                        TextInput::make('recording_url')
+                                            ->label('Pautan Rakaman')
+                                            ->url()
+                                            ->maxLength(255),
                                     ])
                                     ->columns(2),
-                                Section::make('Location')
+                                Section::make('Sasaran Peserta')
                                     ->schema([
-                                        Select::make('venue_id')
-                                            ->relationship('venue', 'name')
+                                        Select::make('gender')
+                                            ->label('Jantina')
+                                            ->options(EventGenderRestriction::class)
+                                            ->required(),
+                                        Select::make('age_group')
+                                            ->label('Peringkat Umur')
+                                            ->options(EventAgeGroup::class)
+                                            ->multiple()
+                                            ->closeOnSelect()
+                                            ->required(),
+                                        Toggle::make('children_allowed')
+                                            ->label('Kanak-kanak Dibenarkan'),
+                                        Toggle::make('is_muslim_only')
+                                            ->label('Terbuka untuk Muslim Sahaja'),
+                                    ])
+                                    ->columns(2),
+                                Section::make('Bahasa')
+                                    ->schema([
+                                        Select::make('languages')
+                                            ->label('Bahasa')
+                                            ->placeholder('Pilih bahasa...')
+                                            ->multiple()
+                                            ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->quickAdd()
-                                            ->helperText('Lokasi venue akan digunakan untuk mengira waktu solat'),
-                                        Select::make('institution_id')
-                                            ->relationship('institution', 'name')
+                                            ->options(fn (): array => self::getLanguageOptions()),
+                                    ]),
+                            ]),
+                        Tab::make('Kategori & Bidang')
+                            ->icon('heroicon-m-tag')
+                            ->schema([
+                                Section::make('Kategori')
+                                    ->schema([
+                                        Select::make('event_type')
+                                            ->label('Jenis Majlis')
+                                            ->required()
+                                            ->multiple()
+                                            ->closeOnSelect()
+                                            ->searchable()
+                                            ->options(self::getEventTypeOptions()),
+                                        Select::make('domain_tags')
+                                            ->label('Kategori')
+                                            ->helperText('Pilih kategori ceramah utama.')
+                                            ->multiple()
+                                            ->closeOnSelect()
+                                            ->searchable()
+                                            ->preload()
+                                            ->options(fn (): array => self::getTagOptions(TagType::Domain)),
+                                        Select::make('discipline_tags')
+                                            ->label('Bidang Ilmu')
+                                            ->multiple()
+                                            ->closeOnSelect()
+                                            ->searchable()
+                                            ->preload()
+                                            ->options(fn (): array => self::getTagOptions(TagType::Discipline))
+                                            ->createOptionForm([
+                                                TextInput::make('name')
+                                                    ->label('Nama Bidang')
+                                                    ->required()
+                                                    ->maxLength(255),
+                                            ])
+                                            ->createOptionUsing(fn (array $data): string => self::createPendingTag($data, TagType::Discipline)),
+                                        Select::make('source_tags')
+                                            ->label('Sumber Utama')
+                                            ->multiple()
+                                            ->closeOnSelect()
+                                            ->searchable()
+                                            ->preload()
+                                            ->options(fn (): array => self::getTagOptions(TagType::Source)),
+                                        Select::make('issue_tags')
+                                            ->label('Tema / Isu')
+                                            ->multiple()
+                                            ->closeOnSelect()
+                                            ->searchable()
+                                            ->preload()
+                                            ->options(fn (): array => self::getTagOptions(TagType::Issue))
+                                            ->createOptionForm([
+                                                TextInput::make('name')
+                                                    ->label('Nama Tema')
+                                                    ->required()
+                                                    ->maxLength(255),
+                                            ])
+                                            ->createOptionUsing(fn (array $data): string => self::createPendingTag($data, TagType::Issue)),
+                                    ])
+                                    ->columns(2),
+                                Section::make('Rujukan')
+                                    ->schema([
+                                        Select::make('references')
+                                            ->label('Rujukan Kitab / Buku')
+                                            ->relationship('references', 'title')
+                                            ->multiple()
+                                            ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
                                             ->quickAdd(),
-                                        Select::make('space_id')
-                                            ->relationship('space', 'name', fn ($query, \Filament\Schemas\Components\Utilities\Get $get) => $get('institution_id')
-                                                ? $query->whereHas('institutions', fn ($q) => $q->where('institutions.id', $get('institution_id')))->where('is_active', true)
-                                                : $query->where('is_active', true))
+                                    ]),
+                            ]),
+                        Tab::make('Penganjur & Lokasi')
+                            ->icon('heroicon-m-building-office')
+                            ->schema([
+                                Section::make('Penganjur')
+                                    ->schema([
+                                        Select::make('organizer_type')
+                                            ->label('Jenis Penganjur')
+                                            ->options([
+                                                Institution::class => 'Institusi',
+                                                Speaker::class => 'Penceramah',
+                                            ])
+                                            ->live(),
+                                        Select::make('organizer_id')
+                                            ->label('Penganjur')
                                             ->searchable()
                                             ->preload()
-                                            ->label('Space / Room'),
+                                            ->options(fn (Get $get): array => self::getOrganizerOptions($get('organizer_type')))
+                                            ->required(fn (Get $get): bool => filled($get('organizer_type'))),
+                                        Select::make('series')
+                                            ->label('Siri')
+                                            ->relationship('series', 'title')
+                                            ->multiple()
+                                            ->searchable()
+                                            ->preload(),
+                                    ])
+                                    ->columns(2),
+                                Section::make('Lokasi')
+                                    ->schema([
+                                        Select::make('institution_id')
+                                            ->label('Institusi')
+                                            ->relationship('institution', 'name')
+                                            ->searchable()
+                                            ->preload()
+                                            ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                                            ->createOptionUsing(fn (array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+                                        Select::make('venue_id')
+                                            ->label('Lokasi')
+                                            ->relationship('venue', 'name')
+                                            ->searchable()
+                                            ->preload()
+                                            ->createOptionForm(VenueFormSchema::createOptionForm())
+                                            ->createOptionUsing(fn (array $data): string => VenueFormSchema::createOptionUsing($data)),
+                                        Select::make('space_id')
+                                            ->label('Ruang')
+                                            ->relationship('space', 'name', fn ($query, Get $get): mixed => $get('institution_id')
+                                                ? $query->whereHas('institutions', fn ($relatedQuery): mixed => $relatedQuery->where('institutions.id', $get('institution_id')))->where('is_active', true)
+                                                : $query->where('is_active', true))
+                                            ->searchable()
+                                            ->preload(),
                                     ])
                                     ->columns(2),
                             ]),
-                        Tab::make('Settings')
-                            ->icon('heroicon-m-cog-6-tooth')
+                        Tab::make('Penceramah & Media')
+                            ->icon('heroicon-m-user-group')
                             ->schema([
-                                Section::make('Classification')
+                                Section::make('Penceramah')
                                     ->schema([
-                                        Select::make('language')
-                                            ->options([
-                                                'bm' => 'Bahasa Melayu',
-                                                'en' => 'English',
-                                                'ar' => 'Arabic',
-                                            ]),
-                                        Select::make('event_type')
-                                            ->label('Event Type')
-                                            ->options(EventType::class)
+                                        Select::make('speakers')
+                                            ->label('Penceramah')
+                                            ->relationship('speakers', 'name', fn ($query): mixed => $query->whereIn('status', ['verified', 'pending']))
                                             ->multiple()
-                                            ->searchable(),
-                                        Select::make('event_format')
-                                            ->label('Event Format')
-                                            ->options(collect(EventFormat::cases())->mapWithKeys(fn (EventFormat $case): array => [$case->value => $case->label()])),
-                                        Select::make('gender')
-                                            ->label('Gender')
-                                            ->options(EventGenderRestriction::class),
-                                        Select::make('age_group')
-                                            ->label('Age Group')
-                                            ->options(EventAgeGroup::class)
-                                            ->multiple()
-                                            ->searchable(),
-                                        Toggle::make('children_allowed')
-                                            ->label('Children Allowed'),
-                                        Select::make('audience')
-                                            ->options([
-                                                'general' => 'General',
-                                                'youth' => 'Youth',
-                                                'muslimah' => 'Muslimah',
-                                                'family' => 'Family',
-                                            ]),
-                                    ])->columns(2),
-                                Section::make('Visibility & Status')
+                                            ->closeOnSelect()
+                                            ->searchable()
+                                            ->preload()
+                                            ->createOptionForm(SpeakerFormSchema::createOptionForm())
+                                            ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
+                                    ]),
+                                Section::make('Media')
                                     ->schema([
-                                        Select::make('visibility')
-                                            ->options([
-                                                'public' => 'Public',
-                                                'unlisted' => 'Unlisted',
-                                                'private' => 'Private',
-                                            ])
-                                            ->required()
-                                            ->default('public'),
+                                        SpatieMediaLibraryFileUpload::make('poster')
+                                            ->label('Gambar Utama')
+                                            ->collection('poster')
+                                            ->image()
+                                            ->imageEditor()
+                                            ->responsiveImages(),
+                                        SpatieMediaLibraryFileUpload::make('gallery')
+                                            ->label('Galeri')
+                                            ->collection('gallery')
+                                            ->multiple()
+                                            ->reorderable()
+                                            ->image()
+                                            ->imageEditor()
+                                            ->responsiveImages(),
+                                    ])
+                                    ->columns(2),
+                            ]),
+                        Tab::make('Semak & Moderasi')
+                            ->icon('heroicon-m-shield-check')
+                            ->schema([
+                                Section::make('Moderasi')
+                                    ->schema([
                                         Select::make('status')
+                                            ->label('Status')
                                             ->options([
                                                 'draft' => 'Draft',
                                                 'pending' => 'Pending',
+                                                'needs_changes' => 'Needs Changes',
                                                 'approved' => 'Approved',
                                                 'rejected' => 'Rejected',
                                                 'cancelled' => 'Cancelled',
                                                 'postponed' => 'Postponed',
                                             ])
-                                            // Status is nullable now, so we can remove required or keep it if admin must choose
-                                            // User said status should be nullable without default.
-                                            // In form, usually we force a selection for admin.
-                                            // But let's leave default removed if we want.
-                                            ->placeholder('Select Status'),
-                                        Toggle::make('is_muslim_only')
-                                            ->label('Muslim Only')
-                                            ->helperText('Hanya untuk penganut agama Islam.'),
+                                            ->placeholder('Pilih status'),
+                                        Toggle::make('is_priority')
+                                            ->label('Priority Review'),
                                         Toggle::make('is_featured')
-                                            ->label('Featured Event')
-                                            ->onColor('success')
-                                            ->offColor('gray')
-                                            ->helperText('Featured events appear at the top of lists.'),
-                                        DateTimePicker::make('published_at'),
-                                    ])->columns(2),
-                                Section::make('Registration')
-                                    ->schema([
-                                        Toggle::make('registration_required')
-                                            ->label('Registration required'),
-                                        TextInput::make('capacity')
-                                            ->numeric()
-                                            ->minValue(1),
-                                        DateTimePicker::make('registration_opens_at'),
-                                        DateTimePicker::make('registration_closes_at'),
-                                    ])->columns(2),
-                            ]),
-                        Tab::make('Media & Donation Channels')
-                            ->icon('heroicon-m-video-camera')
-                            ->schema([
-                                TextInput::make('event_url')
-                                    ->url()
-                                    ->label('Event URL')
-                                    ->maxLength(255),
-                                TextInput::make('live_url')
-                                    ->url()
-                                    ->label('Live URL')
-                                    ->maxLength(255),
-                                TextInput::make('recording_url')
-                                    ->url()
-                                    ->maxLength(255),
+                                            ->label('Featured Event'),
+                                        DateTimePicker::make('published_at')
+                                            ->label('Tarikh Terbit'),
+                                        DateTimePicker::make('escalated_at')
+                                            ->label('Tarikh Eskalasi'),
+                                        Select::make('submitter_id')
+                                            ->label('Penghantar')
+                                            ->relationship('submitter', 'email')
+                                            ->searchable()
+                                            ->preload(),
+                                    ])
+                                    ->columns(2),
                             ]),
                     ])
                     ->persistTabInQueryString(),
             ]);
     }
 
-    protected static function formatTagList(?Event $event, ?string $type = null): string
+    /**
+     * @return array<string, array<string, string>>
+     */
+    protected static function getEventTypeOptions(): array
     {
-        if (! $event instanceof Event) {
-            return '-';
-        }
+        return collect(EventType::cases())
+            ->mapToGroups(fn (EventType $type): array => [
+                $type->getGroup() => [$type->value => $type->getLabel()],
+            ])
+            ->map(fn (Collection $group): array => $group->collapse()->toArray())
+            ->toArray();
+    }
 
-        $tags = $event->tags;
+    /**
+     * @return array<int, string>
+     */
+    protected static function getLanguageOptions(): array
+    {
+        return Language::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->toArray();
+    }
 
-        if ($type !== null) {
-            $tags = $tags->where('type', $type);
-        }
+    /**
+     * @return array<string, string>
+     */
+    protected static function getTagOptions(TagType $type): array
+    {
+        return Tag::query()
+            ->ofType($type)
+            ->whereIn('status', ['verified', 'pending'])
+            ->ordered()
+            ->get()
+            ->mapWithKeys(fn (Tag $tag): array => [
+                (string) $tag->id => $tag->getTranslation('name', app()->getLocale()),
+            ])
+            ->toArray();
+    }
 
-        $values = $tags
-            ->pluck('name')
-            ->filter()
-            ->values();
+    protected static function createPendingTag(array $data, TagType $type): string
+    {
+        $tag = Tag::create([
+            'name' => ['ms' => $data['name'], 'en' => $data['name']],
+            'type' => $type->value,
+            'status' => 'pending',
+        ]);
 
-        if ($values->isEmpty()) {
-            return '-';
-        }
+        return (string) $tag->getKey();
+    }
 
-        return $values->implode(', ');
+    /**
+     * @return array<string, string>
+     */
+    protected static function getOrganizerOptions(?string $organizerType): array
+    {
+        return match ($organizerType) {
+            Institution::class, 'institution' => Institution::query()
+                ->whereIn('status', ['verified', 'pending'])
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->toArray(),
+            Speaker::class, 'speaker' => Speaker::query()
+                ->whereIn('status', ['verified', 'pending'])
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->toArray(),
+            default => [],
+        };
     }
 }

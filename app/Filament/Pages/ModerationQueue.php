@@ -247,6 +247,10 @@ class ModerationQueue extends Page implements HasTable
                 Action::make('view')
                     ->label('View')
                     ->icon('heroicon-o-eye')
+                    ->url(fn (Event $record) => EventResource::getUrl('view', ['record' => $record])),
+                Action::make('edit')
+                    ->label('Edit')
+                    ->icon('heroicon-o-pencil-square')
                     ->url(fn (Event $record) => EventResource::getUrl('edit', ['record' => $record])),
             ])
             ->defaultSort('created_at', 'desc')
