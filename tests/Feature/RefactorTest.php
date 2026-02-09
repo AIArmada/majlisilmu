@@ -66,6 +66,6 @@ class RefactorTest extends TestCase
 
         $event->update(['institution_id' => null]);
 
-        $this->assertEquals(asset('images/default-event-placeholder.png'), $event->card_image_url);
+        $this->assertEquals(asset('images/placeholders/event.png'), $event->card_image_url);
     }
 }
