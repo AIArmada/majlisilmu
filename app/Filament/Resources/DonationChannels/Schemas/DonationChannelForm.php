@@ -86,6 +86,18 @@ class DonationChannelForm
                             ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'ewallet'),
                     ])->columns(3),
 
+                \Filament\Schemas\Components\Section::make('QR Code')
+                    ->schema([
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('qr')
+                            ->label('QR Image')
+                            ->collection('qr')
+                            ->image()
+                            ->imageEditor()
+                            ->avatar()
+                            ->conversion('thumb')
+                            ->helperText('Upload an official payment QR image.'),
+                    ]),
+
                 \Filament\Schemas\Components\Section::make('Verification')
                     ->schema([
                         \Filament\Forms\Components\Select::make('status')

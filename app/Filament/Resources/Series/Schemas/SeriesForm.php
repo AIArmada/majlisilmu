@@ -65,12 +65,16 @@ class SeriesForm
                             ->collection('cover')
                             ->image()
                             ->imageEditor()
+                            ->conversion('thumb')
+                            ->responsiveImages()
                             ->columnSpanFull(),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
                             ->reorderable()
                             ->image()
+                            ->conversion('thumb')
+                            ->responsiveImages()
                             ->columnSpanFull(),
                     ])
                     ->columns(1),

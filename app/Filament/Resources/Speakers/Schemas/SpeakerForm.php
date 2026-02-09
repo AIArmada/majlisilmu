@@ -152,6 +152,7 @@ class SpeakerForm
                             ->image()
                             ->imageEditor()
                             ->avatar()
+                            ->conversion('thumb')
                             ->helperText('Speaker photo (recommended: 400x400)'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('main')
                             ->collection('main')
@@ -159,12 +160,15 @@ class SpeakerForm
                             ->image()
                             ->imageEditor()
                             ->responsiveImages()
+                            ->conversion('banner')
                             ->helperText('Main featured image'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
                             ->reorderable()
                             ->image()
+                            ->responsiveImages()
+                            ->conversion('gallery_thumb')
                             ->helperText('Additional images'),
                     ])
                     ->columns(2),

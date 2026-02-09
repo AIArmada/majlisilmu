@@ -13,6 +13,12 @@ class ReferencesTable
     {
         return $table
             ->columns([
+                \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('cover')
+                    ->label('Cover')
+                    ->collection('cover')
+                    ->conversion('thumb')
+                    ->square()
+                    ->size(56),
                 \Filament\Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->sortable(),

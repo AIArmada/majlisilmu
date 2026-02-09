@@ -44,6 +44,8 @@ class ReferenceForm
                             ->collection('cover')
                             ->image()
                             ->imageEditor()
+                            ->conversion('thumb')
+                            ->responsiveImages()
                             ->columnSpanFull(),
                     ]),
                 \Filament\Schemas\Components\Section::make('Description')

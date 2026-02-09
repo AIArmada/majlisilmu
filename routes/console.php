@@ -37,3 +37,16 @@ Schedule::command('app:prune-orphaned-entities')
     ->timezone('Asia/Kuala_Lumpur')
     ->name('prune-orphaned-entities')
     ->withoutOverlapping();
+
+// Media maintenance: remove orphaned/deprecated files and keep conversions healthy.
+Schedule::command('media-library:clean --delete-orphaned --force')
+    ->dailyAt('02:30')
+    ->timezone('Asia/Kuala_Lumpur')
+    ->name('media-library-clean')
+    ->withoutOverlapping();
+
+Schedule::command('media-library:regenerate --only-missing --with-responsive-images --force')
+    ->weeklyOn(0, '03:00')
+    ->timezone('Asia/Kuala_Lumpur')
+    ->name('media-library-regenerate-missing')
+    ->withoutOverlapping();

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Speakers\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -15,6 +16,12 @@ class SpeakersTable
     {
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('avatar')
+                    ->label('Avatar')
+                    ->collection('avatar')
+                    ->conversion('thumb')
+                    ->circular()
+                    ->size(48),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),

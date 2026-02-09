@@ -171,6 +171,7 @@ class VenueForm
                             ->image()
                             ->imageEditor()
                             ->responsiveImages()
+                            ->conversion('thumb')
                             ->helperText('Main venue image (recommended: 1200x800)'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
@@ -178,6 +179,8 @@ class VenueForm
                             ->image()
                             ->imageEditor()
                             ->reorderable()
+                            ->responsiveImages()
+                            ->conversion('thumb')
                             ->helperText('Additional images for gallery'),
                     ])
                     ->columns(2),

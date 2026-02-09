@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Institutions\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -15,6 +16,12 @@ class InstitutionsTable
     {
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('logo')
+                    ->label('Logo')
+                    ->collection('logo')
+                    ->conversion('thumb')
+                    ->circular()
+                    ->size(48),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),

@@ -36,6 +36,8 @@ class InstitutionFormSchema
                 ->collection('cover')
                 ->image()
                 ->imageEditor()
+                ->conversion('banner')
+                ->responsiveImages()
                 ->maxSize(5120)
                 ->helperText(__('Header or banner image')),
 
@@ -45,6 +47,8 @@ class InstitutionFormSchema
                 ->multiple()
                 ->image()
                 ->imageEditor()
+                ->conversion('gallery_thumb')
+                ->responsiveImages()
                 ->maxSize(5120)
                 ->maxFiles(10)
                 ->helperText(__('Up to 10 photos of the institution')),
