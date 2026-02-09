@@ -122,24 +122,6 @@
             background-clip: content-box !important;
             transition: background-color 5000s ease-in-out 0s;
         }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
     </style>
 </head>
 
@@ -185,7 +167,7 @@
 
                     {{-- Header --}}
                     <div class="text-center mb-8 entry-2">
-                        <a href="{{ route('home') }}" wire:navigate class="inline-block group relative">
+                        <a href="{{ route('home') }}" class="inline-block group relative">
                             <div
                                 class="absolute -inset-4 bg-emerald-500/10 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                             </div>
@@ -204,7 +186,7 @@
 
                     {{-- Main Content (Form) --}}
                     <div class="entry-3">
-                        {{ $slot }}
+                        @yield('content')
                     </div>
 
                 </div>

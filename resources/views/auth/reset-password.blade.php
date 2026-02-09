@@ -1,63 +1,61 @@
-@extends('layouts.app')
+@extends('layouts.auth')
 
 @section('title', __('Reset Password') . ' - ' . config('app.name'))
 
 @section('content')
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-slate-50 py-20">
-        <div
-            class="w-full sm:max-w-md mt-6 px-6 py-8 bg-white shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-100 overflow-hidden">
-            <div class="mb-8 text-center">
-                <h2 class="font-heading text-3xl font-bold text-slate-900">{{ __('Reset Password') }}</h2>
-                <p class="text-slate-500 mt-2">{{ __('Create a new secure password') }}</p>
-            </div>
-
-            <form method="POST" action="{{ route('password.update') }}">
-                @csrf
-
-                <!-- Password Reset Token -->
-                <input type="hidden" name="token" value="{{ $request->route('token') }}">
-
-                <!-- Email Address -->
-                <div>
-                    <label for="email" class="block font-medium text-sm text-slate-700">{{ __('Email') }}</label>
-                    <input id="email"
-                        class="block mt-1 w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
-                        type="email" name="email" value="{{ old('email', $request->email) }}" required autofocus />
-                    @error('email')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <!-- Password -->
-                <div class="mt-4">
-                    <label for="password" class="block font-medium text-sm text-slate-700">{{ __('Password') }}</label>
-                    <input id="password"
-                        class="block mt-1 w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
-                        type="password" name="password" required autocomplete="new-password" />
-                    @error('password')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <!-- Confirm Password -->
-                <div class="mt-4">
-                    <label for="password_confirmation"
-                        class="block font-medium text-sm text-slate-700">{{ __('Confirm Password') }}</label>
-                    <input id="password_confirmation"
-                        class="block mt-1 w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
-                        type="password" name="password_confirmation" required autocomplete="new-password" />
-                    @error('password_confirmation')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div class="flex items-center justify-end mt-8">
-                    <button type="submit"
-                        class="w-full inline-flex justify-center items-center px-6 py-3 bg-emerald-600 border border-transparent rounded-xl font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150 shadow-lg shadow-emerald-500/20">
-                        {{ __('Reset Password') }}
-                    </button>
-                </div>
-            </form>
-        </div>
+    {{-- Header --}}
+    <div class="auth-animate-up auth-delay-1">
+        <h1 class="font-heading text-3xl font-bold text-slate-900 tracking-tight">{{ __('Reset Password') }}</h1>
+        <p class="mt-2 text-slate-500 text-[15px]">{{ __('Create a new secure password for your account') }}</p>
     </div>
+
+    {{-- Form --}}
+    <form method="POST" action="{{ route('password.update') }}" class="mt-8 space-y-5">
+        @csrf
+        <input type="hidden" name="token" value="{{ $request->route('token') }}">
+
+        {{-- Email --}}
+        <div class="auth-animate-up auth-delay-2">
+            <label for="email" class="block text-sm font-semibold text-slate-700 mb-1.5">{{ __('Email address') }}</label>
+            <input id="email" type="email" name="email" value="{{ old('email', $request->email) }}"
+                required autofocus
+                class="auth-input block w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-emerald-500 focus:outline-none" />
+            @error('email')
+                <p class="mt-1.5 text-xs font-medium text-red-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        {{-- Password --}}
+        <div class="auth-animate-up auth-delay-3">
+            <label for="password" class="block text-sm font-semibold text-slate-700 mb-1.5">{{ __('New password') }}</label>
+            <input id="password" type="password" name="password"
+                required autocomplete="new-password"
+                placeholder="••••••••"
+                class="auth-input block w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-emerald-500 focus:outline-none" />
+            @error('password')
+                <p class="mt-1.5 text-xs font-medium text-red-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        {{-- Confirm Password --}}
+        <div class="auth-animate-up auth-delay-4">
+            <label for="password_confirmation" class="block text-sm font-semibold text-slate-700 mb-1.5">{{ __('Confirm new password') }}</label>
+            <input id="password_confirmation" type="password" name="password_confirmation"
+                required autocomplete="new-password"
+                placeholder="••••••••"
+                class="auth-input block w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-emerald-500 focus:outline-none" />
+            @error('password_confirmation')
+                <p class="mt-1.5 text-xs font-medium text-red-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        {{-- Submit --}}
+        <div class="auth-animate-up auth-delay-5 pt-2">
+            <button type="submit"
+                class="btn-gold-shimmer group flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white uppercase tracking-wider transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                style="background: linear-gradient(135deg, oklch(0.48 0.18 165), oklch(0.38 0.14 165)); box-shadow: 0 8px 24px -4px oklch(0.48 0.18 165 / 0.4);">
+                {{ __('Reset Password') }}
+            </button>
+        </div>
+    </form>
 @endsection

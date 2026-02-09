@@ -1,61 +1,11 @@
 <x-layouts.auth>
-    <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
-
-        <!-- Session Status -->
-        <x-auth-session-status class="text-center" :status="session('status')" />
-
-        <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
-            @csrf
-
-            <!-- Email Address -->
-            <flux:input name="email" :label="__('Email address')" :value="old('email')" type="email" required autofocus
-                autocomplete="email" placeholder="email@example.com" />
-
-            <!-- Password -->
-            <div class="relative">
-                <flux:input name="password" :label="__('Password')" type="password" required
-                    autocomplete="current-password" :placeholder="__('Password')" viewable />
-
-                @if (Route::has('password.request'))
-                    <flux:link class="absolute top-0 text-sm end-0" :href="route('password.request')" wire:navigate>
-                        {{ __('Forgot your password?') }}
-                    </flux:link>
-                @endif
-            </div>
-
-            <!-- Remember Me -->
-            <flux:checkbox name="remember" :label="__('Remember me')" :checked="old('remember')" />
-
-            <div class="flex items-center justify-end">
-                <flux:button variant="primary" type="submit" class="w-full" data-test="login-button">
-                    {{ __('Log in') }}
-                </flux:button>
-            </div>
-        </form>
-
-        @if (Route::has('register'))
-            <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-zinc-400">
-                <span>{{ __('Don\'t have an account?') }}</span>
-                <flux:link :href="route('register')" wire:navigate>{{ __('Sign up') }}</flux:link>
-            </div>
-        @endif
-
-        <!-- Social Login Divider -->
-        <div class="relative mt-4">
-            <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-slate-300/50"></div>
-            </div>
-            <div class="relative flex justify-center text-sm">
-                <span class="px-4 bg-white/60 backdrop-blur-sm text-slate-500">{{ __('Or continue with') }}</span>
-            </div>
-        </div>
-
-        <!-- Social Login Buttons -->
-        <div class="mt-4">
+    <div class="space-y-6">
+        {{-- Google Login --}}
+        <div>
             <a href="{{ route('socialite.redirect', 'google') }}"
-                class="w-full inline-flex items-center justify-center gap-3 px-4 py-3 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-xl font-semibold text-sm text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all">
-                <svg class="w-5 h-5" viewBox="0 0 24 24">
+                class="group relative flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.98] transition-all duration-200 shadow-sm">
+                {{-- Colored Google Icon --}}
+                <svg class="h-5 w-5 shrink-0 transition-opacity opacity-80 group-hover:opacity-100" viewBox="0 0 24 24">
                     <path
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                         fill="#4285F4" />
@@ -69,8 +19,100 @@
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                         fill="#EA4335" />
                 </svg>
-                {{ __('Sign in with Google') }}
+                <span>{{ __('Sign in with Google') }}</span>
             </a>
         </div>
+
+        {{-- Divider --}}
+        <div class="relative flex items-center py-2">
+            <div class="flex-grow border-t border-slate-200"></div>
+            <span class="mx-4 flex-shrink-0 text-xs font-bold uppercase tracking-widest text-slate-400">
+                {{ __('OR') }}
+            </span>
+            <div class="flex-grow border-t border-slate-200"></div>
+        </div>
+
+        {{-- Form --}}
+        <form method="POST" action="{{ route('login') }}" class="space-y-5">
+            @csrf
+
+            {{-- Email --}}
+            <div class="space-y-1.5">
+                <label for="email" class="block text-sm font-semibold text-slate-700">{{ __('Email address') }}</label>
+                <div class="relative">
+                    <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
+                        autocomplete="username"
+                        class="block h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        placeholder="you@example.com" />
+                </div>
+                @error('email')
+                    <p class="text-xs font-medium text-red-500">{{ $message }}</p>
+                @enderror
+            </div>
+
+            {{-- Password --}}
+            <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                    <label for="password"
+                        class="block text-sm font-semibold text-slate-700">{{ __('Password') }}</label>
+                    @if (Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" wire:navigate
+                            class="text-xs font-semibold text-emerald-600 hover:text-amber-600 hover:underline transition-colors decoration-2 underline-offset-4">
+                            {{ __('Forgot password?') }}
+                        </a>
+                    @endif
+                </div>
+                <div class="relative">
+                    <input id="password" type="password" name="password" required autocomplete="current-password"
+                        class="block h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        placeholder="••••••••" />
+                </div>
+                @error('password')
+                    <p class="text-xs font-medium text-red-500">{{ $message }}</p>
+                @enderror
+            </div>
+
+            {{-- Remember Me --}}
+            <div class="flex items-center">
+                <input id="remember_me" type="checkbox" name="remember"
+                    class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 transition duration-150 ease-in-out" />
+                <label for="remember_me" class="ml-2 block text-sm text-slate-600 font-medium">
+                    {{ __('Keep me signed in') }}
+                </label>
+            </div>
+
+            {{-- Submit --}}
+            <button type="submit"
+                class="group relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl text-sm font-bold text-white uppercase tracking-wider shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:scale-[0.98]"
+                style="background: linear-gradient(135deg, oklch(0.40 0.12 165), oklch(0.30 0.10 165));">
+
+                {{-- Shimmer effect --}}
+                <div
+                    class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover:animate-[shimmer_1.5s_infinite]">
+                </div>
+
+                <span class="relative flex items-center gap-2">
+                    {{ __('Sign In') }}
+                    <svg class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                            d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                </span>
+            </button>
+        </form>
+
+        {{-- Register Link --}}
+        @if (Route::has('register'))
+            <div class="text-center pt-2">
+                <p class="text-sm text-slate-500">
+                    {{ __('Don\'t have an account?') }}
+                    <a href="{{ route('register') }}" wire:navigate
+                        class="ml-1 font-bold text-emerald-700 hover:text-amber-600 hover:underline transition-colors decoration-2 underline-offset-4">
+                        {{ __('Create one') }}
+                    </a>
+                </p>
+            </div>
+        @endif
     </div>
 </x-layouts.auth>
