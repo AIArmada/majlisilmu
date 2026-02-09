@@ -34,7 +34,15 @@ class Show extends Component
             abort(404);
         }
 
-        $event->load(['institution', 'venue', 'speakers', 'tags', 'donationChannel', 'settings']);
+        $event->load([
+            'media',
+            'institution.media',
+            'venue.media',
+            'speakers.media',
+            'tags',
+            'donationChannel',
+            'settings',
+        ]);
 
         $this->event = $event;
         $this->syncEngagementStates();

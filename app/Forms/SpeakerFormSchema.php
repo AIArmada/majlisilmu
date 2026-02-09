@@ -46,6 +46,7 @@ class SpeakerFormSchema
                 ->avatar()
                 ->imageEditor()
                 ->image()
+                ->conversion('thumb')
                 ->maxSize(5120)
                 ->helperText(__('Recommended: Square image, at least 400x400px')),
 

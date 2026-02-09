@@ -36,6 +36,8 @@ class VenueFormSchema
                 ->collection('main')
                 ->image()
                 ->imageEditor()
+                ->conversion('thumb')
+                ->responsiveImages()
                 ->maxSize(5120)
                 ->helperText(__('Gambar pengepala atau imej hiasan')),
 
@@ -45,6 +47,8 @@ class VenueFormSchema
                 ->multiple()
                 ->image()
                 ->imageEditor()
+                ->conversion('thumb')
+                ->responsiveImages()
                 ->maxSize(5120)
                 ->maxFiles(10)
                 ->helperText(__('Sehingga 10 gambar lokasi')),

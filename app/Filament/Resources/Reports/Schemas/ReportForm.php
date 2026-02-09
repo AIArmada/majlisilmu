@@ -40,6 +40,18 @@ class ReportForm
                         Textarea::make('description')
                             ->columnSpanFull()
                             ->maxLength(2000),
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('evidence')
+                            ->label('Evidence Files')
+                            ->collection('evidence')
+                            ->multiple()
+                            ->reorderable()
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                            ->maxFiles(8)
+                            ->conversion('thumb')
+                            ->openable()
+                            ->downloadable()
+                            ->helperText('Upload screenshots, photos, or PDFs to support this report.')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
                 Section::make('Resolution')

@@ -17,7 +17,17 @@ new class extends Component {
             ->orderByDesc('is_featured')
             ->orderByRaw('(going_count * 5 + interests_count * 3 + saves_count * 2 + views_count * 0.1) DESC')
             ->orderBy('starts_at')
-            ->with(['media', 'institution.media', 'venue.media', 'speakers.media'])
+            ->with([
+                'media' => fn ($query) => $query
+                    ->where('collection_name', 'poster')
+                    ->ordered(),
+                'institution.media' => fn ($query) => $query
+                    ->where('collection_name', 'logo')
+                    ->ordered(),
+                'speakers.media' => fn ($query) => $query
+                    ->where('collection_name', 'avatar')
+                    ->ordered(),
+            ])
             ->take(8)
             ->get();
     }

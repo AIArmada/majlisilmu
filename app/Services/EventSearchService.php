@@ -9,16 +9,22 @@ use Illuminate\Support\Facades\Log;
 class EventSearchService
 {
     /**
-     * @return array<int, string>
+     * @return array<int|string, mixed>
      */
     protected function cardRelationships(): array
     {
         return [
-            'institution.media',
+            'media' => fn ($query) => $query
+                ->where('collection_name', 'poster')
+                ->ordered(),
+            'institution.media' => fn ($query) => $query
+                ->where('collection_name', 'logo')
+                ->ordered(),
             'venue.address.state',
             'venue.address.district',
-            'speakers.media',
-            'media',
+            'speakers.media' => fn ($query) => $query
+                ->where('collection_name', 'avatar')
+                ->ordered(),
         ];
     }
 

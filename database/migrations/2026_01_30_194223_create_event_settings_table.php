@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('event_settings', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('event_id')->unique()->constrained()->cascadeOnDelete();
+            $table->foreignUuid('event_id')->unique();
 
             $table->boolean('registration_required')->default(true);
             $table->unsignedInteger('capacity')->nullable();

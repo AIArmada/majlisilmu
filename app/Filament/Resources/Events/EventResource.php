@@ -52,7 +52,9 @@ class EventResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with([
+                'media',
                 'institution',
+                'institution.media',
                 'settings',
                 'submitter',
             ]);

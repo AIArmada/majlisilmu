@@ -327,6 +327,7 @@ class EventForm
                                             ->collection('poster')
                                             ->image()
                                             ->imageEditor()
+                                            ->conversion('thumb')
                                             ->responsiveImages(),
                                         SpatieMediaLibraryFileUpload::make('gallery')
                                             ->label('Galeri')
@@ -335,6 +336,7 @@ class EventForm
                                             ->reorderable()
                                             ->image()
                                             ->imageEditor()
+                                            ->conversion('thumb')
                                             ->responsiveImages(),
                                     ])
                                     ->columns(2),
