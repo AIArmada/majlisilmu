@@ -21,7 +21,7 @@ class extends Component
         return Institution::query()
             ->where('status', 'verified')
             ->withCount('events')
-            ->with(['address.state'])
+            ->with(['address.state', 'media'])
             ->when($search, function ($query, $search) use ($operator) {
                 $query->where(function ($q) use ($search, $operator) {
                     $q->where('name', $operator, "%{$search}%")
@@ -90,7 +90,7 @@ class extends Component
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($institutions as $institution)
                         @php
-                            $logoUrl = $institution->getFirstMediaUrl('logo');
+                            $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
                         @endphp
                         <a href="{{ route('institutions.show', $institution) }}" wire:navigate class="group relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden">
                             <!-- Banner Area (Abstract) -->
@@ -105,7 +105,7 @@ class extends Component
                                 <!-- Logo/Initial -->
                                 <div class="absolute -top-10 left-6 h-20 w-20 rounded-2xl bg-white border-[3px] border-white shadow-lg flex items-center justify-center overflow-hidden z-10">
                                      @if($logoUrl)
-                                        <img src="{{ $logoUrl }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                                        <img src="{{ $logoUrl }}" alt="{{ $institution->name }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" width="80" height="80" loading="lazy">
                                     @else
                                         <div class="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white relative group-hover:scale-105 transition-transform duration-500">
                                             <div class="absolute inset-0 opacity-20 bg-[url('/images/pattern-bg.png')] bg-repeat"></div>

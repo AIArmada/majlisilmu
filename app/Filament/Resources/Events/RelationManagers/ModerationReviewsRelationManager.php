@@ -54,7 +54,8 @@ class ModerationReviewsRelationManager extends RelationManager
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('reviewer.email')
                     ->label('Reviewer')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->url(fn ($record): ?string => $record->reviewer_id ? url('/admin') : null),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

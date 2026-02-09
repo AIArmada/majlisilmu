@@ -26,20 +26,20 @@ class DatabaseSeeder extends Seeder
         User::factory()->count(50)->create();
 
         $this->call([
-            MasjidSeeder::class,
-            InstitutionSeeder::class,
+            // MasjidSeeder::class,
+            // InstitutionSeeder::class,
             SpaceSeeder::class,
-            VenueSeeder::class,
-            SpeakerSeeder::class,
-            DonationChannelSeeder::class,
-            SeriesSeeder::class,
-            EventSeeder::class,
-            MediaLinkSeeder::class,
-            EventSubmissionSeeder::class,
-            ModerationReviewSeeder::class,
-            ReportSeeder::class,
-            SavedSearchSeeder::class,
-            RegistrationSeeder::class,
+            // VenueSeeder::class,
+            // SpeakerSeeder::class,
+            // DonationChannelSeeder::class,
+            // SeriesSeeder::class,
+            // EventSeeder::class,
+            // MediaLinkSeeder::class,
+            // EventSubmissionSeeder::class,
+            // ModerationReviewSeeder::class,
+            // ReportSeeder::class,
+            // SavedSearchSeeder::class,
+            // RegistrationSeeder::class,
         ]);
     }
 }

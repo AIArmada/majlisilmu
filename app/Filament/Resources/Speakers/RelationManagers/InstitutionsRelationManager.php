@@ -37,7 +37,10 @@ class InstitutionsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn ($record): ?string => $record?->id
+                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->id])
+                        : null),
                 TextColumn::make('position')
                     ->label('Position')
                     ->searchable(),

@@ -69,7 +69,11 @@ class Index extends Component
     #[Computed]
     public function states(): Collection
     {
-        return cache()->remember('states_all', 3600, fn () => State::query()->orderBy('name')->get());
+        return cache()->remember('states_my', 3600, fn () => State::query()
+            ->where('country_code', 'MY')
+            ->orderBy('name')
+            ->get()
+        );
     }
 
     #[Computed]

@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Events\Schemas;
 
 use App\Enums\TagType;
+use App\Enums\TimingMode;
 use App\Models\Event;
 use BackedEnum;
 use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
@@ -19,8 +21,10 @@ class EventInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(1)
             ->components([
                 Tabs::make('EventViewTabs')
+                    ->columnSpanFull()
                     ->tabs([
                         Tab::make('Maklumat Majlis')
                             ->icon('heroicon-m-document-text')
@@ -56,7 +60,7 @@ class EventInfolist
                                             ->placeholder('-'),
                                         TextEntry::make('starts_at')
                                             ->label('Waktu Mula')
-                                            ->dateTime(),
+                                            ->dateTime(format: fn (Event $record): string => self::usesPrayerRelativeTiming($record) ? 'M d, Y' : 'M d, Y H:i:s'),
                                         TextEntry::make('ends_at')
                                             ->label('Waktu Tamat')
                                             ->dateTime()
@@ -139,9 +143,16 @@ class EventInfolist
                                             ->label('Tema / Isu')
                                             ->state(fn (Event $record): string => self::formatTagList($record, TagType::Issue))
                                             ->placeholder('-'),
-                                        TextEntry::make('references.title')
+                                        RepeatableEntry::make('references')
                                             ->label('Rujukan Kitab / Buku')
-                                            ->listWithLineBreaks()
+                                            ->schema([
+                                                TextEntry::make('title')
+                                                    ->hiddenLabel()
+                                                    ->url(fn ($record): ?string => $record?->id
+                                                        ? \App\Filament\Resources\References\ReferenceResource::getUrl('edit', ['record' => $record->id])
+                                                        : null),
+                                            ])
+                                            ->contained(false)
                                             ->placeholder('-')
                                             ->columnSpanFull(),
                                     ])
@@ -158,10 +169,30 @@ class EventInfolist
                                             ->placeholder('-'),
                                         TextEntry::make('organizer.name')
                                             ->label('Penganjur')
-                                            ->placeholder('-'),
-                                        TextEntry::make('series.title')
+                                            ->placeholder('-')
+                                            ->url(function (Event $record): ?string {
+                                                if (! $record->organizer) {
+                                                    return null;
+                                                }
+                                                if ($record->organizer_type === \App\Models\Institution::class) {
+                                                    return \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->organizer_id]);
+                                                }
+                                                if ($record->organizer_type === \App\Models\Speaker::class) {
+                                                    return \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->organizer_id]);
+                                                }
+
+                                                return null;
+                                            }),
+                                        RepeatableEntry::make('series')
                                             ->label('Siri')
-                                            ->listWithLineBreaks()
+                                            ->schema([
+                                                TextEntry::make('title')
+                                                    ->hiddenLabel()
+                                                    ->url(fn ($record): ?string => $record?->id
+                                                        ? \App\Filament\Resources\Series\SeriesResource::getUrl('edit', ['record' => $record->id])
+                                                        : null),
+                                            ])
+                                            ->contained(false)
                                             ->placeholder('-')
                                             ->columnSpanFull(),
                                     ])
@@ -170,10 +201,12 @@ class EventInfolist
                                     ->schema([
                                         TextEntry::make('institution.name')
                                             ->label('Institusi')
-                                            ->placeholder('-'),
+                                            ->placeholder('-')
+                                            ->url(fn (Event $record): ?string => $record->institution_id ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution_id]) : null),
                                         TextEntry::make('venue.name')
                                             ->label('Lokasi')
-                                            ->placeholder('-'),
+                                            ->placeholder('-')
+                                            ->url(fn (Event $record): ?string => $record->venue_id ? \App\Filament\Resources\Venues\VenueResource::getUrl('edit', ['record' => $record->venue_id]) : null),
                                         TextEntry::make('space.name')
                                             ->label('Ruang')
                                             ->placeholder('-'),
@@ -185,21 +218,29 @@ class EventInfolist
                             ->schema([
                                 Section::make('Penceramah')
                                     ->schema([
-                                        TextEntry::make('speakers.name')
+                                        RepeatableEntry::make('speakers')
                                             ->label('Penceramah')
-                                            ->listWithLineBreaks()
+                                            ->schema([
+                                                TextEntry::make('name')
+                                                    ->hiddenLabel()
+                                                    ->url(fn ($record): ?string => $record?->id
+                                                        ? \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->id])
+                                                        : null),
+                                            ])
+                                            ->contained(false)
                                             ->placeholder('-'),
                                     ]),
                                 Section::make('Media')
                                     ->schema([
-                                        ImageEntry::make('poster_image')
+                                        SpatieMediaLibraryImageEntry::make('poster')
                                             ->label('Gambar Utama')
-                                            ->state(fn (Event $record): ?string => $record->getFirstMediaUrl('poster') ?: null)
-                                            ->placeholder('-')
+                                            ->collection('poster')
+                                            ->conversion('preview')
                                             ->columnSpanFull(),
-                                        ImageEntry::make('gallery_images')
+                                        SpatieMediaLibraryImageEntry::make('gallery')
                                             ->label('Galeri')
-                                            ->state(fn (Event $record): array => $record->getMedia('gallery')->map(fn ($media): string => $media->getUrl())->values()->all())
+                                            ->collection('gallery')
+                                            ->conversion('thumb')
                                             ->stacked()
                                             ->limit(6)
                                             ->limitedRemainingText(),
@@ -235,9 +276,39 @@ class EventInfolist
                                             ->label('Tarikh Eskalasi')
                                             ->dateTime()
                                             ->placeholder('-'),
-                                        TextEntry::make('submitter.email')
+                                        TextEntry::make('submitter_info')
                                             ->label('Penghantar')
-                                            ->placeholder('-'),
+                                            ->state(function (Event $record): string {
+                                                // Check if submitted by authenticated user
+                                                if ($record->submitter) {
+                                                    $parts = [$record->submitter->name, $record->submitter->email];
+                                                    if ($record->submitter->phone) {
+                                                        $parts[] = $record->submitter->phone;
+                                                    }
+
+                                                    return implode(' | ', array_filter($parts));
+                                                }
+
+                                                // Get guest submission info from latest submission
+                                                $submission = $record->submissions()->latest()->first();
+                                                if ($submission) {
+                                                    $parts = [];
+                                                    if ($submission->submitter_name) {
+                                                        $parts[] = $submission->submitter_name;
+                                                    }
+                                                    if ($submission->email) {
+                                                        $parts[] = $submission->email;
+                                                    }
+                                                    if ($submission->phone) {
+                                                        $parts[] = $submission->phone;
+                                                    }
+
+                                                    return implode(' | ', array_filter($parts)) ?: '-';
+                                                }
+
+                                                return '-';
+                                            })
+                                            ->columnSpanFull(),
                                         TextEntry::make('created_at')
                                             ->label('Dicipta Pada')
                                             ->dateTime(),
@@ -255,14 +326,14 @@ class EventInfolist
     protected static function normalizeDescription(mixed $description): string
     {
         if (is_string($description) && filled($description)) {
-            return $description;
+            return self::stripDescriptionHtml($description);
         }
 
         if (is_array($description)) {
             $html = data_get($description, 'html');
 
             if (is_string($html) && filled($html)) {
-                return strip_tags($html);
+                return self::stripDescriptionHtml($html);
             }
 
             $content = data_get($description, 'content');
@@ -282,6 +353,13 @@ class EventInfolist
         }
 
         return '-';
+    }
+
+    protected static function stripDescriptionHtml(string $description): string
+    {
+        $stripped = trim(strip_tags($description));
+
+        return $stripped !== '' ? $stripped : '-';
     }
 
     protected static function formatTagList(Event $event, TagType $type): string
@@ -322,6 +400,17 @@ class EventInfolist
             \App\Models\Speaker::class, 'speaker' => 'Penceramah',
             default => '-',
         };
+    }
+
+    protected static function usesPrayerRelativeTiming(Event $record): bool
+    {
+        $timingMode = $record->timing_mode;
+
+        if ($timingMode instanceof TimingMode) {
+            return $timingMode === TimingMode::PrayerRelative;
+        }
+
+        return $timingMode === TimingMode::PrayerRelative->value;
     }
 
     protected static function formatEnumCollection(mixed $state): string

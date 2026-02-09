@@ -13,6 +13,7 @@ new class extends Component {
         }
 
         $speaker->load([
+            'media',
             'events' => function ($query) {
                 $query->where('status', 'approved')
                     ->where('visibility', 'public')
@@ -35,7 +36,7 @@ new class extends Component {
 
 @php
     $speaker = $this->speaker;
-    $mainUrl = $speaker->getFirstMediaUrl('main');
+    $mainUrl = $speaker->getFirstMedia('main')?->getAvailableUrl(['banner']) ?? '';
     $gallery = $speaker->getMedia('gallery');
     $websiteUrl = $speaker->socialMedia->firstWhere('platform', 'website')?->url;
     $facebookUrl = $speaker->socialMedia->firstWhere('platform', 'facebook')?->url;
@@ -60,8 +61,8 @@ new class extends Component {
             <!-- Photo -->
             <div
                 class="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white border-4 border-white shadow-lg flex-shrink-0 overflow-hidden relative bg-slate-100">
-                <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
-                    class="w-full h-full object-cover">
+                <img src="{{ $speaker->hasMedia('avatar') ? $speaker->getFirstMediaUrl('avatar', 'profile') : $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
+                    class="w-full h-full object-cover" width="192" height="192">
             </div>
 
             <div class="flex-grow pt-4">
@@ -118,8 +119,8 @@ new class extends Component {
             <div class="lg:col-span-2 space-y-8">
                 @if($mainUrl)
                     <div class="rounded-3xl overflow-hidden bg-slate-100 shadow-sm border border-slate-100 relative group">
-                        <img src="{{ $mainUrl }}" alt="{{ $speaker->name }}"
-                            class="w-full h-auto shadow-sm transition-transform duration-1000 group-hover:scale-[1.01]">
+                    <img src="{{ $mainUrl }}" alt="{{ $speaker->name }}"
+                            class="w-full h-auto shadow-sm transition-transform duration-1000 group-hover:scale-[1.01]" loading="lazy">
                         <div
                             class="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-60 pointer-events-none">
                         </div>
@@ -143,8 +144,8 @@ new class extends Component {
                             @foreach($gallery as $image)
                                 <div
                                     class="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-zoom-in">
-                                    <img src="{{ $image->getUrl() }}" alt="Gallery Image"
-                                        class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                                    <img src="{{ $image->getAvailableUrl(['gallery_thumb']) }}" alt="{{ __('Gallery Image') }}"
+                                        class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy">
                                     <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                                 </div>
                             @endforeach

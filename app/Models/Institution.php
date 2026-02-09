@@ -15,6 +15,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Institution extends Model implements AuditableContract, HasMedia
 {
@@ -91,12 +92,47 @@ class Institution extends Model implements AuditableContract, HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('logo')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'])
+            ->useFallbackUrl(asset('images/placeholders/institution.png'))
             ->singleFile();
 
         $this->addMediaCollection('cover')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useFallbackUrl(asset('images/placeholders/institution.png'))
+            ->withResponsiveImages()
             ->singleFile();
 
-        $this->addMediaCollection('gallery');
+        $this->addMediaCollection('gallery')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->withResponsiveImages();
+    }
+
+    /**
+     * Register media conversions for optimized image delivery.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(100)
+            ->height(100)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('logo');
+
+        $this->addMediaConversion('banner')
+            ->width(1200)
+            ->format('webp')
+            ->performOnCollections('cover');
+
+        $this->addMediaConversion('gallery_thumb')
+            ->width(368)
+            ->height(232)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('gallery');
     }
 
     public function getAuthzScopeLabel(): string

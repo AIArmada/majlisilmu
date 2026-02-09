@@ -113,7 +113,7 @@ new class extends Component {
                                 <div class="flex -space-x-2">
                                     @foreach($event->speakers->take(3) as $speaker)
                                         <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden shadow-sm bg-slate-100" title="{{ $speaker->name }}">
-                                            <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}" class="w-full h-full object-cover">
+                                            <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}" class="w-full h-full object-cover" width="32" height="32" loading="lazy">
                                         </div>
                                     @endforeach
                                 </div>

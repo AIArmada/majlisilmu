@@ -6,6 +6,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -15,11 +16,28 @@ class DonationChannelsTable
     {
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('qr')
+                    ->label('QR')
+                    ->collection('qr')
+                    ->conversion('thumb')
+                    ->square()
+                    ->size(52),
                 TextColumn::make('donatable.name')
                     ->label('Owner')
                     ->description(fn ($record) => class_basename($record->donatable_type))
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(function ($record): ?string {
+                        if (! $record->donatable) {
+                            return null;
+                        }
+
+                        return match (get_class($record->donatable)) {
+                            \App\Models\Institution::class => \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->donatable->id]),
+                            \App\Models\Speaker::class => \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->donatable->id]),
+                            default => null,
+                        };
+                    }),
                 TextColumn::make('recipient_name')
                     ->label('Recipient')
                     ->searchable()

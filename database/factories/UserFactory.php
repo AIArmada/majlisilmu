@@ -23,11 +23,14 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $hasPhone = fake()->boolean(70); // 70% chance of having a phone
+
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'phone' => fake()->optional()->phoneNumber(),
+            'phone' => $hasPhone ? fake()->unique()->phoneNumber() : null,
+            'phone_verified_at' => $hasPhone ? fake()->boolean(80) ? now() : null : null,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
@@ -40,6 +43,30 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the user only has a phone number (no email).
+     */
+    public function phoneOnly(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'email' => null,
+            'email_verified_at' => null,
+            'phone' => fake()->unique()->phoneNumber(),
+            'phone_verified_at' => now(),
+        ]);
+    }
+
+    /**
+     * Indicate that the user only has an email (no phone).
+     */
+    public function emailOnly(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'phone' => null,
+            'phone_verified_at' => null,
         ]);
     }
 }

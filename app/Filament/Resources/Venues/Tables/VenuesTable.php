@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Venues\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -16,12 +17,21 @@ class VenuesTable
         // Configuration for Venues Table
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('main')
+                    ->label('Image')
+                    ->collection('main')
+                    ->conversion('thumb')
+                    ->square()
+                    ->size(56),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('institution.name')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->url(fn ($record): ?string => $record->institution?->id
+                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id])
+                        : null),
                 TextColumn::make('type')
                     ->badge()
                     ->sortable(),

@@ -13,6 +13,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Speaker extends Model implements AuditableContract, HasMedia
 {
@@ -89,7 +90,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
     public function getAvatarUrlAttribute(): ?string
     {
         if ($this->hasMedia('avatar')) {
-            return $this->getFirstMediaUrl('avatar');
+            return $this->getFirstMediaUrl('avatar', 'thumb');
         }
 
         return null;
@@ -184,7 +185,53 @@ class Speaker extends Model implements AuditableContract, HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('avatar')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useFallbackUrl(asset('images/placeholders/speaker.png'))
             ->singleFile();
+
+        $this->addMediaCollection('main')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useFallbackUrl(asset('images/placeholders/speaker.png'))
+            ->withResponsiveImages()
+            ->singleFile();
+
+        $this->addMediaCollection('gallery')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->withResponsiveImages();
+    }
+
+    /**
+     * Register media conversions for optimized image delivery.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(80)
+            ->height(80)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('avatar');
+
+        $this->addMediaConversion('profile')
+            ->width(400)
+            ->height(400)
+            ->format('webp')
+            ->performOnCollections('avatar');
+
+        $this->addMediaConversion('banner')
+            ->width(1200)
+            ->format('webp')
+            ->performOnCollections('main');
+
+        $this->addMediaConversion('gallery_thumb')
+            ->width(368)
+            ->height(232)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('gallery');
     }
 
     public function getAuthzScopeLabel(): string

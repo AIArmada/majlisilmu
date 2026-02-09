@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\User;
 
@@ -108,4 +109,76 @@ it('renders the admin event view page with infolist tabs', function () {
         ->assertSee('Penganjur & Lokasi')
         ->assertSee('Penceramah & Media')
         ->assertSee('Semak & Moderasi');
+});
+
+it('sanitizes description and uses full-width layout on admin event view page', function () {
+    $this->seed(\Database\Seeders\PermissionSeeder::class);
+    $this->seed(\Database\Seeders\RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+        'description' => '<p>Ini adalah <strong>forum</strong> sekolah</p>',
+    ]);
+
+    $this->actingAs($administrator)
+        ->get("/admin/events/{$event->id}")
+        ->assertSuccessful()
+        ->assertSee('Ini adalah forum sekolah')
+        ->assertDontSee('&lt;p&gt;Ini adalah &lt;strong&gt;forum&lt;/strong&gt; sekolah&lt;/p&gt;', false)
+        ->assertSee('fi-width-full', false);
+});
+
+it('shows date-only start time for prayer-relative events in the admin view', function () {
+    $this->seed(\Database\Seeders\PermissionSeeder::class);
+    $this->seed(\Database\Seeders\RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $prayerRelativeEvent = Event::factory()->create([
+        'status' => 'pending',
+        'starts_at' => '2026-02-19 03:33:00',
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => null,
+        'prayer_offset' => null,
+        'prayer_display_text' => 'Selepas Maghrib',
+    ]);
+
+    $absoluteEvent = Event::factory()->create([
+        'status' => 'pending',
+        'starts_at' => '2026-02-20 09:41:00',
+        'timing_mode' => TimingMode::Absolute,
+        'prayer_reference' => null,
+        'prayer_offset' => null,
+        'prayer_display_text' => null,
+    ]);
+
+    $prayerRelativeDate = $prayerRelativeEvent->starts_at?->format('M d, Y');
+    $prayerRelativeDateTime = $prayerRelativeEvent->starts_at?->format('M d, Y H:i:s');
+    $absoluteDateTime = $absoluteEvent->starts_at?->format('M d, Y H:i:s');
+
+    $this->actingAs($administrator)
+        ->get("/admin/events/{$prayerRelativeEvent->id}")
+        ->assertSuccessful()
+        ->assertSee($prayerRelativeDate)
+        ->assertDontSee($prayerRelativeDateTime);
+
+    $absoluteResponse = $this->actingAs($administrator)
+        ->get("/admin/events/{$absoluteEvent->id}")
+        ->assertSuccessful();
+
+    $absoluteResponseContent = $absoluteResponse->getContent();
+    $possibleAbsoluteDateTimes = [
+        $absoluteDateTime,
+        $absoluteEvent->starts_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('M d, Y H:i:s'),
+        $absoluteEvent->starts_at?->format('M d, Y g:i:s A'),
+        $absoluteEvent->starts_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('M d, Y g:i:s A'),
+    ];
+
+    expect(collect($possibleAbsoluteDateTimes)
+        ->filter()
+        ->contains(fn (string $value): bool => str_contains($absoluteResponseContent, $value)))->toBeTrue();
 });
