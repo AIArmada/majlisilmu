@@ -14,6 +14,10 @@
 pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->beforeEach(function () {
+        config()->set('services.turnstile.enabled', false);
+        config()->set('services.turnstile.site_key', null);
+        config()->set('services.turnstile.secret_key', null);
+
         // Seed common languages for tests that use the submit event form
         $languages = [
             ['id' => 7, 'code' => 'ar', 'name' => 'Arabic', 'name_native' => 'العربية', 'dir' => 'rtl'],
@@ -25,9 +29,7 @@ pest()->extend(Tests\TestCase::class)
             ['id' => 154, 'code' => 'ta', 'name' => 'Tamil', 'name_native' => 'தமிழ்', 'dir' => 'ltr'],
         ];
 
-        foreach ($languages as $lang) {
-            \Illuminate\Support\Facades\DB::table('languages')->insertOrIgnore($lang);
-        }
+        \Illuminate\Support\Facades\DB::table('languages')->insertOrIgnore($languages);
     })
     ->in('Feature');
 
@@ -60,4 +62,23 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+function fakePrayerTimesApi(): void
+{
+    \Illuminate\Support\Facades\Http::fake([
+        'api.aladhan.com/*' => \Illuminate\Support\Facades\Http::response([
+            'code' => 200,
+            'status' => 'OK',
+            'data' => [
+                'timings' => [
+                    'Fajr' => '05:50',
+                    'Dhuhr' => '13:15',
+                    'Asr' => '16:40',
+                    'Maghrib' => '19:25',
+                    'Isha' => '20:35',
+                ],
+            ],
+        ], 200),
+    ]);
 }

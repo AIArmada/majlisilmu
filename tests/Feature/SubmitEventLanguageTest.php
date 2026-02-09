@@ -11,30 +11,58 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use Livewire\Livewire;
 
+beforeEach(function () {
+    fakePrayerTimesApi();
+});
+
+/**
+ * @return array{domain_tag: Tag, discipline_tag: Tag, institution: Institution, speaker: Speaker}
+ */
+function submitEventLanguageFixtures(): array
+{
+    return [
+        'domain_tag' => Tag::factory()->domain()->create(),
+        'discipline_tag' => Tag::factory()->discipline()->create(),
+        'institution' => Institution::factory()->create(['status' => 'verified']),
+        'speaker' => Speaker::factory()->create(['status' => 'verified']),
+    ];
+}
+
+/**
+ * @param  array{domain_tag: Tag, discipline_tag: Tag, institution: Institution, speaker: Speaker}  $fixtures
+ * @return array<string, mixed>
+ */
+function submitEventLanguageFormData(array $fixtures, array $overrides = []): array
+{
+    return array_merge([
+        'title' => 'Submit Event Language',
+        'domain_tags' => [$fixtures['domain_tag']->id],
+        'discipline_tags' => [$fixtures['discipline_tag']->id],
+        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_date' => now()->addDays(5)->toDateString(),
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'description' => 'Test description',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'languages' => [101],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $fixtures['institution']->id,
+        'speakers' => [$fixtures['speaker']->id],
+        'submitter_name' => 'Test User',
+        'submitter_email' => 'test@example.com',
+    ], $overrides);
+}
+
 it('can submit event with single language', function () {
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventLanguageFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'Single Language Event')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101]) // Malay only
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
+        ->fillForm(submitEventLanguageFormData($fixtures, [
+            'title' => 'Single Language Event',
+            'languages' => [101],
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -45,29 +73,13 @@ it('can submit event with single language', function () {
 });
 
 it('can submit event with multiple languages', function () {
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventLanguageFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'Multi Language Event')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101, 7, 40]) // Malay, Arabic, English
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
+        ->fillForm(submitEventLanguageFormData($fixtures, [
+            'title' => 'Multi Language Event',
+            'languages' => [101, 7, 40],
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -79,29 +91,13 @@ it('can submit event with multiple languages', function () {
 });
 
 it('requires at least one language', function () {
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventLanguageFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'No Language Event')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', []) // Empty - should fail validation
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
+        ->fillForm(submitEventLanguageFormData($fixtures, [
+            'title' => 'No Language Event',
+            'languages' => [],
+        ]))
         ->call('submit')
         ->assertHasErrors(['data.languages']);
 });

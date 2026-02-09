@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Enums\NotificationChannel;
+use App\Enums\NotificationFrequency;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -41,6 +44,8 @@ class User extends Authenticatable implements FilamentUser
             $user->handledReports()->update(['handled_by' => null]);
             $user->registrations()->each(fn ($reg) => $reg->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
+            $user->notificationEndpoints()->each(fn ($endpoint) => $endpoint->delete());
+            $user->notificationPreferences()->each(fn ($preference) => $preference->delete());
         });
     }
 
@@ -155,6 +160,74 @@ class User extends Authenticatable implements FilamentUser
             ->using(EventUser::class)
             ->withPivot(['joined_at'])
             ->withTimestamps();
+    }
+
+    public function notificationEndpoints(): MorphMany
+    {
+        return $this->morphMany(NotificationEndpoint::class, 'owner');
+    }
+
+    public function notificationPreferences(): MorphMany
+    {
+        return $this->morphMany(NotificationPreference::class, 'owner');
+    }
+
+    public function notificationPreferenceFor(string $notificationKey): ?NotificationPreference
+    {
+        $loadedPreference = $this->relationLoaded('notificationPreferences')
+            ? $this->notificationPreferences->firstWhere('notification_key', $notificationKey)
+            : null;
+
+        if ($loadedPreference instanceof NotificationPreference) {
+            return $loadedPreference;
+        }
+
+        return $this->notificationPreferences()
+            ->where('notification_key', $notificationKey)
+            ->first();
+    }
+
+    public function notificationChannelsFor(
+        string $notificationKey,
+        array $defaultChannels = [NotificationChannel::Email->value]
+    ): array {
+        $preference = $this->notificationPreferenceFor($notificationKey);
+
+        if (! $preference) {
+            return $defaultChannels;
+        }
+
+        if (! $preference->enabled || $preference->frequency === NotificationFrequency::Off) {
+            return [];
+        }
+
+        $channels = is_array($preference->channels) && $preference->channels !== []
+            ? $preference->channels
+            : $defaultChannels;
+
+        return array_values(array_unique(array_filter(
+            array_map(fn (mixed $channel): string => (string) $channel, $channels),
+            fn (string $channel): bool => $channel !== ''
+        )));
+    }
+
+    public function shouldReceiveNotificationFor(string $notificationKey, ?string $frequency = null): bool
+    {
+        $preference = $this->notificationPreferenceFor($notificationKey);
+
+        if (! $preference) {
+            return true;
+        }
+
+        if (! $preference->enabled || $preference->frequency === NotificationFrequency::Off) {
+            return false;
+        }
+
+        if ($frequency !== null && in_array($preference->frequency, [NotificationFrequency::Daily, NotificationFrequency::Weekly], true)) {
+            return $preference->frequency->value === $frequency;
+        }
+
+        return true;
     }
 
     public function canAccessPanel(Panel $panel): bool

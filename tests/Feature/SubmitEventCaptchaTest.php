@@ -34,23 +34,25 @@ function submitEventCaptchaFixtures(): array
 function fillSubmitEventCaptchaForm(mixed $component, array $fixtures, string $title): void
 {
     $component
-        ->set('data.title', $title)
-        ->set('data.domain_tags', [$fixtures['domain_tag']->id])
-        ->set('data.discipline_tags', [$fixtures['discipline_tag']->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $fixtures['institution']->id)
-        ->set('data.speakers', [$fixtures['speaker']->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com');
+        ->fillForm([
+            'title' => $title,
+            'domain_tags' => [$fixtures['domain_tag']->id],
+            'discipline_tags' => [$fixtures['discipline_tag']->id],
+            'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+            'event_date' => now()->addDays(5)->toDateString(),
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'description' => 'Test description',
+            'event_format' => EventFormat::Physical->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'languages' => [101],
+            'organizer_type' => 'institution',
+            'organizer_institution_id' => $fixtures['institution']->id,
+            'speakers' => [$fixtures['speaker']->id],
+            'submitter_name' => 'Test User',
+            'submitter_email' => 'test@example.com',
+        ]);
 }
 
 it('rejects submission when turnstile verification fails', function () {
@@ -61,6 +63,19 @@ it('rejects submission when turnstile verification fails', function () {
     ]);
 
     Http::fake([
+        'api.aladhan.com/*' => Http::response([
+            'code' => 200,
+            'status' => 'OK',
+            'data' => [
+                'timings' => [
+                    'Fajr' => '05:50',
+                    'Dhuhr' => '13:15',
+                    'Asr' => '16:40',
+                    'Maghrib' => '19:25',
+                    'Isha' => '20:35',
+                ],
+            ],
+        ], 200),
         'challenges.cloudflare.com/*' => Http::response(['success' => false], 200),
     ]);
 
@@ -85,6 +100,19 @@ it('accepts submission when turnstile verification succeeds', function () {
     ]);
 
     Http::fake([
+        'api.aladhan.com/*' => Http::response([
+            'code' => 200,
+            'status' => 'OK',
+            'data' => [
+                'timings' => [
+                    'Fajr' => '05:50',
+                    'Dhuhr' => '13:15',
+                    'Asr' => '16:40',
+                    'Maghrib' => '19:25',
+                    'Isha' => '20:35',
+                ],
+            ],
+        ], 200),
         'challenges.cloudflare.com/*' => Http::response(['success' => true], 200),
     ]);
 

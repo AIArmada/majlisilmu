@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationChannel;
+use App\Enums\NotificationPreferenceKey;
 use App\Models\SavedSearch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +30,29 @@ class SavedSearchDigestNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        $configuredChannels = method_exists($notifiable, 'notificationChannelsFor')
+            ? $notifiable->notificationChannelsFor(
+                NotificationPreferenceKey::SavedSearchDigest->value,
+                [NotificationChannel::Email->value]
+            )
+            : [NotificationChannel::Email->value];
+
+        return collect($configuredChannels)
+            ->map(function (string $channel) use ($notifiable): ?string {
+                if ($channel === NotificationChannel::Email->value) {
+                    return filled($notifiable->email ?? null) ? 'mail' : null;
+                }
+
+                if ($channel === NotificationChannel::InApp->value) {
+                    return 'database';
+                }
+
+                return null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

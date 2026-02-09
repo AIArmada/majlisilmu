@@ -10,38 +10,63 @@ use App\Models\Tag;
 use App\Models\Venue;
 use Livewire\Livewire;
 
+beforeEach(function () {
+    fakePrayerTimesApi();
+});
+
+/**
+ * @return array{domain_tag: Tag, discipline_tag: Tag, speaker: Speaker, venue: Venue}
+ */
+function submitEventOrganizerFixtures(): array
+{
+    return [
+        'speaker' => Speaker::factory()->create(['status' => 'verified']),
+        'domain_tag' => Tag::factory()->domain()->create(),
+        'discipline_tag' => Tag::factory()->discipline()->create(),
+        'venue' => Venue::factory()->create(['status' => 'verified']),
+    ];
+}
+
+/**
+ * @param  array{domain_tag: Tag, discipline_tag: Tag, speaker: Speaker, venue: Venue}  $fixtures
+ * @return array<string, mixed>
+ */
+function submitEventOrganizerFormData(array $fixtures, array $overrides = []): array
+{
+    return array_merge([
+        'organizer_type' => 'speaker',
+        'organizer_speaker_id' => $fixtures['speaker']->id,
+        'speakers' => [$fixtures['speaker']->id],
+        'title' => 'Auto Select Speaker Event',
+        'event_date' => now()->addDay()->toDateString(),
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'languages' => [101],
+        'description' => 'Test description',
+        'domain_tags' => [$fixtures['domain_tag']->id],
+        'discipline_tags' => [$fixtures['discipline_tag']->id],
+        'submitter_name' => 'Test User',
+        'submitter_email' => 'test@example.com',
+        'location_type' => 'venue',
+        'location_venue_id' => $fixtures['venue']->id,
+        'visibility' => EventVisibility::Public->value,
+    ], $overrides);
+}
+
 it('assigns the speaker as event speaker when speaker is the organizer', function () {
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $venue = Venue::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventOrganizerFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.organizer_type', 'speaker')
-        ->set('data.organizer_speaker_id', $speaker->id)
-        ->set('data.speakers', [$speaker->id]) // In real UI, this is auto-set by JS; we simulate it here
-        ->set('data.title', 'Auto Select Speaker Event')
-        ->set('data.event_date', now()->addDay()->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.description', 'Test description')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
-        ->set('data.location_type', 'venue')
-        ->set('data.location_venue_id', $venue->id)
-        ->set('data.visibility', EventVisibility::Public->value)
+        ->fillForm(submitEventOrganizerFormData($fixtures))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
 
     $event = Event::where('title', 'Auto Select Speaker Event')->firstOrFail();
     expect($event->speakers)->toHaveCount(1);
-    expect($event->speakers->first()->id)->toBe($speaker->id);
+    expect($event->speakers->first()->id)->toBe($fixtures['speaker']->id);
     expect($event->organizer_type)->toBe(Speaker::class);
-    expect($event->organizer_id)->toBe($speaker->id);
+    expect($event->organizer_id)->toBe($fixtures['speaker']->id);
 });
