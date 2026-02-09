@@ -43,7 +43,8 @@ class EventSubmissionsRelationManager extends RelationManager
                 TextColumn::make('submitter.email')
                     ->label('User')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->url(fn ($record): ?string => $record->submitted_by ? url('/admin') : null),
                 TextColumn::make('submitter_name')
                     ->label('Guest Name')
                     ->searchable(),
@@ -52,7 +53,7 @@ class EventSubmissionsRelationManager extends RelationManager
                     ->searchable(),
                 TextColumn::make('phone')
                     ->label('Guest Phone')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                 TextColumn::make('notes')
                     ->limit(80)
                     ->wrap()

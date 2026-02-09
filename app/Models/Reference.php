@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Reference extends Model implements HasMedia
 {
@@ -43,7 +44,22 @@ class Reference extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('cover')
-            ->useDisk('public')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->withResponsiveImages()
             ->singleFile();
+    }
+
+    /**
+     * Register media conversions for optimized image delivery.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(200)
+            ->height(280)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('cover');
     }
 }

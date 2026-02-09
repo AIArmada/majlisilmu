@@ -314,21 +314,32 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(EventAgeGroup::class)
                                         ->closeOnSelect()
                                         ->multiple()
+                                        ->live()
                                         ->afterStateUpdatedJs(<<<'JS'
                                                             const ageGroups = $state || []
+                                                            if (ageGroups.includes('all_ages') && ageGroups.length > 1) {
+                                                                $set('age_group', ageGroups.filter((group) => group !== 'all_ages'))
+                                                                return
+                                                            }
                                                             if (ageGroups.includes('children') || ageGroups.includes('all_ages')) {
                                                                 $set('children_allowed', true)
                                                             }
                                                             JS)
-                                        ->afterStateUpdated(function ($state, Set $set) {
-                                            // Server-side hook for tests (JavaScript doesn't execute in Livewire tests)
-                                            if (! $state) {
-                                                return;
+                                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                            $ageGroups = $this->normalizeAgeGroupState($state);
+
+                                            if (in_array(EventAgeGroup::AllAges->value, $ageGroups, true) && count($ageGroups) > 1) {
+                                                $ageGroups = array_values(array_filter(
+                                                    $ageGroups,
+                                                    fn (string $ageGroup): bool => $ageGroup !== EventAgeGroup::AllAges->value
+                                                ));
+                                                $set('age_group', $ageGroups);
                                             }
-                                            
-                                            // In form closures, enum instances are passed, not strings
-                                            if (in_array(EventAgeGroup::Children, $state, true) ||
-                                                in_array(EventAgeGroup::AllAges, $state, true)) {
+
+                                            if (
+                                                in_array(EventAgeGroup::Children->value, $ageGroups, true) ||
+                                                in_array(EventAgeGroup::AllAges->value, $ageGroups, true)
+                                            ) {
                                                 $set('children_allowed', true);
                                             }
                                         }),
@@ -349,7 +360,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->whereIn('code', $preferredOrder)
                                                 ->get()
                                                 ->sortBy(fn($lang) => array_search($lang->code, $preferredOrder))
-                                                ->pluck('name', 'id')
+                                                ->pluck('name_native', 'id')
                                                 ->toArray();
 
                                             // Skip cache in testing to avoid stale data
@@ -366,9 +377,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->default(true)
                                         ->inline(false)
                                         ->disabled(function (Get $get): bool {
-                                            $ageGroups = $get('age_group') ?? [];
-                                            return in_array(EventAgeGroup::Children, $ageGroups, true) ||
-                                                in_array(EventAgeGroup::AllAges, $ageGroups, true);
+                                            $ageGroups = $this->normalizeAgeGroupState($get('age_group'));
+
+                                            return in_array(EventAgeGroup::Children->value, $ageGroups, true) ||
+                                                in_array(EventAgeGroup::AllAges->value, $ageGroups, true);
                                         })
                                         ->dehydrated(),
 
@@ -686,6 +698,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->collection('poster')
                                         ->image()
                                         ->imageEditor()
+                                        ->conversion('thumb')
                                         ->responsiveImages()
                                         ->helperText(__('Gambar utama untuk paparan majlis.')),
                                     SpatieMediaLibraryFileUpload::make('gallery')
@@ -695,6 +708,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->reorderable()
                                         ->image()
                                         ->imageEditor()
+                                        ->conversion('thumb')
                                         ->responsiveImages()
                                         ->helperText(__('Gambar tambahan untuk galeri majlis.')),
                                 ])
@@ -944,6 +958,36 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     }
 
     /**
+     * @return array<int, string>
+     */
+    protected function normalizeAgeGroupState(mixed $state): array
+    {
+        if ($state instanceof \Illuminate\Support\Collection) {
+            $state = $state->all();
+        }
+
+        if (!is_array($state)) {
+            $state = [$state];
+        }
+
+        return collect($state)
+            ->map(function (mixed $ageGroup): ?string {
+                if ($ageGroup instanceof EventAgeGroup) {
+                    return $ageGroup->value;
+                }
+
+                if (is_string($ageGroup) && filled($ageGroup)) {
+                    return $ageGroup;
+                }
+
+                return null;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Resolve the starts_at datetime from event_date and prayer_time/custom_time.
      *
      * @param array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null} $validated
@@ -1094,6 +1138,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     .fi-dropdown-list-item {
         padding-left: 1.5rem !important;
+    }
+
+    /* Hide loading indicators by default - Livewire will show them during actual loading */
+    .fi-loading-indicator {
+        display: none;
     }
 </style>
 

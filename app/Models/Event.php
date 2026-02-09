@@ -25,6 +25,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\ModelStates\HasStates;
 use Spatie\Tags\HasTags;
 
@@ -318,9 +319,34 @@ class Event extends Model implements AuditableContract, HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('poster')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useFallbackUrl(asset('images/placeholders/event.png'))
+            ->withResponsiveImages()
             ->singleFile();
 
-        $this->addMediaCollection('gallery');
+        $this->addMediaCollection('gallery')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->withResponsiveImages();
+    }
+
+    /**
+     * Register media conversions for optimized image delivery.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(368)
+            ->height(232)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('poster', 'gallery');
+
+        $this->addMediaConversion('preview')
+            ->width(800)
+            ->format('webp')
+            ->performOnCollections('poster');
     }
 
     /**
@@ -375,18 +401,18 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Get the card image URL for frontend.
-     * Priority: Poster collection -> Institution logo -> Speaker avatar -> Default.
+     * Priority: Poster thumb -> Institution logo thumb -> Speaker avatar -> Default.
      */
     public function getCardImageUrlAttribute(): string
     {
-        // 1. Poster from Spatie Media Library
+        // 1. Poster thumb conversion from Spatie Media Library
         if ($this->hasMedia('poster')) {
-            return $this->getFirstMediaUrl('poster');
+            return $this->getFirstMediaUrl('poster', 'thumb');
         }
 
-        // 2. Institution logo
+        // 2. Institution logo thumb
         if ($this->institution && $this->institution->hasMedia('logo')) {
-            return $this->institution->getFirstMediaUrl('logo');
+            return $this->institution->getFirstMediaUrl('logo', 'thumb');
         }
 
         // 3. Fallback to first speaker's avatar
@@ -395,7 +421,7 @@ class Event extends Model implements AuditableContract, HasMedia
         }
 
         // 4. Global default (placeholder)
-        return asset('images/default-event-placeholder.png');
+        return asset('images/placeholders/event.png');
     }
 
     /**

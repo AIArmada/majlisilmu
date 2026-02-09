@@ -20,6 +20,7 @@ new class extends Component {
         }
 
         $this->institution = $institution->load([
+            'media',
             'address.state',
             'address.city',
             'events' => function ($query) {
@@ -44,8 +45,8 @@ new class extends Component {
     $institution = $this->institution;
     $randomBackground = collect($this->backgrounds)->random();
 
-    $mainUrl = $institution->getFirstMediaUrl('main');
-    $logoUrl = $institution->getFirstMediaUrl('logo');
+    $mainUrl = $institution->getFirstMediaUrl('cover', 'banner');
+    $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
     $cityName = $institution->addressModel?->city?->name;
     $stateName = $institution->addressModel?->state?->name;
     $gallery = $institution->getMedia('gallery');
@@ -84,7 +85,7 @@ new class extends Component {
                                 <div class="w-40 h-40 rounded-[2rem] bg-white shadow-xl shadow-slate-200/50 p-2 transform rotate-3 hover:rotate-0 transition-transform duration-500 ease-out border-2 border-slate-100">
                                     <div class="w-full h-full rounded-[1.5rem] overflow-hidden flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30 relative group">
                                         @if($logoUrl)
-                                            <img src="{{ $logoUrl }}" alt="{{ $institution->name }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+                                            <img src="{{ $logoUrl }}" alt="{{ $institution->name }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" width="160" height="160" loading="eager">
                                         @else
                                             <!-- Decorative Pattern Background -->
                                             <div class="absolute inset-0 opacity-10 bg-[url('/images/pattern-bg.png')] bg-repeat"></div>
@@ -210,7 +211,7 @@ new class extends Component {
                         <!-- Cover Image (Clear Display) -->
                         <div class="relative bg-slate-100 overflow-hidden group">
                              @if($mainUrl)
-                                <img src="{{ $mainUrl }}" alt="Cover" class="w-full h-auto shadow-sm transition-transform duration-1000 group-hover:scale-[1.01]">
+                                <img src="{{ $mainUrl }}" alt="{{ __('Cover') }}" class="w-full h-auto shadow-sm transition-transform duration-1000 group-hover:scale-[1.01]" loading="lazy">
                             @else
                                 <!-- Fallback Cover Pattern -->
                                 <div class="w-full h-64 lg:h-96 bg-emerald-900 flex items-center justify-center relative overflow-hidden">
@@ -253,7 +254,7 @@ new class extends Component {
                                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
                                     @foreach($gallery as $image)
                                         <div class="group relative aspect-square bg-slate-100 rounded-2xl overflow-hidden cursor-zoom-in">
-                                            <img src="{{ $image->getUrl() }}" alt="Gallery Image" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                                            <img src="{{ $image->getAvailableUrl(['gallery_thumb']) }}" alt="{{ __('Gallery Image') }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy">
                                             <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                                         </div>
                                     @endforeach

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Venue extends Model implements HasMedia
 {
@@ -70,8 +71,33 @@ class Venue extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('main')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useFallbackUrl(asset('images/placeholders/venue.png'))
+            ->withResponsiveImages()
             ->singleFile();
 
-        $this->addMediaCollection('gallery');
+        $this->addMediaCollection('gallery')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->withResponsiveImages();
+    }
+
+    /**
+     * Register media conversions for optimized image delivery.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(368)
+            ->height(232)
+            ->sharpen(10)
+            ->format('webp')
+            ->performOnCollections('main', 'gallery');
+
+        $this->addMediaConversion('banner')
+            ->width(1200)
+            ->format('webp')
+            ->performOnCollections('main');
     }
 }

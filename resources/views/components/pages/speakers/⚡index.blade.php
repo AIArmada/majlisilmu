@@ -18,6 +18,7 @@ new
         return Speaker::query()
             ->where('status', 'verified')
             ->withCount('events')
+            ->with('media')
             ->when($search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('bio', 'like', "%{$search}%");
@@ -106,7 +107,7 @@ new
                             class="h-32 w-32 rounded-full p-1 bg-white border border-slate-100 shadow-lg mb-6 relative group-hover:scale-105 transition-transform duration-500">
                             <div class="w-full h-full rounded-full overflow-hidden bg-slate-100 relative">
                                 <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
-                                    class="w-full h-full object-cover">
+                                    class="w-full h-full object-cover" width="128" height="128" loading="lazy">
                             </div>
                             <div
                                 class="absolute bottom-1 right-1 bg-emerald-500 border-2 border-white rounded-full p-1.5 text-white">

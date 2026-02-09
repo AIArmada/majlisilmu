@@ -2,14 +2,13 @@
 
 use App\Enums\EventAgeGroup;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
-
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $role = Role::firstOrNew(['name' => 'user']);
-    if (!$role->exists) {
+    if (! $role->exists) {
         $role->id = \Illuminate\Support\Str::uuid();
         $role->guard_name = 'web';
         $role->save();
@@ -34,7 +33,7 @@ it('automatically sets and disables children_allowed when Children or AllAges is
         ->assertFormSet([
             'children_allowed' => true,
         ]);
-    // We can't easily assertion 'disabled' state in Livewire test without checking rendered HTML or specific methods, 
+    // We can't easily assertion 'disabled' state in Livewire test without checking rendered HTML or specific methods,
     // but we can trust the logic if the component sets the state correctly.
     // However, we can check if it respects the logic we added.
 
@@ -49,13 +48,25 @@ it('automatically sets and disables children_allowed when Children or AllAges is
     // Changing to Adults only
     // Logic: If I select Adults, it shouldn't force children_allowed to true.
     // But my code only says "if ($mustAllowChildren) { set true }".
-    // It doesn't say "else { set false }". The user didn't ask to set it false, 
+    // It doesn't say "else { set false }". The user didn't ask to set it false,
     // but the disable logic will be false.
 
     $component->fillForm([
         'age_group' => [EventAgeGroup::Adults->value],
     ]);
 
-    // We can't strictly assert 'disabled' property via `assertFormSet` easily. 
+    // We can't strictly assert 'disabled' property via `assertFormSet` easily.
     // But we verified the assignment logic via the `set` call.
+});
+
+it('keeps children_allowed configurable for non-children age groups', function () {
+    Livewire::test('pages.submit-event.create')
+        ->fillForm([
+            'age_group' => [EventAgeGroup::Adults->value],
+            'children_allowed' => false,
+        ])
+        ->assertFormSet([
+            'age_group' => [EventAgeGroup::Adults],
+            'children_allowed' => false,
+        ]);
 });

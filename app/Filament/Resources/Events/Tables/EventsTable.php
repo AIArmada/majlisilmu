@@ -17,6 +17,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -28,12 +29,21 @@ class EventsTable
     {
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('poster')
+                    ->label('Poster')
+                    ->collection('poster')
+                    ->conversion('thumb')
+                    ->square()
+                    ->size(56),
                 TextColumn::make('title')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('institution.name')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->url(fn ($record): ?string => $record->institution?->id
+                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id])
+                        : null),
                 TextColumn::make('event_type')
                     ->label('Type')
                     ->formatStateUsing(fn (mixed $state): string => self::formatEnumCollection($state, EventType::class))

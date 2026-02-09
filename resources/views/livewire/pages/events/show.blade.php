@@ -54,12 +54,12 @@
             <!-- Background Layer -->
             <div class="absolute inset-0 z-0">
                 @php
-                    $heroImage = $event->getFirstMediaUrl('poster');
+                    $heroImage = $event->getFirstMedia('poster')?->getAvailableUrl(['preview', 'thumb']) ?? '';
                     if (!$heroImage) {
-                        $heroImage = $event->institution?->getFirstMediaUrl('cover');
+                        $heroImage = $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
                     }
                     if (!$heroImage) {
-                        $heroImage = $event->venue?->getFirstMediaUrl('cover');
+                        $heroImage = $event->venue?->getFirstMedia('main')?->getAvailableUrl(['banner']) ?? '';
                     }
                 @endphp
 
@@ -115,7 +115,7 @@
                                 <a href="{{ route('institutions.show', $event->institution) }}" wire:navigate
                                     class="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-sm font-medium text-white backdrop-blur-md hover:bg-white/20 transition-all hover:scale-105">
                                     @if($event->institution->getFirstMediaUrl('logo'))
-                                        <img src="{{ $event->institution->getFirstMediaUrl('logo') }}" class="w-4 h-4 rounded-full bg-white object-cover">
+                                        <img src="{{ $event->institution->getFirstMediaUrl('logo', 'thumb') }}" alt="{{ $event->institution->name }}" class="w-4 h-4 rounded-full bg-white object-cover" width="16" height="16" loading="lazy">
                                     @endif
                                     {{ $event->institution->name }}
                                 </a>
@@ -181,7 +181,7 @@
                                     class="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-colors">
                                     <div class="h-14 w-14 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
                                         <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
-                                            class="w-full h-full object-cover">
+                                            class="w-full h-full object-cover" width="56" height="56" loading="lazy">
                                     </div>
                                     <div>
                                         <h4 class="font-bold text-slate-900">{{ $speaker->name }}</h4>
@@ -587,5 +587,4 @@
             </div>
         @endif
     </div>
-
 
