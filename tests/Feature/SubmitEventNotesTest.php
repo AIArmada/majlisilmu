@@ -12,33 +12,59 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use Livewire\Livewire;
 
-it('saves notes to event submission when provided', function () {
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+beforeEach(function () {
+    fakePrayerTimesApi();
+});
 
+/**
+ * @return array{domain_tag: Tag, discipline_tag: Tag, institution: Institution, speaker: Speaker}
+ */
+function submitEventNotesFixtures(): array
+{
+    return [
+        'domain_tag' => Tag::factory()->domain()->create(),
+        'discipline_tag' => Tag::factory()->discipline()->create(),
+        'institution' => Institution::factory()->create(['status' => 'verified']),
+        'speaker' => Speaker::factory()->create(['status' => 'verified']),
+    ];
+}
+
+/**
+ * @param  array{domain_tag: Tag, discipline_tag: Tag, institution: Institution, speaker: Speaker}  $fixtures
+ * @return array<string, mixed>
+ */
+function submitEventNotesFormData(array $fixtures, array $overrides = []): array
+{
+    return array_merge([
+        'title' => 'Submit Event Notes',
+        'domain_tags' => [$fixtures['domain_tag']->id],
+        'discipline_tags' => [$fixtures['discipline_tag']->id],
+        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_date' => now()->addDays(5)->toDateString(),
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'description' => 'Test description',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'languages' => [101],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $fixtures['institution']->id,
+        'speakers' => [$fixtures['speaker']->id],
+        'submitter_name' => 'Test User',
+        'submitter_email' => 'test@example.com',
+    ], $overrides);
+}
+
+it('saves notes to event submission when provided', function () {
+    $fixtures = submitEventNotesFixtures();
     $notes = 'This event requires special audio equipment and accessibility ramps.';
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'Event With Notes')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
-        ->set('data.notes', $notes)
+        ->fillForm(submitEventNotesFormData($fixtures, [
+            'title' => 'Event With Notes',
+            'notes' => $notes,
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -50,29 +76,12 @@ it('saves notes to event submission when provided', function () {
 });
 
 it('allows submitting event without notes', function () {
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventNotesFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'Event Without Notes')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
+        ->fillForm(submitEventNotesFormData($fixtures, [
+            'title' => 'Event Without Notes',
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

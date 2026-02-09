@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EventSaveController;
 use App\Http\Controllers\Api\RegistrationExportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
+use App\Http\Controllers\Api\UserRegistrationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,8 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // User
     Route::get('/user', fn (Request $request) => $request->user());
+    Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
+        ->name('api.user.registrations.index');
 
     // Saved Searches (per documentation B5a)
     Route::apiResource('saved-searches', SavedSearchController::class)

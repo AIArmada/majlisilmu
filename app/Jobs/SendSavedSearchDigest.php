@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\NotificationPreferenceKey;
 use App\Models\SavedSearch;
 use App\Notifications\SavedSearchDigestNotification;
 use App\Services\EventSearchService;
@@ -47,7 +48,14 @@ class SendSavedSearchDigest implements ShouldQueue
         foreach ($savedSearches as $savedSearch) {
             $processed++;
 
-            if (! $savedSearch->user || ! $savedSearch->user->email) {
+            if (! $savedSearch->user) {
+                continue;
+            }
+
+            if (! $savedSearch->user->shouldReceiveNotificationFor(
+                NotificationPreferenceKey::SavedSearchDigest->value,
+                $this->frequency
+            )) {
                 continue;
             }
 

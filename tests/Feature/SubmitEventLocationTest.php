@@ -11,16 +11,34 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    Http::fake();
+    fakePrayerTimesApi();
     $this->user = User::factory()->create();
 
     $this->domainTag = Tag::factory()->create(['type' => TagType::Domain->value]);
     $this->disciplineTag = Tag::factory()->create(['type' => TagType::Discipline->value]);
 });
+
+/**
+ * @return array<string, mixed>
+ */
+function submitEventLocationFormData(array $overrides = []): array
+{
+    return array_merge([
+        'title' => 'Submit Event Location',
+        'description' => 'Test description.',
+        'event_date' => now()->addDays(7)->format('Y-m-d'),
+        'prayer_time' => 'selepas_maghrib',
+        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'languages' => [101],
+    ], $overrides);
+}
 
 it('can submit an event as a speaker with an institution location', function () {
     $speaker = Speaker::factory()->create(['status' => 'verified']);
@@ -28,23 +46,16 @@ it('can submit an event as a speaker with an institution location', function () 
 
     Livewire::actingAs($this->user)
         ->test('pages.submit-event.create')
-        ->set('data.title', 'Speaker at Institution')
-        ->set('data.description', 'Test description.')
-        ->set('data.event_date', now()->addDays(7)->format('Y-m-d'))
-        ->set('data.prayer_time', 'selepas_maghrib')
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.organizer_type', 'speaker')
-        ->set('data.organizer_speaker_id', $speaker->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.location_type', 'institution')
-        ->set('data.location_institution_id', $institution->id)
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.domain_tags', [$this->domainTag->id])
-        ->set('data.discipline_tags', [$this->disciplineTag->id])
+        ->fillForm(submitEventLocationFormData([
+            'title' => 'Speaker at Institution',
+            'organizer_type' => 'speaker',
+            'organizer_speaker_id' => $speaker->id,
+            'speakers' => [$speaker->id],
+            'location_type' => 'institution',
+            'location_institution_id' => $institution->id,
+            'domain_tags' => [$this->domainTag->id],
+            'discipline_tags' => [$this->disciplineTag->id],
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
@@ -62,23 +73,16 @@ it('can submit an event as a speaker with a venue location', function () {
 
     Livewire::actingAs($this->user)
         ->test('pages.submit-event.create')
-        ->set('data.title', 'Speaker at Venue')
-        ->set('data.description', 'Test description.')
-        ->set('data.event_date', now()->addDays(7)->format('Y-m-d'))
-        ->set('data.prayer_time', 'selepas_maghrib')
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.organizer_type', 'speaker')
-        ->set('data.organizer_speaker_id', $speaker->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.location_type', 'venue')
-        ->set('data.location_venue_id', $venue->id)
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.domain_tags', [$this->domainTag->id])
-        ->set('data.discipline_tags', [$this->disciplineTag->id])
+        ->fillForm(submitEventLocationFormData([
+            'title' => 'Speaker at Venue',
+            'organizer_type' => 'speaker',
+            'organizer_speaker_id' => $speaker->id,
+            'speakers' => [$speaker->id],
+            'location_type' => 'venue',
+            'location_venue_id' => $venue->id,
+            'domain_tags' => [$this->domainTag->id],
+            'discipline_tags' => [$this->disciplineTag->id],
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
@@ -92,29 +96,18 @@ it('can submit an event as a speaker with a venue location', function () {
 
 it('automatically sets location to institution when organizer is an institution', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
-
-    $domainTag = Tag::factory()->create(['type' => TagType::Domain->value]);
-    $disciplineTag = Tag::factory()->create(['type' => TagType::Discipline->value]);
-
     $speaker = Speaker::factory()->create(['status' => 'verified']);
 
     Livewire::actingAs($this->user)
         ->test('pages.submit-event.create')
-        ->set('data.title', 'Institution Event')
-        ->set('data.description', 'Test description.')
-        ->set('data.event_date', now()->addDays(7)->format('Y-m-d'))
-        ->set('data.prayer_time', 'selepas_maghrib')
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.domain_tags', [$this->domainTag->id])
-        ->set('data.discipline_tags', [$this->disciplineTag->id])
+        ->fillForm(submitEventLocationFormData([
+            'title' => 'Institution Event',
+            'organizer_type' => 'institution',
+            'organizer_institution_id' => $institution->id,
+            'speakers' => [$speaker->id],
+            'domain_tags' => [$this->domainTag->id],
+            'discipline_tags' => [$this->disciplineTag->id],
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
@@ -148,24 +141,17 @@ it('allows institution organizer to choose a different location', function () {
 
     Livewire::actingAs($this->user)
         ->test('pages.submit-event.create')
-        ->set('data.title', 'Institution at Other Venue')
-        ->set('data.description', 'Test description.')
-        ->set('data.event_date', now()->addDays(7)->format('Y-m-d'))
-        ->set('data.prayer_time', 'selepas_maghrib')
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $organizerInstitution->id)
-        ->set('data.location_same_as_institution', false)
-        ->set('data.location_type', 'venue')
-        ->set('data.location_venue_id', $otherVenue->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.domain_tags', [$this->domainTag->id])
-        ->set('data.discipline_tags', [$this->disciplineTag->id])
+        ->fillForm(submitEventLocationFormData([
+            'title' => 'Institution at Other Venue',
+            'organizer_type' => 'institution',
+            'organizer_institution_id' => $organizerInstitution->id,
+            'location_same_as_institution' => false,
+            'location_type' => 'venue',
+            'location_venue_id' => $otherVenue->id,
+            'speakers' => [$speaker->id],
+            'domain_tags' => [$this->domainTag->id],
+            'discipline_tags' => [$this->disciplineTag->id],
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();

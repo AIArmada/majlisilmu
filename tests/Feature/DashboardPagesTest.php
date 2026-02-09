@@ -3,6 +3,7 @@
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Registration;
+use App\Models\SavedSearch;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -13,7 +14,7 @@ it('requires authentication for user and institution dashboards', function () {
     $this->get('/dashboard/institutions')->assertRedirect(route('login'));
 });
 
-it('shows profile, my events, and my registrations on the user dashboard', function () {
+it('shows profile, events, registrations, saved events, and saved searches on the user dashboard', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
@@ -43,8 +44,25 @@ it('shows profile, my events, and my registrations on the user dashboard', funct
         'starts_at' => now()->addDays(4),
     ]);
 
+    $savedEvent = Event::factory()->for($otherUser)->for($institution)->create([
+        'title' => 'Saved Dashboard Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(7),
+    ]);
+
     Registration::factory()->for($ownedEvent)->for($user)->create([
         'status' => 'registered',
+    ]);
+
+    $user->savedEvents()->attach($savedEvent->id);
+
+    SavedSearch::factory()->for($user)->create([
+        'name' => 'Kuliah KL Daily',
+    ]);
+
+    SavedSearch::factory()->for($otherUser)->create([
+        'name' => 'Other User Search',
     ]);
 
     $response = $this->actingAs($user)->get('/dashboard');
@@ -54,7 +72,13 @@ it('shows profile, my events, and my registrations on the user dashboard', funct
         ->assertSee('Owned Dashboard Event')
         ->assertSee('Institution Managed Event')
         ->assertSee('Registered')
+        ->assertSee('My Saved Events')
+        ->assertSee('Saved Dashboard Event')
+        ->assertSee('My Saved Searches')
+        ->assertSee('Kuliah KL Daily')
         ->assertDontSee('External Event');
+
+    $response->assertDontSee('Other User Search');
 });
 
 it('shows institution profile, events, and registrations for members', function () {

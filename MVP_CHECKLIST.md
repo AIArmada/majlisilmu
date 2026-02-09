@@ -10,13 +10,13 @@
 | Category | Completed | Total | Progress |
 |----------|-----------|-------|----------|
 | Public Pages | 13 | 13 | 100% |
-| User Features | 6 | 8 | 75% |
+| User Features | 8 | 8 | 100% |
 | Admin/Filament | 12 | 16 | 75% |
-| API Endpoints | 12 | 13 | 92% |
+| API Endpoints | 13 | 13 | 100% |
 | Search & Discovery | 7 | 10 | 70% |
 | Moderation | 2 | 5 | 40% |
 | Infrastructure | 8 | 10 | 80% |
-| **Overall** | **60** | **75** | **80%** |
+| **Overall** | **66** | **75** | **88%** |
 
 ---
 
@@ -69,15 +69,15 @@
 - [x] Saved searches CRUD API (backend exists)
 - [x] Event interest marking API (going/interested) ✨
 - [x] Saved searches UI page ✨
-- [ ] Daily digest email job (scheduled, needs verification)
-- [ ] Weekly digest email job (scheduled, needs verification)
-- [ ] Email preference settings
+- [x] Daily digest email job (scheduled, verified) ✨
+- [x] Weekly digest email job (scheduled, verified) ✨
+- [x] Email preference settings ✨
 
 ### User Dashboard
 - [x] User profile page
 - [x] My registrations list
-- [ ] My saved events list
-- [ ] My saved searches list
+- [x] My saved events list ✨
+- [x] My saved searches list ✨
 
 ---
 
@@ -147,7 +147,7 @@
 - [x] `GET/POST/DELETE /api/v1/event-interests` - Event interest (going/interested) ✨
 - [x] Saved searches CRUD API (`/api/v1/saved-searches`)
 - [x] `GET /api/v1/events/{id}/registrations/export` - Export registrations ✨
-- [ ] `GET /api/v1/user/registrations` - User's registrations
+- [x] `GET /api/v1/user/registrations` - User's registrations ✨
 
 ---
 

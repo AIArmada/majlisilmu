@@ -17,9 +17,50 @@ use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    fakePrayerTimesApi();
     $this->seed(RoleSeeder::class);
     Notification::fake();
 });
+
+/**
+ * @return array{domain_tag: Tag, discipline_tag: Tag, institution: Institution, speaker: Speaker}
+ */
+function submitEventNotificationFixtures(): array
+{
+    return [
+        'domain_tag' => Tag::factory()->domain()->create(),
+        'discipline_tag' => Tag::factory()->discipline()->create(),
+        'institution' => Institution::factory()->create(['status' => 'verified']),
+        'speaker' => Speaker::factory()->create(['status' => 'verified']),
+    ];
+}
+
+/**
+ * @param  array{domain_tag: Tag, discipline_tag: Tag, institution: Institution, speaker: Speaker}  $fixtures
+ * @return array<string, mixed>
+ */
+function submitEventNotificationFormData(array $fixtures, array $overrides = []): array
+{
+    return array_merge([
+        'title' => 'Notification Test Event',
+        'domain_tags' => [$fixtures['domain_tag']->id],
+        'discipline_tags' => [$fixtures['discipline_tag']->id],
+        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_date' => now()->addDays(5)->toDateString(),
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'description' => 'Test description for notification',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'languages' => [101],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $fixtures['institution']->id,
+        'speakers' => [$fixtures['speaker']->id],
+        'submitter_name' => 'Test User',
+        'submitter_email' => 'test@example.com',
+    ], $overrides);
+}
 
 it('notifies moderators when a guest submits an event', function () {
     $moderator = User::factory()->create();
@@ -31,29 +72,13 @@ it('notifies moderators when a guest submits an event', function () {
     // Regular user should NOT receive the notification
     $regularUser = User::factory()->create();
 
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventNotificationFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'Notification Test Event')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Test description for notification')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Ahmad bin Abdullah')
-        ->set('data.submitter_email', 'ahmad@example.com')
+        ->fillForm(submitEventNotificationFormData($fixtures, [
+            'submitter_name' => 'Ahmad bin Abdullah',
+            'submitter_email' => 'ahmad@example.com',
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -71,29 +96,13 @@ it('notifies moderators when a guest submits an event', function () {
 });
 
 it('transitions event from draft to pending on submission', function () {
-    $domainTag = Tag::factory()->domain()->create();
-    $disciplineTag = Tag::factory()->discipline()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
-    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $fixtures = submitEventNotificationFixtures();
 
     Livewire::test('pages.submit-event.create')
-        ->set('data.title', 'Draft to Pending Event')
-        ->set('data.domain_tags', [$domainTag->id])
-        ->set('data.discipline_tags', [$disciplineTag->id])
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
-        ->set('data.event_date', now()->addDays(5)->toDateString())
-        ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.description', 'Testing state transition')
-        ->set('data.event_format', EventFormat::Physical->value)
-        ->set('data.visibility', EventVisibility::Public->value)
-        ->set('data.gender', EventGenderRestriction::All->value)
-        ->set('data.age_group', [EventAgeGroup::AllAges->value])
-        ->set('data.languages', [101])
-        ->set('data.organizer_type', 'institution')
-        ->set('data.organizer_institution_id', $institution->id)
-        ->set('data.speakers', [$speaker->id])
-        ->set('data.submitter_name', 'Test User')
-        ->set('data.submitter_email', 'test@example.com')
+        ->fillForm(submitEventNotificationFormData($fixtures, [
+            'title' => 'Draft to Pending Event',
+            'description' => 'Testing state transition',
+        ]))
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
