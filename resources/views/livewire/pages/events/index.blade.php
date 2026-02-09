@@ -13,6 +13,25 @@
 
 @php
     $states = $this->states;
+    $topics = $this->topics;
+    $selectedAgeGroups = array_values(array_filter((array) request('age_group', [])));
+    $selectedTopicIds = array_values(array_filter((array) request('topic_ids', [])));
+    $selectedTopicLabels = collect($selectedTopicIds)
+        ->map(fn (string $topicId): ?string => $topics->firstWhere('id', $topicId)?->name)
+        ->filter()
+        ->values();
+    $activeFilterCount = collect([
+        request('state_id'),
+        request('district_id'),
+        request('language'),
+        request('event_type'),
+        request('gender'),
+        request('children_allowed'),
+        request('starts_after'),
+        request('starts_before'),
+        count($selectedAgeGroups) > 0,
+        count($selectedTopicIds) > 0,
+    ])->filter(fn ($value) => $value !== null && $value !== '' && $value !== false)->count();
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -46,7 +65,6 @@
                     class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{{ __('Circle of Knowledge') }}</span>
             </h1>
             <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto text-balance">
-            <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto text-balance">
                 {{ __('Discover classes, lectures, and community gatherings happening near you. Connect with knowledge seekers in your area.') }}
             </p>
         </div>
@@ -56,7 +74,7 @@
         <!-- Search & Filter Card -->
         <form action="{{ route('events.index') }}" method="GET" x-ref="form" x-data="{
                     locating: false,
-                    showFilters: {{ request()->hasAny(['state_id', 'language', 'event_type', 'gender', 'age_group']) ? 'true' : 'false' }},
+                    showFilters: {{ request()->hasAny(['state_id', 'district_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids']) ? 'true' : 'false' }},
                     locate() {
                         if (this.locating) return;
                         if (! navigator.geolocation) {
@@ -135,7 +153,12 @@
                                 d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                         </svg>
                     </span>
-                    {{ __('Filter Events') }}
+                    {{ __('Advanced Filters') }}
+                    @if($activeFilterCount > 0)
+                        <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-100 px-2 text-xs font-bold text-emerald-700">
+                            {{ $activeFilterCount }}
+                        </span>
+                    @endif
                 </button>
 
                 <div class="flex items-center gap-3">
@@ -154,91 +177,120 @@
             </div>
 
             <!-- Live Filters -->
-            <div x-show="showFilters" x-collapse>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 mt-2">
-                    <!-- State Filter -->
-                    <div class="space-y-2">
-                        <label
-                            class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Location') }}</label>
-                        <select name="state_id" onchange="this.form.submit()"
-                            class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                            <option value="">{{ __('All States') }}</option>
-                            @foreach($states ?? [] as $state)
-                                <option value="{{ $state->id }}" @selected(request('state_id') == $state->id)>
-                                    {{ $state->name }}
-                                </option>
-                            @endforeach
-                        </select>
+            <div x-show="showFilters" x-collapse class="pt-6">
+                <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 md:p-6">
+                    <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Location') }}</label>
+                            <select name="state_id" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                <option value="">{{ __('All States') }}</option>
+                                @foreach($states as $state)
+                                    <option value="{{ $state->id }}" @selected(request('state_id') == $state->id)>
+                                        {{ $state->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Start Date') }}</label>
+                            <input type="date" name="starts_after" value="{{ request('starts_after') }}" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('End Date') }}</label>
+                            <input type="date" name="starts_before" value="{{ request('starts_before') }}" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Language') }}</label>
+                            <select name="language" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                <option value="">{{ __('Any Language') }}</option>
+                                <option value="malay" @selected(request('language') == 'malay')>Bahasa Melayu</option>
+                                <option value="english" @selected(request('language') == 'english')>English</option>
+                                <option value="arabic" @selected(request('language') == 'arabic')>العربية</option>
+                                <option value="mixed" @selected(request('language') == 'mixed')>Mixed</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Event Type') }}</label>
+                            <select name="event_type" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                <option value="">{{ __('Any Type') }}</option>
+                                @foreach(collect(\App\Enums\EventType::cases())->mapToGroups(fn(\App\Enums\EventType $type) => [$type->getGroup() => [$type->value => $type->getLabel()]])->map(fn($group) => $group->collapse()) as $groupLabel => $options)
+                                    <optgroup label="{{ $groupLabel }}">
+                                        @foreach($options as $value => $label)
+                                            <option value="{{ $value }}" @selected(request('event_type') == $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Gender') }}</label>
+                            <select name="gender" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                <option value="">{{ __('Any') }}</option>
+                                @foreach(\App\Enums\EventGenderRestriction::cases() as $gender)
+                                    <option value="{{ $gender->value }}" @selected(request('gender') == $gender->value)>
+                                        {{ $gender->getLabel() }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Age Group') }}</label>
+                            <select name="age_group[]" multiple onchange="this.form.submit()"
+                                class="w-full min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                @foreach(\App\Enums\EventAgeGroup::cases() as $age)
+                                    <option value="{{ $age->value }}" @selected(in_array($age->value, $selectedAgeGroups, true))>
+                                        {{ $age->getLabel() }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Children Allowed') }}</label>
+                            <select name="children_allowed" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                <option value="">{{ __('Any') }}</option>
+                                <option value="1" @selected((string) request('children_allowed') === '1')>{{ __('Yes') }}</option>
+                                <option value="0" @selected((string) request('children_allowed') === '0')>{{ __('No') }}</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <!-- Language Filter -->
-                    <div class="space-y-2">
-                        <label
-                            class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Language') }}</label>
-                        <select name="language" onchange="this.form.submit()"
-                            class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                            <option value="">{{ __('Any Language') }}</option>
-                            <option value="malay" @selected(request('language') == 'malay')>Bahasa Melayu</option>
-                            <option value="english" @selected(request('language') == 'english')>English</option>
-                            <option value="arabic" @selected(request('language') == 'arabic')>العربية</option>
-                            <option value="mixed" @selected(request('language') == 'mixed')>Mixed</option>
-                        </select>
-                    </div>
-
-                    <!-- Event Type Filter -->
-                    <div class="space-y-2">
-                        <label
-                            class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Event Type') }}</label>
-                        <select name="event_type" onchange="this.form.submit()"
-                            class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                            <option value="">{{ __('Any Type') }}</option>
-                            @foreach(collect(\App\Enums\EventType::cases())->mapToGroups(fn(\App\Enums\EventType $type) => [$type->getGroup() => [$type->value => $type->getLabel()]])->map(fn($group) => $group->collapse()) as $groupLabel => $options)
-                                <optgroup label="{{ $groupLabel }}">
-                                    @foreach($options as $value => $label)
-                                        <option value="{{ $value }}" @selected(request('event_type') == $value)>{{ $label }}
-                                        </option>
-                                    @endforeach
-                                </optgroup>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Gender Filter -->
-                    <div class="space-y-2">
-                        <label
-                            class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Gender') }}</label>
-                        <select name="gender" onchange="this.form.submit()"
-                            class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                            <option value="">{{ __('Any') }}</option>
-                            @foreach(\App\Enums\EventGenderRestriction::cases() as $gender)
-                                <option value="{{ $gender->value }}"
-                                    @selected(request('gender') == $gender->value)>{{ $gender->getLabel() }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Age Group Filter -->
-                    <div class="space-y-2">
-                        <label
-                            class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __('Age Group') }}</label>
-                        @php
-                            $selectedAgeGroups = (array) request('age_group', []);
-                        @endphp
-                        <select name="age_group[]" multiple onchange="this.form.submit()"
-                            class="w-full min-h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                            @foreach(\App\Enums\EventAgeGroup::cases() as $age)
-                                <option value="{{ $age->value }}" @selected(in_array($age->value, $selectedAgeGroups, true))>
-                                    {{ $age->getLabel() }}
-                                </option>
-                            @endforeach
-                        </select>
+                    <div class="mt-6 border-t border-slate-200 pt-6">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Topic') }}</label>
+                        @if($topics->isEmpty())
+                            <p class="mt-2 text-sm text-slate-500">{{ __('No topics are available yet.') }}</p>
+                        @else
+                            <select name="topic_ids[]" multiple onchange="this.form.submit()"
+                                class="mt-2 w-full min-h-12 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                @foreach($topics as $topic)
+                                    <option value="{{ $topic->id }}" @selected(in_array($topic->id, $selectedTopicIds, true))>
+                                        {{ $topic->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="mt-2 text-xs text-slate-500">
+                                {{ __('Choose one or more topics to narrow down relevant events.') }}
+                            </p>
+                        @endif
                     </div>
                 </div>
             </div>
 
             <!-- Active Filters Bar -->
-            @if(request()->hasAny(['search', 'state_id', 'language', 'event_type', 'gender', 'age_group', 'lat']))
+            @if(request()->hasAny(['search', 'state_id', 'district_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids', 'lat']))
                 <div class="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100">
                     <span class="text-xs font-bold text-slate-400 uppercase mr-2">{{ __('Active:') }}</span>
                     @if(request('search'))
@@ -257,8 +309,67 @@
                             {{ __('Nearby') }}
                         </span>
                     @endif
+                    @if(request('state_id'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $states->firstWhere('id', request('state_id'))?->name ?? __('State') }}
+                        </span>
+                    @endif
+                    @if(request('language'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ str((string) request('language'))->headline() }}
+                        </span>
+                    @endif
+                    @if(request('event_type'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ str((string) request('event_type'))->replace('_', ' ')->headline() }}
+                        </span>
+                    @endif
+                    @if(request('gender'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ str((string) request('gender'))->replace('_', ' ')->headline() }}
+                        </span>
+                    @endif
+                    @if(request()->filled('children_allowed'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ (string) request('children_allowed') === '1' ? __('Children Allowed') : __('No Children') }}
+                        </span>
+                    @endif
+                    @foreach($selectedAgeGroups as $ageGroup)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ str($ageGroup)->replace('_', ' ')->headline() }}
+                        </span>
+                    @endforeach
+                    @foreach($selectedTopicLabels as $topicLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {{ $topicLabel }}
+                        </span>
+                    @endforeach
+                    @if(request('starts_after'))
+                        @php
+                            $startsAfterLabel = \Illuminate\Support\Carbon::make(request('starts_after'))?->format('d M Y') ?? request('starts_after');
+                        @endphp
+                        <span
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ __('From') }} {{ $startsAfterLabel }}
+                        </span>
+                    @endif
+                    @if(request('starts_before'))
+                        @php
+                            $startsBeforeLabel = \Illuminate\Support\Carbon::make(request('starts_before'))?->format('d M Y') ?? request('starts_before');
+                        @endphp
+                        <span
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ __('Until') }} {{ $startsBeforeLabel }}
+                        </span>
+                    @endif
+                    @auth
+                        <a href="{{ route('saved-searches.index', request()->query()) }}" wire:navigate
+                            class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Save This Search') }}
+                        </a>
+                    @endauth
                     <a href="{{ route('events.index') }}" wire:navigate
-                        class="ml-auto text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
+                        class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
                         {{ __('Clear All Filters') }}
                     </a>
                 </div>

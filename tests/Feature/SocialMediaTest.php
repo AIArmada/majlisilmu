@@ -9,7 +9,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 test('institution can have social media', function () {
-    $this->seed(\Database\Seeders\WorldSeeder::class);
     $institution = Institution::factory()->create();
 
     $institution->socialMedia()->create([
@@ -36,7 +35,6 @@ test('speaker can have social media', function () {
 });
 
 test('venue can have social media', function () {
-    $this->seed(\Database\Seeders\WorldSeeder::class);
     $venue = Venue::factory()->create();
 
     $venue->socialMedia()->create([
@@ -49,7 +47,6 @@ test('venue can have social media', function () {
 });
 
 test('social media is polymorphic', function () {
-    $this->seed(\Database\Seeders\WorldSeeder::class);
     $institution = Institution::factory()->create();
     $social = SocialMedia::create([
         'socialable_type' => 'institution',

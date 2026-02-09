@@ -1,6 +1,6 @@
 # Majlisilmu MVP Feature Checklist
 
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-09
 **Document Purpose:** Track implementation progress for MVP features based on Product Documentation
 
 ---
@@ -9,14 +9,14 @@
 
 | Category | Completed | Total | Progress |
 |----------|-----------|-------|----------|
-| Public Pages | 11 | 13 | 85% |
-| User Features | 5 | 8 | 63% |
+| Public Pages | 13 | 13 | 100% |
+| User Features | 6 | 8 | 75% |
 | Admin/Filament | 12 | 16 | 75% |
 | API Endpoints | 12 | 13 | 92% |
-| Search & Discovery | 6 | 10 | 60% |
+| Search & Discovery | 7 | 10 | 70% |
 | Moderation | 2 | 5 | 40% |
 | Infrastructure | 8 | 10 | 80% |
-| **Overall** | **56** | **75** | **75%** |
+| **Overall** | **60** | **75** | **80%** |
 
 ---
 
@@ -36,7 +36,7 @@
 - [x] **Add to Calendar** (Google, Apple/iCal, Outlook, Office 365, Yahoo) ✨
 - [x] Prayer-relative timing display ✨
 - [x] "Near me tonight" geo-location button ✨
-- [ ] Event distance display in search results
+- [x] Event distance display in search results ✨
 
 ### Institutions & Speakers
 - [x] Institutions listing page (`/institutions`)
@@ -49,7 +49,7 @@
 - [x] Event submission form (`/submit-event`)
 - [x] Submission success page
 - [x] Rate limiting on submissions
-- [ ] CAPTCHA integration (reCAPTCHA/Turnstile)
+- [x] CAPTCHA integration (reCAPTCHA/Turnstile) ✨
 - [ ] Poster upload on submission (Phase 3)
 
 ---
@@ -68,14 +68,14 @@
 - [x] View saved events list (via API / Dashboard)
 - [x] Saved searches CRUD API (backend exists)
 - [x] Event interest marking API (going/interested) ✨
-- [ ] Saved searches UI page
+- [x] Saved searches UI page ✨
 - [ ] Daily digest email job (scheduled, needs verification)
 - [ ] Weekly digest email job (scheduled, needs verification)
 - [ ] Email preference settings
 
 ### User Dashboard
-- [ ] User profile page
-- [ ] My registrations list
+- [x] User profile page
+- [x] My registrations list
 - [ ] My saved events list
 - [ ] My saved searches list
 
@@ -84,12 +84,12 @@
 ## 🏛️ Institution Dashboard
 
 ### Institution Management
-- [ ] Institution admin dashboard home
+- [x] Institution admin dashboard home
 - [ ] Create/edit events for institution
-- [ ] View institution events list
+- [x] View institution events list
 - [ ] Manage institution profile
 - [ ] Manage donation accounts
-- [ ] View event registrations
+- [x] View event registrations
 - [ ] Export attendee list (CSV/Excel)
 
 ### Member Management
@@ -159,16 +159,16 @@
 - [x] Filter by language/genre/audience
 - [x] Filter by institution/speaker
 - [x] Date range filter (API only - starts_after, starts_before, etc.) ✨
-- [ ] Date range filter UI
-- [ ] Topic filter UI (exists in browse-by only)
+- [x] Date range filter UI ✨
+- [x] Topic filter UI (events advanced filters)
 - [x] Geo-distance sorting ("Near me") via Typesense
 - [x] Typesense integration (Scout driver configured)
 
 ### Search UI
 - [x] Basic search input
-- [ ] Advanced filters dropdown/modal
-- [ ] Filter chips (active filters display)
-- [ ] Sort options UI (time, relevance, distance)
+- [x] Advanced filters dropdown/modal
+- [x] Filter chips (active filters display)
+- [x] Sort options UI (time, relevance, distance)
 - [x] "Near me" button with geolocation ✨
 
 ---
@@ -293,6 +293,10 @@ These are documented but not for MVP:
 8. ✅ Additional Filament Resources: EventTypeResource, ReferenceResource
 9. ✅ SendSavedSearchDigest job with daily/weekly scheduling
 10. ✅ 37 test files covering features
+11. ✅ CAPTCHA (Turnstile) integrated in submit-event flow
+12. ✅ Saved searches web UI page (create/list/delete/run)
+13. ✅ Date range filter UI in events listing page
+14. ✅ Distance display + DB fallback geo-distance computation in search results
 
 ### Corrections Made
 - "DonationAccountResource" → "DonationChannelResource"
@@ -302,10 +306,10 @@ These are documented but not for MVP:
 
 ### Next Priority Items
 1. 🔴 User & Institution dashboards (profile, my-events, my-registrations)
-2. 🔴 Date range filter UI in Events listing
-3. 🔴 Advanced filters modal/dropdown
-4. 🟡 Trust score implementation
-5. 🟡 Error pages (404, 500)
+2. 🔴 `GET /api/v1/user/registrations` endpoint + UI consumption
+3. 🔴 Advanced filters modal/dropdown + topic filter UI
+4. 🟡 Trust score implementation (job + scoring model + moderation hooks)
+5. 🟡 Error pages (404, 500) and recovery UX
 
 ### Technical Observations
 - Tests: 37 test files (34 Feature, 3 Unit)

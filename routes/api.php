@@ -14,7 +14,7 @@ Route::prefix('v1')->group(function () {
     // Events API with query builder
     Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
     Route::get('/events/{event}', [EventController::class, 'show'])->name('api.events.show');
-    
+
     // Reports (per documentation B5b) - Rate limited
     Route::post('/reports', [ReportController::class, 'store'])
         ->middleware('throttle:reports')
@@ -27,9 +27,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
 
     // Saved Searches (per documentation B5a)
-    Route::apiResource('saved-searches', SavedSearchController::class);
+    Route::apiResource('saved-searches', SavedSearchController::class)
+        ->names('api.saved-searches');
     Route::post('/saved-searches/{savedSearch}/execute', [SavedSearchController::class, 'execute'])
-        ->name('saved-searches.execute');
+        ->name('api.saved-searches.execute');
 
     // Event Saves / Bookmarks (per documentation B5)
     Route::get('/event-saves', [EventSaveController::class, 'index'])->name('api.event-saves.index');

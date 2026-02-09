@@ -26,6 +26,12 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class AppServiceProvider extends ServiceProvider
 {
+    protected static bool $eventObserverRegistered = false;
+
+    protected static bool $languageSwitchConfigured = false;
+
+    protected static bool $mediaUploadConfigured = false;
+
     /**
      * Register any application services.
      */
@@ -46,12 +52,17 @@ class AppServiceProvider extends ServiceProvider
             Js::make('close-on-select', __DIR__.'/../../resources/js/filament/close-on-select.js'),
         ]);
 
-        // Register model observers
-        Event::observe(EventObserver::class);
+        if (! self::$eventObserverRegistered) {
+            Event::observe(EventObserver::class);
+            self::$eventObserverRegistered = true;
+        }
 
-        LanguageSwitch::configureUsing(function (LanguageSwitch $switch): void {
-            $switch->locales(['en', 'ms', 'jv', 'ta', 'zh']);
-        });
+        if (! self::$languageSwitchConfigured) {
+            LanguageSwitch::configureUsing(function (LanguageSwitch $switch): void {
+                $switch->locales(['en', 'ms', 'jv', 'ta', 'zh']);
+            });
+            self::$languageSwitchConfigured = true;
+        }
 
         Relation::enforceMorphMap([
             'user' => User::class,
@@ -66,63 +77,68 @@ class AppServiceProvider extends ServiceProvider
             'report' => Report::class,
         ]);
 
-        // Register closeOnSelect macro for Filament Select component
-        // This allows multi-select dropdowns to close after each selection
-        Select::macro('closeOnSelect', function (bool $condition = true): static {
-            if ($condition) {
-                /** @var Select $this */
-                $this->extraAttributes([
-                    'x-close-on-select' => true,
-                ]);
-            }
-
-            return $this;
-        });
-
-        // Configure SpatieMediaLibraryFileUpload to use slug-based filenames globally.
-        // This runs after the model is saved so $record always has a slug/name.
-        SpatieMediaLibraryFileUpload::configureUsing(function (SpatieMediaLibraryFileUpload $upload): void {
-            $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
-
-            $upload
-                ->maxSize($maxUploadSizeKb)
-                ->maxParallelUploads(2)
-                ->appendFiles()
-                ->customHeaders([
-                    'CacheControl' => 'public, max-age=31536000, immutable',
-                ]);
-
-            $upload->getUploadedFileNameForStorageUsing(
-                static function (SpatieMediaLibraryFileUpload $component, TemporaryUploadedFile $file): string {
-                    $record = $component->getRecord();
-                    $extension = $file->getClientOriginalExtension();
-                    $baseName = MediaFileNamer::resolveBaseNameFromModel($record);
-
-                    // Append 8-char ULID suffix for uniqueness
-                    $suffix = strtolower(substr(\Illuminate\Support\Str::ulid(), 0, 8));
-
-                    return "{$baseName}-{$suffix}.{$extension}";
+        if (! Select::hasMacro('closeOnSelect')) {
+            // Register closeOnSelect macro for Filament Select component
+            // This allows multi-select dropdowns to close after each selection
+            Select::macro('closeOnSelect', function (bool $condition = true): static {
+                if ($condition) {
+                    /** @var Select $this */
+                    $this->extraAttributes([
+                        'x-close-on-select' => true,
+                    ]);
                 }
-            );
 
-            $upload->mediaName(
-                static function (TemporaryUploadedFile $file) use ($upload): string {
-                    return MediaFileNamer::resolveDisplayNameFromModel(
-                        $upload->getRecord(),
-                        (string) ($upload->getCollection() ?? 'media'),
-                        $file->getClientOriginalName(),
-                    );
-                }
-            );
+                return $this;
+            });
+        }
 
-            $upload->customProperties(
-                static function (TemporaryUploadedFile $file) use ($upload): array {
-                    return [
-                        'collection' => (string) ($upload->getCollection() ?? 'default'),
-                        'original_file_name' => $file->getClientOriginalName(),
-                    ];
-                }
-            );
-        });
+        if (! self::$mediaUploadConfigured) {
+            // Configure SpatieMediaLibraryFileUpload to use slug-based filenames globally.
+            // This runs after the model is saved so $record always has a slug/name.
+            SpatieMediaLibraryFileUpload::configureUsing(function (SpatieMediaLibraryFileUpload $upload): void {
+                $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
+
+                $upload
+                    ->maxSize($maxUploadSizeKb)
+                    ->maxParallelUploads(2)
+                    ->appendFiles()
+                    ->customHeaders([
+                        'CacheControl' => 'public, max-age=31536000, immutable',
+                    ]);
+
+                $upload->getUploadedFileNameForStorageUsing(
+                    static function (SpatieMediaLibraryFileUpload $component, TemporaryUploadedFile $file): string {
+                        $record = $component->getRecord();
+                        $extension = $file->getClientOriginalExtension();
+                        $baseName = MediaFileNamer::resolveBaseNameFromModel($record);
+
+                        // Append 8-char ULID suffix for uniqueness
+                        $suffix = strtolower(substr(\Illuminate\Support\Str::ulid(), 0, 8));
+
+                        return "{$baseName}-{$suffix}.{$extension}";
+                    }
+                );
+
+                $upload->mediaName(
+                    static function (TemporaryUploadedFile $file) use ($upload): string {
+                        return MediaFileNamer::resolveDisplayNameFromModel(
+                            $upload->getRecord(),
+                            (string) ($upload->getCollection() ?? 'media'),
+                            $file->getClientOriginalName(),
+                        );
+                    }
+                );
+
+                $upload->customProperties(
+                    static function (TemporaryUploadedFile $file) use ($upload): array {
+                        return [
+                            'collection' => (string) ($upload->getCollection() ?? 'default'),
+                            'original_file_name' => $file->getClientOriginalName(),
+                        ];
+                    }
+                );
+            });
+            self::$mediaUploadConfigured = true;
+        }
     }
 }

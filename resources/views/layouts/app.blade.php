@@ -133,6 +133,18 @@
                                         <p class="text-xs text-slate-500">{{ __('Signed in as') }}</p>
                                         <p class="text-sm font-bold text-slate-900 truncate">{{ auth()->user()->email }}</p>
                                     </div>
+                                    <a href="{{ route('dashboard') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('Dashboard') }}
+                                    </a>
+                                    <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('Institution Dashboard') }}
+                                    </a>
+                                    <a href="{{ route('saved-searches.index') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('Saved Searches') }}
+                                    </a>
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit"
@@ -194,13 +206,26 @@
                                         <p class="text-sm font-bold text-slate-900 truncate">{{ auth()->user()->name }}</p>
                                         <p class="text-xs text-slate-500 truncate">{{ auth()->user()->email }}</p>
                                     </div>
-                                    <form method="POST" action="{{ route('logout') }}">
-                                        @csrf
-                                        <button type="submit" class="text-xs font-semibold text-red-600">
-                                            {{ __('Log Out') }}
-                                        </button>
-                                    </form>
                                 </div>
+                                <a href="{{ route('saved-searches.index') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('Saved Searches') }}
+                                </a>
+                                <a href="{{ route('dashboard') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('Dashboard') }}
+                                </a>
+                                <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('Institution Dashboard') }}
+                                </a>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit"
+                                        class="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600">
+                                        {{ __('Log Out') }}
+                                    </button>
+                                </form>
                             @endguest
                         </div>
                         <!-- Mobile Language Switcher -->
