@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Institutions\Schemas;
 
 use App\Enums\InstitutionType;
+use App\Enums\SocialMediaPlatform;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -115,6 +116,12 @@ class InstitutionForm
                             ->preload()
                             ->live()
                             ->hidden(fn ($get) => ! $get('state_id')),
+                        Select::make('subdistrict_id')
+                            ->label('Subdistrict / Mukim')
+                            ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
+                            ->searchable()
+                            ->preload()
+                            ->hidden(fn ($get) => ! $get('district_id')),
                         Select::make('city_id')
                             ->relationship('city', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
                             ->searchable()
@@ -182,7 +189,19 @@ class InstitutionForm
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
-                            ->itemLabel(fn (array $state): ?string => $state['platform'] ?? null),
+                            ->itemLabel(function (array $state): ?string {
+                                $platform = $state['platform'] ?? null;
+
+                                if ($platform instanceof SocialMediaPlatform) {
+                                    return $platform->getLabel();
+                                }
+
+                                if (is_string($platform)) {
+                                    return SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? $platform;
+                                }
+
+                                return null;
+                            }),
                     ]),
             ]);
     }

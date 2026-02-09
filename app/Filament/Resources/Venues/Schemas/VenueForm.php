@@ -101,6 +101,12 @@ class VenueForm
                             ->preload()
                             ->live()
                             ->hidden(fn ($get) => ! $get('state_id')),
+                        Select::make('subdistrict_id')
+                            ->label('Subdistrict / Mukim')
+                            ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
+                            ->searchable()
+                            ->preload()
+                            ->hidden(fn ($get) => ! $get('district_id')),
                         Select::make('city_id')
                             ->relationship('city', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
                             ->searchable()
