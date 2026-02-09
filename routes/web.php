@@ -29,6 +29,12 @@ Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calen
 Route::livewire('/submit-event', 'pages.submit-event.create')->name('submit-event.create');
 Route::livewire('/submit-event/success', 'pages.submit-event.success')->name('submit-event.success');
 
+Route::middleware('auth')->group(function () {
+    Route::livewire('/dashboard', \App\Livewire\Pages\Dashboard\UserDashboard::class)->name('dashboard');
+    Route::livewire('/dashboard/institutions', \App\Livewire\Pages\Dashboard\InstitutionDashboard::class)->name('dashboard.institutions');
+    Route::livewire('/saved-searches', \App\Livewire\Pages\SavedSearches\Index::class)->name('saved-searches.index');
+});
+
 // Event Registration - Rate limited
 Route::post('/events/{event:slug}/register', [EventsController::class, 'register'])
     ->middleware('throttle:registration')

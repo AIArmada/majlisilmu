@@ -10,6 +10,7 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\TagType;
 use App\Enums\TimingMode;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -159,13 +160,20 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'venue', 'speakers', 'address']);
+        $this->loadMissing(['institution', 'venue', 'speakers', 'address', 'tags']);
 
         $ageGroupCollection = $this->age_group;
 
         $ageGroupValues = $ageGroupCollection instanceof \Illuminate\Support\Collection && $ageGroupCollection->isNotEmpty()
             ? $ageGroupCollection->map(fn ($e) => $e instanceof EventAgeGroup ? $e->value : $e)->toArray()
             : ['all_ages'];
+
+        $topicIds = $this->tags
+            ->filter(fn ($tag) => in_array($tag->type, [TagType::Discipline->value, TagType::Issue->value], true))
+            ->whereIn('status', ['verified', 'pending'])
+            ->pluck('id')
+            ->values()
+            ->all();
 
         $array = [
             'id' => $this->id,
@@ -186,6 +194,7 @@ class Event extends Model implements AuditableContract, HasMedia
             'children_allowed' => $this->children_allowed ?? true,
             'status' => (string) $this->status,
             'visibility' => $this->visibility?->value ?? 'public',
+            'topic_ids' => $topicIds,
             'speaker_ids' => $this->speakers->pluck('id')->toArray(),
             'starts_at' => $this->starts_at?->timestamp ?? 0,
             'ends_at' => $this->ends_at?->timestamp,

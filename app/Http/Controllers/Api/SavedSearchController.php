@@ -46,6 +46,8 @@ class SavedSearchController extends Controller
             'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
+            'filters.topic_ids' => 'nullable|array',
+            'filters.topic_ids.*' => 'uuid|exists:tags,id',
             'radius_km' => 'nullable|integer|min:1|max:500',
             'lat' => 'nullable|required_with:radius_km|numeric|between:-90,90',
             'lng' => 'nullable|required_with:radius_km|numeric|between:-180,180',

@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\State;
+use App\Models\Tag;
+use App\Models\Venue;
 use App\Services\EventSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -28,7 +31,8 @@ describe('Event Search Filters', function () {
         $response = $this->get('/events');
 
         $response->assertOk()
-            ->assertSee('Circle of');
+            ->assertSee('Circle of')
+            ->assertSee('Advanced Filters');
     });
 
     it('searches events by title', function () {
@@ -108,6 +112,43 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Forum Event')
             ->assertDontSee('Kuliah Event');
+    });
+
+    it('filters events by selected topics', function () {
+        $tafsirTag = Tag::factory()->discipline()->create([
+            'name' => ['en' => 'Tafsir', 'ms' => 'Tafsir'],
+        ]);
+
+        $fiqhTag = Tag::factory()->discipline()->create([
+            'name' => ['en' => 'Fiqh', 'ms' => 'Fiqh'],
+        ]);
+
+        $tafsirEvent = Event::factory()->create([
+            'title' => 'Tafsir Session',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $tafsirEvent->attachTag($tafsirTag);
+
+        $fiqhEvent = Event::factory()->create([
+            'title' => 'Fiqh Session',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $fiqhEvent->attachTag($fiqhTag);
+
+        $query = http_build_query(['topic_ids' => [$tafsirTag->id]]);
+
+        $response = $this->get("/events?{$query}");
+
+        $response->assertOk()
+            ->assertSee('Tafsir Session')
+            ->assertDontSee('Fiqh Session')
+            ->assertSee('Tafsir');
     });
 
     it('shows approved and pending public events', function () {
@@ -224,6 +265,85 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('5')
             ->assertSee('Upcoming Gatherings');
+    });
+
+    it('filters events by a start date range', function () {
+        Event::factory()->create([
+            'title' => 'Within Date Range',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(7),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Outside Date Range',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(20),
+        ]);
+
+        $query = http_build_query([
+            'starts_after' => now()->addDays(5)->toDateString(),
+            'starts_before' => now()->addDays(10)->toDateString(),
+        ]);
+
+        $response = $this->get("/events?{$query}");
+
+        $response->assertOk()
+            ->assertSee('Within Date Range')
+            ->assertDontSee('Outside Date Range');
+    });
+
+    it('returns distance in database nearby search fallback', function () {
+        config(['scout.driver' => 'database']);
+
+        $nearInstitution = Institution::factory()->create();
+        $nearVenue = Venue::factory()->for($nearInstitution)->create();
+        $nearVenue->address()->update([
+            'lat' => 3.1390,
+            'lng' => 101.6869,
+        ]);
+
+        $farInstitution = Institution::factory()->create();
+        $farVenue = Venue::factory()->for($farInstitution)->create();
+        $farVenue->address()->update([
+            'lat' => 3.2600,
+            'lng' => 101.8600,
+        ]);
+
+        Event::factory()->for($nearInstitution)->for($nearVenue)->create([
+            'title' => 'Nearby Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(4),
+        ]);
+
+        Event::factory()->for($farInstitution)->for($farVenue)->create([
+            'title' => 'Far Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(4),
+        ]);
+
+        $events = app(EventSearchService::class)->searchNearby(
+            lat: 3.1390,
+            lng: 101.6869,
+            radiusKm: 12,
+            filters: [],
+            perPage: 20
+        );
+
+        expect($events->pluck('title'))->toContain('Nearby Event')
+            ->not->toContain('Far Event');
+
+        $nearest = $events->first();
+
+        expect($nearest)->not->toBeNull()
+            ->and($nearest->distance_km ?? null)->not->toBeNull();
     });
 });
 

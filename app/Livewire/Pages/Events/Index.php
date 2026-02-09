@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Pages\Events;
 
+use App\Enums\TagType;
 use App\Models\State;
+use App\Models\Tag;
 use App\Services\EventSearchService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -50,6 +53,15 @@ class Index extends Component
     public ?array $speaker_ids = [];
 
     #[Url]
+    public array $topic_ids = [];
+
+    #[Url]
+    public ?string $starts_after = null;
+
+    #[Url]
+    public ?string $starts_before = null;
+
+    #[Url]
     public ?string $lat = null;
 
     #[Url]
@@ -77,6 +89,17 @@ class Index extends Component
     }
 
     #[Computed]
+    public function topics(): Collection
+    {
+        return cache()->remember('events_topics_'.app()->getLocale(), 300, fn () => Tag::query()
+            ->whereIn('type', [TagType::Discipline->value, TagType::Issue->value])
+            ->whereIn('status', ['verified', 'pending'])
+            ->ordered()
+            ->get()
+        );
+    }
+
+    #[Computed]
     public function events(): LengthAwarePaginator
     {
         $filters = [
@@ -89,6 +112,9 @@ class Index extends Component
             'children_allowed' => $this->children_allowed,
             'institution_id' => $this->institution_id,
             'speaker_ids' => $this->speaker_ids,
+            'topic_ids' => $this->topic_ids,
+            'starts_after' => $this->starts_after,
+            'starts_before' => $this->starts_before,
         ];
 
         $filters = array_filter($filters, function ($value) {
@@ -124,7 +150,7 @@ class Index extends Component
         );
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.pages.events.index');
     }

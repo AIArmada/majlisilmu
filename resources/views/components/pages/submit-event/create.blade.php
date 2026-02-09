@@ -20,6 +20,7 @@ use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Services\Captcha\TurnstileVerifier;
 use App\Enums\TagType;
 use App\Models\Reference;
 use App\Models\State;
@@ -30,6 +31,7 @@ use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
@@ -82,6 +84,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'location_same_as_institution' => true,
             'location_type' => 'institution',
             'is_muslim_only' => false,
+            'captcha_token' => null,
         ]);
     }
 
@@ -718,6 +721,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     Step::make(__('Semak & Hantar'))
                         ->icon('heroicon-o-paper-airplane')
                         ->schema([
+                            Hidden::make('captcha_token')
+                                ->dehydrated(),
+
                             Section::make(__('Maklumat Anda'))
                                 ->schema([
                                     Grid::make(['default' => 1, 'sm' => 2])
@@ -777,6 +783,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     public function submit(): mixed
     {
         $validated = $this->form->getState();
+        $this->assertCaptchaIsValid($validated['captcha_token'] ?? null);
 
         // Enforce children_allowed when AllAges or Children is selected
         $ageGroups = $validated['age_group'] ?? [];
@@ -1102,6 +1109,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ]);
         }
     }
+
+    protected function assertCaptchaIsValid(?string $captchaToken): void
+    {
+        $verifier = app(TurnstileVerifier::class);
+
+        if (! $verifier->verify($captchaToken, request()->ip())) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.captcha_token' => __('Sila lengkapkan pengesahan keselamatan sebelum menghantar.'),
+            ]);
+        }
+    }
 };
 ?>
 
@@ -1159,9 +1177,75 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
             <form wire:submit="submit">
                 {{ $this->form }}
+
+                @if(config('services.turnstile.enabled') && filled(config('services.turnstile.site_key')) && filled(config('services.turnstile.secret_key')))
+                    <div class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p class="mb-3 text-sm font-semibold text-slate-700">{{ __('Pengesahan Keselamatan') }}</p>
+                        <p class="mb-3 text-xs text-slate-500">
+                            {{ __('Sila sahkan anda bukan robot sebelum menghantar majlis.') }}
+                        </p>
+                        <input id="submit-event-captcha-token" type="hidden" wire:model.live="data.captcha_token">
+                        <div id="submit-event-turnstile" wire:ignore></div>
+
+                        @error('data.captcha_token')
+                            <p class="mt-2 text-sm text-danger-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @endif
             </form>
 
             <x-filament-actions::modals />
         </div>
     </div>
 </div>
+
+@if(config('services.turnstile.enabled') && filled(config('services.turnstile.site_key')))
+    @push('scripts')
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+        <script>
+            (() => {
+                let isRendered = false;
+
+                const setToken = (token) => {
+                    const tokenInput = document.getElementById('submit-event-captcha-token');
+
+                    if (!tokenInput) {
+                        return;
+                    }
+
+                    tokenInput.value = token;
+                    tokenInput.dispatchEvent(new Event('input', {
+                        bubbles: true
+                    }));
+                };
+
+                const renderTurnstile = () => {
+                    const container = document.getElementById('submit-event-turnstile');
+
+                    if (!container || isRendered || typeof window.turnstile === 'undefined') {
+                        return;
+                    }
+
+                    window.turnstile.render(container, {
+                        sitekey: '{{ config('services.turnstile.site_key') }}',
+                        callback: (token) => setToken(token),
+                        'expired-callback': () => setToken(''),
+                        'error-callback': () => setToken(''),
+                    });
+
+                    isRendered = true;
+                };
+
+                const boot = () => {
+                    renderTurnstile();
+
+                    window.setTimeout(renderTurnstile, 400);
+                    window.setTimeout(renderTurnstile, 1200);
+                };
+
+                document.addEventListener('DOMContentLoaded', boot);
+                document.addEventListener('livewire:navigated', boot);
+            })();
+        </script>
+    @endpush
+@endif
