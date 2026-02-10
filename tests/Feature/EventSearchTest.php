@@ -7,6 +7,8 @@ use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -446,6 +448,90 @@ describe('Event Detail Page', function () {
 
         $response->assertOk()
             ->assertSee('Speakers');
+    });
+
+    it('displays image gallery slider when gallery media exists', function () {
+        Storage::fake('public');
+        config()->set('media-library.disk_name', 'public');
+
+        $event = Event::factory()->create([
+            'title' => 'Gallery Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+        ]);
+
+        $event->addMedia(UploadedFile::fake()->image('gallery-1.jpg', 1200, 800))
+            ->toMediaCollection('gallery');
+        $event->addMedia(UploadedFile::fake()->image('gallery-2.jpg', 1200, 800))
+            ->toMediaCollection('gallery');
+
+        $response = $this->get("/events/{$event->slug}");
+
+        $response->assertOk()
+            ->assertSee('Event Gallery');
+    });
+
+    it('displays related events section', function () {
+        $institution = Institution::factory()->create();
+        $sharedTag = Tag::factory()->discipline()->create();
+
+        $event = Event::factory()->for($institution)->create([
+            'title' => 'Main Related Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+        $event->attachTag($sharedTag);
+
+        Event::factory()->for($institution)->create([
+            'title' => 'Institution Related Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $tagRelatedEvent = Event::factory()->create([
+            'title' => 'Tag Related Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(3),
+        ]);
+        $tagRelatedEvent->attachTag($sharedTag);
+
+        Event::factory()->create([
+            'title' => 'Private Hidden Event',
+            'status' => 'approved',
+            'visibility' => 'private',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(4),
+        ]);
+
+        $response = $this->get("/events/{$event->slug}");
+
+        $response->assertOk()
+            ->assertSee('Related Events')
+            ->assertSee('Institution Related Event')
+            ->assertSee('Tag Related Event')
+            ->assertDontSee('Private Hidden Event');
+    });
+
+    it('renders share preview modal content', function () {
+        $event = Event::factory()->create([
+            'title' => 'Shareable Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->get("/events/{$event->slug}");
+
+        $response->assertOk()
+            ->assertSee('Share Preview')
+            ->assertSee('Copy Link');
     });
 });
 

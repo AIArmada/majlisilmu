@@ -224,9 +224,9 @@
 - [x] Prayer-relative timing badge ✨
 - [x] Add to Calendar dropdown ✨
 - [x] wire:loading states (minimal) ✨
-- [ ] Image gallery/slider
-- [ ] Related events section
-- [ ] Share preview modal
+- [x] Image gallery/slider ✨
+- [x] Related events section ✨
+- [x] Share preview modal ✨
 
 ### Home Page
 - [x] Hero section with search ✨
