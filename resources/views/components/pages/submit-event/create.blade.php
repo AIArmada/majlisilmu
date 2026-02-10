@@ -188,7 +188,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->mapWithKeys(fn (EventPrayerTime $case) => [$case->value => $case->getLabel()])
                                                 ->toArray();
                                         })
-                                        ->live()
                                         ->columnSpan(['default' => 1, 'md' => 2]),
 
                                     TimePicker::make('custom_time')
@@ -197,7 +196,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->native()
                                         ->seconds(false)
                                         ->minutesStep(5)
-                                        ->live()
                                         ->afterStateUpdatedJs(<<<'JS'
                                             const customTime = $state;
                                             const endTime = $get('end_time');
@@ -260,7 +258,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->native()
                                         ->seconds(false)
                                         ->minutesStep(5)
-                                        ->live()
                                         ->afterStateUpdatedJs(<<<'JS'
                                             const customTime = $get('custom_time');
                                             const endTime = $state;
@@ -653,7 +650,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->label(__('Sama seperti institusi penganjur'))
                                         ->default(true)
                                         ->inline(false)
-                                        ->live()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'institution'
                                                             JS),
@@ -666,7 +662,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ])
                                         ->inline()
                                         ->default('institution')
-                                        ->live()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
                                                             JS)
@@ -702,7 +697,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('Pilih ruang…'))
                                         ->searchable()
                                         ->preload()
-                                        ->live()
                                         ->visibleJs(<<<'JS'
                                                             // Show space only for institution locations, not venues
                                                             ($get('organizer_type') === 'institution' && ($get('location_same_as_institution') !== false)) || 
