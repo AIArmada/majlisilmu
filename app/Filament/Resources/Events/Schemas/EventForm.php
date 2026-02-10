@@ -119,9 +119,13 @@ class EventForm
                                             ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
                                         DateTimePicker::make('starts_at')
                                             ->label('Waktu Mula')
+                                            ->seconds(false)
+                                            ->minutesStep(5)
                                             ->required(),
                                         DateTimePicker::make('ends_at')
-                                            ->label('Waktu Tamat'),
+                                            ->label('Waktu Tamat')
+                                            ->seconds(false)
+                                            ->minutesStep(5),
                                         TextInput::make('timezone')
                                             ->label('Timezone')
                                             ->default('Asia/Kuala_Lumpur')
