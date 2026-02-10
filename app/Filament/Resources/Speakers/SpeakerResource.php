@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Speakers;
 use App\Filament\Resources\Speakers\Pages\CreateSpeaker;
 use App\Filament\Resources\Speakers\Pages\EditSpeaker;
 use App\Filament\Resources\Speakers\Pages\ListSpeakers;
+use App\Filament\Resources\Speakers\Pages\ViewSpeaker;
 use App\Filament\Resources\Speakers\RelationManagers\MembersRelationManager;
 use App\Filament\Resources\Speakers\Schemas\SpeakerForm;
 use App\Filament\Resources\Speakers\Tables\SpeakersTable;
@@ -49,6 +50,7 @@ class SpeakerResource extends Resource
         return [
             'index' => ListSpeakers::route('/'),
             'create' => CreateSpeaker::route('/create'),
+            'view' => ViewSpeaker::route('/{record}'),
             'edit' => EditSpeaker::route('/{record}/edit'),
         ];
     }

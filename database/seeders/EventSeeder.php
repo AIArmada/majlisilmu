@@ -37,10 +37,11 @@ class EventSeeder extends Seeder
 
         \Illuminate\Support\Facades\DB::transaction(function (): void {
             $institutions = Institution::query()
-                ->with(['venues', 'series'])
+                ->with(['series'])
                 ->limit(90)
                 ->get();
             $speakerIds = Speaker::query()->pluck('id')->toArray();
+            $venueIds = \App\Models\Venue::query()->pluck('id')->toArray();
 
             if ($institutions->isEmpty()) {
                 return;
@@ -54,8 +55,8 @@ class EventSeeder extends Seeder
                     break;
                 }
 
-                $venue = $institution->venues->isNotEmpty() ? $institution->venues->random() : null;
                 $series = $institution->series->isNotEmpty() ? $institution->series->random() : null;
+                $randomVenueId = ! empty($venueIds) ? $venueIds[array_rand($venueIds)] : null;
 
                 $baseAttributes = [
                     'institution_id' => $institution->id,
@@ -65,10 +66,10 @@ class EventSeeder extends Seeder
                 // Factory will determine venue_id based on event_format
                 $events = Event::factory()->count(10)->create($baseAttributes);
 
-                // For physical/hybrid events that need a venue, assign this institution's venue
+                // For physical/hybrid events that need a venue, assign a random venue
                 foreach ($events as $event) {
-                    if ($event->event_format !== \App\Enums\EventFormat::Online && ! $event->venue_id && $venue) {
-                        $event->update(['venue_id' => $venue->id]);
+                    if ($event->event_format !== \App\Enums\EventFormat::Online && ! $event->venue_id && $randomVenueId) {
+                        $event->update(['venue_id' => $randomVenueId]);
                     }
                 }
 
@@ -167,7 +168,6 @@ class EventSeeder extends Seeder
         $venue = \App\Models\Venue::query()->firstOrCreate([
             'slug' => 'dewan-solat-utama-mtaj',
         ], [
-            'institution_id' => $institution->id,
             'name' => 'Dewan Solat Utama',
         ]);
 

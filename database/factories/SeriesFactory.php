@@ -2,8 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Institution;
-use App\Models\Venue;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -51,8 +49,6 @@ class SeriesFactory extends Factory
         ]);
 
         return [
-            'institution_id' => Institution::factory(),
-            'speaker_id' => null, // Default to null, can be overridden
             'title' => $title,
             'slug' => Str::slug($title.'-'.Str::random(8)),
             'description' => fake()->optional()->paragraph(),

@@ -7,6 +7,7 @@ use App\Models\Venue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
 class VenueFormSchema
@@ -62,7 +63,7 @@ class VenueFormSchema
     /**
      * Shared createOptionUsing callback for Venue selects.
      */
-    public static function createOptionUsing(array $data): string
+    public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {
         $venue = Venue::create([
             'name' => $data['name'],
@@ -70,6 +71,9 @@ class VenueFormSchema
             'type' => $data['type'],
             'status' => 'pending',
         ]);
+
+        // Save media uploads (main, gallery) via Filament's relationship-saving mechanism
+        $schema?->model($venue)->saveRelationships();
 
         SharedFormSchema::createAddressFromData($venue, $data);
         SharedFormSchema::createSocialMediaFromData($venue, $data);

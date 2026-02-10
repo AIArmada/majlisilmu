@@ -25,18 +25,6 @@ class SeriesTable
                 TextColumn::make('title')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('institution.name')
-                    ->sortable()
-                    ->searchable()
-                    ->url(fn ($record): ?string => $record->institution?->id
-                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id])
-                        : null),
-                TextColumn::make('venue.name')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->url(fn ($record): ?string => $record->venue?->id
-                        ? \App\Filament\Resources\Venues\VenueResource::getUrl('edit', ['record' => $record->venue->id])
-                        : null),
                 TextColumn::make('visibility')
                     ->badge()
                     ->sortable(),
@@ -44,8 +32,6 @@ class SeriesTable
                     ->label('Active'),
                 TextColumn::make('languages.name')
                     ->badge()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('audience')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -59,8 +45,6 @@ class SeriesTable
                         'unlisted' => 'Unlisted',
                         'private' => 'Private',
                     ]),
-                SelectFilter::make('institution')
-                    ->relationship('institution', 'name'),
             ])
             ->recordActions([
                 EditAction::make(),

@@ -49,7 +49,7 @@
                                 {{ __('Type:') }} {{ $selectedInstitution->type?->value ? str($selectedInstitution->type->value)->headline() : __('Not specified') }}
                             </p>
                         </div>
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Events') }}</p>
                                 <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['events_count'] }}</p>
@@ -61,10 +61,6 @@
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Members') }}</p>
                                 <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['members_count'] }}</p>
-                            </div>
-                            <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Venues') }}</p>
-                                <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['venues_count'] }}</p>
                             </div>
                         </div>
                     </div>

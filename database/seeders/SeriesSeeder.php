@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Institution;
 use App\Models\Series;
 use Illuminate\Database\Seeder;
 
@@ -20,20 +19,15 @@ class SeriesSeeder extends Seeder
         Series::unsetEventDispatcher();
 
         \Illuminate\Support\Facades\DB::transaction(function (): void {
-            $institutionIds = Institution::query()->pluck('id')->toArray();
-
-            if (empty($institutionIds)) {
-                return;
-            }
-
             // Pre-load language IDs
             $languageIds = \Nnjeim\World\Models\Language::query()->pluck('id')->toArray();
 
-            // Create all series in bulk
+            // Create a batch of series
             $seriesToCreate = [];
-            foreach ($institutionIds as $institutionId) {
+            $count = 10;
+
+            for ($i = 0; $i < $count; $i++) {
                 $seriesToCreate[] = Series::factory()->make([
-                    'institution_id' => $institutionId,
                     'visibility' => 'public',
                 ])->toArray();
             }

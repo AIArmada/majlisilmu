@@ -135,7 +135,6 @@ it('allows institution organizer to choose a different location', function () {
     $organizerInstitution = Institution::factory()->create(['status' => 'verified']);
     $otherVenue = Venue::factory()->create([
         'status' => 'verified',
-        'institution_id' => null,
     ]);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
 

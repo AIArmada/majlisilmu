@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Institution;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -34,7 +33,6 @@ class VenueFactory extends Factory
         $slug = Str::slug($name.'-'.Str::random(8));
 
         return [
-            'institution_id' => Institution::factory(),
             'name' => $name,
             'slug' => $slug,
             'description' => fake()->paragraph(),

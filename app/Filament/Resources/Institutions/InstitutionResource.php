@@ -5,11 +5,11 @@ namespace App\Filament\Resources\Institutions;
 use App\Filament\Resources\Institutions\Pages\CreateInstitution;
 use App\Filament\Resources\Institutions\Pages\EditInstitution;
 use App\Filament\Resources\Institutions\Pages\ListInstitutions;
+use App\Filament\Resources\Institutions\Pages\ViewInstitution;
 use App\Filament\Resources\Institutions\RelationManagers\EventsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\MembersRelationManager;
-use App\Filament\Resources\Institutions\RelationManagers\SeriesRelationManager;
-use App\Filament\Resources\Institutions\RelationManagers\VenuesRelationManager;
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm;
+use App\Filament\Resources\Institutions\Schemas\InstitutionInfolist;
 use App\Filament\Resources\Institutions\Tables\InstitutionsTable;
 use App\Models\Institution;
 use BackedEnum;
@@ -34,6 +34,11 @@ class InstitutionResource extends Resource
         return InstitutionForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return InstitutionInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return InstitutionsTable::configure($table);
@@ -43,9 +48,7 @@ class InstitutionResource extends Resource
     {
         return [
             MembersRelationManager::class,
-            VenuesRelationManager::class,
             EventsRelationManager::class,
-            SeriesRelationManager::class,
         ];
     }
 
@@ -54,6 +57,7 @@ class InstitutionResource extends Resource
         return [
             'index' => ListInstitutions::route('/'),
             'create' => CreateInstitution::route('/create'),
+            'view' => ViewInstitution::route('/{record}'),
             'edit' => EditInstitution::route('/{record}/edit'),
         ];
     }

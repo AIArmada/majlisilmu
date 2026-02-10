@@ -115,7 +115,6 @@ describe('Event Approval', function () {
         // Create pending venue
         $venue = \App\Models\Venue::factory()->create([
             'status' => 'pending',
-            'institution_id' => $locationInstitution->id,
         ]);
 
         // Create pending tags

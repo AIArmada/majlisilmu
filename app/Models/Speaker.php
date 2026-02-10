@@ -163,11 +163,6 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->withTimestamps();
     }
 
-    public function series(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(Series::class);
-    }
-
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'speaker_user')

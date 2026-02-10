@@ -15,6 +15,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
 class SpeakerFormSchema
@@ -126,14 +127,14 @@ class SpeakerFormSchema
                 ->preload()
                 ->closeOnSelect()
                 ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                ->createOptionUsing(fn (array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+                ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
         ];
     }
 
     /**
      * Shared createOptionUsing callback for Speaker selects.
      */
-    public static function createOptionUsing(array $data): string
+    public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {
         $speaker = Speaker::create([
             'name' => $data['name'],
@@ -144,6 +145,9 @@ class SpeakerFormSchema
             'slug' => Str::slug($data['name']).'-'.Str::random(6),
             'status' => 'pending',
         ]);
+
+        // Save media uploads (avatar) via Filament's relationship-saving mechanism
+        $schema?->model($speaker)->saveRelationships();
 
         if (! empty($data['state_id'])) {
             $speaker->address()->create([
