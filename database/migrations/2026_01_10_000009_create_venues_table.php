@@ -9,7 +9,6 @@ return new class extends Migration {
     {
         Schema::create('venues', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('institution_id')->nullable()->index();
             $table->string('type')->nullable()->index();
             $table->string('name');
             $table->string('slug')->unique();
