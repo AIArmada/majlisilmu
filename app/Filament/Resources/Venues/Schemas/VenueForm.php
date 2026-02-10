@@ -18,10 +18,6 @@ class VenueForm
             ->components([
                 Section::make('Details')
                     ->components([
-                        Select::make('institution_id')
-                            ->relationship('institution', 'name')
-                            ->searchable()
-                            ->preload(),
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
@@ -205,7 +201,9 @@ class VenueForm
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
-                            ->itemLabel(fn (array $state): ?string => $state['platform'] ?? null),
+                            ->itemLabel(fn (array $state): ?string => $state['platform'] instanceof \App\Enums\SocialMediaPlatform
+                                ? $state['platform']->getLabel()
+                                : ($state['platform'] ?? null)),
                     ]),
             ]);
     }

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -24,8 +23,6 @@ class Series extends Model implements HasMedia
      * @var list<string>
      */
     protected $fillable = [
-        'institution_id',
-        'speaker_id',
         'title',
         'slug',
         'description',
@@ -38,16 +35,6 @@ class Series extends Model implements HasMedia
         return [
             'is_active' => 'boolean',
         ];
-    }
-
-    public function institution(): BelongsTo
-    {
-        return $this->belongsTo(Institution::class);
-    }
-
-    public function speaker(): BelongsTo
-    {
-        return $this->belongsTo(Speaker::class);
     }
 
     public function events(): BelongsToMany

@@ -47,11 +47,6 @@ class Institution extends Model implements AuditableContract, HasMedia
         ];
     }
 
-    public function venues(): HasMany
-    {
-        return $this->hasMany(Venue::class);
-    }
-
     public function spaces(): BelongsToMany
     {
         return $this->belongsToMany(Space::class, 'institution_space')
@@ -61,11 +56,6 @@ class Institution extends Model implements AuditableContract, HasMedia
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
-    }
-
-    public function series(): HasMany
-    {
-        return $this->hasMany(Series::class);
     }
 
     public function speakers(): BelongsToMany

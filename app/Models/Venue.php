@@ -6,7 +6,6 @@ use App\Enums\VenueType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
@@ -26,7 +25,6 @@ class Venue extends Model implements HasMedia
      * @var list<string>
      */
     protected $fillable = [
-        'institution_id',
         'name',
         'slug',
         'description',
@@ -45,19 +43,9 @@ class Venue extends Model implements HasMedia
         ];
     }
 
-    public function institution(): BelongsTo
-    {
-        return $this->belongsTo(Institution::class);
-    }
-
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
-    }
-
-    public function series(): HasMany
-    {
-        return $this->hasMany(Series::class);
     }
 
     public function scopeActive($query)

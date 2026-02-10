@@ -16,14 +16,6 @@ class SeriesForm
             ->components([
                 Section::make('Series')
                     ->components([
-                        Select::make('institution_id')
-                            ->relationship('institution', 'name')
-                            ->searchable()
-                            ->preload(),
-                        Select::make('venue_id')
-                            ->relationship('venue', 'name')
-                            ->searchable()
-                            ->preload(),
                         TextInput::make('title')
                             ->required()
                             ->maxLength(255),
@@ -47,16 +39,6 @@ class SeriesForm
                             ->preload()
                             ->searchable()
                             ->label('Languages'),
-                        Select::make('audience')
-                            ->options([
-                                'Umum' => 'Umum',
-                                'Belia' => 'Belia',
-                                'Muslimah' => 'Muslimah',
-                                'Keluarga' => 'Keluarga',
-                                'Pelajar IPT' => 'Pelajar IPT',
-                                'Profesional' => 'Profesional',
-                            ])
-                            ->label('Audience'),
                     ])
                     ->columns(2),
                 Section::make('Media')

@@ -81,7 +81,7 @@ class InstitutionDashboard extends Component
         }
 
         return $this->availableInstitutionsQuery($user)
-            ->withCount(['events', 'members', 'venues'])
+            ->withCount(['events', 'members'])
             ->orderBy('name')
             ->get();
     }
@@ -123,7 +123,6 @@ class InstitutionDashboard extends Component
                 ->whereHas('event', fn (Builder $eventQuery) => $eventQuery->where('institution_id', $institution->id))
                 ->count(),
             'members_count' => (int) ($institution->members_count ?? 0),
-            'venues_count' => (int) ($institution->venues_count ?? 0),
         ];
     }
 

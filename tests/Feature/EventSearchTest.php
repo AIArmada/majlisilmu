@@ -215,8 +215,8 @@ describe('Event Search Filters', function () {
     it('eager loads event card relationships', function () {
         config(['scout.driver' => 'database']);
 
+        $institution = \App\Models\Institution::factory()->create();
         $venue = \App\Models\Venue::factory()->create();
-        $institution = $venue->institution;
 
         Event::factory()
             ->for($institution)
@@ -302,14 +302,14 @@ describe('Event Search Filters', function () {
         config(['scout.driver' => 'database']);
 
         $nearInstitution = Institution::factory()->create();
-        $nearVenue = Venue::factory()->for($nearInstitution)->create();
+        $nearVenue = Venue::factory()->create();
         $nearVenue->address()->update([
             'lat' => 3.1390,
             'lng' => 101.6869,
         ]);
 
         $farInstitution = Institution::factory()->create();
-        $farVenue = Venue::factory()->for($farInstitution)->create();
+        $farVenue = Venue::factory()->create();
         $farVenue->address()->update([
             'lat' => 3.2600,
             'lng' => 101.8600,

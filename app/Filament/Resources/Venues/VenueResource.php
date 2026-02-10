@@ -5,7 +5,10 @@ namespace App\Filament\Resources\Venues;
 use App\Filament\Resources\Venues\Pages\CreateVenue;
 use App\Filament\Resources\Venues\Pages\EditVenue;
 use App\Filament\Resources\Venues\Pages\ListVenues;
+use App\Filament\Resources\Venues\Pages\ViewVenue;
+use App\Filament\Resources\Venues\RelationManagers\EventsRelationManager;
 use App\Filament\Resources\Venues\Schemas\VenueForm;
+use App\Filament\Resources\Venues\Schemas\VenueInfolist;
 use App\Filament\Resources\Venues\Tables\VenuesTable;
 use App\Models\Venue;
 use BackedEnum;
@@ -30,6 +33,11 @@ class VenueResource extends Resource
         return VenueForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return VenueInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return VenuesTable::configure($table);
@@ -38,7 +46,7 @@ class VenueResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            EventsRelationManager::class,
         ];
     }
 
@@ -47,6 +55,7 @@ class VenueResource extends Resource
         return [
             'index' => ListVenues::route('/'),
             'create' => CreateVenue::route('/create'),
+            'view' => ViewVenue::route('/{record}'),
             'edit' => EditVenue::route('/{record}/edit'),
         ];
     }

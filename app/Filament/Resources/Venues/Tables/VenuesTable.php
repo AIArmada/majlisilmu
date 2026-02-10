@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Venues\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -26,12 +27,6 @@ class VenuesTable
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('institution.name')
-                    ->sortable()
-                    ->searchable()
-                    ->url(fn ($record): ?string => $record->institution?->id
-                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id])
-                        : null),
                 TextColumn::make('type')
                     ->badge()
                     ->sortable(),
@@ -60,8 +55,6 @@ class VenuesTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('institution')
-                    ->relationship('institution', 'name'),
                 SelectFilter::make('type')
                     ->options([
                         'main_hall' => 'Main Hall',
@@ -82,8 +75,10 @@ class VenuesTable
                     ]),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
+            ->recordUrl(fn ($record): string => \App\Filament\Resources\Venues\VenueResource::getUrl('view', ['record' => $record]))
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

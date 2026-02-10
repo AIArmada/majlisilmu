@@ -577,7 +577,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             JS)
                                         ->required(fn(Get $get): bool => $get('organizer_type') === 'institution')
                                         ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn(array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('organizer_speaker_id')
                                         ->label(__('Penceramah'))
@@ -599,8 +599,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             }
                                                             JS)
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
-                                        ->createOptionUsing(function (array $data, Set $set, Get $get): string {
-                                            return SpeakerFormSchema::createOptionUsing($data);
+                                        ->createOptionUsing(function (array $data, Schema $schema, Set $set, Get $get): string {
+                                            return SpeakerFormSchema::createOptionUsing($data, $schema);
                                         }),
                                 ]),
 
@@ -642,7 +642,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             JS)
                                         ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution')
                                         ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn(array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('location_venue_id')
                                         ->label(__('Lokasi'))
@@ -654,7 +654,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             JS)
                                         ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue')
                                         ->createOptionForm(VenueFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn(array $data): string => VenueFormSchema::createOptionUsing($data)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => VenueFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('space_id')
                                         ->label(__('Ruang'))
@@ -691,7 +691,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->searchable()
                                         ->preload()
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn(array $data): string => SpeakerFormSchema::createOptionUsing($data)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
                                 ]),
 
                             Section::make(__('Media'))

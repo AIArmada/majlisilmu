@@ -7,6 +7,7 @@ use App\Models\Institution;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
 class InstitutionFormSchema
@@ -62,7 +63,7 @@ class InstitutionFormSchema
     /**
      * Shared createOptionUsing callback for Institution selects.
      */
-    public static function createOptionUsing(array $data): string
+    public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {
         $institution = Institution::create([
             'name' => $data['name'],
@@ -70,6 +71,9 @@ class InstitutionFormSchema
             'type' => $data['type'],
             'status' => 'pending',
         ]);
+
+        // Save media uploads (cover, gallery) via Filament's relationship-saving mechanism
+        $schema?->model($institution)->saveRelationships();
 
         SharedFormSchema::createAddressFromData($institution, $data);
         SharedFormSchema::createSocialMediaFromData($institution, $data);

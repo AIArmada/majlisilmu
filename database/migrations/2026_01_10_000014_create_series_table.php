@@ -9,8 +9,6 @@ return new class extends Migration {
     {
         Schema::create('series', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('institution_id')->nullable()->index();
-            $table->foreignUuid('speaker_id')->nullable()->index();
 
             $table->string('title')->index();
             $table->string('slug')->unique();
