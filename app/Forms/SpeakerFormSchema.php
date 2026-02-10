@@ -124,7 +124,9 @@ class SpeakerFormSchema
                 ->multiple()
                 ->searchable()
                 ->preload()
-                ->closeOnSelect(),
+                ->closeOnSelect()
+                ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                ->createOptionUsing(fn (array $data): string => InstitutionFormSchema::createOptionUsing($data)),
         ];
     }
 

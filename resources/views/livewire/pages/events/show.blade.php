@@ -6,10 +6,12 @@
     <meta property="og:description" content="{{ Str::limit(strip_tags($this->event->description), 160) }}">
     <meta property="og:type" content="event">
     <meta property="og:url" content="{{ route('events.show', $this->event) }}">
+    <meta property="og:image" content="{{ $this->event->card_image_url }}">
     <meta property="article:published_time" content="{{ $this->event->starts_at?->toIso8601String() }}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ $this->event->title }}">
     <meta name="twitter:description" content="{{ Str::limit(strip_tags($this->event->description), 160) }}">
+    <meta name="twitter:image" content="{{ $this->event->card_image_url }}">
 @endpush
 
     @php
@@ -17,6 +19,10 @@
         $institutionAddress = $this->event->institution?->addressModel;
         $lat = $venueAddress?->lat ?? $institutionAddress?->lat;
         $lng = $venueAddress?->lng ?? $institutionAddress?->lng;
+        $galleryImages = $this->galleryImages;
+        $relatedEvents = $this->relatedEvents;
+        $shareLinks = $this->shareLinks;
+        $sharePreviewImage = $this->event->card_image_url;
 
         $shareData = [
             'title' => $this->event->title,
@@ -30,23 +36,38 @@
 
     <div class="bg-slate-50 min-h-screen pb-20" x-data='{
         registerOpen: false,
+        shareModalOpen: false,
+        copied: false,
         shareData: @json($shareData),
         copyMessage: @json($copyMessage),
         copyPrompt: @json($copyPrompt),
-        share() {
+        nativeShare() {
             if (navigator.share) {
                 navigator.share(this.shareData);
                 return;
             }
 
+            this.copyLink();
+        },
+        copyLink() {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(this.shareData.url).then(() => {
-                    alert(this.copyMessage);
+                    this.copied = true;
+                    setTimeout(() => {
+                        this.copied = false;
+                    }, 2000);
                 });
                 return;
             }
 
             window.prompt(this.copyPrompt, this.shareData.url);
+        },
+        openShareModal() {
+            this.shareModalOpen = true;
+            this.copied = false;
+        },
+        share() {
+            this.openShareModal();
         }
     }'>
         <!-- Header / Banner -->
@@ -171,6 +192,49 @@
                     @endif
                 </div>
 
+                @if($galleryImages !== [])
+                    <div class="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100"
+                        x-data="{ active: 0, images: @js($galleryImages), next() { this.active = (this.active + 1) % this.images.length }, prev() { this.active = (this.active - 1 + this.images.length) % this.images.length }, go(index) { this.active = index } }">
+                        <div class="mb-6 flex items-center justify-between">
+                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Event Gallery') }}</h2>
+                            <p class="text-sm text-slate-500">
+                                <span x-text="active + 1"></span>
+                                /
+                                <span x-text="images.length"></span>
+                            </p>
+                        </div>
+
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                            <img :src="images[active]?.url" :alt="images[active]?.alt" class="h-[420px] w-full object-cover" loading="lazy">
+
+                            <button type="button" @click="prev()"
+                                class="absolute left-4 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-md transition hover:bg-white"
+                                aria-label="{{ __('Previous image') }}">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+
+                            <button type="button" @click="next()"
+                                class="absolute right-4 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-md transition hover:bg-white"
+                                aria-label="{{ __('Next image') }}">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-6">
+                            @foreach($galleryImages as $index => $image)
+                                <button type="button" @click="go({{ $index }})" :class="{ 'ring-2 ring-emerald-500': active === {{ $index }} }"
+                                    class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                    <img src="{{ $image['thumb'] }}" alt="{{ $image['alt'] }}" class="h-16 w-full object-cover" loading="lazy">
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Speakers -->
                 @if($event->speakers->isNotEmpty())
                     <div class="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
@@ -242,6 +306,33 @@
                                     {{ __('Watch Recording') }}
                                 </a>
                             @endif
+                        </div>
+                    </div>
+                @endif
+
+                @if($relatedEvents->isNotEmpty())
+                    <div class="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
+                        <div class="mb-6 flex items-center justify-between gap-4">
+                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Related Events') }}</h2>
+                            <a href="{{ route('events.index') }}" wire:navigate
+                                class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-500 hover:text-emerald-700">
+                                {{ __('Browse All') }}
+                            </a>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach($relatedEvents as $relatedEvent)
+                                <a href="{{ route('events.show', $relatedEvent) }}" wire:navigate
+                                    class="group overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-white">
+                                    <img src="{{ $relatedEvent->card_image_url }}" alt="{{ $relatedEvent->title }}"
+                                        class="h-36 w-full object-cover transition duration-500 group-hover:scale-[1.03]" loading="lazy">
+                                    <div class="space-y-2 p-4">
+                                        <h3 class="line-clamp-2 text-sm font-bold text-slate-900">{{ $relatedEvent->title }}</h3>
+                                        <p class="text-xs text-slate-500">{{ $relatedEvent->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}</p>
+                                        <p class="line-clamp-1 text-xs text-slate-600">{{ $relatedEvent->institution?->name ?? $relatedEvent->venue?->name ?? __('Independent') }}</p>
+                                    </div>
+                                </a>
+                            @endforeach
                         </div>
                     </div>
                 @endif
@@ -471,7 +562,7 @@
                                 </button>
 
                                 <!-- Share -->
-                                <button type="button" @click="share()"
+                                <button type="button" @click="openShareModal()"
                                     class="px-4 py-3 rounded-xl border-2 border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-all" title="Share">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -486,7 +577,7 @@
                                 {{ __('Log Masuk untuk Hadir') }}
                             </a>
                             <div class="flex gap-3 mt-3">
-                                 <button type="button" @click="share()"
+                                 <button type="button" @click="openShareModal()"
                                     class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold hover:border-emerald-500 hover:text-emerald-600 transition-colors">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -546,6 +637,81 @@
             </div>
         </div>
 
+        <!-- Share Preview Modal -->
+        <div x-show="shareModalOpen" x-cloak x-transition.opacity @keydown.escape.window="shareModalOpen = false"
+            class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" aria-modal="true" role="dialog">
+            <div class="flex min-h-screen items-center justify-center p-4">
+                <div @click.away="shareModalOpen = false"
+                    class="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div class="border-b border-slate-100 px-6 py-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <h3 class="font-heading text-xl font-bold text-slate-900">{{ __('Share Preview') }}</h3>
+                            <button type="button" @click="shareModalOpen = false"
+                                class="inline-flex size-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-5 p-6">
+                        <article class="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                            <img src="{{ $sharePreviewImage }}" alt="{{ $event->title }}" class="h-48 w-full object-cover" loading="lazy">
+                            <div class="space-y-2 p-4">
+                                <h4 class="font-bold text-slate-900">{{ $event->title }}</h4>
+                                <p class="text-sm text-slate-600">{{ $event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}</p>
+                                <p class="line-clamp-2 text-sm text-slate-500">{{ Str::limit(strip_tags($event->description), 140) }}</p>
+                            </div>
+                        </article>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" @click="nativeShare()"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684l6.632 3.316m-6.632-6l6.632-3.316" />
+                                </svg>
+                                {{ __('Share Now') }}
+                            </button>
+
+                            <button type="button" @click="copyLink()"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h8M8 12h8m-6-8H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-4" />
+                                </svg>
+                                {{ __('Copy Link') }}
+                            </button>
+                        </div>
+
+                        <p x-show="copied" class="text-sm font-semibold text-emerald-600">{{ $copyMessage }}</p>
+
+                        <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener"
+                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                                WhatsApp
+                            </a>
+                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener"
+                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                                Telegram
+                            </a>
+                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener"
+                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                                Facebook
+                            </a>
+                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener"
+                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                                X
+                            </a>
+                            <a href="{{ $shareLinks['email'] }}"
+                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
+                                Email
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Registration Form Modal (if needed) -->
         @if($event->settings?->registration_required)
             <div id="registerModal" x-show="registerOpen" x-cloak x-transition.opacity
@@ -587,4 +753,3 @@
             </div>
         @endif
     </div>
-
