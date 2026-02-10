@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Events\Tables;
 
-use A909M\FilamentStateFusion\Tables\Columns\StateFusionSelectColumn;
 use A909M\FilamentStateFusion\Tables\Filters\StateFusionSelectFilter;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
@@ -53,7 +52,23 @@ class EventsTable
                     ->dateTime()
                     ->description(fn (Event $record): ?string => $record->timing_mode === TimingMode::PrayerRelative ? $record->prayer_display_text : null)
                     ->sortable(),
-                StateFusionSelectColumn::make('status')
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (mixed $state): string => match ((string) $state) {
+                        'pending' => 'warning',
+                        'approved' => 'success',
+                        'needs_changes' => 'info',
+                        'rejected' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (mixed $state): string => match ((string) $state) {
+                        'draft' => 'Draft',
+                        'pending' => 'Pending Review',
+                        'needs_changes' => 'Needs Changes',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                        default => (string) $state,
+                    })
                     ->sortable(),
                 TextColumn::make('visibility')
                     ->badge()

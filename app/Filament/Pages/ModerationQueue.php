@@ -198,8 +198,15 @@ class ModerationQueue extends Page implements HasTable
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->requiresConfirmation()
-                    ->action(function (Event $record, \App\Services\ModerationService $service): void {
-                        $service->approve($record, auth()->user());
+                    ->modalHeading('Approve Event')
+                    ->modalDescription('Are you sure you want to approve this event? It will be published and made searchable.')
+                    ->form([
+                        Textarea::make('note')
+                            ->label('Note (optional)')
+                            ->rows(3),
+                    ])
+                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                        $service->approve($record, auth()->user(), $data['note'] ?? null);
                     })
                     ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
 
@@ -207,6 +214,8 @@ class ModerationQueue extends Page implements HasTable
                     ->label('Reject')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
+                    ->modalHeading('Reject Event')
+                    ->modalDescription('This event will be rejected and removed from search.')
                     ->form([
                         Select::make('reason_code')
                             ->label('Reason')
@@ -216,6 +225,9 @@ class ModerationQueue extends Page implements HasTable
                                 'inappropriate' => 'Inappropriate Content',
                                 'spam' => 'Spam',
                                 'wrong_category' => 'Wrong Category',
+                                'inaccurate_details' => 'Inaccurate Details',
+                                'missing_speaker' => 'Missing Speaker Information',
+                                'missing_venue' => 'Missing Venue Information',
                                 'other' => 'Other',
                             ])
                             ->required(),
@@ -233,16 +245,66 @@ class ModerationQueue extends Page implements HasTable
                     ->label('Request Changes')
                     ->icon('heroicon-o-pencil-square')
                     ->color('warning')
+                    ->modalHeading('Request Changes')
+                    ->modalDescription('Specify what changes the submitter needs to make.')
                     ->form([
+                        Select::make('reason_code')
+                            ->label('Reason')
+                            ->options([
+                                'incomplete_info' => 'Incomplete Information',
+                                'duplicate' => 'Duplicate Event',
+                                'inappropriate' => 'Inappropriate Content',
+                                'wrong_category' => 'Wrong Category',
+                                'inaccurate_details' => 'Inaccurate Details',
+                                'missing_speaker' => 'Missing Speaker Information',
+                                'missing_venue' => 'Missing Venue Information',
+                                'other' => 'Other',
+                            ])
+                            ->required(),
                         Textarea::make('note')
                             ->label('What needs to be changed?')
                             ->required()
                             ->rows(3),
                     ])
                     ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
-                        $service->requestChanges($record, auth()->user(), 'needs_changes', $data['note']);
+                        $service->requestChanges($record, auth()->user(), $data['reason_code'], $data['note']);
                     })
                     ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
+
+                Action::make('reconsider')
+                    ->label('Reconsider')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Reconsider Event')
+                    ->modalDescription('Move this event back to pending for re-review.')
+                    ->form([
+                        Textarea::make('note')
+                            ->label('Reason for reconsideration')
+                            ->rows(3),
+                    ])
+                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                        $service->reconsider($record, auth()->user(), $data['note'] ?? null);
+                    })
+                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Rejected),
+
+                Action::make('revert_to_draft')
+                    ->label('Revert to Draft')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->modalHeading('Revert to Draft')
+                    ->modalDescription('Move this event back to draft status.')
+                    ->form([
+                        Textarea::make('note')
+                            ->label('Reason (optional)')
+                            ->rows(3),
+                    ])
+                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                        $service->revertToDraft($record, auth()->user(), $data['note'] ?? null);
+                    })
+                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Rejected
+                        || $record->status instanceof \App\States\EventStatus\NeedsChanges),
 
                 Action::make('view')
                     ->label('View')
