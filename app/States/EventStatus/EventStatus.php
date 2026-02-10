@@ -15,12 +15,19 @@ abstract class EventStatus extends State implements HasFilamentStateFusion
     {
         return parent::config()
             ->default(Draft::class)
+            // Submission flow
             ->allowTransition(Draft::class, Pending::class, Transitions\SubmitForModeration::class)
+            ->allowTransition(NeedsChanges::class, Pending::class, Transitions\SubmitForModeration::class)
+            // Moderation decisions (from Pending)
             ->allowTransition(Pending::class, Approved::class, Transitions\ApproveEvent::class)
             ->allowTransition(Pending::class, NeedsChanges::class, Transitions\RequestChanges::class)
             ->allowTransition(Pending::class, Rejected::class, Transitions\RejectEvent::class)
-            ->allowTransition(NeedsChanges::class, Pending::class, Transitions\SubmitForModeration::class)
-            ->allowTransition(Approved::class, Pending::class) // In case we need to re-moderate (e.g. sensitive changes)
-            ->allowTransition(Rejected::class, Draft::class); // Allow recycling rejected events as drafts
+            // Re-moderation (Approved back to Pending)
+            ->allowTransition(Approved::class, Pending::class, Transitions\RemoderateEvent::class)
+            // Reconsider rejected events (back to Pending for review)
+            ->allowTransition(Rejected::class, Pending::class, Transitions\ReconsiderEvent::class)
+            // Revert to draft (from any terminal state)
+            ->allowTransition(Rejected::class, Draft::class, Transitions\RevertToDraft::class)
+            ->allowTransition(NeedsChanges::class, Draft::class, Transitions\RevertToDraft::class);
     }
 }

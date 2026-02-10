@@ -2,14 +2,6 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\CreateAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -21,26 +13,7 @@ class ModerationReviewsRelationManager extends RelationManager
 
     public function form(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                Select::make('decision')
-                    ->options([
-                        'approved' => 'Approved',
-                        'rejected' => 'Rejected',
-                        'needs_changes' => 'Needs changes',
-                    ])
-                    ->required(),
-                TextInput::make('reason_code')
-                    ->maxLength(255),
-                Select::make('reviewer_id')
-                    ->relationship('reviewer', 'email')
-                    ->searchable()
-                    ->preload(),
-                Textarea::make('note')
-                    ->columnSpanFull()
-                    ->maxLength(2000),
-            ])
-            ->columns(2);
+        return $schema->components([]);
     }
 
     public function table(Table $table): Table
@@ -49,28 +22,34 @@ class ModerationReviewsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('decision')
                     ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'approved' => 'success',
+                        'rejected' => 'danger',
+                        'needs_changes' => 'warning',
+                        'reconsidered' => 'info',
+                        'remoderated' => 'info',
+                        'reverted_to_draft' => 'gray',
+                        'pending_review' => 'warning',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => str($state)->replace('_', ' ')->title()->toString())
                     ->sortable(),
                 TextColumn::make('reason_code')
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('reviewer.email')
-                    ->label('Reviewer')
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->url(fn ($record): ?string => $record->reviewer_id ? url('/admin') : null),
+                    ->label('Reason')
+                    ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->title()->toString() : '-')
+                    ->placeholder('-'),
+                TextColumn::make('moderator.name')
+                    ->label('Moderator')
+                    ->placeholder('System'),
+                TextColumn::make('note')
+                    ->limit(60)
+                    ->tooltip(fn ($record): ?string => $record->note)
+                    ->placeholder('-'),
                 TextColumn::make('created_at')
+                    ->label('Date')
                     ->dateTime()
                     ->sortable(),
             ])
-            ->headerActions([
-                CreateAction::make(),
-            ])
-            ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->defaultSort('created_at', 'desc');
     }
 }

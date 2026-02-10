@@ -263,7 +263,7 @@ describe('Sensitive Change Handling', function () {
         $review = ModerationReview::where('event_id', $event->id)->latest()->first();
 
         expect($review)->not->toBeNull();
-        expect($review->decision)->toBe('pending_review');
+        expect($review->decision)->toBe('remoderated');
         expect($review->note)->toContain('starts_at');
     });
 
@@ -278,5 +278,76 @@ describe('Sensitive Change Handling', function () {
 
         // Status should remain approved
         expect((string) $event->fresh()->status)->toBe('approved');
+    });
+});
+
+describe('Event Reconsideration', function () {
+    it('moves rejected event back to pending', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        $event = Event::factory()->create([
+            'status' => 'rejected',
+        ]);
+
+        $this->service->reconsider($event, $moderator, 'Reconsidering after review.');
+
+        expect((string) $event->fresh()->status)->toBe('pending');
+
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+        expect($review->decision)->toBe('reconsidered');
+        expect($review->moderator_id)->toBe($moderator->id);
+    });
+});
+
+describe('Revert to Draft', function () {
+    it('reverts rejected event to draft', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        $event = Event::factory()->create([
+            'status' => 'rejected',
+        ]);
+
+        $this->service->revertToDraft($event, $moderator, 'Reverting to draft for submitter.');
+
+        expect((string) $event->fresh()->status)->toBe('draft');
+        expect($event->fresh()->published_at)->toBeNull();
+
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+        expect($review->decision)->toBe('reverted_to_draft');
+    });
+
+    it('reverts needs_changes event to draft', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        $event = Event::factory()->create([
+            'status' => 'needs_changes',
+        ]);
+
+        $this->service->revertToDraft($event, $moderator);
+
+        expect((string) $event->fresh()->status)->toBe('draft');
+    });
+});
+
+describe('Re-moderation', function () {
+    it('sends approved event back to pending', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'published_at' => now(),
+        ]);
+
+        $this->service->remoderate($event, $moderator, 'Content needs re-review.');
+
+        expect((string) $event->fresh()->status)->toBe('pending');
+
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+        expect($review->decision)->toBe('remoderated');
+        expect($review->moderator_id)->toBe($moderator->id);
     });
 });

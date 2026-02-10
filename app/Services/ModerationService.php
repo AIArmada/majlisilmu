@@ -4,14 +4,8 @@ namespace App\Services;
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\Event;
-use App\Models\ModerationReview;
 use App\Models\User;
-use App\Notifications\EventApprovedNotification;
-use App\Notifications\EventNeedsChangesNotification;
-use App\Notifications\EventRejectedNotification;
-use App\Notifications\EventSubmittedNotification;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 
 /**
  * Moderation Service per documentation B4 and B4a.
@@ -62,6 +56,39 @@ class ModerationService
     }
 
     /**
+     * Reconsider a rejected event (move back to pending).
+     */
+    public function reconsider(
+        Event $event,
+        ?User $moderator = null,
+        ?string $note = null
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\Pending::class, $moderator, $note);
+    }
+
+    /**
+     * Revert an event to draft.
+     */
+    public function revertToDraft(
+        Event $event,
+        ?User $moderator = null,
+        ?string $note = null
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\Draft::class, $moderator, $note);
+    }
+
+    /**
+     * Send an approved event back for re-moderation.
+     */
+    public function remoderate(
+        Event $event,
+        ?User $moderator = null,
+        ?string $note = null
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\Pending::class, $moderator, $note);
+    }
+
+    /**
      * Handle sensitive change gating.
      * Per documentation B4.
      */
@@ -71,22 +98,11 @@ class ModerationService
             return;
         }
 
-        // Set to pending for re-review
-        $event->status->transitionTo(\App\States\EventStatus\Pending::class);
+        $note = 'Sensitive change detected: '.implode(', ', array_keys($changes));
 
-        // Remove from search temporarily
-        $event->unsearchable();
-
-        // Create review record
-        ModerationReview::create([
-            'event_id' => $event->id,
-            'decision' => 'pending_review',
-            'note' => 'Sensitive change detected: '.implode(', ', array_keys($changes)),
-        ]);
-
-        // Notify moderators
-        $moderators = User::role(['moderator', 'super_admin'])->get();
-        Notification::send($moderators, new EventSubmittedNotification($event));
+        // Use the remoderate transition which handles review creation,
+        // search de-indexing, and moderator notifications.
+        $this->remoderate($event, null, $note);
 
         Log::info('Sensitive change requires re-moderation', [
             'event_id' => $event->id,

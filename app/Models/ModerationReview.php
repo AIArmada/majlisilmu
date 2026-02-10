@@ -21,7 +21,6 @@ class ModerationReview extends Model
      */
     protected $fillable = [
         'event_id',
-        'reviewer_id',
         'moderator_id',
         'decision',
         'note',
@@ -33,6 +32,14 @@ class ModerationReview extends Model
         return $this->belongsTo(Event::class);
     }
 
+    public function moderator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'moderator_id');
+    }
+
+    /**
+     * @deprecated Use moderator() instead
+     */
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewer_id');

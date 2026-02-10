@@ -354,20 +354,23 @@ class EventForm
                                             ->label('Status')
                                             ->options([
                                                 'draft' => 'Draft',
-                                                'pending' => 'Pending',
+                                                'pending' => 'Pending Review',
                                                 'needs_changes' => 'Needs Changes',
                                                 'approved' => 'Approved',
                                                 'rejected' => 'Rejected',
-                                                'cancelled' => 'Cancelled',
-                                                'postponed' => 'Postponed',
                                             ])
-                                            ->placeholder('Pilih status'),
+                                            ->disabled()
+                                            ->dehydrated(false)
+                                            ->helperText('Status boleh ditukar melalui butang moderasi di bahagian atas halaman.'),
                                         Toggle::make('is_priority')
                                             ->label('Priority Review'),
                                         Toggle::make('is_featured')
                                             ->label('Featured Event'),
                                         DateTimePicker::make('published_at')
-                                            ->label('Tarikh Terbit'),
+                                            ->label('Tarikh Terbit')
+                                            ->disabled()
+                                            ->dehydrated(false)
+                                            ->helperText('Ditetapkan secara automatik apabila majlis diluluskan.'),
                                         DateTimePicker::make('escalated_at')
                                             ->label('Tarikh Eskalasi'),
                                         Select::make('submitter_id')
