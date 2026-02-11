@@ -62,6 +62,7 @@ return new class extends Migration
             $table->timestamp('escalated_at')->nullable();
             $table->boolean('is_priority')->nullable();
             $table->boolean('is_featured')->default(false);
+            $table->boolean('is_active')->default(true)->index();
             $table->timestamps();
 
             // Optimized composite indexes for common query patterns

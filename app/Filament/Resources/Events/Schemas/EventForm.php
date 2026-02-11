@@ -207,7 +207,9 @@ class EventForm
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getTagOptions(TagType::Domain)),
+                                            ->options(fn (): array => self::getTagOptions(TagType::Domain))
+                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values)),
                                         Select::make('discipline_tags')
                                             ->label('Bidang Ilmu')
                                             ->multiple()
@@ -215,6 +217,8 @@ class EventForm
                                             ->searchable()
                                             ->preload()
                                             ->options(fn (): array => self::getTagOptions(TagType::Discipline))
+                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values))
                                             ->createOptionForm([
                                                 TextInput::make('name')
                                                     ->label('Nama Bidang')
@@ -228,7 +232,9 @@ class EventForm
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getTagOptions(TagType::Source)),
+                                            ->options(fn (): array => self::getTagOptions(TagType::Source))
+                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values)),
                                         Select::make('issue_tags')
                                             ->label('Tema / Isu')
                                             ->multiple()
@@ -236,6 +242,8 @@ class EventForm
                                             ->searchable()
                                             ->preload()
                                             ->options(fn (): array => self::getTagOptions(TagType::Issue))
+                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values))
                                             ->createOptionForm([
                                                 TextInput::make('name')
                                                     ->label('Nama Tema')
@@ -366,6 +374,10 @@ class EventForm
                                             ->label('Priority Review'),
                                         Toggle::make('is_featured')
                                             ->label('Featured Event'),
+                                        Toggle::make('is_active')
+                                            ->label('Active')
+                                            ->helperText('Nyahaktifkan untuk menyembunyikan majlis daripada paparan awam tanpa menukar status.')
+                                            ->default(true),
                                         DateTimePicker::make('published_at')
                                             ->label('Tarikh Terbit')
                                             ->disabled()
@@ -435,6 +447,30 @@ class EventForm
         ]);
 
         return (string) $tag->getKey();
+    }
+
+    protected static function getTagLabel(mixed $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        return Tag::query()->find($value)?->getTranslation('name', app()->getLocale());
+    }
+
+    /**
+     * @param  array<int, string>  $values
+     * @return array<string, string>
+     */
+    protected static function getTagLabels(array $values): array
+    {
+        return Tag::query()
+            ->whereIn('id', $values)
+            ->get()
+            ->mapWithKeys(fn (Tag $tag): array => [
+                (string) $tag->id => $tag->getTranslation('name', app()->getLocale()),
+            ])
+            ->toArray();
     }
 
     /**

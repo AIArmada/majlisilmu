@@ -217,13 +217,13 @@ it('registers media conversions for Reference model', function () {
     $reference = Reference::factory()->create();
 
     $reference->addMedia(UploadedFile::fake()->image('book-cover.jpg', 400, 560))
-        ->toMediaCollection('cover');
+        ->toMediaCollection('front_cover');
 
-    $media = $reference->getFirstMedia('cover');
+    $media = $reference->getFirstMedia('front_cover');
 
     expect($media)->not->toBeNull();
     expect($media->getMediaConversionNames())->toContain('thumb');
-})->skip('Reference factory has external_link column not yet in migration');
+});
 
 // ---------------------------------------------------------------
 // Report model

@@ -27,6 +27,7 @@ class TagFactory extends Factory
             'name' => ['en' => ucwords($name), 'ms' => ucwords($name)],
             'slug' => ['en' => Str::slug($name), 'ms' => Str::slug($name)],
             'type' => fake()->randomElement(TagType::cases())->value,
+            'status' => 'verified',
             'order_column' => null,
         ];
     }
@@ -78,6 +79,26 @@ class TagFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'type' => TagType::Issue->value,
+        ]);
+    }
+
+    /**
+     * Create a pending (unverified) tag.
+     */
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'pending',
+        ]);
+    }
+
+    /**
+     * Create a verified tag.
+     */
+    public function verified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'verified',
         ]);
     }
 }

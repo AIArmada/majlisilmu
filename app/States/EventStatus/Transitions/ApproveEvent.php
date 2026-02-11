@@ -124,6 +124,11 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
             ->where('status', 'pending')
             ->update(['status' => 'verified']);
 
+        // Verify references
+        $event->references()
+            ->where('status', 'pending')
+            ->update(['status' => 'verified']);
+
         Log::info('Auto-verified pending related records', [
             'event_id' => $event->id,
         ]);

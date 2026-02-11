@@ -5,6 +5,7 @@ namespace App\Filament\Resources\References\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class ReferencesTable
@@ -13,9 +14,9 @@ class ReferencesTable
     {
         return $table
             ->columns([
-                \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('cover')
+                \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('front_cover')
                     ->label('Cover')
-                    ->collection('cover')
+                    ->collection('front_cover')
                     ->conversion('thumb')
                     ->square()
                     ->size(56),
@@ -33,6 +34,11 @@ class ReferencesTable
                         'warning' => 'book',
                         'info' => 'video',
                     ]),
+                \Filament\Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->sortable(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Active'),
                 \Filament\Tables\Columns\IconColumn::make('is_canonical')
                     ->boolean(),
                 \Filament\Tables\Columns\TextColumn::make('created_at')
@@ -41,7 +47,11 @@ class ReferencesTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                    ]),
             ])
             ->recordActions([
                 EditAction::make(),
