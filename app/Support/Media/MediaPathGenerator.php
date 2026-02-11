@@ -46,7 +46,7 @@ class MediaPathGenerator implements PathGenerator
     {
         $modelType = $this->getModelTypeDirectory($media);
         $modelId = $media->model_id;
-        $shard = substr($modelId, 0, 4);
+        $shard = substr((string) $modelId, 0, 4);
         $collection = $media->collection_name ?: 'default';
 
         return "{$modelType}/{$shard}/{$modelId}/{$collection}";

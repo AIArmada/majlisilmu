@@ -1,6 +1,7 @@
 # Database Guidelines
 - **Primary keys**: `uuid('id')->primary()`.
 - **Foreign keys**: `foreignUuid('col')` only.
+- **Intentional geography exception**: `countries`, `states`, `cities`, `districts`, and `subdistricts` use integer IDs (`id` / `foreignId`) by design. Keep all geography references (`country_id`, `state_id`, `city_id`, `district_id`, `subdistrict_id`) as integers.
 - **Never** add DB-level constraints or cascades: no `->constrained()`, no `->cascadeOnDelete()`, no FK constraints.
 - **Cascades/integrity**: enforce in application logic (models/actions/services).
 - **Migrations**: keep safe/idempotent; no `down()` required.

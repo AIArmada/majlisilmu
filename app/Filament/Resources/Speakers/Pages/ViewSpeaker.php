@@ -13,6 +13,7 @@ class ViewSpeaker extends ViewRecord
 
     protected Width|string|null $maxContentWidth = Width::Full;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

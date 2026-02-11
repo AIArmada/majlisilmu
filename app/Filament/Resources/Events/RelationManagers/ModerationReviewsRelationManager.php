@@ -11,6 +11,7 @@ class ModerationReviewsRelationManager extends RelationManager
 {
     protected static string $relationship = 'moderationReviews';
 
+    #[\Override]
     public function form(Schema $schema): Schema
     {
         return $schema->components([]);

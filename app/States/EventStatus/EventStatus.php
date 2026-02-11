@@ -11,6 +11,7 @@ abstract class EventStatus extends State implements HasFilamentStateFusion
 {
     use StateFusionInfo;
 
+    #[\Override]
     public static function config(): StateConfig
     {
         return parent::config()

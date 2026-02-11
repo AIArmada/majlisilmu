@@ -14,7 +14,7 @@ trait HasAddress
      */
     public function getAddressLine1Attribute(): string
     {
-        return $this->addressModel?->address1 ?? '';
+        return $this->addressModel?->line1 ?? '';
     }
 
     /**

@@ -35,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Register any application services.
      */
+    #[\Override]
     public function register(): void
     {
         //
@@ -120,22 +121,18 @@ class AppServiceProvider extends ServiceProvider
                 );
 
                 $upload->mediaName(
-                    static function (TemporaryUploadedFile $file) use ($upload): string {
-                        return MediaFileNamer::resolveDisplayNameFromModel(
-                            $upload->getRecord(),
-                            (string) ($upload->getCollection() ?? 'media'),
-                            $file->getClientOriginalName(),
-                        );
-                    }
+                    static fn (TemporaryUploadedFile $file): string => MediaFileNamer::resolveDisplayNameFromModel(
+                        $upload->getRecord(),
+                        $upload->getCollection() ?? 'media',
+                        $file->getClientOriginalName(),
+                    )
                 );
 
                 $upload->customProperties(
-                    static function (TemporaryUploadedFile $file) use ($upload): array {
-                        return [
-                            'collection' => (string) ($upload->getCollection() ?? 'default'),
-                            'original_file_name' => $file->getClientOriginalName(),
-                        ];
-                    }
+                    static fn (TemporaryUploadedFile $file): array => [
+                        'collection' => $upload->getCollection() ?? 'default',
+                        'original_file_name' => $file->getClientOriginalName(),
+                    ]
                 );
             });
             self::$mediaUploadConfigured = true;

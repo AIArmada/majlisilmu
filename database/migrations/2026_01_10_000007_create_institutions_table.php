@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('institutions', function (Blueprint $table) {
@@ -24,13 +25,13 @@ return new class extends Migration {
             // Optimized composite indexes for common query patterns
             // Main listing: WHERE status='verified' AND is_active=true ORDER BY name
             $table->index(['status', 'is_active', 'name'], 'institutions_status_active_name');
-            
+
             // Type filtering: WHERE type='masjid' AND is_active=true ORDER BY name
             $table->index(['type', 'is_active', 'name'], 'institutions_type_active_name');
-            
+
             // Combined filters: WHERE type='X' AND status='Y' AND is_active=true ORDER BY name
             $table->index(['type', 'status', 'is_active', 'name'], 'institutions_type_status_active');
-            
+
             // Sitemap generation: ORDER BY updated_at DESC
             $table->index('updated_at', 'institutions_sitemap');
         });

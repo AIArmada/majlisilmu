@@ -16,7 +16,7 @@ final class Rejected extends EventStatus implements HasColor, HasIcon, HasLabel
         return __('Rejected');
     }
 
-    public function getColor(): string|array
+    public function getColor(): array
     {
         return Color::Red;
     }

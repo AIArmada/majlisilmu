@@ -25,16 +25,19 @@ class ReportResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Moderation';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return ReportForm::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return ReportsTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -42,6 +45,7 @@ class ReportResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

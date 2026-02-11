@@ -12,6 +12,7 @@ class StatsOverview extends StatsOverviewWidget
 {
     protected ?string $pollingInterval = '15s';
 
+    #[\Override]
     protected function getStats(): array
     {
         return [

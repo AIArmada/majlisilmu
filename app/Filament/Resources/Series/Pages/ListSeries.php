@@ -10,6 +10,7 @@ class ListSeries extends ListRecords
 {
     protected static string $resource = SeriesResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

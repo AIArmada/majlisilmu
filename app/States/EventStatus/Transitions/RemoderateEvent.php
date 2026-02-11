@@ -45,7 +45,7 @@ class RemoderateEvent extends Transition implements HasColor, HasIcon, HasLabel
                 if ($moderators->isNotEmpty()) {
                     Notification::send($moderators, new EventSubmittedNotification($this->event));
                 }
-            } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist) {
                 Log::warning('Could not notify moderators: roles not found', ['event_id' => $this->event->id]);
             }
 

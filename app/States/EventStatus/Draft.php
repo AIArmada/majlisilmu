@@ -16,7 +16,7 @@ final class Draft extends EventStatus implements HasColor, HasIcon, HasLabel
         return __('Draft');
     }
 
-    public function getColor(): string|array
+    public function getColor(): array
     {
         return Color::Gray;
     }

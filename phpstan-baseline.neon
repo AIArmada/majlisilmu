@@ -1,0 +1,3259 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Parameter \#2 \$query of method App\\Console\\Commands\\PruneOrphanedEntities\:\:pruneModel\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Institution\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/PruneOrphanedEntities.php
+
+		-
+			message: '#^Parameter \#2 \$query of method App\\Console\\Commands\\PruneOrphanedEntities\:\:pruneModel\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Speaker\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/PruneOrphanedEntities.php
+
+		-
+			message: '#^Parameter \#2 \$query of method App\\Console\\Commands\\PruneOrphanedEntities\:\:pruneModel\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Venue\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/PruneOrphanedEntities.php
+
+		-
+			message: '#^Method App\\Enums\\EventAgeGroup\:\:getColor\(\) never returns array\<string\> so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventAgeGroup.php
+
+		-
+			message: '#^Method App\\Enums\\EventAgeGroup\:\:getColor\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventAgeGroup.php
+
+		-
+			message: '#^Method App\\Enums\\EventAgeGroup\:\:getIcon\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventAgeGroup.php
+
+		-
+			message: '#^Method App\\Enums\\EventGenderRestriction\:\:getColor\(\) never returns array\<string\> so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventGenderRestriction.php
+
+		-
+			message: '#^Method App\\Enums\\EventGenderRestriction\:\:getColor\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventGenderRestriction.php
+
+		-
+			message: '#^Method App\\Enums\\EventGenderRestriction\:\:getIcon\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventGenderRestriction.php
+
+		-
+			message: '#^Method App\\Enums\\EventType\:\:getColor\(\) never returns array\<string\> so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventType.php
+
+		-
+			message: '#^Method App\\Enums\\EventType\:\:getColor\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventType.php
+
+		-
+			message: '#^Method App\\Enums\\EventType\:\:getIcon\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventType.php
+
+		-
+			message: '#^Method App\\Enums\\EventVisibility\:\:getColor\(\) never returns array\<string\> so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventVisibility.php
+
+		-
+			message: '#^Method App\\Enums\\EventVisibility\:\:getColor\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventVisibility.php
+
+		-
+			message: '#^Method App\\Enums\\EventVisibility\:\:getIcon\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/EventVisibility.php
+
+		-
+			message: '#^Method App\\Enums\\SocialMediaPlatform\:\:getIcon\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/SocialMediaPlatform.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Event\:\:\$open_reports_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Pages/ModerationQueue.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Pages/ModerationQueue.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Pages/ModerationQueue.php
+
+		-
+			message: '#^Method App\\Filament\\Pages\\ModerationQueue\:\:getTableQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Filament/Pages/ModerationQueue.php
+
+		-
+			message: '#^Method App\\Filament\\Pages\\ModerationQueue\:\:getTabs\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Filament/Pages/ModerationQueue.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>status" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Pages/ModerationQueue.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 4
+			path: app/Filament/Resources/DonationChannels/Schemas/DonationChannelForm.php
+
+		-
+			message: '#^Method App\\Filament\\Resources\\Events\\EventResource\:\:getEloquentQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Filament/Resources/Events/EventResource.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Filament\\Resources\\Events\\Pages\\CreateEvent\:\:syncRelationState\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/CreateEvent.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Filament/Resources/Events/Pages/CreateEvent.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Filament/Resources/Events/Pages/CreateEvent.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Cannot access property \$languages on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Cannot access property \$tags on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Filament\\Resources\\Events\\Pages\\EditEvent\:\:syncRelationState\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model\|int\|string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:approve\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:reconsider\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:reject\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:remoderate\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:requestChanges\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:revertToDraft\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Filament/Resources/Events/Pages/EditEvent.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:approve\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:reconsider\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:reject\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:remoderate\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:requestChanges\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Parameter \#1 \$event of method App\\Services\\ModerationService\:\:revertToDraft\(\) expects App\\Models\\Event, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Events/Pages/ViewEvent.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Resources/Events/RelationManagers/EventSubmissionsRelationManager.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Resources/Events/RelationManagers/MediaLinksRelationManager.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Resources/Events/RelationManagers/RegistrationsRelationManager.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 23
+			path: app/Filament/Resources/Events/Schemas/EventForm.php
+
+		-
+			message: '#^Method App\\Filament\\Resources\\Events\\Schemas\\EventForm\:\:createPendingTag\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Filament/Resources/Events/Schemas/EventForm.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/Events/Schemas/EventInfolist.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Events/Schemas/EventInfolist.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/Events/Schemas/EventInfolist.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$submitter_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Events/Schemas/EventInfolist.php
+
+		-
+			message: '#^Parameter \#1 \$array \(array\{\}\|array\{0\: mixed, 1\?\: mixed, 2\?\: mixed\}\) to function array_filter does not contain falsy values, the array will always stay the same\.$#'
+			identifier: arrayFilter.same
+			count: 1
+			path: app/Filament/Resources/Events/Schemas/EventInfolist.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Events/Tables/EventsTable.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 10
+			path: app/Filament/Resources/Institutions/Schemas/InstitutionForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: app/Filament/Resources/References/Schemas/ReferenceForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 5
+			path: app/Filament/Resources/Reports/Schemas/ReportForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Resources/Series/Schemas/SeriesForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 9
+			path: app/Filament/Resources/Speakers/Schemas/SpeakerForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Resources/Tags/Schemas/TagForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 10
+			path: app/Filament/Resources/Venues/Schemas/VenueForm.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Forms/InstitutionFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\InstitutionFormSchema\:\:createOptionForm\(\) has invalid return type Filament\\Forms\\Components\\Component\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Forms/InstitutionFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\InstitutionFormSchema\:\:createOptionUsing\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Forms/InstitutionFormSchema.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 4
+			path: app/Forms/SharedFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\SharedFormSchema\:\:addressFields\(\) has invalid return type Filament\\Forms\\Components\\Component\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Forms/SharedFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\SharedFormSchema\:\:addressFields\(\) should return array\<int, Filament\\Forms\\Components\\Component\> but returns array\<int, mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Forms/SharedFormSchema.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 6
+			path: app/Forms/SpeakerFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\SpeakerFormSchema\:\:createOptionForm\(\) has invalid return type Filament\\Forms\\Components\\Component\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Forms/SpeakerFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\SpeakerFormSchema\:\:createOptionForm\(\) should return array\<int, Filament\\Forms\\Components\\Component\> but returns array\<int, mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Forms/SpeakerFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\SpeakerFormSchema\:\:createOptionUsing\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Forms/SpeakerFormSchema.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Forms/VenueFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\VenueFormSchema\:\:createOptionForm\(\) has invalid return type Filament\\Forms\\Components\\Component\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Forms/VenueFormSchema.php
+
+		-
+			message: '#^Method App\\Forms\\VenueFormSchema\:\:createOptionUsing\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Forms/VenueFormSchema.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>interests_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/EventInterestController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Registration\:\:\$user_email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RegistrationExportController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Registration\:\:\$user_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RegistrationExportController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Http/Controllers/Api/ReportController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Auth\\SocialiteController\:\:callback\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Auth/SocialiteController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Auth\\SocialiteController\:\:redirect\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Auth/SocialiteController.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method Illuminate\\Support\\Facades\\Auth\:\:login\(\) expects Illuminate\\Contracts\\Auth\\Authenticatable, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Auth/SocialiteController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$capacity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Public/EventsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$registration_closes_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Public/EventsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$registration_opens_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Public/EventsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$registration_required\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Public/EventsController.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type Illuminate\\Database\\Eloquent\\Model\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Public/EventsController.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\Auth\\LoginRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/Auth/LoginRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\Auth\\RegisterRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/Auth/RegisterRequest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:notify\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/SendSavedSearchDigest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:shouldReceiveNotificationFor\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/SendSavedSearchDigest.php
+
+		-
+			message: '#^Access to an undefined property App\\Livewire\\Pages\\Dashboard\\InstitutionDashboard\:\:\$institutions\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Livewire/Pages/Dashboard/InstitutionDashboard.php
+
+		-
+			message: '#^Access to an undefined property App\\Livewire\\Pages\\Dashboard\\InstitutionDashboard\:\:\$selectedInstitution\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Livewire/Pages/Dashboard/InstitutionDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\InstitutionDashboard\:\:availableInstitutionsQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/InstitutionDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\InstitutionDashboard\:\:institutionEvents\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/InstitutionDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\InstitutionDashboard\:\:institutionRegistrations\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/InstitutionDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\InstitutionDashboard\:\:institutions\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/InstitutionDashboard.php
+
+		-
+			message: '#^Call to function is_array\(\) with float\|int\<0, max\>\|non\-empty\-string will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\UserDashboard\:\:myEvents\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\UserDashboard\:\:myEventsQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\UserDashboard\:\:myRegistrations\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\UserDashboard\:\:mySavedEvents\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\UserDashboard\:\:mySavedEventsQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Dashboard\\UserDashboard\:\:mySavedSearches\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Return type of call to function array_values contains unresolvable type\.$#'
+			identifier: function.unresolvableReturnType
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between \*NEVER\* and array\{\} will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Livewire/Pages/Dashboard/UserDashboard.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Index\:\:districts\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Index\:\:events\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Index\:\:states\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Index\:\:subdistricts\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Index\:\:topics\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Property App\\Livewire\\Pages\\Events\\Index\:\:\$age_group type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Property App\\Livewire\\Pages\\Events\\Index\:\:\$speaker_ids type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Property App\\Livewire\\Pages\\Events\\Index\:\:\$topic_ids type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Livewire/Pages/Events/Index.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Show\:\:calendarLinks\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Livewire/Pages/Events/Show.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Show\:\:relatedEvents\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/Events/Show.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\Events\\Show\:\:render\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Livewire/Pages/Events/Show.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type App\\States\\EventStatus\\EventStatus\|string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Livewire/Pages/Events/Show.php
+
+		-
+			message: '#^Call to function is_array\(\) with float\|int\<0, max\>\|non\-empty\-string will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Livewire/Pages/SavedSearches/Index.php
+
+		-
+			message: '#^Method App\\Livewire\\Pages\\SavedSearches\\Index\:\:savedSearches\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Livewire/Pages/SavedSearches/Index.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between \*NEVER\* and array\{\} will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Livewire/Pages/SavedSearches/Index.php
+
+		-
+			message: '#^Method App\\Models\\Address\:\:addressable\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Address.php
+
+		-
+			message: '#^Method App\\Models\\Address\:\:city\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Address.php
+
+		-
+			message: '#^Method App\\Models\\Address\:\:country\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Address.php
+
+		-
+			message: '#^Method App\\Models\\Address\:\:district\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Address.php
+
+		-
+			message: '#^Method App\\Models\\Address\:\:state\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Address.php
+
+		-
+			message: '#^Method App\\Models\\Address\:\:subdistrict\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Address.php
+
+		-
+			message: '#^Method App\\Models\\City\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/City.php
+
+		-
+			message: '#^Method App\\Models\\City\:\:institutions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/City.php
+
+		-
+			message: '#^Method App\\Models\\City\:\:venues\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/City.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:contactable\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Country\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Country.php
+
+		-
+			message: '#^Method App\\Models\\Country\:\:institutions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Country.php
+
+		-
+			message: '#^Method App\\Models\\Country\:\:states\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Country.php
+
+		-
+			message: '#^Method App\\Models\\Country\:\:venues\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Country.php
+
+		-
+			message: '#^Method App\\Models\\District\:\:country\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/District.php
+
+		-
+			message: '#^Method App\\Models\\District\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/District.php
+
+		-
+			message: '#^Method App\\Models\\District\:\:institutions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/District.php
+
+		-
+			message: '#^Method App\\Models\\District\:\:state\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/District.php
+
+		-
+			message: '#^Method App\\Models\\District\:\:subdistricts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/District.php
+
+		-
+			message: '#^Method App\\Models\\District\:\:venues\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/District.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/DonationChannel.php
+
+		-
+			message: '#^Method App\\Models\\DonationChannel\:\:donatable\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DonationChannel.php
+
+		-
+			message: '#^Method App\\Models\\DonationChannel\:\:reports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DonationChannel.php
+
+		-
+			message: '#^Method App\\Models\\DonationChannel\:\:verifier\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DonationChannel.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$address\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$avatar_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$district_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lat\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lng\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$state_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$subdistrict_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:getFirstMediaUrl\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasMedia\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\EventAgeGroup and App\\Enums\\EventAgeGroup will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\EventType and App\\Enums\\EventType will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:active\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:active\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:address\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphOne does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:donationChannel\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphOne does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:donationChannels\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:getAddressModelAttribute\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:getAudienceAttribute\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:getGenreAttribute\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:getPrayerCoordinatesAttribute\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:goingBy\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:institution\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:interestedBy\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:languages\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:mediaLinks\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:members\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:moderationReviews\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:organizer\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:references\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:registrations\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:reports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:savedBy\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:series\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:settings\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasOne does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:space\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:speakers\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:submissions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:submitter\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Method App\\Models\\Event\:\:venue\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\:\:each\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\EventSubmission\)\: \(bool\|null\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\:\:each\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\MediaLink\)\: \(bool\|null\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\:\:each\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\ModerationReview\)\: \(bool\|null\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\:\:each\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\Registration\)\: \(bool\|null\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>code" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>district_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>line1" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>state_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>subdistrict_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>timestamp" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Event.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Models/Event.php
+
+		-
+			message: '#^Class App\\Models\\EventSettings uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventSettings.php
+
+		-
+			message: '#^Method App\\Models\\EventSettings\:\:event\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventSettings.php
+
+		-
+			message: '#^Method App\\Models\\EventSubmission\:\:contacts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventSubmission.php
+
+		-
+			message: '#^Method App\\Models\\EventSubmission\:\:event\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventSubmission.php
+
+		-
+			message: '#^Method App\\Models\\EventSubmission\:\:submitter\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventSubmission.php
+
+		-
+			message: '#^Class App\\Models\\EventUser uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventUser.php
+
+		-
+			message: '#^Method App\\Models\\EventUser\:\:event\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventUser.php
+
+		-
+			message: '#^Method App\\Models\\EventUser\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventUser.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:active\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:active\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:address\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphOne does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:contacts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:donationChannels\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:getAddressModelAttribute\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:languages\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:members\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:reports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:socialMedia\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:spaces\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\Institution\:\:speakers\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>line1" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Institution.php
+
+		-
+			message: '#^Method App\\Models\\MediaLink\:\:mediable\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/MediaLink.php
+
+		-
+			message: '#^Method App\\Models\\ModerationReview\:\:event\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ModerationReview.php
+
+		-
+			message: '#^Method App\\Models\\ModerationReview\:\:moderator\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ModerationReview.php
+
+		-
+			message: '#^Method App\\Models\\ModerationReview\:\:reviewer\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ModerationReview.php
+
+		-
+			message: '#^Method App\\Models\\NotificationEndpoint\:\:owner\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/NotificationEndpoint.php
+
+		-
+			message: '#^Method App\\Models\\NotificationPreference\:\:owner\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/NotificationPreference.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Models/Reference.php
+
+		-
+			message: '#^Method App\\Models\\Reference\:\:active\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Reference.php
+
+		-
+			message: '#^Method App\\Models\\Reference\:\:active\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Reference.php
+
+		-
+			message: '#^Method App\\Models\\Reference\:\:socialMedia\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Reference.php
+
+		-
+			message: '#^Method App\\Models\\Registration\:\:event\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Registration.php
+
+		-
+			message: '#^Method App\\Models\\Registration\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Registration.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Report.php
+
+		-
+			message: '#^Method App\\Models\\Report\:\:entity\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Report.php
+
+		-
+			message: '#^Method App\\Models\\Report\:\:handler\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Report.php
+
+		-
+			message: '#^Method App\\Models\\Report\:\:reporter\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Report.php
+
+		-
+			message: '#^Method App\\Models\\SavedSearch\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/SavedSearch.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Series.php
+
+		-
+			message: '#^Method App\\Models\\Series\:\:active\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Series.php
+
+		-
+			message: '#^Method App\\Models\\Series\:\:active\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Series.php
+
+		-
+			message: '#^Method App\\Models\\Series\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Series.php
+
+		-
+			message: '#^Method App\\Models\\Series\:\:languages\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Series.php
+
+		-
+			message: '#^Method App\\Models\\SocialAccount\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/SocialAccount.php
+
+		-
+			message: '#^PHPDoc tag @use has invalid type Database\\Factories\\SocialAccountFactory\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Models/SocialAccount.php
+
+		-
+			message: '#^Type Database\\Factories\\SocialAccountFactory in generic type Illuminate\\Database\\Eloquent\\Factories\\HasFactory\<Database\\Factories\\SocialAccountFactory\> in PHPDoc tag @use is not subtype of template type TFactory of Illuminate\\Database\\Eloquent\\Factories\\Factory of trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory\.$#'
+			identifier: generics.notSubtype
+			count: 1
+			path: app/Models/SocialAccount.php
+
+		-
+			message: '#^Method App\\Models\\SocialMedia\:\:socialable\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/SocialMedia.php
+
+		-
+			message: '#^Class App\\Models\\Space uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Space.php
+
+		-
+			message: '#^Method App\\Models\\Space\:\:active\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Space.php
+
+		-
+			message: '#^Method App\\Models\\Space\:\:active\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Space.php
+
+		-
+			message: '#^Method App\\Models\\Space\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Space.php
+
+		-
+			message: '#^Method App\\Models\\Space\:\:institutions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Space.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Empty array passed to foreach\.$#'
+			identifier: foreach.emptyArray
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:active\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:active\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:address\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphOne does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:contacts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:donationChannels\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:getAddressModelAttribute\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:institutions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:languages\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:members\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:reports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\Speaker\:\:socialMedia\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Offset ''degree'' on \*NEVER\* in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Parameter \#1 \$value of function collect contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Parameter \#1 \$value of method Illuminate\\Support\\Collection\<\*NEVER\*,string\>\:\:implode\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Property App\\Models\\Speaker\:\:\$post_nominal \(string\|null\) does not accept list\<\*NEVER\*\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Return type of call to function collect contains unresolvable type\.$#'
+			identifier: function.unresolvableReturnType
+			count: 2
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>line1" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Speaker.php
+
+		-
+			message: '#^Method App\\Models\\State\:\:addresses\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/State.php
+
+		-
+			message: '#^Method App\\Models\\State\:\:districts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/State.php
+
+		-
+			message: '#^Method App\\Models\\Subdistrict\:\:country\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Subdistrict.php
+
+		-
+			message: '#^Method App\\Models\\Subdistrict\:\:district\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Subdistrict.php
+
+		-
+			message: '#^Method App\\Models\\Subdistrict\:\:state\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Subdistrict.php
+
+		-
+			message: '#^Class App\\Models\\Tag uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Method App\\Models\\Tag\:\:buildSortQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Method App\\Models\\Tag\:\:ofType\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Method App\\Models\\Tag\:\:ofType\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Property App\\Models\\Tag\:\:\$sortable type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:eventSubmissions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:goingEvents\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:handledReports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:institutions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:interestedEvents\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:memberEvents\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:moderationReviews\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:notificationChannelsFor\(\) has parameter \$defaultChannels with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:notificationChannelsFor\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:notificationEndpoints\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:notificationPreferenceFor\(\) should return App\\Models\\NotificationPreference\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:notificationPreferences\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:ownedEvents\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:registrations\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:reports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:savedEvents\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:savedSearches\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:socialAccounts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:speakers\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver\:\:performOnCollections\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:active\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:active\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:address\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphOne does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:contacts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:events\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:getAddressModelAttribute\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Method App\\Models\\Venue\:\:socialMedia\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\MorphMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>line1" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Venue.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Notifications/EventEscalationNotification.php
+
+		-
+			message: '#^Method App\\Notifications\\EventEscalationNotification\:\:toArray\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Notifications/EventEscalationNotification.php
+
+		-
+			message: '#^Method App\\Notifications\\EventEscalationNotification\:\:via\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Notifications/EventEscalationNotification.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>note" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/EventNeedsChangesNotification.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>note" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/EventRejectedNotification.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>reason_code" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/EventRejectedNotification.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Notifications/EventSubmittedNotification.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/EventSubmittedNotification.php
+
+		-
+			message: '#^Method App\\Notifications\\ReportResolvedNotification\:\:toArray\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Notifications/ReportResolvedNotification.php
+
+		-
+			message: '#^Method App\\Notifications\\ReportResolvedNotification\:\:via\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Notifications/ReportResolvedNotification.php
+
+		-
+			message: '#^Method App\\Notifications\\SavedSearchDigestNotification\:\:__construct\(\) has parameter \$events with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Notifications/SavedSearchDigestNotification.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Notifications/SavedSearchDigestNotification.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Notifications/SavedSearchDigestNotification.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Notifications/SavedSearchDigestNotification.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$address\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Observers/EventObserver.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 3
+			path: app/Observers/EventObserver.php
+
+		-
+			message: '#^Cannot call method displayText\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Observers/EventObserver.php
+
+		-
+			message: '#^Parameter \#2 \$prayer of method App\\Services\\PrayerTimeService\:\:calculateStartTime\(\) expects App\\Enums\\PrayerReference, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Observers/EventObserver.php
+
+		-
+			message: '#^Parameter \#3 \$offset of method App\\Services\\PrayerTimeService\:\:calculateStartTime\(\) expects App\\Enums\\PrayerOffset, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Observers/EventObserver.php
+
+		-
+			message: '#^Property App\\Models\\Event\:\:\$starts_at \(Illuminate\\Support\\Carbon\|null\) does not accept Carbon\\Carbon\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Observers/EventObserver.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$institution\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Policies/RegistrationPolicy.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$institution_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Policies/RegistrationPolicy.php
+
+		-
+			message: '#^Call to an undefined method Filament\\Forms\\Components\\Select\:\:extraAttributes\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:hasMacro\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Forms\\Components\\Select\:\:macro\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^PHPDoc tag @var with type Filament\\Forms\\Components\\Select is not subtype of native type \$this\(App\\Providers\\AppServiceProvider\)\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$address_line1\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/CalendarService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/CalendarService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/CalendarService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:buildDatabaseQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:buildTypesenseFilterParts\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:performSearch\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:search\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:searchNearby\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:searchNearbyWithDatabase\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:searchWithDatabase\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\EventSearchService\:\:searchWithTypesense\(\) return type with generic interface Illuminate\\Contracts\\Pagination\\LengthAwarePaginator does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/EventSearchService.php
+
+		-
+			message: '#^Method App\\Services\\ModerationService\:\:handleSensitiveChange\(\) has parameter \$changes with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/ModerationService.php
+
+		-
+			message: '#^Method App\\Services\\PrayerTimeService\:\:getClosestPrayer\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/PrayerTimeService.php
+
+		-
+			message: '#^Property App\\States\\EventStatus\\Approved\:\:\$name has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: app/States/EventStatus/Approved.php
+
+		-
+			message: '#^Property App\\States\\EventStatus\\Draft\:\:\$name has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: app/States/EventStatus/Draft.php
+
+		-
+			message: '#^Class App\\States\\EventStatus\\EventStatus extends generic class Spatie\\ModelStates\\State but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/States/EventStatus/EventStatus.php
+
+		-
+			message: '#^Class App\\States\\EventStatus\\EventStatus implements generic interface A909M\\FilamentStateFusion\\Contracts\\HasFilamentStateFusion but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/States/EventStatus/EventStatus.php
+
+		-
+			message: '#^Class App\\States\\EventStatus\\EventStatus uses generic trait A909M\\FilamentStateFusion\\Concerns\\StateFusionInfo but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/States/EventStatus/EventStatus.php
+
+		-
+			message: '#^Method App\\States\\EventStatus\\NeedsChanges\:\:getDescription\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/States/EventStatus/NeedsChanges.php
+
+		-
+			message: '#^Property App\\States\\EventStatus\\NeedsChanges\:\:\$name has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: app/States/EventStatus/NeedsChanges.php
+
+		-
+			message: '#^Property App\\States\\EventStatus\\Pending\:\:\$name has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: app/States/EventStatus/Pending.php
+
+		-
+			message: '#^Property App\\States\\EventStatus\\Rejected\:\:\$name has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: app/States/EventStatus/Rejected.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$addressModel\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$capacity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$registration_required\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 2
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type Illuminate\\Database\\Eloquent\\Model\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/View/Components/EventJsonLd.php
+
+		-
+			message: '#^Class Spatie\\MediaLibraryPro\\Models\\TemporaryUpload not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: config/media-library.php
+
+		-
+			message: '#^PHPDoc tag @extends has invalid type App\\Models\\AuditLog\.$#'
+			identifier: class.notFound
+			count: 1
+			path: database/factories/AuditLogFactory.php
+
+		-
+			message: '#^Type App\\Models\\AuditLog in generic type Illuminate\\Database\\Eloquent\\Factories\\Factory\<App\\Models\\AuditLog\> in PHPDoc tag @extends is not subtype of template type TModel of Illuminate\\Database\\Eloquent\\Model of class Illuminate\\Database\\Eloquent\\Factories\\Factory\.$#'
+			identifier: generics.notSubtype
+			count: 1
+			path: database/factories/AuditLogFactory.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\State\:\:factory\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: database/factories/DistrictFactory.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 2
+			path: database/factories/DonationChannelFactory.php
+
+		-
+			message: '#^Method Database\\Factories\\DonationChannelFactory\:\:bankAccountFields\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: database/factories/DonationChannelFactory.php
+
+		-
+			message: '#^Method Database\\Factories\\DonationChannelFactory\:\:duitnowFields\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: database/factories/DonationChannelFactory.php
+
+		-
+			message: '#^Method Database\\Factories\\DonationChannelFactory\:\:ewalletFields\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: database/factories/DonationChannelFactory.php
+
+		-
+			message: '#^PHPDoc tag @extends has invalid type App\\Models\\EventType\.$#'
+			identifier: class.notFound
+			count: 1
+			path: database/factories/EventTypeFactory.php
+
+		-
+			message: '#^Type App\\Models\\EventType in generic type Illuminate\\Database\\Eloquent\\Factories\\Factory\<App\\Models\\EventType\> in PHPDoc tag @extends is not subtype of template type TModel of Illuminate\\Database\\Eloquent\\Model of class Illuminate\\Database\\Eloquent\\Factories\\Factory\.$#'
+			identifier: generics.notSubtype
+			count: 1
+			path: database/factories/EventTypeFactory.php
+
+		-
+			message: '#^Call to an undefined method Faker\\Generator\:\:secondaryAddress\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/factories/InstitutionFactory.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/factories/SpeakerFactory.php
+
+		-
+			message: '#^Call to an undefined method Faker\\Generator\:\:state\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/factories/StateFactory.php
+
+		-
+			message: '#^Call to an undefined method Faker\\Generator\:\:secondaryAddress\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/factories/VenueFactory.php
+
+		-
+			message: '#^Method Illuminate\\Database\\Migrations\\Migration@anonymous/database/migrations/2022_12_14_083707_create_settings_table\.php\:7\:\:up\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2022_12_14_083707_create_settings_table.php
+
+		-
+			message: '#^Method CreateActivityLogTable\:\:down\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_21_095013_create_activity_log_table.php
+
+		-
+			message: '#^Method CreateActivityLogTable\:\:up\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_21_095013_create_activity_log_table.php
+
+		-
+			message: '#^Method AddEventColumnToActivityLogTable\:\:down\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_21_095014_add_event_column_to_activity_log_table.php
+
+		-
+			message: '#^Method AddEventColumnToActivityLogTable\:\:up\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_21_095014_add_event_column_to_activity_log_table.php
+
+		-
+			message: '#^Method AddBatchUuidColumnToActivityLogTable\:\:down\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_21_095015_add_batch_uuid_column_to_activity_log_table.php
+
+		-
+			message: '#^Method AddBatchUuidColumnToActivityLogTable\:\:up\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_21_095015_add_batch_uuid_column_to_activity_log_table.php
+
+		-
+			message: '#^Method Illuminate\\Database\\Migrations\\Migration@anonymous/database/migrations/2026_01_23_074047_create_deleted_models_table\.php\:7\:\:up\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/migrations/2026_01_23_074047_create_deleted_models_table.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: database/seeders/DatabaseSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$country_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$district_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$line1\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$state_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Result of && is always true\.$#'
+			identifier: booleanAnd.alwaysTrue
+			count: 2
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''Dato Dr Ahmad Zaki''\|''Dato Dr Danial…''\|''Dato Dr Mohd Radzi''\|''Dato Dr Najmuddin''\|''Dato Prof Dr Basri…''\|''Dato Seri Zulkifli…''\|''Dr Adnin Ramly''\|''Dr Azman Shah Alias''\|''Dr Mizan Mohamed''\|''Imam Muda Hassan''\|''Mufti Wilayah…''\|''Puan Farhana Abdul…''\|''Ust Abdul Khair Zaki''\|''Ust Abu Hazim''\|''Ust Adi Hamman Mahwi''\|''Ust Adnin Ramly''\|''Ust Ahmad Anwar''\|''Ust Ahmad Fawwaz…''\|''Ust Ahmad Rosli''\|''Ust Ahmad Saffwan''\|''Ust Akid Shafie''\|''Ust Anas Mohd''\|''Ust Anuar Harun''\|''Ust Azhar Idrus''\|''Ust Dr Fathullah…''\|''Ust Dr Zulkifli…''\|''Ust Ebit Lew''\|''Ust Fahmi Ideris''\|''Ust Fawwaz Mohd Nur''\|''Ust Hj Zakaria…''\|''Ust Ibrahim Zamzibar''\|''Ust Izani Zulkifli''\|''Ust Jamil Hashim''\|''Ust Mohd Aris Johari''\|''Ust Mohd Faiz al…''\|''Ust Mohd Nazri…''\|''Ust Mohd Shah Rizal''\|''Ust Mohd Sufyan''\|''Ust Muhamad Azmi''\|''Ust Muhd Azmi''\|''Ust Muhd Izudin…''\|''Ust Muhd Zulkifli''\|''Ust Mukhlisur…''\|''Ust Radzi Shahari''\|''Ust Roslan Mohamed''\|''Ust Syed Mohd…'' and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''Dato Dr Ahmad Zaki''\|''Dato Dr Danial…''\|''Dato Dr Mohd Radzi''\|''Dato Dr Najmuddin''\|''Dato Prof Dr Basri…''\|''Dato Seri Zulkifli…''\|''Dr Adnin Ramly''\|''Dr Azman Shah Alias''\|''Dr Mizan Mohamed''\|''Imam Muda Hassan''\|''Mufti Wilayah…''\|''Puan Farhana Abdul…''\|''Ust Abdul Khair Zaki''\|''Ust Abu Hazim''\|''Ust Adi Hamman Mahwi''\|''Ust Adnin Ramly''\|''Ust Ahmad Anwar''\|''Ust Ahmad Fawwaz…''\|''Ust Ahmad Rosli''\|''Ust Ahmad Saffwan''\|''Ust Akid Shafie''\|''Ust Anas Mohd''\|''Ust Anuar Harun''\|''Ust Azhar Idrus''\|''Ust Dr Fathullah…''\|''Ust Dr Zulkifli…''\|''Ust Ebit Lew''\|''Ust Fahmi Ideris''\|''Ust Fawwaz Mohd Nur''\|''Ust Hj Zakaria…''\|''Ust Ibrahim Zamzibar''\|''Ust Izani Zulkifli''\|''Ust Jamil Hashim''\|''Ust Mohd Aris Johari''\|''Ust Mohd Faiz al…''\|''Ust Mohd Nazri…''\|''Ust Mohd Shah Rizal''\|''Ust Mohd Sufyan''\|''Ust Muhamad Azmi''\|''Ust Muhd Azmi''\|''Ust Muhd Izudin…''\|''Ust Muhd Zulkifli''\|''Ust Mukhlisur…''\|''Ust Radzi Shahari''\|''Ust Roslan Mohamed''\|''Ust Syed Mohd…'' and ''0'' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: database/seeders/EventSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: database/seeders/InstitutionSeeder.php
+
+		-
+			message: '#^Offset ''lat'' on array\{name\: ''Masjid Tuanku Mizan…'', type\: ''masjid'', line1\: ''Presint 3'', city\: ''Putrajaya'', state_name\: ''Putrajaya'', lat\: 2\.9221376, lng\: 101\.6841203\}\|array\{name\: ''Masjid Wilayah…'', type\: ''masjid'', line1\: ''Jalan Duta'', city\: ''Kuala Lumpur'', state_name\: ''Kuala Lumpur'', lat\: 3\.1614755, lng\: 101\.6701549\}\|array\{name\: ''Pusat Islam…'', type\: ''masjid'', line1\: ''Jalan Gasing'', city\: ''Petaling Jaya'', state_name\: ''Selangor'', lat\: 3\.1026, lng\: 101\.6521\}\|array\{name\: ''Surau Ar\-Raudhah'', type\: ''surau'', line1\: ''Seksyen 7'', city\: ''Shah Alam'', state_name\: ''Selangor'', lat\: 3\.0746, lng\: 101\.4883\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: database/seeders/InstitutionSeeder.php
+
+		-
+			message: '#^Offset ''lng'' on array\{name\: ''Masjid Tuanku Mizan…'', type\: ''masjid'', line1\: ''Presint 3'', city\: ''Putrajaya'', state_name\: ''Putrajaya'', lat\: 2\.9221376, lng\: 101\.6841203\}\|array\{name\: ''Masjid Wilayah…'', type\: ''masjid'', line1\: ''Jalan Duta'', city\: ''Kuala Lumpur'', state_name\: ''Kuala Lumpur'', lat\: 3\.1614755, lng\: 101\.6701549\}\|array\{name\: ''Pusat Islam…'', type\: ''masjid'', line1\: ''Jalan Gasing'', city\: ''Petaling Jaya'', state_name\: ''Selangor'', lat\: 3\.1026, lng\: 101\.6521\}\|array\{name\: ''Surau Ar\-Raudhah'', type\: ''surau'', line1\: ''Seksyen 7'', city\: ''Shah Alam'', state_name\: ''Selangor'', lat\: 3\.0746, lng\: 101\.4883\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: database/seeders/InstitutionSeeder.php
+
+		-
+			message: '#^Method Database\\Seeders\\MasjidSeeder\:\:findState\(\) has parameter \$states with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: database/seeders/MasjidSeeder.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: database/seeders/MasjidSeeder.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and ''0'' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: database/seeders/MasjidSeeder.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: database/seeders/MasjidSeeder.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: database/seeders/MasjidSeeder.php
+
+		-
+			message: '#^Call to an undefined method Faker\\Generator\:\:secondaryAddress\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/seeders/VenueSeeder.php
+
+		-
+			message: '#^Method Database\\Seeders\\WorldSeeder\:\:run\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: database/seeders/WorldSeeder.php
+
+		-
+			message: '#^Access to an undefined property Pest\\Mixins\\Expectation\<array\|null\>\:\:\$not\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/AdminEventsResourceTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/AdminEventsResourceTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 11
+			path: tests/Feature/AdminEventsResourceTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:getJson\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/Api/EventApiContractTest.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 4
+			path: tests/Feature/Api/EventApiContractTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 4
+			path: tests/Feature/Api/EventApiContractTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$event\.$#'
+			identifier: property.notFound
+			count: 17
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$user\.$#'
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseMissing\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:deleteJson\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:getJson\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:postJson\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/Api/EventSaveTest.php
+
+		-
+			message: '#^Access to an undefined property OwenIt\\Auditing\\Models\\Audit\:\:\$auditable_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Api/RegistrationExportTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Api/RegistrationExportTest.php
+
+		-
+			message: '#^Unable to resolve the template type TAndValue in call to method Pest\\Expectation\<mixed\>\:\:and\(\)$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/Api/RegistrationExportTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseCount\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Api/ReportApiModerationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Api/ReportApiModerationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:postJson\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Api/ReportApiModerationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:withServerVariables\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/Api/ReportApiModerationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:getJson\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Api/UserRegistrationsTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertAuthenticated\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Auth/AuthenticationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertGuest\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Auth/AuthenticationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/Auth/AuthenticationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:post\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/Auth/AuthenticationTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$calendarService\.$#'
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/CalendarServiceTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/DashboardPagesTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/DashboardPagesTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EditInstitutionSocialMediaTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventEngagementLivewireTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseMissing\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventEngagementLivewireTest.php
+
+		-
+			message: '#^Unable to resolve the template type TComponent in call to method Livewire\\LivewireManager\:\:test\(\)$#'
+			identifier: argument.templateType
+			count: 2
+			path: tests/Feature/EventEngagementLivewireTest.php
+
+		-
+			message: '#^Cannot call method diffInMinutes\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: tests/Feature/EventEscalationTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function expect$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/EventEscalationTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EventGoingTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function expect$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/EventGoingTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 13
+			path: tests/Feature/EventModerationActionsTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventModerationActionsTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EventOwnershipTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$event\.$#'
+			identifier: property.notFound
+			count: 29
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$user\.$#'
+			identifier: property.notFound
+			count: 15
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseMissing\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:deleteJson\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:getJson\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:postJson\(\)\.$#'
+			identifier: method.notFound
+			count: 11
+			path: tests/Feature/EventPledgeTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:post\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EventRegistrationSafetyTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$state\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Access to an undefined property Pest\\Mixins\\Expectation\<mixed\>\:\:\$not\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Pagination\\LengthAwarePaginator\:\:first\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Pagination\\LengthAwarePaginator\:\:pluck\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 23
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:post\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function expect$#'
+			identifier: argument.templateType
+			count: 3
+			path: tests/Feature/EventSearchTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EventShowPageTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/EventShowPageTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pivot\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EventUserTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/ExampleTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/HomePageTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:andReturnNull\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/InstitutionSeederTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:andReturnUsing\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/InstitutionSeederTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\LegacyMockInterface\:\:run\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/InstitutionSeederTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/ModerationQueueTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/ModerationQueueTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$service\.$#'
+			identifier: property.notFound
+			count: 16
+			path: tests/Feature/ModerationServiceTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/ModerationServiceTest.php
+
+		-
+			message: '#^Parameter \#1 \$searchService of method App\\Jobs\\SendSavedSearchDigest\:\:handle\(\) expects App\\Services\\EventSearchService, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 2
+			path: tests/Feature/NotificationPreferencesTest.php
+
+		-
+			message: '#^Unable to resolve the template type TComponent in call to method Livewire\\LivewireManager\:\:test\(\)$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/NotificationPreferencesTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 12
+			path: tests/Feature/PublicPagesTest.php
+
+		-
+			message: '#^Method Tests\\Feature\\RefactorTest\:\:test_event_card_image_url_uses_speaker_fallback\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Feature/RefactorTest.php
+
+		-
+			message: '#^Method Tests\\Feature\\RefactorTest\:\:test_relationships\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Feature/RefactorTest.php
+
+		-
+			message: '#^Method Tests\\Feature\\RefactorTest\:\:test_schema_changes\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Feature/RefactorTest.php
+
+		-
+			message: '#^Method Tests\\Feature\\RefactorTest\:\:test_speaker_avatar_url_behavior\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Feature/RefactorTest.php
+
+		-
+			message: '#^Method Tests\\Feature\\RefactorTest\:\:test_speaker_post_nominal_logic\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Feature/RefactorTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$user\.$#'
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseMissing\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:deleteJson\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:getJson\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:postJson\(\)\.$#'
+			identifier: method.notFound
+			count: 8
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:putJson\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SavedSearchApiTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:actingAs\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/SavedSearchPageTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/SavedSearchPageTest.php
+
+		-
+			message: '#^Unable to resolve the template type TComponent in call to method Livewire\\LivewireManager\:\:test\(\)$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/SavedSearchPageTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/SocialMediaTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$platform\.$#'
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/SocialMediaTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$username\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/SocialMediaTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function expect$#'
+			identifier: argument.templateType
+			count: 5
+			path: tests/Feature/SocialMediaTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/SocialiteAuthTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SocialiteAuthTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SpeakerSeederIdempotencyTest.php
+
+		-
+			message: '#^Function submitEventTimingFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventCustomTimeValidationTest.php
+
+		-
+			message: '#^Function submitEventEndTimeFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventEndTimeTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/SubmitEventLanguageTest.php
+
+		-
+			message: '#^Function submitEventLanguageFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventLanguageTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function expect$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/SubmitEventLanguageTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$disciplineTag\.$#'
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/SubmitEventLocationTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$domainTag\.$#'
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/SubmitEventLocationTest.php
+
+		-
+			message: '#^Access to an undefined property PHPUnit\\Framework\\TestCase\:\:\$user\.$#'
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/SubmitEventLocationTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:assertDatabaseHas\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/SubmitEventLocationTest.php
+
+		-
+			message: '#^Function submitEventLocationFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventLocationTest.php
+
+		-
+			message: '#^Unable to resolve the template type TComponent in call to method Livewire\\LivewireManager\:\:test\(\)$#'
+			identifier: argument.templateType
+			count: 5
+			path: tests/Feature/SubmitEventLocationTest.php
+
+		-
+			message: '#^Function submitEventMediaFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventMediaTest.php
+
+		-
+			message: '#^Unable to resolve the template type TComponent in call to method Livewire\\LivewireManager\:\:test\(\)$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/SubmitEventMediaTest.php
+
+		-
+			message: '#^Function submitEventNotesFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventNotesTest.php
+
+		-
+			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:seed\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/SubmitEventNotificationTest.php
+
+		-
+			message: '#^Function submitEventNotificationFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventNotificationTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/SubmitEventOrganizerAutoSelectTest.php
+
+		-
+			message: '#^Function submitEventOrganizerFormData\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Feature/SubmitEventOrganizerAutoSelectTest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function expect$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/SubmitEventOrganizerAutoSelectTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/TagTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/TagTest.php
+
+		-
+			message: '#^Unable to resolve the template type TAndValue in call to method Pest\\Expectation\<Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|null\>\:\:and\(\)$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/TagTest.php
+
+		-
+			message: '#^Unable to resolve the template type TAndValue in call to method Pest\\Expectation\<Illuminate\\Database\\Eloquent\\Collection\|null\>\:\:and\(\)$#'
+			identifier: argument.templateType
+			count: 1
+			path: tests/Feature/TagTest.php
+
+		-
+			message: '#^Parameter \#1 \$input of method App\\Actions\\Fortify\\CreateNewUser\:\:create\(\) expects array\<string, string\>, array\<string, string\|null\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Feature/UserRegistrationTest.php
+
+		-
+			message: '#^Function something\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Pest.php
+
+		-
+			message: '#^Property Tests\\TestCase\:\:\$service has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: tests/TestCase.php
+
+		-
+			message: '#^Property Tests\\TestCase\:\:\$user has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: tests/TestCase.php

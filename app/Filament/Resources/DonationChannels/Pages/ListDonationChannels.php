@@ -10,6 +10,7 @@ class ListDonationChannels extends ListRecords
 {
     protected static string $resource = DonationChannelResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

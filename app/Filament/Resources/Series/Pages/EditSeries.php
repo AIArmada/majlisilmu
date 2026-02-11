@@ -10,6 +10,7 @@ class EditSeries extends EditRecord
 {
     protected static string $resource = SeriesResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

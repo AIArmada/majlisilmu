@@ -156,6 +156,7 @@ class EventFactory extends Factory
     /**
      * Configure the model factory.
      */
+    #[\Override]
     public function configure(): static
     {
         return $this->afterCreating(function (\App\Models\Event $event) {

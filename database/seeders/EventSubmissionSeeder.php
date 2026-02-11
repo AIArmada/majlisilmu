@@ -20,60 +20,62 @@ class EventSubmissionSeeder extends Seeder
 
         EventSubmission::unsetEventDispatcher();
 
-        \Illuminate\Support\Facades\DB::transaction(function (): void {
-            $eventIds = Event::query()->pluck('id')->toArray();
-            $userIds = User::query()->pluck('id')->toArray();
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function (): void {
+                $eventIds = Event::query()->pluck('id')->toArray();
+                $userIds = User::query()->pluck('id')->toArray();
 
-            $submissionsToInsert = [];
-            $contactsToInsert = [];
+                $submissionsToInsert = [];
+                $contactsToInsert = [];
 
-            foreach ($eventIds as $eventId) {
-                $isPublic = random_int(0, 4) === 0;
-                $submitterId = (!$isPublic && !empty($userIds)) ? $userIds[array_rand($userIds)] : null;
+                foreach ($eventIds as $eventId) {
+                    $isPublic = random_int(0, 4) === 0;
+                    $submitterId = (! $isPublic && ! empty($userIds)) ? $userIds[array_rand($userIds)] : null;
 
-                $submissionId = (string) \Illuminate\Support\Str::uuid();
+                    $submissionId = (string) \Illuminate\Support\Str::uuid();
 
-                $submissionsToInsert[] = array_merge(
-                    EventSubmission::factory()->make([
-                        'event_id' => $eventId,
-                        'submitted_by' => $submitterId,
-                        'submitter_name' => $submitterId ? null : fake()->name(),
-                    ])->toArray(),
-                    [
-                        'id' => $submissionId,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                );
+                    $submissionsToInsert[] = array_merge(
+                        EventSubmission::factory()->make([
+                            'event_id' => $eventId,
+                            'submitted_by' => $submitterId,
+                            'submitter_name' => $submitterId ? null : fake()->name(),
+                        ])->toArray(),
+                        [
+                            'id' => $submissionId,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
 
-                // Add contact for public submissions (no user)
-                if (!$submitterId) {
-                    $contactsToInsert[] = [
-                        'id' => (string) \Illuminate\Support\Str::uuid(),
-                        'contactable_type' => 'event_submission',
-                        'contactable_id' => $submissionId,
-                        'type' => 'main',
-                        'category' => 'email',
-                        'value' => fake()->safeEmail(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
+                    // Add contact for public submissions (no user)
+                    if (! $submitterId) {
+                        $contactsToInsert[] = [
+                            'id' => (string) \Illuminate\Support\Str::uuid(),
+                            'contactable_type' => 'event_submission',
+                            'contactable_id' => $submissionId,
+                            'type' => 'main',
+                            'category' => 'email',
+                            'value' => fake()->safeEmail(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
                 }
-            }
 
-            // Bulk insert submissions
-            foreach (array_chunk($submissionsToInsert, 200) as $chunk) {
-                EventSubmission::insert($chunk);
-            }
-
-            // Bulk insert contacts
-            if (!empty($contactsToInsert)) {
-                foreach (array_chunk($contactsToInsert, 200) as $chunk) {
-                    \Illuminate\Support\Facades\DB::table('contacts')->insert($chunk);
+                // Bulk insert submissions
+                foreach (array_chunk($submissionsToInsert, 200) as $chunk) {
+                    EventSubmission::insert($chunk);
                 }
-            }
-        });
 
-        EventSubmission::setEventDispatcher(app('events'));
+                // Bulk insert contacts
+                if ($contactsToInsert !== []) {
+                    foreach (array_chunk($contactsToInsert, 200) as $chunk) {
+                        \Illuminate\Support\Facades\DB::table('contacts')->insert($chunk);
+                    }
+                }
+            });
+        } finally {
+            EventSubmission::setEventDispatcher(app('events'));
+        }
     }
 }

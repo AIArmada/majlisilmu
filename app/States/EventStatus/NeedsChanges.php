@@ -17,7 +17,7 @@ final class NeedsChanges extends EventStatus implements HasColor, HasDescription
         return __('Needs Changes');
     }
 
-    public function getColor(): string|array
+    public function getColor(): array
     {
         return Color::Orange;
     }

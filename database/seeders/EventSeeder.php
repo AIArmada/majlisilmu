@@ -20,16 +20,18 @@ class EventSeeder extends Seeder
         // Temporarily disable the EventObserver to speed up seeding
         Event::unsetEventDispatcher();
 
-        $hadEvents = Event::query()->exists();
+        try {
+            $hadEvents = Event::query()->exists();
 
-        $this->seedMajlisIlmuSchedule();
+            $this->seedMajlisIlmuSchedule();
 
-        if (! $hadEvents) {
-            $this->seedBulkEvents();
+            if (! $hadEvents) {
+                $this->seedBulkEvents();
+            }
+        } finally {
+            // Re-enable event dispatcher after seeding
+            Event::setEventDispatcher(app('events'));
         }
-
-        // Re-enable event dispatcher after seeding
-        Event::setEventDispatcher(app('events'));
     }
 
     private function seedBulkEvents(): void
@@ -37,9 +39,9 @@ class EventSeeder extends Seeder
 
         \Illuminate\Support\Facades\DB::transaction(function (): void {
             $institutions = Institution::query()
-                ->with(['series'])
                 ->limit(90)
                 ->get();
+            $seriesIds = \App\Models\Series::query()->pluck('id')->toArray();
             $speakerIds = Speaker::query()->pluck('id')->toArray();
             $venueIds = \App\Models\Venue::query()->pluck('id')->toArray();
 
@@ -55,8 +57,8 @@ class EventSeeder extends Seeder
                     break;
                 }
 
-                $series = $institution->series->isNotEmpty() ? $institution->series->random() : null;
-                $randomVenueId = ! empty($venueIds) ? $venueIds[array_rand($venueIds)] : null;
+                $randomSeriesId = empty($seriesIds) ? null : $seriesIds[array_rand($seriesIds)];
+                $randomVenueId = empty($venueIds) ? null : $venueIds[array_rand($venueIds)];
 
                 $baseAttributes = [
                     'institution_id' => $institution->id,
@@ -73,14 +75,14 @@ class EventSeeder extends Seeder
                     }
                 }
 
-                // If there's a series, attach events to it via pivot table
-                if ($series) {
+                // If a series exists in the system, attach events via pivot table.
+                if ($randomSeriesId) {
                     $order = 1;
                     foreach ($events as $event) {
                         \Illuminate\Support\Facades\DB::table('event_series')->insert([
                             'id' => (string) \Illuminate\Support\Str::uuid(),
                             'event_id' => $event->id,
-                            'series_id' => $series->id,
+                            'series_id' => $randomSeriesId,
                             'order_column' => $order++,
                             'created_at' => now(),
                             'updated_at' => now(),
@@ -106,7 +108,7 @@ class EventSeeder extends Seeder
                 }
 
                 // Bulk insert relationships
-                if (! empty($speakerAttachments)) {
+                if ($speakerAttachments !== []) {
                     \Illuminate\Support\Facades\DB::table('event_speaker')->insert($speakerAttachments);
                 }
 
@@ -118,6 +120,7 @@ class EventSeeder extends Seeder
     private function seedMajlisIlmuSchedule(): void
     {
         $malaysia = \App\Models\Country::where('iso2', 'MY')->first();
+        $likeOperator = $this->databaseLikeOperator();
 
         $institution = Institution::query()->firstOrCreate([
             'slug' => 'masjid-tengku-ampuan-jemaah-bukit-jelutong',
@@ -147,15 +150,15 @@ class EventSeeder extends Seeder
             ]);
 
             $state = \App\Models\State::query()
-                ->where('name', 'ILIKE', '%selangor%')
+                ->where('name', $likeOperator, '%selangor%')
                 ->first();
 
             $district = $state?->districts()
-                ->where('name', 'ILIKE', '%petaling%')
+                ->where('name', $likeOperator, '%petaling%')
                 ->first();
 
             $city = $state?->cities()
-                ->where('name', 'ILIKE', '%shah alam%')
+                ->where('name', $likeOperator, '%shah alam%')
                 ->first();
 
             $institution->address()->update([
@@ -268,7 +271,7 @@ class EventSeeder extends Seeder
             if ($topic) {
                 $descriptionParts[] = $topic;
             }
-            if (! empty($entry['speaker'])) {
+            if (isset($entry['speaker']) && ($entry['speaker'] !== '' && $entry['speaker'] !== '0')) {
                 $descriptionParts[] = 'Bersama '.$entry['speaker'];
             }
             if ($note) {
@@ -312,7 +315,7 @@ class EventSeeder extends Seeder
                 'institution_id' => $institution->id,
                 'venue_id' => $venue->id,
                 'title' => $title,
-                'description' => $descriptionParts ? implode(' | ', $descriptionParts) : null,
+                'description' => $descriptionParts !== [] ? implode(' | ', $descriptionParts) : null,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'timezone' => 'Asia/Kuala_Lumpur',
@@ -335,7 +338,7 @@ class EventSeeder extends Seeder
                 }
             }
 
-            if (! empty($entry['speaker'])) {
+            if (isset($entry['speaker']) && ($entry['speaker'] !== '' && $entry['speaker'] !== '0')) {
                 $speakerName = $entry['speaker'];
                 $speaker = \App\Models\Speaker::query()->firstOrCreate([
                     'slug' => \Illuminate\Support\Str::slug($speakerName),
@@ -350,5 +353,10 @@ class EventSeeder extends Seeder
             }
 
         }
+    }
+
+    private function databaseLikeOperator(): string
+    {
+        return \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
     }
 }

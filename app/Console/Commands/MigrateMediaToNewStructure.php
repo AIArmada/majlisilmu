@@ -84,7 +84,7 @@ class MigrateMediaToNewStructure extends Command
             $rows
         );
 
-        if ($dryRun || empty($migrationPlan)) {
+        if ($dryRun || $migrationPlan === []) {
             return self::SUCCESS;
         }
 

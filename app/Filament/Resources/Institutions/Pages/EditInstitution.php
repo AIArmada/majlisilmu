@@ -10,6 +10,7 @@ class EditInstitution extends EditRecord
 {
     protected static string $resource = InstitutionResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

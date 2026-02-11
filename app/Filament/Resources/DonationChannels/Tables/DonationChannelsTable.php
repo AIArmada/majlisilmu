@@ -32,7 +32,7 @@ class DonationChannelsTable
                             return null;
                         }
 
-                        return match (get_class($record->donatable)) {
+                        return match ($record->donatable::class) {
                             \App\Models\Institution::class => \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->donatable->id]),
                             \App\Models\Speaker::class => \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->donatable->id]),
                             default => null,

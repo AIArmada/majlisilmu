@@ -19,6 +19,7 @@ class EventUser extends Pivot
         'joined_at',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

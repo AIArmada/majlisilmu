@@ -4,8 +4,13 @@ namespace App\Forms;
 
 use App\Enums\SocialMediaPlatform;
 use App\Models\District;
+use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Models\Venue;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -128,10 +133,9 @@ class SharedFormSchema
     /**
      * Create address record for a model that has an address() relationship.
      *
-     * @param  \Illuminate\Database\Eloquent\Model  $model
      * @param  array<string, mixed>  $data
      */
-    public static function createAddressFromData($model, array $data, string $type = 'main'): void
+    public static function createAddressFromData(Event|Institution|Speaker|Venue $model, array $data, string $type = 'main'): void
     {
         if (! empty($data['line1']) || ! empty($data['state_id'])) {
             $model->address()->create([
@@ -152,10 +156,9 @@ class SharedFormSchema
     /**
      * Create social media entries for a model.
      *
-     * @param  \Illuminate\Database\Eloquent\Model  $model
      * @param  array<string, mixed>  $data
      */
-    public static function createSocialMediaFromData($model, array $data): void
+    public static function createSocialMediaFromData(Institution|Speaker|Venue|Reference $model, array $data): void
     {
         if (! empty($data['social_media'])) {
             foreach ($data['social_media'] as $social) {

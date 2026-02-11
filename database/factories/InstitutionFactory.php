@@ -110,6 +110,7 @@ class InstitutionFactory extends Factory
         ];
     }
 
+    #[\Override]
     public function configure(): static
     {
         return $this->afterCreating(function (\App\Models\Institution $institution) {

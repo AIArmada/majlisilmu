@@ -55,6 +55,7 @@ class VenueFactory extends Factory
         ];
     }
 
+    #[\Override]
     public function configure(): static
     {
         return $this->afterCreating(function (\App\Models\Venue $venue) {

@@ -45,10 +45,19 @@ class EventInterestController extends Controller
             'event_id' => ['required', 'uuid', 'exists:events,id'],
         ]);
 
-        $event = Event::find($validated['event_id']);
+        $event = Event::query()->find($validated['event_id']);
+
+        if (! $event) {
+            return response()->json([
+                'error' => [
+                    'code' => 'not_found',
+                    'message' => 'Event not found.',
+                ],
+            ], 404);
+        }
 
         // Only allow interest for public, approved events
-        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== \App\Enums\EventVisibility::Public) {
+        if ((string) $event->status !== 'approved' || $event->visibility !== \App\Enums\EventVisibility::Public) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',
@@ -67,13 +76,42 @@ class EventInterestController extends Controller
             ], 403);
         }
 
-        // Check if already interested
-        $exists = DB::table('event_interests')
-            ->where('user_id', $request->user()->id)
-            ->where('event_id', $validated['event_id'])
-            ->exists();
+        $interestState = DB::transaction(function () use ($event, $request): string {
+            $lockedEvent = Event::query()
+                ->whereKey($event->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($exists) {
+            if (! $lockedEvent) {
+                return 'not_found';
+            }
+
+            $inserted = DB::table('event_interests')->insertOrIgnore([
+                'user_id' => $request->user()->id,
+                'event_id' => $lockedEvent->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($inserted === 0) {
+                return 'conflict';
+            }
+
+            $this->syncInterestsCount($lockedEvent->id);
+
+            return 'created';
+        }, 3);
+
+        if ($interestState === 'not_found') {
+            return response()->json([
+                'error' => [
+                    'code' => 'not_found',
+                    'message' => 'Event not found.',
+                ],
+            ], 404);
+        }
+
+        if ($interestState === 'conflict') {
             return response()->json([
                 'error' => [
                     'code' => 'conflict',
@@ -82,20 +120,10 @@ class EventInterestController extends Controller
             ], 409);
         }
 
-        DB::table('event_interests')->insert([
-            'user_id' => $request->user()->id,
-            'event_id' => $validated['event_id'],
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Increment interests_count on event
-        $event->increment('interests_count');
-
         return response()->json([
             'data' => [
                 'message' => 'Interest recorded successfully.',
-                'interests_count' => $event->fresh()->interests_count,
+                'interests_count' => (int) (Event::query()->find($event->id)?->interests_count ?? 0),
             ],
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
@@ -108,12 +136,31 @@ class EventInterestController extends Controller
      */
     public function destroy(Request $request, string $eventId): JsonResponse
     {
-        $deleted = DB::table('event_interests')
-            ->where('user_id', $request->user()->id)
-            ->where('event_id', $eventId)
-            ->delete();
+        $interestsCount = DB::transaction(function () use ($eventId, $request): ?int {
+            $event = Event::query()
+                ->whereKey($eventId)
+                ->lockForUpdate()
+                ->first();
 
-        if (! $deleted) {
+            $deletedRows = DB::table('event_interests')
+                ->where('user_id', $request->user()->id)
+                ->where('event_id', $eventId)
+                ->delete();
+
+            if ($deletedRows === 0) {
+                return null;
+            }
+
+            if ($event) {
+                $this->syncInterestsCount($eventId);
+            }
+
+            return (int) DB::table('event_interests')
+                ->where('event_id', $eventId)
+                ->count();
+        }, 3);
+
+        if ($interestsCount === null) {
             return response()->json([
                 'error' => [
                     'code' => 'not_found',
@@ -122,15 +169,10 @@ class EventInterestController extends Controller
             ], 404);
         }
 
-        // Decrement interests_count on event
-        Event::where('id', $eventId)->decrement('interests_count');
-
-        $event = Event::find($eventId);
-
         return response()->json([
             'data' => [
                 'message' => 'Interest removed successfully.',
-                'interests_count' => $event ? $event->interests_count : 0,
+                'interests_count' => $interestsCount,
             ],
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
@@ -159,5 +201,16 @@ class EventInterestController extends Controller
                 'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
             ],
         ]);
+    }
+
+    private function syncInterestsCount(string $eventId): void
+    {
+        $interestsCount = DB::table('event_interests')
+            ->where('event_id', $eventId)
+            ->count();
+
+        Event::query()
+            ->whereKey($eventId)
+            ->update(['interests_count' => $interestsCount]);
     }
 }

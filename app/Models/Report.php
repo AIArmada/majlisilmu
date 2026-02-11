@@ -25,6 +25,7 @@ class Report extends Model implements HasMedia
      */
     protected $fillable = [
         'reporter_id',
+        'reporter_fingerprint',
         'handled_by',
         'entity_type',
         'entity_id',

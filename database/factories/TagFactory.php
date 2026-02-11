@@ -21,7 +21,7 @@ class TagFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->words(rand(1, 3), true);
+        $name = fake()->unique()->words(random_int(1, 3), true);
 
         return [
             'name' => ['en' => ucwords($name), 'ms' => ucwords($name)],

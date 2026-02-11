@@ -11,6 +11,7 @@ class CreateEvent extends CreateRecord
 {
     protected static string $resource = EventResource::class;
 
+    #[\Override]
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         unset(

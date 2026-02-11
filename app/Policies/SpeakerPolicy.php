@@ -26,7 +26,7 @@ class SpeakerPolicy
             return true;
         }
 
-        if (! $user) {
+        if (! $user instanceof \App\Models\User) {
             return false;
         }
 

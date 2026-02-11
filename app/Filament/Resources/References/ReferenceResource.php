@@ -25,16 +25,19 @@ class ReferenceResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return ReferenceForm::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return ReferencesTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -42,6 +45,7 @@ class ReferenceResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Event;
 use App\Models\Report;
+use App\Services\ModerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        private readonly ModerationService $moderationService
+    ) {}
+
     /**
      * Store a newly created report.
      * Per documentation B5b - POST /reports
      */
     public function store(Request $request): JsonResponse
     {
+        $reporterFingerprint = $this->resolveReporterFingerprint($request);
+
         $validated = $request->validate([
             'entity_type' => ['required', Rule::in(['event', 'institution', 'speaker', 'donation_channel'])],
             'entity_id' => ['required', 'uuid'],
@@ -49,13 +56,7 @@ class ReportController extends Controller
         $existingReport = Report::query()
             ->where('entity_type', $validated['entity_type'])
             ->where('entity_id', $validated['entity_id'])
-            ->where(function ($query) use ($request) {
-                if ($request->user()) {
-                    $query->where('reporter_id', $request->user()->id);
-                } else {
-                    $query->whereNull('reporter_id');
-                }
-            })
+            ->where('reporter_fingerprint', $reporterFingerprint)
             ->where('created_at', '>=', now()->subDay())
             ->exists();
 
@@ -74,6 +75,7 @@ class ReportController extends Controller
             'category' => $validated['category'],
             'description' => $validated['description'] ?? null,
             'reporter_id' => $request->user()?->id,
+            'reporter_fingerprint' => $reporterFingerprint,
             'status' => 'open',
         ]);
 
@@ -101,13 +103,17 @@ class ReportController extends Controller
      */
     private function handleHighRiskReport(Report $report): void
     {
-        if ($report->entity_type === 'event') {
-            DB::table('events')
-                ->where('id', $report->entity_id)
-                ->update(['status' => 'pending']);
+        if ($report->entity_type !== 'event') {
+            return;
         }
 
-        // TODO: Notify moderators and super admin
+        $event = Event::query()->find($report->entity_id);
+
+        if (! $event) {
+            return;
+        }
+
+        $this->queueEventForModeration($event, 'High-risk report: '.$report->category);
     }
 
     /**
@@ -119,14 +125,21 @@ class ReportController extends Controller
             ->where('entity_type', $entityType)
             ->where('entity_id', $entityId)
             ->where('created_at', '>=', now()->subDay())
-            ->distinct('reporter_id')
-            ->count();
+            ->whereNotNull('reporter_fingerprint')
+            ->distinct()
+            ->count('reporter_fingerprint');
 
-        if ($recentReportCount >= 2 && $entityType === 'event') {
-            DB::table('events')
-                ->where('id', $entityId)
-                ->update(['status' => 'pending']);
+        if ($recentReportCount < 2 || $entityType !== 'event') {
+            return;
         }
+
+        $event = Event::query()->find($entityId);
+
+        if (! $event) {
+            return;
+        }
+
+        $this->queueEventForModeration($event, 'Escalated due to multiple reports within 24 hours.');
     }
 
     /**
@@ -140,5 +153,28 @@ class ReportController extends Controller
             'speaker' => \App\Models\Speaker::class,
             'donation_channel' => \App\Models\DonationChannel::class,
         };
+    }
+
+    private function queueEventForModeration(Event $event, string $note): void
+    {
+        if ((string) $event->status !== 'approved') {
+            return;
+        }
+
+        $this->moderationService->remoderate($event, null, $note);
+    }
+
+    private function resolveReporterFingerprint(Request $request): string
+    {
+        $userId = $request->user()?->id;
+
+        if (is_string($userId) && $userId !== '') {
+            return 'user:'.$userId;
+        }
+
+        $ipAddress = (string) ($request->ip() ?? 'unknown-ip');
+        $userAgent = trim((string) ($request->userAgent() ?? 'unknown-agent'));
+
+        return 'guest:'.hash('sha256', "{$ipAddress}|{$userAgent}");
     }
 }

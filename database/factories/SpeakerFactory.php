@@ -227,6 +227,7 @@ class SpeakerFactory extends Factory
         ];
     }
 
+    #[\Override]
     public function configure(): static
     {
         return $this->afterCreating(function (\App\Models\Speaker $speaker) {
@@ -253,13 +254,13 @@ class SpeakerFactory extends Factory
 
             // Attach Languages
             if (class_exists(\Nnjeim\World\Models\Language::class)) {
-                $languages = \Nnjeim\World\Models\Language::inRandomOrder()->limit(rand(1, 3))->pluck('id');
+                $languages = \Nnjeim\World\Models\Language::inRandomOrder()->limit(random_int(1, 3))->pluck('id');
                 $speaker->languages()->attach($languages);
             }
 
             // Attach Institutions
             if (! $speaker->is_freelance) {
-                $institutions = \App\Models\Institution::inRandomOrder()->limit(rand(1, 2))->get();
+                $institutions = \App\Models\Institution::inRandomOrder()->limit(random_int(1, 2))->get();
                 foreach ($institutions as $institution) {
                     $speaker->institutions()->attach($institution->id, [
                         'position' => fake()->randomElement(['Imam', 'Lecturer', 'Guest Speaker', 'Advisor']),

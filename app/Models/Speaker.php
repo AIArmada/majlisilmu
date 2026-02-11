@@ -42,6 +42,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         'is_active',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -54,6 +55,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         ];
     }
 
+    #[\Override]
     protected static function booted(): void
     {
         static::saving(function (Speaker $speaker) {
@@ -79,7 +81,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
                     // De-duplicate
                     $parts = array_unique($parts);
 
-                    if (! empty($parts)) {
+                    if ($parts !== []) {
                         $speaker->post_nominal = array_values($parts);
                     }
                 }
@@ -115,7 +117,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         $preNominalLabels = null;
 
         // Convert honorific enum values to labels
-        if (is_array($this->honorific) && ! empty($this->honorific)) {
+        if (is_array($this->honorific) && $this->honorific !== []) {
             $honorificLabels = collect($this->honorific)
                 ->map(fn ($value) => \App\Enums\Honorific::tryFrom($value)?->getLabel())
                 ->filter()
@@ -123,7 +125,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         }
 
         // Convert pre_nominal enum values to labels
-        if (is_array($this->pre_nominal) && ! empty($this->pre_nominal)) {
+        if (is_array($this->pre_nominal) && $this->pre_nominal !== []) {
             $preNominalLabels = collect($this->pre_nominal)
                 ->map(fn ($value) => \App\Enums\PreNominal::tryFrom($value)?->getLabel())
                 ->filter()
@@ -134,11 +136,11 @@ class Speaker extends Model implements AuditableContract, HasMedia
             $honorificLabels,
             $preNominalLabels,
             $this->name,
-        ], fn ($value) => filled($value));
+        ], filled(...));
 
         $formatted = trim(implode(' ', $parts));
 
-        if (is_array($this->post_nominal) && ! empty($this->post_nominal)) {
+        if (is_array($this->post_nominal) && $this->post_nominal !== []) {
             $postNominalStr = implode(', ', $this->post_nominal);
             $formatted = trim($formatted.', '.$postNominalStr);
         } elseif (filled($this->post_nominal)) {
@@ -237,7 +239,8 @@ class Speaker extends Model implements AuditableContract, HasMedia
     /**
      * Scope a query to only include active speakers.
      */
-    public function scopeActive($query)
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active($query)
     {
         return $query->where('is_active', true);
     }

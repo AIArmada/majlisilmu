@@ -32,11 +32,9 @@ class EventUsersRelationManager extends RelationManager
                 TextColumn::make('roles')
                     ->label('Roles')
                     ->getStateUsing(function (User $record): string {
-                        $event = $this->getOwnerRecord();
+                        $event = $this->getEventOwner();
 
-                        return Authz::withScope($event, function () use ($record): string {
-                            return $record->getRoleNames()->implode(', ');
-                        }, $record) ?: '—';
+                        return Authz::withScope($event, fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
                     }),
                 TextColumn::make('pivot.joined_at')
                     ->label('Joined')
@@ -50,7 +48,7 @@ class EventUsersRelationManager extends RelationManager
                         Forms\Components\Select::make('user_id')
                             ->label('User')
                             ->options(function () {
-                                $existingMemberIds = $this->getOwnerRecord()->members()->pluck('users.id')->toArray();
+                                $existingMemberIds = $this->getEventOwner()->members()->pluck('users.id')->toArray();
 
                                 return User::query()
                                     ->whereNotIn('id', $existingMemberIds)
@@ -67,7 +65,7 @@ class EventUsersRelationManager extends RelationManager
                             ->required(),
                     ])
                     ->action(function (array $data): void {
-                        $event = $this->getOwnerRecord();
+                        $event = $this->getEventOwner();
                         $user = User::findOrFail($data['user_id']);
 
                         $event->members()->syncWithoutDetaching([$user->id => [
@@ -93,7 +91,7 @@ class EventUsersRelationManager extends RelationManager
                         ]);
                     })
                     ->action(function (array $data, User $record): void {
-                        $event = $this->getOwnerRecord();
+                        $event = $this->getEventOwner();
 
                         $this->syncMemberRoles($event, $record, $data['role_ids'] ?? []);
                     }),
@@ -103,7 +101,7 @@ class EventUsersRelationManager extends RelationManager
                     ->color('danger')
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $event = $this->getOwnerRecord();
+                        $event = $this->getEventOwner();
 
                         $event->members()->detach($record->id);
                         $this->syncMemberRoles($event, $record, []);
@@ -116,16 +114,14 @@ class EventUsersRelationManager extends RelationManager
      */
     protected function getScopedRoleOptions(): array
     {
-        $event = $this->getOwnerRecord();
+        $event = $this->getEventOwner();
         $teamsKey = app(PermissionRegistrar::class)->teamsKey;
 
-        return Authz::withScope($event, function () use ($teamsKey): array {
-            return Role::query()
-                ->where($teamsKey, getPermissionsTeamId())
-                ->orderBy('name')
-                ->pluck('name', 'id')
-                ->all();
-        });
+        return Authz::withScope($event, fn (): array => Role::query()
+            ->where($teamsKey, getPermissionsTeamId())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all());
     }
 
     /**
@@ -133,11 +129,9 @@ class EventUsersRelationManager extends RelationManager
      */
     protected function getMemberRoleIds(User $user): array
     {
-        $event = $this->getOwnerRecord();
+        $event = $this->getEventOwner();
 
-        return Authz::withScope($event, function () use ($user): array {
-            return $user->roles()->pluck('id')->all();
-        }, $user);
+        return Authz::withScope($event, fn (): array => $user->roles()->pluck('id')->all(), $user);
     }
 
     /**
@@ -148,5 +142,13 @@ class EventUsersRelationManager extends RelationManager
         Authz::withScope($event, function () use ($user, $roleIds): void {
             $user->syncRoles($roleIds);
         }, $user);
+    }
+
+    private function getEventOwner(): Event
+    {
+        /** @var Event $event */
+        $event = $this->getOwnerRecord();
+
+        return $event;
     }
 }

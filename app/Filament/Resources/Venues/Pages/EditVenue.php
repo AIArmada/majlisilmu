@@ -10,6 +10,7 @@ class EditVenue extends EditRecord
 {
     protected static string $resource = VenueResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

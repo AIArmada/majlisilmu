@@ -345,6 +345,7 @@ class ModerationQueue extends Page implements HasTable
         return 'pending';
     }
 
+    #[\Override]
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['super_admin', 'moderator']) ?? false;

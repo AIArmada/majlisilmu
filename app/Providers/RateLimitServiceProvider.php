@@ -12,6 +12,7 @@ class RateLimitServiceProvider extends ServiceProvider
     /**
      * Register services.
      */
+    #[\Override]
     public function register(): void
     {
         //
@@ -24,34 +25,22 @@ class RateLimitServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Default API rate limit: 60 per minute
-        RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-        });
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
 
         // Public search: 30 per minute per IP
-        RateLimiter::for('search', function (Request $request) {
-            return Limit::perMinute(30)->by($request->ip());
-        });
+        RateLimiter::for('search', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
 
         // Event submission: 5 per hour per IP (anti-spam)
-        RateLimiter::for('event-submission', function (Request $request) {
-            return Limit::perHour(5)->by($request->ip());
-        });
+        RateLimiter::for('event-submission', fn (Request $request) => Limit::perHour(5)->by($request->ip()));
 
         // Registration: 10 per hour per IP
-        RateLimiter::for('registration', function (Request $request) {
-            return Limit::perHour(10)->by($request->ip());
-        });
+        RateLimiter::for('registration', fn (Request $request) => Limit::perHour(10)->by($request->ip()));
 
         // Report submission: 3 per hour per user/IP
-        RateLimiter::for('reports', function (Request $request) {
-            return Limit::perHour(3)->by($request->user()?->id ?: $request->ip());
-        });
+        RateLimiter::for('reports', fn (Request $request) => Limit::perHour(3)->by($request->user()?->id ?: $request->ip()));
 
         // Saved searches: 20 per minute
-        RateLimiter::for('saved-searches', function (Request $request) {
-            return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
-        });
+        RateLimiter::for('saved-searches', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()));
 
         // Admin/Moderation: Higher limits for moderators
         RateLimiter::for('moderation', function (Request $request) {

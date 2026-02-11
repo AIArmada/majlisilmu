@@ -180,5 +180,5 @@ it('shows date-only start time for prayer-relative events in the admin view', fu
 
     expect(collect($possibleAbsoluteDateTimes)
         ->filter()
-        ->contains(fn (string $value): bool => str_contains($absoluteResponseContent, $value)))->toBeTrue();
+        ->contains(fn (string $value): bool => str_contains((string) $absoluteResponseContent, $value)))->toBeTrue();
 });

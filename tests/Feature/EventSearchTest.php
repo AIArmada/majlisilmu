@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
@@ -88,6 +90,179 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('English Event')
             ->assertDontSee('Malay Event');
+    });
+
+    it('filters events by district', function () {
+        $state = State::where('country_code', 'MY')->first();
+
+        if (! $state) {
+            $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+                'iso2' => 'MY',
+                'name' => 'Malaysia',
+                'status' => 1,
+                'phone_code' => '60',
+                'iso3' => 'MYS',
+                'region' => 'Asia',
+                'subregion' => 'South-Eastern Asia',
+            ]);
+
+            $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+                'country_id' => $countryId,
+                'name' => 'Selangor',
+                'country_code' => 'MY',
+            ]);
+
+            $state = State::query()->findOrFail($stateId);
+        }
+
+        $districtA = District::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'country_code' => 'MY',
+            'name' => 'District A '.uniqid(),
+        ]);
+
+        $districtB = District::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'country_code' => 'MY',
+            'name' => 'District B '.uniqid(),
+        ]);
+
+        $subdistrictA = Subdistrict::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'district_id' => $districtA->id,
+            'country_code' => 'MY',
+            'name' => 'Subdistrict A '.uniqid(),
+        ]);
+
+        $subdistrictB = Subdistrict::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'district_id' => $districtB->id,
+            'country_code' => 'MY',
+            'name' => 'Subdistrict B '.uniqid(),
+        ]);
+
+        $venueA = Venue::factory()->create();
+        $venueA->address()->update([
+            'state_id' => $state->id,
+            'district_id' => $districtA->id,
+            'subdistrict_id' => $subdistrictA->id,
+        ]);
+
+        $venueB = Venue::factory()->create();
+        $venueB->address()->update([
+            'state_id' => $state->id,
+            'district_id' => $districtB->id,
+            'subdistrict_id' => $subdistrictB->id,
+        ]);
+
+        Event::factory()->for($venueA)->create([
+            'title' => 'District Filter Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->for($venueB)->create([
+            'title' => 'District Filter Non Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?district_id='.$districtA->id);
+
+        $response->assertOk()
+            ->assertSee('District Filter Match')
+            ->assertDontSee('District Filter Non Match');
+    });
+
+    it('filters events by subdistrict', function () {
+        $state = State::where('country_code', 'MY')->first();
+
+        if (! $state) {
+            $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+                'iso2' => 'MY',
+                'name' => 'Malaysia',
+                'status' => 1,
+                'phone_code' => '60',
+                'iso3' => 'MYS',
+                'region' => 'Asia',
+                'subregion' => 'South-Eastern Asia',
+            ]);
+
+            $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+                'country_id' => $countryId,
+                'name' => 'Selangor',
+                'country_code' => 'MY',
+            ]);
+
+            $state = State::query()->findOrFail($stateId);
+        }
+
+        $district = District::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'country_code' => 'MY',
+            'name' => 'District C '.uniqid(),
+        ]);
+
+        $subdistrictA = Subdistrict::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'district_id' => $district->id,
+            'country_code' => 'MY',
+            'name' => 'Subdistrict C1 '.uniqid(),
+        ]);
+
+        $subdistrictB = Subdistrict::query()->create([
+            'country_id' => $state->country_id,
+            'state_id' => $state->id,
+            'district_id' => $district->id,
+            'country_code' => 'MY',
+            'name' => 'Subdistrict C2 '.uniqid(),
+        ]);
+
+        $venueA = Venue::factory()->create();
+        $venueA->address()->update([
+            'state_id' => $state->id,
+            'district_id' => $district->id,
+            'subdistrict_id' => $subdistrictA->id,
+        ]);
+
+        $venueB = Venue::factory()->create();
+        $venueB->address()->update([
+            'state_id' => $state->id,
+            'district_id' => $district->id,
+            'subdistrict_id' => $subdistrictB->id,
+        ]);
+
+        Event::factory()->for($venueA)->create([
+            'title' => 'Subdistrict Filter Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->for($venueB)->create([
+            'title' => 'Subdistrict Filter Non Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?subdistrict_id='.$subdistrictA->id);
+
+        $response->assertOk()
+            ->assertSee('Subdistrict Filter Match')
+            ->assertDontSee('Subdistrict Filter Non Match');
     });
 
     it('filters events by genre', function () {
@@ -641,6 +816,13 @@ describe('Event Registration', function () {
                 'published_at' => now(),
                 'registrations_count' => 1,
             ]);
+
+        \App\Models\Registration::factory()->create([
+            'event_id' => $event->id,
+            'status' => 'registered',
+            'name' => 'Existing Registrant',
+            'email' => 'existing-capacity@example.com',
+        ]);
 
         $response = $this->post("/events/{$event->slug}/register", [
             'name' => 'Late Registrant',

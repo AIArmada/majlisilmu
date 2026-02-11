@@ -20,11 +20,13 @@ class SpeakerSeeder extends Seeder
         // Disable model events for faster seeding
         Speaker::unsetEventDispatcher();
 
-        \Illuminate\Support\Facades\DB::transaction(function (): void {
-            $this->seedSpeakers();
-        });
-
-        Speaker::setEventDispatcher(app('events'));
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function (): void {
+                $this->seedSpeakers();
+            });
+        } finally {
+            Speaker::setEventDispatcher(app('events'));
+        }
     }
 
     private function seedSpeakers(): void
@@ -48,7 +50,6 @@ class SpeakerSeeder extends Seeder
         ];
 
         $userIds = User::query()->pluck('id')->toArray();
-        $contactsToInsert = [];
         $memberAttachments = [];
 
         // Create real speakers
@@ -63,29 +64,17 @@ class SpeakerSeeder extends Seeder
                 ]
             );
 
-            $contactsToInsert[] = [
-                'id' => (string) Str::uuid(),
-                'contactable_type' => 'speaker',
-                'contactable_id' => $speaker->id,
-                'category' => 'email',
-                'value' => Str::slug($name).'@example.com',
-                'type' => 'work',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            $speaker->contacts()->updateOrCreate(
+                ['category' => 'email'],
+                ['value' => Str::slug($name).'@example.com', 'type' => 'work']
+            );
 
-            $contactsToInsert[] = [
-                'id' => (string) Str::uuid(),
-                'contactable_type' => 'speaker',
-                'contactable_id' => $speaker->id,
-                'category' => 'phone',
-                'value' => '01'.fake()->numberBetween(10000000, 99999999),
-                'type' => 'work',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            $speaker->contacts()->updateOrCreate(
+                ['category' => 'phone'],
+                ['value' => $this->deterministicPhoneNumber($name), 'type' => 'work']
+            );
 
-            if (!empty($userIds)) {
+            if (! empty($userIds)) {
                 $memberAttachments[] = [
                     'speaker_id' => $speaker->id,
                     'user_id' => $userIds[array_rand($userIds)],
@@ -99,7 +88,7 @@ class SpeakerSeeder extends Seeder
             $speakers = Speaker::factory()->count(30 - $currentCount)->create();
 
             foreach ($speakers as $speaker) {
-                if (!empty($userIds)) {
+                if (! empty($userIds)) {
                     $memberAttachments[] = [
                         'speaker_id' => $speaker->id,
                         'user_id' => $userIds[array_rand($userIds)],
@@ -108,15 +97,17 @@ class SpeakerSeeder extends Seeder
             }
         }
 
-        // Bulk insert contacts
-        if (!empty($contactsToInsert)) {
-            \Illuminate\Support\Facades\DB::table('contacts')->insert($contactsToInsert);
-        }
-
         // Bulk insert member attachments
-        if (!empty($memberAttachments)) {
+        if ($memberAttachments !== []) {
             \Illuminate\Support\Facades\DB::table('speaker_user')->insertOrIgnore($memberAttachments);
         }
+    }
+
+    private function deterministicPhoneNumber(string $name): string
+    {
+        $suffix = str_pad((string) (abs(crc32($name)) % 100000000), 8, '0', STR_PAD_LEFT);
+
+        return '01'.$suffix;
     }
 
     /**

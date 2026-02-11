@@ -33,21 +33,25 @@ class EventResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Content';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return EventForm::configure($schema);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return EventInfolist::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return EventsTable::configure($table);
     }
 
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
@@ -60,6 +64,7 @@ class EventResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -71,6 +76,7 @@ class EventResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

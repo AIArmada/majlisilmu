@@ -37,7 +37,7 @@ class EventJsonLd extends Component
             '@context' => 'https://schema.org',
             '@type' => 'Event',
             'name' => $event->title,
-            'description' => $event->description ?? '',
+            'description' => $event->description_text,
             'startDate' => $event->starts_at?->toIso8601String(),
             'endDate' => $event->ends_at?->toIso8601String(),
             'eventStatus' => $this->getEventStatus(),
@@ -47,6 +47,8 @@ class EventJsonLd extends Component
 
         // Location
         if ($event->venue) {
+            $venueAddress = $event->venue->addressModel;
+
             $jsonLd['location'] = [
                 '@type' => 'Place',
                 'name' => $event->venue->name,
@@ -54,12 +56,10 @@ class EventJsonLd extends Component
                     '@type' => 'PostalAddress',
                     'streetAddress' => $event->venue->address_line1 ?? '',
                     'addressLocality' => $event->venue->city ?? '',
-                    'addressRegion' => $event->state?->name ?? '',
+                    'addressRegion' => $venueAddress?->state?->name ?? '',
                     'addressCountry' => 'MY',
                 ],
             ];
-
-            $venueAddress = $event->venue->addressModel;
 
             if ($venueAddress?->lat && $venueAddress?->lng) {
                 $jsonLd['location']['geo'] = [
@@ -94,8 +94,8 @@ class EventJsonLd extends Component
         }
 
         // Image
-        if ($event->image_url ?? false) {
-            $jsonLd['image'] = $event->image_url;
+        if ($event->card_image_url !== '') {
+            $jsonLd['image'] = $event->card_image_url;
         }
 
         // Offers (free admission)
@@ -132,7 +132,7 @@ class EventJsonLd extends Component
      */
     protected function getEventStatus(): string
     {
-        if ($this->event->status?->equals(\App\States\EventStatus\Rejected::class)) { // Or cancelled if you have a Cancelled state
+        if ((string) $this->event->status === 'rejected') {
             return 'https://schema.org/EventCancelled';
         }
 
@@ -158,14 +158,12 @@ class EventJsonLd extends Component
     {
         $event = $this->event;
 
-        if ($event->status?->equals(\App\States\EventStatus\Rejected::class)) {
+        if ((string) $event->status === 'rejected') {
             return 'https://schema.org/Discontinued';
         }
 
-        if ($event->settings?->registration_required && $event->settings?->capacity) {
-            if ($event->registrations_count >= $event->settings->capacity) {
-                return 'https://schema.org/SoldOut';
-            }
+        if ($event->settings?->registration_required && $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity) {
+            return 'https://schema.org/SoldOut';
         }
 
         return 'https://schema.org/InStock';

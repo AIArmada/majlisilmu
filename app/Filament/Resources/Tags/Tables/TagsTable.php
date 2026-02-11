@@ -25,12 +25,10 @@ class TagsTable
                     ->sortable(),
 
                 \Filament\Tables\Columns\TextColumn::make('name')
-                    ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->where(function ($query) use ($search) {
-                            $query->where('name->ms', 'like', "%{$search}%")
-                                ->orWhere('name->en', 'like', "%{$search}%");
-                        });
-                    })
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function ($query) use ($search) {
+                        $query->where('name->ms', 'like', "%{$search}%")
+                            ->orWhere('name->en', 'like', "%{$search}%");
+                    }))
                     ->formatStateUsing(function ($record): string {
                         $ms = $record->getTranslation('name', 'ms');
                         $en = $record->getTranslation('name', 'en');

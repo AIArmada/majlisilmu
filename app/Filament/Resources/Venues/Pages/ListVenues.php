@@ -10,6 +10,7 @@ class ListVenues extends ListRecords
 {
     protected static string $resource = VenueResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

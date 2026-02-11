@@ -30,6 +30,7 @@ class Series extends Model implements HasMedia
         'is_active',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -75,7 +76,8 @@ class Series extends Model implements HasMedia
             ->performOnCollections('cover', 'gallery');
     }
 
-    public function scopeActive($query)
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active($query)
     {
         return $query->where('is_active', true);
     }

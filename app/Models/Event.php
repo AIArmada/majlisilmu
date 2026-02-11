@@ -30,6 +30,21 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\ModelStates\HasStates;
 use Spatie\Tags\HasTags;
 
+/**
+ * @property string $id
+ * @property string $title
+ * @property string $slug
+ * @property array<string, mixed>|string|null $description
+ * @property \Illuminate\Support\Carbon|null $starts_at
+ * @property \Illuminate\Support\Carbon|null $ends_at
+ * @property \App\States\EventStatus\EventStatus|string $status
+ * @property \App\Enums\EventVisibility|string|null $visibility
+ * @property \App\Enums\EventFormat|string|null $event_format
+ * @property \App\Enums\EventGenderRestriction|string|null $gender
+ * @property \Illuminate\Support\Collection<int, \App\Enums\EventAgeGroup>|array<int, string>|null $age_group
+ * @property \Illuminate\Support\Collection<int, \App\Enums\EventType>|array<int, string>|null $event_type
+ * @property bool $is_active
+ */
 class Event extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\EventFactory> */
@@ -39,6 +54,7 @@ class Event extends Model implements AuditableContract, HasMedia
 
     protected $keyType = 'string';
 
+    #[\Override]
     protected static function booted(): void
     {
         static::deleting(function (Event $event) {
@@ -104,6 +120,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'is_muslim_only',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -137,7 +154,8 @@ class Event extends Model implements AuditableContract, HasMedia
     /**
      * Scope a query to only include active events (approved + pending public events).
      */
-    public function scopeActive($query)
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active($query)
     {
         return $query->where('is_active', true)
             ->whereIn('status', ['approved', 'pending'])
@@ -151,8 +169,7 @@ class Event extends Model implements AuditableContract, HasMedia
     public function shouldBeSearchable(): bool
     {
         return $this->is_active
-            && ($this->status->equals(\App\States\EventStatus\Approved::class)
-                || $this->status->equals(\App\States\EventStatus\Pending::class))
+            && in_array((string) $this->status, ['approved', 'pending'], true)
             && $this->visibility === EventVisibility::Public;
     }
 
@@ -164,7 +181,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'venue', 'speakers', 'address', 'tags']);
+        $this->loadMissing(['institution', 'venue', 'venue.address', 'speakers', 'address', 'tags']);
 
         $ageGroupCollection = $this->age_group;
 
@@ -182,20 +199,22 @@ class Event extends Model implements AuditableContract, HasMedia
         $array = [
             'id' => $this->id,
             'title' => $this->title,
-            'description' => $this->description ?? '',
+            'description' => $this->description_text,
             'slug' => $this->slug,
             'speaker_names' => $this->speakers->pluck('name')->implode(', '),
             'institution_name' => $this->institution?->name ?? '',
             'venue_name' => $this->venue?->name ?? '',
             'state_id' => $this->venue?->address?->state_id ?? ($this->address?->state_id ?? ''),
             'district_id' => $this->venue?->address?->district_id ?? ($this->address?->district_id ?? ''),
+            'subdistrict_id' => $this->venue?->address?->subdistrict_id ?? ($this->address?->subdistrict_id ?? ''),
             'language' => $this->language,
-            'event_type' => $this->event_type?->map(fn ($e) => $e->value)->toArray() ?? [],
+            'event_type' => $this->normalizedEventTypeValues(),
             'gender' => $this->gender?->value ?? 'all',
             'age_group' => $ageGroupValues,
             'audience' => $ageGroupValues,
             'event_format' => $this->event_format?->value ?? 'physical',
             'children_allowed' => $this->children_allowed ?? true,
+            'is_active' => (bool) $this->is_active,
             'status' => (string) $this->status,
             'visibility' => $this->visibility?->value ?? 'public',
             'topic_ids' => $topicIds,
@@ -207,8 +226,8 @@ class Event extends Model implements AuditableContract, HasMedia
         ];
 
         // Add geolocation if available
-        if ($this->venue?->lat && $this->venue?->lng) {
-            $array['location'] = [$this->venue->lat, $this->venue->lng];
+        if ($this->venue?->address?->lat && $this->venue->address->lng) {
+            $array['location'] = [$this->venue->address->lat, $this->venue->address->lng];
         } elseif ($this->address?->lat) {
             $array['location'] = [$this->address->lat, $this->address->lng];
         }
@@ -440,9 +459,9 @@ class Event extends Model implements AuditableContract, HasMedia
     /**
      * Map 'genre' to 'event_type' for compatibility.
      */
-    public function getGenreAttribute(): mixed
+    public function getGenreAttribute(): array
     {
-        return $this->event_type?->map(fn ($e) => $e->value)->toArray();
+        return $this->normalizedEventTypeValues();
     }
 
     /**
@@ -471,6 +490,69 @@ class Event extends Model implements AuditableContract, HasMedia
         }
 
         return $this->languages->first()?->code ?? 'ms';
+    }
+
+    public function getDescriptionTextAttribute(): string
+    {
+        return $this->normalizeDescriptionText($this->description);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizedEventTypeValues(): array
+    {
+        $eventType = $this->event_type;
+
+        if ($eventType instanceof \Illuminate\Support\Collection) {
+            return $eventType
+                ->map(fn (mixed $value): string => $value instanceof EventType ? $value->value : (string) $value)
+                ->filter(fn (string $value): bool => $value !== '')
+                ->values()
+                ->all();
+        }
+
+        if (is_array($eventType)) {
+            return array_values(array_filter(array_map(static fn (mixed $value): string => $value, $eventType), static fn (string $value): bool => $value !== ''));
+        }
+
+        if ($eventType instanceof EventType) {
+            return [$eventType->value];
+        }
+
+        if (is_string($eventType) && $eventType !== '') {
+            return [$eventType];
+        }
+
+        return [];
+    }
+
+    private function normalizeDescriptionText(mixed $description): string
+    {
+        if (is_string($description)) {
+            return trim(strip_tags($description));
+        }
+
+        if (! is_array($description)) {
+            return '';
+        }
+
+        $html = data_get($description, 'html');
+
+        if (is_string($html) && $html !== '') {
+            return trim(strip_tags($html));
+        }
+
+        $content = data_get($description, 'content');
+
+        if (is_string($content) && $content !== '') {
+            return trim($content);
+        }
+
+        return trim(collect($description)
+            ->flatten()
+            ->filter(fn (mixed $value): bool => is_string($value) && $value !== '')
+            ->implode(' '));
     }
 
     /**

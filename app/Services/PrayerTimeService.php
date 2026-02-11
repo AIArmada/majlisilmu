@@ -118,7 +118,7 @@ class PrayerTimeService
     {
         // Remove any timezone indicator (e.g., "(MYT)")
         $time = preg_replace('/\s*\([^)]+\)/', '', $time);
-        $time = trim($time);
+        $time = trim((string) $time);
 
         [$hours, $minutes] = explode(':', $time);
 
