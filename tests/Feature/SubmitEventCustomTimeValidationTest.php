@@ -60,12 +60,14 @@ function submitEventTimingFormData(array $fixtures, array $overrides = []): arra
 it('can submit event with custom prayer time (lain_waktu)', function () {
     $fixtures = submitEventTimingFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventTimingFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventTimingFormData($fixtures, [
             'title' => 'Custom Time Event',
             'prayer_time' => EventPrayerTime::LainWaktu->value,
             'custom_time' => '10:00',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -77,10 +79,12 @@ it('can submit event with custom prayer time (lain_waktu)', function () {
 it('saves timing mode as prayer_relative when using prayer time', function () {
     $fixtures = submitEventTimingFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventTimingFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventTimingFormData($fixtures, [
             'title' => 'Prayer Time Event',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -94,11 +98,13 @@ it('can submit event for future dates', function () {
     $fixtures = submitEventTimingFixtures();
     $futureDate = now()->addWeek()->toDateString();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventTimingFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventTimingFormData($fixtures, [
             'title' => 'Future Event',
             'event_date' => $futureDate,
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

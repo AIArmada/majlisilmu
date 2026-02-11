@@ -446,11 +446,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->pluck('name_native', 'id')
                                                 ->toArray();
 
-                                            // Skip cache in testing to avoid stale data
-                                            if (app()->environment('testing')) {
-                                                return $getLanguages();
-                                            }
-
                                             return Cache::remember('submit_languages', 3600, $getLanguages);
                                         }),
 

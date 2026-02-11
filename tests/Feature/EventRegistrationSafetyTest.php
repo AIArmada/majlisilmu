@@ -29,10 +29,13 @@ it('enforces capacity using live registration rows when counter is stale', funct
         'email' => 'existing@example.com',
     ]);
 
-    $response = $this->post("/events/{$event->slug}/register", [
-        'name' => 'New Registrant',
-        'email' => 'new@example.com',
-    ]);
+    $response = $this
+        ->withSession(['_token' => 'test-token'])
+        ->post("/events/{$event->slug}/register", [
+            '_token' => 'test-token',
+            'name' => 'New Registrant',
+            'email' => 'new@example.com',
+        ]);
 
     $response->assertSessionHasErrors(['registration']);
 

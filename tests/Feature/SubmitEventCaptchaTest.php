@@ -33,26 +33,25 @@ function submitEventCaptchaFixtures(): array
  */
 function fillSubmitEventCaptchaForm(mixed $component, array $fixtures, string $title): void
 {
-    $component
-        ->fillForm([
-            'title' => $title,
-            'domain_tags' => [$fixtures['domain_tag']->id],
-            'discipline_tags' => [$fixtures['discipline_tag']->id],
-            'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
-            'event_date' => now()->addDays(5)->toDateString(),
-            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
-            'description' => 'Test description',
-            'event_format' => EventFormat::Physical->value,
-            'visibility' => EventVisibility::Public->value,
-            'gender' => EventGenderRestriction::All->value,
-            'age_group' => [EventAgeGroup::AllAges->value],
-            'languages' => [101],
-            'organizer_type' => 'institution',
-            'organizer_institution_id' => $fixtures['institution']->id,
-            'speakers' => [$fixtures['speaker']->id],
-            'submitter_name' => 'Test User',
-            'submitter_email' => 'test@example.com',
-        ]);
+    setSubmitEventFormState($component, [
+        'title' => $title,
+        'domain_tags' => [$fixtures['domain_tag']->id],
+        'discipline_tags' => [$fixtures['discipline_tag']->id],
+        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_date' => now()->addDays(5)->toDateString(),
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'description' => 'Test description',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'languages' => [101],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $fixtures['institution']->id,
+        'speakers' => [$fixtures['speaker']->id],
+        'submitter_name' => 'Test User',
+        'submitter_email' => 'test@example.com',
+    ]);
 }
 
 it('rejects submission when turnstile verification fails', function () {

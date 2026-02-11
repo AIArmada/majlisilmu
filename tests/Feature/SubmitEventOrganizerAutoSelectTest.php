@@ -58,8 +58,10 @@ function submitEventOrganizerFormData(array $fixtures, array $overrides = []): a
 it('assigns the speaker as event speaker when speaker is the organizer', function () {
     $fixtures = submitEventOrganizerFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventOrganizerFormData($fixtures))
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventOrganizerFormData($fixtures),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
