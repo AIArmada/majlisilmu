@@ -40,6 +40,8 @@ class VenuesTable
                         default => 'gray',
                     })
                     ->sortable(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Active'),
                 TextColumn::make('address.state.name')
                     ->label('State')
                     ->sortable(),
@@ -73,6 +75,8 @@ class VenuesTable
                         'verified' => 'Verified',
                         'rejected' => 'Rejected',
                     ]),
+                \Filament\Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Active'),
             ])
             ->recordActions([
                 ViewAction::make(),

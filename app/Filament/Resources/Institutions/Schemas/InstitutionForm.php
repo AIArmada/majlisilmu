@@ -170,6 +170,9 @@ class InstitutionForm
                                 'rejected' => 'Rejected',
                             ])
                             ->required(),
+                        \Filament\Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true),
                     ])
                     ->columns(1),
                 Section::make('Social Media')

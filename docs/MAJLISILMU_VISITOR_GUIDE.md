@@ -29,6 +29,7 @@ MajlisIlmu addresses this with structured event listings, moderation workflows, 
 ### 3. Speakers
 - Be discoverable by topic and participation history.
 - Stay connected to institutions and event pages.
+- Build richer public profiles with biography, avatar/main image, and affiliated institution role.
 
 ### 4. Moderators and administrators
 - Review submissions and maintain quality.
@@ -39,6 +40,7 @@ MajlisIlmu addresses this with structured event listings, moderation workflows, 
 - Prayer-time-aware scheduling support.
 - Public and admin workflows in one coherent system.
 - Rich media support (poster, gallery, profile images, etc.).
+- Speaker profiles support rich biography content and featured profile images.
 - Search with geolocation and filtering capabilities.
 - Built-in moderation lifecycle (pending, approved, needs changes, rejected).
 - Saved-search digest notifications for recurring discovery.
@@ -58,7 +60,7 @@ MajlisIlmu addresses this with structured event listings, moderation workflows, 
 
 ### C. “I want to submit an event”
 1. Open the submit-event page.
-2. Fill event details (time, format, organizer, tags, optional media).
+2. Fill event details (time, format, organizer, tags, media), including quick-adding a speaker with biography, affiliated institution role, and main profile image.
 3. Submit for moderation.
 4. Track publication after review.
 

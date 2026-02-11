@@ -682,8 +682,20 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             'kitab' => __('Kitab Turath'),
                                             'book' => __('Buku Moden'),
                                             'article' => __('Artikel'),
+                                            'video' => __('Video'),
+                                            'other' => __('Lain-lain'),
                                         ])
                                         ->default('kitab'),
+                                    TextInput::make('publication_year')
+                                        ->label(__('Tahun Terbitan'))
+                                        ->numeric()
+                                        ->minValue(1000)
+                                        ->maxValue((int) now()->addYears(1)->format('Y'))
+                                        ->placeholder(__('cth: 2018')),
+                                    TextInput::make('publisher')
+                                        ->label(__('Penerbit'))
+                                        ->maxLength(255)
+                                        ->placeholder(__('cth: Dar al-Kutub')),
                                     TextInput::make('reference_url')
                                         ->label(__('Pautan Rujukan'))
                                         ->url()
@@ -716,14 +728,23 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->maxSize(5120)
                                         ->maxFiles(5)
                                         ->helperText(__('Sehingga 5 gambar tambahan')),
+                                    Textarea::make('description')
+                                        ->label(__('Keterangan Ringkas'))
+                                        ->rows(3)
+                                        ->placeholder(__('Nota ringkas tentang rujukan ini…'))
+                                        ->columnSpanFull(),
                                 ])
                                 ->createOptionUsing(function (array $data, Schema $schema): string {
                                     $reference = Reference::create([
                                         'title' => $data['title'],
                                         'author' => $data['author'] ?? null,
                                         'type' => $data['type'] ?? 'kitab',
+                                        'publication_year' => filled($data['publication_year'] ?? null) ? (string) $data['publication_year'] : null,
+                                        'publisher' => $data['publisher'] ?? null,
+                                        'description' => $data['description'] ?? null,
                                         'is_canonical' => false,
                                         'status' => 'pending',
+                                        'is_active' => true,
                                     ]);
 
                                     // Save media uploads via Filament's relationship-saving mechanism

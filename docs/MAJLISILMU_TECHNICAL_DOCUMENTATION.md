@@ -1,0 +1,427 @@
+# MajlisIlmu Developer Technical Documentation
+
+Updated: February 12, 2026
+Audience: Engineers onboarding to build, maintain, and extend MajlisIlmu.
+
+---
+
+## 1. System Overview
+MajlisIlmu is a Laravel-based platform for Islamic event discovery, submission, moderation, and publishing.
+
+At runtime it has three main surfaces:
+1. Public web experience (event discovery, detail, submission).
+2. Authenticated user experience (dashboard, registrations, saved searches).
+3. Admin operations via Filament (resource CRUD, moderation queue, report handling).
+
+Core architecture style is modular monolith:
+- Laravel app and Eloquent models as domain core.
+- Livewire page components for interactive public/user UI.
+- Filament panel for admin operations.
+- Scout + Typesense (with DB fallback) for event search.
+- Queue jobs and scheduler for digest/escalation/maintenance tasks.
+
+---
+
+## 2. Tech Stack and Major Packages
+
+### 2.1 Runtime
+- PHP 8.4
+- Laravel 12
+- Postgres (primary relational store)
+- Laravel Scout + Typesense (search)
+- Livewire (via app stack)
+- Filament v5 (admin + form/table system)
+
+### 2.2 Security/Auth/Access
+- Laravel Fortify (auth flows)
+- Laravel Sanctum (API auth)
+- Laravel Socialite (Google OAuth)
+- `aiarmada/filament-authz` (role/scope authorization in admin and domain context)
+
+### 2.3 Data/Domain Support
+- Spatie Tags
+- Spatie Medialibrary + Filament media plugin
+- Spatie Eloquent Sortable
+- Spatie Deleted Models (instead of SoftDeletes)
+- Owen-it Laravel Auditing
+- Nnjeim World (geography metadata)
+
+### 2.4 Developer Tooling
+- Pest v4
+- Pint
+- Larastan/PHPStan
+- Rector
+
+---
+
+## 3. Repository Layout
+
+Top-level directories of interest:
+- `app/Models`: domain entities and relationships.
+- `app/Livewire/Pages`: interactive pages (`Events`, `Dashboard`, `SavedSearches`).
+- `resources/views/components/pages`: page-level Blade/Volt components including submit-event wizard.
+- `app/Filament/Resources`: admin CRUD resources.
+- `app/Filament/Pages`: custom admin pages (`ModerationQueue`).
+- `app/Services`: application services (search, moderation, prayer times, calendar).
+- `app/Jobs`: queue jobs.
+- `routes/web.php`, `routes/api.php`, `routes/console.php`: HTTP and schedule topology.
+- `database/migrations`, `database/seeders`, `database/factories`: schema + test/seed data.
+- `tests/Feature`, `tests/Unit`: test suite.
+- `docs`: project docs and handover guides.
+
+---
+
+## 4. Domain Model Summary
+
+## 4.1 Core entities
+- `Event`: primary content object; searchable and moderated.
+- `Institution`: organizer and location authority context.
+- `Speaker`: profile + media + affiliation to institutions.
+- `Venue`: physical location object with address context.
+- `Series`: grouping recurring/related events.
+- `Reference`: books/sources used in events.
+- `Tag`: unified topic taxonomy (domains/discipline/source/issue).
+- `Report`: public/user reporting of suspicious/problematic content.
+- `SavedSearch`, `Registration`, `DonationChannel`, `ModerationReview`.
+
+## 4.2 Important relationships
+- Event belongs to Institution/Venue and has many Speakers.
+- Event has many Tags, References, Languages.
+- Speaker belongsToMany Institutions through `institution_speaker` pivot.
+- Institution belongsToMany Speakers through same pivot.
+- `institution_speaker` pivot includes:
+  - `position`
+  - `is_primary`
+  - `joined_at`
+
+## 4.3 Event status/visibility
+Event uses state casting (`App\States\EventStatus\*`) and enum casting for visibility/gender/format/age group.
+
+Searchability and active rendering are gated by:
+- `is_active = true`
+- status in approved/pending (depending on surface)
+- `visibility = public` for public discovery/indexing
+
+---
+
+## 5. Public Surface Architecture
+
+## 5.1 Public routes
+Defined in `routes/web.php`:
+- Home: `/`
+- Events index/detail: `/events`, `/events/{slug}`
+- Event calendar export: `/events/{slug}/calendar.ics`
+- Institutions index/detail: `/institutions`, `/institutions/{slug}`
+- Speakers index/detail: `/speakers`, `/speakers/{slug}`
+- Series detail: `/series/{slug}`
+- Submit-event flow: `/submit-event`, `/submit-event/success`
+- Sitemap endpoints
+
+## 5.2 Submit-event flow
+The submit wizard is in:
+- `resources/views/components/pages/submit-event/create.blade.php`
+
+Main behavior:
+- Multi-step form for event details, organizer/location, speakers/media, review/submit.
+- Organizer branching for institution vs speaker.
+- Quick-create options for institution/speaker/venue/reference from selects.
+- Captcha token integration.
+- Poster/gallery upload support for event.
+
+Recent speaker quick-create capabilities:
+- Rich biography (`bio` JSON content).
+- Avatar and main image support.
+- Single affiliated institution selection and optional pivot position capture.
+
+Policy note:
+- Public submit-event route is intentionally not throttled in current product policy.
+
+---
+
+## 6. Authenticated User Surface
+
+Routes (auth middleware in `routes/web.php`):
+- `/dashboard`
+- `/dashboard/institutions`
+- `/saved-searches`
+
+Capabilities:
+- View personal metrics and registrations.
+- Manage saved searches and run them.
+- Institution dashboard has base data views but still has pending management capabilities per MVP status.
+
+---
+
+## 7. Admin Surface (Filament)
+
+## 7.1 Panel config
+- Provider: `app/Providers/Filament/AdminPanelProvider.php`
+- Panel path: `/admin`
+- Top navigation, custom theme, auth middleware, and FilamentAuthz plugin.
+
+## 7.2 Resources currently registered
+Under `app/Filament/Resources`:
+- EventResource
+- InstitutionResource
+- SpeakerResource
+- VenueResource
+- SeriesResource
+- ReferenceResource
+- DonationChannelResource
+- ReportResource
+- TagResource
+
+## 7.3 Moderation queue
+- Page: `app/Filament/Pages/ModerationQueue.php`
+- Supports tabs and actions for:
+  - pending
+  - needs changes
+  - reports
+  - recently rejected
+- Actions include approve/reject/request changes with reason/note.
+
+---
+
+## 8. Search Architecture
+
+## 8.1 Search service
+- `app/Services/EventSearchService.php`
+- Uses Typesense when configured, otherwise falls back to DB query path.
+- Always applies active/public/status filtering logic.
+
+## 8.2 Typesense schema and settings
+- `config/scout.php`
+- Event collection schema includes filtering facets (state/district/subdistrict/language/status/visibility/topic/speaker) and geopoint.
+
+## 8.3 Geo and filter support
+Search supports:
+- text query
+- geography filters
+- topic/speaker/institution filters
+- date window
+- near-me distance sort (Typesense + DB fallback strategy)
+
+## 8.4 Index maintenance
+Command:
+- `php artisan search:index-events --fresh`
+
+Use this after major searchable payload changes or when bootstrapping a fresh search index.
+
+---
+
+## 9. Media Architecture
+
+Core pieces:
+- Global upload defaults in `app/Providers/AppServiceProvider.php`.
+- Naming strategy: `app/Support/Media/MediaFileNamer.php`.
+- Path strategy: `app/Support/Media/MediaPathGenerator.php`.
+
+Global behavior includes:
+- max upload size from media config
+- immutable cache-control headers
+- slug-aware unique filenames
+- consistent custom media properties
+
+Common media usage:
+- Event: poster/gallery
+- Institution: logo/cover/gallery
+- Speaker: avatar/main/gallery
+- Reference/report/donation channel specific collections
+
+Scheduled media maintenance:
+- `media-library:clean --delete-orphaned --force` daily
+- `media-library:regenerate --only-missing --with-responsive-images --force` weekly
+
+---
+
+## 10. API Surface
+
+Defined in `routes/api.php` under `/api/v1`.
+
+Public:
+- `GET /events`
+- `GET /events/{event}`
+- `POST /reports` (reports throttle applied)
+
+Authenticated (`auth:sanctum`):
+- `GET /user`
+- `GET /user/registrations`
+- Saved-search CRUD + execute
+- Event saves CRUD-like endpoints
+- Event interests endpoints
+- Event registration export
+
+Controllers:
+- `app/Http/Controllers/Api/*`
+
+---
+
+## 11. Scheduling and Jobs
+
+Schedule definitions: `routes/console.php`
+
+Jobs/commands configured:
+- `SendSavedSearchDigest` daily/weekly
+- `EscalatePendingEvents` hourly
+- `app:prune-orphaned-entities` daily
+- media maintenance commands (daily/weekly)
+
+Job classes:
+- `app/Jobs/EscalatePendingEvents.php`
+- `app/Jobs/SendSavedSearchDigest.php`
+
+Additional operational commands:
+- `app:prune-orphaned-entities`
+- `search:index-events`
+- `app:media:migrate-structure` (media structure migration)
+
+---
+
+## 12. Rate Limiting and Abuse Controls
+
+Current policy/implementation:
+- Search pages use `throttle:search`.
+- Registration endpoint uses `throttle:registration`.
+- Report API uses `throttle:reports`.
+- Submit-event route is intentionally unthrottled (business policy decision).
+- Captcha support exists through Turnstile service settings.
+
+---
+
+## 13. Configuration and Environment
+
+## 13.1 Key environment/config groups
+- App + DB config (`.env`, `config/database.php`)
+- Auth (Fortify/Sanctum)
+- Social login (`config/services.php` -> Google)
+- Turnstile (`config/services.php` -> `turnstile`)
+- Search (`config/scout.php`, Typesense node/API key)
+- Media library (`config/media-library.php`)
+
+## 13.2 Local domain
+With Laravel Herd, app URL convention is:
+- `https://majlisilmu.test`
+
+---
+
+## 14. Database Rules and Conventions
+
+Project-level conventions used in this codebase:
+- Primary keys are UUID for core domain entities.
+- Foreign keys use UUID columns without DB-level FK constraints/cascades.
+- SoftDeletes are not used; deleted-model tracking uses Spatie deleted models.
+- Integrity and cascade behavior are handled in application logic.
+
+Important exception:
+- Geography datasets (`states`, `districts`, `subdistricts` and related IDs) use integer IDs.
+
+Recent schema change to note:
+- `speakers.bio` now uses `jsonb` and is edited via rich editor JSON content.
+
+---
+
+## 15. Testing and Quality Gates
+
+## 15.1 Test framework
+- Pest (parallel execution preferred)
+- Global test bootstrap: `tests/Pest.php`
+
+## 15.2 Typical commands
+```bash
+# Full suite (parallel)
+vendor/bin/pest --parallel --compact
+
+# Targeted examples
+vendor/bin/pest --parallel --compact --filter='SubmitEventRateLimitTest|SpeakerCreateOptionSchemaTest'
+
+# Code style
+vendor/bin/pint --test
+
+# Static analysis
+vendor/bin/phpstan analyse
+```
+
+## 15.3 Current suite scale
+- Feature tests: ~58 files
+- Unit tests: ~4 files
+- Total discovered tests: ~336
+
+---
+
+## 16. Local Development Runbook
+
+## 16.1 Initial setup
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+npm install
+npm run build
+```
+
+## 16.2 Daily development
+```bash
+# Backend server + queue + vite (if using composer script)
+composer run dev
+
+# Or run granular processes manually
+php artisan serve
+php artisan queue:work
+npm run dev
+```
+
+## 16.3 Useful maintenance
+```bash
+# Clear stale optimization/cache state
+php artisan optimize:clear
+
+# Rebuild optimized caches (if desired)
+php artisan optimize
+
+# Re-index search content
+php artisan search:index-events --fresh
+```
+
+---
+
+## 17. Developer Handover Notes
+
+## 17.1 High-impact files to know first
+- Submission UX: `resources/views/components/pages/submit-event/create.blade.php`
+- Search logic: `app/Services/EventSearchService.php`
+- Event model/search payload: `app/Models/Event.php`
+- Speaker quick-create schema: `app/Forms/SpeakerFormSchema.php`
+- Admin moderation: `app/Filament/Pages/ModerationQueue.php`
+
+## 17.2 Common gotchas
+1. Cached state confusion
+- If behavior looks stale, run `php artisan optimize:clear`.
+
+2. Historical migration edits
+- Some workflows directly updated older migrations; if local schema drifts, use fresh migration flow for clean environment setup.
+
+3. Search parity
+- If Typesense and DB results differ, verify index freshness and Scout configuration, then re-index.
+
+4. Media expectations
+- Follow global media naming/path conventions; avoid ad-hoc file naming.
+
+## 17.3 Recommended first-day checklist for new developers
+1. Run full setup and verify `/events`, `/submit-event`, `/admin`.
+2. Run focused tests on submit-event + search + public pages.
+3. Read MVP status doc: `docs/MAJLISILMU_MVP_STATUS.md`.
+4. Validate Typesense connectivity and run `search:index-events` if needed.
+5. Review moderation queue behavior end-to-end.
+
+---
+
+## 18. Open Work Summary (From Current MVP State)
+
+Most impactful unfinished work:
+1. Institution dashboard completion (event/profile/member management depth).
+2. Moderation UX upgrades (diff and SLA visibility).
+3. Trust scoring and auto-approval strategy.
+4. API contract documentation (OpenAPI) for external consumers.
+
+Use `docs/MAJLISILMU_MVP_STATUS.md` as the execution-level product status tracker.

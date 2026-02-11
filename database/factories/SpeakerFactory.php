@@ -221,7 +221,18 @@ class SpeakerFactory extends Factory
             'is_freelance' => fake()->boolean(20),
             'qualifications' => $qualifications,
             'slug' => Str::slug($name.'-'.Str::random(8)),
-            'bio' => fake()->optional()->paragraph(),
+            'bio' => fake()->boolean(70)
+                ? [
+                    'type' => 'doc',
+                    'content' => [[
+                        'type' => 'paragraph',
+                        'content' => [[
+                            'type' => 'text',
+                            'text' => fake()->paragraph(),
+                        ]],
+                    ]],
+                ]
+                : null,
             'status' => 'verified',
             'is_active' => true,
         ];

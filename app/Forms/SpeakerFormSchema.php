@@ -12,6 +12,7 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
@@ -50,6 +51,21 @@ class SpeakerFormSchema
                 ->conversion('thumb')
                 ->maxSize(5120)
                 ->helperText(__('Recommended: Square image, at least 400x400px')),
+
+            SpatieMediaLibraryFileUpload::make('main')
+                ->label(__('Main Image'))
+                ->collection('main')
+                ->image()
+                ->imageEditor()
+                ->responsiveImages()
+                ->conversion('banner')
+                ->maxSize(5120)
+                ->helperText(__('Main featured image for speaker profile')),
+
+            RichEditor::make('bio')
+                ->label(__('Biography'))
+                ->json()
+                ->placeholder(__('Share a short biography of the speaker')),
 
             Select::make('honorific')
                 ->label(__('Honorific'))
@@ -116,18 +132,24 @@ class SpeakerFormSchema
                     $get('district_id') != null && $get('district_id') !== ''
                     JS),
 
-            Select::make('institutions')
-                ->label(__('Affiliated Institutions'))
+            Select::make('institution_id')
+                ->label(__('Affiliated Institution'))
                 ->options(fn () => Institution::query()
                     ->whereIn('status', ['verified', 'pending'])
                     ->orderBy('name')
                     ->pluck('name', 'id'))
-                ->multiple()
                 ->searchable()
                 ->preload()
+                ->live()
                 ->closeOnSelect()
                 ->createOptionForm(InstitutionFormSchema::createOptionForm())
                 ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
+
+            TextInput::make('institution_position')
+                ->label(__('Position'))
+                ->maxLength(255)
+                ->placeholder(__('e.g., Imam, Mudir, Committee Member'))
+                ->visible(fn (Get $get): bool => filled($get('institution_id'))),
         ];
     }
 
@@ -144,11 +166,12 @@ class SpeakerFormSchema
             'honorific' => empty($data['honorific']) ? null : $data['honorific'],
             'pre_nominal' => empty($data['pre_nominal']) ? null : $data['pre_nominal'],
             'job_title' => $data['job_title'] ?? null,
+            'bio' => $data['bio'] ?? null,
             'slug' => Str::slug($data['name']).'-'.Str::random(6),
             'status' => 'pending',
         ]);
 
-        // Save media uploads (avatar) via Filament's relationship-saving mechanism
+        // Save media uploads (avatar/main) via Filament's relationship-saving mechanism
         $schema?->model($speaker)->saveRelationships();
 
         if (! empty($data['state_id'])) {
@@ -159,8 +182,32 @@ class SpeakerFormSchema
             ]);
         }
 
-        if (! empty($data['institutions'])) {
-            $speaker->institutions()->attach($data['institutions']);
+        $institutionIds = [];
+
+        if (filled($data['institution_id'] ?? null)) {
+            $institutionIds[] = (string) $data['institution_id'];
+        } elseif (! empty($data['institutions'])) {
+            $institutionIds = array_filter(
+                array_map(
+                    fn (mixed $institutionId): ?string => filled($institutionId) ? (string) $institutionId : null,
+                    (array) $data['institutions']
+                )
+            );
+        }
+
+        if ($institutionIds !== []) {
+            $position = filled($data['institution_position'] ?? null) ? $data['institution_position'] : null;
+            $institutionData = [];
+
+            foreach ($institutionIds as $institutionId) {
+                $institutionData[$institutionId] = [
+                    'position' => $position,
+                ];
+            }
+
+            if ($institutionData !== []) {
+                $speaker->institutions()->attach($institutionData);
+            }
         }
 
         return (string) $speaker->getKey();

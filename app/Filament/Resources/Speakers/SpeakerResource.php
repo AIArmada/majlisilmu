@@ -6,6 +6,7 @@ use App\Filament\Resources\Speakers\Pages\CreateSpeaker;
 use App\Filament\Resources\Speakers\Pages\EditSpeaker;
 use App\Filament\Resources\Speakers\Pages\ListSpeakers;
 use App\Filament\Resources\Speakers\Pages\ViewSpeaker;
+use App\Filament\Resources\Speakers\RelationManagers\EventsRelationManager;
 use App\Filament\Resources\Speakers\RelationManagers\MembersRelationManager;
 use App\Filament\Resources\Speakers\Schemas\SpeakerForm;
 use App\Filament\Resources\Speakers\Tables\SpeakersTable;
@@ -45,6 +46,7 @@ class SpeakerResource extends Resource
         return [
             MembersRelationManager::class,
             RelationManagers\InstitutionsRelationManager::class,
+            EventsRelationManager::class,
         ];
     }
 

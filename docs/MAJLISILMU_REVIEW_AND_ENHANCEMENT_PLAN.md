@@ -1,6 +1,6 @@
 # MajlisIlmu Full Code Audit (Literal Codebase Audit)
 
-Updated: February 11, 2026
+Updated: February 12, 2026
 
 ## 0. Implementation Progress (Current Pass)
 Completed in code:
@@ -19,8 +19,8 @@ Completed in code:
    - CSV export now streams using cursor-based query instead of eager-loading all registrations.
 7. Export audit robustness:
    - Added explicit UUID assignment for audit inserts to match UUID PK schema in `audits`.
-8. Submit-event rate limiting alignment:
-   - Applied `throttle:event-submission` middleware to public submit-event route.
+8. Submit-event public access alignment:
+   - Explicitly kept public submit-event route unthrottled based on product decision (guests can submit freely), and aligned route test coverage to this behavior.
 9. Moderation service dead code cleanup:
    - Removed unused notification methods with unresolved references from `ModerationService`.
 10. Typesense parity with DB filtering:
@@ -55,10 +55,12 @@ Completed in code:
     - Removed stale factories (`AuditLogFactory`, `EventTypeFactory`) that referenced non-existent models.
     - Introduced typed custom select component (`App\Forms\Components\Select`) with concrete `closeOnSelect()` and `quickAdd()` passthrough to remove macro-only static-analysis blind spots.
     - Regenerated baseline to zero.
+21. Speaker quick-create UX/data completeness:
+    - Enhanced submit-event speaker create-option flow with rich biography (`jsonb` + rich editor), main profile image upload, single affiliated institution selection, and institution-specific position capture on `institution_speaker` pivot.
 
 ## 0.1 Resolution Status (Audit Findings)
 1. Findings 1-4 (`P1`): fixed.
-2. Findings 5-13 (`P2`): fixed.
+2. Findings 5-13 (`P2`): fixed (finding 11 resolved by explicit unthrottled public-submit product policy + aligned tests/docs).
 3. Finding 14 (`P3` mixed UUID/integer geography strategy): fixed by explicit architecture decision and documentation (integer geography exception).
 4. Finding 15 (`P3` placeholder job): fixed.
 
