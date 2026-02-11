@@ -979,6 +979,26 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 ])
                     ->skippable()
                     ->persistStepInQueryString()
+                    ->extraAlpineAttributes([
+                        'x-init' => <<<'JS'
+                            window.__submitEventReviewRefreshed ??= false
+
+                            $watch('step', () => {
+                                if (isLastStep()) {
+                                    if (window.__submitEventReviewRefreshed) {
+                                        return
+                                    }
+
+                                    window.__submitEventReviewRefreshed = true
+                                    $wire.$refresh()
+
+                                    return
+                                }
+
+                                window.__submitEventReviewRefreshed = false
+                            })
+                        JS,
+                    ])
                     ->submitAction(new HtmlString(Blade::render(<<<'BLADE'
                                         <x-filament::button
                                             type="submit"
