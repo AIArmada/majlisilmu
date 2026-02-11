@@ -23,7 +23,7 @@ class SpeakerFormSchema
     /**
      * Shared createOptionForm for Speaker selects.
      *
-     * @return array<int, \Filament\Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     public static function createOptionForm(): array
     {

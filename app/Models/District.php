@@ -24,31 +24,49 @@ class District extends Model
         'name',
     ];
 
+    /**
+     * @return BelongsTo<Country, $this>
+     */
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
     }
 
+    /**
+     * @return BelongsTo<State, $this>
+     */
     public function state(): BelongsTo
     {
         return $this->belongsTo(State::class);
     }
 
+    /**
+     * @return HasMany<Subdistrict, $this>
+     */
     public function subdistricts(): HasMany
     {
         return $this->hasMany(Subdistrict::class);
     }
 
+    /**
+     * @return HasMany<Institution, $this>
+     */
     public function institutions(): HasMany
     {
         return $this->hasMany(Institution::class);
     }
 
+    /**
+     * @return HasMany<Venue, $this>
+     */
     public function venues(): HasMany
     {
         return $this->hasMany(Venue::class);
     }
 
+    /**
+     * @return HasMany<Event, $this>
+     */
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);

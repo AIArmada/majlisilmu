@@ -46,11 +46,13 @@ class Reference extends Model implements HasMedia
 
     /**
      * Scope a query to only include active references.
+     *
+     * @param  Builder<self>  $query
      */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active(Builder $query): Builder
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true);
+        $query->where('is_active', true);
     }
 
     /**
@@ -82,17 +84,17 @@ class Reference extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('front_cover', 'back_cover')
             ->width(200)
             ->height(280)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('front_cover', 'back_cover');
+            ->format('webp');
 
         $this->addMediaConversion('gallery_thumb')
+            ->performOnCollections('gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('gallery');
+            ->format('webp');
     }
 }

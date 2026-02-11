@@ -26,11 +26,17 @@ class EventSubmission extends Model
         'notes',
     ];
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function submitter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitted_by');

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Space extends Model
 {
+    /** @use HasFactory<\Database\Factories\SpaceFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -23,20 +25,29 @@ class Space extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * @return BelongsToMany<Institution, $this>
+     */
     public function institutions(): BelongsToMany
     {
         return $this->belongsToMany(Institution::class, 'institution_space')
             ->withTimestamps();
     }
 
+    /**
+     * @return HasMany<Event, $this>
+     */
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
     }
 
+    /**
+     * @param  Builder<self>  $query
+     */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active($query)
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true);
+        $query->where('is_active', true);
     }
 }

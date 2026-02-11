@@ -9,6 +9,9 @@ class Subdistrict extends Model
 {
     public $timestamps = false;
 
+    /**
+     * @var list<string>
+     */
     protected $fillable = [
         'country_id',
         'state_id',
@@ -17,16 +20,25 @@ class Subdistrict extends Model
         'country_code',
     ];
 
+    /**
+     * @return BelongsTo<Country, $this>
+     */
     public function country(): BelongsTo
     {
-        return $this->belongsTo(\Nnjeim\World\Models\Country::class);
+        return $this->belongsTo(Country::class);
     }
 
+    /**
+     * @return BelongsTo<State, $this>
+     */
     public function state(): BelongsTo
     {
         return $this->belongsTo(State::class);
     }
 
+    /**
+     * @return BelongsTo<District, $this>
+     */
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);

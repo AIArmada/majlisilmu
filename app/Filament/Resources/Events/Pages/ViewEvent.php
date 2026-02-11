@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Events\Pages;
 
 use App\Filament\Resources\Events\EventResource;
+use App\Models\Event;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\NeedsChanges;
@@ -53,7 +54,7 @@ class ViewEvent extends ViewRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->approve($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->approve($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event approved')
@@ -62,7 +63,7 @@ class ViewEvent extends ViewRecord
 
                 $this->refreshFormData(['status', 'published_at']);
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getRequestChangesAction(): Action
@@ -86,7 +87,7 @@ class ViewEvent extends ViewRecord
             ])
             ->action(function (array $data, ModerationService $service): void {
                 $service->requestChanges(
-                    $this->getRecord(),
+                    $this->eventRecord(),
                     auth()->user(),
                     $data['reason_code'],
                     $data['note']
@@ -99,7 +100,7 @@ class ViewEvent extends ViewRecord
 
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getRejectAction(): Action
@@ -123,7 +124,7 @@ class ViewEvent extends ViewRecord
             ])
             ->action(function (array $data, ModerationService $service): void {
                 $service->reject(
-                    $this->getRecord(),
+                    $this->eventRecord(),
                     auth()->user(),
                     $data['reason_code'],
                     $data['note']
@@ -136,7 +137,7 @@ class ViewEvent extends ViewRecord
 
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getReconsiderAction(): Action
@@ -155,7 +156,7 @@ class ViewEvent extends ViewRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->reconsider($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->reconsider($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event moved back to pending review')
@@ -164,7 +165,7 @@ class ViewEvent extends ViewRecord
 
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Rejected);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Rejected);
     }
 
     protected function getRemoderateAction(): Action
@@ -183,7 +184,7 @@ class ViewEvent extends ViewRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->remoderate($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->remoderate($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event sent for re-moderation')
@@ -192,7 +193,7 @@ class ViewEvent extends ViewRecord
 
                 $this->refreshFormData(['status', 'published_at']);
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Approved);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Approved);
     }
 
     protected function getRevertToDraftAction(): Action
@@ -211,7 +212,7 @@ class ViewEvent extends ViewRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->revertToDraft($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->revertToDraft($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event reverted to draft')
@@ -220,8 +221,8 @@ class ViewEvent extends ViewRecord
                 $this->refreshFormData(['status', 'published_at']);
             })
             ->visible(fn (): bool => $this->canModerate() && (
-                $this->getRecord()->status instanceof Rejected
-                || $this->getRecord()->status instanceof NeedsChanges
+                $this->eventRecord()->status instanceof Rejected
+                || $this->eventRecord()->status instanceof NeedsChanges
             ));
     }
 
@@ -246,5 +247,16 @@ class ViewEvent extends ViewRecord
             'missing_venue' => 'Missing Venue Information',
             'other' => 'Other',
         ];
+    }
+
+    protected function eventRecord(): Event
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof Event) {
+            throw new \RuntimeException('Expected Filament record to be an Event instance.');
+        }
+
+        return $record;
     }
 }

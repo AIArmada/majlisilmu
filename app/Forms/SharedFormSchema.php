@@ -21,7 +21,7 @@ class SharedFormSchema
     /**
      * Address fields (line1, line2, postcode, state/district/subdistrict cascades, maps URLs).
      *
-     * @return array<int, \Filament\Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     public static function addressFields(): array
     {

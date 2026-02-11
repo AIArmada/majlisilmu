@@ -27,7 +27,7 @@ class CreateEvent extends CreateRecord
 
     protected function afterCreate(): void
     {
-        $this->syncRelationState($this->record, $this->form->getState());
+        $this->syncRelationState($this->eventRecord(), $this->form->getState());
     }
 
     /**
@@ -35,7 +35,9 @@ class CreateEvent extends CreateRecord
      */
     protected function syncRelationState(Event $event, array $state): void
     {
-        $languageIds = collect($state['languages'] ?? [])
+        $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
+
+        $languageIds = collect($rawLanguageIds)
             ->filter(fn (mixed $id): bool => filled($id))
             ->map(fn (mixed $id): int => (int) $id)
             ->values()
@@ -43,12 +45,12 @@ class CreateEvent extends CreateRecord
 
         $event->syncLanguages($languageIds);
 
-        $tagIds = collect([
-            ...($state['domain_tags'] ?? []),
-            ...($state['discipline_tags'] ?? []),
-            ...($state['source_tags'] ?? []),
-            ...($state['issue_tags'] ?? []),
-        ])
+        $domainTagIds = is_array($state['domain_tags'] ?? null) ? $state['domain_tags'] : [];
+        $disciplineTagIds = is_array($state['discipline_tags'] ?? null) ? $state['discipline_tags'] : [];
+        $sourceTagIds = is_array($state['source_tags'] ?? null) ? $state['source_tags'] : [];
+        $issueTagIds = is_array($state['issue_tags'] ?? null) ? $state['issue_tags'] : [];
+
+        $tagIds = collect(array_merge($domainTagIds, $disciplineTagIds, $sourceTagIds, $issueTagIds))
             ->filter(fn (mixed $id): bool => filled($id))
             ->map(fn (mixed $id): string => (string) $id)
             ->unique()
@@ -58,5 +60,16 @@ class CreateEvent extends CreateRecord
         $tags = Tag::query()->whereKey($tagIds)->get();
 
         $event->syncTags($tags);
+    }
+
+    protected function eventRecord(): Event
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof Event) {
+            throw new \RuntimeException('Expected Filament record to be an Event instance.');
+        }
+
+        return $record;
     }
 }

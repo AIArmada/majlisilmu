@@ -412,7 +412,7 @@ describe('Event Search Filters', function () {
             sort: 'time'
         );
 
-        $event = $events->first();
+        $event = collect($events->items())->first();
 
         expect($event)->not->toBeNull()
             ->and($event->relationLoaded('institution'))->toBeTrue()
@@ -514,10 +514,12 @@ describe('Event Search Filters', function () {
             perPage: 20
         );
 
-        expect($events->pluck('title'))->toContain('Nearby Event')
-            ->not->toContain('Far Event');
+        $eventTitles = collect($events->items())->pluck('title')->all();
 
-        $nearest = $events->first();
+        expect($eventTitles)->toContain('Nearby Event');
+        expect($eventTitles)->not->toContain('Far Event');
+
+        $nearest = collect($events->items())->first();
 
         expect($nearest)->not->toBeNull()
             ->and($nearest->distance_km ?? null)->not->toBeNull();

@@ -26,9 +26,10 @@ class EditEvent extends EditRecord
     #[\Override]
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $this->record->loadMissing(['languages:id', 'tags:id,type']);
+        $event = $this->eventRecord();
+        $event->loadMissing(['languages:id', 'tags:id,type']);
 
-        $data['languages'] = $this->record->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $data['languages'] = $event->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $data['domain_tags'] = $this->getTagIdsByType(TagType::Domain);
         $data['discipline_tags'] = $this->getTagIdsByType(TagType::Discipline);
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
@@ -53,7 +54,7 @@ class EditEvent extends EditRecord
 
     protected function afterSave(): void
     {
-        $this->syncRelationState($this->record, $this->form->getState());
+        $this->syncRelationState($this->eventRecord(), $this->form->getState());
     }
 
     /**
@@ -61,7 +62,9 @@ class EditEvent extends EditRecord
      */
     protected function syncRelationState(Event $event, array $state): void
     {
-        $languageIds = collect($state['languages'] ?? [])
+        $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
+
+        $languageIds = collect($rawLanguageIds)
             ->filter(fn (mixed $id): bool => filled($id))
             ->map(fn (mixed $id): int => (int) $id)
             ->values()
@@ -69,12 +72,12 @@ class EditEvent extends EditRecord
 
         $event->syncLanguages($languageIds);
 
-        $tagIds = collect([
-            ...($state['domain_tags'] ?? []),
-            ...($state['discipline_tags'] ?? []),
-            ...($state['source_tags'] ?? []),
-            ...($state['issue_tags'] ?? []),
-        ])
+        $domainTagIds = is_array($state['domain_tags'] ?? null) ? $state['domain_tags'] : [];
+        $disciplineTagIds = is_array($state['discipline_tags'] ?? null) ? $state['discipline_tags'] : [];
+        $sourceTagIds = is_array($state['source_tags'] ?? null) ? $state['source_tags'] : [];
+        $issueTagIds = is_array($state['issue_tags'] ?? null) ? $state['issue_tags'] : [];
+
+        $tagIds = collect(array_merge($domainTagIds, $disciplineTagIds, $sourceTagIds, $issueTagIds))
             ->filter(fn (mixed $id): bool => filled($id))
             ->map(fn (mixed $id): string => (string) $id)
             ->unique()
@@ -91,7 +94,7 @@ class EditEvent extends EditRecord
      */
     protected function getTagIdsByType(TagType $type): array
     {
-        return $this->record->tags
+        return $this->eventRecord()->tags
             ->where('type', $type->value)
             ->pluck('id')
             ->map(fn (mixed $id): string => (string) $id)
@@ -133,16 +136,16 @@ class EditEvent extends EditRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->approve($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->approve($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event approved')
                     ->success()
                     ->send();
 
-                $this->redirect(EventResource::getUrl('view', ['record' => $this->getRecord()]));
+                $this->redirect(EventResource::getUrl('view', ['record' => $this->eventRecord()]));
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getRequestChangesAction(): Action
@@ -166,7 +169,7 @@ class EditEvent extends EditRecord
             ])
             ->action(function (array $data, ModerationService $service): void {
                 $service->requestChanges(
-                    $this->getRecord(),
+                    $this->eventRecord(),
                     auth()->user(),
                     $data['reason_code'],
                     $data['note']
@@ -177,9 +180,9 @@ class EditEvent extends EditRecord
                     ->warning()
                     ->send();
 
-                $this->redirect(EventResource::getUrl('view', ['record' => $this->getRecord()]));
+                $this->redirect(EventResource::getUrl('view', ['record' => $this->eventRecord()]));
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getRejectAction(): Action
@@ -203,7 +206,7 @@ class EditEvent extends EditRecord
             ])
             ->action(function (array $data, ModerationService $service): void {
                 $service->reject(
-                    $this->getRecord(),
+                    $this->eventRecord(),
                     auth()->user(),
                     $data['reason_code'],
                     $data['note']
@@ -214,9 +217,9 @@ class EditEvent extends EditRecord
                     ->danger()
                     ->send();
 
-                $this->redirect(EventResource::getUrl('view', ['record' => $this->getRecord()]));
+                $this->redirect(EventResource::getUrl('view', ['record' => $this->eventRecord()]));
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getReconsiderAction(): Action
@@ -235,16 +238,16 @@ class EditEvent extends EditRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->reconsider($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->reconsider($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event moved back to pending review')
                     ->success()
                     ->send();
 
-                $this->redirect(EventResource::getUrl('view', ['record' => $this->getRecord()]));
+                $this->redirect(EventResource::getUrl('view', ['record' => $this->eventRecord()]));
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Rejected);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Rejected);
     }
 
     protected function getRemoderateAction(): Action
@@ -263,16 +266,16 @@ class EditEvent extends EditRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->remoderate($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->remoderate($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event sent for re-moderation')
                     ->warning()
                     ->send();
 
-                $this->redirect(EventResource::getUrl('view', ['record' => $this->getRecord()]));
+                $this->redirect(EventResource::getUrl('view', ['record' => $this->eventRecord()]));
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->getRecord()->status instanceof Approved);
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Approved);
     }
 
     protected function getRevertToDraftAction(): Action
@@ -291,17 +294,17 @@ class EditEvent extends EditRecord
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
-                $service->revertToDraft($this->getRecord(), auth()->user(), $data['note'] ?? null);
+                $service->revertToDraft($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
                     ->title('Event reverted to draft')
                     ->send();
 
-                $this->redirect(EventResource::getUrl('view', ['record' => $this->getRecord()]));
+                $this->redirect(EventResource::getUrl('view', ['record' => $this->eventRecord()]));
             })
             ->visible(fn (): bool => $this->canModerate() && (
-                $this->getRecord()->status instanceof Rejected
-                || $this->getRecord()->status instanceof NeedsChanges
+                $this->eventRecord()->status instanceof Rejected
+                || $this->eventRecord()->status instanceof NeedsChanges
             ));
     }
 
@@ -326,5 +329,16 @@ class EditEvent extends EditRecord
             'missing_venue' => 'Missing Venue Information',
             'other' => 'Other',
         ];
+    }
+
+    protected function eventRecord(): Event
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof Event) {
+            throw new \RuntimeException('Expected Filament record to be an Event instance.');
+        }
+
+        return $record;
     }
 }

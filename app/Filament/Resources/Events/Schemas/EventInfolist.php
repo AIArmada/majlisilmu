@@ -5,6 +5,10 @@ namespace App\Filament\Resources\Events\Schemas;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Models\Event;
+use App\Models\EventSubmission;
+use App\Models\Reference;
+use App\Models\Series;
+use App\Models\Speaker;
 use BackedEnum;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -148,7 +152,7 @@ class EventInfolist
                                             ->schema([
                                                 TextEntry::make('title')
                                                     ->hiddenLabel()
-                                                    ->url(fn ($record): ?string => $record?->id
+                                                    ->url(fn (?Reference $record): ?string => $record?->id
                                                         ? \App\Filament\Resources\References\ReferenceResource::getUrl('edit', ['record' => $record->id])
                                                         : null),
                                             ])
@@ -188,7 +192,7 @@ class EventInfolist
                                             ->schema([
                                                 TextEntry::make('title')
                                                     ->hiddenLabel()
-                                                    ->url(fn ($record): ?string => $record?->id
+                                                    ->url(fn (?Series $record): ?string => $record?->id
                                                         ? \App\Filament\Resources\Series\SeriesResource::getUrl('edit', ['record' => $record->id])
                                                         : null),
                                             ])
@@ -223,7 +227,7 @@ class EventInfolist
                                             ->schema([
                                                 TextEntry::make('name')
                                                     ->hiddenLabel()
-                                                    ->url(fn ($record): ?string => $record?->id
+                                                    ->url(fn (?Speaker $record): ?string => $record?->id
                                                         ? \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->id])
                                                         : null),
                                             ])
@@ -294,7 +298,7 @@ class EventInfolist
 
                                                 // Get guest submission info from latest submission
                                                 $submission = $record->submissions()->latest()->first();
-                                                if ($submission) {
+                                                if ($submission instanceof EventSubmission) {
                                                     $parts = [];
                                                     if ($submission->submitter_name) {
                                                         $parts[] = $submission->submitter_name;

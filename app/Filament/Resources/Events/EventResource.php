@@ -52,6 +52,9 @@ class EventResource extends Resource
     }
 
     #[\Override]
+    /**
+     * @return Builder<Event>
+     */
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

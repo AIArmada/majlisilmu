@@ -28,6 +28,9 @@ class SocialAccount extends Model
         'avatar_url',
     ];
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

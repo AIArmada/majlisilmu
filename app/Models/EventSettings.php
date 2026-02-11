@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventSettings extends Model
 {
+    /** @use HasFactory<\Database\Factories\EventSettingsFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;
@@ -40,6 +41,9 @@ class EventSettings extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);

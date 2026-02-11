@@ -71,6 +71,9 @@ class UserDashboard extends Component
         ];
     }
 
+    /**
+     * @return LengthAwarePaginator<int, Event>
+     */
     #[Computed]
     public function myEvents(): LengthAwarePaginator
     {
@@ -87,6 +90,9 @@ class UserDashboard extends Component
             ->paginate(perPage: 8, pageName: 'my_events_page');
     }
 
+    /**
+     * @return LengthAwarePaginator<int, Registration>
+     */
     #[Computed]
     public function myRegistrations(): LengthAwarePaginator
     {
@@ -108,6 +114,9 @@ class UserDashboard extends Component
             ->paginate(perPage: 8, pageName: 'my_registrations_page');
     }
 
+    /**
+     * @return LengthAwarePaginator<int, Event&object{pivot: \Illuminate\Database\Eloquent\Relations\Pivot}>
+     */
     #[Computed]
     public function mySavedEvents(): LengthAwarePaginator
     {
@@ -124,6 +133,9 @@ class UserDashboard extends Component
             ->paginate(perPage: 8, pageName: 'my_saved_events_page');
     }
 
+    /**
+     * @return LengthAwarePaginator<int, SavedSearch>
+     */
     #[Computed]
     public function mySavedSearches(): LengthAwarePaginator
     {
@@ -168,6 +180,7 @@ class UserDashboard extends Component
      */
     public function toSavedSearchQueryParams(SavedSearch $savedSearch): array
     {
+        /** @var array<string, mixed> $params */
         $params = array_merge(
             ['search' => $savedSearch->query],
             is_array($savedSearch->filters) ? $savedSearch->filters : []
@@ -182,7 +195,7 @@ class UserDashboard extends Component
             ]);
         }
 
-        return array_filter($params, function (mixed $value): bool {
+        return array_filter($params, static function (mixed $value): bool {
             if ($value === null || $value === '') {
                 return false;
             }
@@ -238,6 +251,9 @@ class UserDashboard extends Component
         session()->flash('digest_preferences_status', __('Digest notification preferences updated.'));
     }
 
+    /**
+     * @return Builder<Event>
+     */
     protected function myEventsQuery(User $user): Builder
     {
         return Event::query()
@@ -248,6 +264,9 @@ class UserDashboard extends Component
             });
     }
 
+    /**
+     * @return BelongsToMany<Event, User>
+     */
     protected function mySavedEventsQuery(User $user): BelongsToMany
     {
         return $user->savedEvents()
@@ -263,13 +282,21 @@ class UserDashboard extends Component
             return;
         }
 
-        $this->digestNotificationFrequency = $preference->frequency->value;
-        $this->digestNotificationsEnabled = $preference->enabled
-            && $preference->frequency !== NotificationFrequency::Off;
+        $frequency = $preference->frequency;
 
-        $channels = is_array($preference->channels)
-            ? array_values(array_intersect($preference->channels, $this->allowedDigestChannels()))
-            : [];
+        if (! $frequency instanceof NotificationFrequency) {
+            return;
+        }
+
+        $this->digestNotificationFrequency = $frequency->value;
+        $this->digestNotificationsEnabled = $preference->enabled
+            && $frequency !== NotificationFrequency::Off;
+
+        $rawChannels = is_array($preference->channels) ? $preference->channels : [];
+        $channels = array_values(array_filter(
+            array_map(static fn (mixed $channel): string => (string) $channel, $rawChannels),
+            fn (string $channel): bool => in_array($channel, $this->allowedDigestChannels(), true)
+        ));
 
         if ($this->digestNotificationsEnabled) {
             $this->digestNotificationChannels = $channels !== []

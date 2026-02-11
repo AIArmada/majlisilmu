@@ -35,31 +35,49 @@ class Address extends Model
         'lng' => 'float',
     ];
 
+    /**
+     * @return MorphTo<Model, $this>
+     */
     public function addressable(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /**
+     * @return BelongsTo<Country, $this>
+     */
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
     }
 
+    /**
+     * @return BelongsTo<State, $this>
+     */
     public function state(): BelongsTo
     {
         return $this->belongsTo(State::class);
     }
 
+    /**
+     * @return BelongsTo<District, $this>
+     */
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);
     }
 
+    /**
+     * @return BelongsTo<Subdistrict, $this>
+     */
     public function subdistrict(): BelongsTo
     {
         return $this->belongsTo(Subdistrict::class);
     }
 
+    /**
+     * @return BelongsTo<City, $this>
+     */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);

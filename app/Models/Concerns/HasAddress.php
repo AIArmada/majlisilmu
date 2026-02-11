@@ -2,11 +2,17 @@
 
 namespace App\Models\Concerns;
 
+use App\Models\Address;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+
 trait HasAddress
 {
-    public function address(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    /**
+     * @return MorphOne<Address, $this>
+     */
+    public function address(): MorphOne
     {
-        return $this->morphOne(\App\Models\Address::class, 'addressable');
+        return $this->morphOne(Address::class, 'addressable');
     }
 
     /**
@@ -14,14 +20,28 @@ trait HasAddress
      */
     public function getAddressLine1Attribute(): string
     {
-        return $this->addressModel?->line1 ?? '';
+        $address = $this->addressModel;
+
+        if (! $address instanceof Address || ! filled($address->line1)) {
+            return '';
+        }
+
+        return (string) $address->line1;
     }
 
     /**
      * Get the address relationship (helper to avoid conflict with legacy accessors if any, strict typing).
      */
-    public function getAddressModelAttribute()
+    public function getAddressModelAttribute(): ?Address
     {
-        return $this->relationLoaded('address') ? $this->address : $this->address()->first();
+        $loadedAddress = $this->relationLoaded('address') ? $this->getRelation('address') : null;
+
+        if ($loadedAddress instanceof Address) {
+            return $loadedAddress;
+        }
+
+        $address = $this->address()->first();
+
+        return $address instanceof Address ? $address : null;
     }
 }

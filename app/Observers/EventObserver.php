@@ -6,6 +6,7 @@ use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Services\PrayerTimeService;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
 
 class EventObserver
@@ -48,7 +49,10 @@ class EventObserver
         }
 
         // Ensure we have prayer reference and offset
-        if (! $event->prayer_reference || ! $event->prayer_offset) {
+        $prayerReference = $event->prayer_reference;
+        $prayerOffset = $event->prayer_offset;
+
+        if (! $prayerReference instanceof \App\Enums\PrayerReference || ! $prayerOffset instanceof \App\Enums\PrayerOffset) {
             Log::warning('Prayer-relative event missing prayer_reference or prayer_offset', [
                 'event_id' => $event->id,
             ]);
@@ -68,36 +72,38 @@ class EventObserver
         }
 
         // Determine the event date
-        $eventDate = $event->starts_at ?? Carbon::now($event->timezone ?? 'Asia/Kuala_Lumpur');
+        $eventDate = $event->starts_at instanceof \Illuminate\Support\Carbon
+            ? $event->starts_at
+            : Carbon::now($event->timezone ?? 'Asia/Kuala_Lumpur');
 
         // Calculate the actual start time
         $calculatedTime = $this->prayerTimeService->calculateStartTime(
             $eventDate,
-            $event->prayer_reference,
-            $event->prayer_offset,
+            $prayerReference,
+            $prayerOffset,
             $coords['lat'],
             $coords['lng'],
             $event->timezone ?? 'Asia/Kuala_Lumpur'
         );
 
-        if ($calculatedTime instanceof \Carbon\Carbon) {
-            $event->starts_at = $calculatedTime;
+        if ($calculatedTime instanceof CarbonInterface) {
+            $event->starts_at = \Illuminate\Support\Carbon::instance($calculatedTime);
 
             // Update display text if not already set
             if (empty($event->prayer_display_text)) {
-                $event->prayer_display_text = $event->prayer_offset->displayText($event->prayer_reference);
+                $event->prayer_display_text = $prayerOffset->displayText($prayerReference);
             }
 
             Log::info('Calculated prayer-relative start time', [
                 'event_id' => $event->id,
-                'prayer' => $event->prayer_reference->value,
-                'offset' => $event->prayer_offset->value,
+                'prayer' => $prayerReference->value,
+                'offset' => $prayerOffset->value,
                 'calculated_time' => $calculatedTime->toIso8601String(),
             ]);
         } else {
             Log::warning('Failed to calculate prayer-relative start time', [
                 'event_id' => $event->id,
-                'prayer' => $event->prayer_reference->value,
+                'prayer' => $prayerReference->value,
             ]);
         }
     }
@@ -114,11 +120,14 @@ class EventObserver
             $event->load('venue.address');
         }
 
-        // Use venue coordinates via address
-        if ($event->venue && $event->venue->address && $event->venue->address->lat && $event->venue->address->lng) {
+        $venueAddress = $event->venue?->addressModel;
+
+        if ($venueAddress instanceof \App\Models\Address
+            && $venueAddress->lat !== null
+            && $venueAddress->lng !== null) {
             return [
-                'lat' => (float) $event->venue->address->lat,
-                'lng' => (float) $event->venue->address->lng,
+                'lat' => (float) $venueAddress->lat,
+                'lng' => (float) $venueAddress->lng,
             ];
         }
 

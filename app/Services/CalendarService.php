@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Venue;
 use Illuminate\Support\Carbon;
 
 class CalendarService
@@ -90,7 +92,9 @@ class CalendarService
         $location = $this->escapeIcs($this->formatLocation($event));
         $url = route('events.show', $event);
 
-        $organizer = $event->institution?->name ?? config('app.name');
+        $organizer = $event->institution instanceof Institution
+            ? $event->institution->name
+            : config('app.name');
 
         $ics = "BEGIN:VCALENDAR\r\n";
         $ics .= "VERSION:2.0\r\n";
@@ -183,18 +187,20 @@ class CalendarService
     protected function formatLocation(Event $event): string
     {
         $parts = [];
+        $venue = $event->venue;
+        $institution = $event->institution;
 
-        if ($event->venue) {
-            $parts[] = $event->venue->name;
+        if ($venue instanceof Venue) {
+            $parts[] = $venue->name;
 
-            if ($event->venue->address_line1) {
-                $parts[] = $event->venue->address_line1;
+            if ($venue->address_line1 !== '') {
+                $parts[] = $venue->address_line1;
             }
-        } elseif ($event->institution) {
-            $parts[] = $event->institution->name;
+        } elseif ($institution instanceof Institution) {
+            $parts[] = $institution->name;
 
-            if ($event->institution->address_line1) {
-                $parts[] = $event->institution->address_line1;
+            if ($institution->address_line1 !== '') {
+                $parts[] = $institution->address_line1;
             }
         }
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class EventUser extends Pivot
 {
+    /** @use HasFactory<\Database\Factories\EventUserFactory> */
     use HasFactory;
 
     /**
@@ -27,11 +28,17 @@ class EventUser extends Pivot
         ];
     }
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

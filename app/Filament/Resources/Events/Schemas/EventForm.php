@@ -438,6 +438,9 @@ class EventForm
             ->toArray();
     }
 
+    /**
+     * @param  array{name: string}  $data
+     */
     protected static function createPendingTag(array $data, TagType $type): string
     {
         $tag = Tag::create([

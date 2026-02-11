@@ -35,16 +35,25 @@ class Report extends Model implements HasMedia
         'resolution_note',
     ];
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reporter_id');
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function handler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by');
     }
 
+    /**
+     * @return MorphTo<Model, $this>
+     */
     public function entity(): MorphTo
     {
         return $this->morphTo('entity');
@@ -66,9 +75,9 @@ class Report extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('evidence')
             ->width(200)
             ->height(200)
-            ->format('webp')
-            ->performOnCollections('evidence');
+            ->format('webp');
     }
 }

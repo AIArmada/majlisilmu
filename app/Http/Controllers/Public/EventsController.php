@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\EventSettings;
 use App\Models\Registration;
 use App\Services\CalendarService;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -48,16 +50,17 @@ class EventsController extends Controller
             return back()->withErrors(['registration' => 'This event is not available for registration.']);
         }
 
-        if (! $event->settings?->registration_required) {
+        $settings = $event->settings;
+
+        if (! $settings instanceof EventSettings || ! $settings->registration_required) {
             return back()->withErrors(['registration' => 'This event does not require registration.']);
         }
 
-        // Check registration window
-        if ($event->settings?->registration_opens_at && $event->settings->registration_opens_at->isFuture()) {
+        if ($settings->registration_opens_at instanceof Carbon && $settings->registration_opens_at->isFuture()) {
             return back()->withErrors(['registration' => 'Registration has not opened yet.']);
         }
 
-        if ($event->settings?->registration_closes_at && $event->settings->registration_closes_at->isPast()) {
+        if ($settings->registration_closes_at instanceof Carbon && $settings->registration_closes_at->isPast()) {
             return back()->withErrors(['registration' => 'Registration has closed.']);
         }
 
@@ -82,13 +85,16 @@ class EventsController extends Controller
                     ->firstOrFail();
 
                 $lockedEvent->load('settings');
+                $lockedEventSettings = $lockedEvent->settings;
 
                 $activeRegistrationsCount = Registration::query()
                     ->where('event_id', $lockedEvent->id)
                     ->where('status', '!=', 'cancelled')
                     ->count();
 
-                if ($lockedEvent->settings?->capacity && $activeRegistrationsCount >= $lockedEvent->settings->capacity) {
+                if ($lockedEventSettings instanceof EventSettings
+                    && is_int($lockedEventSettings->capacity)
+                    && $activeRegistrationsCount >= $lockedEventSettings->capacity) {
                     throw ValidationException::withMessages(['registration' => 'This event is full.']);
                 }
 
