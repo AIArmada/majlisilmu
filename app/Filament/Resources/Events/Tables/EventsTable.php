@@ -40,14 +40,22 @@ class EventsTable
                 TextColumn::make('institution.name')
                     ->sortable()
                     ->searchable()
-                    ->url(fn ($record): ?string => $record->institution?->id
-                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id])
-                        : null),
+                    ->url(function (Event $record): ?string {
+                        if (! $record->institution) {
+                            return null;
+                        }
+
+                        return \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id]);
+                    }),
                 TextColumn::make('event_type')
                     ->label('Type')
                     ->formatStateUsing(fn (mixed $state): string => self::formatEnumCollection($state, EventType::class))
                     ->wrap()
-                    ->searchable(query: fn ($query, string $search) => $query->whereJsonContains('event_type', EventType::tryFrom($search)?->value ?? $search)),
+                    ->searchable(query: function ($query, string $search) {
+                        $eventType = EventType::tryFrom($search);
+
+                        return $query->whereJsonContains('event_type', $eventType ? $eventType->value : $search);
+                    }),
                 TextColumn::make('starts_at')
                     ->dateTime()
                     ->description(fn (Event $record): ?string => $record->timing_mode === TimingMode::PrayerRelative ? $record->prayer_display_text : null)

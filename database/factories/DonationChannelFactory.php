@@ -17,6 +17,7 @@ class DonationChannelFactory extends Factory
      */
     public function definition(): array
     {
+        /** @var 'bank_account'|'duitnow'|'ewallet' $method */
         $method = fake()->randomElement(['bank_account', 'duitnow', 'ewallet']);
 
         $base = [
@@ -34,9 +35,13 @@ class DonationChannelFactory extends Factory
             'bank_account' => array_merge($base, $this->bankAccountFields()),
             'duitnow' => array_merge($base, $this->duitnowFields()),
             'ewallet' => array_merge($base, $this->ewalletFields()),
+            default => array_merge($base, $this->bankAccountFields()),
         };
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function bankAccountFields(): array
     {
         return [
@@ -59,8 +64,12 @@ class DonationChannelFactory extends Factory
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function duitnowFields(): array
     {
+        /** @var 'mobile'|'nric'|'business' $type */
         $type = fake()->randomElement(['mobile', 'nric', 'business']);
 
         return [
@@ -69,6 +78,7 @@ class DonationChannelFactory extends Factory
                 'mobile' => fake()->numerify('01#-#######'),
                 'nric' => fake()->numerify('######-##-####'),
                 'business' => fake()->numerify('########'),
+                default => fake()->numerify('########'),
             },
             // Ensure other method fields are null
             'bank_code' => null,
@@ -80,6 +90,9 @@ class DonationChannelFactory extends Factory
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function ewalletFields(): array
     {
         $provider = fake()->randomElement(['tng', 'grab', 'shopee', 'boost']);

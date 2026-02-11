@@ -10,7 +10,7 @@ use Filament\Support\Contracts\HasLabel;
 
 final class NeedsChanges extends EventStatus implements HasColor, HasDescription, HasIcon, HasLabel
 {
-    public static $name = 'needs_changes';
+    public static string $name = 'needs_changes';
 
     public function getLabel(): string
     {
@@ -27,7 +27,7 @@ final class NeedsChanges extends EventStatus implements HasColor, HasDescription
         return 'heroicon-o-exclamation-triangle';
     }
 
-    public function getDescription(): ?string
+    public function getDescription(): string
     {
         return __('The event requires modifications before approval.');
     }

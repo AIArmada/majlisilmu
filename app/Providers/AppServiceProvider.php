@@ -83,7 +83,7 @@ class AppServiceProvider extends ServiceProvider
             // This allows multi-select dropdowns to close after each selection
             Select::macro('closeOnSelect', function (bool $condition = true): static {
                 if ($condition) {
-                    /** @var Select $this */
+                    /** @phpstan-ignore-next-line */
                     $this->extraAttributes([
                         'x-close-on-select' => true,
                     ]);

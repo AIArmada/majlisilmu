@@ -7,13 +7,14 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 class SocialiteController extends Controller
 {
     /**
      * Redirect to the OAuth provider.
      */
-    public function redirect(string $provider)
+    public function redirect(string $provider): RedirectResponse
     {
         return Socialite::driver($provider)->redirect();
     }
@@ -21,7 +22,7 @@ class SocialiteController extends Controller
     /**
      * Handle the OAuth callback.
      */
-    public function callback(string $provider)
+    public function callback(string $provider): RedirectResponse
     {
         try {
             $socialUser = Socialite::driver($provider)->user();

@@ -9,7 +9,7 @@ use Filament\Support\Contracts\HasLabel;
 
 final class Rejected extends EventStatus implements HasColor, HasIcon, HasLabel
 {
-    public static $name = 'rejected';
+    public static string $name = 'rejected';
 
     public function getLabel(): string
     {

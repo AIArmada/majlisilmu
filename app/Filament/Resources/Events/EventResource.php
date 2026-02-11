@@ -51,10 +51,10 @@ class EventResource extends Resource
         return EventsTable::configure($table);
     }
 
-    #[\Override]
     /**
      * @return Builder<Event>
      */
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

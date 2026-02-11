@@ -100,12 +100,12 @@ class InstitutionSeeder extends Seeder
             $inst->address()->updateOrCreate([], [
                 'line1' => $data['line1'],
                 'postcode' => fake()->postcode(),
-                'country_id' => $malaysia?->id,
-                'state_id' => $state->id,
-                'district_id' => $district?->id,
-                'city_id' => $city?->id,
-                'lat' => $data['lat'] ?? null,
-                'lng' => $data['lng'] ?? null,
+                'country_id' => $malaysia?->getKey(),
+                'state_id' => $state->getKey(),
+                'district_id' => $district?->getKey(),
+                'city_id' => $city?->getKey(),
+                'lat' => $data['lat'],
+                'lng' => $data['lng'],
             ]);
 
             // Skip authorization for speed
@@ -138,17 +138,17 @@ class InstitutionSeeder extends Seeder
                 'status' => 'verified',
             ]);
 
-            $institutions->each(function (Institution $institution, int $index) use ($malaysia, $states): void {
+            $institutions->each(function (Institution $institution) use ($malaysia, $states): void {
                 if ($states->isNotEmpty()) {
                     $state = $states->random();
                     $district = collect($state->districts)->isNotEmpty() ? collect($state->districts)->random() : null;
                     $city = collect($state->cities)->isNotEmpty() ? collect($state->cities)->random() : null;
 
                     $institution->address()->update([
-                        'country_id' => $malaysia?->id,
-                        'state_id' => $state->id,
-                        'district_id' => $district?->id,
-                        'city_id' => $city?->id,
+                        'country_id' => $malaysia?->getKey(),
+                        'state_id' => $state->getKey(),
+                        'district_id' => $district?->getKey(),
+                        'city_id' => $city?->getKey(),
                     ]);
                 }
 

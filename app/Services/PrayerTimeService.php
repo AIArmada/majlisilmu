@@ -187,6 +187,8 @@ class PrayerTimeService
 
     /**
      * Determine the closest prayer reference for a given time.
+     *
+     * @return array{prayer: string, offset_minutes: int}|null
      */
     public function getClosestPrayer(
         Carbon $time,
@@ -209,9 +211,9 @@ class PrayerTimeService
 
             // Find the closest match within reasonable offset range (-30 to +60 min)
             if (abs($diffMinutes) < $minDiff && $diffMinutes >= -30 && $diffMinutes <= 60) {
-                $minDiff = abs($diffMinutes);
+                $minDiff = abs((int) $diffMinutes);
                 $closestPrayer = $prayerName;
-                $bestOffset = $diffMinutes;
+                $bestOffset = (int) $diffMinutes;
             }
         }
 

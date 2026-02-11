@@ -290,3 +290,22 @@ When a method looks "undefined" in static analysis, do not remove it until you v
 ## Practical Rule
 - Behavior safety takes priority over static-analysis convenience.
 - Never remove feature methods such as `->closeOnSelect()` or `->quickAdd()` without source verification and impact check.
+
+---
+
+# PHPStan Level 6 Compliance
+
+All new and modified code must be written to pass PHPStan at level 6.
+
+## Required Standard
+1. Do not introduce new PHPStan errors.
+2. Prefer real fixes (types, generics, return shapes, null-handling, narrowing) over broad ignores.
+3. Avoid adding baseline suppressions unless there is a verified runtime-extension limitation that cannot be modeled safely.
+4. If a suppression is unavoidable, keep it as narrow as possible (specific file + message pattern) and document why.
+
+## Verification Command
+Run and pass:
+
+```bash
+vendor/bin/phpstan analyse --ansi
+```

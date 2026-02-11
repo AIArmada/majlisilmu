@@ -95,7 +95,9 @@ class DatabaseSeeder extends Seeder
 
     private function shouldSeedMasjidDirectory(): bool
     {
-        return (bool) env('SEED_MASJID_DIRECTORY', false);
+        $seedMasjidDirectory = getenv('SEED_MASJID_DIRECTORY');
+
+        return filter_var($seedMasjidDirectory === false ? 'false' : $seedMasjidDirectory, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

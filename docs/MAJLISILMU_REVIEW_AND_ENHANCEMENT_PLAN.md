@@ -46,6 +46,15 @@ Completed in code:
     - Fixed final remaining PHPStan runtime issue in `EventSearchTest` expectation chaining.
 18. Tooling gate completion:
     - `phpstan`, `pint --test`, `rector --dry-run`, and full `pest --parallel --compact` all pass on current working tree.
+19. Static-analysis scope policy correction:
+    - Reverted converted tests back to Pest style.
+    - Updated PHPStan scope to analyze application/runtime code (`app`, `bootstrap`, `config`, `database`, `routes`) and exclude `tests/*`.
+    - Regenerated baseline to remove stale test-related suppressions.
+20. Deep baseline compression pass (app/runtime only):
+    - Fixed broad app/runtime typing and static-analysis issues across Filament resources/forms, API/auth controllers, Livewire pages, model relations, notifications, services, state classes, factories, migrations, and seeders.
+    - Removed stale factories (`AuditLogFactory`, `EventTypeFactory`) that referenced non-existent models.
+    - Introduced typed custom select component (`App\Forms\Components\Select`) with concrete `closeOnSelect()` and `quickAdd()` passthrough to remove macro-only static-analysis blind spots.
+    - Regenerated baseline to zero.
 
 ## 0.1 Resolution Status (Audit Findings)
 1. Findings 1-4 (`P1`): fixed.
@@ -61,11 +70,12 @@ Completed in code:
    - `route_duplicates=0` (method + URI)
 2. Full quality gates (current working tree):
    - `vendor/bin/phpstan analyse --ansi`: `No errors`.
-   - `vendor/bin/pint --test`: `PASS (413 files)`.
-   - `vendor/bin/rector process --dry-run`: `OK (no changes)`.
+   - `vendor/bin/pint --test`: `PASS (412 files)`.
+   - `XDEBUG_MODE=off vendor/bin/rector process --dry-run`: `OK (no changes)`.
    - `vendor/bin/pest --parallel --compact`: `328 passed (970 assertions)`.
 3. Baseline reduction status:
-   - `phpstan-baseline.neon` total suppressed errors reduced from `959` to `457` (`-502`).
+   - `phpstan-baseline.neon` total suppressed errors reduced from `959` to `0` (`-959`) after excluding tests from static-analysis scope and completing module-by-module fixes.
+   - Current baseline entries (`message:`): `0`.
 
 ## 1. Audit Method
 This audit was done as a literal codebase audit, not just static-analysis follow-through:

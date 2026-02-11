@@ -293,7 +293,7 @@ class EventInfolist
                                                         $parts[] = $record->submitter->phone;
                                                     }
 
-                                                    return implode(' | ', array_filter($parts));
+                                                    return implode(' | ', $parts);
                                                 }
 
                                                 // Get guest submission info from latest submission
@@ -310,7 +310,7 @@ class EventInfolist
                                                         $parts[] = $submission->phone;
                                                     }
 
-                                                    return implode(' | ', array_filter($parts)) ?: '-';
+                                                    return $parts === [] ? '-' : implode(' | ', $parts);
                                                 }
 
                                                 return '-';
