@@ -44,9 +44,9 @@ it('can submit an event as a speaker with an institution location', function () 
     $speaker = Speaker::factory()->create(['status' => 'verified']);
     $institution = Institution::factory()->create(['status' => 'verified']);
 
-    Livewire::actingAs($this->user)
-        ->test('pages.submit-event.create')
-        ->fillForm(submitEventLocationFormData([
+    setSubmitEventFormState(
+        Livewire::actingAs($this->user)->test('pages.submit-event.create'),
+        submitEventLocationFormData([
             'title' => 'Speaker at Institution',
             'organizer_type' => 'speaker',
             'organizer_speaker_id' => $speaker->id,
@@ -55,7 +55,8 @@ it('can submit an event as a speaker with an institution location', function () 
             'location_institution_id' => $institution->id,
             'domain_tags' => [$this->domainTag->id],
             'discipline_tags' => [$this->disciplineTag->id],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
@@ -71,9 +72,9 @@ it('can submit an event as a speaker with a venue location', function () {
     $speaker = Speaker::factory()->create(['status' => 'verified']);
     $venue = Venue::factory()->create(['status' => 'verified']);
 
-    Livewire::actingAs($this->user)
-        ->test('pages.submit-event.create')
-        ->fillForm(submitEventLocationFormData([
+    setSubmitEventFormState(
+        Livewire::actingAs($this->user)->test('pages.submit-event.create'),
+        submitEventLocationFormData([
             'title' => 'Speaker at Venue',
             'organizer_type' => 'speaker',
             'organizer_speaker_id' => $speaker->id,
@@ -82,7 +83,8 @@ it('can submit an event as a speaker with a venue location', function () {
             'location_venue_id' => $venue->id,
             'domain_tags' => [$this->domainTag->id],
             'discipline_tags' => [$this->disciplineTag->id],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
@@ -98,16 +100,17 @@ it('automatically sets location to institution when organizer is an institution'
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
 
-    Livewire::actingAs($this->user)
-        ->test('pages.submit-event.create')
-        ->fillForm(submitEventLocationFormData([
+    setSubmitEventFormState(
+        Livewire::actingAs($this->user)->test('pages.submit-event.create'),
+        submitEventLocationFormData([
             'title' => 'Institution Event',
             'organizer_type' => 'institution',
             'organizer_institution_id' => $institution->id,
             'speakers' => [$speaker->id],
             'domain_tags' => [$this->domainTag->id],
             'discipline_tags' => [$this->disciplineTag->id],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
@@ -138,9 +141,9 @@ it('allows institution organizer to choose a different location', function () {
     ]);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
 
-    Livewire::actingAs($this->user)
-        ->test('pages.submit-event.create')
-        ->fillForm(submitEventLocationFormData([
+    setSubmitEventFormState(
+        Livewire::actingAs($this->user)->test('pages.submit-event.create'),
+        submitEventLocationFormData([
             'title' => 'Institution at Other Venue',
             'organizer_type' => 'institution',
             'organizer_institution_id' => $organizerInstitution->id,
@@ -150,7 +153,8 @@ it('allows institution organizer to choose a different location', function () {
             'speakers' => [$speaker->id],
             'domain_tags' => [$this->domainTag->id],
             'discipline_tags' => [$this->disciplineTag->id],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();

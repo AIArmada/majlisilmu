@@ -63,14 +63,19 @@ it('stores poster and gallery uploads when submitting an event', function () {
 
     $fixtures = submitEventMediaFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventMediaFormData($fixtures, [
+    $component = setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventMediaFormData($fixtures),
+    );
+
+    $component
+        ->fillForm([
             'poster' => UploadedFile::fake()->image('poster.jpg', 1200, 800),
             'gallery' => [
                 UploadedFile::fake()->image('gallery-1.jpg', 1200, 800),
                 UploadedFile::fake()->image('gallery-2.jpg', 1200, 800),
             ],
-        ]))
+        ])
         ->call('submit')
         ->assertRedirect(route('submit-event.success'));
 
@@ -86,13 +91,14 @@ it('does not require guest details for authenticated users', function () {
 
     $fixtures = submitEventMediaFixtures();
 
-    Livewire::actingAs($user)
-        ->test('pages.submit-event.create')
-        ->fillForm(submitEventMediaFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::actingAs($user)->test('pages.submit-event.create'),
+        submitEventMediaFormData($fixtures, [
             'title' => 'Logged In Event',
             'submitter_name' => null,
             'submitter_email' => null,
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertRedirect(route('submit-event.success'));
 

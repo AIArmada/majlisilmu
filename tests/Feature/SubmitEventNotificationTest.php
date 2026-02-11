@@ -74,11 +74,13 @@ it('notifies moderators when a guest submits an event', function () {
 
     $fixtures = submitEventNotificationFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventNotificationFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventNotificationFormData($fixtures, [
             'submitter_name' => 'Ahmad bin Abdullah',
             'submitter_email' => 'ahmad@example.com',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -98,11 +100,13 @@ it('notifies moderators when a guest submits an event', function () {
 it('transitions event from draft to pending on submission', function () {
     $fixtures = submitEventNotificationFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventNotificationFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventNotificationFormData($fixtures, [
             'title' => 'Draft to Pending Event',
             'description' => 'Testing state transition',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

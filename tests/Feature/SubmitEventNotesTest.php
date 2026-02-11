@@ -60,11 +60,13 @@ it('saves notes to event submission when provided', function () {
     $fixtures = submitEventNotesFixtures();
     $notes = 'This event requires special audio equipment and accessibility ramps.';
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventNotesFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventNotesFormData($fixtures, [
             'title' => 'Event With Notes',
             'notes' => $notes,
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -78,10 +80,12 @@ it('saves notes to event submission when provided', function () {
 it('allows submitting event without notes', function () {
     $fixtures = submitEventNotesFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventNotesFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventNotesFormData($fixtures, [
             'title' => 'Event Without Notes',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

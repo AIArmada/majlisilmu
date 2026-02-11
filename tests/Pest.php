@@ -14,6 +14,8 @@
 pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->beforeEach(function () {
+        \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::except('*');
+
         config()->set('services.turnstile.enabled', false);
         config()->set('services.turnstile.site_key');
         config()->set('services.turnstile.secret_key');
@@ -85,4 +87,25 @@ function fakePrayerTimesApi(): void
             ],
         ], 200),
     ]);
+}
+
+/**
+ * @param  array<string, mixed>  $state
+ */
+function setSubmitEventFormState(mixed $component, array $state): mixed
+{
+    foreach ($state as $field => $value) {
+        if (
+            $value instanceof \Illuminate\Http\UploadedFile ||
+            (is_array($value) && isset($value[0]) && $value[0] instanceof \Illuminate\Http\UploadedFile)
+        ) {
+            $component->set("data.{$field}", $value);
+
+            continue;
+        }
+
+        $component->set("data.{$field}", $value);
+    }
+
+    return $component;
 }

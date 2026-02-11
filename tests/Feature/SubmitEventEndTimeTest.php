@@ -58,11 +58,13 @@ function submitEventEndTimeFormData(array $fixtures, array $overrides = []): arr
 it('can submit event with optional end time', function () {
     $fixtures = submitEventEndTimeFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventEndTimeFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
             'title' => 'Event With End Time',
             'end_time' => '21:30',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -78,10 +80,12 @@ it('can submit event with optional end time', function () {
 it('can submit event without end time (optional)', function () {
     $fixtures = submitEventEndTimeFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventEndTimeFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
             'title' => 'Event Without End Time',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -93,13 +97,15 @@ it('can submit event without end time (optional)', function () {
 it('can submit event with custom time and end time', function () {
     $fixtures = submitEventEndTimeFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventEndTimeFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
             'title' => 'Custom Time With End Time',
             'prayer_time' => EventPrayerTime::LainWaktu->value,
             'custom_time' => '10:00',
             'end_time' => '12:00',
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));

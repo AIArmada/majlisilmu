@@ -58,11 +58,13 @@ function submitEventLanguageFormData(array $fixtures, array $overrides = []): ar
 it('can submit event with single language', function () {
     $fixtures = submitEventLanguageFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventLanguageFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventLanguageFormData($fixtures, [
             'title' => 'Single Language Event',
             'languages' => [101],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -75,11 +77,13 @@ it('can submit event with single language', function () {
 it('can submit event with multiple languages', function () {
     $fixtures = submitEventLanguageFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventLanguageFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventLanguageFormData($fixtures, [
             'title' => 'Multi Language Event',
             'languages' => [101, 7, 40],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect(route('submit-event.success'));
@@ -93,11 +97,13 @@ it('can submit event with multiple languages', function () {
 it('requires at least one language', function () {
     $fixtures = submitEventLanguageFixtures();
 
-    Livewire::test('pages.submit-event.create')
-        ->fillForm(submitEventLanguageFormData($fixtures, [
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventLanguageFormData($fixtures, [
             'title' => 'No Language Event',
             'languages' => [],
-        ]))
+        ]),
+    )
         ->call('submit')
         ->assertHasErrors(['data.languages']);
 });
