@@ -21,14 +21,14 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Facebook => 'Facebook',
-            self::Twitter => 'Twitter / X',
-            self::Instagram => 'Instagram',
-            self::YouTube => 'YouTube',
-            self::TikTok => 'TikTok',
-            self::Telegram => 'Telegram',
-            self::WhatsApp => 'WhatsApp',
-            self::LinkedIn => 'LinkedIn',
+            self::Facebook => __('Facebook'),
+            self::Twitter => __('Twitter / X'),
+            self::Instagram => __('Instagram'),
+            self::YouTube => __('YouTube'),
+            self::TikTok => __('TikTok'),
+            self::Telegram => __('Telegram'),
+            self::WhatsApp => __('WhatsApp'),
+            self::LinkedIn => __('LinkedIn'),
             self::Website => __('Laman Web'),
             self::Other => __('Lain-lain'),
         };

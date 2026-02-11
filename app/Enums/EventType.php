@@ -45,40 +45,40 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::KuliahCeramah => 'Kuliah / Ceramah',
-            self::KelasDaurah => 'Kelas / Daurah',
-            self::Forum => 'Forum',
-            self::SeminarKonvensyen => 'Seminar / Konvensyen',
-            self::Tazkirah => 'Tazkirah',
-            self::Qiamullail => 'Qiamullail',
-            self::Tahlil => 'Tahlil',
-            self::SolatHajat => 'Solat Hajat',
-            self::Zikir => 'Zikir',
-            self::Selawat => 'Selawat',
-            self::DoaSelamat => 'Doa Selamat',
-            self::BacaanYasin => 'Bacaan Yasin',
-            self::KhatamQuran => 'Khatam Al-Quran',
-            self::Tilawah => 'Tilawah Al-Quran',
-            self::HafazanQuran => 'Hafazan Al-Quran',
-            self::GotongRoyong => 'Gotong Royong',
-            self::Kenduri => 'Kenduri',
-            self::Iftar => 'Iftar / Berbuka Puasa',
-            self::Sahur => 'Sahur',
-            self::Korban => 'Korban',
-            self::Aqiqah => 'Aqiqah',
-            self::Other => 'Lain-lain',
+            self::KuliahCeramah => __('Kuliah / Ceramah'),
+            self::KelasDaurah => __('Kelas / Daurah'),
+            self::Forum => __('Forum'),
+            self::SeminarKonvensyen => __('Seminar / Konvensyen'),
+            self::Tazkirah => __('Tazkirah'),
+            self::Qiamullail => __('Qiamullail'),
+            self::Tahlil => __('Tahlil'),
+            self::SolatHajat => __('Solat Hajat'),
+            self::Zikir => __('Zikir'),
+            self::Selawat => __('Selawat'),
+            self::DoaSelamat => __('Doa Selamat'),
+            self::BacaanYasin => __('Bacaan Yasin'),
+            self::KhatamQuran => __('Khatam Al-Quran'),
+            self::Tilawah => __('Tilawah Al-Quran'),
+            self::HafazanQuran => __('Hafazan Al-Quran'),
+            self::GotongRoyong => __('Gotong Royong'),
+            self::Kenduri => __('Kenduri'),
+            self::Iftar => __('Iftar / Berbuka Puasa'),
+            self::Sahur => __('Sahur'),
+            self::Korban => __('Korban'),
+            self::Aqiqah => __('Aqiqah'),
+            self::Other => __('Lain-lain'),
         };
     }
 
     public function getGroup(): string
     {
         return match ($this) {
-            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah => 'Ilmu',
-            self::Qiamullail, self::Tahlil, self::SolatHajat => 'Ibadah',
-            self::Zikir, self::Selawat, self::DoaSelamat => 'Zikir & Doa',
-            self::BacaanYasin, self::KhatamQuran, self::Tilawah, self::HafazanQuran => 'Tilawah',
-            self::GotongRoyong, self::Kenduri, self::Iftar, self::Sahur, self::Korban, self::Aqiqah => 'Komuniti',
-            self::Other => 'Lain-lain',
+            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah => __('Ilmu'),
+            self::Qiamullail, self::Tahlil, self::SolatHajat => __('Ibadah'),
+            self::Zikir, self::Selawat, self::DoaSelamat => __('Zikir & Doa'),
+            self::BacaanYasin, self::KhatamQuran, self::Tilawah, self::HafazanQuran => __('Tilawah'),
+            self::GotongRoyong, self::Kenduri, self::Iftar, self::Sahur, self::Korban, self::Aqiqah => __('Komuniti'),
+            self::Other => __('Lain-lain'),
         };
     }
 
