@@ -18,14 +18,14 @@ enum EventPrayerTime: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::SelepasSubuh => 'Selepas Subuh',
-            self::SelepasZuhur => 'Selepas Zuhur',
-            self::SelepasJumaat => 'Selepas Jumaat',
-            self::SelepasAsar => 'Selepas Asar',
-            self::SelepasMaghrib => 'Selepas Maghrib',
-            self::SelepasIsyak => 'Selepas Isyak',
-            self::SelepasTarawih => 'Selepas Tarawih',
-            self::LainWaktu => 'Lain Waktu',
+            self::SelepasSubuh => __('Selepas Subuh'),
+            self::SelepasZuhur => __('Selepas Zuhur'),
+            self::SelepasJumaat => __('Selepas Jumaat'),
+            self::SelepasAsar => __('Selepas Asar'),
+            self::SelepasMaghrib => __('Selepas Maghrib'),
+            self::SelepasIsyak => __('Selepas Isyak'),
+            self::SelepasTarawih => __('Selepas Tarawih'),
+            self::LainWaktu => __('Lain Waktu'),
         };
     }
 

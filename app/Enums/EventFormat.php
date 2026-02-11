@@ -11,9 +11,9 @@ enum EventFormat: string
     public function label(): string
     {
         return match ($this) {
-            self::Physical => 'Physical',
-            self::Online => 'Online',
-            self::Hybrid => 'Hybrid',
+            self::Physical => __('Physical'),
+            self::Online => __('Online'),
+            self::Hybrid => __('Hybrid'),
         };
     }
 }

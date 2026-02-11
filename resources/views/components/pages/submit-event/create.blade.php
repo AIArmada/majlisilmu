@@ -35,6 +35,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View as SchemaView;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
@@ -482,7 +483,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('Pilih kategori…'))
                                         ->multiple()
                                         ->required()
-                                        ->searchable()
                                         ->preload()
                                         ->native(false)
                                         ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
@@ -579,7 +579,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->helperText(__('Pilih sumber rujukan utama (jika ada).'))
                                         ->placeholder(__('Pilih sumber…'))
                                         ->multiple()
-                                        ->searchable()
                                         ->preload()
                                         ->native(false)
                                         ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
@@ -931,6 +930,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                         ->schema([
                             Hidden::make('captcha_token')
                                 ->dehydrated(),
+
+                            Section::make(__('Pratonton Penghantaran'))
+                                ->description(__('Semak ringkasan ini sebelum anda menghantar.'))
+                                ->schema([
+                                    SchemaView::make('components.pages.submit-event.partials.review-preview'),
+                                ]),
 
                             Section::make(__('Maklumat Anda'))
                                 ->schema([

@@ -12,20 +12,20 @@ enum TagType: string
     public function label(): string
     {
         return match ($this) {
-            self::Domain => 'Domain',
-            self::Discipline => 'Discipline',
-            self::Source => 'Source',
-            self::Issue => 'Issue',
+            self::Domain => __('Domain'),
+            self::Discipline => __('Discipline'),
+            self::Source => __('Source'),
+            self::Issue => __('Issue'),
         };
     }
 
     public function description(): string
     {
         return match ($this) {
-            self::Domain => 'Core Islamic knowledge areas (Aqidah, Syariah, Akhlak)',
-            self::Discipline => 'Specific fields of study (Tafsir, Sirah, Fiqh, etc.)',
-            self::Source => 'Reference sources (Quran, Hadith, Turath, etc.)',
-            self::Issue => 'Contemporary themes/topics (Rasuah, Kepimpinan, etc.)',
+            self::Domain => __('Core Islamic knowledge areas (Aqidah, Syariah, Akhlak)'),
+            self::Discipline => __('Specific fields of study (Tafsir, Sirah, Fiqh, etc.)'),
+            self::Source => __('Reference sources (Quran, Hadith, Turath, etc.)'),
+            self::Issue => __('Contemporary themes/topics (Rasuah, Kepimpinan, etc.)'),
         };
     }
 
