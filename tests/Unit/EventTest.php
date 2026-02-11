@@ -14,22 +14,32 @@ it('active scope filters approved and pending public events', function () {
     $approvedEvent = Event::factory()->create([
         'status' => Approved::class,
         'visibility' => 'public',
+        'is_active' => true,
     ]);
 
     $pendingEvent = Event::factory()->create([
         'status' => Pending::class,
         'visibility' => 'public',
+        'is_active' => true,
     ]);
 
     // Inactive events
     $draftEvent = Event::factory()->create([
         'status' => Draft::class,
         'visibility' => 'public',
+        'is_active' => true,
     ]);
 
     $privateEvent = Event::factory()->create([
         'status' => Approved::class,
         'visibility' => 'private',
+        'is_active' => true,
+    ]);
+
+    $deactivatedEvent = Event::factory()->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => false,
     ]);
 
     $results = Event::active()->get();
@@ -38,5 +48,6 @@ it('active scope filters approved and pending public events', function () {
         ->and($results->pluck('id')->toArray())->toContain($approvedEvent->id)
         ->and($results->pluck('id')->toArray())->toContain($pendingEvent->id)
         ->and($results->pluck('id')->toArray())->not->toContain($draftEvent->id)
-        ->and($results->pluck('id')->toArray())->not->toContain($privateEvent->id);
+        ->and($results->pluck('id')->toArray())->not->toContain($privateEvent->id)
+        ->and($results->pluck('id')->toArray())->not->toContain($deactivatedEvent->id);
 });

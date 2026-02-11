@@ -268,6 +268,9 @@ class EventInfolist
                                         IconEntry::make('is_featured')
                                             ->label('Featured Event')
                                             ->boolean(),
+                                        IconEntry::make('is_active')
+                                            ->label('Active')
+                                            ->boolean(),
                                         TextEntry::make('published_at')
                                             ->label('Tarikh Terbit')
                                             ->dateTime()

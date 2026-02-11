@@ -33,8 +33,9 @@ class Show extends Component
 
     public function mount(Event $event): void
     {
-        $isViewable = $event->status?->equals(\App\States\EventStatus\Approved::class)
-            || $event->status?->equals(\App\States\EventStatus\Pending::class);
+        $isViewable = $event->is_active
+            && ($event->status?->equals(\App\States\EventStatus\Approved::class)
+                || $event->status?->equals(\App\States\EventStatus\Pending::class));
 
         if (! $isViewable || $event->visibility !== \App\Enums\EventVisibility::Public) {
             abort(404);
@@ -96,6 +97,7 @@ class Show extends Component
         $query = Event::query()
             ->whereKeyNot($this->event->id)
             ->where('visibility', EventVisibility::Public)
+            ->where('is_active', true)
             ->where(function (Builder $statusQuery): void {
                 $statusQuery
                     ->whereState('status', Approved::class)

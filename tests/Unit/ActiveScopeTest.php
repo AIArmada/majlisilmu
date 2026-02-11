@@ -27,14 +27,21 @@ it('models have active scopes', function () {
     Venue::factory()->create(['is_active' => false]);
     expect(Venue::active()->count())->toBe(1);
 
-    // Event (uses status/visibility instead of is_active)
+    // Event (uses is_active + status/visibility)
     Event::factory()->create([
         'status' => Approved::class,
         'visibility' => 'public',
+        'is_active' => true,
     ]);
     Event::factory()->create([
         'status' => Draft::class,
         'visibility' => 'public',
+        'is_active' => true,
+    ]);
+    Event::factory()->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => false,
     ]);
     expect(Event::active()->count())->toBe(1);
 });

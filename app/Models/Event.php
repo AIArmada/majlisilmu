@@ -100,6 +100,7 @@ class Event extends Model implements AuditableContract, HasMedia
         'escalated_at',
         'is_priority',
         'is_featured',
+        'is_active',
         'is_muslim_only',
     ];
 
@@ -128,6 +129,7 @@ class Event extends Model implements AuditableContract, HasMedia
             'escalated_at' => 'datetime',
             'is_priority' => 'boolean',
             'is_featured' => 'boolean',
+            'is_active' => 'boolean',
             'is_muslim_only' => 'boolean',
         ];
     }
@@ -137,7 +139,8 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function scopeActive($query)
     {
-        return $query->whereIn('status', ['approved', 'pending'])
+        return $query->where('is_active', true)
+            ->whereIn('status', ['approved', 'pending'])
             ->where('visibility', EventVisibility::Public);
     }
 
@@ -147,8 +150,9 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function shouldBeSearchable(): bool
     {
-        return ($this->status->equals(\App\States\EventStatus\Approved::class)
-            || $this->status->equals(\App\States\EventStatus\Pending::class))
+        return $this->is_active
+            && ($this->status->equals(\App\States\EventStatus\Approved::class)
+                || $this->status->equals(\App\States\EventStatus\Pending::class))
             && $this->visibility === EventVisibility::Public;
     }
 

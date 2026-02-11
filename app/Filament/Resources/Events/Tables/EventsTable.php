@@ -90,6 +90,8 @@ class EventsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 \Filament\Tables\Columns\ToggleColumn::make('is_featured')
                     ->label('Featured'),
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Active'),
                 IconColumn::make('is_muslim_only')
                     ->boolean()
                     ->label('Muslim Only')
@@ -127,6 +129,8 @@ class EventsTable
                     ]),
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),
+                \Filament\Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Active'),
                 SelectFilter::make('event_type')
                     ->label('Event Type')
                     ->options(\App\Enums\EventType::class)

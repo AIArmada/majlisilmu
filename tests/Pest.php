@@ -18,6 +18,12 @@ pest()->extend(Tests\TestCase::class)
         config()->set('services.turnstile.site_key', null);
         config()->set('services.turnstile.secret_key', null);
 
+        // Clear tag option caches to prevent stale data in tests
+        foreach (['domain', 'discipline', 'source', 'issue'] as $type) {
+            \Illuminate\Support\Facades\Cache::forget("submit_tags_{$type}_ms");
+            \Illuminate\Support\Facades\Cache::forget("submit_tags_{$type}_en");
+        }
+
         // Seed common languages for tests that use the submit event form
         $languages = [
             ['id' => 7, 'code' => 'ar', 'name' => 'Arabic', 'name_native' => 'العربية', 'dir' => 'rtl'],

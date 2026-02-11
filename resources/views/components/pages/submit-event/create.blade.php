@@ -105,6 +105,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->required()
                                 ->searchable()
                                 ->allowHtml()
+                                ->live()
                                 ->getSearchResultsUsing(function (string $search): array {
                                     if (empty($search)) {
                                         return [];
@@ -121,7 +122,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     $exactMatch = collect($results)->contains(fn ($value) => strtolower($value) === strtolower($search));
 
                                     if (! $exactMatch) {
-                                        $results = ["__quick_add__{$search}" => '+ '.__('Tambah')." '{$search}'"] + $results;
+                                        $results = ["__quick_add__{$search}" => "<span class='text-primary-600'>+ ".__('Tambah')." '{$search}'</span>"] + $results;
                                     }
 
                                     return $results;
@@ -139,6 +140,50 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         $set('title', $state.substring('__quick_add__'.length))
                                     }
                                 JS)
+                                ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                    // Skip quick-add values — they're new titles, not existing events
+                                    if (! $state || str_starts_with($state, '__quick_add__')) {
+                                        return;
+                                    }
+
+                                    // Find the latest approved event with this exact title
+                                    $existingEvent = Event::query()
+                                        ->where('title', $state)
+                                        ->where('status', 'approved')
+                                        ->with(['tags', 'references'])
+                                        ->latest()
+                                        ->first();
+
+                                    if (! $existingEvent) {
+                                        return;
+                                    }
+
+                                    // Populate event type
+                                    if ($existingEvent->event_type) {
+                                        $set('event_type', $existingEvent->event_type->map(fn ($e) => $e->value)->toArray());
+                                    }
+
+                                    // Populate tags by type
+                                    $tagsByType = $existingEvent->tags->groupBy('type');
+
+                                    if ($tagsByType->has(TagType::Domain->value)) {
+                                        $set('domain_tags', $tagsByType->get(TagType::Domain->value)->pluck('id')->toArray());
+                                    }
+                                    if ($tagsByType->has(TagType::Discipline->value)) {
+                                        $set('discipline_tags', $tagsByType->get(TagType::Discipline->value)->pluck('id')->toArray());
+                                    }
+                                    if ($tagsByType->has(TagType::Source->value)) {
+                                        $set('source_tags', $tagsByType->get(TagType::Source->value)->pluck('id')->toArray());
+                                    }
+                                    if ($tagsByType->has(TagType::Issue->value)) {
+                                        $set('issue_tags', $tagsByType->get(TagType::Issue->value)->pluck('id')->toArray());
+                                    }
+
+                                    // Populate references
+                                    if ($existingEvent->references->isNotEmpty()) {
+                                        $set('references', $existingEvent->references->pluck('id')->toArray());
+                                    }
+                                })
                                 ->placeholder(__('Cari atau masukkan tajuk majlis...')),
 
                             RichEditor::make('description')
@@ -445,8 +490,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->searchable()
                                         ->preload()
                                         ->native(false)
+                                        ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
                                         ->options(fn () => Cache::remember('submit_tags_domain_'.app()->getLocale(), 60, fn () => Tag::query()
-                                            ->where('type', TagType::Domain->value)
+                                            ->where('type', TagType::Domain)
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->orderBy('order_column')
                                             ->get()
@@ -460,41 +506,74 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('discipline_tags')
                                         ->label(__('Bidang Ilmu'))
-                                        ->closeOnSelect()
                                         ->helperText(__('Pilih bidang yang menggambarkan isi ceramah.'))
-                                        ->placeholder(__('Pilih bidang…'))
+                                        ->placeholder(__('Pilih atau taip untuk tambah bidang…'))
                                         ->multiple()
                                         ->required()
                                         ->searchable()
                                         ->preload()
-                                        ->native(false)
-                                        ->options(fn () => Cache::remember('submit_tags_discipline_'.app()->getLocale(), 60, fn () => Tag::query()
-                                            ->where('type', TagType::Discipline->value)
-                                            ->whereIn('status', ['verified', 'pending'])
+                                        ->allowHtml()
+                                        ->options(fn () => Cache::remember('submit_tags_discipline_verified_'.app()->getLocale(), 60, fn () => Tag::query()
+                                            ->where('type', TagType::Discipline)
+                                            ->where('status', 'verified')
                                             ->orderBy('order_column')
                                             ->get()
                                             ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                        ->getSearchResultsUsing(function (string $search): array {
+                                            if (blank($search)) {
+                                                // No search, let options() handle preload
+                                                return [];
+                                            }
+
+                                            $results = Tag::query()
+                                                ->where('type', TagType::Discipline)
+                                                ->where('status', 'verified')
+                                                ->where('name', 'like', "%{$search}%")
+                                                ->limit(20)
+                                                ->get()
+                                                ->pluck('name', 'id')
+                                                ->toArray();
+
+                                            return ["__quick_add__{$search}" => "<span class='text-primary-600'>+ ".__('Tambah')." '{$search}'</span>"] + $results;
+                                        })
+                                        ->getOptionLabelsUsing(function (array $values): array {
+                                            $labels = [];
+                                            $uuids = [];
+
+                                            foreach ($values as $value) {
+                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                    $labels[$value] = $value;
+                                                } else {
+                                                    $uuids[] = $value;
+                                                }
+                                            }
+
+                                            if (! empty($uuids)) {
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                            }
+
+                                            return $labels;
+                                        })
+                                        ->afterStateUpdatedJs(<<<'JS'
+                                            if (Array.isArray($state)) {
+                                                const hasQuickAdd = $state.some(v => typeof v === 'string' && v.startsWith('__quick_add__'));
+                                                if (hasQuickAdd) {
+                                                    const cleaned = $state.map(v => (typeof v === 'string' && v.startsWith('__quick_add__')) ? v.substring(13) : v);
+                                                    $set('discipline_tags', cleaned);
+                                                    $nextTick(() => {
+                                                        const wrapper = $el.querySelector('[wire\\:ignore]');
+                                                        if (wrapper) {
+                                                            Alpine.$data(wrapper)?.select?.closeDropdown();
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        JS)
                                         ->rules(['min:1'])
                                         ->validationMessages([
                                             'required' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
                                             'min' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
-                                        ])
-                                        ->createOptionForm([
-                                            TextInput::make('name')
-                                                ->label(__('Nama Bidang'))
-                                                ->required()
-                                                ->maxLength(255)
-                                                ->placeholder(__('cth: Fiqh, Tasawuf')),
-                                        ])
-                                        ->createOptionUsing(function (array $data): string {
-                                            $tag = Tag::create([
-                                                'name' => ['ms' => $data['name'], 'en' => $data['name']],
-                                                'type' => TagType::Discipline->value,
-                                                'status' => 'pending',
-                                            ]);
-
-                                            return (string) $tag->getKey();
-                                        }),
+                                        ]),
                                 ]),
 
                             Grid::make(['default' => 1, 'sm' => 2])
@@ -508,8 +587,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->searchable()
                                         ->preload()
                                         ->native(false)
+                                        ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
                                         ->options(fn () => Cache::remember('submit_tags_source_'.app()->getLocale(), 60, fn () => Tag::query()
-                                            ->where('type', TagType::Source->value)
+                                            ->where('type', TagType::Source)
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->orderBy('order_column')
                                             ->get()
@@ -518,34 +598,67 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     Select::make('issue_tags')
                                         ->label(__('Tema / Isu'))
                                         ->helperText(__('Pilih tema supaya mudah dicari.'))
-                                        ->placeholder(__('Pilih tema…'))
+                                        ->placeholder(__('Pilih atau taip untuk tambah tema…'))
                                         ->multiple()
-                                        ->closeOnSelect()
                                         ->searchable()
                                         ->preload()
-                                        ->native(false)
-                                        ->options(fn () => Cache::remember('submit_tags_issue_'.app()->getLocale(), 60, fn () => Tag::query()
-                                            ->where('type', TagType::Issue->value)
-                                            ->whereIn('status', ['verified', 'pending'])
+                                        ->allowHtml()
+                                        ->options(fn () => Cache::remember('submit_tags_issue_verified_'.app()->getLocale(), 60, fn () => Tag::query()
+                                            ->where('type', TagType::Issue)
+                                            ->where('status', 'verified')
                                             ->orderBy('order_column')
                                             ->get()
                                             ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
-                                        ->createOptionForm([
-                                            TextInput::make('name')
-                                                ->label(__('Nama Tema'))
-                                                ->required()
-                                                ->maxLength(255)
-                                                ->placeholder(__('cth: Palestin, Riba')),
-                                        ])
-                                        ->createOptionUsing(function (array $data): string {
-                                            $tag = Tag::create([
-                                                'name' => ['ms' => $data['name'], 'en' => $data['name']],
-                                                'type' => TagType::Issue->value,
-                                                'status' => 'pending',
-                                            ]);
+                                        ->getSearchResultsUsing(function (string $search): array {
+                                            if (blank($search)) {
+                                                // No search, let options() handle preload
+                                                return [];
+                                            }
 
-                                            return (string) $tag->getKey();
-                                        }),
+                                            $results = Tag::query()
+                                                ->where('type', TagType::Issue)
+                                                ->where('status', 'verified')
+                                                ->where('name', 'like', "%{$search}%")
+                                                ->limit(20)
+                                                ->get()
+                                                ->pluck('name', 'id')
+                                                ->toArray();
+
+                                            return ["__quick_add__{$search}" => "<span class='text-primary-600'>+ ".__('Tambah')." '{$search}'</span>"] + $results;
+                                        })
+                                        ->getOptionLabelsUsing(function (array $values): array {
+                                            $labels = [];
+                                            $uuids = [];
+
+                                            foreach ($values as $value) {
+                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                    $labels[$value] = $value;
+                                                } else {
+                                                    $uuids[] = $value;
+                                                }
+                                            }
+
+                                            if (! empty($uuids)) {
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                            }
+
+                                            return $labels;
+                                        })
+                                        ->afterStateUpdatedJs(<<<'JS'
+                                            if (Array.isArray($state)) {
+                                                const hasQuickAdd = $state.some(v => typeof v === 'string' && v.startsWith('__quick_add__'));
+                                                if (hasQuickAdd) {
+                                                    const cleaned = $state.map(v => (typeof v === 'string' && v.startsWith('__quick_add__')) ? v.substring(13) : v);
+                                                    $set('issue_tags', cleaned);
+                                                    $nextTick(() => {
+                                                        const wrapper = $el.querySelector('[wire\\:ignore]');
+                                                        if (wrapper) {
+                                                            Alpine.$data(wrapper)?.select?.closeDropdown();
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        JS),
                                 ]),
 
                             Select::make('references')
@@ -557,7 +670,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->searchable()
                                 ->preload()
                                 ->native(false)
-                                ->relationship('references', 'title')
+                                ->relationship('references', 'title', fn (Builder $query) => $query->where('is_active', true))
                                 ->createOptionForm([
                                     TextInput::make('title')
                                         ->label(__('Tajuk Kitab / Buku'))
@@ -576,14 +689,58 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             'article' => __('Artikel'),
                                         ])
                                         ->default('kitab'),
+                                    TextInput::make('reference_url')
+                                        ->label(__('Pautan Rujukan'))
+                                        ->url()
+                                        ->maxLength(255)
+                                        ->placeholder(__('https://...')),
+                                    SpatieMediaLibraryFileUpload::make('front_cover')
+                                        ->label(__('Muka Depan'))
+                                        ->collection('front_cover')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->conversion('thumb')
+                                        ->responsiveImages()
+                                        ->maxSize(5120),
+                                    SpatieMediaLibraryFileUpload::make('back_cover')
+                                        ->label(__('Muka Belakang'))
+                                        ->collection('back_cover')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->conversion('thumb')
+                                        ->responsiveImages()
+                                        ->maxSize(5120),
+                                    SpatieMediaLibraryFileUpload::make('gallery')
+                                        ->label(__('Galeri'))
+                                        ->collection('gallery')
+                                        ->multiple()
+                                        ->image()
+                                        ->imageEditor()
+                                        ->conversion('gallery_thumb')
+                                        ->responsiveImages()
+                                        ->maxSize(5120)
+                                        ->maxFiles(5)
+                                        ->helperText(__('Sehingga 5 gambar tambahan')),
                                 ])
-                                ->createOptionUsing(function (array $data): string {
+                                ->createOptionUsing(function (array $data, Schema $schema): string {
                                     $reference = Reference::create([
                                         'title' => $data['title'],
                                         'author' => $data['author'] ?? null,
                                         'type' => $data['type'] ?? 'kitab',
                                         'is_canonical' => false,
+                                        'status' => 'pending',
                                     ]);
+
+                                    // Save media uploads via Filament's relationship-saving mechanism
+                                    $schema?->model($reference)->saveRelationships();
+
+                                    // Save reference URL as social media link
+                                    if (! empty($data['reference_url'])) {
+                                        $reference->socialMedia()->create([
+                                            'platform' => 'website',
+                                            'url' => $data['reference_url'],
+                                        ]);
+                                    }
 
                                     return (string) $reference->getKey();
                                 }),
@@ -606,7 +763,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('organizer_institution_id')
                                         ->label(__('Institusi'))
-                                        ->options(fn () => Cache::remember('submit_institutions', 60, fn () => Institution::whereIn('status', ['verified', 'pending'])->pluck('name', 'id')))
+                                        ->options(fn () => Cache::remember('submit_institutions', 60, fn () => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -620,6 +777,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->label(__('Penceramah'))
                                         ->options(fn () => Cache::remember('submit_speakers', 60, fn () => Speaker::query()
                                             ->whereIn('status', ['verified', 'pending'])
+                                            ->where('is_active', true)
                                             ->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
@@ -669,7 +827,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('location_institution_id')
                                         ->label(__('Institusi'))
-                                        ->options(fn () => Cache::remember('submit_institutions', 60, fn () => Institution::whereIn('status', ['verified', 'pending'])->pluck('name', 'id')))
+                                        ->options(fn () => Cache::remember('submit_institutions', 60, fn () => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -681,7 +839,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('location_venue_id')
                                         ->label(__('Lokasi'))
-                                        ->options(fn () => Cache::remember('submit_venues', 60, fn () => Venue::whereIn('status', ['verified', 'pending'])->pluck('name', 'id')))
+                                        ->options(fn () => Cache::remember('submit_venues', 60, fn () => Venue::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -721,7 +879,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->required()
                                         ->multiple()
                                         ->closeOnSelect()
-                                        ->relationship('speakers', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending']))
+                                        ->relationship('speakers', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending'])->where('is_active', true))
                                         ->searchable()
                                         ->preload()
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
@@ -960,13 +1118,40 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $event->syncLanguages($validated['languages']);
         }
 
-        // Attach tags (merge all selected tags from 4 type fields)
+        // Attach tags (merge all selected tags from 4 type fields, resolving quick-add text values)
+        $tagFieldMap = [
+            'discipline_tags' => TagType::Discipline,
+            'issue_tags' => TagType::Issue,
+        ];
+
         $allTagIds = array_merge(
             $validated['domain_tags'] ?? [],
-            $validated['discipline_tags'] ?? [],
             $validated['source_tags'] ?? [],
-            $validated['issue_tags'] ?? []
         );
+
+        // Resolve quick-add text values (non-UUID) to real tag records
+        foreach ($tagFieldMap as $field => $tagType) {
+            foreach ($validated[$field] ?? [] as $value) {
+                if (Str::isUuid($value)) {
+                    $allTagIds[] = $value;
+                } else {
+                    // Find or create tag from plain text
+                    $tag = Tag::where('type', $tagType->value)
+                        ->whereRaw("LOWER(name->>'ms') = ?", [strtolower($value)])
+                        ->first();
+
+                    if (! $tag) {
+                        $tag = Tag::create([
+                            'name' => ['ms' => $value, 'en' => $value],
+                            'type' => $tagType->value,
+                            'status' => 'pending',
+                        ]);
+                    }
+
+                    $allTagIds[] = (string) $tag->id;
+                }
+            }
+        }
 
         if (! empty($allTagIds)) {
             $tags = Tag::whereIn('id', $allTagIds)->get();

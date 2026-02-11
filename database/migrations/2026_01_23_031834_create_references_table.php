@@ -20,6 +20,8 @@ return new class extends Migration
             $table->string('publisher')->nullable();
             $table->text('description')->nullable();
             $table->boolean('is_canonical')->default(false)->index(); // Generic/Official reference
+            $table->string('status')->default('verified')->index();
+            $table->boolean('is_active')->default(true)->index();
             $table->timestamps();
         });
     }

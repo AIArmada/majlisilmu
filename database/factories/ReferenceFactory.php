@@ -23,8 +23,29 @@ class ReferenceFactory extends Factory
             'publication_year' => $this->faker->year(),
             'publisher' => $this->faker->company(),
             'description' => $this->faker->paragraph(),
-            'external_link' => $this->faker->url(),
             'is_canonical' => $this->faker->boolean(),
+            'status' => 'verified',
+            'is_active' => true,
         ];
+    }
+
+    /**
+     * Create a pending (unverified) reference.
+     */
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'pending',
+        ]);
+    }
+
+    /**
+     * Create a verified reference.
+     */
+    public function verified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'verified',
+        ]);
     }
 }

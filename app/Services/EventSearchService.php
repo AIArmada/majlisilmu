@@ -271,6 +271,7 @@ class EventSearchService
     protected function buildDatabaseQuery(?string $query, array $filters): Builder
     {
         $queryBuilder = Event::query()
+            ->where('is_active', true)
             ->whereIn('status', ['approved', 'pending'])
             ->where('visibility', 'public')
             ->where('starts_at', '>=', $this->startsAfterDateTime($filters));
