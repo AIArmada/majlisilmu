@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Speaker;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Livewire\Component;
 
 new class extends Component {
@@ -42,6 +43,9 @@ new class extends Component {
     $facebookUrl = $speaker->socialMedia->firstWhere('platform', 'facebook')?->url;
     $instagramUrl = $speaker->socialMedia->firstWhere('platform', 'instagram')?->url;
     $youtubeUrl = $speaker->socialMedia->firstWhere('platform', 'youtube')?->url;
+    $bioHtml = is_array($speaker->bio)
+        ? RichContentRenderer::make($speaker->bio)->toHtml()
+        : $speaker->bio;
 @endphp
 
 
@@ -127,11 +131,11 @@ new class extends Component {
                     </div>
                 @endif
 
-                @if($speaker->bio)
+                @if(filled($bioHtml))
                     <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
                         <h2 class="font-heading text-xl font-bold text-slate-900 mb-4">{{ __('Bio') }}</h2>
                         <div class="prose prose-slate max-w-none">
-                            {!! $speaker->bio !!}
+                            {!! $bioHtml !!}
                         </div>
                     </div>
                 @endif

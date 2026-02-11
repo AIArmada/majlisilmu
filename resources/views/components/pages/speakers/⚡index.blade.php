@@ -20,8 +20,10 @@ new
             ->withCount('events')
             ->with('media')
             ->when($search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('bio', 'like', "%{$search}%");
+                $query->where(function ($innerQuery) use ($search) {
+                    $innerQuery->where('name', 'like', "%{$search}%")
+                        ->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
+                });
             })
             ->orderBy('name', 'asc')
             ->paginate(12);

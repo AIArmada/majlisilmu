@@ -33,6 +33,9 @@ class SeriesForm
                                 'private' => 'Private',
                             ])
                             ->required(),
+                        \Filament\Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true),
                         Select::make('languages')
                             ->relationship('languages', 'name')
                             ->multiple()

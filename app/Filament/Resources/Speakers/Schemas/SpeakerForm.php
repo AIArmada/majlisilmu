@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\Speakers\Schemas;
 
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -52,9 +52,10 @@ class SpeakerForm
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
-                        Textarea::make('bio')
+                        RichEditor::make('bio')
+                            ->json()
                             ->columnSpanFull()
-                            ->maxLength(5000),
+                            ->placeholder('Speaker biography'),
 
                         // Address Components
                         Section::make('Location / Base')
@@ -205,6 +206,9 @@ class SpeakerForm
                                 'rejected' => 'Rejected',
                             ])
                             ->required(),
+                        \Filament\Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true),
                     ])
                     ->columns(1),
             ]);

@@ -44,6 +44,9 @@ class ReferenceForm
                             ])
                             ->default('verified')
                             ->required(),
+                        \Filament\Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true),
                     ])->columns(2),
                 \Filament\Schemas\Components\Section::make('Imagery')
                     ->components([

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->jsonb('pre_nominal')->nullable(); // Multiple pre-nominals: ["tun", "datuk_seri"]
             $table->jsonb('post_nominal')->nullable(); // Multiple post-nominals: ["phd", "msc", "ma"]
             $table->string('slug')->unique();
-            $table->text('bio')->nullable();
+            $table->jsonb('bio')->nullable();
 
             $table->jsonb('qualifications')->nullable();
             $table->boolean('is_freelance')->default(false);

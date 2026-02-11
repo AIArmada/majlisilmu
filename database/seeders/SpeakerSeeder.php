@@ -58,7 +58,16 @@ class SpeakerSeeder extends Seeder
                 ['name' => $name],
                 [
                     'slug' => Str::slug($name),
-                    'bio' => fake()->paragraph(),
+                    'bio' => [
+                        'type' => 'doc',
+                        'content' => [[
+                            'type' => 'paragraph',
+                            'content' => [[
+                                'type' => 'text',
+                                'text' => fake()->paragraph(),
+                            ]],
+                        ]],
+                    ],
                     'status' => 'verified',
                     'is_active' => true,
                 ]

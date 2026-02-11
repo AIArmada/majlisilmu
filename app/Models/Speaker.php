@@ -58,6 +58,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
             'honorific' => 'array',
             'pre_nominal' => 'array',
             'post_nominal' => 'array',
+            'bio' => 'array',
             'qualifications' => 'array',
             'is_freelance' => 'boolean',
             'is_active' => 'boolean',

@@ -33,6 +33,9 @@ class VenueForm
                             ])
                             ->required()
                             ->default('verified'),
+                        \Filament\Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true),
                         TextInput::make('slug')
                             ->required()
                             ->maxLength(255)
