@@ -50,6 +50,23 @@ new class extends Component {
     $cityName = $institution->addressModel?->city?->name;
     $stateName = $institution->addressModel?->state?->name;
     $gallery = $institution->getMedia('gallery');
+    $resolveEventTypeLabel = static function (mixed $eventType): string {
+        if ($eventType instanceof \Illuminate\Support\Collection) {
+            $eventType = $eventType->first();
+        } elseif (is_array($eventType)) {
+            $eventType = $eventType[0] ?? null;
+        }
+
+        if ($eventType instanceof \App\Enums\EventType) {
+            return $eventType->getLabel();
+        }
+
+        if (is_string($eventType) && $eventType !== '') {
+            return \App\Enums\EventType::tryFrom($eventType)?->getLabel() ?? 'General';
+        }
+
+        return 'General';
+    };
 @endphp
 
 
@@ -299,7 +316,7 @@ new class extends Component {
                                                 
                                                 <div class="flex-1 min-w-0 py-0.5">
                                                      <p class="text-xs font-bold text-emerald-600 mb-1 uppercase tracking-wide">
-                                                        {{ $event->event_type?->getLabel() ?? 'General' }}
+                                                        {{ $resolveEventTypeLabel($event->event_type) }}
                                                     </p>
                                                     <h3 class="font-bold text-slate-900 leading-tight mb-2 group-hover:text-emerald-700 transition-colors line-clamp-2">
                                                         {{ $event->title }}

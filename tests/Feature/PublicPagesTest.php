@@ -41,6 +41,26 @@ it('loads public detail pages', function () {
     $this->get(route('series.show', $series))->assertSuccessful()->assertSee($series->title);
 });
 
+it('loads institution detail page with upcoming event type enum collection', function () {
+    $institution = Institution::factory()->create(['status' => 'verified']);
+    $eventType = \App\Enums\EventType::KuliahCeramah;
+    $event = Event::factory()
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'starts_at' => now()->addDay(),
+            'event_type' => [$eventType],
+            'title' => 'Institution Upcoming Event',
+        ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee($institution->name)
+        ->assertSee($event->title)
+        ->assertSee($eventType->getLabel());
+});
+
 it('hides unverified speakers and institutions from public pages', function () {
     $institution = Institution::factory()->create(['status' => 'pending']);
     $speaker = Speaker::factory()->create(['status' => 'pending']);
