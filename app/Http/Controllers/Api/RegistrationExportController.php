@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\Registration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use OwenIt\Auditing\Models\Audit;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -29,7 +29,7 @@ class RegistrationExportController extends Controller
             ], 403);
         }
 
-        $registrationsQuery = Registration::query()
+        $registrationsQuery = DB::table('registrations')
             ->where('registrations.event_id', $event->id)
             ->leftJoin('users', 'users.id', '=', 'registrations.user_id')
             ->orderBy('registrations.created_at')

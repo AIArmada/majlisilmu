@@ -16,6 +16,9 @@ class ReportResolvedNotification extends Notification implements ShouldQueue
         public Report $report,
     ) {}
 
+    /**
+     * @return array<int, string>
+     */
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
@@ -38,6 +41,9 @@ class ReportResolvedNotification extends Notification implements ShouldQueue
             ->salutation('The Majlis Ilmu Team');
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(object $notifiable): array
     {
         return [

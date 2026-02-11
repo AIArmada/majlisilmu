@@ -32,8 +32,12 @@ class EventRejectedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $reason = $this->review?->reason_code ?? 'policy_violation';
-        $note = $this->review?->note ?? 'The event did not meet our content guidelines.';
+        $reason = $this->review && $this->review->reason_code
+            ? $this->review->reason_code
+            : 'policy_violation';
+        $note = $this->review && $this->review->note
+            ? $this->review->note
+            : 'The event did not meet our content guidelines.';
 
         $reasonLabels = [
             'duplicate' => 'This event appears to be a duplicate of an existing listing.',
@@ -62,8 +66,8 @@ class EventRejectedNotification extends Notification implements ShouldQueue
         return [
             'event_id' => $this->event->id,
             'event_title' => $this->event->title,
-            'reason_code' => $this->review?->reason_code,
-            'review_note' => $this->review?->note,
+            'reason_code' => $this->review instanceof \App\Models\ModerationReview ? $this->review->reason_code : null,
+            'review_note' => $this->review instanceof \App\Models\ModerationReview ? $this->review->note : null,
             'type' => 'event_rejected',
         ];
     }

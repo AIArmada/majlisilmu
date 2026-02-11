@@ -38,6 +38,9 @@ class Index extends Component
         $this->prefillFromRequest();
     }
 
+    /**
+     * @return Collection<int, SavedSearch>
+     */
     #[Computed]
     public function savedSearches(): Collection
     {
@@ -119,17 +122,7 @@ class Index extends Component
             ]);
         }
 
-        return array_filter($params, function (mixed $value): bool {
-            if ($value === null || $value === '') {
-                return false;
-            }
-
-            if (is_array($value)) {
-                return $value !== [];
-            }
-
-            return true;
-        });
+        return array_filter($params, filled(...));
     }
 
     public function render(): View

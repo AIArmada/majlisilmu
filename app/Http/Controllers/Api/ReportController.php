@@ -9,6 +9,7 @@ use App\Services\ModerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class ReportController extends Controller
 {
@@ -152,6 +153,7 @@ class ReportController extends Controller
             'institution' => \App\Models\Institution::class,
             'speaker' => \App\Models\Speaker::class,
             'donation_channel' => \App\Models\DonationChannel::class,
+            default => throw new InvalidArgumentException("Unsupported entity type [{$entityType}]"),
         };
     }
 

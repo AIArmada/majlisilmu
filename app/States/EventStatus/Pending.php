@@ -9,7 +9,7 @@ use Filament\Support\Contracts\HasLabel;
 
 final class Pending extends EventStatus implements HasColor, HasIcon, HasLabel
 {
-    public static $name = 'pending';
+    public static string $name = 'pending';
 
     public function getLabel(): string
     {

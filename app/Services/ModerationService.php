@@ -90,6 +90,8 @@ class ModerationService
     /**
      * Handle sensitive change gating.
      * Per documentation B4.
+     *
+     * @param  array<string, mixed>  $changes
      */
     public function handleSensitiveChange(Event $event, array $changes): void
     {

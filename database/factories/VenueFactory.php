@@ -61,7 +61,7 @@ class VenueFactory extends Factory
         return $this->afterCreating(function (\App\Models\Venue $venue) {
             $venue->address()->create([
                 'line1' => fake()->streetAddress(),
-                'line2' => fake()->optional()->secondaryAddress(),
+                'line2' => fake()->optional()->words(2, true),
                 'postcode' => fake()->postcode(),
                 'lat' => fake()->randomFloat(7, 1.0, 7.0),
                 'lng' => fake()->randomFloat(7, 99.0, 119.0),

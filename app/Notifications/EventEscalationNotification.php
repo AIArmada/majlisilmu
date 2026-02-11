@@ -17,6 +17,9 @@ class EventEscalationNotification extends Notification implements ShouldQueue
         public string $escalationType,
     ) {}
 
+    /**
+     * @return array<int, string>
+     */
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
@@ -56,6 +59,9 @@ class EventEscalationNotification extends Notification implements ShouldQueue
         return $message;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(object $notifiable): array
     {
         return [

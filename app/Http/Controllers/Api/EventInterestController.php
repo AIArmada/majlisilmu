@@ -123,7 +123,7 @@ class EventInterestController extends Controller
         return response()->json([
             'data' => [
                 'message' => 'Interest recorded successfully.',
-                'interests_count' => (int) (Event::query()->find($event->id)?->interests_count ?? 0),
+                'interests_count' => (int) (Event::query()->whereKey($event->id)->value('interests_count') ?? 0),
             ],
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),

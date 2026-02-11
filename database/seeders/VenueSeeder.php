@@ -51,9 +51,9 @@ class VenueSeeder extends Seeder
                     $addressesToInsert[] = [
                         'id' => (string) \Illuminate\Support\Str::uuid(),
                         'addressable_type' => 'venue',
-                        'addressable_id' => $venue->id,
+                        'addressable_id' => $venue->getKey(),
                         'line1' => fake()->streetAddress(),
-                        'line2' => fake()->optional()->secondaryAddress(),
+                        'line2' => fake()->optional()->words(2, true),
                         'postcode' => fake()->postcode(),
                         'lat' => fake()->randomFloat(7, 1.0, 7.0),
                         'lng' => fake()->randomFloat(7, 99.0, 119.0),

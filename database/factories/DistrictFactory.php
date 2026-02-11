@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\State;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -19,7 +18,7 @@ class DistrictFactory extends Factory
     {
         return [
             'country_id' => 132, // Malaysia default in World package usually
-            'state_id' => State::factory(),
+            'state_id' => fake()->numberBetween(1, 16),
             'country_code' => 'MY',
             'name' => fake()->unique()->city(),
         ];

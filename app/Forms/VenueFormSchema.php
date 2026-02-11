@@ -62,6 +62,8 @@ class VenueFormSchema
 
     /**
      * Shared createOptionUsing callback for Venue selects.
+     *
+     * @param  array<string, mixed>  $data
      */
     public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {

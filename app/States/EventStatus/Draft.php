@@ -9,7 +9,7 @@ use Filament\Support\Contracts\HasLabel;
 
 final class Draft extends EventStatus implements HasColor, HasIcon, HasLabel
 {
-    public static $name = 'draft';
+    public static string $name = 'draft';
 
     public function getLabel(): string
     {

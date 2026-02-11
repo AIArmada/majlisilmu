@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationPreferenceKey;
+use App\Models\Event;
 use App\Models\SavedSearch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,6 +18,8 @@ class SavedSearchDigestNotification extends Notification implements ShouldQueue
 
     /**
      * Create a new notification instance.
+     *
+     * @param  Collection<int, Event>  $events
      */
     public function __construct(
         public SavedSearch $savedSearch,
@@ -37,22 +40,23 @@ class SavedSearchDigestNotification extends Notification implements ShouldQueue
             )
             : [NotificationChannel::Email->value];
 
-        return collect($configuredChannels)
-            ->map(function (string $channel) use ($notifiable): ?string {
-                if ($channel === NotificationChannel::Email->value) {
-                    return filled($notifiable->email ?? null) ? 'mail' : null;
+        $channels = [];
+
+        foreach ($configuredChannels as $channel) {
+            if ($channel === NotificationChannel::Email->value) {
+                if (filled($notifiable->email ?? null)) {
+                    $channels[] = 'mail';
                 }
 
-                if ($channel === NotificationChannel::InApp->value) {
-                    return 'database';
-                }
+                continue;
+            }
 
-                return null;
-            })
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+            if ($channel === NotificationChannel::InApp->value) {
+                $channels[] = 'database';
+            }
+        }
+
+        return array_values(array_unique($channels));
     }
 
     /**
@@ -71,7 +75,12 @@ class SavedSearchDigestNotification extends Notification implements ShouldQueue
         // Add event summaries
         foreach ($this->events->take(5) as $event) {
             $date = $event->starts_at?->format('D, M d') ?? 'TBD';
-            $venue = $event->venue?->name ?? ($event->institution?->name ?? 'Location TBA');
+            $venue = 'Location TBA';
+            if ($event->venue) {
+                $venue = $event->venue->name;
+            } elseif ($event->institution) {
+                $venue = $event->institution->name;
+            }
 
             $mail->line("📅 **{$event->title}**")
                 ->line("   {$date} @ {$venue}");

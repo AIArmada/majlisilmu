@@ -30,12 +30,15 @@ class EventSubmittedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $institution = $this->event->institution;
+        $institutionName = $institution ? $institution->name : 'Public Submission';
+
         return (new MailMessage)
             ->subject('🕌 New Event Submitted for Review')
             ->greeting('Assalamualaikum!')
             ->line('A new event has been submitted and requires moderation:')
             ->line("**{$this->event->title}**")
-            ->line('Institution: '.($this->event->institution?->name ?? 'Public Submission'))
+            ->line('Institution: '.$institutionName)
             ->line('Date: '.($this->event->starts_at?->format('D, M d, Y h:i A') ?? 'TBD'))
             ->action('Review Event', url('/admin/moderation-queue'))
             ->line('Please review this submission at your earliest convenience.');
@@ -46,10 +49,12 @@ class EventSubmittedNotification extends Notification implements ShouldQueue
      */
     public function toArray(object $notifiable): array
     {
+        $institution = $this->event->institution;
+
         return [
             'event_id' => $this->event->id,
             'event_title' => $this->event->title,
-            'institution_name' => $this->event->institution?->name,
+            'institution_name' => $institution ? $institution->name : null,
             'type' => 'event_submitted',
         ];
     }

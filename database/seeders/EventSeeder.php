@@ -162,9 +162,9 @@ class EventSeeder extends Seeder
                 ->first();
 
             $institution->address()->update([
-                'state_id' => $state?->id,
-                'district_id' => $district?->id,
-                'city_id' => $city?->id,
+                'state_id' => $state?->getKey(),
+                'district_id' => $district?->getKey(),
+                'city_id' => $city?->getKey(),
             ]);
         }
 
@@ -271,7 +271,7 @@ class EventSeeder extends Seeder
             if ($topic) {
                 $descriptionParts[] = $topic;
             }
-            if (isset($entry['speaker']) && ($entry['speaker'] !== '' && $entry['speaker'] !== '0')) {
+            if (isset($entry['speaker'])) {
                 $descriptionParts[] = 'Bersama '.$entry['speaker'];
             }
             if ($note) {
@@ -334,11 +334,11 @@ class EventSeeder extends Seeder
             if (class_exists(\Nnjeim\World\Models\Language::class)) {
                 $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first();
                 if ($malay) {
-                    $event->languages()->syncWithoutDetaching([$malay->id]);
+                    $event->languages()->syncWithoutDetaching([$malay->getKey()]);
                 }
             }
 
-            if (isset($entry['speaker']) && ($entry['speaker'] !== '' && $entry['speaker'] !== '0')) {
+            if (isset($entry['speaker'])) {
                 $speakerName = $entry['speaker'];
                 $speaker = \App\Models\Speaker::query()->firstOrCreate([
                     'slug' => \Illuminate\Support\Str::slug($speakerName),

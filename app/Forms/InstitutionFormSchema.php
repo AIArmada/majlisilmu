@@ -62,6 +62,8 @@ class InstitutionFormSchema
 
     /**
      * Shared createOptionUsing callback for Institution selects.
+     *
+     * @param  array<string, mixed>  $data
      */
     public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {

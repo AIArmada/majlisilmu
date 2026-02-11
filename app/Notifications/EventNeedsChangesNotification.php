@@ -32,7 +32,9 @@ class EventNeedsChangesNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $note = $this->review?->note ?? 'Please review the event details and make necessary corrections.';
+        $note = $this->review && $this->review->note
+            ? $this->review->note
+            : 'Please review the event details and make necessary corrections.';
 
         return (new MailMessage)
             ->subject('📝 Changes Requested for Your Event')
@@ -53,7 +55,7 @@ class EventNeedsChangesNotification extends Notification implements ShouldQueue
         return [
             'event_id' => $this->event->id,
             'event_title' => $this->event->title,
-            'review_note' => $this->review?->note,
+            'review_note' => $this->review instanceof \App\Models\ModerationReview ? $this->review->note : null,
             'type' => 'event_needs_changes',
         ];
     }

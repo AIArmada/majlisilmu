@@ -17,7 +17,7 @@ class StateFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->state();
+        $name = 'State '.fake()->unique()->word();
 
         return [
             'name' => $name,

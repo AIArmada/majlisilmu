@@ -6,10 +6,12 @@ use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Models\Country;
+use App\Models\District;
 use App\Models\Institution;
 use App\Models\State;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -68,7 +70,7 @@ class MasjidSeeder extends Seeder
 
             // Find matching state
             $state = $this->findState($states, $negeri);
-            if (! $state) {
+            if (! $state instanceof \App\Models\State) {
                 // If we can't find the state, skip this mosque
                 $skipped++;
 
@@ -78,8 +80,8 @@ class MasjidSeeder extends Seeder
             // Find matching district
             $district = null;
             if ($daerah && $state->districts) {
-                $district = collect($state->districts)->first(fn ($d) => Str::contains(strtolower((string) $d->name), strtolower($daerah)) ||
-                       Str::contains(strtolower($daerah), strtolower((string) $d->name)));
+                $district = $state->districts->first(fn (District $district): bool => Str::contains(strtolower((string) $district->name), strtolower($daerah)) ||
+                    Str::contains(strtolower($daerah), strtolower((string) $district->name)));
             }
 
             // Create or update institution
@@ -105,7 +107,7 @@ class MasjidSeeder extends Seeder
             ]);
 
             // Create contacts
-            if ($noTel && $noTel !== '0' && $noTel !== '') {
+            if ($noTel !== '' && $noTel !== '0') {
                 // Clean phone number
                 $cleanedPhone = $this->cleanPhoneNumber($noTel);
                 if ($cleanedPhone) {
@@ -126,9 +128,9 @@ class MasjidSeeder extends Seeder
                 $inst->address()->create([
                     'line1' => $alamat ?: null,
                     'postcode' => null,
-                    'country_id' => $malaysia?->id,
-                    'state_id' => $state->id,
-                    'district_id' => $district?->id,
+                    'country_id' => $malaysia?->getKey(),
+                    'state_id' => $state->getKey(),
+                    'district_id' => $district?->getKey(),
                     'city_id' => null,
                     'lat' => null,
                     'lng' => null,
@@ -163,8 +165,10 @@ class MasjidSeeder extends Seeder
 
     /**
      * Find state from CSV state name
+     *
+     * @param  Collection<int, State>  $states
      */
-    protected function findState($states, string $negeri): ?object
+    protected function findState(Collection $states, string $negeri): ?State
     {
         // State name mappings
         $stateMap = [
@@ -180,8 +184,8 @@ class MasjidSeeder extends Seeder
         // Use mapping if available
         $searchName = $stateMap[strtoupper($negeri)] ?? $negeri;
 
-        return $states->first(function ($s) use ($searchName, $negeri) {
-            $stateLower = strtolower((string) $s->name);
+        return $states->first(function (State $state) use ($searchName, $negeri): bool {
+            $stateLower = strtolower((string) $state->name);
             $searchLower = strtolower($searchName);
             $negeriLower = strtolower($negeri);
 

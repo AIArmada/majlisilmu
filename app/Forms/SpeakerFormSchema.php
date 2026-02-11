@@ -5,13 +5,13 @@ namespace App\Forms;
 use App\Enums\Gender;
 use App\Enums\Honorific;
 use App\Enums\PreNominal;
+use App\Forms\Components\Select;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
@@ -133,6 +133,8 @@ class SpeakerFormSchema
 
     /**
      * Shared createOptionUsing callback for Speaker selects.
+     *
+     * @param  array<string, mixed>  $data
      */
     public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {

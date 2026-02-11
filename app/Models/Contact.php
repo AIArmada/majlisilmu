@@ -27,6 +27,9 @@ class Contact extends Model
         ];
     }
 
+    /**
+     * @return MorphTo<Model, $this>
+     */
     public function contactable(): MorphTo
     {
         return $this->morphTo();
