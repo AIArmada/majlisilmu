@@ -159,6 +159,7 @@ class Index extends Component
         $filterKeys = [
             'state_id',
             'district_id',
+            'subdistrict_id',
             'language',
             'event_type',
             'gender',
@@ -193,7 +194,7 @@ class Index extends Component
     protected function suggestedName(): string
     {
         if (filled($this->query)) {
-            return __('Carian: :query', ['query' => Str::limit((string) $this->query, 40)]);
+            return __('Carian: :query', ['query' => Str::limit($this->query, 40)]);
         }
 
         if (! empty($this->filters['event_type'])) {

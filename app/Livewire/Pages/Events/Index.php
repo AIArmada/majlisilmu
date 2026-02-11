@@ -3,7 +3,9 @@
 namespace App\Livewire\Pages\Events;
 
 use App\Enums\TagType;
+use App\Models\District;
 use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Services\EventSearchService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -30,6 +32,9 @@ class Index extends Component
 
     #[Url]
     public ?string $district_id = null;
+
+    #[Url]
+    public ?string $subdistrict_id = null;
 
     #[Url]
     public ?string $language = null;
@@ -89,6 +94,32 @@ class Index extends Component
     }
 
     #[Computed]
+    public function districts(): Collection
+    {
+        if (! filled($this->state_id)) {
+            return collect();
+        }
+
+        return District::query()
+            ->where('state_id', $this->state_id)
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
+    public function subdistricts(): Collection
+    {
+        if (! filled($this->district_id)) {
+            return collect();
+        }
+
+        return Subdistrict::query()
+            ->where('district_id', $this->district_id)
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
     public function topics(): Collection
     {
         return cache()->remember('events_topics_'.app()->getLocale(), 300, fn () => Tag::query()
@@ -105,6 +136,7 @@ class Index extends Component
         $filters = [
             'state_id' => $this->state_id,
             'district_id' => $this->district_id,
+            'subdistrict_id' => $this->subdistrict_id,
             'language' => $this->language,
             'event_type' => $this->event_type,
             'gender' => $this->gender,

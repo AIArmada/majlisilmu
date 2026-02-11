@@ -89,3 +89,19 @@ test('can check if event is saved', function () {
     $this->getJson(route('api.event-saves.show', $this->event->id))
         ->assertJsonPath('data.is_saved', true);
 });
+
+test('saving an event recalculates stale saves_count from source rows', function () {
+    Sanctum::actingAs($this->user);
+
+    $this->event->update(['saves_count' => 99]);
+
+    $response = $this->postJson(route('api.event-saves.store'), [
+        'event_id' => $this->event->id,
+    ]);
+
+    $response->assertStatus(201);
+
+    $this->event->refresh();
+
+    expect($this->event->saves_count)->toBe(1);
+});

@@ -43,10 +43,8 @@ class EventSearchService
         int $perPage = 20,
         string $sort = 'time'
     ): LengthAwarePaginator {
-        if (empty($query) && empty($filters) && $perPage === 12 && $sort === 'time') {
-            return cache()->remember('default_events_search', 60, function () use ($query, $filters, $perPage, $sort) {
-                return $this->performSearch($query, $filters, $perPage, $sort);
-            });
+        if (in_array($query, [null, '', '0'], true) && $filters === [] && $perPage === 12 && $sort === 'time') {
+            return cache()->remember('default_events_search', 60, fn () => $this->performSearch($query, $filters, $perPage, $sort));
         }
 
         return $this->performSearch($query, $filters, $perPage, $sort);
@@ -116,13 +114,14 @@ class EventSearchService
         $queryBuilder = $this->buildDatabaseQuery($query, $filters)
             ->with($this->cardRelationships());
 
-        $operator = $this->databaseDriver() === 'pgsql' ? 'ILIKE' : 'LIKE';
+        $operator = $this->databaseLikeOperator();
+        $descriptionExpression = $this->searchableDescriptionExpression();
 
         if ($sort === 'relevance' && $query) {
             $queryBuilder->orderByRaw(
                 "CASE
                     WHEN title {$operator} ? THEN 1
-                    WHEN description {$operator} ? THEN 2
+                    WHEN {$descriptionExpression} {$operator} ? THEN 2
                     ELSE 3
                 END, starts_at ASC",
                 ["%{$query}%", "%{$query}%"]
@@ -177,6 +176,7 @@ class EventSearchService
     protected function buildTypesenseFilterParts(array $filters): array
     {
         $filterParts = [
+            'is_active:=true',
             'status:[approved, pending]',
             'visibility:public',
             'starts_at:>='.$this->startsAfterTimestamp($filters),
@@ -194,6 +194,10 @@ class EventSearchService
 
         if (! empty($filters['district_id'])) {
             $filterParts[] = 'district_id:='.$filters['district_id'];
+        }
+
+        if (! empty($filters['subdistrict_id'])) {
+            $filterParts[] = 'subdistrict_id:='.$filters['subdistrict_id'];
         }
 
         if (! empty($filters['language'])) {
@@ -278,17 +282,18 @@ class EventSearchService
 
         $startsBefore = $this->startsBeforeDateTime($filters);
 
-        if ($startsBefore !== null) {
+        if ($startsBefore instanceof \Carbon\CarbonInterface) {
             $queryBuilder->where('starts_at', '<=', $startsBefore);
         }
 
         if (filled($query)) {
-            $operator = $this->databaseDriver() === 'pgsql' ? 'ilike' : 'like';
+            $operator = strtolower($this->databaseLikeOperator());
+            $descriptionExpression = $this->searchableDescriptionExpression();
 
-            $queryBuilder->where(function (Builder $nestedQuery) use ($query, $operator) {
+            $queryBuilder->where(function (Builder $nestedQuery) use ($descriptionExpression, $query, $operator): void {
                 $nestedQuery
                     ->where('title', $operator, "%{$query}%")
-                    ->orWhere('description', $operator, "%{$query}%");
+                    ->orWhereRaw("{$descriptionExpression} {$operator} ?", ["%{$query}%"]);
             });
         }
 
@@ -301,6 +306,12 @@ class EventSearchService
         if (! empty($filters['district_id'])) {
             $queryBuilder->whereHas('venue.address', function (Builder $addressQuery) use ($filters) {
                 $addressQuery->where('district_id', $filters['district_id']);
+            });
+        }
+
+        if (! empty($filters['subdistrict_id'])) {
+            $queryBuilder->whereHas('venue.address', function (Builder $addressQuery) use ($filters) {
+                $addressQuery->where('subdistrict_id', $filters['subdistrict_id']);
             });
         }
 
@@ -428,7 +439,7 @@ class EventSearchService
     {
         $startsAfter = $this->parseDateFilter($filters['starts_after'] ?? null, false);
 
-        if ($startsAfter === null) {
+        if (! $startsAfter instanceof \Carbon\CarbonInterface) {
             return now();
         }
 
@@ -513,6 +524,23 @@ class EventSearchService
 
     protected function databaseDriver(): string
     {
-        return Event::query()->getConnection()->getDriverName();
+        /** @var \Illuminate\Database\Connection $connection */
+        $connection = Event::query()->getConnection();
+
+        return $connection->getDriverName();
+    }
+
+    private function databaseLikeOperator(): string
+    {
+        return $this->databaseDriver() === 'pgsql' ? 'ILIKE' : 'LIKE';
+    }
+
+    private function searchableDescriptionExpression(): string
+    {
+        return match ($this->databaseDriver()) {
+            'pgsql' => "COALESCE(description::text, '')",
+            'mysql', 'mariadb' => "COALESCE(CAST(description AS CHAR), '')",
+            default => "COALESCE(CAST(description AS TEXT), '')",
+        };
     }
 }

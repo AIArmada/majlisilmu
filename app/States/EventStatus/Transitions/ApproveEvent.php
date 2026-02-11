@@ -68,9 +68,7 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
 
         // Notify institution admins
         if ($event->institution_id) {
-            $admins = Authz::withScope($event->institution, function () {
-                return User::permission('event.update')->get();
-            });
+            $admins = Authz::withScope($event->institution, fn () => User::permission('event.update')->get());
 
             $notifiables = $notifiables->merge($admins);
         }

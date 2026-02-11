@@ -32,11 +32,9 @@ class MembersRelationManager extends RelationManager
                 TextColumn::make('roles')
                     ->label('Roles')
                     ->getStateUsing(function (User $record): string {
-                        $institution = $this->getOwnerRecord();
+                        $institution = $this->getInstitutionOwner();
 
-                        return Authz::withScope($institution, function () use ($record): string {
-                            return $record->getRoleNames()->implode(', ');
-                        }, $record) ?: '—';
+                        return Authz::withScope($institution, fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
                     }),
             ])
             ->headerActions([
@@ -55,7 +53,7 @@ class MembersRelationManager extends RelationManager
                             ->required(),
                     ])
                     ->action(function (array $data): void {
-                        $institution = $this->getOwnerRecord();
+                        $institution = $this->getInstitutionOwner();
                         $user = User::findOrFail($data['user_id']);
 
                         $institution->members()->syncWithoutDetaching([$user->id]);
@@ -78,7 +76,7 @@ class MembersRelationManager extends RelationManager
                         ]);
                     })
                     ->action(function (array $data, User $record): void {
-                        $institution = $this->getOwnerRecord();
+                        $institution = $this->getInstitutionOwner();
 
                         $this->syncMemberRoles($institution, $record, $data['role_ids'] ?? []);
                     }),
@@ -87,7 +85,7 @@ class MembersRelationManager extends RelationManager
                     ->color('danger')
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $institution = $this->getOwnerRecord();
+                        $institution = $this->getInstitutionOwner();
 
                         $institution->members()->detach($record->id);
                         $this->syncMemberRoles($institution, $record, []);
@@ -100,16 +98,14 @@ class MembersRelationManager extends RelationManager
      */
     protected function getScopedRoleOptions(): array
     {
-        $institution = $this->getOwnerRecord();
+        $institution = $this->getInstitutionOwner();
         $teamsKey = app(PermissionRegistrar::class)->teamsKey;
 
-        return Authz::withScope($institution, function () use ($teamsKey): array {
-            return Role::query()
-                ->where($teamsKey, getPermissionsTeamId())
-                ->orderBy('name')
-                ->pluck('name', 'id')
-                ->all();
-        });
+        return Authz::withScope($institution, fn (): array => Role::query()
+            ->where($teamsKey, getPermissionsTeamId())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all());
     }
 
     /**
@@ -117,11 +113,9 @@ class MembersRelationManager extends RelationManager
      */
     protected function getMemberRoleIds(User $user): array
     {
-        $institution = $this->getOwnerRecord();
+        $institution = $this->getInstitutionOwner();
 
-        return Authz::withScope($institution, function () use ($user): array {
-            return $user->roles()->pluck('id')->all();
-        }, $user);
+        return Authz::withScope($institution, fn (): array => $user->roles()->pluck('id')->all(), $user);
     }
 
     /**
@@ -132,5 +126,13 @@ class MembersRelationManager extends RelationManager
         Authz::withScope($institution, function () use ($user, $roleIds): void {
             $user->syncRoles($roleIds);
         }, $user);
+    }
+
+    private function getInstitutionOwner(): Institution
+    {
+        /** @var Institution $institution */
+        $institution = $this->getOwnerRecord();
+
+        return $institution;
     }
 }

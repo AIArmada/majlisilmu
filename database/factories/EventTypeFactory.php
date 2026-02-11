@@ -17,6 +17,7 @@ class EventTypeFactory extends Factory
     public function definition(): array
     {
         $name = $this->faker->words(2, true);
+
         return [
             'name' => ucfirst($name),
             'slug' => \Illuminate\Support\Str::slug($name).'-'.\Illuminate\Support\Str::random(5),

@@ -27,16 +27,19 @@ class SpeakerResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Directory';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return SpeakerForm::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return SpeakersTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -45,6 +48,7 @@ class SpeakerResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

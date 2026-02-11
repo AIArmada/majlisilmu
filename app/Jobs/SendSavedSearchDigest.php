@@ -16,17 +16,14 @@ class SendSavedSearchDigest implements ShouldQueue
     use Queueable;
 
     /**
-     * The frequency type: 'daily' or 'weekly'.
-     */
-    protected string $frequency;
-
-    /**
      * Create a new job instance.
      */
-    public function __construct(string $frequency = 'daily')
-    {
-        $this->frequency = $frequency;
-    }
+    public function __construct(
+        /**
+         * The frequency type: 'daily' or 'weekly'.
+         */
+        protected string $frequency = 'daily'
+    ) {}
 
     /**
      * Execute the job.
@@ -80,9 +77,7 @@ class SendSavedSearchDigest implements ShouldQueue
                 }
 
                 // Filter to only events created since last digest
-                $newEvents = collect($events->items())->filter(function ($event) use ($since) {
-                    return $event->created_at >= $since || $event->updated_at >= $since;
-                });
+                $newEvents = collect($events->items())->filter(fn ($event) => $event->created_at >= $since || $event->updated_at >= $since);
 
                 if ($newEvents->isEmpty()) {
                     continue;

@@ -49,6 +49,7 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
         'is_default',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

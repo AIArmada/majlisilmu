@@ -32,11 +32,9 @@ class MembersRelationManager extends RelationManager
                 TextColumn::make('roles')
                     ->label('Roles')
                     ->getStateUsing(function (User $record): string {
-                        $speaker = $this->getOwnerRecord();
+                        $speaker = $this->getSpeakerOwner();
 
-                        return Authz::withScope($speaker, function () use ($record): string {
-                            return $record->getRoleNames()->implode(', ');
-                        }, $record) ?: '—';
+                        return Authz::withScope($speaker, fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
                     }),
             ])
             ->headerActions([
@@ -55,7 +53,7 @@ class MembersRelationManager extends RelationManager
                             ->required(),
                     ])
                     ->action(function (array $data): void {
-                        $speaker = $this->getOwnerRecord();
+                        $speaker = $this->getSpeakerOwner();
                         $user = User::findOrFail($data['user_id']);
 
                         $speaker->members()->syncWithoutDetaching([$user->id]);
@@ -78,7 +76,7 @@ class MembersRelationManager extends RelationManager
                         ]);
                     })
                     ->action(function (array $data, User $record): void {
-                        $speaker = $this->getOwnerRecord();
+                        $speaker = $this->getSpeakerOwner();
 
                         $this->syncMemberRoles($speaker, $record, $data['role_ids'] ?? []);
                     }),
@@ -87,7 +85,7 @@ class MembersRelationManager extends RelationManager
                     ->color('danger')
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $speaker = $this->getOwnerRecord();
+                        $speaker = $this->getSpeakerOwner();
 
                         $speaker->members()->detach($record->id);
                         $this->syncMemberRoles($speaker, $record, []);
@@ -100,16 +98,14 @@ class MembersRelationManager extends RelationManager
      */
     protected function getScopedRoleOptions(): array
     {
-        $speaker = $this->getOwnerRecord();
+        $speaker = $this->getSpeakerOwner();
         $teamsKey = app(PermissionRegistrar::class)->teamsKey;
 
-        return Authz::withScope($speaker, function () use ($teamsKey): array {
-            return Role::query()
-                ->where($teamsKey, getPermissionsTeamId())
-                ->orderBy('name')
-                ->pluck('name', 'id')
-                ->all();
-        });
+        return Authz::withScope($speaker, fn (): array => Role::query()
+            ->where($teamsKey, getPermissionsTeamId())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all());
     }
 
     /**
@@ -117,11 +113,9 @@ class MembersRelationManager extends RelationManager
      */
     protected function getMemberRoleIds(User $user): array
     {
-        $speaker = $this->getOwnerRecord();
+        $speaker = $this->getSpeakerOwner();
 
-        return Authz::withScope($speaker, function () use ($user): array {
-            return $user->roles()->pluck('id')->all();
-        }, $user);
+        return Authz::withScope($speaker, fn (): array => $user->roles()->pluck('id')->all(), $user);
     }
 
     /**
@@ -132,5 +126,13 @@ class MembersRelationManager extends RelationManager
         Authz::withScope($speaker, function () use ($user, $roleIds): void {
             $user->syncRoles($roleIds);
         }, $user);
+    }
+
+    private function getSpeakerOwner(): Speaker
+    {
+        /** @var Speaker $speaker */
+        $speaker = $this->getOwnerRecord();
+
+        return $speaker;
     }
 }

@@ -10,6 +10,7 @@ class ListReports extends ListRecords
 {
     protected static string $resource = ReportResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

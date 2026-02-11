@@ -10,6 +10,7 @@ class EditReference extends EditRecord
 {
     protected static string $resource = ReferenceResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

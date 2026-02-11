@@ -47,11 +47,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/event-interests/{eventId}', [EventInterestController::class, 'show'])->name('api.event-interests.show');
     Route::delete('/event-interests/{eventId}', [EventInterestController::class, 'destroy'])->name('api.event-interests.destroy');
 
-    // Reports (authenticated users get higher limits)
-    Route::post('/reports', [ReportController::class, 'store'])
-        ->middleware('throttle:reports')
-        ->name('api.reports.store.auth');
-
     // Registration Exports (per documentation B9d)
     Route::get('/events/{event}/registrations/export', [RegistrationExportController::class, 'export'])
         ->name('api.registrations.export');

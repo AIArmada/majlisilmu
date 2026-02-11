@@ -29,22 +29,32 @@ class RegistrationExportController extends Controller
             ], 403);
         }
 
-        $registrations = Registration::query()
-            ->where('event_id', $event->id)
-            ->with('user:id,name,email')
-            ->orderBy('created_at')
-            ->get();
+        $registrationsQuery = Registration::query()
+            ->where('registrations.event_id', $event->id)
+            ->leftJoin('users', 'users.id', '=', 'registrations.user_id')
+            ->orderBy('registrations.created_at')
+            ->select([
+                'registrations.id',
+                'registrations.name',
+                'registrations.email',
+                'registrations.phone',
+                'registrations.status',
+                'registrations.created_at',
+                'users.name as user_name',
+                'users.email as user_email',
+            ]);
 
         // Log the export action using Laravel Auditing (per B9d)
         Audit::create([
-            'user_type' => get_class($request->user()),
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'user_type' => $request->user()::class,
             'user_id' => $request->user()->id,
             'event' => 'export_registrations',
             'auditable_type' => Event::class,
             'auditable_id' => $event->id,
             'old_values' => [],
             'new_values' => [
-                'count' => $registrations->count(),
+                'count' => (clone $registrationsQuery)->count('registrations.id'),
                 'exported_at' => now()->toIso8601String(),
             ],
             'url' => $request->fullUrl(),
@@ -54,7 +64,7 @@ class RegistrationExportController extends Controller
 
         $filename = "registrations-{$event->slug}-".now()->format('Ymd-His').'.csv';
 
-        return response()->streamDownload(function () use ($registrations) {
+        return response()->streamDownload(function () use ($registrationsQuery) {
             $handle = fopen('php://output', 'w');
 
             // Header row
@@ -65,17 +75,21 @@ class RegistrationExportController extends Controller
                 'Phone',
                 'Status',
                 'Registered At',
-            ]);
+            ],
+                escape: '\\');
 
-            foreach ($registrations as $registration) {
+            foreach ($registrationsQuery->cursor() as $registration) {
                 fputcsv($handle, [
                     $registration->id,
-                    $registration->name ?? $registration->user?->name,
-                    $registration->email ?? $registration->user?->email,
+                    $registration->name ?? $registration->user_name,
+                    $registration->email ?? $registration->user_email,
                     $registration->phone,
                     $registration->status,
-                    $registration->created_at->toIso8601String(),
-                ]);
+                    $registration->created_at instanceof \DateTimeInterface
+                        ? $registration->created_at->format(\DateTimeInterface::ATOM)
+                        : (string) $registration->created_at,
+                ],
+                    escape: '\\');
             }
 
             fclose($handle);

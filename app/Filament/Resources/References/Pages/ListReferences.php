@@ -10,6 +10,7 @@ class ListReferences extends ListRecords
 {
     protected static string $resource = ReferenceResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

@@ -30,6 +30,7 @@ class SavedSearch extends Model
         'notify',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

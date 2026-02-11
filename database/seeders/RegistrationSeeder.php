@@ -21,68 +21,70 @@ class RegistrationSeeder extends Seeder
         Registration::unsetEventDispatcher();
         Event::unsetEventDispatcher();
 
-        \Illuminate\Support\Facades\DB::transaction(function (): void {
-            $events = Event::query()
-                ->whereHas('settings', function ($query) {
-                    $query->where('registration_required', true);
-                })
-                ->pluck('id')
-                ->toArray();
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function (): void {
+                $events = Event::query()
+                    ->whereHas('settings', function ($query) {
+                        $query->where('registration_required', true);
+                    })
+                    ->pluck('id')
+                    ->toArray();
 
-            $users = User::query()->get(['id', 'name', 'email', 'phone'])->toArray();
+                $users = User::query()->get(['id', 'name', 'email', 'phone'])->toArray();
 
-            $registrationsToInsert = [];
-            $eventCounts = [];
+                $registrationsToInsert = [];
+                $eventCounts = [];
 
-            foreach ($events as $eventId) {
-                $count = random_int(3, 8);
-                $eventCounts[$eventId] = $count;
-                $shuffledUsers = collect($users)->shuffle()->values()->toArray();
-                $usedEmails = [];
-                $userIndex = 0;
+                foreach ($events as $eventId) {
+                    $count = random_int(3, 8);
+                    $eventCounts[$eventId] = $count;
+                    $shuffledUsers = collect($users)->shuffle()->values()->toArray();
+                    $usedEmails = [];
+                    $userIndex = 0;
 
-                for ($i = 0; $i < $count; $i++) {
-                    $user = null;
-                    if (!empty($shuffledUsers) && $userIndex < count($shuffledUsers) && random_int(0, 1) === 1) {
-                        $user = $shuffledUsers[$userIndex++];
-                    }
-
-                    $email = $user['email'] ?? fake()->safeEmail();
-                    while (in_array($email, $usedEmails, true)) {
+                    for ($i = 0; $i < $count; $i++) {
                         $user = null;
-                        $email = fake()->safeEmail();
+                        if (! empty($shuffledUsers) && $userIndex < count($shuffledUsers) && random_int(0, 1) === 1) {
+                            $user = $shuffledUsers[$userIndex++];
+                        }
+
+                        $email = $user['email'] ?? fake()->safeEmail();
+                        while (in_array($email, $usedEmails, true)) {
+                            $user = null;
+                            $email = fake()->safeEmail();
+                        }
+                        $usedEmails[] = $email;
+
+                        $registrationsToInsert[] = array_merge(
+                            Registration::factory()->make([
+                                'event_id' => $eventId,
+                                'user_id' => $user['id'] ?? null,
+                                'name' => $user['name'] ?? fake()->name(),
+                                'email' => $email,
+                                'phone' => $user['phone'] ?? fake()->optional()->phoneNumber(),
+                                'status' => 'registered',
+                            ])->toArray(),
+                            [
+                                'id' => (string) \Illuminate\Support\Str::uuid(),
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]
+                        );
                     }
-                    $usedEmails[] = $email;
-
-                    $registrationsToInsert[] = array_merge(
-                        Registration::factory()->make([
-                            'event_id' => $eventId,
-                            'user_id' => $user['id'] ?? null,
-                            'name' => $user['name'] ?? fake()->name(),
-                            'email' => $email,
-                            'phone' => $user['phone'] ?? fake()->optional()->phoneNumber(),
-                            'status' => 'registered',
-                        ])->toArray(),
-                        [
-                            'id' => (string) \Illuminate\Support\Str::uuid(),
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]
-                    );
                 }
-            }
 
-            foreach (array_chunk($registrationsToInsert, 200) as $chunk) {
-                Registration::insert($chunk);
-            }
+                foreach (array_chunk($registrationsToInsert, 200) as $chunk) {
+                    Registration::insert($chunk);
+                }
 
-            // Bulk update registration counts
-            foreach ($eventCounts as $eventId => $count) {
-                Event::where('id', $eventId)->update(['registrations_count' => $count]);
-            }
-        });
-
-        Event::setEventDispatcher(app('events'));
-        Registration::setEventDispatcher(app('events'));
+                // Bulk update registration counts
+                foreach ($eventCounts as $eventId => $count) {
+                    Event::where('id', $eventId)->update(['registrations_count' => $count]);
+                }
+            });
+        } finally {
+            Event::setEventDispatcher(app('events'));
+            Registration::setEventDispatcher(app('events'));
+        }
     }
 }

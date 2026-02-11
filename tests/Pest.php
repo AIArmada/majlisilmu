@@ -15,8 +15,8 @@ pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->beforeEach(function () {
         config()->set('services.turnstile.enabled', false);
-        config()->set('services.turnstile.site_key', null);
-        config()->set('services.turnstile.secret_key', null);
+        config()->set('services.turnstile.site_key');
+        config()->set('services.turnstile.secret_key');
 
         // Clear tag option caches to prevent stale data in tests
         foreach (['domain', 'discipline', 'source', 'issue'] as $type) {
@@ -50,9 +50,7 @@ pest()->extend(Tests\TestCase::class)
 |
 */
 
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
+expect()->extend('toBeOne', fn () => $this->toBe(1));
 
 /*
 |--------------------------------------------------------------------------

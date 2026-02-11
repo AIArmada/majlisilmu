@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Event;
+use Illuminate\Support\Carbon;
 
 class CalendarService
 {
@@ -31,10 +32,10 @@ class CalendarService
             'path' => '/calendar/0/deeplink/compose',
             'rru' => 'addevent',
             'subject' => $event->title,
-            'body' => strip_tags($event->description ?? ''),
+            'body' => $event->description_text,
             'location' => $this->formatLocation($event),
             'startdt' => $event->starts_at?->toIso8601String(),
-            'enddt' => $event->ends_at?->toIso8601String() ?? $event->starts_at?->addHours(2)->toIso8601String(),
+            'enddt' => $this->defaultEndAt($event)?->toIso8601String(),
         ];
 
         return 'https://outlook.live.com/calendar/0/deeplink/compose?'.http_build_query($params);
@@ -49,10 +50,10 @@ class CalendarService
             'path' => '/calendar/action/compose',
             'rru' => 'addevent',
             'subject' => $event->title,
-            'body' => strip_tags($event->description ?? ''),
+            'body' => $event->description_text,
             'location' => $this->formatLocation($event),
             'startdt' => $event->starts_at?->toIso8601String(),
-            'enddt' => $event->ends_at?->toIso8601String() ?? $event->starts_at?->addHours(2)->toIso8601String(),
+            'enddt' => $this->defaultEndAt($event)?->toIso8601String(),
         ];
 
         return 'https://outlook.office.com/calendar/0/deeplink/compose?'.http_build_query($params);
@@ -67,8 +68,8 @@ class CalendarService
             'v' => '60',
             'title' => $event->title,
             'st' => $event->starts_at?->format('Ymd\THis'),
-            'et' => ($event->ends_at ?? $event->starts_at?->addHours(2))?->format('Ymd\THis'),
-            'desc' => strip_tags($event->description ?? ''),
+            'et' => $this->defaultEndAt($event)?->format('Ymd\THis'),
+            'desc' => $event->description_text,
             'in_loc' => $this->formatLocation($event),
         ];
 
@@ -83,7 +84,7 @@ class CalendarService
         $uid = $event->id.'@'.config('app.url');
         $dtstamp = now()->format('Ymd\THis\Z');
         $dtstart = $event->starts_at?->setTimezone('UTC')->format('Ymd\THis\Z');
-        $dtend = ($event->ends_at ?? $event->starts_at?->addHours(2))?->setTimezone('UTC')->format('Ymd\THis\Z');
+        $dtend = $this->defaultEndAt($event)?->setTimezone('UTC')->format('Ymd\THis\Z');
         $summary = $this->escapeIcs($event->title);
         $description = $this->escapeIcs($this->formatDescription($event));
         $location = $this->escapeIcs($this->formatLocation($event));
@@ -117,9 +118,8 @@ class CalendarService
         $ics .= "END:VALARM\r\n";
 
         $ics .= "END:VEVENT\r\n";
-        $ics .= "END:VCALENDAR\r\n";
 
-        return $ics;
+        return $ics."END:VCALENDAR\r\n";
     }
 
     /**
@@ -128,7 +128,7 @@ class CalendarService
     protected function formatGoogleDates(Event $event): string
     {
         $start = $event->starts_at?->setTimezone('UTC')->format('Ymd\THis\Z');
-        $end = ($event->ends_at ?? $event->starts_at?->addHours(2))?->setTimezone('UTC')->format('Ymd\THis\Z');
+        $end = $this->defaultEndAt($event)?->setTimezone('UTC')->format('Ymd\THis\Z');
 
         return "{$start}/{$end}";
     }
@@ -140,8 +140,8 @@ class CalendarService
     {
         $parts = [];
 
-        if ($event->description) {
-            $parts[] = strip_tags($event->description);
+        if ($event->description_text !== '') {
+            $parts[] = $event->description_text;
         }
 
         // Add prayer-relative timing info
@@ -162,6 +162,19 @@ class CalendarService
         $parts[] = 'Maklumat lanjut: '.route('events.show', $event);
 
         return implode("\n", $parts);
+    }
+
+    private function defaultEndAt(Event $event): ?Carbon
+    {
+        if ($event->ends_at instanceof Carbon) {
+            return $event->ends_at->copy();
+        }
+
+        if ($event->starts_at instanceof Carbon) {
+            return $event->starts_at->copy()->addHours(2);
+        }
+
+        return null;
     }
 
     /**

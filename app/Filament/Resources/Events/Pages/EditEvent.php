@@ -23,6 +23,7 @@ class EditEvent extends EditRecord
 {
     protected static string $resource = EventResource::class;
 
+    #[\Override]
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $this->record->loadMissing(['languages:id', 'tags:id,type']);
@@ -36,6 +37,7 @@ class EditEvent extends EditRecord
         return $data;
     }
 
+    #[\Override]
     protected function mutateFormDataBeforeSave(array $data): array
     {
         unset(
@@ -97,6 +99,7 @@ class EditEvent extends EditRecord
             ->all();
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

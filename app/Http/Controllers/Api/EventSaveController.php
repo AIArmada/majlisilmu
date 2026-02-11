@@ -45,10 +45,19 @@ class EventSaveController extends Controller
             'event_id' => ['required', 'uuid', 'exists:events,id'],
         ]);
 
-        $event = Event::find($validated['event_id']);
+        $event = Event::query()->find($validated['event_id']);
+
+        if (! $event) {
+            return response()->json([
+                'error' => [
+                    'code' => 'not_found',
+                    'message' => 'Event not found.',
+                ],
+            ], 404);
+        }
 
         // Only allow saving public, approved events
-        if (! $event->status?->equals(\App\States\EventStatus\Approved::class) || $event->visibility !== \App\Enums\EventVisibility::Public) {
+        if ((string) $event->status !== 'approved' || $event->visibility !== \App\Enums\EventVisibility::Public) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',
@@ -57,13 +66,42 @@ class EventSaveController extends Controller
             ], 403);
         }
 
-        // Check if already saved
-        $exists = DB::table('event_saves')
-            ->where('user_id', $request->user()->id)
-            ->where('event_id', $validated['event_id'])
-            ->exists();
+        $savedState = DB::transaction(function () use ($event, $request): string {
+            $lockedEvent = Event::query()
+                ->whereKey($event->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($exists) {
+            if (! $lockedEvent) {
+                return 'not_found';
+            }
+
+            $inserted = DB::table('event_saves')->insertOrIgnore([
+                'user_id' => $request->user()->id,
+                'event_id' => $lockedEvent->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($inserted === 0) {
+                return 'conflict';
+            }
+
+            $this->syncSavesCount($lockedEvent->id);
+
+            return 'created';
+        }, 3);
+
+        if ($savedState === 'not_found') {
+            return response()->json([
+                'error' => [
+                    'code' => 'not_found',
+                    'message' => 'Event not found.',
+                ],
+            ], 404);
+        }
+
+        if ($savedState === 'conflict') {
             return response()->json([
                 'error' => [
                     'code' => 'conflict',
@@ -71,16 +109,6 @@ class EventSaveController extends Controller
                 ],
             ], 409);
         }
-
-        DB::table('event_saves')->insert([
-            'user_id' => $request->user()->id,
-            'event_id' => $validated['event_id'],
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Increment saves_count on event
-        $event->increment('saves_count');
 
         return response()->json([
             'data' => [
@@ -97,10 +125,27 @@ class EventSaveController extends Controller
      */
     public function destroy(Request $request, string $eventId): JsonResponse
     {
-        $deleted = DB::table('event_saves')
-            ->where('user_id', $request->user()->id)
-            ->where('event_id', $eventId)
-            ->delete();
+        $deleted = DB::transaction(function () use ($eventId, $request): int {
+            $event = Event::query()
+                ->whereKey($eventId)
+                ->lockForUpdate()
+                ->first();
+
+            $deletedRows = DB::table('event_saves')
+                ->where('user_id', $request->user()->id)
+                ->where('event_id', $eventId)
+                ->delete();
+
+            if ($deletedRows === 0) {
+                return 0;
+            }
+
+            if ($event) {
+                $this->syncSavesCount($eventId);
+            }
+
+            return $deletedRows;
+        }, 3);
 
         if (! $deleted) {
             return response()->json([
@@ -110,9 +155,6 @@ class EventSaveController extends Controller
                 ],
             ], 404);
         }
-
-        // Decrement saves_count on event
-        Event::where('id', $eventId)->decrement('saves_count');
 
         return response()->json([
             'data' => [
@@ -142,5 +184,16 @@ class EventSaveController extends Controller
                 'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
             ],
         ]);
+    }
+
+    private function syncSavesCount(string $eventId): void
+    {
+        $savesCount = DB::table('event_saves')
+            ->where('event_id', $eventId)
+            ->count();
+
+        Event::query()
+            ->whereKey($eventId)
+            ->update(['saves_count' => $savesCount]);
     }
 }

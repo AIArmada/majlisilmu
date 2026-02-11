@@ -26,7 +26,9 @@ Route::livewire('/events/{event:slug}', 'pages.events.show')->name('events.show'
 Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar'])->name('events.calendar');
 
 // Event Submission (Public) - Rate limited to prevent spam
-Route::livewire('/submit-event', 'pages.submit-event.create')->name('submit-event.create');
+Route::livewire('/submit-event', 'pages.submit-event.create')
+    ->middleware('throttle:event-submission')
+    ->name('submit-event.create');
 Route::livewire('/submit-event/success', 'pages.submit-event.success')->name('submit-event.success');
 
 Route::middleware('auth')->group(function () {

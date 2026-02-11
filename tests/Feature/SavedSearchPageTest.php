@@ -61,3 +61,20 @@ it('allows authenticated users to create and delete saved searches', function ()
 
     expect(SavedSearch::where('id', $savedSearch->id)->exists())->toBeFalse();
 });
+
+it('prefills subdistrict filter from query string when saving searches', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams([
+        'search' => 'fiqh',
+        'state_id' => '10',
+        'district_id' => '20',
+        'subdistrict_id' => '30',
+    ])->test(SavedSearchesIndex::class)
+        ->assertSet('query', 'fiqh')
+        ->assertSet('filters.state_id', '10')
+        ->assertSet('filters.district_id', '20')
+        ->assertSet('filters.subdistrict_id', '30');
+});

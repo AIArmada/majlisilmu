@@ -32,6 +32,7 @@ class NotificationEndpoint extends Model
         'meta',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

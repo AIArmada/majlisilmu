@@ -10,6 +10,7 @@ class EditSpeaker extends EditRecord
 {
     protected static string $resource = SpeakerResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

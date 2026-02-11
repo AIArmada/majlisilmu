@@ -28,21 +28,25 @@ class VenueResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Directory';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return VenueForm::configure($schema);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return VenueInfolist::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return VenuesTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -50,6 +54,7 @@ class VenueResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

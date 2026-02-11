@@ -139,8 +139,8 @@ class SpeakerFormSchema
         $speaker = Speaker::create([
             'name' => $data['name'],
             'gender' => $data['gender'] ?? Gender::Male->value,
-            'honorific' => ! empty($data['honorific']) ? $data['honorific'] : null,
-            'pre_nominal' => ! empty($data['pre_nominal']) ? $data['pre_nominal'] : null,
+            'honorific' => empty($data['honorific']) ? null : $data['honorific'],
+            'pre_nominal' => empty($data['pre_nominal']) ? null : $data['pre_nominal'],
             'job_title' => $data['job_title'] ?? null,
             'slug' => Str::slug($data['name']).'-'.Str::random(6),
             'status' => 'pending',

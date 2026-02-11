@@ -98,7 +98,7 @@ class InstitutionForm
                                     ->default(true),
                             ])
                             ->columns(4)
-                            ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
+                            ->itemLabel(fn (array $state): string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
                     ]),
                 Section::make('Location')
                     ->relationship('address')

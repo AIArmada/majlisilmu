@@ -34,7 +34,8 @@ class Space extends Model
         return $this->hasMany(Event::class);
     }
 
-    public function scopeActive($query)
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active($query)
     {
         return $query->where('is_active', true);
     }

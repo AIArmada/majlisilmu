@@ -34,6 +34,7 @@ class Venue extends Model implements HasMedia
         'is_active',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -48,7 +49,8 @@ class Venue extends Model implements HasMedia
         return $this->hasMany(Event::class);
     }
 
-    public function scopeActive($query)
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active($query)
     {
         return $query->where('is_active', true);
     }

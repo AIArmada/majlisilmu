@@ -39,6 +39,7 @@ class Institution extends Model implements AuditableContract, HasMedia
         'is_active',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -130,7 +131,8 @@ class Institution extends Model implements AuditableContract, HasMedia
         return 'Institution: '.$this->name;
     }
 
-    public function scopeActive($query)
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active($query)
     {
         return $query->where('is_active', true);
     }

@@ -2,44 +2,112 @@
 
 namespace Database\Seeders;
 
+use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
+use App\Models\Venue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
+    private const int DEMO_USER_TARGET = 60;
+
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
+        $this->seedGeography();
+        $this->seedAuthAndTaxonomy();
+        $this->seedPrimaryEntities();
+        $this->seedActivityAndModeration();
+    }
+
+    private function seedGeography(): void
+    {
         $this->call([
             WorldSeeder::class,
+            MalaysiaCitySeeder::class,
             DistrictSeeder::class,
             SubdistrictSeeder::class,
+        ]);
+    }
+
+    private function seedAuthAndTaxonomy(): void
+    {
+        $this->call([
             PermissionSeeder::class,
             RoleSeeder::class,
             TagSeeder::class,
             UserSeeder::class,
         ]);
 
-        // Create additional random users
-        User::factory()->count(50)->create();
+        $this->topUpDemoUsers();
+    }
+
+    private function seedPrimaryEntities(): void
+    {
+        // Shared entities used by institution/event forms.
+        $this->call([SpaceSeeder::class]);
+
+        // Guard non-idempotent seeders.
+        $this->seedWhenEmpty(Institution::class, InstitutionSeeder::class);
+        $this->seedWhenEmpty(Venue::class, VenueSeeder::class);
+        $this->seedWhenEmpty(Speaker::class, SpeakerSeeder::class);
+
+        // Optional national masjid directory import.
+        if ($this->shouldSeedMasjidDirectory()) {
+            $this->call([MasjidSeeder::class]);
+        }
 
         $this->call([
-            // MasjidSeeder::class,
-            // InstitutionSeeder::class,
-            SpaceSeeder::class,
-            // VenueSeeder::class,
-            // SpeakerSeeder::class,
-            // DonationChannelSeeder::class,
-            // SeriesSeeder::class,
-            // EventSeeder::class,
-            // MediaLinkSeeder::class,
-            // EventSubmissionSeeder::class,
-            // ModerationReviewSeeder::class,
-            // ReportSeeder::class,
-            // SavedSearchSeeder::class,
-            // RegistrationSeeder::class,
+            SeriesSeeder::class,
+            EventSeeder::class,
+            DonationChannelSeeder::class,
+            MediaLinkSeeder::class,
         ]);
+    }
+
+    private function seedActivityAndModeration(): void
+    {
+        // Dependent records that illustrate moderation + engagement workflows.
+        $this->call([
+            EventSubmissionSeeder::class,
+            ModerationReviewSeeder::class,
+            ReportSeeder::class,
+            SavedSearchSeeder::class,
+            RegistrationSeeder::class,
+        ]);
+    }
+
+    private function topUpDemoUsers(): void
+    {
+        $existingUsers = User::query()->count();
+        $usersToCreate = max(0, self::DEMO_USER_TARGET - $existingUsers);
+
+        if ($usersToCreate === 0) {
+            return;
+        }
+
+        User::factory()->count($usersToCreate)->create();
+    }
+
+    private function shouldSeedMasjidDirectory(): bool
+    {
+        return (bool) env('SEED_MASJID_DIRECTORY', false);
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  class-string<Seeder>  $seederClass
+     */
+    private function seedWhenEmpty(string $modelClass, string $seederClass): void
+    {
+        if ($modelClass::query()->exists()) {
+            return;
+        }
+
+        $this->call([$seederClass]);
     }
 }

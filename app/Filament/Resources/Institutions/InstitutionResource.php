@@ -29,21 +29,25 @@ class InstitutionResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Directory';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return InstitutionForm::configure($schema);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return InstitutionInfolist::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return InstitutionsTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -52,6 +56,7 @@ class InstitutionResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

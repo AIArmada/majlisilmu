@@ -25,6 +25,7 @@ use Spatie\MediaLibrary\Support\FileNamer\FileNamer;
  */
 class MediaFileNamer extends FileNamer
 {
+    #[\Override]
     public function originalFileName(string $fileName): string
     {
         return pathinfo($fileName, PATHINFO_FILENAME);
@@ -50,7 +51,7 @@ class MediaFileNamer extends FileNamer
      */
     public static function resolveBaseNameFromModel(?Model $model): string
     {
-        if (! $model) {
+        if (! $model instanceof \Illuminate\Database\Eloquent\Model) {
             return 'media';
         }
 
@@ -76,9 +77,8 @@ class MediaFileNamer extends FileNamer
 
         // Fallback: use morph alias or class basename
         $morphMap = array_flip(\Illuminate\Database\Eloquent\Relations\Relation::morphMap());
-        $morphAlias = $morphMap[$model::class] ?? str(class_basename($model))->slug()->toString();
 
-        return $morphAlias;
+        return $morphMap[$model::class] ?? str(class_basename($model))->slug()->toString();
     }
 
     /**
@@ -129,7 +129,7 @@ class MediaFileNamer extends FileNamer
 
     protected static function resolveSubjectLabel(?Model $model): ?string
     {
-        if (! $model) {
+        if (! $model instanceof \Illuminate\Database\Eloquent\Model) {
             return null;
         }
 

@@ -37,34 +37,34 @@ class MasjidSeeder extends Seeder
 
         $countries = Country::query()->get();
         $states = State::query()->with(['districts'])->get();
-        $users = User::query()->get();
+        User::query()->get();
 
         $malaysia = $countries->where('iso2', 'MY')->first() ?? $countries->first();
 
         // Read CSV file
         $handle = fopen($csvPath, 'r');
-        $header = fgetcsv($handle); // Skip header row
+        fgetcsv($handle, escape: '\\'); // Skip header row
 
         $count = 0;
         $skipped = 0;
         $limit = 300;
         // Process mosques from CSV (limited to 300)
 
-        while ($count < $limit && ($row = fgetcsv($handle)) !== false) {
+        while ($count < $limit && ($row = fgetcsv($handle, escape: '\\')) !== false) {
             // CSV columns: No., Nama, Alamat, Negeri, Daerah, No. Tel, Fax
             [, $nama, $alamat, $negeri, $daerah, $noTel] = $row;
 
             // Skip if no name
-            if (empty($nama) || trim($nama) === '') {
+            if (in_array($nama, [null, '', '0'], true) || trim($nama) === '') {
                 continue;
             }
 
             // Clean the name
             $nama = trim($nama);
-            $alamat = trim($alamat);
-            $negeri = trim($negeri);
-            $daerah = trim($daerah);
-            $noTel = trim($noTel);
+            $alamat = trim((string) $alamat);
+            $negeri = trim((string) $negeri);
+            $daerah = trim((string) $daerah);
+            $noTel = trim((string) $noTel);
 
             // Find matching state
             $state = $this->findState($states, $negeri);
@@ -78,10 +78,8 @@ class MasjidSeeder extends Seeder
             // Find matching district
             $district = null;
             if ($daerah && $state->districts) {
-                $district = collect($state->districts)->first(function ($d) use ($daerah) {
-                    return Str::contains(strtolower($d->name), strtolower($daerah)) ||
-                           Str::contains(strtolower($daerah), strtolower($d->name));
-                });
+                $district = collect($state->districts)->first(fn ($d) => Str::contains(strtolower((string) $d->name), strtolower($daerah)) ||
+                       Str::contains(strtolower($daerah), strtolower((string) $d->name)));
             }
 
             // Create or update institution
@@ -183,7 +181,7 @@ class MasjidSeeder extends Seeder
         $searchName = $stateMap[strtoupper($negeri)] ?? $negeri;
 
         return $states->first(function ($s) use ($searchName, $negeri) {
-            $stateLower = strtolower($s->name);
+            $stateLower = strtolower((string) $s->name);
             $searchLower = strtolower($searchName);
             $negeriLower = strtolower($negeri);
 
@@ -203,26 +201,22 @@ class MasjidSeeder extends Seeder
         $cleaned = preg_replace('/[^0-9]/', '', $phone);
 
         // Must have at least 7 digits
-        if (strlen($cleaned) < 7) {
+        if (strlen((string) $cleaned) < 7) {
             return null;
         }
 
         // Format Malaysian phone numbers
-        if (strlen($cleaned) === 7) {
+        if (strlen((string) $cleaned) === 7) {
             // Landline without area code, add 03 (KL area code)
             $cleaned = '03'.$cleaned;
         }
 
         // Add + if it starts with country code
-        if (strlen($cleaned) > 10 && substr($cleaned, 0, 2) === '60') {
+        if (strlen($cleaned) > 10 && str_starts_with($cleaned, '60')) {
             $cleaned = '+'.$cleaned;
         } elseif (strlen($cleaned) === 9 || strlen($cleaned) === 10) {
             // Add Malaysian country code for mobile numbers
-            if (substr($cleaned, 0, 1) === '0') {
-                $cleaned = '+6'.substr($cleaned, 1);
-            } else {
-                $cleaned = '+60'.$cleaned;
-            }
+            $cleaned = str_starts_with($cleaned, '0') ? '+6'.substr($cleaned, 1) : '+60'.$cleaned;
         }
 
         return $cleaned;

@@ -20,6 +20,7 @@ class MediaLinksRelationManager extends RelationManager
 {
     protected static string $relationship = 'mediaLinks';
 
+    #[\Override]
     public function form(Schema $schema): Schema
     {
         return $schema

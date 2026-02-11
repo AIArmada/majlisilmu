@@ -60,7 +60,7 @@ class InstitutionSeeder extends Seeder
 
         $countries = Country::query()->get();
         $states = State::query()->with(['districts', 'cities'])->get();
-        $users = User::query()->get();
+        User::query()->get();
 
         $malaysia = $countries->where('iso2', 'MY')->first() ?? $countries->first();
 
@@ -68,9 +68,7 @@ class InstitutionSeeder extends Seeder
 
         // 1. Seed Real Institutions with coordinates (skip mosques that are already in CSV)
         foreach ($realInstitutions as $data) {
-            $stateMatch = $states->filter(function ($s) use ($data) {
-                return Str::contains(strtolower($s->name), strtolower($data['state_name']));
-            })->first();
+            $stateMatch = $states->filter(fn ($s) => Str::contains(strtolower((string) $s->name), strtolower($data['state_name'])))->first();
 
             // Fallback to random if not found, or skip? better to random.
             $state = $stateMatch ?? $states->random();

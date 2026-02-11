@@ -20,76 +20,78 @@ class DonationChannelSeeder extends Seeder
 
         DonationChannel::unsetEventDispatcher();
 
-        \Illuminate\Support\Facades\DB::transaction(function (): void {
-            // Create donation channels for institutions in bulk
-            $institutions = Institution::query()->pluck('status', 'id')->toArray();
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function (): void {
+                // Create donation channels for institutions in bulk
+                $institutions = Institution::query()->pluck('status', 'id')->toArray();
 
-            if (empty($institutions)) {
-                $institutions = Institution::factory()->count(3)->create()->pluck('status', 'id')->toArray();
-            }
-
-            $donationChannels = [];
-
-            foreach ($institutions as $institutionId => $status) {
-                // Default bank account
-                $donationChannels[] = array_merge(
-                    DonationChannel::factory()->bankAccount()->make([
-                        'donatable_type' => 'institution',
-                        'donatable_id' => $institutionId,
-                        'status' => $status === 'verified' ? 'verified' : 'unverified',
-                        'is_default' => true,
-                    ])->toArray(),
-                    ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
-                );
-
-                // Optionally add DuitNow (60% chance)
-                if (fake()->boolean(60)) {
-                    $donationChannels[] = array_merge(
-                        DonationChannel::factory()->duitnow()->make([
-                            'donatable_type' => 'institution',
-                            'donatable_id' => $institutionId,
-                            'status' => $status === 'verified' ? 'verified' : 'unverified',
-                        ])->toArray(),
-                        ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
-                    );
+                if (empty($institutions)) {
+                    $institutions = Institution::factory()->count(3)->create()->pluck('status', 'id')->toArray();
                 }
 
-                // Optionally add e-wallet (30% chance)
-                if (fake()->boolean(30)) {
-                    $donationChannels[] = array_merge(
-                        DonationChannel::factory()->ewallet()->make([
-                            'donatable_type' => 'institution',
-                            'donatable_id' => $institutionId,
-                            'status' => 'unverified',
-                        ])->toArray(),
-                        ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
-                    );
-                }
-            }
+                $donationChannels = [];
 
-            // Create donation channels for some speakers
-            $speakers = Speaker::query()->take(5)->pluck('status', 'id')->toArray();
-
-            foreach ($speakers as $speakerId => $status) {
-                if (fake()->boolean(30)) {
+                foreach ($institutions as $institutionId => $status) {
+                    // Default bank account
                     $donationChannels[] = array_merge(
                         DonationChannel::factory()->bankAccount()->make([
-                            'donatable_type' => 'speaker',
-                            'donatable_id' => $speakerId,
+                            'donatable_type' => 'institution',
+                            'donatable_id' => $institutionId,
                             'status' => $status === 'verified' ? 'verified' : 'unverified',
                             'is_default' => true,
                         ])->toArray(),
                         ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                     );
+
+                    // Optionally add DuitNow (60% chance)
+                    if (fake()->boolean(60)) {
+                        $donationChannels[] = array_merge(
+                            DonationChannel::factory()->duitnow()->make([
+                                'donatable_type' => 'institution',
+                                'donatable_id' => $institutionId,
+                                'status' => $status === 'verified' ? 'verified' : 'unverified',
+                            ])->toArray(),
+                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                        );
+                    }
+
+                    // Optionally add e-wallet (30% chance)
+                    if (fake()->boolean(30)) {
+                        $donationChannels[] = array_merge(
+                            DonationChannel::factory()->ewallet()->make([
+                                'donatable_type' => 'institution',
+                                'donatable_id' => $institutionId,
+                                'status' => 'unverified',
+                            ])->toArray(),
+                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                        );
+                    }
                 }
-            }
 
-            // Bulk insert all donation channels
-            foreach (array_chunk($donationChannels, 100) as $chunk) {
-                DonationChannel::insert($chunk);
-            }
-        });
+                // Create donation channels for some speakers
+                $speakers = Speaker::query()->take(5)->pluck('status', 'id')->toArray();
 
-        DonationChannel::setEventDispatcher(app('events'));
+                foreach ($speakers as $speakerId => $status) {
+                    if (fake()->boolean(30)) {
+                        $donationChannels[] = array_merge(
+                            DonationChannel::factory()->bankAccount()->make([
+                                'donatable_type' => 'speaker',
+                                'donatable_id' => $speakerId,
+                                'status' => $status === 'verified' ? 'verified' : 'unverified',
+                                'is_default' => true,
+                            ])->toArray(),
+                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                        );
+                    }
+                }
+
+                // Bulk insert all donation channels
+                foreach (array_chunk($donationChannels, 100) as $chunk) {
+                    DonationChannel::insert($chunk);
+                }
+            });
+        } finally {
+            DonationChannel::setEventDispatcher(app('events'));
+        }
     }
 }

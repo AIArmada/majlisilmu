@@ -29,6 +29,7 @@ class MediaLink extends Model
         'is_primary',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

@@ -25,9 +25,10 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
         public ?string $note = null
     ) {}
 
+    #[\Override]
     public function canTransition(): bool
     {
-        return $this->moderator !== null && filled($this->reasonCode);
+        return $this->moderator instanceof \App\Models\User && filled($this->reasonCode);
     }
 
     public function handle(): Event
@@ -82,9 +83,7 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
         }
 
         if ($event->institution_id) {
-            $admins = Authz::withScope($event->institution, function () {
-                return User::permission('event.update')->get();
-            });
+            $admins = Authz::withScope($event->institution, fn () => User::permission('event.update')->get());
 
             $notifiables = $notifiables->merge($admins);
         }

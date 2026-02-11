@@ -105,7 +105,7 @@ class SpeakerForm
                                     ->length(4),
                             ])
                             ->columns(2)
-                            ->itemLabel(fn (array $state): ?string => ($state['degree'] ?? '').' - '.($state['institution'] ?? '')),
+                            ->itemLabel(fn (array $state): string => ($state['degree'] ?? '').' - '.($state['institution'] ?? '')),
                     ]),
                 Section::make('Contact')
                     ->components([
@@ -143,7 +143,7 @@ class SpeakerForm
                                     ->default(true),
                             ])
                             ->columns(4)
-                            ->itemLabel(fn (array $state): ?string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
+                            ->itemLabel(fn (array $state): string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
                     ]),
                 Section::make('Media')
                     ->components([

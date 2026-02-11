@@ -26,6 +26,7 @@ class User extends Authenticatable implements FilamentUser
 
     protected $keyType = 'string';
 
+    #[\Override]
     protected static function booted(): void
     {
         static::deleting(function (User $user) {
@@ -78,6 +79,7 @@ class User extends Authenticatable implements FilamentUser
      *
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -193,7 +195,7 @@ class User extends Authenticatable implements FilamentUser
     ): array {
         $preference = $this->notificationPreferenceFor($notificationKey);
 
-        if (! $preference) {
+        if (! $preference instanceof \App\Models\NotificationPreference) {
             return $defaultChannels;
         }
 
@@ -215,7 +217,7 @@ class User extends Authenticatable implements FilamentUser
     {
         $preference = $this->notificationPreferenceFor($notificationKey);
 
-        if (! $preference) {
+        if (! $preference instanceof \App\Models\NotificationPreference) {
             return true;
         }
 

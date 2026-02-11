@@ -19,6 +19,7 @@ class EventSubmissionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'submissions';
 
+    #[\Override]
     public function form(Schema $schema): Schema
     {
         return $schema

@@ -1,9 +1,11 @@
 <?php
 
+use App\Models\Country;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
+use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -77,18 +79,43 @@ it('loads the upcoming events component', function () {
 });
 
 it('loads the browse by location component', function () {
-    // Get an actual Malaysian state from World package data
     $state = State::where('country_code', 'MY')->first();
 
     if (! $state) {
-        $this->markTestSkipped('No Malaysian states seeded. Run WorldSeeder first.');
+        $country = Country::query()->firstOrCreate(
+            ['iso2' => 'MY'],
+            [
+                'name' => 'Malaysia',
+                'status' => 1,
+                'phone_code' => '60',
+                'iso3' => 'MYS',
+                'region' => 'Asia',
+                'subregion' => 'South-Eastern Asia',
+            ],
+        );
+
+        $state = State::query()->create([
+            'country_id' => $country->id,
+            'name' => 'Selangor',
+            'country_code' => 'MY',
+        ]);
     }
+
+    $venue = Venue::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $venue->address()->update([
+        'country_id' => $state->country_id,
+        'state_id' => $state->id,
+    ]);
 
     Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
         'starts_at' => now()->addDays(1),
-        'state_id' => $state->id,
+        'venue_id' => $venue->id,
+        'event_format' => 'physical',
     ]);
 
     Livewire::test('home.browse-by-location')

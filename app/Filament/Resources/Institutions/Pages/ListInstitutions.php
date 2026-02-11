@@ -10,6 +10,7 @@ class ListInstitutions extends ListRecords
 {
     protected static string $resource = InstitutionResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

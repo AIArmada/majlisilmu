@@ -7,6 +7,7 @@ use Nnjeim\World\Models\Country as WorldCountry;
 
 class Country extends WorldCountry
 {
+    #[\Override]
     public function states(): HasMany
     {
         return $this->hasMany(State::class);

@@ -125,7 +125,7 @@ it('requires location type when organizer is speaker', function () {
     Livewire::actingAs($this->user)
         ->test('pages.submit-event.create')
         ->set('data.organizer_type', 'speaker')
-        ->set('data.location_type', null)
+        ->set('data.location_type')
         ->set('data.visibility', EventVisibility::Public->value)
         ->call('submit')
         ->assertHasErrors(['data.location_type' => 'required']);

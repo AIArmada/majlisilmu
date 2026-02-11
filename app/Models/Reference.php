@@ -17,6 +17,7 @@ class Reference extends Model implements HasMedia
     /** @use HasFactory<\Database\Factories\ReferenceFactory> */
     use HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
+    #[\Override]
     protected static function booted(): void
     {
         //
@@ -34,6 +35,7 @@ class Reference extends Model implements HasMedia
         'is_active',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -45,7 +47,8 @@ class Reference extends Model implements HasMedia
     /**
      * Scope a query to only include active references.
      */
-    public function scopeActive(Builder $query): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function active(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }

@@ -13,6 +13,8 @@
 
 @php
     $states = $this->states;
+    $districts = $this->districts;
+    $subdistricts = $this->subdistricts;
     $topics = $this->topics;
     $selectedAgeGroups = array_values(array_filter((array) request('age_group', [])));
     $selectedTopicIds = array_values(array_filter((array) request('topic_ids', [])));
@@ -23,6 +25,7 @@
     $activeFilterCount = collect([
         request('state_id'),
         request('district_id'),
+        request('subdistrict_id'),
         request('language'),
         request('event_type'),
         request('gender'),
@@ -74,7 +77,7 @@
         <!-- Search & Filter Card -->
         <form action="{{ route('events.index') }}" method="GET" x-ref="form" x-data="{
                     locating: false,
-                    showFilters: {{ request()->hasAny(['state_id', 'district_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids']) ? 'true' : 'false' }},
+                    showFilters: {{ request()->hasAny(['state_id', 'district_id', 'subdistrict_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids']) ? 'true' : 'false' }},
                     locate() {
                         if (this.locating) return;
                         if (! navigator.geolocation) {
@@ -181,13 +184,41 @@
                 <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 md:p-6">
                     <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                         <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Location') }}</label>
-                            <select name="state_id" onchange="this.form.submit()"
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('State') }}</label>
+                            <select name="state_id" onchange="this.form.elements['district_id'].value=''; this.form.elements['subdistrict_id'].value=''; this.form.submit()"
                                 class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
                                 <option value="">{{ __('All States') }}</option>
                                 @foreach($states as $state)
                                     <option value="{{ $state->id }}" @selected(request('state_id') == $state->id)>
                                         {{ $state->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('District') }}</label>
+                            <select name="district_id" onchange="this.form.elements['subdistrict_id'].value=''; this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors"
+                                @disabled(! request('state_id'))>
+                                <option value="">{{ __('All Districts') }}</option>
+                                @foreach($districts as $district)
+                                    <option value="{{ $district->id }}" @selected(request('district_id') == $district->id)>
+                                        {{ $district->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Subdistrict') }}</label>
+                            <select name="subdistrict_id" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors"
+                                @disabled(! request('district_id'))>
+                                <option value="">{{ __('All Subdistricts') }}</option>
+                                @foreach($subdistricts as $subdistrict)
+                                    <option value="{{ $subdistrict->id }}" @selected(request('subdistrict_id') == $subdistrict->id)>
+                                        {{ $subdistrict->name }}
                                     </option>
                                 @endforeach
                             </select>
@@ -290,7 +321,7 @@
             </div>
 
             <!-- Active Filters Bar -->
-            @if(request()->hasAny(['search', 'state_id', 'district_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids', 'lat']))
+            @if(request()->hasAny(['search', 'state_id', 'district_id', 'subdistrict_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids', 'lat']))
                 <div class="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100">
                     <span class="text-xs font-bold text-slate-400 uppercase mr-2">{{ __('Active:') }}</span>
                     @if(request('search'))
@@ -312,6 +343,16 @@
                     @if(request('state_id'))
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ $states->firstWhere('id', request('state_id'))?->name ?? __('State') }}
+                        </span>
+                    @endif
+                    @if(request('district_id'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $districts->firstWhere('id', request('district_id'))?->name ?? __('District') }}
+                        </span>
+                    @endif
+                    @if(request('subdistrict_id'))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $subdistricts->firstWhere('id', request('subdistrict_id'))?->name ?? __('Subdistrict') }}
                         </span>
                     @endif
                     @if(request('language'))

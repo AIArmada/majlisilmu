@@ -10,6 +10,7 @@ class ListEvents extends ListRecords
 {
     protected static string $resource = EventResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

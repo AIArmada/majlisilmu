@@ -105,7 +105,7 @@ it('skips digest delivery when user opts out globally', function () {
     $searchService->shouldNotReceive('search');
     $searchService->shouldNotReceive('searchNearby');
 
-    (new SendSavedSearchDigest(NotificationFrequency::Daily->value))
+    new SendSavedSearchDigest(NotificationFrequency::Daily->value)
         ->handle($searchService);
 
     Notification::assertNothingSent();
@@ -182,7 +182,7 @@ it('skips digest delivery when frequency does not match user preference', functi
     $searchService->shouldNotReceive('search');
     $searchService->shouldNotReceive('searchNearby');
 
-    (new SendSavedSearchDigest(NotificationFrequency::Daily->value))
+    new SendSavedSearchDigest(NotificationFrequency::Daily->value)
         ->handle($searchService);
 
     Notification::assertNothingSent();

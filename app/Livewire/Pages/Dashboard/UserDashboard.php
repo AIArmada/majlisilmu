@@ -259,7 +259,7 @@ class UserDashboard extends Component
     {
         $preference = $user->notificationPreferenceFor(NotificationPreferenceKey::SavedSearchDigest->value);
 
-        if (! $preference) {
+        if (! $preference instanceof \App\Models\NotificationPreference) {
             return;
         }
 

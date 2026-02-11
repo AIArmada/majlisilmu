@@ -80,7 +80,7 @@ class EventObserver
             $event->timezone ?? 'Asia/Kuala_Lumpur'
         );
 
-        if ($calculatedTime) {
+        if ($calculatedTime instanceof \Carbon\Carbon) {
             $event->starts_at = $calculatedTime;
 
             // Update display text if not already set

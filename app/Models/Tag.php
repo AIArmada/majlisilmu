@@ -31,6 +31,7 @@ class Tag extends SpatieTag implements Sortable
         'status',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -51,6 +52,7 @@ class Tag extends SpatieTag implements Sortable
     /**
      * Build the sort query scoped by type.
      */
+    #[\Override]
     public function buildSortQuery(): Builder
     {
         $query = static::query();
@@ -65,7 +67,8 @@ class Tag extends SpatieTag implements Sortable
     /**
      * Scope to filter by tag type.
      */
-    public function scopeOfType(Builder $query, TagType|string $type): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function ofType(Builder $query, TagType|string $type): Builder
     {
         $value = $type instanceof TagType ? $type->value : $type;
 

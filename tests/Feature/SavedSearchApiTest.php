@@ -88,6 +88,32 @@ describe('Saved Search API Endpoints', function () {
                 $response->assertUnprocessable()
                     ->assertJsonValidationErrors(['lat', 'lng']);
             });
+
+            it('rejects non-numeric geography filter ids', function () {
+                $response = $this->postJson('/api/v1/saved-searches', [
+                    'name' => 'Geography Filter Test',
+                    'filters' => [
+                        'state_id' => (string) \Illuminate\Support\Str::uuid(),
+                    ],
+                    'notify' => 'daily',
+                ]);
+
+                $response->assertUnprocessable()
+                    ->assertJsonValidationErrors(['filters.state_id']);
+            });
+
+            it('rejects non-numeric subdistrict filter ids', function () {
+                $response = $this->postJson('/api/v1/saved-searches', [
+                    'name' => 'Subdistrict Filter Test',
+                    'filters' => [
+                        'subdistrict_id' => (string) \Illuminate\Support\Str::uuid(),
+                    ],
+                    'notify' => 'daily',
+                ]);
+
+                $response->assertUnprocessable()
+                    ->assertJsonValidationErrors(['filters.subdistrict_id']);
+            });
         });
 
         describe('GET /api/v1/saved-searches/{id}', function () {

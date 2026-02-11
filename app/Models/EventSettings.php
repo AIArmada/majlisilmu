@@ -26,6 +26,7 @@ class EventSettings extends Model
         'max_per_user',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

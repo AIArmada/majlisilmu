@@ -25,7 +25,7 @@ class SocialiteController extends Controller
     {
         try {
             $socialUser = Socialite::driver($provider)->user();
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return redirect()->route('login')->with('error', __('Unable to authenticate. Please try again.'));
         }
 

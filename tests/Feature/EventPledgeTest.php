@@ -215,3 +215,19 @@ test('event show page does not show interest button for past events', function (
     // The button is visible but the API endpoint rejects interest for past events (403).
     $response->assertStatus(200);
 });
+
+test('marking interest recalculates stale interests_count from source rows', function () {
+    Sanctum::actingAs($this->user);
+
+    $this->event->update(['interests_count' => 77]);
+
+    $response = $this->postJson(route('api.event-interests.store'), [
+        'event_id' => $this->event->id,
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.interests_count', 1);
+
+    $this->event->refresh();
+    expect($this->event->interests_count)->toBe(1);
+});

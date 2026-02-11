@@ -16,7 +16,7 @@ final class Pending extends EventStatus implements HasColor, HasIcon, HasLabel
         return __('Pending Review');
     }
 
-    public function getColor(): string|array
+    public function getColor(): array
     {
         return Color::Amber;
     }

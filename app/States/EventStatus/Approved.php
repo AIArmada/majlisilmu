@@ -16,7 +16,7 @@ final class Approved extends EventStatus implements HasColor, HasIcon, HasLabel
         return __('Approved');
     }
 
-    public function getColor(): string|array
+    public function getColor(): array
     {
         return Color::Emerald;
     }

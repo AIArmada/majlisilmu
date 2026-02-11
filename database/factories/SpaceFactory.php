@@ -47,7 +47,7 @@ class SpaceFactory extends Factory
         ]);
 
         $name = fake()->unique()->regexify($prefix.' '.$suffix.' (Alpha|Beta|Gamma|A|B|C|1|2|3)');
-        $slug = Str::slug($name.'-'.Str::random(5));
+        Str::slug($name.'-'.Str::random(5));
 
         return [
             'name' => $name,

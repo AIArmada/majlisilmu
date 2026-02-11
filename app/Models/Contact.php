@@ -19,6 +19,7 @@ class Contact extends Model
         'is_public',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
