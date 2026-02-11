@@ -73,6 +73,9 @@ class ModerationQueue extends Page implements HasTable
         };
     }
 
+    /**
+     * @return array<string, array{label: string, icon: string, count: int, badgeColor: string}>
+     */
     public function getTabs(): array
     {
         return [
@@ -129,7 +132,15 @@ class ModerationQueue extends Page implements HasTable
                 TextColumn::make('venue.status')
                     ->label('Venue Status')
                     ->badge()
-                    ->state(fn (Event $record): string => (string) ($record->venue?->status ?? 'none'))
+                    ->state(function (Event $record): string {
+                        $venue = $record->venue;
+
+                        if ($venue === null) {
+                            return 'none';
+                        }
+
+                        return (string) ($venue->getAttribute('status') ?? 'none');
+                    })
                     ->formatStateUsing(fn ($state): string => $state === 'none' ? 'None' : Str::title(str_replace('_', ' ', (string) $state)))
                     ->color(fn ($state): string => match ((string) $state) {
                         'verified' => 'success',
@@ -160,7 +171,7 @@ class ModerationQueue extends Page implements HasTable
                 TextColumn::make('open_reports_count')
                     ->label('Open Reports')
                     ->badge()
-                    ->state(fn (Event $record): int => (int) $record->open_reports_count)
+                    ->state(fn (Event $record): int => (int) $record->getAttribute('open_reports_count'))
                     ->color(fn (int $state): string => $state > 0 ? 'danger' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
@@ -319,6 +330,9 @@ class ModerationQueue extends Page implements HasTable
             ->poll('30s');
     }
 
+    /**
+     * @return Builder<Event>
+     */
     protected function getTableQuery(): Builder
     {
         $query = Event::query()

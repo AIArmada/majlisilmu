@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VenueType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,15 +45,21 @@ class Venue extends Model implements HasMedia
         ];
     }
 
+    /**
+     * @return HasMany<Event, $this>
+     */
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
     }
 
+    /**
+     * @param  Builder<self>  $query
+     */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active($query)
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true);
+        $query->where('is_active', true);
     }
 
     /**
@@ -79,15 +86,15 @@ class Venue extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('main', 'gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('main', 'gallery');
+            ->format('webp');
 
         $this->addMediaConversion('banner')
+            ->performOnCollections('main')
             ->width(1200)
-            ->format('webp')
-            ->performOnCollections('main');
+            ->format('webp');
     }
 }

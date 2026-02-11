@@ -4,6 +4,7 @@ namespace App\Livewire\Pages\Events;
 
 use App\Enums\TagType;
 use App\Models\District;
+use App\Models\Event;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
@@ -45,6 +46,9 @@ class Index extends Component
     #[Url]
     public ?string $gender = null;
 
+    /**
+     * @var list<string>
+     */
     #[Url]
     public array $age_group = [];
 
@@ -54,9 +58,15 @@ class Index extends Component
     #[Url]
     public ?string $institution_id = null;
 
+    /**
+     * @var list<string>|null
+     */
     #[Url]
     public ?array $speaker_ids = [];
 
+    /**
+     * @var list<string>
+     */
     #[Url]
     public array $topic_ids = [];
 
@@ -83,6 +93,9 @@ class Index extends Component
         //
     }
 
+    /**
+     * @return Collection<int, State>
+     */
     #[Computed]
     public function states(): Collection
     {
@@ -93,6 +106,9 @@ class Index extends Component
         );
     }
 
+    /**
+     * @return Collection<int, District>
+     */
     #[Computed]
     public function districts(): Collection
     {
@@ -106,6 +122,9 @@ class Index extends Component
             ->get();
     }
 
+    /**
+     * @return Collection<int, Subdistrict>
+     */
     #[Computed]
     public function subdistricts(): Collection
     {
@@ -119,6 +138,9 @@ class Index extends Component
             ->get();
     }
 
+    /**
+     * @return Collection<int, Tag>
+     */
     #[Computed]
     public function topics(): Collection
     {
@@ -130,6 +152,9 @@ class Index extends Component
         );
     }
 
+    /**
+     * @return LengthAwarePaginator<int, Event>
+     */
     #[Computed]
     public function events(): LengthAwarePaginator
     {
@@ -149,7 +174,7 @@ class Index extends Component
             'starts_before' => $this->starts_before,
         ];
 
-        $filters = array_filter($filters, function ($value) {
+        $filters = array_filter($filters, function (mixed $value): bool {
             if ($value === null || $value === '') {
                 return false;
             }
@@ -160,6 +185,7 @@ class Index extends Component
 
             return true;
         });
+        /** @var array<string, mixed> $filters */
 
         /** @var EventSearchService $searchService */
         $searchService = app(EventSearchService::class);

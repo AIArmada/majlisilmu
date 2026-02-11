@@ -2,7 +2,10 @@
 
 namespace App\View\Components;
 
+use App\Models\Address;
 use App\Models\Event;
+use App\Models\EventSettings;
+use App\Models\Speaker;
 use Illuminate\View\Component;
 use Illuminate\View\View;
 
@@ -32,6 +35,8 @@ class EventJsonLd extends Component
     public function jsonLd(): array
     {
         $event = $this->event;
+        $venue = $event->venue;
+        $institution = $event->institution;
 
         $jsonLd = [
             '@context' => 'https://schema.org',
@@ -45,60 +50,60 @@ class EventJsonLd extends Component
             'url' => route('events.show', $event->slug),
         ];
 
-        // Location
-        if ($event->venue) {
-            $venueAddress = $event->venue->addressModel;
+        if ($venue instanceof \App\Models\Venue) {
+            $venueAddress = $venue->addressModel;
+            $region = '';
+
+            if ($venueAddress instanceof Address && $venueAddress->state instanceof \App\Models\State) {
+                $region = $venueAddress->state->name;
+            }
 
             $jsonLd['location'] = [
                 '@type' => 'Place',
-                'name' => $event->venue->name,
+                'name' => $venue->name,
                 'address' => [
                     '@type' => 'PostalAddress',
-                    'streetAddress' => $event->venue->address_line1 ?? '',
-                    'addressLocality' => $event->venue->city ?? '',
-                    'addressRegion' => $venueAddress?->state?->name ?? '',
+                    'streetAddress' => $venue->address_line1,
+                    'addressLocality' => '',
+                    'addressRegion' => $region,
                     'addressCountry' => 'MY',
                 ],
             ];
 
-            if ($venueAddress?->lat && $venueAddress?->lng) {
+            if ($venueAddress instanceof Address && $venueAddress->lat !== null && $venueAddress->lng !== null) {
                 $jsonLd['location']['geo'] = [
                     '@type' => 'GeoCoordinates',
                     'latitude' => $venueAddress->lat,
                     'longitude' => $venueAddress->lng,
                 ];
             }
-        } elseif ($event->institution) {
+        } elseif ($institution instanceof \App\Models\Institution) {
             $jsonLd['location'] = [
                 '@type' => 'Place',
-                'name' => $event->institution->name,
+                'name' => $institution->name,
             ];
         }
 
-        // Organizer
-        if ($event->institution) {
+        if ($institution instanceof \App\Models\Institution) {
             $jsonLd['organizer'] = [
                 '@type' => 'Organization',
-                'name' => $event->institution->name,
-                'url' => route('institutions.show', $event->institution->slug),
+                'name' => $institution->name,
+                'url' => route('institutions.show', $institution->slug),
             ];
         }
 
-        // Performers (Speakers)
         if ($event->speakers->isNotEmpty()) {
-            $jsonLd['performer'] = $event->speakers->map(fn ($speaker) => [
+            $jsonLd['performer'] = $event->speakers->map(fn (Speaker $speaker): array => [
                 '@type' => 'Person',
                 'name' => $speaker->name,
                 'url' => route('speakers.show', $speaker->slug),
             ])->toArray();
         }
 
-        // Image
         if ($event->card_image_url !== '') {
             $jsonLd['image'] = $event->card_image_url;
         }
 
-        // Offers (free admission)
         $jsonLd['offers'] = [
             '@type' => 'Offer',
             'price' => '0',
@@ -107,15 +112,17 @@ class EventJsonLd extends Component
             'url' => route('events.show', $event->slug),
         ];
 
-        // Keywords/About from tags
         if ($event->tags->isNotEmpty()) {
-            $jsonLd['about'] = $event->tags->map(fn ($tag) => [
-                '@type' => 'Thing',
-                'name' => $tag->name,
-            ])->toArray();
+            $jsonLd['about'] = $event->tags->map(function (mixed $tag): array {
+                $name = $tag instanceof \Spatie\Tags\Tag ? $tag->name : '';
+
+                return [
+                    '@type' => 'Thing',
+                    'name' => is_string($name) ? $name : '',
+                ];
+            })->toArray();
         }
 
-        // In language
         $jsonLd['inLanguage'] = match ($event->language) {
             'malay' => 'ms',
             'english' => 'en',
@@ -157,12 +164,16 @@ class EventJsonLd extends Component
     protected function getAvailability(): string
     {
         $event = $this->event;
+        $settings = $event->settings;
 
         if ((string) $event->status === 'rejected') {
             return 'https://schema.org/Discontinued';
         }
 
-        if ($event->settings?->registration_required && $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity) {
+        if ($settings instanceof EventSettings
+            && $settings->registration_required
+            && $settings->capacity !== null
+            && $event->registrations_count >= $settings->capacity) {
             return 'https://schema.org/SoldOut';
         }
 

@@ -36,6 +36,16 @@ Completed in code:
     - Decided and documented intentional integer-ID exception for geography tables (`countries`, `states`, `cities`, `districts`, `subdistricts`) and references (`country_id`, `state_id`, `city_id`, `district_id`, `subdistrict_id`) in `.ai/guidelines/database.blade.php`.
 15. Geography filter completeness implemented:
     - End-to-end `state -> district -> subdistrict` support added across frontend filters, API filters, saved-search validation/state, search service (DB + Typesense), and searchable payload/schema.
+16. Static-analysis baseline reduction (module pass):
+    - Completed module pass for `User.php`, `Institution.php`, `Speaker.php`, `Venue.php`, plus shared model concerns (`HasAddress`, `HasContacts`, `HasDonationChannels`, `HasLanguages`, `HasSocialMedia`).
+    - Added missing generic relation PHPDoc, corrected typed scope signatures, hardened model-return typing, and cleaned media conversion chains for static-analysis compatibility.
+    - Regenerated baseline to remove stale entries introduced by resolved findings.
+17. Event-centric static-analysis and reliability pass:
+    - Extended typed relation/collection generic coverage across `Event`, event-facing Livewire pages, search/calendar/observer/controller layers, and geography models.
+    - Added/updated `SocialAccountFactory` for missing factory coverage referenced by model generics.
+    - Fixed final remaining PHPStan runtime issue in `EventSearchTest` expectation chaining.
+18. Tooling gate completion:
+    - `phpstan`, `pint --test`, `rector --dry-run`, and full `pest --parallel --compact` all pass on current working tree.
 
 ## 0.1 Resolution Status (Audit Findings)
 1. Findings 1-4 (`P1`): fixed.
@@ -44,16 +54,18 @@ Completed in code:
 4. Finding 15 (`P3` placeholder job): fixed.
 
 ## 0.2 Verification Snapshot (Current Pass)
-1. Syntax sweep:
-   - `507` PHP files linted with no parse errors.
-2. Hygiene sweeps:
+1. Hygiene sweeps:
    - `debug_calls_found=0`
    - `db_constraints_found=0` (`constrained`, `cascadeOnDelete`)
    - `softdeletes_found=0` (`SoftDeletes`, `softDeletes()`)
    - `route_duplicates=0` (method + URI)
-3. Regression test set:
-   - `71 passed (197 assertions)` on targeted feature/unit coverage for all fixed areas.
-   - `55 passed (165 assertions)` on focused geography/search/filter completeness coverage (state, district, subdistrict across frontend/API/saved-search/index payload).
+2. Full quality gates (current working tree):
+   - `vendor/bin/phpstan analyse --ansi`: `No errors`.
+   - `vendor/bin/pint --test`: `PASS (413 files)`.
+   - `vendor/bin/rector process --dry-run`: `OK (no changes)`.
+   - `vendor/bin/pest --parallel --compact`: `328 passed (970 assertions)`.
+3. Baseline reduction status:
+   - `phpstan-baseline.neon` total suppressed errors reduced from `959` to `457` (`-502`).
 
 ## 1. Audit Method
 This audit was done as a literal codebase audit, not just static-analysis follow-through:
@@ -233,7 +245,7 @@ These findings are the original audit baseline. Current resolution status is tra
 
 ## 3. Dead Code and Hygiene Summary
 1. Previously identified dead/unreachable code paths have been removed in this pass (registration unreachable branch, placeholder job, unused moderation notification methods).
-2. `pint --test` currently reports `17` style issues across `413` files (all pre-existing in unrelated files; none introduced by this pass).
+2. `pint --test` currently reports `0` style issues (`PASS` across `413` files).
 3. No debug artifact calls (`dd`, `dump`, `var_dump`, etc.) detected in application code paths.
 
 ## 4. Laravel Best-Practice Summary

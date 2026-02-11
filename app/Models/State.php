@@ -7,6 +7,9 @@ use Nnjeim\World\Models\State as WorldState;
 
 class State extends WorldState
 {
+    /**
+     * @return HasMany<District, $this>
+     */
     public function districts(): HasMany
     {
         return $this->hasMany(District::class);
@@ -14,6 +17,8 @@ class State extends WorldState
 
     /**
      * Get all addresses in this state.
+     *
+     * @return HasMany<Address, $this>
      */
     public function addresses(): HasMany
     {

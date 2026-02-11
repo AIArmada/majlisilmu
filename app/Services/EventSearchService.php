@@ -36,6 +36,7 @@ class EventSearchService
      * Search events using Typesense if available, otherwise fallback to database.
      *
      * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
      */
     public function search(
         ?string $query = null,
@@ -52,6 +53,7 @@ class EventSearchService
 
     /**
      * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
      */
     protected function performSearch(
         ?string $query = null,
@@ -76,6 +78,7 @@ class EventSearchService
      * Search with Typesense via Laravel Scout.
      *
      * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
      */
     protected function searchWithTypesense(
         ?string $query,
@@ -84,7 +87,7 @@ class EventSearchService
         string $sort
     ): LengthAwarePaginator {
         $search = Event::search($query ?? '')
-            ->query(fn ($builder) => $builder->with($this->cardRelationships()));
+            ->query(fn (Builder $builder) => $builder->with($this->cardRelationships()));
 
         $sortBy = match ($sort) {
             'relevance' => '_text_match:desc,starts_at:asc',
@@ -104,6 +107,7 @@ class EventSearchService
      * Search with database fallback.
      *
      * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
      */
     protected function searchWithDatabase(
         ?string $query,
@@ -137,6 +141,7 @@ class EventSearchService
      * Geo search for "near me" functionality.
      *
      * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
      */
     public function searchNearby(
         float $lat,
@@ -149,7 +154,7 @@ class EventSearchService
             try {
                 $search = Event::search('');
 
-                $search->query(fn ($builder) => $builder->with($this->cardRelationships()));
+                $search->query(fn (Builder $builder) => $builder->with($this->cardRelationships()));
 
                 $filterBy = implode(' && ', [
                     "location:({$lat}, {$lng}, {$radiusKm} km)",
@@ -172,6 +177,7 @@ class EventSearchService
 
     /**
      * @param  array<string, mixed>  $filters
+     * @return list<string>
      */
     protected function buildTypesenseFilterParts(array $filters): array
     {
@@ -271,6 +277,7 @@ class EventSearchService
 
     /**
      * @param  array<string, mixed>  $filters
+     * @return Builder<Event>
      */
     protected function buildDatabaseQuery(?string $query, array $filters): Builder
     {
@@ -399,6 +406,7 @@ class EventSearchService
 
     /**
      * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
      */
     protected function searchNearbyWithDatabase(
         float $lat,

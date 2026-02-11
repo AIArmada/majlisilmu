@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class MediaLink extends Model
 {
@@ -37,7 +38,10 @@ class MediaLink extends Model
         ];
     }
 
-    public function mediable(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    /**
+     * @return MorphTo<Model, $this>
+     */
+    public function mediable(): MorphTo
     {
         return $this->morphTo();
     }

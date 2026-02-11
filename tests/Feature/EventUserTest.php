@@ -72,5 +72,5 @@ it('includes pivot data in relationships', function () {
 
     $memberFromEvent = $event->members->first();
 
-    expect($memberFromEvent->pivot->joined_at)->not->toBeNull();
+    expect(data_get($memberFromEvent, 'pivot.joined_at'))->not->toBeNull();
 });

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use App\Enums\InstitutionType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -48,17 +49,26 @@ class Institution extends Model implements AuditableContract, HasMedia
         ];
     }
 
+    /**
+     * @return BelongsToMany<Space, $this>
+     */
     public function spaces(): BelongsToMany
     {
         return $this->belongsToMany(Space::class, 'institution_space')
             ->withTimestamps();
     }
 
+    /**
+     * @return HasMany<Event, $this>
+     */
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);
     }
 
+    /**
+     * @return BelongsToMany<Speaker, $this>
+     */
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'institution_speaker')
@@ -66,12 +76,18 @@ class Institution extends Model implements AuditableContract, HasMedia
             ->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'institution_user')
             ->withTimestamps();
     }
 
+    /**
+     * @return MorphMany<Report, $this>
+     */
     public function reports(): MorphMany
     {
         return $this->morphMany(Report::class, 'entity');
@@ -107,23 +123,23 @@ class Institution extends Model implements AuditableContract, HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('logo')
             ->width(100)
             ->height(100)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('logo');
+            ->format('webp');
 
         $this->addMediaConversion('banner')
+            ->performOnCollections('cover')
             ->width(1200)
-            ->format('webp')
-            ->performOnCollections('cover');
+            ->format('webp');
 
         $this->addMediaConversion('gallery_thumb')
+            ->performOnCollections('gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('gallery');
+            ->format('webp');
     }
 
     public function getAuthzScopeLabel(): string
@@ -131,9 +147,12 @@ class Institution extends Model implements AuditableContract, HasMedia
         return 'Institution: '.$this->name;
     }
 
+    /**
+     * @param  Builder<self>  $query
+     */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active($query)
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true);
+        $query->where('is_active', true);
     }
 }

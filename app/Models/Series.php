@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +39,9 @@ class Series extends Model implements HasMedia
         ];
     }
 
+    /**
+     * @return BelongsToMany<Event, $this>
+     */
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_series')
@@ -69,16 +73,19 @@ class Series extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('cover', 'gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('cover', 'gallery');
+            ->format('webp');
     }
 
+    /**
+     * @param  Builder<self>  $query
+     */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active($query)
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true);
+        $query->where('is_active', true);
     }
 }

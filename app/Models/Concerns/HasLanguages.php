@@ -3,15 +3,18 @@
 namespace App\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Nnjeim\World\Models\Language;
 
 trait HasLanguages
 {
     /**
      * Get all of the languages for the model.
+     *
+     * @return MorphToMany<Language, $this>
      */
     public function languages(): MorphToMany
     {
-        return $this->morphToMany(\Nnjeim\World\Models\Language::class, 'languageable', 'languageables');
+        return $this->morphToMany(Language::class, 'languageable', 'languageables');
     }
 
     /**

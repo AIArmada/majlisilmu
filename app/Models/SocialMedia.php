@@ -18,6 +18,9 @@ class SocialMedia extends Model
         'username',
     ];
 
+    /**
+     * @return MorphTo<Model, $this>
+     */
     public function socialable(): MorphTo
     {
         return $this->morphTo();

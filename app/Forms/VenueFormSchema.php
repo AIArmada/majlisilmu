@@ -15,7 +15,7 @@ class VenueFormSchema
     /**
      * Shared createOptionForm for Venue selects.
      *
-     * @return array<int, \Filament\Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     public static function createOptionForm(): array
     {

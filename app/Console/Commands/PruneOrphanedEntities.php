@@ -6,6 +6,8 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Venue;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 class PruneOrphanedEntities extends Command
@@ -84,9 +86,11 @@ class PruneOrphanedEntities extends Command
     /**
      * Prune orphaned records for a given model query.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      */
-    private function pruneModel(string $label, $query, bool $dryRun): int
+    private function pruneModel(string $label, Builder $query, bool $dryRun): int
     {
         $count = $query->count();
 
@@ -102,7 +106,7 @@ class PruneOrphanedEntities extends Command
             return 0;
         }
 
-        $query->each(fn ($model) => $model->delete());
+        $query->each(fn (Model $model): ?bool => $model->delete());
 
         $this->line("  {$label}: {$count} pruned.");
 

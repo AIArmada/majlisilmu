@@ -12,14 +12,17 @@ use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
@@ -44,6 +47,11 @@ use Spatie\Tags\HasTags;
  * @property \Illuminate\Support\Collection<int, \App\Enums\EventAgeGroup>|array<int, string>|null $age_group
  * @property \Illuminate\Support\Collection<int, \App\Enums\EventType>|array<int, string>|null $event_type
  * @property bool $is_active
+ * @property-read Address|null $address
+ * @property-read Address|null $addressModel
+ * @property-read Institution|null $institution
+ * @property-read Venue|null $venue
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Speaker> $speakers
  */
 class Event extends Model implements AuditableContract, HasMedia
 {
@@ -65,10 +73,18 @@ class Event extends Model implements AuditableContract, HasMedia
             $event->interestedBy()->detach();
             $event->goingBy()->detach();
 
-            $event->registrations()->each(fn (\App\Models\Registration $registration) => $registration->delete());
-            $event->submissions()->each(fn (\App\Models\EventSubmission $submission) => $submission->delete());
-            $event->moderationReviews()->each(fn (\App\Models\ModerationReview $review) => $review->delete());
-            $event->mediaLinks()->each(fn (\App\Models\MediaLink $mediaLink) => $mediaLink->delete());
+            $event->registrations()->each(function (Registration $registration): void {
+                $registration->delete();
+            });
+            $event->submissions()->each(function (EventSubmission $submission): void {
+                $submission->delete();
+            });
+            $event->moderationReviews()->each(function (ModerationReview $review): void {
+                $review->delete();
+            });
+            $event->mediaLinks()->each(function (MediaLink $mediaLink): void {
+                $mediaLink->delete();
+            });
 
             // Note: MediaLibrary works automatically via InteractsWithMedia if we delete the model,
             // but we can also be explicit if needed.
@@ -153,11 +169,13 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Scope a query to only include active events (approved + pending public events).
+     *
+     * @param  Builder<self>  $query
      */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active($query)
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true)
+        $query->where('is_active', true)
             ->whereIn('status', ['approved', 'pending'])
             ->where('visibility', EventVisibility::Public);
     }
@@ -182,15 +200,25 @@ class Event extends Model implements AuditableContract, HasMedia
     public function toSearchableArray(): array
     {
         $this->loadMissing(['institution', 'venue', 'venue.address', 'speakers', 'address', 'tags']);
+        $venueAddress = $this->venue?->addressModel;
+        $eventAddress = $this->addressModel;
+        $institution = $this->institution;
+        $venue = $this->venue;
+        $gender = $this->gender;
+        $eventFormat = $this->event_format;
+        $visibility = $this->visibility;
 
         $ageGroupCollection = $this->age_group;
 
         $ageGroupValues = $ageGroupCollection instanceof \Illuminate\Support\Collection && $ageGroupCollection->isNotEmpty()
-            ? $ageGroupCollection->map(fn ($e) => $e instanceof EventAgeGroup ? $e->value : $e)->toArray()
+            ? $ageGroupCollection->map(fn (EventAgeGroup $value): string => $value->value)->toArray()
             : ['all_ages'];
 
-        $topicIds = $this->tags
-            ->filter(fn ($tag) => in_array($tag->type, [TagType::Discipline->value, TagType::Issue->value], true))
+        /** @var \Illuminate\Database\Eloquent\Collection<int, Tag> $tags */
+        $tags = $this->tags;
+
+        $topicIds = $tags
+            ->filter(fn (Tag $tag): bool => in_array($tag->type, [TagType::Discipline->value, TagType::Issue->value], true))
             ->whereIn('status', ['verified', 'pending'])
             ->pluck('id')
             ->values()
@@ -202,49 +230,57 @@ class Event extends Model implements AuditableContract, HasMedia
             'description' => $this->description_text,
             'slug' => $this->slug,
             'speaker_names' => $this->speakers->pluck('name')->implode(', '),
-            'institution_name' => $this->institution?->name ?? '',
-            'venue_name' => $this->venue?->name ?? '',
-            'state_id' => $this->venue?->address?->state_id ?? ($this->address?->state_id ?? ''),
-            'district_id' => $this->venue?->address?->district_id ?? ($this->address?->district_id ?? ''),
-            'subdistrict_id' => $this->venue?->address?->subdistrict_id ?? ($this->address?->subdistrict_id ?? ''),
+            'institution_name' => $institution instanceof Institution ? $institution->name : '',
+            'venue_name' => $venue instanceof Venue ? $venue->name : '',
+            'state_id' => $venueAddress instanceof Address ? $venueAddress->state_id : ($eventAddress instanceof Address ? $eventAddress->state_id : ''),
+            'district_id' => $venueAddress instanceof Address ? $venueAddress->district_id : ($eventAddress instanceof Address ? $eventAddress->district_id : ''),
+            'subdistrict_id' => $venueAddress instanceof Address ? $venueAddress->subdistrict_id : ($eventAddress instanceof Address ? $eventAddress->subdistrict_id : ''),
             'language' => $this->language,
             'event_type' => $this->normalizedEventTypeValues(),
-            'gender' => $this->gender?->value ?? 'all',
+            'gender' => $gender instanceof EventGenderRestriction ? $gender->value : ((is_string($gender) && $gender !== '') ? $gender : 'all'),
             'age_group' => $ageGroupValues,
             'audience' => $ageGroupValues,
-            'event_format' => $this->event_format?->value ?? 'physical',
+            'event_format' => $eventFormat instanceof EventFormat ? $eventFormat->value : ((is_string($eventFormat) && $eventFormat !== '') ? $eventFormat : 'physical'),
             'children_allowed' => $this->children_allowed ?? true,
             'is_active' => (bool) $this->is_active,
             'status' => (string) $this->status,
-            'visibility' => $this->visibility?->value ?? 'public',
+            'visibility' => $visibility instanceof EventVisibility ? $visibility->value : ((is_string($visibility) && $visibility !== '') ? $visibility : 'public'),
             'topic_ids' => $topicIds,
             'speaker_ids' => $this->speakers->pluck('id')->toArray(),
-            'starts_at' => $this->starts_at?->timestamp ?? 0,
-            'ends_at' => $this->ends_at?->timestamp,
+            'starts_at' => $this->starts_at instanceof \Illuminate\Support\Carbon ? $this->starts_at->timestamp : 0,
+            'ends_at' => $this->ends_at instanceof \Illuminate\Support\Carbon ? $this->ends_at->timestamp : null,
             'saves_count' => $this->saves_count ?? 0,
             'registrations_count' => $this->registrations_count ?? 0,
         ];
 
-        // Add geolocation if available
-        if ($this->venue?->address?->lat && $this->venue->address->lng) {
-            $array['location'] = [$this->venue->address->lat, $this->venue->address->lng];
-        } elseif ($this->address?->lat) {
-            $array['location'] = [$this->address->lat, $this->address->lng];
+        if ($venueAddress instanceof Address && $venueAddress->lat !== null && $venueAddress->lng !== null) {
+            $array['location'] = [(float) $venueAddress->lat, (float) $venueAddress->lng];
+        } elseif ($eventAddress instanceof Address && $eventAddress->lat !== null && $eventAddress->lng !== null) {
+            $array['location'] = [(float) $eventAddress->lat, (float) $eventAddress->lng];
         }
 
         return $array;
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function submitter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitter_id');
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsToMany<User, $this, EventUser>
+     */
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_user')
@@ -253,21 +289,33 @@ class Event extends Model implements AuditableContract, HasMedia
             ->withTimestamps();
     }
 
+    /**
+     * @return BelongsTo<Institution, $this>
+     */
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
     }
 
+    /**
+     * @return BelongsTo<Venue, $this>
+     */
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
     }
 
+    /**
+     * @return BelongsTo<Space, $this>
+     */
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);
     }
 
+    /**
+     * @return BelongsToMany<Series, $this>
+     */
     public function series(): BelongsToMany
     {
         return $this->belongsToMany(Series::class, 'event_series')
@@ -278,11 +326,17 @@ class Event extends Model implements AuditableContract, HasMedia
 
     // EventType relationship removed in favor of Enum
 
-    public function settings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    /**
+     * @return HasOne<EventSettings, $this>
+     */
+    public function settings(): HasOne
     {
         return $this->hasOne(EventSettings::class);
     }
 
+    /**
+     * @return BelongsToMany<Speaker, $this>
+     */
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'event_speaker')
@@ -291,6 +345,9 @@ class Event extends Model implements AuditableContract, HasMedia
             ->orderByPivot('order_column');
     }
 
+    /**
+     * @return BelongsToMany<Reference, $this>
+     */
     public function references(): BelongsToMany
     {
         return $this->belongsToMany(Reference::class, 'event_reference')
@@ -299,46 +356,73 @@ class Event extends Model implements AuditableContract, HasMedia
             ->orderByPivot('order_column');
     }
 
-    public function mediaLinks(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    /**
+     * @return MorphMany<MediaLink, $this>
+     */
+    public function mediaLinks(): MorphMany
     {
-        return $this->morphMany(\App\Models\MediaLink::class, 'mediable');
+        return $this->morphMany(MediaLink::class, 'mediable');
     }
 
+    /**
+     * @return HasMany<EventSubmission, $this>
+     */
     public function submissions(): HasMany
     {
         return $this->hasMany(EventSubmission::class);
     }
 
+    /**
+     * @return HasMany<ModerationReview, $this>
+     */
     public function moderationReviews(): HasMany
     {
         return $this->hasMany(ModerationReview::class);
     }
 
+    /**
+     * @return HasMany<Registration, $this>
+     */
     public function registrations(): HasMany
     {
         return $this->hasMany(Registration::class);
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
     public function savedBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_saves')->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
     public function interestedBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_interests')->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
     public function goingBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_attendees')->withTimestamps();
     }
 
+    /**
+     * @return MorphMany<Report, $this>
+     */
     public function reports(): MorphMany
     {
         return $this->morphMany(Report::class, 'entity');
     }
 
+    /**
+     * @return MorphOne<DonationChannel, $this>
+     */
     public function donationChannel(): MorphOne
     {
         return $this->morphOne(DonationChannel::class, 'donatable')
@@ -369,16 +453,16 @@ class Event extends Model implements AuditableContract, HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('poster', 'gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('poster', 'gallery');
+            ->format('webp');
 
         $this->addMediaConversion('preview')
+            ->performOnCollections('poster')
             ->width(800)
-            ->format('webp')
-            ->performOnCollections('poster');
+            ->format('webp');
     }
 
     /**
@@ -417,14 +501,17 @@ class Event extends Model implements AuditableContract, HasMedia
     /**
      * Get coordinates for prayer time calculation.
      * Falls back to venue coordinates if specific coords not set.
+     *
+     * @return array{lat: float, lng: float}|null
      */
     public function getPrayerCoordinatesAttribute(): ?array
     {
-        // Use venue coordinates
-        if ($this->venue && $this->venue->lat && $this->venue->lng) {
+        $venueAddress = $this->venue?->addressModel;
+
+        if ($venueAddress instanceof Address && $venueAddress->lat !== null && $venueAddress->lng !== null) {
             return [
-                'lat' => (float) $this->venue->lat,
-                'lng' => (float) $this->venue->lng,
+                'lat' => (float) $venueAddress->lat,
+                'lng' => (float) $venueAddress->lng,
             ];
         }
 
@@ -447,9 +534,10 @@ class Event extends Model implements AuditableContract, HasMedia
             return $this->institution->getFirstMediaUrl('logo', 'thumb');
         }
 
-        // 3. Fallback to first speaker's avatar
-        if ($this->speakers->isNotEmpty() && $url = $this->speakers->first()->avatar_url) {
-            return $url;
+        $firstSpeaker = $this->speakers->first();
+
+        if ($firstSpeaker instanceof Speaker && filled($firstSpeaker->avatar_url)) {
+            return (string) $firstSpeaker->avatar_url;
         }
 
         // 4. Global default (placeholder)
@@ -458,6 +546,8 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Map 'genre' to 'event_type' for compatibility.
+     *
+     * @return list<string>
      */
     public function getGenreAttribute(): array
     {
@@ -467,16 +557,23 @@ class Event extends Model implements AuditableContract, HasMedia
     /**
      * Map 'audience' to 'age_group' for compatibility.
      * Returns string values for search indexing.
+     *
+     * @return list<string>
      */
     public function getAudienceAttribute(): array
     {
         $ageGroup = $this->age_group;
 
         if ($ageGroup instanceof \Illuminate\Support\Collection) {
-            return $ageGroup->map(fn ($e) => $e instanceof EventAgeGroup ? $e->value : $e)->toArray();
+            return $ageGroup
+                ->map(fn (EventAgeGroup $value): string => $value->value)
+                ->values()
+                ->all();
         }
 
-        return is_array($ageGroup) ? $ageGroup : ['all_ages'];
+        return is_array($ageGroup)
+            ? array_values(array_map(strval(...), $ageGroup))
+            : ['all_ages'];
     }
 
     /**
@@ -489,7 +586,13 @@ class Event extends Model implements AuditableContract, HasMedia
             return $this->attributes['language'];
         }
 
-        return $this->languages->first()?->code ?? 'ms';
+        $language = $this->languages->first();
+
+        if ($language instanceof \Nnjeim\World\Models\Language && is_string($language->code) && $language->code !== '') {
+            return $language->code;
+        }
+
+        return 'ms';
     }
 
     public function getDescriptionTextAttribute(): string
@@ -506,14 +609,14 @@ class Event extends Model implements AuditableContract, HasMedia
 
         if ($eventType instanceof \Illuminate\Support\Collection) {
             return $eventType
-                ->map(fn (mixed $value): string => $value instanceof EventType ? $value->value : (string) $value)
+                ->map(fn (EventType $value): string => $value->value)
                 ->filter(fn (string $value): bool => $value !== '')
                 ->values()
                 ->all();
         }
 
         if (is_array($eventType)) {
-            return array_values(array_filter(array_map(static fn (mixed $value): string => $value, $eventType), static fn (string $value): bool => $value !== ''));
+            return array_values(array_filter(array_map(strval(...), $eventType), static fn (string $value): bool => $value !== ''));
         }
 
         if ($eventType instanceof EventType) {
@@ -556,9 +659,9 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * Get the organizer model (Institution or Speaker).
+     * @return MorphTo<Model, $this>
      */
-    public function organizer(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    public function organizer(): MorphTo
     {
         return $this->morphTo();
     }

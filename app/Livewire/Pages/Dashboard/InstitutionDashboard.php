@@ -71,6 +71,9 @@ class InstitutionDashboard extends Component
         $this->resetPage('institution_registrations_page');
     }
 
+    /**
+     * @return Collection<int, Institution>
+     */
     #[Computed]
     public function institutions(): Collection
     {
@@ -94,7 +97,7 @@ class InstitutionDashboard extends Component
         }
 
         /** @var Institution|null $institution */
-        $institution = $this->institutions
+        $institution = $this->institutions()
             ->firstWhere('id', $this->institutionId);
 
         return $institution;
@@ -106,9 +109,9 @@ class InstitutionDashboard extends Component
     #[Computed]
     public function institutionStats(): array
     {
-        $institution = $this->selectedInstitution;
+        $institution = $this->selectedInstitution();
 
-        if (! $institution) {
+        if (! $institution instanceof Institution) {
             return [
                 'events_count' => 0,
                 'registrations_count' => 0,
@@ -126,12 +129,15 @@ class InstitutionDashboard extends Component
         ];
     }
 
+    /**
+     * @return LengthAwarePaginator<int, Event>
+     */
     #[Computed]
     public function institutionEvents(): LengthAwarePaginator
     {
-        $institution = $this->selectedInstitution;
+        $institution = $this->selectedInstitution();
 
-        if (! $institution) {
+        if (! $institution instanceof Institution) {
             return Event::query()
                 ->whereRaw('1 = 0')
                 ->paginate(perPage: 8, pageName: 'institution_events_page');
@@ -145,12 +151,15 @@ class InstitutionDashboard extends Component
             ->paginate(perPage: 8, pageName: 'institution_events_page');
     }
 
+    /**
+     * @return LengthAwarePaginator<int, Registration>
+     */
     #[Computed]
     public function institutionRegistrations(): LengthAwarePaginator
     {
-        $institution = $this->selectedInstitution;
+        $institution = $this->selectedInstitution();
 
-        if (! $institution) {
+        if (! $institution instanceof Institution) {
             return Registration::query()
                 ->whereRaw('1 = 0')
                 ->paginate(perPage: 8, pageName: 'institution_registrations_page');
@@ -166,6 +175,9 @@ class InstitutionDashboard extends Component
             ->paginate(perPage: 8, pageName: 'institution_registrations_page');
     }
 
+    /**
+     * @return BelongsToMany<Institution, User>
+     */
     protected function availableInstitutionsQuery(User $user): BelongsToMany
     {
         return $user->institutions();

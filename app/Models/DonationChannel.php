@@ -58,16 +58,25 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
         ];
     }
 
+    /**
+     * @return MorphTo<Model, $this>
+     */
     public function donatable(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
     }
 
+    /**
+     * @return MorphMany<Report, $this>
+     */
     public function reports(): MorphMany
     {
         return $this->morphMany(Report::class, 'entity');
@@ -124,9 +133,9 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('qr')
             ->width(200)
             ->height(200)
-            ->format('webp')
-            ->performOnCollections('qr');
+            ->format('webp');
     }
 }

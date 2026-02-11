@@ -4,9 +4,12 @@ namespace App\Livewire\Pages\Events;
 
 use App\Enums\EventVisibility;
 use App\Models\Event;
+use App\Models\User;
 use App\Services\CalendarService;
 use App\States\EventStatus\Approved;
+use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -33,11 +36,9 @@ class Show extends Component
 
     public function mount(Event $event): void
     {
-        $isViewable = $event->is_active
-            && ($event->status?->equals(\App\States\EventStatus\Approved::class)
-                || $event->status?->equals(\App\States\EventStatus\Pending::class));
+        $isViewable = $event->is_active && $this->isApprovedOrPending($event);
 
-        if (! $isViewable || $event->visibility !== \App\Enums\EventVisibility::Public) {
+        if (! $isViewable || $event->visibility !== EventVisibility::Public) {
             abort(404);
         }
 
@@ -55,6 +56,9 @@ class Show extends Component
         $this->syncEngagementStates();
     }
 
+    /**
+     * @return array<string, string>
+     */
     #[Computed]
     public function calendarLinks(): array
     {
@@ -90,6 +94,9 @@ class Show extends Component
         return $images;
     }
 
+    /**
+     * @return Collection<int, Event>
+     */
     #[Computed]
     public function relatedEvents(): Collection
     {
@@ -169,15 +176,13 @@ class Show extends Component
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             $this->redirectRoute('login');
 
             return;
         }
 
-        if (! $this->event->status?->equals(\App\States\EventStatus\Approved::class)
-            && ! $this->event->status?->equals(\App\States\EventStatus\Pending::class)
-            || $this->event->visibility !== \App\Enums\EventVisibility::Public) {
+        if (! $this->isApprovedOrPending($this->event) || $this->event->visibility !== EventVisibility::Public) {
             abort(403);
         }
 
@@ -209,7 +214,7 @@ class Show extends Component
 
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             $this->isSaved = false;
             $this->isInterested = false;
             $this->isGoing = false;
@@ -237,8 +242,19 @@ class Show extends Component
         ];
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.pages.events.show');
+    }
+
+    protected function isApprovedOrPending(Event $event): bool
+    {
+        $status = $event->status;
+
+        if ($status instanceof EventStatus) {
+            return $status->equals(Approved::class) || $status->equals(Pending::class);
+        }
+
+        return in_array((string) $status, ['approved', 'pending'], true);
     }
 }

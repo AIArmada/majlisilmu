@@ -271,3 +271,22 @@ vendor/bin/pest --parallel --filter=SubmitEvent
 - Parallel execution is safe for all tests (Pest handles isolation)
 - No need to modify existing tests to support parallel mode
 - Default behavior - no additional configuration required
+
+---
+
+# Static Analysis Safety for Runtime Extensions
+
+When a method looks "undefined" in static analysis, do not remove it until you verify its source.
+
+## Required Verification Before Removal
+1. Search for runtime extensions first:
+   - `macro()` / `hasMacro()` in service providers
+   - package mixins/traits
+   - plugin-specific extensions (for example Filament add-ons like quick-add select)
+2. Confirm if the method is intentionally runtime-provided (for example `Select::macro(...)`).
+3. If runtime-provided, preserve behavior and fix static analysis with a narrow rule (stub or focused ignore pattern), instead of deleting the method call.
+4. Only remove a method when you have confirmed there is no implementation source and no feature dependency.
+
+## Practical Rule
+- Behavior safety takes priority over static-analysis convenience.
+- Never remove feature methods such as `->closeOnSelect()` or `->quickAdd()` without source verification and impact check.

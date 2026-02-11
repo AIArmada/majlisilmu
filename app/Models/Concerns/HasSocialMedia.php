@@ -2,10 +2,16 @@
 
 namespace App\Models\Concerns;
 
+use App\Models\SocialMedia;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
 trait HasSocialMedia
 {
-    public function socialMedia(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    /**
+     * @return MorphMany<SocialMedia, $this>
+     */
+    public function socialMedia(): MorphMany
     {
-        return $this->morphMany(\App\Models\SocialMedia::class, 'socialable');
+        return $this->morphMany(SocialMedia::class, 'socialable');
     }
 }

@@ -89,73 +89,115 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
+    /**
+     * @return BelongsToMany<Institution, $this>
+     */
     public function institutions(): BelongsToMany
     {
         return $this->belongsToMany(Institution::class, 'institution_user')
             ->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<Speaker, $this>
+     */
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'speaker_user')
             ->withTimestamps();
     }
 
+    /**
+     * @return HasMany<EventSubmission, $this>
+     */
     public function eventSubmissions(): HasMany
     {
         return $this->hasMany(EventSubmission::class, 'submitted_by');
     }
 
+    /**
+     * @return HasMany<ModerationReview, $this>
+     */
     public function moderationReviews(): HasMany
     {
         return $this->hasMany(ModerationReview::class, 'reviewer_id');
     }
 
+    /**
+     * @return HasMany<Report, $this>
+     */
     public function reports(): HasMany
     {
         return $this->hasMany(Report::class, 'reporter_id');
     }
 
+    /**
+     * @return HasMany<Report, $this>
+     */
     public function handledReports(): HasMany
     {
         return $this->hasMany(Report::class, 'handled_by');
     }
 
+    /**
+     * @return HasMany<Registration, $this>
+     */
     public function registrations(): HasMany
     {
         return $this->hasMany(Registration::class);
     }
 
+    /**
+     * @return HasMany<SocialAccount, $this>
+     */
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(SocialAccount::class);
     }
 
+    /**
+     * @return HasMany<SavedSearch, $this>
+     */
     public function savedSearches(): HasMany
     {
         return $this->hasMany(SavedSearch::class);
     }
 
+    /**
+     * @return BelongsToMany<Event, $this>
+     */
     public function savedEvents(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_saves')->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<Event, $this>
+     */
     public function interestedEvents(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_interests')->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<Event, $this>
+     */
     public function goingEvents(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_attendees')->withTimestamps();
     }
 
+    /**
+     * @return HasMany<Event, $this>
+     */
     public function ownedEvents(): HasMany
     {
         return $this->hasMany(Event::class);
     }
 
+    /**
+     * @return BelongsToMany<Event, $this, EventUser>
+     */
     public function memberEvents(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_user')
@@ -164,11 +206,17 @@ class User extends Authenticatable implements FilamentUser
             ->withTimestamps();
     }
 
+    /**
+     * @return MorphMany<NotificationEndpoint, $this>
+     */
     public function notificationEndpoints(): MorphMany
     {
         return $this->morphMany(NotificationEndpoint::class, 'owner');
     }
 
+    /**
+     * @return MorphMany<NotificationPreference, $this>
+     */
     public function notificationPreferences(): MorphMany
     {
         return $this->morphMany(NotificationPreference::class, 'owner');
@@ -184,18 +232,24 @@ class User extends Authenticatable implements FilamentUser
             return $loadedPreference;
         }
 
-        return $this->notificationPreferences()
+        $preference = $this->notificationPreferences()
             ->where('notification_key', $notificationKey)
             ->first();
+
+        return $preference instanceof NotificationPreference ? $preference : null;
     }
 
+    /**
+     * @param  list<string>  $defaultChannels
+     * @return list<string>
+     */
     public function notificationChannelsFor(
         string $notificationKey,
         array $defaultChannels = [NotificationChannel::Email->value]
     ): array {
         $preference = $this->notificationPreferenceFor($notificationKey);
 
-        if (! $preference instanceof \App\Models\NotificationPreference) {
+        if (! $preference instanceof NotificationPreference) {
             return $defaultChannels;
         }
 

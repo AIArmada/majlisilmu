@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
+use App\Enums\Honorific;
+use App\Enums\PreNominal;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +18,12 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
+/**
+ * @property array<int, mixed>|null $honorific
+ * @property array<int, mixed>|null $pre_nominal
+ * @property array<int, string>|string|null $post_nominal
+ * @property array<int, array<string, mixed>>|null $qualifications
+ */
 class Speaker extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<\Database\Factories\SpeakerFactory> */
@@ -60,31 +69,30 @@ class Speaker extends Model implements AuditableContract, HasMedia
     {
         static::saving(function (Speaker $speaker) {
             if ($speaker->isDirty('qualifications')) {
-                // Logic to compute post_nominal from qualifications
-                $qualifications = $speaker->qualifications ?? [];
-                // Assuming qualifications is an array of arrays with 'degree' or 'post_nominal' key
-                // The factory uses: ['institution' => ..., 'degree' => ..., 'field' => ..., 'year' => ...]
-                // The user said: "post_nominal is a computed display string derived from qualifications"
+                $qualifications = $speaker->qualifications;
 
-                // Let's assume we map degree/field to a string.
-                // Example: PhD (Oxford), MA (Cairo)
-                // Or just simpler: PhD, MA.
-                // The factory has 'degree' in qualifications.
+                if (! is_array($qualifications) || $qualifications === []) {
+                    $speaker->post_nominal = null;
 
-                if (is_array($qualifications)) {
-                    $parts = [];
-                    foreach ($qualifications as $qual) {
-                        if (isset($qual['degree'])) {
-                            $parts[] = $qual['degree'];
-                        }
+                    return;
+                }
+
+                $parts = [];
+
+                foreach ($qualifications as $qualification) {
+                    if (! is_array($qualification)) {
+                        continue;
                     }
-                    // De-duplicate
-                    $parts = array_unique($parts);
 
-                    if ($parts !== []) {
-                        $speaker->post_nominal = array_values($parts);
+                    $degree = $qualification['degree'] ?? null;
+
+                    if (is_string($degree) && $degree !== '') {
+                        $parts[] = $degree;
                     }
                 }
+
+                $parts = array_values(array_unique($parts));
+                $speaker->post_nominal = $parts !== [] ? $parts : null;
             }
         });
     }
@@ -115,20 +123,24 @@ class Speaker extends Model implements AuditableContract, HasMedia
     {
         $honorificLabels = null;
         $preNominalLabels = null;
+        $honorificValues = is_array($this->honorific)
+            ? array_values(array_filter($this->honorific, fn (mixed $value): bool => is_string($value) && $value !== ''))
+            : [];
+        $preNominalValues = is_array($this->pre_nominal)
+            ? array_values(array_filter($this->pre_nominal, fn (mixed $value): bool => is_string($value) && $value !== ''))
+            : [];
 
-        // Convert honorific enum values to labels
-        if (is_array($this->honorific) && $this->honorific !== []) {
-            $honorificLabels = collect($this->honorific)
-                ->map(fn ($value) => \App\Enums\Honorific::tryFrom($value)?->getLabel())
-                ->filter()
+        if ($honorificValues !== []) {
+            $honorificLabels = collect($honorificValues)
+                ->map(fn (string $value): ?string => Honorific::tryFrom($value)?->getLabel())
+                ->filter(fn (?string $label): bool => filled($label))
                 ->implode(', ');
         }
 
-        // Convert pre_nominal enum values to labels
-        if (is_array($this->pre_nominal) && $this->pre_nominal !== []) {
-            $preNominalLabels = collect($this->pre_nominal)
-                ->map(fn ($value) => \App\Enums\PreNominal::tryFrom($value)?->getLabel())
-                ->filter()
+        if ($preNominalValues !== []) {
+            $preNominalLabels = collect($preNominalValues)
+                ->map(fn (string $value): ?string => PreNominal::tryFrom($value)?->getLabel())
+                ->filter(fn (?string $label): bool => filled($label))
                 ->implode(' ');
         }
 
@@ -139,9 +151,12 @@ class Speaker extends Model implements AuditableContract, HasMedia
         ], filled(...));
 
         $formatted = trim(implode(' ', $parts));
+        $postNominalValues = is_array($this->post_nominal)
+            ? array_values(array_filter($this->post_nominal, fn (string $value): bool => $value !== ''))
+            : [];
 
-        if (is_array($this->post_nominal) && $this->post_nominal !== []) {
-            $postNominalStr = implode(', ', $this->post_nominal);
+        if ($postNominalValues !== []) {
+            $postNominalStr = implode(', ', $postNominalValues);
             $formatted = trim($formatted.', '.$postNominalStr);
         } elseif (filled($this->post_nominal)) {
             $formatted = trim($formatted.', '.$this->post_nominal);
@@ -150,6 +165,9 @@ class Speaker extends Model implements AuditableContract, HasMedia
         return $formatted;
     }
 
+    /**
+     * @return BelongsToMany<Event, $this>
+     */
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_speaker')
@@ -158,6 +176,9 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->orderByPivot('order_column');
     }
 
+    /**
+     * @return BelongsToMany<Institution, $this>
+     */
     public function institutions(): BelongsToMany
     {
         return $this->belongsToMany(Institution::class, 'institution_speaker')
@@ -165,12 +186,18 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'speaker_user')
             ->withTimestamps();
     }
 
+    /**
+     * @return MorphMany<Report, $this>
+     */
     public function reports(): MorphMany
     {
         return $this->morphMany(Report::class, 'entity');
@@ -206,29 +233,29 @@ class Speaker extends Model implements AuditableContract, HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->performOnCollections('avatar')
             ->width(80)
             ->height(80)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('avatar');
+            ->format('webp');
 
         $this->addMediaConversion('profile')
+            ->performOnCollections('avatar')
             ->width(400)
             ->height(400)
-            ->format('webp')
-            ->performOnCollections('avatar');
+            ->format('webp');
 
         $this->addMediaConversion('banner')
+            ->performOnCollections('main')
             ->width(1200)
-            ->format('webp')
-            ->performOnCollections('main');
+            ->format('webp');
 
         $this->addMediaConversion('gallery_thumb')
+            ->performOnCollections('gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
-            ->format('webp')
-            ->performOnCollections('gallery');
+            ->format('webp');
     }
 
     public function getAuthzScopeLabel(): string
@@ -238,11 +265,13 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
     /**
      * Scope a query to only include active speakers.
+     *
+     * @param  Builder<self>  $query
      */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function active($query)
+    protected function active(Builder $query): void
     {
-        return $query->where('is_active', true);
+        $query->where('is_active', true);
     }
 
     /**

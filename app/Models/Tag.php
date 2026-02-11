@@ -12,12 +12,16 @@ use Spatie\Tags\Tag as SpatieTag;
 
 class Tag extends SpatieTag implements Sortable
 {
+    /** @use HasFactory<\Database\Factories\TagFactory> */
     use HasFactory, HasUuids, SortableTrait;
 
     public $incrementing = false;
 
     protected $keyType = 'string';
 
+    /**
+     * @var array<string, string|bool>
+     */
     public array $sortable = [
         'order_column_name' => 'order_column',
         'sort_when_creating' => true,
@@ -51,6 +55,8 @@ class Tag extends SpatieTag implements Sortable
 
     /**
      * Build the sort query scoped by type.
+     *
+     * @return Builder<static>
      */
     #[\Override]
     public function buildSortQuery(): Builder
@@ -66,12 +72,14 @@ class Tag extends SpatieTag implements Sortable
 
     /**
      * Scope to filter by tag type.
+     *
+     * @param  Builder<self>  $query
      */
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function ofType(Builder $query, TagType|string $type): Builder
+    protected function ofType(Builder $query, TagType|string $type): void
     {
         $value = $type instanceof TagType ? $type->value : $type;
 
-        return $query->where('type', $value);
+        $query->where('type', $value);
     }
 }

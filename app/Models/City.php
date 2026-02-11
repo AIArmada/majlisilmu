@@ -9,6 +9,8 @@ class City extends WorldCity
 {
     /**
      * Events in this city.
+     *
+     * @return HasMany<Event, $this>
      */
     public function events(): HasMany
     {
@@ -17,6 +19,8 @@ class City extends WorldCity
 
     /**
      * Institutions in this city.
+     *
+     * @return HasMany<Institution, $this>
      */
     public function institutions(): HasMany
     {
@@ -25,6 +29,8 @@ class City extends WorldCity
 
     /**
      * Venues in this city.
+     *
+     * @return HasMany<Venue, $this>
      */
     public function venues(): HasMany
     {

@@ -34,7 +34,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): ?string
+    public function getIcon(): string
     {
         return match ($this) {
             self::Facebook => 'heroicon-m-globe-alt',

@@ -82,7 +82,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
         };
     }
 
-    public function getColor(): string|array|null
+    public function getColor(): string
     {
         return match ($this) {
             self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah => 'info',
@@ -94,7 +94,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): ?string
+    public function getIcon(): string
     {
         return match ($this) {
             self::KuliahCeramah => 'heroicon-m-book-open',
