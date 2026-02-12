@@ -80,7 +80,7 @@
                         $heroImage = $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
                     }
                     if (!$heroImage) {
-                        $heroImage = $event->venue?->getFirstMedia('main')?->getAvailableUrl(['banner']) ?? '';
+                        $heroImage = $event->venue?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
                     }
                 @endphp
 

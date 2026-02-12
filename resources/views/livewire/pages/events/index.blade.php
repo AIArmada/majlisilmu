@@ -32,9 +32,25 @@
         request('children_allowed'),
         request('starts_after'),
         request('starts_before'),
+        request('time_scope') !== null && request('time_scope') !== 'upcoming',
         count($selectedAgeGroups) > 0,
         count($selectedTopicIds) > 0,
     ])->filter(fn ($value) => $value !== null && $value !== '' && $value !== false)->count();
+    $hasActiveFilters = request()->hasAny([
+        'search',
+        'state_id',
+        'district_id',
+        'subdistrict_id',
+        'language',
+        'event_type',
+        'gender',
+        'age_group',
+        'children_allowed',
+        'starts_after',
+        'starts_before',
+        'topic_ids',
+        'lat',
+    ]) || (request('time_scope') !== null && request('time_scope') !== 'upcoming');
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -57,7 +73,12 @@
                     <span class="h-4 w-8 bg-slate-200 rounded"></span> {{ __('Gatherings') }}
                 </span>
                 @endplaceholder
-                {{ $this->events->total() }} {{ __('Upcoming Gatherings') }}
+                {{ $this->events->total() }}
+                {{ match (request('time_scope', 'upcoming')) {
+                    'past' => __('Past Gatherings'),
+                    'all' => __('All Gatherings'),
+                    default => __('Upcoming Gatherings'),
+                } }}
                 @endisland
             </span>
 
@@ -77,7 +98,7 @@
         <!-- Search & Filter Card -->
         <form action="{{ route('events.index') }}" method="GET" x-ref="form" x-data="{
                     locating: false,
-                    showFilters: {{ request()->hasAny(['state_id', 'district_id', 'subdistrict_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids']) ? 'true' : 'false' }},
+                    showFilters: {{ request()->hasAny(['state_id', 'district_id', 'subdistrict_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids']) || (request('time_scope') !== null && request('time_scope') !== 'upcoming') ? 'true' : 'false' }},
                     locate() {
                         if (this.locating) return;
                         if (! navigator.geolocation) {
@@ -237,6 +258,16 @@
                         </div>
 
                         <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Time Scope') }}</label>
+                            <select name="time_scope" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                                <option value="upcoming" @selected(request('time_scope', 'upcoming') === 'upcoming')>{{ __('Upcoming') }}</option>
+                                <option value="past" @selected(request('time_scope') === 'past')>{{ __('Past') }}</option>
+                                <option value="all" @selected(request('time_scope') === 'all')>{{ __('All Time') }}</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Language') }}</label>
                             <select name="language" onchange="this.form.submit()"
                                 class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
@@ -321,7 +352,7 @@
             </div>
 
             <!-- Active Filters Bar -->
-            @if(request()->hasAny(['search', 'state_id', 'district_id', 'subdistrict_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids', 'lat']))
+            @if($hasActiveFilters)
                 <div class="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100">
                     <span class="text-xs font-bold text-slate-400 uppercase mr-2">{{ __('Active:') }}</span>
                     @if(request('search'))
@@ -401,6 +432,18 @@
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ __('Until') }} {{ $startsBeforeLabel }}
+                        </span>
+                    @endif
+                    @if(request('time_scope') === 'past')
+                        <span
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ __('Past') }}
+                        </span>
+                    @endif
+                    @if(request('time_scope') === 'all')
+                        <span
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ __('All Time') }}
                         </span>
                     @endif
                     @auth

@@ -181,14 +181,21 @@ class EventSearchService
      */
     protected function buildTypesenseFilterParts(array $filters): array
     {
+        $timeScope = $this->normalizeTimeScope($filters['time_scope'] ?? null);
+
         $filterParts = [
             'is_active:=true',
             'status:[approved, pending]',
             'visibility:public',
-            'starts_at:>='.$this->startsAfterTimestamp($filters),
         ];
 
-        $startsBeforeTimestamp = $this->startsBeforeTimestamp($filters);
+        $startsAfterTimestamp = $this->startsAfterTimestamp($filters, $timeScope);
+
+        if ($startsAfterTimestamp !== null) {
+            $filterParts[] = 'starts_at:>='.$startsAfterTimestamp;
+        }
+
+        $startsBeforeTimestamp = $this->startsBeforeTimestamp($filters, $timeScope);
 
         if ($startsBeforeTimestamp !== null) {
             $filterParts[] = 'starts_at:<='.$startsBeforeTimestamp;
@@ -281,13 +288,20 @@ class EventSearchService
      */
     protected function buildDatabaseQuery(?string $query, array $filters): Builder
     {
+        $timeScope = $this->normalizeTimeScope($filters['time_scope'] ?? null);
+
         $queryBuilder = Event::query()
             ->where('is_active', true)
             ->whereIn('status', ['approved', 'pending'])
-            ->where('visibility', 'public')
-            ->where('starts_at', '>=', $this->startsAfterDateTime($filters));
+            ->where('visibility', 'public');
 
-        $startsBefore = $this->startsBeforeDateTime($filters);
+        $startsAfter = $this->startsAfterDateTime($filters, $timeScope);
+
+        if ($startsAfter instanceof \Carbon\CarbonInterface) {
+            $queryBuilder->where('starts_at', '>=', $startsAfter);
+        }
+
+        $startsBefore = $this->startsBeforeDateTime($filters, $timeScope);
 
         if ($startsBefore instanceof \Carbon\CarbonInterface) {
             $queryBuilder->where('starts_at', '<=', $startsBefore);
@@ -443,41 +457,68 @@ class EventSearchService
     /**
      * @param  array<string, mixed>  $filters
      */
-    protected function startsAfterDateTime(array $filters): CarbonInterface
+    protected function startsAfterDateTime(array $filters, string $timeScope = 'upcoming'): ?CarbonInterface
     {
         $startsAfter = $this->parseDateFilter($filters['starts_after'] ?? null, false);
 
-        if (! $startsAfter instanceof \Carbon\CarbonInterface) {
+        if ($startsAfter instanceof \Carbon\CarbonInterface) {
+            if ($timeScope === 'upcoming' && now()->greaterThan($startsAfter)) {
+                return now();
+            }
+
+            return $startsAfter;
+        }
+
+        if ($timeScope === 'upcoming') {
             return now();
         }
 
-        return now()->greaterThan($startsAfter) ? now() : $startsAfter;
+        return null;
     }
 
     /**
      * @param  array<string, mixed>  $filters
      */
-    protected function startsBeforeDateTime(array $filters): ?CarbonInterface
+    protected function startsBeforeDateTime(array $filters, string $timeScope = 'upcoming'): ?CarbonInterface
     {
-        return $this->parseDateFilter($filters['starts_before'] ?? null, true);
+        $startsBefore = $this->parseDateFilter($filters['starts_before'] ?? null, true);
+
+        if ($startsBefore instanceof \Carbon\CarbonInterface) {
+            return $startsBefore;
+        }
+
+        if ($timeScope === 'past') {
+            return now();
+        }
+
+        return null;
     }
 
     /**
      * @param  array<string, mixed>  $filters
      */
-    protected function startsAfterTimestamp(array $filters): int
+    protected function startsAfterTimestamp(array $filters, string $timeScope = 'upcoming'): ?int
     {
-        return $this->startsAfterDateTime($filters)->timestamp;
+        return $this->startsAfterDateTime($filters, $timeScope)?->timestamp;
     }
 
     /**
      * @param  array<string, mixed>  $filters
      */
-    protected function startsBeforeTimestamp(array $filters): ?int
+    protected function startsBeforeTimestamp(array $filters, string $timeScope = 'upcoming'): ?int
     {
-        $startsBefore = $this->startsBeforeDateTime($filters);
+        $startsBefore = $this->startsBeforeDateTime($filters, $timeScope);
 
         return $startsBefore?->timestamp;
+    }
+
+    protected function normalizeTimeScope(mixed $value): string
+    {
+        if (! is_string($value)) {
+            return 'upcoming';
+        }
+
+        return in_array($value, ['upcoming', 'past', 'all'], true) ? $value : 'upcoming';
     }
 
     protected function parseDateFilter(mixed $value, bool $endOfDay): ?CarbonInterface

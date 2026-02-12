@@ -18,9 +18,9 @@ class VenuesTable
         // Configuration for Venues Table
         return $table
             ->columns([
-                SpatieMediaLibraryImageColumn::make('main')
+                SpatieMediaLibraryImageColumn::make('cover')
                     ->label('Image')
-                    ->collection('main')
+                    ->collection('cover')
                     ->conversion('thumb')
                     ->square()
                     ->size(56),

@@ -163,13 +163,13 @@ class VenueForm
                     ->columns(1),
                 Section::make('Media')
                     ->components([
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('main')
-                            ->collection('main')
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                            ->collection('cover')
                             ->image()
                             ->imageEditor()
                             ->responsiveImages()
                             ->conversion('thumb')
-                            ->helperText('Main venue image (recommended: 1200x800)'),
+                            ->helperText('Cover venue image (recommended: 1200x800)'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()

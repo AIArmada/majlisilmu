@@ -28,9 +28,9 @@ class VenueInfolist
                             ->schema([
                                 Section::make('Maklumat Asas')
                                     ->schema([
-                                        SpatieMediaLibraryImageEntry::make('main')
-                                            ->label('Imej Utama')
-                                            ->collection('main')
+                                        SpatieMediaLibraryImageEntry::make('cover')
+                                            ->label('Imej Sampul')
+                                            ->collection('cover')
                                             ->conversion('thumb')
                                             ->columnSpan(1),
                                         Grid::make(2)

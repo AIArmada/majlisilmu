@@ -1,5 +1,7 @@
 <?php
 
+use App\Filament\Resources\AiModelPricings\AiModelPricingResource;
+use App\Filament\Resources\AiUsageLogs\AiUsageLogResource;
 use App\Filament\Resources\DonationChannels\DonationChannelResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
@@ -8,6 +10,7 @@ use App\Filament\Resources\References\RelationManagers\EventsRelationManager as 
 use App\Filament\Resources\Reports\ReportResource;
 use App\Filament\Resources\Series\RelationManagers\EventsRelationManager as SeriesEventsRelationManager;
 use App\Filament\Resources\Series\SeriesResource;
+use App\Filament\Resources\Spaces\SpaceResource;
 use App\Filament\Resources\Speakers\RelationManagers\EventsRelationManager as SpeakerEventsRelationManager;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Filament\Resources\Tags\TagResource;
@@ -31,6 +34,9 @@ it('allows super admin to access all core admin resource index pages', function 
         DonationChannelResource::class,
         TagResource::class,
         ReportResource::class,
+        SpaceResource::class,
+        AiUsageLogResource::class,
+        AiModelPricingResource::class,
     ];
 
     foreach ($resources as $resource) {

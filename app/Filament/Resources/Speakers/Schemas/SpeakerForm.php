@@ -152,17 +152,18 @@ class SpeakerForm
                             ->collection('avatar')
                             ->image()
                             ->imageEditor()
+                            ->circleCropper()
                             ->avatar()
                             ->conversion('thumb')
                             ->helperText('Speaker photo (recommended: 400x400)'),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('main')
-                            ->collection('main')
-                            ->label('Main Image')
+                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                            ->collection('cover')
+                            ->label('Cover Image')
                             ->image()
                             ->imageEditor()
                             ->responsiveImages()
                             ->conversion('banner')
-                            ->helperText('Main featured image'),
+                            ->helperText('Cover featured image'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()

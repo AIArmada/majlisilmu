@@ -473,6 +473,54 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Outside Date Range');
     });
 
+    it('filters events to past only when time scope is past', function () {
+        Event::factory()->create([
+            'title' => 'Past Scope Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->subDays(2),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Past Scope Non Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?time_scope=past');
+
+        $response->assertOk()
+            ->assertSee('Past Scope Match')
+            ->assertDontSee('Past Scope Non Match');
+    });
+
+    it('shows both past and upcoming events when time scope is all', function () {
+        Event::factory()->create([
+            'title' => 'All Scope Past',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->subDays(2),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'All Scope Upcoming',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?time_scope=all');
+
+        $response->assertOk()
+            ->assertSee('All Scope Past')
+            ->assertSee('All Scope Upcoming');
+    });
+
     it('returns distance in database nearby search fallback', function () {
         config(['scout.driver' => 'database']);
 

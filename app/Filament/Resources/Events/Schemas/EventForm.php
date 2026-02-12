@@ -44,11 +44,13 @@ class EventForm
         return $schema
             ->components([
                 Tabs::make('EventTabs')
+                    ->columnSpanFull()
                     ->tabs([
                         Tab::make('Maklumat Majlis')
                             ->icon('heroicon-m-document-text')
                             ->schema([
                                 Section::make('Maklumat Utama')
+                                    ->columnSpanFull()
                                     ->schema([
                                         TextInput::make('title')
                                             ->label('Tajuk Majlis')
@@ -81,6 +83,7 @@ class EventForm
                                     ])
                                     ->columns(2),
                                 Section::make('Waktu & Format')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('timing_mode')
                                             ->label('Mode Waktu')
@@ -159,6 +162,7 @@ class EventForm
                                     ])
                                     ->columns(2),
                                 Section::make('Sasaran Peserta')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('gender')
                                             ->label('Jantina')
@@ -177,6 +181,7 @@ class EventForm
                                     ])
                                     ->columns(2),
                                 Section::make('Bahasa')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('languages')
                                             ->label('Bahasa')
@@ -192,6 +197,7 @@ class EventForm
                             ->icon('heroicon-m-tag')
                             ->schema([
                                 Section::make('Kategori')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('event_type')
                                             ->label('Jenis Majlis')
@@ -254,6 +260,7 @@ class EventForm
                                     ])
                                     ->columns(2),
                                 Section::make('Rujukan')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('references')
                                             ->label('Rujukan Kitab / Buku')
@@ -269,6 +276,7 @@ class EventForm
                             ->icon('heroicon-m-building-office')
                             ->schema([
                                 Section::make('Penganjur')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('organizer_type')
                                             ->label('Jenis Penganjur')
@@ -292,6 +300,7 @@ class EventForm
                                     ])
                                     ->columns(2),
                                 Section::make('Lokasi')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('institution_id')
                                             ->label('Institusi')
@@ -321,6 +330,7 @@ class EventForm
                             ->icon('heroicon-m-user-group')
                             ->schema([
                                 Section::make('Penceramah')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('speakers')
                                             ->label('Penceramah')
@@ -333,6 +343,7 @@ class EventForm
                                             ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
                                     ]),
                                 Section::make('Media')
+                                    ->columnSpanFull()
                                     ->schema([
                                         SpatieMediaLibraryFileUpload::make('poster')
                                             ->label('Gambar Utama')
@@ -346,6 +357,7 @@ class EventForm
                                             ->collection('gallery')
                                             ->multiple()
                                             ->reorderable()
+                                            ->maxFiles(10)
                                             ->image()
                                             ->imageEditor()
                                             ->conversion('thumb')
@@ -357,6 +369,7 @@ class EventForm
                             ->icon('heroicon-m-shield-check')
                             ->schema([
                                 Section::make('Moderasi')
+                                    ->columnSpanFull()
                                     ->schema([
                                         Select::make('status')
                                             ->label('Status')

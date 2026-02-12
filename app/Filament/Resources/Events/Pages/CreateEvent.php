@@ -6,10 +6,13 @@ use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Tag;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Enums\Width;
 
 class CreateEvent extends CreateRecord
 {
     protected static string $resource = EventResource::class;
+
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     #[\Override]
     protected function mutateFormDataBeforeCreate(array $data): array

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Ai\Listeners\RecordAiUsage;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventSubmission;
@@ -22,6 +23,13 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Ai\Events\AgentPrompted;
+use Laravel\Ai\Events\AgentStreamed;
+use Laravel\Ai\Events\AudioGenerated;
+use Laravel\Ai\Events\EmbeddingsGenerated;
+use Laravel\Ai\Events\ImageGenerated;
+use Laravel\Ai\Events\Reranked;
+use Laravel\Ai\Events\TranscriptionGenerated;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class AppServiceProvider extends ServiceProvider
@@ -56,6 +64,18 @@ class AppServiceProvider extends ServiceProvider
         if (! self::$eventObserverRegistered) {
             Event::observe(EventObserver::class);
             self::$eventObserverRegistered = true;
+        }
+
+        if (! app()->bound('ai.usage.listeners.registered')) {
+            \Illuminate\Support\Facades\Event::listen(AgentPrompted::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(AgentStreamed::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(ImageGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(TranscriptionGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(EmbeddingsGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(Reranked::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(AudioGenerated::class, [RecordAiUsage::class, 'handle']);
+
+            app()->instance('ai.usage.listeners.registered', true);
         }
 
         if (! self::$languageSwitchConfigured) {
@@ -100,6 +120,7 @@ class AppServiceProvider extends ServiceProvider
                 $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
 
                 $upload
+                    ->placeholder(__('filament-forms::components.file_upload.placeholder'))
                     ->maxSize($maxUploadSizeKb)
                     ->maxParallelUploads(2)
                     ->appendFiles()
