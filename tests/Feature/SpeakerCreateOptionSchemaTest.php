@@ -4,7 +4,7 @@ use App\Forms\SpeakerFormSchema;
 use App\Models\Institution;
 use App\Models\Speaker;
 
-it('includes biography, main image, and institution position fields in speaker create option form', function () {
+it('includes biography, cover image, and institution position fields in speaker create option form', function () {
     $components = collect(SpeakerFormSchema::createOptionForm())
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
@@ -15,7 +15,7 @@ it('includes biography, main image, and institution position fields in speaker c
         ->all();
 
     expect($fieldNames)->toContain('bio');
-    expect($fieldNames)->toContain('main');
+    expect($fieldNames)->toContain('cover');
     expect($fieldNames)->toContain('institution_position');
     expect($fieldNames)->toContain('institution_id');
     expect($components->get('institution_id')?->isMultiple())->toBeFalse();

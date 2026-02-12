@@ -61,6 +61,8 @@ it('shows only needs changes events on the needs changes tab', function () {
         ->get('/admin/moderation-queue?tab=needs_changes')
         ->assertSuccessful()
         ->assertSee($needsChangesEvent->title)
+        ->assertSee('Please update venue details.')
+        ->assertSee('Return to Pending')
         ->assertDontSee($pendingEvent->title);
 });
 

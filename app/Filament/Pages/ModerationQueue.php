@@ -183,11 +183,23 @@ class ModerationQueue extends Page implements HasTable
                     ->badge()
                     ->color(fn ($state): string => match ((string) $state) {
                         'pending' => 'warning',
+                        'needs_changes' => 'warning',
                         'approved' => 'success',
                         'rejected' => 'danger',
                         'draft' => 'gray',
                         default => 'gray',
                     }),
+                TextColumn::make('latestModerationReview.reason_code')
+                    ->label('Latest Reason')
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? Str::title(str_replace('_', ' ', $state)) : '-')
+                    ->placeholder('-')
+                    ->toggleable(),
+                TextColumn::make('latestModerationReview.note')
+                    ->label('Latest Moderation Note')
+                    ->limit(80)
+                    ->tooltip(fn (Event $record): ?string => $record->latestModerationReview?->note)
+                    ->placeholder('-')
+                    ->wrap(),
                 TextColumn::make('created_at')
                     ->label('Submitted')
                     ->since()
@@ -317,6 +329,18 @@ class ModerationQueue extends Page implements HasTable
                     ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Rejected
                         || $record->status instanceof \App\States\EventStatus\NeedsChanges),
 
+                Action::make('return_to_pending')
+                    ->label('Return to Pending')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Return to Pending')
+                    ->modalDescription('Move this event back to pending for moderation review.')
+                    ->action(function (Event $record, \App\Services\ModerationService $service): void {
+                        $service->submitForModeration($record);
+                    })
+                    ->visible(fn (Event $record): bool => $record->status instanceof NeedsChanges),
+
                 Action::make('view')
                     ->label('View')
                     ->icon('heroicon-o-eye')
@@ -326,6 +350,7 @@ class ModerationQueue extends Page implements HasTable
                     ->icon('heroicon-o-pencil-square')
                     ->url(fn (Event $record) => EventResource::getUrl('edit', ['record' => $record])),
             ])
+            ->recordUrl(fn (Event $record): string => EventResource::getUrl('view', ['record' => $record]))
             ->defaultSort('created_at', 'desc')
             ->poll('30s');
     }
@@ -336,7 +361,7 @@ class ModerationQueue extends Page implements HasTable
     protected function getTableQuery(): Builder
     {
         $query = Event::query()
-            ->with(['institution', 'venue', 'speakers', 'address.state'])
+            ->with(['institution', 'venue', 'speakers', 'address.state', 'latestModerationReview'])
             ->withCount([
                 'reports as open_reports_count' => fn (Builder $reportQuery) => $reportQuery->where('status', 'open'),
             ]);

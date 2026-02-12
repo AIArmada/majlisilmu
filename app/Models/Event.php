@@ -381,6 +381,16 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * @return HasOne<ModerationReview, $this>
+     */
+    public function latestModerationReview(): HasOne
+    {
+        return $this->hasOne(ModerationReview::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
+
+    /**
      * @return HasMany<Registration, $this>
      */
     public function registrations(): HasMany

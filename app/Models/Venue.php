@@ -67,7 +67,7 @@ class Venue extends Model implements HasMedia
      */
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('main')
+        $this->addMediaCollection('cover')
             ->useDisk(config('media-library.disk_name'))
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
             ->useFallbackUrl(asset('images/placeholders/venue.png'))
@@ -86,14 +86,14 @@ class Venue extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
-            ->performOnCollections('main', 'gallery')
+            ->performOnCollections('cover', 'gallery')
             ->width(368)
             ->height(232)
             ->sharpen(10)
             ->format('webp');
 
         $this->addMediaConversion('banner')
-            ->performOnCollections('main')
+            ->performOnCollections('cover')
             ->width(1200)
             ->format('webp');
     }

@@ -4,6 +4,7 @@
 # Database Guidelines
 - **Primary keys**: `uuid('id')->primary()`.
 - **Foreign keys**: `foreignUuid('col')` only.
+- **Intentional geography exception**: `countries`, `states`, `cities`, `districts`, and `subdistricts` use integer IDs (`id` / `foreignId`) by design. Keep all geography references (`country_id`, `state_id`, `city_id`, `district_id`, `subdistrict_id`) as integers.
 - **Never** add DB-level constraints or cascades: no `->constrained()`, no `->cascadeOnDelete()`, no FK constraints.
 - **Cascades/integrity**: enforce in application logic (models/actions/services).
 - **Migrations**: keep safe/idempotent; no `down()` required.
@@ -652,6 +653,44 @@ vendor/bin/pest --parallel --filter=SubmitEvent
 - Parallel execution is safe for all tests (Pest handles isolation)
 - No need to modify existing tests to support parallel mode
 - Default behavior - no additional configuration required
+
+---
+
+# Static Analysis Safety for Runtime Extensions
+
+When a method looks "undefined" in static analysis, do not remove it until you verify its source.
+
+## Required Verification Before Removal
+1. Search for runtime extensions first:
+   - `macro()` / `hasMacro()` in service providers
+   - package mixins/traits
+   - plugin-specific extensions (for example Filament add-ons like quick-add select)
+2. Confirm if the method is intentionally runtime-provided (for example `Select::macro(...)`).
+3. If runtime-provided, preserve behavior and fix static analysis with a narrow rule (stub or focused ignore pattern), instead of deleting the method call.
+4. Only remove a method when you have confirmed there is no implementation source and no feature dependency.
+
+## Practical Rule
+- Behavior safety takes priority over static-analysis convenience.
+- Never remove feature methods such as `->closeOnSelect()` or `->quickAdd()` without source verification and impact check.
+
+---
+
+# PHPStan Level 6 Compliance
+
+All new and modified code must be written to pass PHPStan at level 6.
+
+## Required Standard
+1. Do not introduce new PHPStan errors.
+2. Prefer real fixes (types, generics, return shapes, null-handling, narrowing) over broad ignores.
+3. Avoid adding baseline suppressions unless there is a verified runtime-extension limitation that cannot be modeled safely.
+4. If a suppression is unavoidable, keep it as narrow as possible (specific file + message pattern) and document why.
+
+## Verification Command
+Run and pass:
+
+```bash
+vendor/bin/phpstan analyse --ansi
+```
 
 === foundation rules ===
 

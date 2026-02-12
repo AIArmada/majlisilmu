@@ -32,15 +32,14 @@ class VenueFormSchema
                 ->options(VenueType::class)
                 ->placeholder(__('Select type...')),
 
-            SpatieMediaLibraryFileUpload::make('main')
-                ->label(__('Gambar Utama'))
-                ->collection('main')
+            SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Cover Image'))
+                ->collection('cover')
                 ->image()
                 ->imageEditor()
                 ->conversion('thumb')
                 ->responsiveImages()
-                ->maxSize(5120)
-                ->helperText(__('Gambar pengepala atau imej hiasan')),
+                ->helperText(__('Header or banner image')),
 
             SpatieMediaLibraryFileUpload::make('gallery')
                 ->label(__('Galeri'))
@@ -50,13 +49,12 @@ class VenueFormSchema
                 ->imageEditor()
                 ->conversion('thumb')
                 ->responsiveImages()
-                ->maxSize(5120)
                 ->maxFiles(10)
                 ->helperText(__('Sehingga 10 gambar lokasi')),
 
             ...SharedFormSchema::addressFields(),
 
-            SharedFormSchema::socialMediaRepeater('Tambah pautan media sosial untuk lokasi ini'),
+            SharedFormSchema::socialMediaRepeater('Add social media links for this venue'),
         ];
     }
 
@@ -74,7 +72,7 @@ class VenueFormSchema
             'status' => 'pending',
         ]);
 
-        // Save media uploads (main, gallery) via Filament's relationship-saving mechanism
+        // Save media uploads (cover, gallery) via Filament's relationship-saving mechanism
         $schema?->model($venue)->saveRelationships();
 
         SharedFormSchema::createAddressFromData($venue, $data);

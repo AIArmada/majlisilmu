@@ -2,16 +2,28 @@
 
 namespace Database\Seeders;
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Models\Tag;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 
 class EventSeeder extends Seeder
 {
+    /**
+     * @var array<string, string>
+     */
+    private array $tagIdMap = [];
+
     /**
      * Run the database seeds.
      */
@@ -28,6 +40,8 @@ class EventSeeder extends Seeder
             if (! $hadEvents) {
                 $this->seedBulkEvents();
             }
+
+            $this->backfillSeededEventRequiredFields();
         } finally {
             // Re-enable event dispatcher after seeding
             Event::setEventDispatcher(app('events'));
@@ -309,11 +323,17 @@ class EventSeeder extends Seeder
                 $prayerDisplayText = 'Selepas Zohor';
             }
 
+            $speaker = $this->resolveScheduleSpeaker($entry['speaker'] ?? null);
+            $organizerType = $speaker instanceof Speaker ? Speaker::class : Institution::class;
+            $organizerId = $speaker?->getKey() ?? $institution->getKey();
+
             $event = Event::query()->updateOrCreate([
                 'slug' => $slug,
             ], [
                 'institution_id' => $institution->id,
                 'venue_id' => $venue->id,
+                'organizer_type' => $organizerType,
+                'organizer_id' => $organizerId,
                 'title' => $title,
                 'description' => $descriptionParts !== [] ? implode(' | ', $descriptionParts) : null,
                 'starts_at' => $startsAt,
@@ -321,7 +341,12 @@ class EventSeeder extends Seeder
                 'timezone' => 'Asia/Kuala_Lumpur',
                 // 'language' has been removed; genre/audience are now event_type/age_group etc
                 'event_type' => \App\Enums\EventType::KuliahCeramah,
-                'visibility' => 'public',
+                'gender' => EventGenderRestriction::All,
+                'age_group' => [EventAgeGroup::AllAges->value],
+                'children_allowed' => true,
+                'event_format' => EventFormat::Physical,
+                'visibility' => EventVisibility::Public,
+                'is_muslim_only' => false,
                 'status' => 'approved',
                 'published_at' => $startsAt->copy()->subDays(7),
                 'timing_mode' => $timingMode,
@@ -338,25 +363,275 @@ class EventSeeder extends Seeder
                 }
             }
 
-            if (isset($entry['speaker'])) {
-                $speakerName = $entry['speaker'];
-                $speaker = \App\Models\Speaker::query()->firstOrCreate([
-                    'slug' => \Illuminate\Support\Str::slug($speakerName),
-                ], [
-                    'name' => $speakerName,
-                    'status' => 'verified',
-                ]);
-
+            if ($speaker instanceof Speaker) {
                 $event->speakers()->syncWithoutDetaching([
                     $speaker->id => ['order_column' => 1],
                 ]);
             }
 
+            $this->ensureScheduleEventHasTags($event, $title, $topic);
+
         }
+    }
+
+    private function resolveScheduleSpeaker(?string $speakerName): ?Speaker
+    {
+        if (! is_string($speakerName) || $speakerName === '') {
+            return null;
+        }
+
+        return Speaker::query()->firstOrCreate([
+            'slug' => \Illuminate\Support\Str::slug($speakerName),
+        ], [
+            'name' => $speakerName,
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+    }
+
+    private function ensureScheduleEventHasTags(Event $event, string $title, ?string $topic): void
+    {
+        $existingTypes = $event->tags()
+            ->pluck('type')
+            ->filter(fn (mixed $type): bool => is_string($type) && $type !== '')
+            ->unique()
+            ->values();
+
+        $hasRequiredTypes = $existingTypes->contains(TagType::Domain->value)
+            && $existingTypes->contains(TagType::Discipline->value);
+
+        if ($hasRequiredTypes) {
+            return;
+        }
+
+        $this->hydrateTagIdMap();
+
+        $selectedTagIds = $this->resolveSeedTagIds($title, $topic);
+
+        if ($selectedTagIds === []) {
+            return;
+        }
+
+        $combinedTagIds = $event->tags()
+            ->pluck('id')
+            ->merge($selectedTagIds)
+            ->unique()
+            ->values()
+            ->all();
+
+        $tags = Tag::query()->whereIn('id', $combinedTagIds)->get();
+
+        if ($tags->isEmpty()) {
+            return;
+        }
+
+        $event->syncTags($tags);
+    }
+
+    private function hydrateTagIdMap(): void
+    {
+        if ($this->tagIdMap !== []) {
+            return;
+        }
+
+        Tag::query()
+            ->whereIn('status', ['verified', 'pending'])
+            ->get(['id', 'type', 'slug'])
+            ->each(function (Tag $tag): void {
+                $slug = $tag->slug;
+                $normalizedSlug = null;
+
+                if (is_string($slug)) {
+                    $decodedSlug = json_decode($slug, true);
+                    if (is_array($decodedSlug) && $decodedSlug !== []) {
+                        $normalizedSlug = $decodedSlug['en'] ?? $decodedSlug['ms'] ?? null;
+                    } else {
+                        $normalizedSlug = $slug;
+                    }
+                }
+
+                if (is_array($slug) && $slug !== []) {
+                    $normalizedSlug = $slug['en'] ?? $slug['ms'] ?? null;
+                }
+
+                if (! is_string($normalizedSlug) || $normalizedSlug === '') {
+                    return;
+                }
+
+                $key = $tag->type.':'.$normalizedSlug;
+                $this->tagIdMap[$key] = (string) $tag->id;
+            });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolveSeedTagIds(string $title, ?string $topic): array
+    {
+        $haystack = mb_strtolower(trim($title.' '.($topic ?? '')));
+
+        $domainSlug = 'syariah';
+        $disciplineSlug = 'hadith_studies';
+        $sourceSlug = 'hadith';
+        $issueSlug = null;
+
+        if (
+            str_contains($haystack, 'tafsir') ||
+            str_contains($haystack, 'quran') ||
+            str_contains($haystack, 'qur\'an') ||
+            str_contains($haystack, 'tadabbur')
+        ) {
+            $domainSlug = 'aqidah';
+            $disciplineSlug = str_contains($haystack, 'tadabbur') ? 'tadabbur' : 'tafsir';
+            $sourceSlug = 'quran';
+        } elseif (
+            str_contains($haystack, 'adab') ||
+            str_contains($haystack, 'akhlak') ||
+            str_contains($haystack, 'tazkiyah') ||
+            str_contains($haystack, 'hikam')
+        ) {
+            $domainSlug = 'akhlak';
+            $disciplineSlug = str_contains($haystack, 'tazkiyah') ? 'tazkiyah' : 'adab_akhlaq';
+            $sourceSlug = 'turath';
+        } elseif (str_contains($haystack, 'sirah')) {
+            $domainSlug = 'aqidah';
+            $disciplineSlug = 'sirah';
+            $sourceSlug = 'hadith';
+            $issueSlug = 'kepimpinan';
+        } elseif (
+            str_contains($haystack, 'fiqh') ||
+            str_contains($haystack, 'solat') ||
+            str_contains($haystack, 'zakat') ||
+            str_contains($haystack, 'puasa')
+        ) {
+            $domainSlug = 'syariah';
+            $disciplineSlug = 'ibadah';
+            $sourceSlug = 'hadith';
+        }
+
+        if (str_contains($haystack, 'keluarga') || str_contains($haystack, 'keibubapaan')) {
+            $issueSlug = 'keluarga';
+        }
+
+        $resolved = [
+            $this->tagIdFor(TagType::Domain, $domainSlug) ?? $this->tagIdFor(TagType::Domain, 'syariah'),
+            $this->tagIdFor(TagType::Discipline, $disciplineSlug) ?? $this->tagIdFor(TagType::Discipline, 'hadith_studies'),
+            $this->tagIdFor(TagType::Source, $sourceSlug) ?? $this->tagIdFor(TagType::Source, 'hadith'),
+            $issueSlug ? $this->tagIdFor(TagType::Issue, $issueSlug) : null,
+        ];
+
+        /** @var Collection<int, string> $uniqueIds */
+        $uniqueIds = collect($resolved)
+            ->filter(fn (?string $id): bool => is_string($id) && $id !== '')
+            ->unique()
+            ->values();
+
+        return $uniqueIds->all();
+    }
+
+    private function tagIdFor(TagType $type, string $slug): ?string
+    {
+        return $this->tagIdMap[$type->value.':'.$slug] ?? null;
     }
 
     private function databaseLikeOperator(): string
     {
         return \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
+    }
+
+    private function backfillSeededEventRequiredFields(): void
+    {
+        $defaultDomainTagId = Tag::query()
+            ->where('type', TagType::Domain->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->orderBy('order_column')
+            ->value('id');
+
+        $defaultDisciplineTagId = Tag::query()
+            ->where('type', TagType::Discipline->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->orderBy('order_column')
+            ->value('id');
+
+        $defaultSourceTagId = Tag::query()
+            ->where('type', TagType::Source->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->orderBy('order_column')
+            ->value('id');
+
+        Event::query()
+            ->whereNull('submitter_id')
+            ->whereNull('user_id')
+            ->with([
+                'speakers:id',
+                'tags:id,type',
+            ])
+            ->chunk(200, function (Collection $events) use (
+                $defaultDomainTagId,
+                $defaultDisciplineTagId,
+                $defaultSourceTagId
+            ): void {
+                foreach ($events as $event) {
+                    $updates = [];
+
+                    $ageGroup = $event->age_group;
+                    $hasAgeGroup = $ageGroup instanceof Collection && $ageGroup->isNotEmpty();
+
+                    if (! $hasAgeGroup) {
+                        $updates['age_group'] = [EventAgeGroup::AllAges->value];
+                    }
+
+                    if (empty($event->organizer_type) || empty($event->organizer_id)) {
+                        $firstSpeakerId = $event->speakers->first()?->getKey();
+
+                        if (is_string($firstSpeakerId) && $firstSpeakerId !== '') {
+                            $updates['organizer_type'] = Speaker::class;
+                            $updates['organizer_id'] = $firstSpeakerId;
+                        } elseif (! empty($event->institution_id)) {
+                            $updates['organizer_type'] = Institution::class;
+                            $updates['organizer_id'] = $event->institution_id;
+                        }
+                    }
+
+                    if ($updates !== []) {
+                        $event->fill($updates)->save();
+                    }
+
+                    $tagTypes = $event->tags
+                        ->pluck('type')
+                        ->filter(fn (mixed $type): bool => is_string($type) && $type !== '')
+                        ->unique()
+                        ->values();
+
+                    $hasRequiredTagTypes = $tagTypes->contains(TagType::Domain->value)
+                        && $tagTypes->contains(TagType::Discipline->value);
+
+                    if ($hasRequiredTagTypes) {
+                        continue;
+                    }
+
+                    $defaultIds = array_filter([
+                        $defaultDomainTagId,
+                        $defaultDisciplineTagId,
+                        $defaultSourceTagId,
+                    ]);
+
+                    if ($defaultIds === []) {
+                        continue;
+                    }
+
+                    /** @var list<string> $existingTagIds */
+                    $existingTagIds = $event->tags->pluck('id')->map(fn (mixed $id): string => (string) $id)->all();
+
+                    /** @var list<string> $finalTagIds */
+                    $finalTagIds = array_values(array_unique(array_merge($existingTagIds, $defaultIds)));
+
+                    $tags = Tag::query()->whereIn('id', $finalTagIds)->get();
+
+                    if ($tags->isNotEmpty()) {
+                        $event->syncTags($tags);
+                    }
+                }
+            });
     }
 }

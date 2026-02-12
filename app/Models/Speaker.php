@@ -215,7 +215,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->useFallbackUrl(asset('images/placeholders/speaker.png'))
             ->singleFile();
 
-        $this->addMediaCollection('main')
+        $this->addMediaCollection('cover')
             ->useDisk(config('media-library.disk_name'))
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
             ->useFallbackUrl(asset('images/placeholders/speaker.png'))
@@ -247,7 +247,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->format('webp');
 
         $this->addMediaConversion('banner')
-            ->performOnCollections('main')
+            ->performOnCollections('cover')
             ->width(1200)
             ->format('webp');
 

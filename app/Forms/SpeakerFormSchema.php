@@ -47,20 +47,19 @@ class SpeakerFormSchema
                 ->collection('avatar')
                 ->avatar()
                 ->imageEditor()
+                ->circleCropper()
                 ->image()
                 ->conversion('thumb')
-                ->maxSize(5120)
                 ->helperText(__('Recommended: Square image, at least 400x400px')),
 
-            SpatieMediaLibraryFileUpload::make('main')
-                ->label(__('Main Image'))
-                ->collection('main')
+            SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Cover Image'))
+                ->collection('cover')
                 ->image()
                 ->imageEditor()
                 ->responsiveImages()
                 ->conversion('banner')
-                ->maxSize(5120)
-                ->helperText(__('Main featured image for speaker profile')),
+                ->helperText(__('Cover image for speaker profile')),
 
             RichEditor::make('bio')
                 ->label(__('Biography'))
@@ -171,7 +170,7 @@ class SpeakerFormSchema
             'status' => 'pending',
         ]);
 
-        // Save media uploads (avatar/main) via Filament's relationship-saving mechanism
+        // Save media uploads (avatar/cover) via Filament's relationship-saving mechanism
         $schema?->model($speaker)->saveRelationships();
 
         if (! empty($data['state_id'])) {
@@ -205,9 +204,7 @@ class SpeakerFormSchema
                 ];
             }
 
-            if ($institutionData !== []) {
-                $speaker->institutions()->attach($institutionData);
-            }
+            $speaker->institutions()->attach($institutionData);
         }
 
         return (string) $speaker->getKey();

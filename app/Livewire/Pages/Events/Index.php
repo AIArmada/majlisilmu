@@ -77,6 +77,9 @@ class Index extends Component
     public ?string $starts_before = null;
 
     #[Url]
+    public ?string $time_scope = null;
+
+    #[Url]
     public ?string $lat = null;
 
     #[Url]
@@ -172,6 +175,7 @@ class Index extends Component
             'topic_ids' => $this->topic_ids,
             'starts_after' => $this->starts_after,
             'starts_before' => $this->starts_before,
+            'time_scope' => in_array($this->time_scope, ['past', 'all'], true) ? $this->time_scope : null,
         ];
 
         $filters = array_filter($filters, function (mixed $value): bool {

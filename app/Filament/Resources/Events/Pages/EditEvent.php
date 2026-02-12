@@ -17,11 +17,14 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 
 class EditEvent extends EditRecord
 {
     protected static string $resource = EventResource::class;
+
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     #[\Override]
     protected function mutateFormDataBeforeFill(array $data): array

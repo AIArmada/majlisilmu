@@ -17,6 +17,7 @@ use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\Venue;
+use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -32,12 +33,13 @@ use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\View as SchemaView;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\View as SchemaView;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
@@ -45,10 +47,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 new #[Layout('layouts.app')] class extends Component implements HasActions, HasForms
@@ -58,6 +62,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     use WithFileUploads;
 
     public ?array $data = [];
+
+    public ?TemporaryUploadedFile $event_source_attachment = null;
 
     public function mount(): void
     {
@@ -75,6 +81,97 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'is_muslim_only' => false,
             'captcha_token' => null,
         ]);
+    }
+
+    public function extractEventFromMedia(EventMediaExtractionService $eventMediaExtractionService): void
+    {
+        $maxFileSizeKb = (int) config('ai.features.event_media_extraction.max_file_size_kb', 10240);
+        $acceptedMimeTypes = config('ai.features.event_media_extraction.accepted_mime_types', [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+        ]);
+
+        if (! is_array($acceptedMimeTypes) || $acceptedMimeTypes === []) {
+            $acceptedMimeTypes = [
+                'application/pdf',
+                'image/jpeg',
+                'image/png',
+                'image/webp',
+            ];
+        }
+
+        $validated = Validator::make(
+            ['event_source_attachment' => $this->event_source_attachment],
+            [
+                'event_source_attachment' => [
+                    'required',
+                    'file',
+                    "max:{$maxFileSizeKb}",
+                    'mimetypes:'.implode(',', $acceptedMimeTypes),
+                ],
+            ],
+            [
+                'event_source_attachment.required' => __('Sila muat naik poster, gambar, atau PDF terlebih dahulu.'),
+                'event_source_attachment.file' => __('Fail yang dimuat naik tidak sah.'),
+                'event_source_attachment.max' => __('Saiz fail melebihi had yang dibenarkan.'),
+                'event_source_attachment.mimetypes' => __('Hanya fail PDF, JPEG, PNG, atau WEBP dibenarkan.'),
+            ],
+        )->validate();
+
+        /** @var TemporaryUploadedFile $file */
+        $file = $validated['event_source_attachment'];
+
+        try {
+            $extractedState = $eventMediaExtractionService->extract($file);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title(__('Pengekstrakan AI gagal. Sila cuba semula.'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $mergedState = array_replace($this->data ?? [], $extractedState);
+        $mergedState['age_group'] = $this->normalizeAgeGroupState($mergedState['age_group'] ?? []);
+
+        if (
+            in_array(EventAgeGroup::Children->value, $mergedState['age_group'], true) ||
+            in_array(EventAgeGroup::AllAges->value, $mergedState['age_group'], true)
+        ) {
+            $mergedState['children_allowed'] = true;
+        }
+
+        $mimeType = (string) $file->getMimeType();
+
+        if (str_starts_with($mimeType, 'image/') && blank($mergedState['poster'] ?? null)) {
+            $mergedState['poster'] = $file;
+        }
+
+        $this->form->fill($mergedState);
+        $this->data = $mergedState;
+
+        $wizard = $this->form->getComponent(
+            fn (mixed $component): bool => $component instanceof Wizard
+        );
+
+        if ($wizard instanceof Wizard) {
+            $steps = array_values($wizard->getChildSchema()->getComponents());
+            $lastStep = end($steps);
+
+            if ($lastStep instanceof Step && filled($lastStep->getKey())) {
+                $wizard->goToStep($lastStep->getKey());
+            }
+        }
+
+        Notification::make()
+            ->title(__('Maklumat majlis berjaya diekstrak dengan AI.'))
+            ->success()
+            ->send();
     }
 
     public function form(Schema $schema): Schema
@@ -257,7 +354,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 if (endMinutes <= startMinutes) {
                                                     $set('end_time', null);
                                                     new FilamentNotification()
-                                                        .title('Masa akhir mestilah selepas masa mula')
+                                                        .title(@js(__('Masa akhir mestilah selepas masa mula.')))
                                                         .warning()
                                                         .send();
                                                 }
@@ -319,7 +416,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 if (endMinutes <= startMinutes) {
                                                     $set('end_time', null);
                                                     new FilamentNotification()
-                                                        .title('Masa akhir mestilah selepas masa mula')
+                                                        .title(@js(__('Masa akhir mestilah selepas masa mula.')))
                                                         .warning()
                                                         .send();
                                                 }
@@ -482,6 +579,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->closeOnSelect()
                                         ->placeholder(__('Pilih kategori…'))
                                         ->multiple()
+                                        ->searchable(false)
                                         ->required()
                                         ->preload()
                                         ->native(false)
@@ -580,6 +678,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('Pilih sumber…'))
                                         ->multiple()
                                         ->preload()
+                                        ->searchable(false)
                                         ->native(false)
                                         ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
                                         ->options(fn () => Cache::remember('submit_tags_source_'.app()->getLocale(), 60, fn () => Tag::query()
@@ -706,16 +805,14 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->image()
                                         ->imageEditor()
                                         ->conversion('thumb')
-                                        ->responsiveImages()
-                                        ->maxSize(5120),
+                                        ->responsiveImages(),
                                     SpatieMediaLibraryFileUpload::make('back_cover')
                                         ->label(__('Muka Belakang'))
                                         ->collection('back_cover')
                                         ->image()
                                         ->imageEditor()
                                         ->conversion('thumb')
-                                        ->responsiveImages()
-                                        ->maxSize(5120),
+                                        ->responsiveImages(),
                                     SpatieMediaLibraryFileUpload::make('gallery')
                                         ->label(__('Galeri'))
                                         ->collection('gallery')
@@ -724,7 +821,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->imageEditor()
                                         ->conversion('gallery_thumb')
                                         ->responsiveImages()
-                                        ->maxSize(5120)
                                         ->maxFiles(5)
                                         ->helperText(__('Sehingga 5 gambar tambahan')),
                                     Textarea::make('description')
@@ -916,6 +1012,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->collection('gallery')
                                         ->multiple()
                                         ->reorderable()
+                                        ->maxFiles(10)
                                         ->image()
                                         ->imageEditor()
                                         ->conversion('thumb')
@@ -1434,7 +1531,41 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 </p>
             </div>
 
-            <form wire:submit="submit">
+            <div class="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 class="text-base font-semibold text-slate-900">{{ __('Isi Automatik Dengan AI') }}</h2>
+                <p class="mt-2 text-sm text-slate-600">
+                    {{ __('Muat naik poster, gambar, atau PDF majlis. Kami akan cuba isi borang ini secara automatik dan bawa anda terus ke pratonton.') }}
+                </p>
+
+                <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
+                    <input
+                        type="file"
+                        wire:model="event_source_attachment"
+                        accept=".pdf,image/jpeg,image/png,image/webp"
+                        class="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+                    >
+
+                    <x-filament::button
+                        type="button"
+                        wire:click="extractEventFromMedia"
+                        wire:loading.attr="disabled"
+                        wire:target="event_source_attachment,extractEventFromMedia"
+                        class="whitespace-nowrap"
+                    >
+                        {{ __('Ekstrak Dengan AI') }}
+                    </x-filament::button>
+                </div>
+
+                @error('event_source_attachment')
+                    <p class="mt-2 text-sm text-danger-600">{{ $message }}</p>
+                @enderror
+
+                <p wire:loading wire:target="extractEventFromMedia" class="mt-2 text-sm text-primary-600">
+                    {{ __('Sedang mengekstrak maklumat daripada fail...') }}
+                </p>
+            </div>
+
+            <form wire:submit="submit" novalidate>
                 {{ $this->form }}
 
                 @if(config('services.turnstile.enabled') && filled(config('services.turnstile.site_key')) && filled(config('services.turnstile.secret_key')))

@@ -131,20 +131,20 @@ it('registers media conversions for Speaker model', function () {
     expect($media->getMediaConversionNames())->toContain('profile');
 });
 
-it('registers media conversions for Speaker main and gallery collections', function () {
+it('registers media conversions for Speaker cover and gallery collections', function () {
     $speaker = Speaker::factory()->create();
 
-    $speaker->addMedia(UploadedFile::fake()->image('main.jpg', 1200, 800))
-        ->toMediaCollection('main');
+    $speaker->addMedia(UploadedFile::fake()->image('cover.jpg', 1200, 800))
+        ->toMediaCollection('cover');
     $speaker->addMedia(UploadedFile::fake()->image('gallery.jpg', 1200, 800))
         ->toMediaCollection('gallery');
 
-    $mainMedia = $speaker->getFirstMedia('main');
+    $coverMedia = $speaker->getFirstMedia('cover');
     $galleryMedia = $speaker->getFirstMedia('gallery');
 
-    expect($mainMedia)->not->toBeNull();
+    expect($coverMedia)->not->toBeNull();
     expect($galleryMedia)->not->toBeNull();
-    expect($mainMedia->getMediaConversionNames())->toContain('banner');
+    expect($coverMedia->getMediaConversionNames())->toContain('banner');
     expect($galleryMedia->getMediaConversionNames())->toContain('gallery_thumb');
 });
 
@@ -175,20 +175,20 @@ it('returns avatar_url using thumb conversion when media exists', function () {
 it('registers media conversions for Venue model', function () {
     $venue = Venue::factory()->create();
 
-    $venue->addMedia(UploadedFile::fake()->image('main.jpg', 1200, 800))
-        ->toMediaCollection('main');
+    $venue->addMedia(UploadedFile::fake()->image('cover.jpg', 1200, 800))
+        ->toMediaCollection('cover');
 
-    $media = $venue->getFirstMedia('main');
+    $media = $venue->getFirstMedia('cover');
 
     expect($media)->not->toBeNull();
     expect($media->getMediaConversionNames())->toContain('thumb');
     expect($media->getMediaConversionNames())->toContain('banner');
 });
 
-it('returns fallback URL when Venue has no main image', function () {
+it('returns fallback URL when Venue has no cover image', function () {
     $venue = Venue::factory()->create();
 
-    $fallbackUrl = $venue->getFirstMediaUrl('main');
+    $fallbackUrl = $venue->getFirstMediaUrl('cover');
 
     expect($fallbackUrl)->toContain('images/placeholders/venue.png');
 });
