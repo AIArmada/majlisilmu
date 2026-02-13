@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
@@ -37,6 +38,7 @@ class EditEvent extends EditRecord
         $data['discipline_tags'] = $this->getTagIdsByType(TagType::Discipline);
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
+        $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
 
         return $data;
     }
@@ -50,6 +52,7 @@ class EditEvent extends EditRecord
             $data['discipline_tags'],
             $data['source_tags'],
             $data['issue_tags'],
+            $data['registration_mode'],
         );
 
         return $data;
@@ -57,7 +60,27 @@ class EditEvent extends EditRecord
 
     protected function afterSave(): void
     {
-        $this->syncRelationState($this->eventRecord(), $this->form->getState());
+        $event = $this->eventRecord();
+        $requestedRegistrationMode = (string) ($this->form->getState()['registration_mode'] ?? RegistrationMode::Event->value);
+        $currentRegistrationMode = $this->resolveRegistrationMode($event)->value;
+        $modeToPersist = $requestedRegistrationMode;
+
+        if ($event->registrations()->exists() && $requestedRegistrationMode !== $currentRegistrationMode) {
+            $modeToPersist = $currentRegistrationMode;
+
+            Notification::make()
+                ->title('Registration mode is locked')
+                ->body('Cannot change registration mode after registrations exist.')
+                ->warning()
+                ->send();
+        }
+
+        $event->settings()->updateOrCreate(
+            ['event_id' => $event->id],
+            ['registration_mode' => $modeToPersist]
+        );
+
+        $this->syncRelationState($event, $this->form->getState());
     }
 
     /**
@@ -103,6 +126,21 @@ class EditEvent extends EditRecord
             ->map(fn (mixed $id): string => (string) $id)
             ->values()
             ->all();
+    }
+
+    protected function resolveRegistrationMode(Event $event): RegistrationMode
+    {
+        $rawMode = $event->settings?->registration_mode;
+
+        if ($rawMode instanceof RegistrationMode) {
+            return $rawMode;
+        }
+
+        if (is_string($rawMode)) {
+            return RegistrationMode::tryFrom($rawMode) ?? RegistrationMode::Event;
+        }
+
+        return RegistrationMode::Event;
     }
 
     #[\Override]

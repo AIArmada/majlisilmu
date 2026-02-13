@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Ai\Listeners\RecordAiUsage;
 use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\EventRecurrenceRule;
+use App\Models\EventSession;
 use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Reference;
@@ -14,6 +16,8 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
 use App\Observers\EventObserver;
+use App\Observers\EventRecurrenceRuleObserver;
+use App\Observers\EventSessionObserver;
 use App\Support\Media\MediaFileNamer;
 use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Forms\Components\Select;
@@ -40,6 +44,8 @@ class AppServiceProvider extends ServiceProvider
 
     protected static bool $mediaUploadConfigured = false;
 
+    protected static bool $eventScheduleObserversRegistered = false;
+
     /**
      * Register any application services.
      */
@@ -64,6 +70,12 @@ class AppServiceProvider extends ServiceProvider
         if (! self::$eventObserverRegistered) {
             Event::observe(EventObserver::class);
             self::$eventObserverRegistered = true;
+        }
+
+        if (! self::$eventScheduleObserversRegistered) {
+            EventSession::observe(EventSessionObserver::class);
+            EventRecurrenceRule::observe(EventRecurrenceRuleObserver::class);
+            self::$eventScheduleObserversRegistered = true;
         }
 
         if (! app()->bound('ai.usage.listeners.registered')) {

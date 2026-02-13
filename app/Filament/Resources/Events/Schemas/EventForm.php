@@ -9,12 +9,16 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\RegistrationMode;
+use App\Enums\ScheduleKind;
+use App\Enums\ScheduleState;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Forms\Components\Select;
 use App\Forms\InstitutionFormSchema;
 use App\Forms\SpeakerFormSchema;
 use App\Forms\VenueFormSchema;
+use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -141,6 +145,24 @@ class EventForm
                                                     ->mapWithKeys(fn (EventFormat $case): array => [$case->value => $case->label()])
                                                     ->toArray(),
                                             )
+                                            ->required(),
+                                        Select::make('schedule_kind')
+                                            ->label('Jenis Jadual')
+                                            ->options(
+                                                collect(ScheduleKind::cases())
+                                                    ->mapWithKeys(fn (ScheduleKind $case): array => [$case->value => $case->label()])
+                                                    ->toArray(),
+                                            )
+                                            ->default(ScheduleKind::Single->value)
+                                            ->required(),
+                                        Select::make('schedule_state')
+                                            ->label('Status Jadual')
+                                            ->options(
+                                                collect(ScheduleState::cases())
+                                                    ->mapWithKeys(fn (ScheduleState $case): array => [$case->value => $case->label()])
+                                                    ->toArray(),
+                                            )
+                                            ->default(ScheduleState::Active->value)
                                             ->required(),
                                         Select::make('visibility')
                                             ->label('Keterlihatan')
@@ -350,6 +372,9 @@ class EventForm
                                             ->collection('poster')
                                             ->image()
                                             ->imageEditor()
+                                            ->imageAspectRatio('3:2')
+                                            ->imageEditorAspectRatioOptions(['3:2'])
+                                            ->automaticallyCropImagesToAspectRatio()
                                             ->conversion('thumb')
                                             ->responsiveImages(),
                                         SpatieMediaLibraryFileUpload::make('gallery')
@@ -403,6 +428,18 @@ class EventForm
                                             ->relationship('submitter', 'email')
                                             ->searchable()
                                             ->preload(),
+                                        Select::make('registration_mode')
+                                            ->label('Mod Pendaftaran')
+                                            ->options(
+                                                collect(RegistrationMode::cases())
+                                                    ->mapWithKeys(fn (RegistrationMode $mode): array => [$mode->value => $mode->label()])
+                                                    ->toArray(),
+                                            )
+                                            ->disabled(fn (?Event $record): bool => $record?->registrations()->exists() ?? false)
+                                            ->helperText(fn (?Event $record): ?string => ($record?->registrations()->exists() ?? false)
+                                                ? __('Registration mode is locked after first registration.')
+                                                : null)
+                                            ->default(RegistrationMode::Event->value),
                                     ])
                                     ->columns(2),
                             ]),

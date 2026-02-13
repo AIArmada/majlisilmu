@@ -473,6 +473,9 @@ return [
         'no_merge_tag_search_results_message' => 'Tiada hasil carian yang sepadan dengan tag penggabungan anda.',
 
         'tools' => [
+            'align_center' => 'Jajar tengah',
+            'align_end' => 'Jajar kanan',
+            'align_start' => 'Jajar kiri',
             'attach_files' => 'Lampirkan fail',
             'blockquote' => 'Blockquote',
             'bold' => 'Bold',
@@ -490,6 +493,7 @@ return [
             'strike' => 'Strikethrough',
             'subscript' => 'Subscript',
             'superscript' => 'Superscript',
+            'table' => 'Jadual',
             'underline' => 'Garis bawah',
             'undo' => 'Buat asal',
         ],

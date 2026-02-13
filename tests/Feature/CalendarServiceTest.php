@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Event;
+use App\Models\EventSession;
 use App\Models\Institution;
 use App\Models\Venue;
 use App\Services\CalendarService;
@@ -79,6 +80,71 @@ describe('CalendarService', function () {
         // Check for alarm
         expect($ics)->toContain('BEGIN:VALARM');
         expect($ics)->toContain('TRIGGER:-PT1H');
+    });
+
+    it('generates one VEVENT per scheduled session for advanced schedules', function () {
+        $event = Event::factory()->create([
+            'title' => 'Siri Tafsir Mingguan',
+            'starts_at' => now()->addDays(1)->setTime(20, 0),
+            'ends_at' => now()->addDays(1)->setTime(22, 0),
+        ]);
+
+        $sessionA = EventSession::factory()->create([
+            'event_id' => $event->id,
+            'starts_at' => now()->addDays(1)->setTime(20, 0),
+            'ends_at' => now()->addDays(1)->setTime(22, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $sessionB = EventSession::factory()->create([
+            'event_id' => $event->id,
+            'starts_at' => now()->addDays(8)->setTime(20, 0),
+            'ends_at' => now()->addDays(8)->setTime(22, 0),
+            'status' => 'scheduled',
+        ]);
+
+        EventSession::factory()->create([
+            'event_id' => $event->id,
+            'starts_at' => now()->addDays(15)->setTime(20, 0),
+            'ends_at' => now()->addDays(15)->setTime(22, 0),
+            'status' => 'cancelled',
+        ]);
+
+        $ics = $this->calendarService->generateIcs($event);
+
+        expect(substr_count($ics, 'BEGIN:VEVENT'))->toBe(2);
+        expect($ics)->toContain($sessionA->starts_at?->copy()->setTimezone('UTC')->format('Ymd\THis\Z'));
+        expect($ics)->toContain($sessionB->starts_at?->copy()->setTimezone('UTC')->format('Ymd\THis\Z'));
+    });
+
+    it('uses the latest past session for calendar deep links when no upcoming sessions exist', function () {
+        $event = Event::factory()->create([
+            'title' => 'Siri Tazkirah Mingguan',
+            'starts_at' => now()->subDays(10)->setTime(20, 0),
+            'ends_at' => now()->subDays(10)->setTime(22, 0),
+        ]);
+
+        $olderSession = EventSession::factory()->create([
+            'event_id' => $event->id,
+            'starts_at' => now()->subDays(10)->setTime(20, 0),
+            'ends_at' => now()->subDays(10)->setTime(22, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $latestPastSession = EventSession::factory()->create([
+            'event_id' => $event->id,
+            'starts_at' => now()->subDay()->setTime(20, 0),
+            'ends_at' => now()->subDay()->setTime(22, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $url = $this->calendarService->googleCalendarUrl($event);
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $dates = (string) ($query['dates'] ?? '');
+
+        expect($dates)->toContain($latestPastSession->starts_at?->copy()->setTimezone('UTC')->format('Ymd\THis\Z'))
+            ->and($dates)->not->toContain($olderSession->starts_at?->copy()->setTimezone('UTC')->format('Ymd\THis\Z'));
     });
 
     it('includes venue location in calendar events', function () {

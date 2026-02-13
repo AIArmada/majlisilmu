@@ -20,6 +20,9 @@
         $lat = $venueAddress?->lat ?? $institutionAddress?->lat;
         $lng = $venueAddress?->lng ?? $institutionAddress?->lng;
         $galleryImages = $this->galleryImages;
+        $upcomingSessions = $this->upcomingSessions;
+        $nextSession = $upcomingSessions->first();
+        $registrationMode = $this->registrationMode();
         $relatedEvents = $this->relatedEvents;
         $shareLinks = $this->shareLinks;
         $sharePreviewImage = $this->event->card_image_url;
@@ -360,6 +363,17 @@
                                         - {{ $event->ends_at?->format('h:i A') }}
                                     @endif
                                 </p>
+                                @if($upcomingSessions->count() > 1)
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ __(':count upcoming sessions', ['count' => $upcomingSessions->count()]) }}
+                                    </p>
+                                @endif
+                                @if($nextSession)
+                                    <p class="mt-1 text-xs text-emerald-700">
+                                        {{ __('Next session') }}:
+                                        {{ $nextSession->starts_at?->translatedFormat('d M Y, h:i A') }}
+                                    </p>
+                                @endif
                             </div>
                         </div>
 
@@ -414,6 +428,24 @@
                                     </svg>
                                     {{ __('Maps') }}
                                 </a>
+                            </div>
+                        @endif
+
+                        @if($upcomingSessions->isNotEmpty())
+                            <div class="space-y-2 border-t border-slate-100 pt-4">
+                                <p class="text-sm font-semibold text-slate-800">{{ __('Upcoming Sessions') }}</p>
+                                <div class="space-y-2">
+                                    @foreach($upcomingSessions->take(5) as $session)
+                                        <div class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                            <p class="text-sm font-medium text-slate-700">
+                                                {{ $session->starts_at?->translatedFormat('d M Y, h:i A') }}
+                                            </p>
+                                            @if($session->ends_at)
+                                                <p class="text-xs text-slate-500">{{ __('Ends') }} {{ $session->ends_at->format('h:i A') }}</p>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
                             </div>
                         @endif
                     </div>
@@ -594,13 +626,19 @@
                             @php
                                 $regOpen = !$event->settings?->registration_opens_at || $event->settings->registration_opens_at <= now();
                                 $regClosed = $event->settings?->registration_closes_at && $event->settings->registration_closes_at < now();
-                                $atCapacity = $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity;
+                                $atCapacity = $registrationMode === \App\Enums\RegistrationMode::Event && $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity;
+                                $sessionModeUnavailable = $registrationMode === \App\Enums\RegistrationMode::Session && $upcomingSessions->isEmpty();
                             @endphp
 
                             @if($regClosed)
                                 <button disabled
                                     class="flex w-full items-center justify-center rounded-xl bg-slate-100 px-6 py-3.5 text-sm font-bold text-slate-400 cursor-not-allowed">
                                     {{ __('Registration Closed') }}
+                                </button>
+                            @elseif($sessionModeUnavailable)
+                                <button disabled
+                                    class="flex w-full items-center justify-center rounded-xl bg-slate-100 px-6 py-3.5 text-sm font-bold text-slate-400 cursor-not-allowed">
+                                    {{ __('No available sessions') }}
                                 </button>
                             @elseif($atCapacity)
                                 <button disabled
@@ -616,7 +654,7 @@
                                 <a href="#register" @click.prevent="registerOpen = true"
                                     class="flex w-full items-center justify-center rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
                                     {{ __('Register Now') }}
-                                    @if($event->settings?->capacity)
+                                    @if($registrationMode === \App\Enums\RegistrationMode::Event && $event->settings?->capacity)
                                         <span class="ml-2 text-xs opacity-75">({{ $event->settings->capacity - $event->registrations_count }}
                                             {{ __('spots left') }})</span>
                                     @endif
@@ -736,6 +774,23 @@
                                 <input type="tel" name="phone"
                                     class="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none">
                             </div>
+                            @if($registrationMode === \App\Enums\RegistrationMode::Session)
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">{{ __('Session') }} *</label>
+                                    <select name="event_session_id" required
+                                        class="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none">
+                                        <option value="">{{ __('Choose a session') }}</option>
+                                        @foreach($upcomingSessions as $session)
+                                            <option value="{{ $session->id }}">
+                                                {{ $session->starts_at?->translatedFormat('d M Y, h:i A') }}
+                                                @if($session->ends_at)
+                                                    - {{ $session->ends_at->format('h:i A') }}
+                                                @endif
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
                             <p class="text-xs text-slate-500">{{ __('Please provide either email or phone.') }}</p>
                         </div>
                         <div class="mt-6 flex gap-3">

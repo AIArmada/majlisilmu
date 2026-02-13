@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -131,7 +132,7 @@ class Institution extends Model implements AuditableContract, HasMedia
 
         $this->addMediaConversion('banner')
             ->performOnCollections('cover')
-            ->width(1200)
+            ->fit(Fit::Crop, 1200, 675)
             ->format('webp');
 
         $this->addMediaConversion('gallery_thumb')

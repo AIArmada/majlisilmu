@@ -161,6 +161,9 @@ class SpeakerForm
                             ->label('Cover Image')
                             ->image()
                             ->imageEditor()
+                            ->imageAspectRatio('16:9')
+                            ->imageEditorAspectRatioOptions(['16:9'])
+                            ->automaticallyCropImagesToAspectRatio()
                             ->responsiveImages()
                             ->conversion('banner')
                             ->helperText('Cover featured image'),

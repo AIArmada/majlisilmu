@@ -37,6 +37,9 @@ class InstitutionFormSchema
                 ->collection('cover')
                 ->image()
                 ->imageEditor()
+                ->imageAspectRatio('16:9')
+                ->imageEditorAspectRatioOptions(['16:9'])
+                ->automaticallyCropImagesToAspectRatio()
                 ->conversion('banner')
                 ->responsiveImages()
                 ->helperText(__('Header or banner image')),

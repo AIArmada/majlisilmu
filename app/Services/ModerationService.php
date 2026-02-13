@@ -82,9 +82,10 @@ class ModerationService
     public function remoderate(
         Event $event,
         ?User $moderator = null,
-        ?string $note = null
+        ?string $note = null,
+        ?string $reasonCode = null,
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Pending::class, $moderator, $note);
+        $event->status->transitionTo(\App\States\EventStatus\Pending::class, $moderator, $note, $reasonCode);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RegistrationMode;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class EventSettings extends Model
         'capacity',
         'registration_opens_at',
         'registration_closes_at',
+        'registration_mode',
         'requires_approval',
         'allow_waitlist',
         'max_per_user',
@@ -35,6 +37,7 @@ class EventSettings extends Model
             'capacity' => 'integer',
             'registration_opens_at' => 'datetime',
             'registration_closes_at' => 'datetime',
+            'registration_mode' => RegistrationMode::class,
             'requires_approval' => 'boolean',
             'allow_waitlist' => 'boolean',
             'max_per_user' => 'integer',

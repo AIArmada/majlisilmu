@@ -10,8 +10,12 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\ScheduleKind;
+use App\Enums\ScheduleState;
+use App\Enums\SessionStatus;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +31,7 @@ use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -79,6 +84,12 @@ class Event extends Model implements AuditableContract, HasMedia
             $event->submissions()->each(function (EventSubmission $submission): void {
                 $submission->delete();
             });
+            $event->sessions()->each(function (EventSession $session): void {
+                $session->delete();
+            });
+            $event->recurrenceRules()->each(function (EventRecurrenceRule $rule): void {
+                $rule->delete();
+            });
             $event->moderationReviews()->each(function (ModerationReview $review): void {
                 $review->delete();
             });
@@ -108,6 +119,8 @@ class Event extends Model implements AuditableContract, HasMedia
         'description',
         'starts_at',
         'ends_at',
+        'schedule_kind',
+        'schedule_state',
         'timezone',
         'timing_mode',
         'prayer_reference',
@@ -144,6 +157,8 @@ class Event extends Model implements AuditableContract, HasMedia
             'description' => 'array',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'schedule_kind' => ScheduleKind::class,
+            'schedule_state' => ScheduleState::class,
             'timing_mode' => TimingMode::class,
             'prayer_reference' => PrayerReference::class,
             'prayer_offset' => PrayerOffset::class,
@@ -335,6 +350,50 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * @return HasMany<EventSession, $this>
+     */
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(EventSession::class)->orderBy('starts_at');
+    }
+
+    /**
+     * @return HasMany<EventRecurrenceRule, $this>
+     */
+    public function recurrenceRules(): HasMany
+    {
+        return $this->hasMany(EventRecurrenceRule::class)->orderByDesc('created_at');
+    }
+
+    public function nextActiveSession(?CarbonInterface $moment = null): ?EventSession
+    {
+        $moment ??= now($this->timezone ?: 'Asia/Kuala_Lumpur');
+
+        /** @var EventSession|null $session */
+        $session = $this->sessions()
+            ->where('status', SessionStatus::Scheduled->value)
+            ->where('starts_at', '>=', $moment)
+            ->orderBy('starts_at')
+            ->first();
+
+        return $session;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, EventSession>
+     */
+    public function activeSessions(): \Illuminate\Database\Eloquent\Collection
+    {
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventSession> $sessions */
+        $sessions = $this->sessions()
+            ->where('status', SessionStatus::Scheduled->value)
+            ->orderBy('starts_at')
+            ->get();
+
+        return $sessions;
+    }
+
+    /**
      * @return BelongsToMany<Speaker, $this>
      */
     public function speakers(): BelongsToMany
@@ -464,14 +523,13 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         $this->addMediaConversion('thumb')
             ->performOnCollections('poster', 'gallery')
-            ->width(368)
-            ->height(232)
+            ->fit(Fit::Crop, 600, 400)
             ->sharpen(10)
             ->format('webp');
 
         $this->addMediaConversion('preview')
             ->performOnCollections('poster')
-            ->width(800)
+            ->fit(Fit::Crop, 1200, 800)
             ->format('webp');
     }
 

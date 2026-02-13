@@ -53,10 +53,16 @@
             <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
                 <div class="mb-5 flex items-center justify-between gap-4">
                     <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('My Events') }}</h2>
-                    <a href="{{ route('submit-event.create') }}" wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
-                        {{ __('Submit New Event') }}
-                    </a>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('dashboard.events.create-advanced') }}" wire:navigate
+                            class="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100">
+                            {{ __('Create Advanced Event') }}
+                        </a>
+                        <a href="{{ route('submit-event.create') }}" wire:navigate
+                            class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
+                            {{ __('Submit New Event') }}
+                        </a>
+                    </div>
                 </div>
 
                 @if($myEvents->isEmpty())
@@ -83,6 +89,14 @@
                                                 class="font-semibold text-slate-900 hover:text-emerald-700">
                                                 {{ $event->title }}
                                             </a>
+                                            @if($event->userCanManage($user))
+                                                <p class="mt-1">
+                                                    <a href="{{ route('dashboard.events.schedule', $event) }}" wire:navigate
+                                                        class="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
+                                                        {{ __('Manage Schedule') }}
+                                                    </a>
+                                                </p>
+                                            @endif
                                             @if($event->venue?->name)
                                                 <p class="mt-1 text-xs text-slate-500">{{ $event->venue->name }}</p>
                                             @endif

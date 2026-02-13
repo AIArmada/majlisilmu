@@ -20,7 +20,8 @@ class RemoderateEvent extends Transition implements HasColor, HasIcon, HasLabel
     public function __construct(
         public Event $event,
         public ?User $moderator = null,
-        public ?string $note = null
+        public ?string $note = null,
+        public ?string $reasonCode = null,
     ) {}
 
     public function handle(): Event
@@ -30,6 +31,7 @@ class RemoderateEvent extends Transition implements HasColor, HasIcon, HasLabel
                 'event_id' => $this->event->id,
                 'moderator_id' => $this->moderator?->id,
                 'decision' => 'remoderated',
+                'reason_code' => $this->reasonCode,
                 'note' => $this->note ?? 'Approved event sent back for re-moderation.',
             ]);
 

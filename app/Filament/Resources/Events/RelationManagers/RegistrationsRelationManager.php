@@ -13,6 +13,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class RegistrationsRelationManager extends RelationManager
 {
@@ -25,6 +26,15 @@ class RegistrationsRelationManager extends RelationManager
             ->components([
                 Select::make('user_id')
                     ->relationship('user', 'email')
+                    ->searchable()
+                    ->preload(),
+                Select::make('event_session_id')
+                    ->relationship(
+                        name: 'session',
+                        titleAttribute: 'id',
+                        modifyQueryUsing: fn (Builder $query): Builder => $query->where('event_id', $this->getOwnerRecord()->id),
+                    )
+                    ->getOptionLabelFromRecordUsing(fn (\App\Models\EventSession $record): string => $record->starts_at?->translatedFormat('d M Y, h:i A') ?? (string) $record->id)
                     ->searchable()
                     ->preload(),
                 TextInput::make('name')
@@ -61,6 +71,10 @@ class RegistrationsRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->badge()
                     ->sortable(),
+                TextColumn::make('session.starts_at')
+                    ->label('Session')
+                    ->dateTime()
+                    ->placeholder('-'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

@@ -13,6 +13,7 @@
     use App\Models\Venue;
     use Illuminate\Support\Carbon;
     use Illuminate\Support\Collection;
+    use Illuminate\Support\Str;
 
     $dash = '-';
 
@@ -121,17 +122,47 @@
         'issue_tags' => $asList($get('issue_tags')),
     ];
 
-    $tagIds = collect($tagFields)->flatten()->unique()->values()->all();
-    $tagLabelMap = Tag::query()
-        ->whereIn('id', $tagIds)
-        ->get()
-        ->mapWithKeys(fn (Tag $tag): array => [(string) $tag->id => $tag->getTranslation('name', app()->getLocale()) ?: $tag->name])
+    $tagValues = collect($tagFields)
+        ->flatten()
+        ->map(fn (mixed $value): string => (string) $value)
+        ->filter(fn (string $value): bool => filled($value))
+        ->unique()
+        ->values();
+
+    $tagIds = $tagValues
+        ->filter(fn (string $value): bool => Str::isUuid($value))
+        ->all();
+
+    $tagLabelMap = $tagValues
+        ->reject(fn (string $value): bool => Str::isUuid($value))
+        ->mapWithKeys(fn (string $value): array => [$value => $value])
         ->toArray();
 
-    $domainLabels = collect($tagFields['domain_tags'])->map(fn (mixed $id): ?string => $tagLabelMap[(string) $id] ?? null)->filter()->all();
-    $disciplineLabels = collect($tagFields['discipline_tags'])->map(fn (mixed $id): ?string => $tagLabelMap[(string) $id] ?? null)->filter()->all();
-    $sourceLabels = collect($tagFields['source_tags'])->map(fn (mixed $id): ?string => $tagLabelMap[(string) $id] ?? null)->filter()->all();
-    $issueLabels = collect($tagFields['issue_tags'])->map(fn (mixed $id): ?string => $tagLabelMap[(string) $id] ?? null)->filter()->all();
+    if ($tagIds !== []) {
+        $tagLabelMap = array_merge(
+            $tagLabelMap,
+            Tag::query()
+                ->whereIn('id', $tagIds)
+                ->get()
+                ->mapWithKeys(fn (Tag $tag): array => [(string) $tag->id => $tag->getTranslation('name', app()->getLocale()) ?: $tag->name])
+                ->toArray(),
+        );
+    }
+
+    $resolveTagLabel = static function (mixed $value) use ($tagLabelMap): ?string {
+        $key = (string) $value;
+
+        if (! filled($key)) {
+            return null;
+        }
+
+        return $tagLabelMap[$key] ?? (! Str::isUuid($key) ? $key : null);
+    };
+
+    $domainLabels = collect($tagFields['domain_tags'])->map($resolveTagLabel)->filter()->all();
+    $disciplineLabels = collect($tagFields['discipline_tags'])->map($resolveTagLabel)->filter()->all();
+    $sourceLabels = collect($tagFields['source_tags'])->map($resolveTagLabel)->filter()->all();
+    $issueLabels = collect($tagFields['issue_tags'])->map($resolveTagLabel)->filter()->all();
 
     $referenceIds = $asList($get('references'));
     $referenceMap = Reference::query()->whereIn('id', $referenceIds)->pluck('title', 'id')->toArray();
