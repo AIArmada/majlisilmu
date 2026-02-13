@@ -23,6 +23,7 @@ class CreateEvent extends CreateRecord
             $data['discipline_tags'],
             $data['source_tags'],
             $data['issue_tags'],
+            $data['registration_mode'],
         );
 
         return $data;
@@ -30,6 +31,12 @@ class CreateEvent extends CreateRecord
 
     protected function afterCreate(): void
     {
+        $registrationMode = $this->form->getState()['registration_mode'] ?? \App\Enums\RegistrationMode::Event->value;
+        $this->eventRecord()->settings()->updateOrCreate(
+            ['event_id' => $this->eventRecord()->id],
+            ['registration_mode' => (string) $registrationMode]
+        );
+
         $this->syncRelationState($this->eventRecord(), $this->form->getState());
     }
 

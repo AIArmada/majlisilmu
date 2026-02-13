@@ -37,7 +37,10 @@ class VenueFormSchema
                 ->collection('cover')
                 ->image()
                 ->imageEditor()
-                ->conversion('thumb')
+                ->imageAspectRatio('16:9')
+                ->imageEditorAspectRatioOptions(['16:9'])
+                ->automaticallyCropImagesToAspectRatio()
+                ->conversion('banner')
                 ->responsiveImages()
                 ->helperText(__('Header or banner image')),
 

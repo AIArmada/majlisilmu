@@ -71,10 +71,20 @@ class EventObserver
             return;
         }
 
-        // Determine the event date
-        $eventDate = $event->starts_at instanceof \Illuminate\Support\Carbon
-            ? $event->starts_at
-            : Carbon::now($event->timezone ?? 'Asia/Kuala_Lumpur');
+        // Determine the event date from the current starts_at payload first, then fallback to now.
+        $eventTimezone = $event->timezone ?? 'Asia/Kuala_Lumpur';
+        $startsAt = $event->starts_at;
+        $rawStartsAt = $event->getAttributes()['starts_at'] ?? null;
+
+        if (is_string($rawStartsAt) && trim($rawStartsAt) !== '') {
+            $eventDate = Carbon::parse($rawStartsAt, $eventTimezone);
+        } elseif ($startsAt instanceof \DateTimeInterface) {
+            $eventDate = Carbon::parse($startsAt->format('Y-m-d H:i:s'), $eventTimezone);
+        } elseif (is_string($startsAt) && trim($startsAt) !== '') {
+            $eventDate = Carbon::parse($startsAt, $eventTimezone);
+        } else {
+            $eventDate = Carbon::now($eventTimezone);
+        }
 
         // Calculate the actual start time
         $calculatedTime = $this->prayerTimeService->calculateStartTime(
@@ -83,7 +93,7 @@ class EventObserver
             $prayerOffset,
             $coords['lat'],
             $coords['lng'],
-            $event->timezone ?? 'Asia/Kuala_Lumpur'
+            $eventTimezone
         );
 
         if ($calculatedTime instanceof CarbonInterface) {

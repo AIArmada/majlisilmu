@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\SessionStatus;
 use App\Models\Event;
+use App\Models\EventSession;
 use App\Models\Institution;
 use App\Models\Venue;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class CalendarService
 {
@@ -14,10 +17,12 @@ class CalendarService
      */
     public function googleCalendarUrl(Event $event): string
     {
+        [$startAt, $endAt] = $this->nextCalendarWindow($event);
+
         $params = [
             'action' => 'TEMPLATE',
             'text' => $event->title,
-            'dates' => $this->formatGoogleDates($event),
+            'dates' => $this->formatGoogleDates($startAt, $endAt),
             'details' => $this->formatDescription($event),
             'location' => $this->formatLocation($event),
         ];
@@ -30,14 +35,16 @@ class CalendarService
      */
     public function outlookCalendarUrl(Event $event): string
     {
+        [$startAt, $endAt] = $this->nextCalendarWindow($event);
+
         $params = [
             'path' => '/calendar/0/deeplink/compose',
             'rru' => 'addevent',
             'subject' => $event->title,
             'body' => $event->description_text,
             'location' => $this->formatLocation($event),
-            'startdt' => $event->starts_at?->toIso8601String(),
-            'enddt' => $this->defaultEndAt($event)?->toIso8601String(),
+            'startdt' => $startAt?->toIso8601String(),
+            'enddt' => $endAt?->toIso8601String(),
         ];
 
         return 'https://outlook.live.com/calendar/0/deeplink/compose?'.http_build_query($params);
@@ -48,14 +55,16 @@ class CalendarService
      */
     public function office365CalendarUrl(Event $event): string
     {
+        [$startAt, $endAt] = $this->nextCalendarWindow($event);
+
         $params = [
             'path' => '/calendar/action/compose',
             'rru' => 'addevent',
             'subject' => $event->title,
             'body' => $event->description_text,
             'location' => $this->formatLocation($event),
-            'startdt' => $event->starts_at?->toIso8601String(),
-            'enddt' => $this->defaultEndAt($event)?->toIso8601String(),
+            'startdt' => $startAt?->toIso8601String(),
+            'enddt' => $endAt?->toIso8601String(),
         ];
 
         return 'https://outlook.office.com/calendar/0/deeplink/compose?'.http_build_query($params);
@@ -66,11 +75,13 @@ class CalendarService
      */
     public function yahooCalendarUrl(Event $event): string
     {
+        [$startAt, $endAt] = $this->nextCalendarWindow($event);
+
         $params = [
             'v' => '60',
             'title' => $event->title,
-            'st' => $event->starts_at?->format('Ymd\THis'),
-            'et' => $this->defaultEndAt($event)?->format('Ymd\THis'),
+            'st' => $startAt?->format('Ymd\THis'),
+            'et' => $endAt?->format('Ymd\THis'),
             'desc' => $event->description_text,
             'in_loc' => $this->formatLocation($event),
         ];
@@ -83,10 +94,13 @@ class CalendarService
      */
     public function generateIcs(Event $event): string
     {
-        $uid = $event->id.'@'.config('app.url');
+        $uidDomain = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+        if (! is_string($uidDomain) || $uidDomain === '') {
+            $uidDomain = 'localhost';
+        }
+
         $dtstamp = now()->format('Ymd\THis\Z');
-        $dtstart = $event->starts_at?->setTimezone('UTC')->format('Ymd\THis\Z');
-        $dtend = $this->defaultEndAt($event)?->setTimezone('UTC')->format('Ymd\THis\Z');
         $summary = $this->escapeIcs($event->title);
         $description = $this->escapeIcs($this->formatDescription($event));
         $location = $this->escapeIcs($this->formatLocation($event));
@@ -101,27 +115,31 @@ class CalendarService
         $ics .= 'PRODID:-//'.config('app.name')."//Events//EN\r\n";
         $ics .= "CALSCALE:GREGORIAN\r\n";
         $ics .= "METHOD:PUBLISH\r\n";
-        $ics .= "BEGIN:VEVENT\r\n";
-        $ics .= "UID:{$uid}\r\n";
-        $ics .= "DTSTAMP:{$dtstamp}\r\n";
-        $ics .= "DTSTART:{$dtstart}\r\n";
-        $ics .= "DTEND:{$dtend}\r\n";
-        $ics .= "SUMMARY:{$summary}\r\n";
-        $ics .= "DESCRIPTION:{$description}\r\n";
-        $ics .= "LOCATION:{$location}\r\n";
-        $ics .= "URL:{$url}\r\n";
-        $ics .= "ORGANIZER;CN={$organizer}:MAILTO:".config('mail.from.address', 'noreply@example.com')."\r\n";
-        $ics .= "STATUS:CONFIRMED\r\n";
-        $ics .= "TRANSP:OPAQUE\r\n";
 
-        // Add alarm (reminder) 1 hour before
-        $ics .= "BEGIN:VALARM\r\n";
-        $ics .= "TRIGGER:-PT1H\r\n";
-        $ics .= "ACTION:DISPLAY\r\n";
-        $ics .= "DESCRIPTION:Reminder: {$summary}\r\n";
-        $ics .= "END:VALARM\r\n";
+        foreach ($this->sessionWindowsForIcs($event) as $window) {
+            $dtstart = $window['start']->copy()->setTimezone('UTC')->format('Ymd\THis\Z');
+            $dtend = $window['end']->copy()->setTimezone('UTC')->format('Ymd\THis\Z');
+            $uid = $event->id.'-'.$window['uid'].'@'.$uidDomain;
 
-        $ics .= "END:VEVENT\r\n";
+            $ics .= "BEGIN:VEVENT\r\n";
+            $ics .= "UID:{$uid}\r\n";
+            $ics .= "DTSTAMP:{$dtstamp}\r\n";
+            $ics .= "DTSTART:{$dtstart}\r\n";
+            $ics .= "DTEND:{$dtend}\r\n";
+            $ics .= "SUMMARY:{$summary}\r\n";
+            $ics .= "DESCRIPTION:{$description}\r\n";
+            $ics .= "LOCATION:{$location}\r\n";
+            $ics .= "URL:{$url}\r\n";
+            $ics .= "ORGANIZER;CN={$organizer}:MAILTO:".config('mail.from.address', 'noreply@example.com')."\r\n";
+            $ics .= "STATUS:CONFIRMED\r\n";
+            $ics .= "TRANSP:OPAQUE\r\n";
+            $ics .= "BEGIN:VALARM\r\n";
+            $ics .= "TRIGGER:-PT1H\r\n";
+            $ics .= "ACTION:DISPLAY\r\n";
+            $ics .= "DESCRIPTION:Reminder: {$summary}\r\n";
+            $ics .= "END:VALARM\r\n";
+            $ics .= "END:VEVENT\r\n";
+        }
 
         return $ics."END:VCALENDAR\r\n";
     }
@@ -129,10 +147,10 @@ class CalendarService
     /**
      * Format dates for Google Calendar (YYYYMMDDTHHMMSS/YYYYMMDDTHHMMSS).
      */
-    protected function formatGoogleDates(Event $event): string
+    protected function formatGoogleDates(?Carbon $startAt, ?Carbon $endAt): string
     {
-        $start = $event->starts_at?->setTimezone('UTC')->format('Ymd\THis\Z');
-        $end = $this->defaultEndAt($event)?->setTimezone('UTC')->format('Ymd\THis\Z');
+        $start = $startAt?->copy()->setTimezone('UTC')->format('Ymd\THis\Z');
+        $end = $endAt?->copy()->setTimezone('UTC')->format('Ymd\THis\Z');
 
         return "{$start}/{$end}";
     }
@@ -168,17 +186,141 @@ class CalendarService
         return implode("\n", $parts);
     }
 
-    private function defaultEndAt(Event $event): ?Carbon
+    private function defaultEndAt(?Carbon $startsAt, Carbon|string|null $endsAt = null): ?Carbon
     {
-        if ($event->ends_at instanceof Carbon) {
-            return $event->ends_at->copy();
+        $normalizedEndAt = $this->asCarbon($endsAt);
+
+        if ($normalizedEndAt instanceof Carbon) {
+            return $normalizedEndAt->copy();
         }
 
-        if ($event->starts_at instanceof Carbon) {
-            return $event->starts_at->copy()->addHours(2);
+        if ($startsAt instanceof Carbon) {
+            return $startsAt->copy()->addHours(2);
         }
 
         return null;
+    }
+
+    private function asCarbon(Carbon|string|null $value): ?Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    protected function nextCalendarWindow(Event $event): array
+    {
+        $sessions = $this->activeSessions($event);
+        $timezone = $event->timezone ?: config('app.timezone', 'UTC');
+        $now = now($timezone);
+
+        /** @var EventSession|null $nextSession */
+        $nextSession = $sessions->first(
+            fn (EventSession $session): bool => ($this->asCarbon($session->starts_at)?->copy()->setTimezone($timezone)->greaterThanOrEqualTo($now)) ?? false
+        );
+
+        if (! $nextSession instanceof EventSession) {
+            /** @var EventSession|null $nextSession */
+            $nextSession = $sessions->last();
+        }
+
+        $nextSessionStart = $nextSession instanceof EventSession ? $this->asCarbon($nextSession->starts_at) : null;
+
+        if ($nextSessionStart instanceof Carbon) {
+            return [
+                $nextSessionStart->copy(),
+                $this->defaultEndAt($nextSessionStart, $nextSession?->ends_at),
+            ];
+        }
+
+        $eventStartAt = $this->asCarbon($event->starts_at);
+
+        if ($eventStartAt instanceof Carbon) {
+            return [
+                $eventStartAt->copy(),
+                $this->defaultEndAt($eventStartAt, $event->ends_at),
+            ];
+        }
+
+        return [null, null];
+    }
+
+    /**
+     * @return Collection<int, EventSession>
+     */
+    protected function activeSessions(Event $event): Collection
+    {
+        if ($event->relationLoaded('sessions')) {
+            /** @var Collection<int, EventSession> $sessions */
+            $sessions = $event->sessions;
+        } else {
+            /** @var Collection<int, EventSession> $sessions */
+            $sessions = $event->sessions()
+                ->where('status', SessionStatus::Scheduled->value)
+                ->orderBy('starts_at')
+                ->get();
+        }
+
+        return $sessions
+            ->filter(function (EventSession $session): bool {
+                $status = $session->status;
+
+                return ($status === SessionStatus::Scheduled || $status === SessionStatus::Scheduled->value)
+                    && $this->asCarbon($session->starts_at) instanceof Carbon;
+            })
+            ->sortBy('starts_at')
+            ->values();
+    }
+
+    /**
+     * @return array<int, array{uid: string, start: Carbon, end: Carbon}>
+     */
+    protected function sessionWindowsForIcs(Event $event): array
+    {
+        $windows = [];
+
+        foreach ($this->activeSessions($event) as $session) {
+            $sessionStartAt = $this->asCarbon($session->starts_at);
+
+            if (! $sessionStartAt instanceof Carbon) {
+                continue;
+            }
+
+            $windows[] = [
+                'uid' => (string) $session->id,
+                'start' => $sessionStartAt->copy(),
+                'end' => $this->defaultEndAt($sessionStartAt, $session->ends_at) ?? $sessionStartAt->copy()->addHours(2),
+            ];
+        }
+
+        if ($windows !== []) {
+            return $windows;
+        }
+
+        [$startAt, $endAt] = $this->nextCalendarWindow($event);
+
+        if ($startAt instanceof Carbon && $endAt instanceof Carbon) {
+            $windows[] = [
+                'uid' => 'event',
+                'start' => $startAt,
+                'end' => $endAt,
+            ];
+        }
+
+        return $windows;
     }
 
     /**

@@ -40,10 +40,11 @@ class PrayerTimeService
         string $timezone = 'Asia/Kuala_Lumpur'
     ): ?array {
         $cacheKey = sprintf(
-            'prayer_times:%s:%.4f:%.4f',
+            'prayer_times:%s:%.4f:%.4f:%s',
             $date->format('Y-m-d'),
             $latitude,
-            $longitude
+            $longitude,
+            strtolower($timezone),
         );
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($date, $latitude, $longitude, $timezone) {

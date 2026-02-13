@@ -286,7 +286,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                             RichEditor::make('description')
                                 ->label(__('Keterangan'))
-                                ->required()
                                 ->maxLength(5000)
                                 ->placeholder(__('Terangkan mengenai majlis, topik yang akan dikupas, dll.')),
 
@@ -580,20 +579,34 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('Pilih kategori…'))
                                         ->multiple()
                                         ->searchable(false)
-                                        ->required()
                                         ->preload()
                                         ->native(false)
-                                        ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
+                                        ->getOptionLabelsUsing(function (array $values): array {
+                                            $labels = [];
+                                            $uuids = [];
+
+                                            foreach ($values as $value) {
+                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                    $labels[$value] = $value;
+                                                } else {
+                                                    $uuids[] = $value;
+                                                }
+                                            }
+
+                                            if (! empty($uuids)) {
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                            }
+
+                                            return $labels;
+                                        })
                                         ->options(fn () => Cache::remember('submit_tags_domain_'.app()->getLocale(), 60, fn () => Tag::query()
                                             ->where('type', TagType::Domain)
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->orderBy('order_column')
                                             ->get()
                                             ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
-                                        ->rules(['min:1', 'max:3'])
+                                        ->rules(['max:3'])
                                         ->validationMessages([
-                                            'required' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
-                                            'min' => __('Sila pilih sekurang-kurangnya 1 kategori.'),
                                             'max' => __('Maksimum 3 kategori sahaja.'),
                                         ]),
 
@@ -602,7 +615,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->helperText(__('Pilih bidang yang menggambarkan isi ceramah.'))
                                         ->placeholder(__('Pilih atau taip untuk tambah bidang…'))
                                         ->multiple()
-                                        ->required()
                                         ->searchable()
                                         ->preload()
                                         ->allowHtml()
@@ -661,12 +673,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     });
                                                 }
                                             }
-                                        JS)
-                                        ->rules(['min:1'])
-                                        ->validationMessages([
-                                            'required' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
-                                            'min' => __('Sila pilih sekurang-kurangnya 1 bidang ilmu.'),
-                                        ]),
+                                        JS),
                                 ]),
 
                             Grid::make(['default' => 1, 'sm' => 2])
@@ -680,7 +687,24 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->preload()
                                         ->searchable(false)
                                         ->native(false)
-                                        ->getOptionLabelsUsing(fn (array $values): array => Tag::whereIn('id', $values)->get()->pluck('name', 'id')->toArray())
+                                        ->getOptionLabelsUsing(function (array $values): array {
+                                            $labels = [];
+                                            $uuids = [];
+
+                                            foreach ($values as $value) {
+                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                    $labels[$value] = $value;
+                                                } else {
+                                                    $uuids[] = $value;
+                                                }
+                                            }
+
+                                            if (! empty($uuids)) {
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                            }
+
+                                            return $labels;
+                                        })
                                         ->options(fn () => Cache::remember('submit_tags_source_'.app()->getLocale(), 60, fn () => Tag::query()
                                             ->where('type', TagType::Source)
                                             ->whereIn('status', ['verified', 'pending'])
@@ -1004,6 +1028,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->collection('poster')
                                         ->image()
                                         ->imageEditor()
+                                        ->imageAspectRatio('3:2')
+                                        ->imageEditorAspectRatioOptions(['3:2'])
+                                        ->automaticallyCropImagesToAspectRatio()
                                         ->conversion('thumb')
                                         ->responsiveImages()
                                         ->helperText(__('Gambar utama untuk paparan majlis.')),
@@ -1262,10 +1289,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'issue_tags' => TagType::Issue,
         ];
 
-        $allTagIds = array_merge(
+        $allTagIds = collect(array_merge(
             $validated['domain_tags'] ?? [],
             $validated['source_tags'] ?? [],
-        );
+        ))
+            ->filter(fn (mixed $value): bool => is_string($value) && Str::isUuid($value))
+            ->values()
+            ->all();
 
         // Resolve quick-add text values (non-UUID) to real tag records
         foreach ($tagFieldMap as $field => $tagType) {
@@ -1291,7 +1321,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
-        if (! empty($allTagIds)) {
+        $allTagIds = collect($allTagIds)
+            ->filter(fn (mixed $value): bool => is_string($value) && Str::isUuid($value))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($allTagIds !== []) {
             $tags = Tag::whereIn('id', $allTagIds)->get();
             $event->syncTags($tags);
         }

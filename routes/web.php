@@ -33,6 +33,8 @@ Route::livewire('/submit-event/success', 'pages.submit-event.success')->name('su
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard', \App\Livewire\Pages\Dashboard\UserDashboard::class)->name('dashboard');
     Route::livewire('/dashboard/institutions', \App\Livewire\Pages\Dashboard\InstitutionDashboard::class)->name('dashboard.institutions');
+    Route::livewire('/dashboard/events/create-advanced', \App\Livewire\Pages\Dashboard\Events\CreateAdvanced::class)->name('dashboard.events.create-advanced');
+    Route::livewire('/dashboard/events/{event}/schedule', \App\Livewire\Pages\Dashboard\Events\Schedule::class)->name('dashboard.events.schedule');
     Route::livewire('/saved-searches', \App\Livewire\Pages\SavedSearches\Index::class)->name('saved-searches.index');
 });
 

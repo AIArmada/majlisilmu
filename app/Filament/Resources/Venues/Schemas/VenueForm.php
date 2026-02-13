@@ -167,9 +167,12 @@ class VenueForm
                             ->collection('cover')
                             ->image()
                             ->imageEditor()
+                            ->imageAspectRatio('16:9')
+                            ->imageEditorAspectRatioOptions(['16:9'])
+                            ->automaticallyCropImagesToAspectRatio()
                             ->responsiveImages()
-                            ->conversion('thumb')
-                            ->helperText('Cover venue image (recommended: 1200x800)'),
+                            ->conversion('banner')
+                            ->helperText('Cover venue image (recommended: 1200x675)'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()

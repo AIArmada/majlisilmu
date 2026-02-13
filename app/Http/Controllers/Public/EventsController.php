@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Public;
 
+use App\Enums\RegistrationMode;
+use App\Enums\SessionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\EventSession;
 use App\Models\EventSettings;
 use App\Models\Registration;
 use App\Services\CalendarService;
@@ -64,16 +67,23 @@ class EventsController extends Controller
             return back()->withErrors(['registration' => 'Registration has closed.']);
         }
 
+        $registrationMode = $this->resolveRegistrationMode($settings);
+
         // Validate request
         $validated = $request->validate([
             'name' => 'required|string|max:100',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
+            'event_session_id' => 'nullable|uuid',
         ]);
 
         // Require at least email or phone for guest
         if (! auth()->check() && empty($validated['email']) && empty($validated['phone'])) {
             return back()->withErrors(['contact' => 'Please provide either email or phone number.']);
+        }
+
+        if ($registrationMode === RegistrationMode::Session && empty($validated['event_session_id'])) {
+            return back()->withErrors(['event_session_id' => 'Please choose a session to register.']);
         }
 
         try {
@@ -86,44 +96,79 @@ class EventsController extends Controller
 
                 $lockedEvent->load('settings');
                 $lockedEventSettings = $lockedEvent->settings;
+                $mode = $this->resolveRegistrationMode($lockedEventSettings);
+
+                $selectedSession = null;
+                $capacity = $lockedEventSettings?->capacity;
+
+                if ($mode === RegistrationMode::Session) {
+                    $selectedSessionId = $validated['event_session_id'] ?? null;
+
+                    if (! is_string($selectedSessionId) || $selectedSessionId === '') {
+                        throw ValidationException::withMessages(['event_session_id' => 'Please choose a session to register.']);
+                    }
+
+                    /** @var EventSession|null $selectedSession */
+                    $selectedSession = EventSession::query()
+                        ->where('event_id', $lockedEvent->id)
+                        ->whereKey($selectedSessionId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $selectedSession instanceof EventSession || $selectedSession->status !== SessionStatus::Scheduled) {
+                        throw ValidationException::withMessages(['event_session_id' => 'Selected session is not available.']);
+                    }
+
+                    if ($selectedSession->starts_at instanceof Carbon && $selectedSession->starts_at->isPast()) {
+                        throw ValidationException::withMessages(['event_session_id' => 'Selected session has already started.']);
+                    }
+
+                    if (is_int($selectedSession->capacity)) {
+                        $capacity = $selectedSession->capacity;
+                    }
+                }
 
                 $activeRegistrationsCount = Registration::query()
                     ->where('event_id', $lockedEvent->id)
+                    ->when($mode === RegistrationMode::Session, fn (Builder $query): Builder => $query->where('event_session_id', $validated['event_session_id'] ?? null))
                     ->where('status', '!=', 'cancelled')
                     ->count();
 
                 if ($lockedEventSettings instanceof EventSettings
-                    && is_int($lockedEventSettings->capacity)
-                    && $activeRegistrationsCount >= $lockedEventSettings->capacity) {
+                    && is_int($capacity)
+                    && $activeRegistrationsCount >= $capacity) {
                     throw ValidationException::withMessages(['registration' => 'This event is full.']);
                 }
 
-                $existingRegistration = Registration::query()
+                $existingRegistrationQuery = Registration::query()
                     ->where('event_id', $lockedEvent->id)
-                    ->where(function (Builder $query) use ($validated): void {
-                        $hasContactConstraint = false;
+                    ->when($mode === RegistrationMode::Session, fn (Builder $query): Builder => $query->where('event_session_id', $validated['event_session_id'] ?? null))
+                    ->where('status', '!=', 'cancelled');
 
-                        if (! empty($validated['email'])) {
-                            $query->where('email', $validated['email']);
-                            $hasContactConstraint = true;
-                        }
+                if (auth()->check()) {
+                    $existingRegistration = (clone $existingRegistrationQuery)
+                        ->where('user_id', auth()->id())
+                        ->exists();
+                } else {
+                    $existingRegistration = (clone $existingRegistrationQuery)
+                        ->where(function (Builder $query) use ($validated): void {
+                            $hasContactConstraint = false;
 
-                        if (! empty($validated['phone'])) {
-                            if ($hasContactConstraint) {
-                                $query->orWhere('phone', $validated['phone']);
-                            } else {
-                                $query->where('phone', $validated['phone']);
+                            if (! empty($validated['email'])) {
+                                $query->where('email', $validated['email']);
+                                $hasContactConstraint = true;
                             }
 
-                            $hasContactConstraint = true;
-                        }
-
-                        if (! $hasContactConstraint && auth()->check()) {
-                            $query->where('user_id', auth()->id());
-                        }
-                    })
-                    ->where('status', '!=', 'cancelled')
-                    ->exists();
+                            if (! empty($validated['phone'])) {
+                                if ($hasContactConstraint) {
+                                    $query->orWhere('phone', $validated['phone']);
+                                } else {
+                                    $query->where('phone', $validated['phone']);
+                                }
+                            }
+                        })
+                        ->exists();
+                }
 
                 if ($existingRegistration) {
                     throw ValidationException::withMessages(['registration' => 'You are already registered for this event.']);
@@ -131,6 +176,7 @@ class EventsController extends Controller
 
                 Registration::create([
                     'event_id' => $lockedEvent->id,
+                    'event_session_id' => $mode === RegistrationMode::Session ? ($validated['event_session_id'] ?? null) : null,
                     'user_id' => auth()->id(),
                     'name' => $validated['name'],
                     'email' => $validated['email'] ?? null,
@@ -166,5 +212,20 @@ class EventsController extends Controller
 
         return str_contains($message, 'registrations')
             && str_contains($message, 'unique');
+    }
+
+    private function resolveRegistrationMode(?EventSettings $settings): RegistrationMode
+    {
+        $rawMode = $settings?->registration_mode;
+
+        if ($rawMode instanceof RegistrationMode) {
+            return $rawMode;
+        }
+
+        if (is_string($rawMode)) {
+            return RegistrationMode::tryFrom($rawMode) ?? RegistrationMode::Event;
+        }
+
+        return RegistrationMode::Event;
     }
 }

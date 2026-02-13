@@ -15,6 +15,7 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
@@ -46,17 +47,26 @@ class SpeakerFormSchema
                 ->label(__('Avatar'))
                 ->collection('avatar')
                 ->avatar()
+                ->alignCenter()
                 ->imageEditor()
                 ->circleCropper()
                 ->image()
                 ->conversion('thumb')
-                ->helperText(__('Recommended: Square image, at least 400x400px')),
+                ->belowContent(
+                    Schema::center([
+                        Text::make(__('Recommended: Square image, at least 400x400px'))
+                            ->extraAttributes(['class' => 'text-center']),
+                    ])
+                ),
 
             SpatieMediaLibraryFileUpload::make('cover')
                 ->label(__('Cover Image'))
                 ->collection('cover')
                 ->image()
                 ->imageEditor()
+                ->imageAspectRatio('16:9')
+                ->imageEditorAspectRatioOptions(['16:9'])
+                ->automaticallyCropImagesToAspectRatio()
                 ->responsiveImages()
                 ->conversion('banner')
                 ->helperText(__('Cover image for speaker profile')),

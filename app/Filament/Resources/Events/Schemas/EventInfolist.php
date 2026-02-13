@@ -51,6 +51,14 @@ class EventInfolist
                                             ->label('Mode Waktu')
                                             ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
                                             ->badge(),
+                                        TextEntry::make('schedule_kind')
+                                            ->label('Jenis Jadual')
+                                            ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
+                                            ->badge(),
+                                        TextEntry::make('schedule_state')
+                                            ->label('Status Jadual')
+                                            ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
+                                            ->badge(),
                                         TextEntry::make('prayer_reference')
                                             ->label('Waktu Solat')
                                             ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
@@ -266,6 +274,11 @@ class EventInfolist
                                                 'rejected' => 'danger',
                                                 default => 'gray',
                                             }),
+                                        TextEntry::make('settings.registration_mode')
+                                            ->label('Mod Pendaftaran')
+                                            ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
+                                            ->badge()
+                                            ->placeholder('-'),
                                         IconEntry::make('is_priority')
                                             ->label('Priority Review')
                                             ->boolean(),

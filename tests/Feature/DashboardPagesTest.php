@@ -12,6 +12,7 @@ uses(RefreshDatabase::class);
 it('requires authentication for user and institution dashboards', function () {
     $this->get('/dashboard')->assertRedirect(route('login'));
     $this->get('/dashboard/institutions')->assertRedirect(route('login'));
+    $this->get('/dashboard/events/create-advanced')->assertRedirect(route('login'));
 });
 
 it('shows profile, events, registrations, saved events, and saved searches on the user dashboard', function () {
@@ -135,5 +136,24 @@ it('forbids selecting institutions the user does not belong to', function () {
 
     $this->actingAs($user)
         ->get('/dashboard/institutions?institution='.$nonMemberInstitution->id)
+        ->assertForbidden();
+});
+
+it('allows owner to access advanced schedule page and blocks others', function () {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $event = Event::factory()->create([
+        'user_id' => $owner->id,
+        'submitter_id' => $owner->id,
+        'status' => 'draft',
+    ]);
+
+    $this->actingAs($owner)
+        ->get("/dashboard/events/{$event->id}/schedule")
+        ->assertOk();
+
+    $this->actingAs($otherUser)
+        ->get("/dashboard/events/{$event->id}/schedule")
         ->assertForbidden();
 });

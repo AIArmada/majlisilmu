@@ -3,7 +3,10 @@
 namespace App\Livewire\Pages\Events;
 
 use App\Enums\EventVisibility;
+use App\Enums\RegistrationMode;
+use App\Enums\SessionStatus;
 use App\Models\Event;
+use App\Models\EventSession;
 use App\Models\User;
 use App\Services\CalendarService;
 use App\States\EventStatus\Approved;
@@ -37,8 +40,22 @@ class Show extends Component
     public function mount(Event $event): void
     {
         $isViewable = $event->is_active && $this->isApprovedOrPending($event);
+        $isOwner = $this->isEventOwner($event);
 
-        if (! $isViewable || $event->visibility !== EventVisibility::Public) {
+        // Public events: anyone can view if active and approved/pending
+        if ($isViewable && $event->visibility === EventVisibility::Public) {
+            // Allow access
+        }
+        // Unlisted events: anyone with link can view if active and approved/pending
+        elseif ($isViewable && $event->visibility === EventVisibility::Unlisted) {
+            // Allow access
+        }
+        // Private events: only owner can view if active and approved/pending
+        elseif ($isViewable && $event->visibility === EventVisibility::Private && $isOwner) {
+            // Allow access
+        }
+        // All other cases: 404
+        else {
             abort(404);
         }
 
@@ -50,6 +67,7 @@ class Show extends Component
             'tags',
             'donationChannel',
             'settings',
+            'sessions',
         ]);
 
         $this->event = $event;
@@ -134,6 +152,35 @@ class Show extends Component
             ->orderBy('starts_at')
             ->limit(6)
             ->get();
+    }
+
+    /**
+     * @return Collection<int, EventSession>
+     */
+    #[Computed]
+    public function upcomingSessions(): Collection
+    {
+        $now = now($this->event->timezone ?: 'Asia/Kuala_Lumpur');
+
+        return $this->event->sessions
+            ->filter(function (EventSession $session) use ($now): bool {
+                return $session->status === SessionStatus::Scheduled
+                    && $session->starts_at !== null
+                    && $session->starts_at->greaterThanOrEqualTo($now);
+            })
+            ->sortBy('starts_at')
+            ->values();
+    }
+
+    public function registrationMode(): RegistrationMode
+    {
+        $mode = $this->event->settings?->registration_mode;
+
+        if ($mode instanceof RegistrationMode) {
+            return $mode;
+        }
+
+        return RegistrationMode::Event;
     }
 
     /**
@@ -256,5 +303,20 @@ class Show extends Component
         }
 
         return in_array((string) $status, ['approved', 'pending'], true);
+    }
+
+    /**
+     * Determine if the currently authenticated user is the owner of the event.
+     * Checks both user_id (owner) and submitter_id (submitter).
+     */
+    protected function isEventOwner(Event $event): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $event->user_id === $user->id || $event->submitter_id === $user->id;
     }
 }

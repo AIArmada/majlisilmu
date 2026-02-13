@@ -48,9 +48,12 @@ class InstitutionForm
                             ->label('Cover Image')
                             ->image()
                             ->imageEditor()
+                            ->imageAspectRatio('16:9')
+                            ->imageEditorAspectRatioOptions(['16:9'])
+                            ->automaticallyCropImagesToAspectRatio()
                             ->responsiveImages()
                             ->conversion('banner')
-                            ->helperText('Main image (recommended: 1200x800)'),
+                            ->helperText('Main image (recommended: 1200x675)'),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
