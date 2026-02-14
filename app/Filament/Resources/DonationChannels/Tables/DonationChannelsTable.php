@@ -12,33 +12,40 @@ use Filament\Tables\Table;
 
 class DonationChannelsTable
 {
-    public static function configure(Table $table): Table
+    public static function configure(Table $table, bool $showOwnerColumn = true): Table
     {
+        $columns = [
+            SpatieMediaLibraryImageColumn::make('qr')
+                ->label('QR')
+                ->collection('qr')
+                ->conversion('thumb')
+                ->square()
+                ->size(52),
+        ];
+
+        if ($showOwnerColumn) {
+            $columns[] = TextColumn::make('donatable.name')
+                ->label('Owner')
+                ->description(fn ($record) => class_basename($record->donatable_type))
+                ->searchable()
+                ->sortable()
+                ->url(function ($record): ?string {
+                    if (! $record->donatable) {
+                        return null;
+                    }
+
+                    return match ($record->donatable::class) {
+                        \App\Models\Institution::class => \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->donatable->id]),
+                        \App\Models\Speaker::class => \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->donatable->id]),
+                        default => null,
+                    };
+                });
+        }
+
         return $table
             ->columns([
-                SpatieMediaLibraryImageColumn::make('qr')
-                    ->label('QR')
-                    ->collection('qr')
-                    ->conversion('thumb')
-                    ->square()
-                    ->size(52),
-                TextColumn::make('donatable.name')
-                    ->label('Owner')
-                    ->description(fn ($record) => class_basename($record->donatable_type))
-                    ->searchable()
-                    ->sortable()
-                    ->url(function ($record): ?string {
-                        if (! $record->donatable) {
-                            return null;
-                        }
-
-                        return match ($record->donatable::class) {
-                            \App\Models\Institution::class => \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->donatable->id]),
-                            \App\Models\Speaker::class => \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->donatable->id]),
-                            default => null,
-                        };
-                    }),
-                TextColumn::make('recipient_name')
+                ...$columns,
+                TextColumn::make('recipient')
                     ->label('Recipient')
                     ->searchable()
                     ->sortable(),

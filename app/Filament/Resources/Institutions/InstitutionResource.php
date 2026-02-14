@@ -6,6 +6,7 @@ use App\Filament\Resources\Institutions\Pages\CreateInstitution;
 use App\Filament\Resources\Institutions\Pages\EditInstitution;
 use App\Filament\Resources\Institutions\Pages\ListInstitutions;
 use App\Filament\Resources\Institutions\Pages\ViewInstitution;
+use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\EventsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\MembersRelationManager;
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm;
@@ -52,6 +53,7 @@ class InstitutionResource extends Resource
     {
         return [
             MembersRelationManager::class,
+            DonationChannelsRelationManager::class,
             EventsRelationManager::class,
         ];
     }
