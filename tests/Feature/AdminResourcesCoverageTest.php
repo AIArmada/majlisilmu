@@ -5,6 +5,7 @@ use App\Filament\Resources\AiUsageLogs\AiUsageLogResource;
 use App\Filament\Resources\DonationChannels\DonationChannelResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
+use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager as InstitutionDonationChannelsRelationManager;
 use App\Filament\Resources\References\ReferenceResource;
 use App\Filament\Resources\References\RelationManagers\EventsRelationManager as ReferenceEventsRelationManager;
 use App\Filament\Resources\Reports\ReportResource;
@@ -50,4 +51,5 @@ it('registers expected relation managers on core admin resources', function () {
     expect(SeriesResource::getRelations())->toContain(SeriesEventsRelationManager::class);
     expect(SpeakerResource::getRelations())->toContain(SpeakerEventsRelationManager::class);
     expect(ReferenceResource::getRelations())->toContain(ReferenceEventsRelationManager::class);
+    expect(InstitutionResource::getRelations())->toContain(InstitutionDonationChannelsRelationManager::class);
 });

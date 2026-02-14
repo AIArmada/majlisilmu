@@ -18,6 +18,8 @@ class DonationChannelResource extends Resource
 {
     protected static ?string $model = DonationChannel::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     #[\Override]

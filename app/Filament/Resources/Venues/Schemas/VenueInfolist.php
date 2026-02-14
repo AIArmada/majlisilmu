@@ -29,7 +29,7 @@ class VenueInfolist
                                 Section::make('Maklumat Asas')
                                     ->schema([
                                         SpatieMediaLibraryImageEntry::make('cover')
-                                            ->label('Imej Sampul')
+                                            ->label('Imej Latar')
                                             ->collection('cover')
                                             ->conversion('thumb')
                                             ->columnSpan(1),
