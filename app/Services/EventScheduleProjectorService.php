@@ -53,9 +53,9 @@ class EventScheduleProjectorService
         }
 
         if (
-            ($event->ends_at === null && $sessionEnd !== null)
-            || ($event->ends_at !== null && $sessionEnd === null)
-            || ($event->ends_at !== null && $sessionEnd !== null && ! $event->ends_at->equalTo($sessionEnd))
+            ($event->ends_at === null && $sessionEnd instanceof \Illuminate\Support\Carbon)
+            || ($event->ends_at !== null && ! $sessionEnd instanceof \Illuminate\Support\Carbon)
+            || ($event->ends_at !== null && $sessionEnd instanceof \Illuminate\Support\Carbon && ! $event->ends_at->equalTo($sessionEnd))
         ) {
             $event->ends_at = $sessionEnd;
             $dirty = true;

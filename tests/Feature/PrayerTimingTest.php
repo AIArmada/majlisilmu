@@ -23,7 +23,7 @@ describe('TimingMode Enum', function () {
     });
 
     it('has labels in Malay', function () {
-        expect(TimingMode::Absolute->label())->toBe('Waktu Tertentu');
+        expect(TimingMode::Absolute->label())->toBe('Masa Tepat');
         expect(TimingMode::PrayerRelative->label())->toBe('Waktu Solat');
     });
 });

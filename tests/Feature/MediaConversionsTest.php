@@ -134,9 +134,9 @@ it('registers media conversions for Speaker model', function () {
 it('registers media conversions for Speaker cover and gallery collections', function () {
     $speaker = Speaker::factory()->create();
 
-    $speaker->addMedia(UploadedFile::fake()->image('cover.jpg', 1200, 800))
+    $speaker->addMedia(UploadedFile::fake()->image('cover.png', 100, 100))
         ->toMediaCollection('cover');
-    $speaker->addMedia(UploadedFile::fake()->image('gallery.jpg', 1200, 800))
+    $speaker->addMedia(UploadedFile::fake()->image('gallery.png', 100, 100))
         ->toMediaCollection('gallery');
 
     $coverMedia = $speaker->getFirstMedia('cover');

@@ -11,6 +11,7 @@ use Database\Seeders\MasjidSeeder;
 use Database\Seeders\MediaLinkSeeder;
 use Database\Seeders\ModerationReviewSeeder;
 use Database\Seeders\PermissionSeeder;
+use Database\Seeders\ReferenceSeeder;
 use Database\Seeders\RegistrationSeeder;
 use Database\Seeders\ReportSeeder;
 use Database\Seeders\RoleSeeder;
@@ -63,6 +64,7 @@ it('runs the full demo seeding pipeline in the expected order', function () {
     expect($calledSeederBatches)->toContain([
         SeriesSeeder::class,
         EventSeeder::class,
+        ReferenceSeeder::class,
         DonationChannelSeeder::class,
         MediaLinkSeeder::class,
     ]);

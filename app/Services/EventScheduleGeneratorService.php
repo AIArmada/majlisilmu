@@ -136,7 +136,7 @@ class EventScheduleGeneratorService
     {
         $session ??= new EventSession;
         $existingRecurrenceRuleId = $session->exists ? $session->recurrence_rule_id : null;
-        $existingIsGenerated = $session->exists ? (bool) $session->is_generated : false;
+        $existingIsGenerated = $session->exists && (bool) $session->is_generated;
 
         $session->fill([
             'event_id' => $event->id,
@@ -311,7 +311,7 @@ class EventScheduleGeneratorService
             ? $rule->starts_time->format('H:i:s')
             : ((string) ($rule->starts_time ?: '20:00:00'));
 
-        [$hour, $minute, $second] = array_map('intval', explode(':', str_pad($startsTime, 8, ':00')));
+        [$hour, $minute, $second] = array_map(intval(...), explode(':', str_pad($startsTime, 8, ':00')));
 
         return $date->copy()->setTimezone($timezone)->setTime($hour, $minute, $second);
     }
@@ -326,7 +326,7 @@ class EventScheduleGeneratorService
             return $startsAt->copy()->addHours(2);
         }
 
-        [$hour, $minute, $second] = array_map('intval', explode(':', str_pad($endsTime, 8, ':00')));
+        [$hour, $minute, $second] = array_map(intval(...), explode(':', str_pad($endsTime, 8, ':00')));
         $endsAt = $startsAt->copy()->setTimezone($timezone)->setTime($hour, $minute, $second);
 
         if ($endsAt->lessThanOrEqualTo($startsAt)) {

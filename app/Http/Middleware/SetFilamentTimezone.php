@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Timezone\UserTimezoneResolver;
 use Closure;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Http\Request;
@@ -16,7 +17,12 @@ class SetFilamentTimezone
      */
     public function handle(Request $request, Closure $next): Response
     {
-        FilamentTimezone::set('Asia/Kuala_Lumpur');
+        $timezone = UserTimezoneResolver::resolve($request);
+
+        FilamentTimezone::set($timezone);
+        if ($request->hasSession()) {
+            $request->session()->put('user_timezone', $timezone);
+        }
 
         return $next($request);
     }

@@ -37,7 +37,7 @@ new class extends Component {
 
 @php
     $speaker = $this->speaker;
-    $coverUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
+    $mainUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
     $gallery = $speaker->getMedia('gallery');
     $websiteUrl = $speaker->socialMedia->firstWhere('platform', 'website')?->url;
     $facebookUrl = $speaker->socialMedia->firstWhere('platform', 'facebook')?->url;

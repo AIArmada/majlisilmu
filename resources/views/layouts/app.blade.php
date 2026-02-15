@@ -18,6 +18,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script>
+        (() => {
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+            if (!timezone) {
+                return;
+            }
+
+            document.cookie = `user_timezone=${encodeURIComponent(timezone)}; path=/; max-age=31536000; SameSite=Lax`;
+        })();
+    </script>
     @livewireStyles
     @filamentStyles
     @stack('head')
