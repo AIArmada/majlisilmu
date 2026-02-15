@@ -1,4 +1,5 @@
 @php
+    use App\Support\Timezone\UserTimezoneResolver;
     use App\Enums\EventAgeGroup;
     use App\Enums\EventFormat;
     use App\Enums\EventGenderRestriction;
@@ -73,7 +74,11 @@
         return (string) $value;
     };
 
-    $previewTimezone = (string) ($get('timezone') ?: config('app.timezone', 'UTC'));
+    $preferredTimezone = $toScalar($get('timezone'));
+    $previewTimezone = UserTimezoneResolver::resolve(
+        request(),
+        $preferredTimezone !== '' ? $preferredTimezone : null,
+    );
 
     $toTimeLabel = static function (mixed $value) use ($dash, $previewTimezone): string {
         if (! filled($value)) {
@@ -90,10 +95,10 @@
             $parsed = Carbon::parse($timeValue);
 
             if (preg_match('/(Z|[+\-]\d{2}:?\d{2})$/', $timeValue) === 1) {
-                return $parsed->setTimezone($previewTimezone)->format('H:i');
+                return $parsed->setTimezone($previewTimezone)->format('h:i A');
             }
 
-            return $parsed->format('H:i');
+            return $parsed->format('h:i A');
         } catch (\Throwable) {
             return (string) $value;
         }
@@ -132,9 +137,23 @@
         ->all();
 
     $languageIds = $asList($get('languages'));
+    $preferredLanguageLabels = [
+        'ms' => 'Bahasa Melayu',
+        'ar' => 'Bahasa Arab',
+        'en' => 'Bahasa Inggeris',
+        'id' => 'Bahasa Indonesia',
+        'zh' => 'Bahasa Cina',
+        'ta' => 'Bahasa Tamil',
+        'jv' => 'Bahasa Jawa',
+    ];
     $languageMap = \Nnjeim\World\Models\Language::query()
         ->whereIn('id', $languageIds)
-        ->pluck('name_native', 'id')
+        ->get(['id', 'code', 'name'])
+        ->mapWithKeys(fn ($language): array => [
+            $language->id => $preferredLanguageLabels[$language->code]
+                ?? $language->name
+                ?? Str::upper($language->code),
+        ])
         ->toArray();
     $languageLabels = collect($languageIds)
         ->map(fn (mixed $id): ?string => $languageMap[$id] ?? null)
