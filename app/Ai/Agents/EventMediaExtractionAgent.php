@@ -53,8 +53,10 @@ TXT;
 
     /**
      * Get the list of messages comprising the conversation so far.
+     *
+     * @return array<int, mixed>
      */
-    public function messages(): iterable
+    public function messages(): array
     {
         return [];
     }
@@ -62,21 +64,29 @@ TXT;
     /**
      * Get the tools available to the agent.
      *
-     * @return Tool[]
+     * @return array<int, mixed>
      */
-    public function tools(): iterable
+    public function tools(): array
     {
         return [];
     }
 
     /**
      * Get the agent's structured output schema definition.
+     *
+     * @return array<string, mixed>
      */
     public function schema(JsonSchema $schema): array
     {
         $enumString = function (string $contextKey) use ($schema): StringType {
             $type = $schema->string();
-            $values = collect($this->context[$contextKey] ?? [])
+            $rawValues = $this->context[$contextKey] ?? [];
+
+            if (! is_array($rawValues)) {
+                $rawValues = [];
+            }
+
+            $values = collect($rawValues)
                 ->filter(fn (mixed $value): bool => is_string($value) && filled($value))
                 ->values()
                 ->all();
@@ -88,12 +98,22 @@ TXT;
             return $type;
         };
 
-        $domainTagIds = collect(array_keys($this->context['domain_tag_options'] ?? []))
+        $domainTagOptions = $this->context['domain_tag_options'] ?? [];
+        if (! is_array($domainTagOptions)) {
+            $domainTagOptions = [];
+        }
+
+        $domainTagIds = collect(array_keys($domainTagOptions))
             ->filter(fn (mixed $value): bool => is_string($value) && filled($value))
             ->values()
             ->all();
 
-        $sourceTagIds = collect(array_keys($this->context['source_tag_options'] ?? []))
+        $sourceTagOptions = $this->context['source_tag_options'] ?? [];
+        if (! is_array($sourceTagOptions)) {
+            $sourceTagOptions = [];
+        }
+
+        $sourceTagIds = collect(array_keys($sourceTagOptions))
             ->filter(fn (mixed $value): bool => is_string($value) && filled($value))
             ->values()
             ->all();

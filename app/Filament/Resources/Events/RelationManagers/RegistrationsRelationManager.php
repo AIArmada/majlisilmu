@@ -14,6 +14,8 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Throwable;
 
 class RegistrationsRelationManager extends RelationManager
 {
@@ -32,9 +34,33 @@ class RegistrationsRelationManager extends RelationManager
                     ->relationship(
                         name: 'session',
                         titleAttribute: 'id',
-                        modifyQueryUsing: fn (Builder $query): Builder => $query->where('event_id', $this->getOwnerRecord()->id),
+                        modifyQueryUsing: function (Builder $query): Builder {
+                            $ownerKey = $this->getOwnerRecord()->getKey();
+
+                            if (! is_string($ownerKey) || $ownerKey === '') {
+                                return $query->whereRaw('1 = 0');
+                            }
+
+                            return $query->where('event_id', $ownerKey);
+                        },
                     )
-                    ->getOptionLabelFromRecordUsing(fn (\App\Models\EventSession $record): string => $record->starts_at?->translatedFormat('d M Y, h:i A') ?? (string) $record->id)
+                    ->getOptionLabelFromRecordUsing(function (\App\Models\EventSession $record): string {
+                        $startsAt = $record->starts_at;
+
+                        if ($startsAt instanceof Carbon) {
+                            return $startsAt->translatedFormat('d M Y, h:i A');
+                        }
+
+                        if (is_string($startsAt) && $startsAt !== '') {
+                            try {
+                                return Carbon::parse($startsAt)->translatedFormat('d M Y, h:i A');
+                            } catch (Throwable) {
+                                return (string) $record->getKey();
+                            }
+                        }
+
+                        return (string) $record->getKey();
+                    })
                     ->searchable()
                     ->preload(),
                 TextInput::make('name')

@@ -24,7 +24,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
-use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Events\AgentPrompted;
@@ -60,11 +59,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        FilamentTimezone::set('Asia/Kuala_Lumpur');
-
         // Register custom scripts
         FilamentAsset::register([
             Js::make('close-on-select', __DIR__.'/../../resources/js/filament/close-on-select.js'),
+            Js::make('user-timezone', __DIR__.'/../../resources/js/filament/user-timezone.js'),
         ]);
 
         if (! self::$eventObserverRegistered) {

@@ -73,6 +73,32 @@
         return (string) $value;
     };
 
+    $previewTimezone = (string) ($get('timezone') ?: config('app.timezone', 'UTC'));
+
+    $toTimeLabel = static function (mixed $value) use ($dash, $previewTimezone): string {
+        if (! filled($value)) {
+            return $dash;
+        }
+
+        try {
+            $timeValue = (string) $value;
+
+            if (preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $timeValue) === 1) {
+                return $timeValue;
+            }
+
+            $parsed = Carbon::parse($timeValue);
+
+            if (preg_match('/(Z|[+\-]\d{2}:?\d{2})$/', $timeValue) === 1) {
+                return $parsed->setTimezone($previewTimezone)->format('H:i');
+            }
+
+            return $parsed->format('H:i');
+        } catch (\Throwable) {
+            return (string) $value;
+        }
+    };
+
     $eventTypeValues = $asList($get('event_type'));
     $eventTypeLabels = collect($eventTypeValues)
         ->map(function (mixed $value): string {
@@ -235,11 +261,11 @@
             </div>
             <div>
                 <dt class="text-slate-500">{{ __('Masa Mula') }}</dt>
-                <dd class="font-medium text-slate-900">{{ $toLabel($get('custom_time')) }}</dd>
+                <dd class="font-medium text-slate-900">{{ $toTimeLabel($get('custom_time')) }}</dd>
             </div>
             <div>
                 <dt class="text-slate-500">{{ __('Masa Akhir') }}</dt>
-                <dd class="font-medium text-slate-900">{{ $toLabel($get('end_time')) }}</dd>
+                <dd class="font-medium text-slate-900">{{ $toTimeLabel($get('end_time')) }}</dd>
             </div>
             <div>
                 <dt class="text-slate-500">{{ __('Format Majlis') }}</dt>

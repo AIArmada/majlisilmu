@@ -22,18 +22,18 @@ class AiUsageLedger
             return;
         }
 
-        $payload = match (true) {
-            $event instanceof AgentPrompted => $this->payloadFromAgentPrompted($event),
-            $event instanceof ImageGenerated => $this->payloadFromImageGenerated($event),
-            $event instanceof TranscriptionGenerated => $this->payloadFromTranscriptionGenerated($event),
-            $event instanceof EmbeddingsGenerated => $this->payloadFromEmbeddingsGenerated($event),
-            $event instanceof Reranked => $this->payloadFromReranked($event),
-            $event instanceof AudioGenerated => $this->payloadFromAudioGenerated($event),
-            default => null,
-        };
-
-        if (! is_array($payload)) {
-            return;
+        if ($event instanceof AgentPrompted) {
+            $payload = $this->payloadFromAgentPrompted($event);
+        } elseif ($event instanceof ImageGenerated) {
+            $payload = $this->payloadFromImageGenerated($event);
+        } elseif ($event instanceof TranscriptionGenerated) {
+            $payload = $this->payloadFromTranscriptionGenerated($event);
+        } elseif ($event instanceof EmbeddingsGenerated) {
+            $payload = $this->payloadFromEmbeddingsGenerated($event);
+        } elseif ($event instanceof Reranked) {
+            $payload = $this->payloadFromReranked($event);
+        } else {
+            $payload = $this->payloadFromAudioGenerated($event);
         }
 
         AiUsageLog::query()->create($payload);

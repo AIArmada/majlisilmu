@@ -14,12 +14,14 @@ use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Throwable;
 
 #[Layout('layouts.app')]
 #[Title('Event Details')]
@@ -164,9 +166,19 @@ class Show extends Component
 
         return $this->event->sessions
             ->filter(function (EventSession $session) use ($now): bool {
+                $startsAt = $session->starts_at;
+
+                if (is_string($startsAt) && $startsAt !== '') {
+                    try {
+                        $startsAt = Carbon::parse($startsAt, $this->event->timezone ?: 'Asia/Kuala_Lumpur');
+                    } catch (Throwable) {
+                        return false;
+                    }
+                }
+
                 return $session->status === SessionStatus::Scheduled
-                    && $session->starts_at !== null
-                    && $session->starts_at->greaterThanOrEqualTo($now);
+                    && $startsAt instanceof Carbon
+                    && $startsAt->greaterThanOrEqualTo($now);
             })
             ->sortBy('starts_at')
             ->values();

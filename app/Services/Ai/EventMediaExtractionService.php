@@ -11,6 +11,7 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\TagType;
 use App\Models\Tag;
+use ArrayAccess;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -50,10 +51,59 @@ class EventMediaExtractionService
                 model: $resolvedModel,
             );
         } catch (Throwable $exception) {
-            throw new RuntimeException('Failed to extract event data from media.', previous: $exception);
+            throw new RuntimeException('Failed to extract event data from media.', $exception->getCode(), previous: $exception);
         }
 
-        return $this->normalizePayload($response->toArray());
+        return $this->normalizePayload($this->extractResponsePayload($response));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function extractResponsePayload(mixed $response): array
+    {
+        if (is_array($response)) {
+            return $response;
+        }
+
+        if (! $response instanceof ArrayAccess) {
+            return [];
+        }
+
+        $keys = [
+            'title',
+            'description',
+            'event_date',
+            'prayer_time',
+            'custom_time',
+            'end_time',
+            'event_type',
+            'event_format',
+            'visibility',
+            'event_url',
+            'live_url',
+            'gender',
+            'age_group',
+            'children_allowed',
+            'is_muslim_only',
+            'language_codes',
+            'domain_tag_ids',
+            'source_tag_ids',
+            'discipline_tags',
+            'issue_tags',
+        ];
+
+        $payload = [];
+
+        foreach ($keys as $key) {
+            $value = $response[$key] ?? null;
+
+            if ($value !== null) {
+                $payload[$key] = $value;
+            }
+        }
+
+        return $payload;
     }
 
     /**
@@ -132,7 +182,7 @@ class EventMediaExtractionService
 
         return array_filter(
             $normalized,
-            fn (mixed $value): bool => ! ($value === null || $value === [] || $value === '')
+            fn (mixed $value): bool => ! (in_array($value, [null, [], ''], true))
         );
     }
 
@@ -429,10 +479,15 @@ class EventMediaExtractionService
     protected function tagSearchLabels(Tag $tag): array
     {
         if (is_array($tag->name)) {
-            return collect($tag->name)
-                ->filter(fn (mixed $value): bool => is_string($value) && filled($value))
-                ->values()
-                ->all();
+            $labels = array_values(array_filter(
+                $tag->name,
+                filled(...)
+            ));
+
+            return array_map(
+                fn (mixed $value): string => (string) $value,
+                $labels,
+            );
         }
 
         return filled($tag->name) ? [(string) $tag->name] : [];

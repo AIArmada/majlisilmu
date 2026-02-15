@@ -19,6 +19,7 @@ use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
+use App\Support\Timezone\UserTimezoneResolver;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
@@ -67,6 +68,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public function mount(): void
     {
+        $timezone = $this->resolveUserTimezone();
+
         $this->form->fill([
             'submitter_name' => auth()->user()?->name,
             'submitter_email' => auth()->user()?->email,
@@ -80,6 +83,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'location_type' => 'institution',
             'is_muslim_only' => false,
             'captcha_token' => null,
+            'timezone' => $timezone,
         ]);
     }
 
@@ -315,7 +319,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                         return ! in_array($case, [EventPrayerTime::SelepasJumaat, EventPrayerTime::SelepasTarawih], true);
                                                     }
 
-                                                    $date = Carbon::parse($eventDate, 'Asia/Kuala_Lumpur')->startOfDay();
+                                                    $timezone = $this->resolveUserTimezone();
+                                                    $date = Carbon::parse($eventDate, $timezone)->startOfDay();
 
                                                     if ($case === EventPrayerTime::SelepasJumaat) {
                                                         return $date->isFriday();
@@ -371,7 +376,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->rule(function (Get $get): Closure {
                                             return function (string $attribute, $value, Closure $fail) use ($get) {
                                                 $eventDate = $get('event_date');
-                                                $timezone = 'Asia/Kuala_Lumpur';
+                                                $timezone = $this->resolveUserTimezone((string) ($get('timezone') ?? ''));
                                                 $now = Carbon::now($timezone);
 
                                                 if (! $eventDate || ! $value) {
@@ -404,9 +409,22 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             const customTime = $get('custom_time');
                                             const endTime = $state;
                                             const prayerTime = $get('prayer_time');
+                                            const estimatedStartByPrayer = {
+                                                selepas_subuh: '06:30',
+                                                selepas_zuhur: '13:30',
+                                                selepas_jumaat: '14:00',
+                                                selepas_asar: '17:00',
+                                                selepas_maghrib: '20:00',
+                                                selepas_isyak: '21:30',
+                                                selepas_tarawih: '22:30',
+                                            };
                                             
-                                            if (prayerTime === 'lain_waktu' && customTime && endTime) {
-                                                const startParts = customTime.split(':');
+                                            const guessedStartTime = prayerTime === 'lain_waktu'
+                                                ? customTime
+                                                : (estimatedStartByPrayer[prayerTime] ?? null);
+                                            
+                                            if (guessedStartTime && endTime) {
+                                                const startParts = guessedStartTime.split(':');
                                                 const endParts = endTime.split(':');
                                                 
                                                 const startMinutes = parseInt(startParts[0]) * 60 + parseInt(startParts[1] || 0);
@@ -428,20 +446,24 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                     return; // Optional field
                                                 }
 
-                                                $prayerTime = $get('prayer_time');
-                                                $customTime = $get('custom_time');
+                                                $prayerTimeRaw = $get('prayer_time');
+                                                $startTime = $this->resolveStartTimeForComparison(
+                                                    $prayerTimeRaw,
+                                                    $get('custom_time')
+                                                );
 
-                                                // If using custom time, validate end_time is after custom_time
-                                                if ($prayerTime === 'lain_waktu' && $customTime) {
-                                                    $startParts = explode(':', $customTime);
-                                                    $endParts = explode(':', $value);
+                                                if ($startTime === null) {
+                                                    return;
+                                                }
 
-                                                    $startMinutes = ((int) $startParts[0]) * 60 + ((int) ($startParts[1] ?? 0));
-                                                    $endMinutes = ((int) $endParts[0]) * 60 + ((int) ($endParts[1] ?? 0));
+                                                $startParts = explode(':', $startTime);
+                                                $endParts = explode(':', (string) $value);
 
-                                                    if ($endMinutes <= $startMinutes) {
-                                                        $fail(__('Masa akhir mestilah selepas masa mula.'));
-                                                    }
+                                                $startMinutes = ((int) $startParts[0]) * 60 + ((int) ($startParts[1] ?? 0));
+                                                $endMinutes = ((int) $endParts[0]) * 60 + ((int) ($endParts[1] ?? 0));
+
+                                                if ($endMinutes <= $startMinutes) {
+                                                    $fail(__('Masa akhir mestilah selepas masa mula.'));
                                                 }
                                             };
                                         }),
@@ -1052,6 +1074,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     Step::make(__('Semak & Hantar'))
                         ->icon('heroicon-o-paper-airplane')
                         ->schema([
+                            Hidden::make('timezone')
+                                ->dehydrated()
+                                ->default(fn (): string => $this->resolveUserTimezone()),
+
                             Hidden::make('captcha_token')
                                 ->dehydrated(),
 
@@ -1105,6 +1131,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     ->persistStepInQueryString()
                     ->extraAlpineAttributes([
                         'x-init' => <<<'JS'
+                            const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+                            if (browserTimezone && $wire.get('data.timezone') !== browserTimezone) {
+                                $wire.$set('data.timezone', browserTimezone)
+                            }
+
                             window.__submitEventReviewRefreshed ??= false
 
                             $watch('step', () => {
@@ -1152,13 +1184,14 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $startsAt = $this->resolveStartsAt($validated);
+        $timezone = $this->resolveUserTimezone($validated['timezone'] ?? null);
 
         // Validate contextual prayer time constraints (client-side filtering removed)
         $prayerTimeRaw = $validated['prayer_time'] ?? '';
         $selectedPrayer = $prayerTimeRaw instanceof EventPrayerTime
             ? $prayerTimeRaw
             : EventPrayerTime::tryFrom($prayerTimeRaw);
-        $eventDate = Carbon::parse($validated['event_date'], 'Asia/Kuala_Lumpur')->startOfDay();
+        $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
 
         if ($selectedPrayer === EventPrayerTime::SelepasJumaat && ! $eventDate->isFriday()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1166,7 +1199,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ]);
         }
 
-        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && ! $this->isRamadhan($eventDate)) {
+        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && ! $this->isRamadhan($eventDate, $timezone)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'data.prayer_time' => __('Selepas Tarawih hanya boleh dipilih semasa bulan Ramadhan.'),
             ]);
@@ -1230,8 +1263,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $prayerOffset = $prayerTime?->getDefaultOffset();
         $prayerDisplayText = $prayerTime && ! $prayerTime->isCustomTime() ? $prayerTime->getLabel() : null;
 
+        $this->validateEndsAtAfterStartsAt($validated, $startsAt, $timezone);
+
         // Validate that the resolved start time is not in the past
-        $now = Carbon::now('Asia/Kuala_Lumpur');
+        $now = Carbon::now($timezone);
         if ($startsAt->lessThanOrEqualTo($now)) {
             $errorField = $prayerTime?->isCustomTime() ? 'data.custom_time' : 'data.prayer_time';
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1243,8 +1278,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'title' => $validated['title'],
             'slug' => Str::slug($validated['title']).'-'.Str::random(6),
             'description' => $validated['description'] ?? null,
+            'timezone' => $timezone,
             'starts_at' => $startsAt,
-            'ends_at' => $this->resolveEndsAt($validated, $startsAt),
+            'ends_at' => $this->resolveEndsAt($validated, $startsAt, $timezone),
             'institution_id' => $targetInstitutionId,
             'venue_id' => $targetVenueId,
             'space_id' => $validated['space_id'] ?? null,
@@ -1389,11 +1425,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     /**
      * Resolve the starts_at datetime from event_date and prayer_time/custom_time.
      *
-     * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null}  $validated
+     * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null, timezone?: string|null}  $validated
      */
     protected function resolveStartsAt(array $validated): Carbon
     {
-        $eventDate = Carbon::parse($validated['event_date'], 'Asia/Kuala_Lumpur')->startOfDay();
+        $timezone = $this->resolveUserTimezone($validated['timezone'] ?? null);
+        $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
         $prayerTimeValue = $validated['prayer_time'] ?? '';
         $prayerTime = $prayerTimeValue instanceof EventPrayerTime
             ? $prayerTimeValue
@@ -1402,7 +1439,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         if ($prayerTime?->isCustomTime() && ! empty($validated['custom_time'])) {
             $time = Carbon::parse($validated['custom_time']);
 
-            return $eventDate->setTime($time->hour, $time->minute);
+            return $eventDate->setTime($time->hour, $time->minute)->utc();
         }
 
         $defaultTimes = $this->getDefaultPrayerTimes();
@@ -1410,7 +1447,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $timeString = $defaultTimes[$prayerTime?->value ?? ''] ?? '20:00';
         $time = Carbon::parse($timeString);
 
-        return $eventDate->setTime($time->hour, $time->minute);
+        return $eventDate->setTime($time->hour, $time->minute)->utc();
     }
 
     /**
@@ -1418,7 +1455,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
      *
      * @param  array{end_time?: string|null}  $validated
      */
-    protected function resolveEndsAt(array $validated, Carbon $startsAt): ?Carbon
+    protected function resolveEndsAt(array $validated, Carbon $startsAt, string $timezone): ?Carbon
     {
         $endTimeValue = $validated['end_time'] ?? null;
 
@@ -1427,8 +1464,45 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $time = Carbon::parse($endTimeValue);
+        $startInUserTimezone = $startsAt->copy()->setTimezone($timezone);
 
-        return $startsAt->copy()->setTime($time->hour, $time->minute);
+        return $startInUserTimezone->setTime($time->hour, $time->minute)->utc();
+    }
+
+    protected function validateEndsAtAfterStartsAt(array $validated, Carbon $startsAt, string $timezone): void
+    {
+        $endTimeValue = $validated['end_time'] ?? null;
+
+        if (! is_string($endTimeValue) || $endTimeValue === '') {
+            return;
+        }
+
+        $endTime = Carbon::parse($endTimeValue);
+        $startInUserTimezone = $startsAt->copy()->setTimezone($timezone);
+        $endInUserTimezone = $startInUserTimezone->copy()->setTime($endTime->hour, $endTime->minute);
+
+        if ($endInUserTimezone->lessThanOrEqualTo($startInUserTimezone)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.end_time' => __('Masa akhir mestilah selepas masa mula.'),
+            ]);
+        }
+    }
+
+    protected function resolveStartTimeForComparison(mixed $prayerTimeValue, mixed $customTime): ?string
+    {
+        $prayerTime = $prayerTimeValue instanceof EventPrayerTime
+            ? $prayerTimeValue
+            : EventPrayerTime::tryFrom((string) $prayerTimeValue);
+
+        if ($prayerTime?->isCustomTime()) {
+            return is_string($customTime) && $customTime !== '' ? $customTime : null;
+        }
+
+        if (! $prayerTime instanceof EventPrayerTime) {
+            return null;
+        }
+
+        return $this->getDefaultPrayerTimes()[$prayerTime->value] ?? null;
     }
 
     /**
@@ -1451,8 +1525,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
      * Check if a given date falls within Ramadhan.
      * This uses approximate Gregorian dates for Ramadhan periods.
      */
-    protected function isRamadhan(Carbon $date): bool
+    protected function isRamadhan(Carbon $date, ?string $timezone = null): bool
     {
+        $timezone = $this->resolveUserTimezone($timezone);
         $year = $date->year;
 
         // Ramadhan dates for common years (approximate)
@@ -1469,10 +1544,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $period = $ramadhanPeriods[$year];
-        $startDate = Carbon::parse("{$year}-{$period['start']}", 'Asia/Kuala_Lumpur')->startOfDay();
-        $endDate = Carbon::parse("{$year}-{$period['end']}", 'Asia/Kuala_Lumpur')->endOfDay();
+        $startDate = Carbon::parse("{$year}-{$period['start']}", $timezone)->startOfDay();
+        $endDate = Carbon::parse("{$year}-{$period['end']}", $timezone)->endOfDay();
 
         return $date->between($startDate, $endDate);
+    }
+
+    protected function resolveUserTimezone(?string $preferredTimezone = null): string
+    {
+        return UserTimezoneResolver::resolve(request(), $preferredTimezone);
     }
 
     /**

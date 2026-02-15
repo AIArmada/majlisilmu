@@ -52,6 +52,7 @@ function submitEventEndTimeFormData(array $fixtures, array $overrides = []): arr
         'speakers' => [$fixtures['speaker']->id],
         'submitter_name' => 'Test User',
         'submitter_email' => 'test@example.com',
+        'timezone' => 'Asia/Jakarta',
     ], $overrides);
 }
 
@@ -71,8 +72,9 @@ it('can submit event with optional end time', function () {
 
     $event = Event::where('title', 'Event With End Time')->firstOrFail();
     expect($event->ends_at)->not->toBeNull();
-    // Compare in the same timezone used in the form
-    expect($event->ends_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('21:30');
+    expect($event->timezone)->toBe('Asia/Jakarta');
+    expect($event->ends_at->timezone('Asia/Jakarta')->format('H:i'))->toBe('21:30');
+    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('14:30');
     // Verify ends_at has same date as starts_at
     expect($event->ends_at->toDateString())->toBe($event->starts_at->toDateString());
 });
@@ -111,8 +113,45 @@ it('can submit event with custom time and end time', function () {
         ->assertRedirect(route('submit-event.success'));
 
     $event = Event::where('title', 'Custom Time With End Time')->firstOrFail();
-    // Compare in the same timezone used in the form
-    expect($event->starts_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('10:00');
-    expect($event->ends_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('12:00');
+    expect($event->timezone)->toBe('Asia/Jakarta');
+    expect($event->starts_at->timezone('Asia/Jakarta')->format('H:i'))->toBe('10:00');
+    expect($event->ends_at->timezone('Asia/Jakarta')->format('H:i'))->toBe('12:00');
+    expect($event->starts_at->timezone('UTC')->format('H:i'))->toBe('03:00');
+    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('05:00');
     expect($event->ends_at->toDateString())->toBe($event->starts_at->toDateString());
+});
+
+it('rejects end time that is earlier than estimated prayer start time', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Prayer Time Invalid End Time',
+            'prayer_time' => EventPrayerTime::SelepasIsyak->value,
+            'end_time' => '21:00',
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.end_time']);
+
+    expect(Event::where('title', 'Prayer Time Invalid End Time')->exists())->toBeFalse();
+});
+
+it('rejects end time that is equal to start time', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Equal End Time Invalid',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '10:00',
+            'end_time' => '10:00',
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.end_time']);
+
+    expect(Event::where('title', 'Equal End Time Invalid')->exists())->toBeFalse();
 });

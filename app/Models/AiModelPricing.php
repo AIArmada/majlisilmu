@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class AiModelPricing extends Model
 {
+    /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;

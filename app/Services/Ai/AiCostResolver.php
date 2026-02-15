@@ -54,7 +54,7 @@ class AiCostResolver
             context: $context,
         );
 
-        if ($matchedPricing !== null) {
+        if ($matchedPricing instanceof \App\Models\AiModelPricing) {
             $cost = $this->calculateCostFromRates(
                 rates: [
                     'input_per_million' => $matchedPricing->input_per_million,
