@@ -155,3 +155,84 @@ it('rejects end time that is equal to start time', function () {
 
     expect(Event::where('title', 'Equal End Time Invalid')->exists())->toBeFalse();
 });
+
+it('stores 08:00PM local as 12:00 UTC in database', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'KL 8PM UTC 12 Test',
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'prayer_time' => EventPrayerTime::SelepasAsar->value,
+            'end_time' => '20:00',
+        ]),
+    )
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('submit-event.success'));
+
+    $event = Event::where('title', 'KL 8PM UTC 12 Test')->firstOrFail();
+
+    expect($event->timezone)->toBe('Asia/Kuala_Lumpur');
+    expect($event->ends_at)->not->toBeNull();
+    expect($event->ends_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('20:00');
+    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('12:00');
+});
+
+it('allows sebelum maghrib during ramadhan', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Ramadhan Sebelum Maghrib Valid',
+            'event_date' => '2026-03-01',
+            'prayer_time' => EventPrayerTime::SebelumMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'end_time' => '20:00',
+        ]),
+    )
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('submit-event.success'));
+
+    $event = Event::where('title', 'Ramadhan Sebelum Maghrib Valid')->firstOrFail();
+
+    expect($event->starts_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('19:45');
+    expect($event->starts_at->timezone('UTC')->format('H:i'))->toBe('11:45');
+});
+
+it('rejects sebelum maghrib outside ramadhan', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Non Ramadhan Sebelum Maghrib Invalid',
+            'event_date' => '2026-04-01',
+            'prayer_time' => EventPrayerTime::SebelumMaghrib->value,
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.prayer_time']);
+
+    expect(Event::where('title', 'Non Ramadhan Sebelum Maghrib Invalid')->exists())->toBeFalse();
+});
+
+it('rejects non-physical format for community event types', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Community Online Invalid',
+            'event_type' => [\App\Enums\EventType::Iftar->value],
+            'event_format' => EventFormat::Online->value,
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.event_format']);
+
+    expect(Event::where('title', 'Community Online Invalid')->exists())->toBeFalse();
+});

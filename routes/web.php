@@ -6,6 +6,7 @@ use App\Http\Controllers\Public\EventsController;
 use Illuminate\Support\Facades\Route;
 
 Route::livewire('/', 'pages.⚡home')->name('home');
+Route::livewire('/glm', \App\Livewire\Pages\Home\GlmHome::class)->name('home.glm');
 Route::get('/locale/{locale}', LocaleController::class)->name('locale.switch');
 
 // Socialite OAuth Routes

@@ -4,6 +4,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\TagType;
 use App\Forms\InstitutionFormSchema;
@@ -192,9 +193,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->required()
                                 ->multiple()
                                 ->closeOnSelect()
+                                ->live()
+                                ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                    if ($this->hasCommunityEventTypeSelection($state)) {
+                                        $set('event_format', EventFormat::Physical->value);
+                                    }
+                                })
                                 ->options(function (): array {
-                                    return collect(\App\Enums\EventType::cases())
-                                        ->mapToGroups(fn (\App\Enums\EventType $type) => [
+                                    return collect(EventType::cases())
+                                        ->mapToGroups(fn (EventType $type) => [
                                             $type->getGroup() => [$type->value => $type->getLabel()],
                                         ])
                                         ->map(fn ($group) => $group->collapse())
@@ -315,15 +322,23 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             return collect(EventPrayerTime::cases())
                                                 ->filter(function (EventPrayerTime $case) use ($eventDate) {
                                                     if (! $eventDate) {
-                                                        // No date selected — show base options only (no Jumaat/Tarawih)
-                                                        return ! in_array($case, [EventPrayerTime::SelepasJumaat, EventPrayerTime::SelepasTarawih], true);
+                                                        // No date selected — show base options only (no Jumaat/Tarawih/Ramadhan-only options)
+                                                        return ! in_array($case, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat, EventPrayerTime::SebelumMaghrib, EventPrayerTime::SelepasTarawih], true);
                                                     }
 
                                                     $timezone = $this->resolveUserTimezone();
                                                     $date = Carbon::parse($eventDate, $timezone)->startOfDay();
 
+                                                    if ($case === EventPrayerTime::SebelumJumaat) {
+                                                        return $date->isFriday();
+                                                    }
+
                                                     if ($case === EventPrayerTime::SelepasJumaat) {
                                                         return $date->isFriday();
+                                                    }
+
+                                                    if ($case === EventPrayerTime::SebelumMaghrib) {
+                                                        return $this->isRamadhan($date);
                                                     }
 
                                                     if ($case === EventPrayerTime::SelepasTarawih) {
@@ -340,6 +355,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     TimePicker::make('custom_time')
                                         ->label(__('Masa Mula'))
                                         ->helperText(__('Pilih masa mula majlis'))
+                                        ->timezone('UTC')
                                         ->native()
                                         ->seconds(false)
                                         ->minutesStep(5)
@@ -402,6 +418,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     TimePicker::make('end_time')
                                         ->label(__('Masa Akhir'))
                                         ->helperText(__('Pilihan: Bila majlis dijangka tamat.'))
+                                        ->timezone('UTC')
                                         ->native()
                                         ->seconds(false)
                                         ->minutesStep(5)
@@ -412,8 +429,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             const estimatedStartByPrayer = {
                                                 selepas_subuh: '06:30',
                                                 selepas_zuhur: '13:30',
+                                                sebelum_jumaat: '13:45',
                                                 selepas_jumaat: '14:00',
                                                 selepas_asar: '17:00',
+                                                sebelum_maghrib: '19:45',
                                                 selepas_maghrib: '20:00',
                                                 selepas_isyak: '21:30',
                                                 selepas_tarawih: '22:30',
@@ -476,6 +495,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->required()
                                         ->options(EventFormat::class)
                                         ->default(EventFormat::Physical)
+                                        ->disableOptionWhen(fn (string $value, Get $get): bool =>
+                                            $this->hasCommunityEventTypeSelection($get('event_type'))
+                                            && $value !== EventFormat::Physical->value
+                                        )
                                         ->inline(),
 
                                     Radio::make('visibility')
@@ -558,14 +581,30 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->default([101])
                                         ->options(function () {
                                             $preferredOrder = ['ms', 'ar', 'en', 'id', 'zh', 'ta', 'jv'];
+                                            $preferredLabels = [
+                                                'ms' => 'Bahasa Melayu',
+                                                'ar' => 'Bahasa Arab',
+                                                'en' => 'Bahasa Inggeris',
+                                                'id' => 'Bahasa Indonesia',
+                                                'zh' => 'Bahasa Cina',
+                                                'ta' => 'Bahasa Tamil',
+                                                'jv' => 'Bahasa Jawa',
+                                            ];
+
                                             $getLanguages = fn () => \Nnjeim\World\Models\Language::query()
                                                 ->whereIn('code', $preferredOrder)
                                                 ->get()
                                                 ->sortBy(fn ($lang) => array_search($lang->code, $preferredOrder))
-                                                ->pluck('name_native', 'id')
+                                                ->mapWithKeys(function ($lang) use ($preferredLabels): array {
+                                                    $label = $preferredLabels[$lang->code]
+                                                        ?? $lang->name
+                                                        ?? Str::upper($lang->code);
+
+                                                    return [$lang->id => $label];
+                                                })
                                                 ->toArray();
 
-                                            return Cache::remember('submit_languages', 3600, $getLanguages);
+                                            return Cache::remember('submit_languages_v2', 3600, $getLanguages);
                                         }),
 
                                     Toggle::make('children_allowed')
@@ -1186,6 +1225,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $startsAt = $this->resolveStartsAt($validated);
         $timezone = $this->resolveUserTimezone($validated['timezone'] ?? null);
 
+        if (
+            $this->hasCommunityEventTypeSelection($validated['event_type'] ?? [])
+            && (($validated['event_format'] ?? EventFormat::Physical->value) !== EventFormat::Physical->value)
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.event_format' => __('Jenis majlis komuniti mesti menggunakan format fizikal.'),
+            ]);
+        }
+
         // Validate contextual prayer time constraints (client-side filtering removed)
         $prayerTimeRaw = $validated['prayer_time'] ?? '';
         $selectedPrayer = $prayerTimeRaw instanceof EventPrayerTime
@@ -1193,9 +1241,18 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             : EventPrayerTime::tryFrom($prayerTimeRaw);
         $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
 
-        if ($selectedPrayer === EventPrayerTime::SelepasJumaat && ! $eventDate->isFriday()) {
+        if (
+            in_array($selectedPrayer, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat], true)
+            && ! $eventDate->isFriday()
+        ) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'data.prayer_time' => __('Selepas Jumaat hanya boleh dipilih untuk hari Jumaat.'),
+                'data.prayer_time' => __('Pilihan waktu Jumaat hanya boleh dipilih untuk hari Jumaat.'),
+            ]);
+        }
+
+        if ($selectedPrayer === EventPrayerTime::SebelumMaghrib && ! $this->isRamadhan($eventDate, $timezone)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.prayer_time' => __('Sebelum Maghrib hanya boleh dipilih semasa bulan Ramadhan.'),
             ]);
         }
 
@@ -1422,6 +1479,29 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ->all();
     }
 
+    protected function hasCommunityEventTypeSelection(mixed $eventTypes): bool
+    {
+        if ($eventTypes instanceof \Illuminate\Support\Collection) {
+            $eventTypes = $eventTypes->all();
+        }
+
+        if (! is_array($eventTypes)) {
+            $eventTypes = [$eventTypes];
+        }
+
+        foreach ($eventTypes as $eventTypeValue) {
+            $eventType = $eventTypeValue instanceof EventType
+                ? $eventTypeValue
+                : EventType::tryFrom((string) $eventTypeValue);
+
+            if ($eventType?->isCommunity()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Resolve the starts_at datetime from event_date and prayer_time/custom_time.
      *
@@ -1513,8 +1593,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         return [
             EventPrayerTime::SelepasSubuh->value => '06:30',
             EventPrayerTime::SelepasZuhur->value => '13:30',
+            EventPrayerTime::SebelumJumaat->value => '13:45',
             EventPrayerTime::SelepasJumaat->value => '14:00',
             EventPrayerTime::SelepasAsar->value => '17:00',
+            EventPrayerTime::SebelumMaghrib->value => '19:45',
             EventPrayerTime::SelepasMaghrib->value => '20:00',
             EventPrayerTime::SelepasIsyak->value => '21:30',
             EventPrayerTime::SelepasTarawih->value => '22:30',

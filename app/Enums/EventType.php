@@ -14,6 +14,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     case Forum = 'forum';
     case SeminarKonvensyen = 'seminar_konvensyen';
     case Tazkirah = 'tazkirah';
+    case KhutbahJumaat = 'khutbah_jumaat';
 
     // Ibadah
     case Qiamullail = 'qiamullail';
@@ -50,6 +51,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
             self::Forum => __('Forum'),
             self::SeminarKonvensyen => __('Seminar / Konvensyen'),
             self::Tazkirah => __('Tazkirah'),
+            self::KhutbahJumaat => __('Khutbah Jumaat'),
             self::Qiamullail => __('Qiamullail'),
             self::Tahlil => __('Tahlil'),
             self::SolatHajat => __('Solat Hajat'),
@@ -73,7 +75,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     public function getGroup(): string
     {
         return match ($this) {
-            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah => __('Ilmu'),
+            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah, self::KhutbahJumaat => __('Ilmu'),
             self::Qiamullail, self::Tahlil, self::SolatHajat => __('Ibadah'),
             self::Zikir, self::Selawat, self::DoaSelamat => __('Zikir & Doa'),
             self::BacaanYasin, self::KhatamQuran, self::Tilawah, self::HafazanQuran => __('Tilawah'),
@@ -85,7 +87,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     public function getColor(): string
     {
         return match ($this) {
-            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah => 'info',
+            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah, self::KhutbahJumaat => 'info',
             self::Qiamullail, self::Tahlil, self::SolatHajat => 'success',
             self::Zikir, self::Selawat, self::DoaSelamat => 'primary',
             self::BacaanYasin, self::KhatamQuran, self::Tilawah, self::HafazanQuran => 'success',
@@ -102,6 +104,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
             self::Forum => 'heroicon-m-chat-bubble-left-right',
             self::SeminarKonvensyen => 'heroicon-m-academic-cap',
             self::Tazkirah => 'heroicon-m-megaphone',
+            self::KhutbahJumaat => 'heroicon-m-megaphone',
             self::Qiamullail, self::SolatHajat => 'heroicon-m-moon',
             self::Tahlil => 'heroicon-m-heart',
             self::Zikir, self::Selawat => 'heroicon-m-sparkles',
@@ -111,6 +114,14 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
             self::Kenduri, self::Iftar, self::Sahur => 'heroicon-m-cake',
             self::Korban, self::Aqiqah => 'heroicon-m-gift',
             self::Other => 'heroicon-m-ellipsis-horizontal-circle',
+        };
+    }
+
+    public function isCommunity(): bool
+    {
+        return match ($this) {
+            self::GotongRoyong, self::Kenduri, self::Iftar, self::Sahur, self::Korban, self::Aqiqah => true,
+            default => false,
         };
     }
 }
