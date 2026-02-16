@@ -208,7 +208,7 @@
 
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach($featuredEvents as $event)
-                    <a href="{{ route('events.show', $event->slug) }}" wire:navigate
+                    <a href="{{ route('events.show', $event) }}" wire:navigate
                         class="group bg-white rounded-2xl overflow-hidden border border-slate-200 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-100/50 transition-all">
                         <!-- Event Image -->
                         <div class="relative h-48 bg-gradient-to-br from-emerald-100 to-teal-100 overflow-hidden">

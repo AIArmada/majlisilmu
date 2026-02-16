@@ -32,7 +32,7 @@ it('enforces capacity using live registration rows when counter is stale', funct
 
     $response = $this
         ->withSession(['_token' => 'test-token'])
-        ->post("/events/{$event->slug}/register", [
+        ->post(route('events.register', $event), [
             '_token' => 'test-token',
             'name' => 'New Registrant',
             'email' => 'new@example.com',
@@ -66,7 +66,7 @@ it('requires session selection when registration mode is per-session', function 
 
     $response = $this
         ->withSession(['_token' => 'test-token'])
-        ->post("/events/{$event->slug}/register", [
+        ->post(route('events.register', $event), [
             '_token' => 'test-token',
             'name' => 'Registrant',
             'email' => 'session-required@example.com',
@@ -106,7 +106,7 @@ it('enforces uniqueness per session in per-session registration mode', function 
 
     $first = $this
         ->withSession(['_token' => 'test-token'])
-        ->post("/events/{$event->slug}/register", [
+        ->post(route('events.register', $event), [
             '_token' => 'test-token',
             'name' => 'Registrant',
             'email' => 'same@example.com',
@@ -117,7 +117,7 @@ it('enforces uniqueness per session in per-session registration mode', function 
 
     $duplicateInSameSession = $this
         ->withSession(['_token' => 'test-token'])
-        ->post("/events/{$event->slug}/register", [
+        ->post(route('events.register', $event), [
             '_token' => 'test-token',
             'name' => 'Registrant Again',
             'email' => 'same@example.com',
@@ -128,7 +128,7 @@ it('enforces uniqueness per session in per-session registration mode', function 
 
     $sameContactDifferentSession = $this
         ->withSession(['_token' => 'test-token'])
-        ->post("/events/{$event->slug}/register", [
+        ->post(route('events.register', $event), [
             '_token' => 'test-token',
             'name' => 'Registrant Other Session',
             'email' => 'same@example.com',

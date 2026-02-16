@@ -50,7 +50,7 @@ class SeriesFactory extends Factory
 
         return [
             'title' => $title,
-            'slug' => Str::slug($title.'-'.Str::random(8)),
+            'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),
             'description' => fake()->optional()->paragraph(),
             'visibility' => fake()->randomElement(['public', 'unlisted', 'private']),
             'is_active' => true,

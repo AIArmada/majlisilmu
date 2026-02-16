@@ -78,7 +78,7 @@ new class extends Component
                                                 </div>
                                             @endif
                                             <div class="absolute top-2 left-2 inline-flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 shadow-sm border border-white/50 min-w-[3rem]">
-                                                <span class="text-[0.6rem] font-bold text-slate-400 uppercase tracking-wider">{{ $event->starts_at?->format('M') }}</span>
+                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ $event->starts_at?->format('M') }}</span>
                                                 <span class="text-lg font-black text-slate-900 leading-none">{{ $event->starts_at?->format('d') }}</span>
                                             </div>
                                         </div>

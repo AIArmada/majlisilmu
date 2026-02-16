@@ -8,9 +8,11 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -47,6 +49,8 @@ class User extends Authenticatable implements FilamentUser
             $user->savedSearches()->each(fn ($search) => $search->delete());
             $user->notificationEndpoints()->each(fn ($endpoint) => $endpoint->delete());
             $user->notificationPreferences()->each(fn ($preference) => $preference->delete());
+
+            \Illuminate\Support\Facades\DB::table('followings')->where('user_id', $user->id)->delete();
         });
     }
 
@@ -169,6 +173,44 @@ class User extends Authenticatable implements FilamentUser
     public function savedEvents(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_saves')->withTimestamps();
+    }
+
+    /**
+     * @return MorphToMany<Speaker, $this>
+     */
+    public function followingSpeakers(): MorphToMany
+    {
+        return $this->morphedByMany(Speaker::class, 'followable', 'followings')
+            ->withTimestamps();
+    }
+
+    public function follow(Model $followable): void
+    {
+        \Illuminate\Support\Facades\DB::table('followings')->insertOrIgnore([
+            'user_id' => $this->id,
+            'followable_id' => $followable->getKey(),
+            'followable_type' => $followable->getMorphClass(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function unfollow(Model $followable): void
+    {
+        \Illuminate\Support\Facades\DB::table('followings')
+            ->where('user_id', $this->id)
+            ->where('followable_id', $followable->getKey())
+            ->where('followable_type', $followable->getMorphClass())
+            ->delete();
+    }
+
+    public function isFollowing(Model $followable): bool
+    {
+        return \Illuminate\Support\Facades\DB::table('followings')
+            ->where('user_id', $this->id)
+            ->where('followable_id', $followable->getKey())
+            ->where('followable_type', $followable->getMorphClass())
+            ->exists();
     }
 
     /**

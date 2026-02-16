@@ -2,10 +2,21 @@
 
 use App\Models\Speaker;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new class extends Component {
+    use WithPagination;
+
     public Speaker $speaker;
+
+    public int $upcomingPerPage = 6;
+
+    public int $pastPerPage = 6;
+
+    public bool $isFollowing = false;
 
     public function mount(Speaker $speaker): void
     {
@@ -15,207 +26,714 @@ new class extends Component {
 
         $speaker->load([
             'media',
-            'events' => function ($query) {
-                $query->where('status', 'approved')
-                    ->where('visibility', 'public')
-                    ->where('starts_at', '>=', now())
-                    ->orderBy('starts_at', 'asc')
-                    ->take(5);
-            },
             'socialMedia',
+            'address.state',
+            'address.city',
+            'address.country',
+            'institutions' => fn ($q) => $q->orderByPivot('is_primary', 'desc')->limit(3),
+            'institutions.media',
         ]);
 
         $this->speaker = $speaker;
+        $this->isFollowing = auth()->user()?->isFollowing($speaker) ?? false;
     }
 
-    public function rendering($view)
+    public function toggleFollow(): void
     {
-        $view->title($this->speaker->name . ' - ' . config('app.name'));
+        $user = auth()->user();
+
+        if (! $user) {
+            $this->redirect(route('login'), navigate: true);
+
+            return;
+        }
+
+        if ($this->isFollowing) {
+            $user->unfollow($this->speaker);
+            $this->isFollowing = false;
+        } else {
+            $user->follow($this->speaker);
+            $this->isFollowing = true;
+        }
+    }
+
+    public function loadMoreUpcoming(): void
+    {
+        $this->upcomingPerPage += 6;
+    }
+
+    public function loadMorePast(): void
+    {
+        $this->pastPerPage += 6;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
+     */
+    public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->speaker->events()
+            ->where('status', 'approved')
+            ->where('visibility', 'public')
+            ->where('starts_at', '>=', now())
+            ->with([
+                'institution',
+                'venue.address.state',
+                'venue.address.district',
+                'venue.address.subdistrict',
+                'media',
+            ])
+            ->orderBy('starts_at', 'asc')
+            ->take($this->upcomingPerPage)
+            ->get();
+    }
+
+    public function getUpcomingTotalProperty(): int
+    {
+        return $this->speaker->events()
+            ->where('status', 'approved')
+            ->where('visibility', 'public')
+            ->where('starts_at', '>=', now())
+            ->count();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
+     */
+    public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->speaker->events()
+            ->where('status', 'approved')
+            ->where('visibility', 'public')
+            ->where('starts_at', '<', now())
+            ->with([
+                'institution',
+                'venue.address.state',
+                'venue.address.district',
+                'venue.address.subdistrict',
+                'media',
+            ])
+            ->orderBy('starts_at', 'desc')
+            ->take($this->pastPerPage)
+            ->get();
+    }
+
+    public function getPastTotalProperty(): int
+    {
+        return $this->speaker->events()
+            ->where('status', 'approved')
+            ->where('visibility', 'public')
+            ->where('starts_at', '<', now())
+            ->count();
+    }
+
+    public function rendering($view): void
+    {
+        $view->title($this->speaker->formatted_name . ' - ' . config('app.name'));
     }
 };
 ?>
 
 @php
     $speaker = $this->speaker;
-    $mainUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
+    $upcomingEvents = $this->upcomingEvents;
+    $pastEvents = $this->pastEvents;
+    $upcomingTotal = $this->upcomingTotal;
+    $pastTotal = $this->pastTotal;
+
+    $avatarUrl = $speaker->hasMedia('avatar')
+        ? $speaker->getFirstMediaUrl('avatar', 'profile')
+        : $speaker->default_avatar_url;
+    $coverUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
     $gallery = $speaker->getMedia('gallery');
-    $websiteUrl = $speaker->socialMedia->firstWhere('platform', 'website')?->url;
-    $facebookUrl = $speaker->socialMedia->firstWhere('platform', 'facebook')?->url;
-    $instagramUrl = $speaker->socialMedia->firstWhere('platform', 'instagram')?->url;
-    $youtubeUrl = $speaker->socialMedia->firstWhere('platform', 'youtube')?->url;
     $bioHtml = is_array($speaker->bio)
         ? RichContentRenderer::make($speaker->bio)->toHtml()
         : $speaker->bio;
+    $bioExcerpt = filled($bioHtml) ? Str::limit(strip_tags($bioHtml), 180) : null;
+
+    // Social media
+    $socialLinks = $speaker->socialMedia->mapWithKeys(fn ($s) => [$s->platform => $s->url]);
+
+    // Institutions (primary first, max 3)
+    $institutions = $speaker->institutions;
+
+    // Qualifications
+    $qualifications = is_array($speaker->qualifications) ? $speaker->qualifications : [];
+
+    // Location
+    $locationParts = array_filter([
+        $speaker->addressModel?->city?->name,
+        $speaker->addressModel?->state?->name,
+        $speaker->addressModel?->country?->name,
+    ]);
+    $locationString = implode(', ', $locationParts);
+
+    // Event type label
+    $resolveEventTypeLabel = static function (mixed $eventType): string {
+        if ($eventType instanceof \Illuminate\Support\Collection) {
+            $eventType = $eventType->first();
+        } elseif (is_array($eventType)) {
+            $eventType = $eventType[0] ?? null;
+        }
+        if ($eventType instanceof \App\Enums\EventType) {
+            return $eventType->getLabel();
+        }
+        if (is_string($eventType) && $eventType !== '') {
+            return \App\Enums\EventType::tryFrom($eventType)?->getLabel() ?? __('Umum');
+        }
+        return __('Umum');
+    };
+
+    // Venue location helper — state, district, subdistrict
+    $resolveVenueLocation = static function (\App\Models\Event $event): string {
+        $venue = $event->venue;
+        if (! $venue) {
+            return '';
+        }
+        $address = $venue->addressModel;
+        if (! $address) {
+            return $venue->name;
+        }
+        $parts = array_filter([
+            $venue->name,
+            $address->subdistrict?->name,
+            $address->district?->name,
+            $address->state?->name,
+        ]);
+        return implode(', ', $parts);
+    };
+
+    // Calendar data: map events to dates for the calendar view
+    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(fn ($e) => [
+        'id' => $e->id,
+        'title' => $e->title,
+        'url' => route('events.show', $e),
+        'type' => $resolveEventTypeLabel($e->event_type),
+    ])->values())->toArray();
 @endphp
 
+<div class="min-h-screen bg-slate-50/80">
 
-
-<div class="bg-slate-50 min-h-screen">
-    <!-- Banner -->
-    <div class="h-64 lg:h-80 bg-slate-900 relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/50 to-slate-900/90 z-10"></div>
-        <!-- Pattern -->
-        <div class="absolute inset-0 opacity-20"
-            style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 300px;"></div>
-    </div>
-
-    <div class="container mx-auto px-6 lg:px-12 relative z-20 -mt-32 pb-20">
-        <div
-            class="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col md:flex-row gap-8 items-start">
-            <!-- Photo -->
-            <div
-                class="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white border-4 border-white shadow-lg flex-shrink-0 overflow-hidden relative bg-slate-100">
-                <img src="{{ $speaker->hasMedia('avatar') ? $speaker->getFirstMediaUrl('avatar', 'profile') : $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
-                    class="w-full h-full object-cover" width="192" height="192">
-            </div>
-
-            <div class="flex-grow pt-4">
-                <h1 class="font-heading text-3xl md:text-5xl font-bold text-slate-900 mb-2">
-                    {{ $speaker->formatted_name }}
-                </h1>
-
-                <div class="flex flex-wrap gap-4 mt-4">
-                    @if($websiteUrl)
-                        <a href="{{ $websiteUrl }}" target="_blank"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 transition-colors">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                            </svg>
-                            {{ __('Website') }}
-                        </a>
-                    @endif
-                    @if($facebookUrl)
-                        <a href="{{ $facebookUrl }}" target="_blank"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-600 font-medium hover:bg-blue-100 transition-colors">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                            </svg>
-                            {{ __('Facebook') }}
-                        </a>
-                    @endif
-                    @if($instagramUrl)
-                        <a href="{{ $instagramUrl }}" target="_blank"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-50 text-pink-600 font-medium hover:bg-pink-100 transition-colors">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm0 1.818c-4.518 0-8.182 3.664-8.182 8.182 0 4.518 3.664 8.182 8.182 8.182 4.518 0 8.182-3.664 8.182-8.182 0-4.518-3.664-8.182-8.182-8.182zm0 3.636c2.51 0 4.545 2.036 4.545 4.546 0 2.51-2.036 4.545-4.546 4.545-2.51 0-4.545-2.035-4.545-4.545 0-2.51 2.035-4.546 4.545-4.546zm0 1.819a2.727 2.727 0 100 5.454 2.727 2.727 0 000-5.454zM17.455 6.545a1.091 1.091 0 110 2.182 1.091 1.091 0 010-2.182z" />
-                            </svg>
-                            {{ __('Instagram') }}
-                        </a>
-                    @endif
-                    @if($youtubeUrl)
-                        <a href="{{ $youtubeUrl }}" target="_blank"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-600 font-medium hover:bg-red-100 transition-colors">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
-                            </svg>
-                            {{ __('YouTube') }}
-                        </a>
-                    @endif
-                </div>
-            </div>
+    {{-- ═══════════════════════════════════════════════════════════
+         CINEMATIC HERO — Dramatic, layered depth with atmosphere
+    ═══════════════════════════════════════════════════════════ --}}
+    <header class="relative isolate overflow-hidden bg-slate-950" style="min-height: 300px">
+        {{-- Ambient gradient background orbs --}}
+        <div class="pointer-events-none absolute inset-0">
+            <div class="absolute -top-24 left-[15%] h-[28rem] w-[28rem] rounded-full bg-emerald-600/20 blur-[120px]"></div>
+            <div class="absolute -bottom-20 right-[10%] h-[22rem] w-[22rem] rounded-full bg-gold-500/15 blur-[100px]"></div>
+            <div class="absolute top-10 right-[40%] h-[18rem] w-[18rem] rounded-full bg-teal-500/10 blur-[80px]"></div>
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-8 mt-8">
-            <div class="lg:col-span-2 space-y-8">
-                @if($mainUrl)
-                    <div class="rounded-3xl overflow-hidden bg-slate-100 shadow-sm border border-slate-100 relative group">
-                    <img src="{{ $mainUrl }}" alt="{{ $speaker->name }}"
-                            class="w-full h-auto shadow-sm transition-transform duration-1000 group-hover:scale-[1.01]" loading="lazy">
-                        <div
-                            class="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-60 pointer-events-none">
-                        </div>
+        {{-- Cover image or atmospheric fallback --}}
+        @if($coverUrl)
+            <img src="{{ $coverUrl }}" alt="" class="absolute inset-0 h-full w-full object-cover opacity-30 mix-blend-luminosity" loading="eager">
+        @endif
+        {{-- Islamic geometric pattern overlay --}}
+        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 200px;"></div>
+        {{-- Bottom gradient fade --}}
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
+        {{-- Side vignette for depth --}}
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.4)_100%)]"></div>
+
+        {{-- Breadcrumb --}}
+        <div class="container relative z-10 mx-auto max-w-6xl px-6 pt-8 lg:px-8">
+            <nav class="animate-fade-in-up flex items-center gap-2 text-sm" style="animation-delay: 100ms; opacity: 0;">
+                <a href="{{ route('speakers.index') }}" wire:navigate class="text-slate-400/80 transition-colors duration-300 hover:text-white">{{ __('Penceramah') }}</a>
+                <svg class="h-3.5 w-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                <span class="max-w-[200px] truncate text-slate-300/60">{{ $speaker->name }}</span>
+            </nav>
+        </div>
+
+        {{-- Hero content: Avatar + Name side-by-side on the hero --}}
+        <div class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 pb-6 pt-6 sm:flex-row sm:items-end sm:gap-8 lg:px-8 lg:pb-8 lg:pt-8">
+            {{-- Avatar with decorative ring --}}
+            <div class="animate-scale-in relative shrink-0" style="animation-delay: 200ms; opacity: 0;">
+                <div class="absolute -inset-1.5 rounded-[1.25rem] bg-gradient-to-br from-emerald-400/40 via-gold-400/30 to-emerald-600/40 blur-sm"></div>
+                <div class="relative h-32 w-32 overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-800 shadow-2xl shadow-black/40 ring-1 ring-white/10 sm:h-40 sm:w-40">
+                    <img src="{{ $avatarUrl }}" alt="{{ $speaker->name }}" class="h-full w-full object-cover" width="160" height="160">
+                </div>
+                @if($speaker->gender)
+                    <span class="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl border-2 border-slate-950 bg-gradient-to-br from-emerald-500 to-emerald-700 text-xs text-white shadow-lg" title="{{ $speaker->gender === 'male' ? __('Lelaki') : __('Perempuan') }}">
+                        @if($speaker->gender === 'male')
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="10" cy="14" r="5"/><path d="M15 9l5-5m0 0h-4m4 0v4"/></svg>
+                        @else
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="10" r="5"/><path d="M12 15v6m-3-3h6"/></svg>
+                        @endif
+                    </span>
+                @endif
+            </div>
+
+            {{-- Name & title on the hero --}}
+            <div class="animate-fade-in-up text-center sm:text-left" style="animation-delay: 350ms; opacity: 0;">
+                @if($speaker->job_title)
+                    <p class="mb-1.5 text-sm font-medium tracking-wide text-emerald-400/90">{{ $speaker->job_title }}</p>
+                @endif
+                <h1 class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                    {{ $speaker->formatted_name }}
+                </h1>
+                {{-- Decorative gold line --}}
+                <div class="mx-auto mt-3 h-0.5 w-16 rounded-full bg-gradient-to-r from-gold-400/80 to-gold-600/40 sm:mx-0"></div>
+
+                {{-- Institution affiliation --}}
+                @if($institutions->isNotEmpty())
+                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                        @foreach($institutions as $inst)
+                            @php
+                                $position = $inst->pivot->position;
+                                $isPrimary = $inst->pivot->is_primary;
+                                $logoUrl = $inst->getFirstMediaUrl('logo', 'thumb');
+                            @endphp
+                            <a href="{{ route('institutions.show', $inst) }}" wire:navigate
+                               class="group inline-flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-sm transition-all duration-200 hover:border-emerald-400/30 hover:bg-white/10">
+                                @if($logoUrl)
+                                    <img src="{{ $logoUrl }}" alt="{{ $inst->name }}" class="h-5 w-5 shrink-0 rounded object-contain">
+                                @else
+                                    <svg class="h-4 w-4 shrink-0 text-emerald-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>
+                                @endif
+                                <span class="flex flex-col leading-tight">
+                                    <span class="text-xs font-semibold text-white/90 group-hover:text-emerald-300 transition-colors duration-200">{{ $inst->name }}</span>
+                                    @if($position)
+                                        <span class="text-[10px] text-slate-400/80">{{ $position }}</span>
+                                    @endif
+                                </span>
+                                @if($isPrimary)
+                                    <span class="ml-0.5 inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" title="{{ __('Institusi Utama') }}"></span>
+                                @endif
+                            </a>
+                        @endforeach
                     </div>
                 @endif
 
-                @if(filled($bioHtml))
-                    <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-                        <h2 class="font-heading text-xl font-bold text-slate-900 mb-4">{{ __('Bio') }}</h2>
-                        <div class="prose prose-slate max-w-none">
-                            {!! $bioHtml !!}
-                        </div>
+                {{-- Follow button + quick badges --}}
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
+                    {{-- Follow button --}}
+                    <button wire:click="toggleFollow" wire:loading.attr="disabled"
+                            class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 {{ $this->isFollowing ? 'border border-emerald-400/40 bg-emerald-500/20 text-emerald-300 hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-300' : 'border border-white/15 bg-white/10 text-white hover:border-emerald-400/40 hover:bg-emerald-500/20 hover:text-emerald-300' }} backdrop-blur-sm"
+                            x-data="{ hovering: false }"
+                            @mouseenter="hovering = true"
+                            @mouseleave="hovering = false">
+                        @if($this->isFollowing)
+                            <template x-if="!hovering">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                    {{ __('Mengikuti') }}
+                                </span>
+                            </template>
+                            <template x-if="hovering">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    {{ __('Nyahikut') }}
+                                </span>
+                            </template>
+                        @else
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                            {{ __('Ikuti') }}
+                        @endif
+                    </button>
+                    @if($locationString)
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                            <svg class="h-3 w-3 text-emerald-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                            {{ $locationString }}
+                        </span>
+                    @endif
+                    @if($speaker->is_freelance)
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-gold-500/20 bg-gold-500/10 px-3 py-1 text-xs font-semibold text-gold-300 backdrop-blur-sm">
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                            {{ __('Bebas / Freelance') }}
+                        </span>
+                    @endif
+                </div>
+
+                {{-- Social links --}}
+                @if($socialLinks->isNotEmpty())
+                    <div class="mt-3 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
+                        @if($socialLinks->has('website'))
+                            <a href="{{ $socialLinks->get('website') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/10 hover:text-white" title="{{ __('Laman Web') }}">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
+                            </a>
+                        @endif
+                        @if($socialLinks->has('facebook'))
+                            <a href="{{ $socialLinks->get('facebook') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-blue-500/20 hover:text-blue-300" title="{{ __('Facebook') }}">
+                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                            </a>
+                        @endif
+                        @if($socialLinks->has('instagram'))
+                            <a href="{{ $socialLinks->get('instagram') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-pink-500/20 hover:text-pink-300" title="{{ __('Instagram') }}">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>
+                            </a>
+                        @endif
+                        @if($socialLinks->has('youtube'))
+                            <a href="{{ $socialLinks->get('youtube') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-red-500/20 hover:text-red-300" title="{{ __('YouTube') }}">
+                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                            </a>
+                        @endif
+                        @if($socialLinks->has('twitter') || $socialLinks->has('x'))
+                            <a href="{{ $socialLinks->get('twitter') ?? $socialLinks->get('x') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/10 hover:text-white" title="{{ __('X') }}">
+                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            </a>
+                        @endif
+                        @if($socialLinks->has('tiktok'))
+                            <a href="{{ $socialLinks->get('tiktok') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/10 hover:text-white" title="{{ __('TikTok') }}">
+                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48V13a8.28 8.28 0 005.58 2.15V11.7a4.84 4.84 0 01-3.77-1.78v-.01l.01-.01V6.69h3.76z"/></svg>
+                            </a>
+                        @endif
+                        @if($socialLinks->has('telegram'))
+                            <a href="{{ $socialLinks->get('telegram') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-sky-500/20 hover:text-sky-300" title="{{ __('Telegram') }}">
+                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                            </a>
+                        @endif
                     </div>
                 @endif
+            </div>
+        </div>
+        {{-- Bottom edge accent --}}
+        <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent"></div>
+    </header>
 
-                <!-- Gallery Section -->
-                @if($gallery->count() > 0)
-                    <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-                        <h2 class="font-heading text-xl font-bold text-slate-900 mb-4">{{ __('Gallery') }}</h2>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            @foreach($gallery as $image)
-                                <div
-                                    class="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-zoom-in">
-                                    <img src="{{ $image->getAvailableUrl(['gallery_thumb']) }}" alt="{{ __('Gallery Image') }}"
-                                        class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy">
-                                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                                </div>
-                            @endforeach
+    {{-- ═══════════════════════════════════════════════════════════
+         MAIN CONTENT — Events-first layout
+    ═══════════════════════════════════════════════════════════ --}}
+    <div class="container mx-auto mt-4 max-w-5xl px-6 pb-12 lg:px-8">
+        <div class="space-y-12">
+
+            {{-- ─── UPCOMING EVENTS (Primary section) ─── --}}
+            <section class="animate-fade-in-up" style="animation-delay: 500ms; opacity: 0;"
+                     x-data="{ view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
+                <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Jadual Akan Datang') }}</h2>
+                            <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-emerald-500 to-transparent"></div>
                         </div>
                     </div>
-                @endif
 
-                <!-- Upcoming Events -->
-                <div>
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Upcoming Engagements') }}</h2>
-                    </div>
-
-                    @if($speaker->events->isEmpty())
-                        <div class="bg-white rounded-3xl p-8 text-center border border-slate-100">
-                            <p class="text-slate-500">{{ __('No upcoming events scheduled at the moment.') }}</p>
+                    {{-- View toggle --}}
+                    @if($upcomingEvents->isNotEmpty())
+                        <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
+                            <button @click="view = 'list'" :class="view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+                                {{ __('Senarai') }}
+                            </button>
+                            <button @click="view = 'calendar'" :class="view === 'calendar' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"/></svg>
+                                {{ __('Kalendar') }}
+                            </button>
                         </div>
-                    @else
+                    @endif
+                </div>
+
+                @if($upcomingEvents->isEmpty())
+                    <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 p-12 text-center">
+                        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
+                            <svg class="h-8 w-8 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                        </div>
+                        <p class="text-base font-semibold text-slate-500">{{ __('Tiada majlis dijadualkan buat masa ini') }}</p>
+                        <p class="mt-1 text-sm text-slate-400">{{ __('Semak semula nanti untuk kemas kini terbaru.') }}</p>
+                    </div>
+                @else
+                    {{-- LIST VIEW --}}
+                    <div x-show="view === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
                         <div class="space-y-4">
-                            @foreach($speaker->events as $event)
-                                <a href="{{ route('events.show', $event) }}" wire:navigate
-                                    class="block bg-white rounded-2xl p-4 border border-slate-100 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/5 transition-all group">
-                                    <div class="flex gap-4">
-                                        <div
-                                            class="h-20 w-20 rounded-xl bg-slate-100 flex flex-col items-center justify-center text-center flex-shrink-0">
-                                            <span
-                                                class="text-xs font-bold text-slate-400 uppercase">{{ $event->starts_at?->format('M') }}</span>
-                                            <span
-                                                class="text-xl font-black text-slate-900">{{ $event->starts_at?->format('d') }}</span>
+                            @foreach($upcomingEvents as $event)
+                                @php
+                                    $venueLocation = $resolveVenueLocation($event);
+                                @endphp
+                                <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="upcoming-{{ $event->id }}"
+                                   class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
+                                    {{-- Date accent sidebar --}}
+                                    <div class="flex w-20 shrink-0 flex-col items-center justify-center bg-gradient-to-b from-emerald-600 to-emerald-800 p-3 text-white sm:w-24">
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-emerald-200/80">{{ $event->starts_at?->translatedFormat('l') }}</span>
+                                        <span class="font-heading text-3xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
+                                        <span class="mt-0.5 text-[13px] font-bold tracking-wide text-emerald-200/80">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                    </div>
+                                    {{-- Event details --}}
+                                    <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
+                                                {{ $resolveEventTypeLabel($event->event_type) }}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <h3
-                                                class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors line-clamp-1">
-                                                {{ $event->title }}
-                                            </h3>
-                                            <div class="flex items-center gap-2 text-sm text-slate-500 mt-1">
-                                                <span>{{ $event->starts_at?->format('h:i A') }}</span>
-                                                <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span>{{ $event->institution?->name ?? __('Online') }}</span>
+                                        <h3 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-emerald-700 sm:text-lg">
+                                            {{ $event->title }}
+                                        </h3>
+                                        <div class="space-y-1 text-sm text-slate-500">
+                                            <div class="flex items-center gap-1.5">
+                                                <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                {{ $event->starts_at?->format('h:i A') }}
+                                                @if($event->ends_at)
+                                                    <span class="text-slate-300">–</span> {{ $event->ends_at?->format('h:i A') }}
+                                                @endif
                                             </div>
+                                            @if($venueLocation)
+                                                <div class="flex items-center gap-1.5">
+                                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                                    <span class="line-clamp-1">{{ $venueLocation }}</span>
+                                                </div>
+                                            @elseif($event->institution)
+                                                <div class="flex items-center gap-1.5">
+                                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
+                                                    {{ $event->institution->name }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    {{-- Arrow indicator --}}
+                                    <div class="hidden items-center pr-5 sm:flex">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all duration-300 group-hover:bg-emerald-100 group-hover:text-emerald-600">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                                         </div>
                                     </div>
                                 </a>
                             @endforeach
                         </div>
-                    @endif
-                </div>
-            </div>
 
-            <div class="space-y-6">
-                @if($speaker->email)
-                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-                        <h3 class="font-heading text-lg font-bold text-slate-900 mb-4">{{ __('Contact') }}</h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center gap-3">
-                                <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                                <a href="mailto:{{ $speaker->email }}"
-                                    class="text-emerald-600 hover:text-emerald-700 font-medium">{{ $speaker->email }}</a>
+                        {{-- Load more --}}
+                        @if($upcomingTotal > $upcomingEvents->count())
+                            <div class="mt-6 text-center">
+                                <button wire:click="loadMoreUpcoming" wire:loading.attr="disabled"
+                                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50">
+                                    <span wire:loading.remove wire:target="loadMoreUpcoming">{{ __('Lihat Lagi') }} ({{ $upcomingTotal - $upcomingEvents->count() }} {{ __('lagi') }})</span>
+                                    <span wire:loading wire:target="loadMoreUpcoming" class="inline-flex items-center gap-2">
+                                        <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                        {{ __('Memuatkan...') }}
+                                    </span>
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- CALENDAR VIEW --}}
+                    <div x-show="view === 'calendar'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+                        <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+                            {{-- Calendar header --}}
+                            <div class="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent px-5 py-3">
+                                <button @click="calendarMonth--; if(calendarMonth < 0) { calendarMonth = 11; calendarYear--; }" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                                </button>
+                                <h3 class="text-sm font-bold text-slate-700" x-text="new Date(calendarYear, calendarMonth).toLocaleDateString('{{ app()->getLocale() }}', { month: 'long', year: 'numeric' })"></h3>
+                                <button @click="calendarMonth++; if(calendarMonth > 11) { calendarMonth = 0; calendarYear++; }" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                                </button>
+                            </div>
+                            {{-- Day headers --}}
+                            <div class="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
+                                <template x-for="day in ['{{ __('Isn') }}','{{ __('Sel') }}','{{ __('Rab') }}','{{ __('Kha') }}','{{ __('Jum') }}','{{ __('Sab') }}','{{ __('Ahd') }}']">
+                                    <div class="py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400" x-text="day"></div>
+                                </template>
+                            </div>
+                            {{-- Calendar grid --}}
+                            <div class="grid grid-cols-7">
+                                <template x-for="(cell, idx) in (() => {
+                                    const first = new Date(calendarYear, calendarMonth, 1);
+                                    const lastDay = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+                                    let startDay = first.getDay(); // 0=Sun
+                                    startDay = startDay === 0 ? 6 : startDay - 1; // Convert to Mon=0
+                                    const cells = [];
+                                    for (let i = 0; i < startDay; i++) cells.push({ day: null });
+                                    for (let d = 1; d <= lastDay; d++) {
+                                        const key = calendarYear + '-' + String(calendarMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                                        cells.push({ day: d, key, events: calendarEvents[key] || [] });
+                                    }
+                                    return cells;
+                                })()" :key="idx">
+                                     <div class="relative min-h-[6rem] border-b border-r border-slate-100 p-1 sm:min-h-[7.5rem] sm:p-1.5"
+                                         :class="cell.day === null ? 'bg-slate-50/30' : ''">
+                                        <template x-if="cell.day !== null">
+                                            <div>
+                                                <span class="text-xs font-medium" :class="cell.events?.length > 0 ? 'font-bold text-emerald-700' : 'text-slate-400'" x-text="cell.day"></span>
+                                                <template x-if="cell.events?.length > 0">
+                                                    <div class="mt-0.5 space-y-0.5">
+                                                        <template x-for="ev in cell.events.slice(0, 2)" :key="ev.id">
+                                                            <a :href="ev.url" class="block rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words text-emerald-700 transition hover:bg-emerald-100" x-text="ev.title"></a>
+                                                        </template>
+                                                        <template x-if="cell.events?.length > 2">
+                                                            <span class="block text-[9px] font-semibold text-emerald-500" x-text="'+' + (cell.events.length - 2) + ' lagi'"></span>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                                <template x-if="cell.events?.length > 0">
+                                                    <div class="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5 sm:hidden">
+                                                        <template x-for="i in Math.min(cell.events.length, 3)" :key="i">
+                                                            <span class="h-1 w-1 rounded-full bg-emerald-500"></span>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>
                 @endif
-            </div>
+            </section>
+
+            {{-- Cover image --}}
+            @if($coverUrl)
+                <div class="animate-fade-in-up overflow-hidden rounded-2xl shadow-lg shadow-slate-900/5" style="animation-delay: 700ms; opacity: 0;">
+                    <img src="{{ $coverUrl }}" alt="{{ $speaker->name }}" class="w-full object-cover" loading="lazy">
+                </div>
+            @endif
+
+            {{-- ─── PAST EVENTS ─── --}}
+            @if($pastEvents->isNotEmpty())
+                <section class="animate-fade-in-up" style="animation-delay: 800ms; opacity: 0;">
+                    <div class="mb-5 flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
+                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Majlis Lepas') }}</h2>
+                            <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-slate-300 to-transparent"></div>
+                        </div>
+                    </div>
+                    <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+                        @foreach($pastEvents as $index => $event)
+                            @php
+                                $pastVenueLocation = $resolveVenueLocation($event);
+                            @endphp
+                            <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
+                               class="group flex items-center gap-4 px-5 py-4 transition-all duration-200 hover:bg-slate-50/80 {{ $index > 0 ? 'border-t border-slate-100' : '' }}">
+                                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-center transition-colors duration-200 group-hover:bg-slate-200/80">
+                                    <span class="text-[11px] font-bold text-slate-500">{{ $event->starts_at?->format('d/m') }}</span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="truncate text-sm font-semibold text-slate-700 transition-colors group-hover:text-slate-900">{{ $event->title }}</h3>
+                                    <p class="truncate text-xs text-slate-400">
+                                        {{ $event->starts_at?->translatedFormat('d M Y') }}
+                                        <span class="text-slate-300">&middot;</span>
+                                        {{ $event->starts_at?->format('h:i A') }}
+                                        @if($pastVenueLocation)
+                                            <span class="text-slate-300">&middot;</span>
+                                            {{ $pastVenueLocation }}
+                                        @endif
+                                    </p>
+                                </div>
+                                <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg opacity-0 transition-all duration-200 group-hover:bg-slate-100 group-hover:opacity-100">
+                                    <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+
+                    {{-- Load more past --}}
+                    @if($pastTotal > $pastEvents->count())
+                        <div class="mt-4 text-center">
+                            <button wire:click="loadMorePast" wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="loadMorePast">{{ __('Lihat Lagi') }} ({{ $pastTotal - $pastEvents->count() }} {{ __('lagi') }})</span>
+                                <span wire:loading wire:target="loadMorePast" class="inline-flex items-center gap-2">
+                                    <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                    {{ __('Memuatkan...') }}
+                                </span>
+                            </button>
+                        </div>
+                    @endif
+                </section>
+            @endif
+
+            {{-- ─── GALLERY ─── --}}
+            @if($gallery->count() > 0)
+                <section class="animate-fade-in-up" style="animation-delay: 850ms; opacity: 0;">
+                    <div class="mb-5 flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
+                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25zm15-14.25a1.125 1.125 0 11-2.25 0 1.125 1.125 0 012.25 0z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Galeri') }}</h2>
+                            <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        @foreach($gallery as $index => $image)
+                            <div class="group relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/50 {{ $index === 0 && $gallery->count() >= 3 ? 'col-span-2 row-span-2 aspect-square sm:aspect-[4/3]' : '' }}">
+                                <img src="{{ $image->getAvailableUrl(['gallery_thumb']) }}" alt="{{ __('Galeri') }}"
+                                     class="h-full w-full object-cover transition-all duration-700 group-hover:scale-110" loading="lazy">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"></div>
+                                <div class="absolute bottom-3 left-3 opacity-0 transition-all duration-500 group-hover:opacity-100">
+                                    <span class="rounded-lg bg-black/40 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-sm">{{ $index + 1 }}/{{ $gallery->count() }}</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
+            {{-- Qualifications — Timeline style (hidden for now) --}}
+            @if(false && $qualifications !== [])
+                <section class="animate-fade-in-up" style="animation-delay: 900ms; opacity: 0;">
+                    <div class="mb-5 flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-white shadow-lg shadow-gold-500/20">
+                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Kelayakan Akademik') }}</h2>
+                            <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-gold-500 to-transparent"></div>
+                        </div>
+                    </div>
+                    <div class="relative space-y-0 pl-8">
+                        <div class="absolute left-3 top-2 bottom-2 w-px bg-gradient-to-b from-gold-300 via-gold-200 to-transparent"></div>
+                        @foreach($qualifications as $index => $qual)
+                            @php
+                                $degree = $qual['degree'] ?? null;
+                                $field = $qual['field'] ?? null;
+                                $institution = $qual['institution'] ?? null;
+                                $year = $qual['year'] ?? null;
+                            @endphp
+                            <div class="group relative pb-6 last:pb-0">
+                                <div class="absolute -left-5 top-1.5 flex h-4 w-4 items-center justify-center">
+                                    <div class="h-2.5 w-2.5 rounded-full border-2 border-gold-400 bg-white transition-all duration-300 group-hover:scale-125 group-hover:border-gold-500 group-hover:bg-gold-50"></div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200/70 bg-white p-4 shadow-sm transition-all duration-300 hover:border-gold-200/80 hover:shadow-md hover:shadow-gold-500/[0.04]">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm font-bold text-slate-900">
+                                                {{ $degree }}
+                                                @if($field)
+                                                    <span class="font-normal text-slate-500">{{ __('dalam') }} {{ $field }}</span>
+                                                @endif
+                                            </p>
+                                            @if($institution)
+                                                <p class="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                                                    <svg class="h-3 w-3 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
+                                                    {{ $institution }}
+                                                </p>
+                                            @endif
+                                        </div>
+                                        @if($year)
+                                            <span class="shrink-0 rounded-lg bg-gold-50 px-2.5 py-1 text-xs font-bold text-gold-700 ring-1 ring-gold-200/60">{{ $year }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
+            {{-- ─── BIODATA ─── --}}
+            @if(filled($bioHtml))
+                <section class="animate-fade-in-up" style="animation-delay: 950ms; opacity: 0;">
+                    <div class="mb-5 flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/20">
+                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Biodata') }}</h2>
+                            <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-emerald-500 to-transparent"></div>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm md:p-8">
+                        <div class="prose prose-slate prose-sm max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
+                            {!! $bioHtml !!}
+                        </div>
+                    </div>
+                </section>
+            @endif
         </div>
     </div>
 </div>

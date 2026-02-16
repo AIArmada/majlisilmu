@@ -75,7 +75,7 @@ new class extends Component {
                                     <div
                                         class="flex-shrink-0 w-14 h-14 rounded-xl bg-emerald-50 flex flex-col items-center justify-center">
                                         <span
-                                            class="text-xs font-bold text-emerald-600 uppercase">{{ $event->starts_at?->translatedFormat('M') }}</span>
+                                            class="text-sm font-bold text-emerald-600 uppercase">{{ $event->starts_at?->translatedFormat('M') }}</span>
                                         <span
                                             class="text-lg font-black text-emerald-700 leading-none">{{ $event->starts_at?->format('d') }}</span>
                                     </div>

@@ -47,7 +47,7 @@ class EventJsonLd extends Component
             'endDate' => $event->ends_at?->toIso8601String(),
             'eventStatus' => $this->getEventStatus(),
             'eventAttendanceMode' => $this->getAttendanceMode(),
-            'url' => route('events.show', $event->slug),
+            'url' => route('events.show', $event),
         ];
 
         if ($venue instanceof \App\Models\Venue) {
@@ -88,7 +88,7 @@ class EventJsonLd extends Component
             $jsonLd['organizer'] = [
                 '@type' => 'Organization',
                 'name' => $institution->name,
-                'url' => route('institutions.show', $institution->slug),
+                'url' => route('institutions.show', $institution),
             ];
         }
 
@@ -96,7 +96,7 @@ class EventJsonLd extends Component
             $jsonLd['performer'] = $event->speakers->map(fn (Speaker $speaker): array => [
                 '@type' => 'Person',
                 'name' => $speaker->name,
-                'url' => route('speakers.show', $speaker->slug),
+                'url' => route('speakers.show', $speaker),
             ])->toArray();
         }
 
@@ -109,7 +109,7 @@ class EventJsonLd extends Component
             'price' => '0',
             'priceCurrency' => 'MYR',
             'availability' => $this->getAvailability(),
-            'url' => route('events.show', $event->slug),
+            'url' => route('events.show', $event),
         ];
 
         if ($event->tags->isNotEmpty()) {

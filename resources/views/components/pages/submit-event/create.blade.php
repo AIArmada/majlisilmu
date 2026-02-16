@@ -1333,7 +1333,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $event = Event::create([
             'title' => $validated['title'],
-            'slug' => Str::slug($validated['title']).'-'.Str::random(6),
+            'slug' => Str::slug($validated['title']).'-'.Str::random(7),
             'description' => $validated['description'] ?? null,
             'timezone' => $timezone,
             'starts_at' => $startsAt,

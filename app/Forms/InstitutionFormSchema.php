@@ -70,7 +70,7 @@ class InstitutionFormSchema
     {
         $institution = Institution::create([
             'name' => $data['name'],
-            'slug' => Str::slug($data['name']).'-'.Str::random(6),
+            'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
             'type' => $data['type'],
             'status' => 'pending',
         ]);

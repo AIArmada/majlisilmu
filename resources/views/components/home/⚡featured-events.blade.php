@@ -84,7 +84,7 @@ new class extends Component {
                                         <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                                         <!-- Date Badge -->
                                         <div class="absolute top-4 left-4 bg-white rounded-xl px-3 py-2 shadow-md">
-                                            <div class="text-xs font-bold text-slate-400 uppercase">
+                                            <div class="text-[13px] font-bold text-slate-400 uppercase">
                                                 {{ $event->starts_at?->translatedFormat('M') }}</div>
                                             <div class="text-xl font-black text-slate-900 leading-none">
                                                 {{ $event->starts_at?->format('d') }}</div>

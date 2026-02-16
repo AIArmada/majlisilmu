@@ -220,7 +220,7 @@ class SpeakerFactory extends Factory
             'post_nominal' => $postNominal,
             'is_freelance' => fake()->boolean(20),
             'qualifications' => $qualifications,
-            'slug' => Str::slug($name.'-'.Str::random(8)),
+            'slug' => Str::slug($name).'-'.Str::lower(Str::random(7)),
             'bio' => fake()->boolean(70)
                 ? [
                     'type' => 'doc',

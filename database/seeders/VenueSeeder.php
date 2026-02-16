@@ -27,6 +27,7 @@ class VenueSeeder extends Seeder
                 for ($i = 0; $i < $count; $i++) {
                     $venue = Venue::factory()->make();
                     $venueData = $venue->toArray();
+
                     // JSON encode array fields for raw insert
                     if (isset($venueData['facilities']) && is_array($venueData['facilities'])) {
                         $venueData['facilities'] = json_encode($venueData['facilities']);
