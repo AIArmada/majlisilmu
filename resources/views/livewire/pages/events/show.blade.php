@@ -100,7 +100,7 @@
                     <div class="absolute bottom-[-50%] right-[-50%] w-[100%] h-[100%] rounded-full bg-teal-500/10 blur-[120px] animate-blob animation-delay-2000"></div>
                     
                     <!-- Islamic Pattern Overlay -->
-                    <div class="absolute inset-0 bg-pattern-islamic opacity-[0.03] mix-blend-overlay"></div>
+                    <div class="absolute inset-0 bg-pattern-islamic opacity-[0.03] mix-blend-overlay" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
                 @endif
             </div>
 

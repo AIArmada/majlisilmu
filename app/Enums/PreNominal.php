@@ -6,74 +6,64 @@ use Filament\Support\Contracts\HasLabel;
 
 enum PreNominal: string implements HasLabel
 {
-    // Highest Federal Honours
-    case Tun = 'tun';
-    case TohPuan = 'toh_puan';
+    // Academic
+    case Dr = 'dr';
+    case Prof = 'prof';
+    case ProfMadya = 'prof_madya';
 
-    // Tan Sri Level
-    case TanSri = 'tan_sri';
-    case PuanSri = 'puan_sri';
+    // Professional
+    case Ir = 'ir';
+    case Ar = 'ar';
 
-    // Datuk/Dato' Base Titles
-    case Datuk = 'datuk';
-    case Dato = 'dato';
-    case Datin = 'datin';
+    // Islamic Teachers/Scholars
+    case Ustaz = 'ustaz';
+    case Ustazah = 'ustazah';
+    case Syeikh = 'syeikh';
+    case Pendeta = 'pendeta';
+    case TuanGuru = 'tuan_guru';
 
-    // Higher Grade Datuk/Dato'
-    case DatukSeri = 'datuk_seri';
-    case DatoSri = 'dato_sri';
-    case DatukPaduka = 'datuk_paduka';
-    case DatinPaduka = 'datin_paduka';
+    // Quran Memorizers/Reciters
+    case Hafiz = 'hafiz';
+    case Hafizah = 'hafizah';
+    case Qari = 'qari';
+    case Qariah = 'qariah';
 
-    // Warrior Distinction
-    case DatukWira = 'datuk_wira';
-    case DatoWira = 'dato_wira';
-
-    // Sarawak Specific
-    case DatukAmar = 'datuk_amar';
-    case DatukPatinggi = 'datuk_patinggi';
-
-    // Sabah Specific
-    case DatukSeriPanglima = 'datuk_seri_panglima';
-
-    // State Highest Honours
-    case DatukSeriUtama = 'datuk_seri_utama';
+    // Program-Based/Religious Roles
+    case ImamMuda = 'imam_muda';
+    case Dai = 'dai';
+    case Mufti = 'mufti';
+    case Kadi = 'kadi';
 
     public function getLabel(): string
     {
         return match ($this) {
-            // Highest Federal Honours
-            self::Tun => __('Tun'),
-            self::TohPuan => __('Toh Puan'),
+            // Academic
+            self::Dr => __('Dr.'),
+            self::Prof => __('Prof.'),
+            self::ProfMadya => __('Prof. Madya'),
 
-            // Tan Sri Level
-            self::TanSri => __('Tan Sri'),
-            self::PuanSri => __('Puan Sri'),
+            // Professional
+            self::Ir => __('Ir.'),
+            self::Ar => __('Ar.'),
 
-            // Datuk/Dato' Base Titles
-            self::Datuk => __('Datuk'),
-            self::Dato => __('Dato\''),
-            self::Datin => __('Datin'),
+            // Islamic Teachers/Scholars
+            self::Ustaz => __('Ustaz'),
+            self::Ustazah => __('Ustazah'),
+            self::Syeikh => __('Syeikh'),
+            self::Pendeta => __('Pendeta'),
+            self::TuanGuru => __('Tuan Guru'),
 
-            // Higher Grade Datuk/Dato'
-            self::DatukSeri => __('Datuk Seri'),
-            self::DatoSri => __('Dato\' Sri'),
-            self::DatukPaduka => __('Datuk Paduka'),
-            self::DatinPaduka => __('Datin Paduka'),
+            // Quran Memorizers/Reciters
+            self::Hafiz => __('Hafiz'),
+            self::Hafizah => __('Hafizah'),
+            self::Qari => __('Qari'),
+            self::Qariah => __('Qariah'),
 
-            // Warrior Distinction
-            self::DatukWira => __('Datuk Wira'),
-            self::DatoWira => __('Dato\' Wira'),
-
-            // Sarawak Specific
-            self::DatukAmar => __('Datuk Amar'),
-            self::DatukPatinggi => __('Datuk Patinggi'),
-
-            // Sabah Specific
-            self::DatukSeriPanglima => __('Datuk Seri Panglima'),
-
-            // State Highest Honours
-            self::DatukSeriUtama => __('Datuk Seri Utama'),
+            // Program-Based/Religious Roles
+            self::ImamMuda => __('Imam Muda'),
+            self::Dai => __('Dai'),
+            self::Mufti => __('Mufti'),
+            self::Kadi => __('Kadi'),
         };
     }
 }

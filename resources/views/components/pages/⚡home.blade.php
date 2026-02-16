@@ -20,7 +20,7 @@ new
         <!-- Background Layer -->
         <div class="absolute inset-0 z-0 bg-slate-950">
             <!-- Islamic Pattern Base -->
-            <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay"></div>
+            <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
 
             <!-- Aurora Gradients -->
             <div
@@ -222,7 +222,7 @@ new
     <!-- CTA Section -->
     <section class="relative py-24 overflow-hidden bg-slate-950">
         <!-- Background Effects -->
-        <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay"></div>
+        <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
         <div
             class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-900/20 rounded-full blur-[120px]">
         </div>

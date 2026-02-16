@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Speakers\Schemas;
 
+use App\Enums\SocialMediaPlatform;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -36,18 +37,31 @@ class SpeakerForm
                             ->placeholder('e.g. Freelance Da\'i, Independent Researcher')
                             ->maxLength(255)
                             ->visible(fn (Get $get) => $get('is_freelance')),
-                        TextInput::make('honorific')
+                        Select::make('honorific')
                             ->label('Honorific')
-                            ->placeholder('e.g. Dato’, Datin, Tan Sri')
-                            ->maxLength(255),
-                        TextInput::make('pre_nominal')
+                            ->options(\App\Enums\Honorific::class)
+                            ->multiple()
+                            ->preload()
+                            ->searchable(),
+                        Select::make('pre_nominal')
                             ->label('Pre-nominal')
-                            ->placeholder('e.g. Dr, Prof, Ir, Ustaz')
-                            ->maxLength(255),
-                        TextInput::make('post_nominal')
+                            ->options(\App\Enums\PreNominal::class)
+                            ->multiple()
+                            ->preload()
+                            ->searchable(),
+                        \Filament\Forms\Components\TagsInput::make('post_nominal')
                             ->label('Post-nominal')
                             ->placeholder('e.g. PhD, HONS, MSc')
-                            ->maxLength(255),
+                            ->suggestions([
+                                'PhD',
+                                'MSc',
+                                'MA',
+                                'BA',
+                                'BSc',
+                                'HONS',
+                                'Lc.',
+                                'Dpl.',
+                            ]),
                         TextInput::make('slug')
                             ->required()
                             ->maxLength(255)
@@ -198,7 +212,19 @@ class SpeakerForm
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
-                            ->itemLabel(fn (array $state): ?string => $state['platform'] ?? null),
+                            ->itemLabel(function (array $state): ?string {
+                                $platform = $state['platform'] ?? null;
+
+                                if ($platform instanceof SocialMediaPlatform) {
+                                    return $platform->getLabel();
+                                }
+
+                                if (is_string($platform) && $platform !== '') {
+                                    return SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? $platform;
+                                }
+
+                                return null;
+                            }),
                     ]),
                 Section::make('Status')
                     ->components([
