@@ -11,6 +11,8 @@ new class extends Component {
 
     public int $pastPerPage = 6;
 
+    public bool $isFollowing = false;
+
     public function mount(Institution $institution): void
     {
         if ($institution->status !== 'verified' && ! auth()->user()?->hasAnyRole(['super_admin', 'moderator'])) {
@@ -32,6 +34,27 @@ new class extends Component {
             'spaces' => fn ($q) => $q->where('is_active', true),
             'languages',
         ]);
+
+        $this->isFollowing = auth()->user()?->isFollowing($institution) ?? false;
+    }
+
+    public function toggleFollow(): void
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            $this->redirect(route('login'), navigate: true);
+
+            return;
+        }
+
+        if ($this->isFollowing) {
+            $user->unfollow($this->institution);
+            $this->isFollowing = false;
+        } else {
+            $user->follow($this->institution);
+            $this->isFollowing = true;
+        }
     }
 
     public function loadMoreUpcoming(): void
@@ -86,6 +109,7 @@ new class extends Component {
             ->with([
                 'venue.address.state',
                 'venue.address.district',
+                'venue.address.subdistrict',
                 'speakers.media',
                 'media',
             ])
@@ -103,14 +127,6 @@ new class extends Component {
             ->count();
     }
 
-    public function getTotalEventsProperty(): int
-    {
-        return $this->institution->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
-            ->count();
-    }
-
     public function rendering($view): void
     {
         $view->title($this->institution->name . ' - ' . config('app.name'));
@@ -124,7 +140,6 @@ new class extends Component {
     $pastEvents = $this->pastEvents;
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
-    $totalEvents = $this->totalEvents;
 
     $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
     $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
@@ -182,17 +197,20 @@ new class extends Component {
         return implode(', ', $parts);
     };
 
-    // Calendar data
-    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(fn ($e) => [
-        'id' => $e->id,
-        'title' => $e->title,
-        'url' => route('events.show', $e),
-        'type' => $resolveEventTypeLabel($e->event_type),
-    ])->values())->toArray();
+    // Calendar data: map events to dates for the calendar view
+    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
+        $typeLabel = $resolveEventTypeLabel($e->event_type);
 
-    // Stats
-    $speakerCount = $speakers->count();
-    $spaceCount = $spaces->count();
+        return [
+            'id' => $e->id,
+            'title' => (string) str($e->title)
+                ->replace($typeLabel.': ', '')
+                ->replace($typeLabel.' - ', '')
+                ->replace(' ('.$typeLabel.')', '')
+                ->trim(),
+            'url' => route('events.show', $e),
+        ];
+    })->values())->toArray();
 @endphp
 
 <div class="min-h-screen bg-slate-50/80">
@@ -219,17 +237,8 @@ new class extends Component {
         {{-- Side vignette --}}
         <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.4)_100%)]"></div>
 
-        {{-- Breadcrumb --}}
-        <div class="container relative z-10 mx-auto max-w-6xl px-6 pt-8 lg:px-8">
-            <nav class="animate-fade-in-up flex items-center gap-2 text-sm" style="animation-delay: 100ms; opacity: 0;">
-                <a href="{{ route('institutions.index') }}" wire:navigate class="text-slate-400/80 transition-colors duration-300 hover:text-white">{{ __('Institusi') }}</a>
-                <svg class="h-3.5 w-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                <span class="max-w-[200px] truncate text-slate-300/60">{{ $institution->name }}</span>
-            </nav>
-        </div>
-
         {{-- Hero content: Logo + Name --}}
-        <div class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 pb-8 pt-6 sm:flex-row sm:items-end sm:gap-8 lg:px-8 lg:pb-10 lg:pt-8">
+        <div class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 pb-10 pt-12 sm:flex-row sm:items-center sm:gap-8 lg:px-8 lg:pb-12 lg:pt-16">
             {{-- Logo --}}
             <div class="animate-scale-in relative shrink-0" style="animation-delay: 200ms; opacity: 0;">
                 <div class="absolute -inset-1.5 rounded-[1.25rem] bg-gradient-to-br from-emerald-400/40 via-gold-400/30 to-emerald-600/40 blur-sm"></div>
@@ -263,9 +272,6 @@ new class extends Component {
 
             {{-- Name & meta --}}
             <div class="animate-fade-in-up flex-1 text-center sm:text-left" style="animation-delay: 350ms; opacity: 0;">
-                @if($typeLabel)
-                    <p class="mb-1.5 text-sm font-medium tracking-wide text-emerald-400/90">{{ $typeLabel }}</p>
-                @endif
                 <h1 class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
                     {{ $institution->name }}
                 </h1>
@@ -280,24 +286,39 @@ new class extends Component {
                             {{ $locationString }}
                         </span>
                     @endif
-                    @if($totalEvents > 0)
-                        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                            <svg class="h-3 w-3 text-gold-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
-                            {{ $totalEvents }} {{ __('majlis') }}
-                        </span>
-                    @endif
-                    @if($speakerCount > 0)
-                        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                            <svg class="h-3 w-3 text-emerald-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
-                            {{ $speakerCount }} {{ __('penceramah') }}
-                        </span>
-                    @endif
                     @if($languages->isNotEmpty())
                         <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
                             <svg class="h-3 w-3 text-slate-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802"/></svg>
                             {{ $languages->pluck('name')->implode(', ') }}
                         </span>
                     @endif
+                </div>
+
+                {{-- Follow button --}}
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
+                    <button wire:click="toggleFollow" wire:loading.attr="disabled"
+                            class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 {{ $this->isFollowing ? 'border border-emerald-400/40 bg-emerald-500/20 text-emerald-300 hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-300' : 'border border-white/15 bg-white/10 text-white hover:border-emerald-400/40 hover:bg-emerald-500/20 hover:text-emerald-300' }} backdrop-blur-sm"
+                            x-data="{ hovering: false }"
+                            @mouseenter="hovering = true"
+                            @mouseleave="hovering = false">
+                        @if($this->isFollowing)
+                            <template x-if="!hovering">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                    {{ __('Mengikuti') }}
+                                </span>
+                            </template>
+                            <template x-if="hovering">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    {{ __('Nyahikut') }}
+                                </span>
+                            </template>
+                        @else
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                            {{ __('Ikuti') }}
+                        @endif
+                    </button>
                 </div>
 
                 {{-- Social links --}}
@@ -355,55 +376,53 @@ new class extends Component {
             {{-- LEFT COLUMN — Main Content --}}
             <div class="space-y-10">
 
-                {{-- ─── ABOUT / DESCRIPTION ─── --}}
-                @if($institution->description)
-                    <section class="animate-fade-in-up" style="animation-delay: 500ms; opacity: 0;">
-                        <div class="mb-5 flex items-center gap-3">
-                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/20">
-                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
-                            </div>
-                            <div>
-                                <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Mengenai Kami') }}</h2>
-                                <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-emerald-500 to-transparent"></div>
-                            </div>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm md:p-8">
-                            <div class="prose prose-slate prose-sm max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
-                                {!! $institution->description !!}
-                            </div>
-                        </div>
-                    </section>
-                @endif
-
-                {{-- ─── UPCOMING EVENTS (Primary) ─── --}}
+                {{-- ─── EVENTS (Upcoming / Past) ─── --}}
                 <section class="animate-fade-in-up" style="animation-delay: 600ms; opacity: 0;"
-                         x-data="{ view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
+                         x-data="{ tab: 'upcoming', view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
                     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3">
                             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
                             </div>
                             <div>
-                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Jadual Akan Datang') }}</h2>
+                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Majlis') }}</h2>
                                 <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-emerald-500 to-transparent"></div>
                             </div>
                         </div>
 
-                        {{-- View toggle --}}
-                        @if($upcomingEvents->isNotEmpty())
+                        <div class="flex items-center gap-3">
+                            {{-- Tab toggle: Upcoming / Past --}}
                             <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
-                                <button @click="view = 'list'" :class="view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
-                                    {{ __('Senarai') }}
+                                <button @click="tab = 'upcoming'; view = 'list'" :class="tab === 'upcoming' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                                    {{ __('Akan Datang') }}
+                                    <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $upcomingTotal }}</span>
                                 </button>
-                                <button @click="view = 'calendar'" :class="view === 'calendar' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"/></svg>
-                                    {{ __('Kalendar') }}
+                                <button @click="tab = 'past'" :class="tab === 'past' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50" @disabled($pastTotal === 0)>
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    {{ __('Lepas') }}
+                                    <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $pastTotal }}</span>
                                 </button>
                             </div>
-                        @endif
+
+                            {{-- View toggle (list/calendar) — only for upcoming tab --}}
+                            @if($upcomingEvents->isNotEmpty())
+                                <div x-show="tab === 'upcoming'" class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
+                                    <button @click="view = 'list'" :class="view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+                                        {{ __('Senarai') }}
+                                    </button>
+                                    <button @click="view = 'calendar'" :class="view === 'calendar' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"/></svg>
+                                        {{ __('Kalendar') }}
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
+                    {{-- ═══ UPCOMING TAB ═══ --}}
+                    <div x-show="tab === 'upcoming'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
                     @if($upcomingEvents->isEmpty())
                         <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 p-12 text-center">
                             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
@@ -417,7 +436,10 @@ new class extends Component {
                         <div x-show="view === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
                             <div class="space-y-4">
                                 @foreach($upcomingEvents as $event)
-                                    @php $venueLocation = $resolveVenueLocation($event); @endphp
+                                    @php
+                                        $venueLocation = $resolveVenueLocation($event);
+                                        $isOnlineEvent = ($event->event_format?->value ?? $event->event_format) === 'online';
+                                    @endphp
                                     <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="upcoming-{{ $event->id }}"
                                        class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                         {{-- Date accent sidebar --}}
@@ -432,6 +454,12 @@ new class extends Component {
                                                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
                                                     {{ $resolveEventTypeLabel($event->event_type) }}
                                                 </span>
+                                                @if($isOnlineEvent)
+                                                    <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
+                                                        <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                                                        {{ __('Online') }}
+                                                    </span>
+                                                @endif
                                             </div>
                                             <h3 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-emerald-700 sm:text-lg">
                                                 {{ $event->title }}
@@ -534,14 +562,82 @@ new class extends Component {
                             </div>
                         </div>
                     @endif
-                </section>
+                    </div>{{-- end upcoming tab --}}
 
-                {{-- ─── COVER IMAGE ─── --}}
-                @if($coverUrl)
-                    <div class="animate-fade-in-up overflow-hidden rounded-2xl shadow-lg shadow-slate-900/5" style="animation-delay: 700ms; opacity: 0;">
-                        <img src="{{ $coverUrl }}" alt="{{ $institution->name }}" class="w-full object-cover" loading="lazy">
+                    {{-- ═══ PAST EVENTS TAB ═══ --}}
+                    @if($pastEvents->isNotEmpty())
+                    <div x-show="tab === 'past'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+                        <div class="space-y-4">
+                            @foreach($pastEvents as $event)
+                                @php
+                                    $pastVenueLocation = $resolveVenueLocation($event);
+                                    $isOnlineEvent = ($event->event_format?->value ?? $event->event_format) === 'online';
+                                @endphp
+                                <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
+                                   class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/[0.06]">
+                                    <div class="flex w-20 shrink-0 flex-col items-center justify-center bg-gradient-to-b from-slate-500 to-slate-700 p-3 text-white sm:w-24">
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-300/80">{{ $event->starts_at?->translatedFormat('l') }}</span>
+                                        <span class="font-heading text-3xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
+                                        <span class="mt-0.5 text-[13px] font-bold tracking-wide text-slate-300/80">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                    </div>
+                                    <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/60">
+                                                {{ $resolveEventTypeLabel($event->event_type) }}
+                                            </span>
+                                            @if($isOnlineEvent)
+                                                <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
+                                                    <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                                                    {{ __('Online') }}
+                                                </span>
+                                            @endif
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                {{ __('Selesai') }}
+                                            </span>
+                                        </div>
+                                        <h3 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
+                                            {{ $event->title }}
+                                        </h3>
+                                        <div class="space-y-1 text-sm text-slate-500">
+                                            <div class="flex items-center gap-1.5">
+                                                <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                {{ $event->starts_at?->format('h:i A') }}
+                                                @if($event->ends_at)
+                                                    <span class="text-slate-300">–</span> {{ $event->ends_at?->format('h:i A') }}
+                                                @endif
+                                            </div>
+                                            @if($pastVenueLocation)
+                                                <div class="flex items-center gap-1.5">
+                                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                                    <span class="line-clamp-1">{{ $pastVenueLocation }}</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="hidden items-center pr-5 sm:flex">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all duration-300 group-hover:bg-slate-200 group-hover:text-slate-600">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                                        </div>
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+
+                        @if($pastTotal > $pastEvents->count())
+                            <div class="mt-6 text-center">
+                                <button wire:click="loadMorePast" wire:loading.attr="disabled"
+                                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50">
+                                    <span wire:loading.remove wire:target="loadMorePast">{{ __('Lihat Lagi') }} ({{ $pastTotal - $pastEvents->count() }} {{ __('lagi') }})</span>
+                                    <span wire:loading wire:target="loadMorePast" class="inline-flex items-center gap-2">
+                                        <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                        {{ __('Memuatkan...') }}
+                                    </span>
+                                </button>
+                            </div>
+                        @endif
                     </div>
-                @endif
+                    @endif
+                </section>
 
                 {{-- ─── SPEAKERS ─── --}}
                 @if($speakers->isNotEmpty())
@@ -592,57 +688,23 @@ new class extends Component {
                     </section>
                 @endif
 
-                {{-- ─── PAST EVENTS ─── --}}
-                @if($pastEvents->isNotEmpty())
+                {{-- ─── ABOUT / DESCRIPTION ─── --}}
+                @if($institution->description)
                     <section class="animate-fade-in-up" style="animation-delay: 800ms; opacity: 0;">
                         <div class="mb-5 flex items-center gap-3">
-                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
-                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/20">
+                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
                             </div>
                             <div>
-                                <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Majlis Lepas') }}</h2>
-                                <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-slate-300 to-transparent"></div>
+                                <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Mengenai Kami') }}</h2>
+                                <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-emerald-500 to-transparent"></div>
                             </div>
                         </div>
-                        <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-                            @foreach($pastEvents as $index => $event)
-                                @php $pastVenueLocation = $resolveVenueLocation($event); @endphp
-                                <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
-                                   class="group flex items-center gap-4 px-5 py-4 transition-all duration-200 hover:bg-slate-50/80 {{ $index > 0 ? 'border-t border-slate-100' : '' }}">
-                                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-center transition-colors duration-200 group-hover:bg-slate-200/80">
-                                        <span class="text-[11px] font-bold text-slate-500">{{ $event->starts_at?->format('d/m') }}</span>
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <h3 class="truncate text-sm font-semibold text-slate-700 transition-colors group-hover:text-slate-900">{{ $event->title }}</h3>
-                                        <p class="truncate text-xs text-slate-400">
-                                            {{ $event->starts_at?->translatedFormat('d M Y') }}
-                                            <span class="text-slate-300">&middot;</span>
-                                            {{ $event->starts_at?->format('h:i A') }}
-                                            @if($pastVenueLocation)
-                                                <span class="text-slate-300">&middot;</span>
-                                                {{ $pastVenueLocation }}
-                                            @endif
-                                        </p>
-                                    </div>
-                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg opacity-0 transition-all duration-200 group-hover:bg-slate-100 group-hover:opacity-100">
-                                        <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                                    </div>
-                                </a>
-                            @endforeach
-                        </div>
-
-                        @if($pastTotal > $pastEvents->count())
-                            <div class="mt-4 text-center">
-                                <button wire:click="loadMorePast" wire:loading.attr="disabled"
-                                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50">
-                                    <span wire:loading.remove wire:target="loadMorePast">{{ __('Lihat Lagi') }} ({{ $pastTotal - $pastEvents->count() }} {{ __('lagi') }})</span>
-                                    <span wire:loading wire:target="loadMorePast" class="inline-flex items-center gap-2">
-                                        <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
-                                        {{ __('Memuatkan...') }}
-                                    </span>
-                                </button>
+                        <div class="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm md:p-8">
+                            <div class="prose prose-slate prose-sm max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
+                                {!! $institution->description !!}
                             </div>
-                        @endif
+                        </div>
                     </section>
                 @endif
 
@@ -688,22 +750,24 @@ new class extends Component {
                         </div>
                         <div class="space-y-4 p-5">
                             @foreach($contacts as $contact)
-                                <div class="flex items-start gap-3 group">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
-                                        @if($contact->category === 'email')
-                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
-                                        @else
-                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
-                                        @endif
+                                @if($contact->value)
+                                    <div class="flex items-start gap-3 group">
+                                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
+                                            @if($contact->category === 'email')
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                                            @else
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $contact->type ?? __('Utama') }}</span>
+                                            <span class="block break-all text-sm font-medium text-slate-800">{{ $contact->value }}</span>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0 flex-1">
-                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $contact->type ?? __('Utama') }}</span>
-                                        <span class="block break-all text-sm font-medium text-slate-800">{{ $contact->value }}</span>
-                                    </div>
-                                </div>
+                                @endif
                             @endforeach
 
-                            @if($address)
+                            @if($address && ($address->line1 || $address->city?->name || $address->state?->name))
                                 <div class="flex items-start gap-3 group">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
                                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
@@ -711,10 +775,11 @@ new class extends Component {
                                     <div class="min-w-0 flex-1">
                                         <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ __('Alamat') }}</span>
                                         <p class="text-sm font-medium leading-snug text-slate-800">
-                                            {{ $address->line1 }}
+                                            @if($address->line1) {{ $address->line1 }} @endif
                                             @if($address->line2), {{ $address->line2 }}@endif
-                                            <br>
-                                            {{ $address->postcode }} {{ $address->city?->name }}
+                                            @if($address->line1 || $address->line2) <br> @endif
+                                            @if($address->postcode) {{ $address->postcode }} @endif
+                                            @if($address->city?->name) {{ $address->city->name }} @endif
                                             @if($address->state?->name)
                                                 <br>{{ $address->state->name }}
                                             @endif
@@ -823,16 +888,6 @@ new class extends Component {
                     </div>
                 @endif
 
-                {{-- ─── VIEW ALL EVENTS LINK ─── --}}
-                @if($totalEvents > 0)
-                    <div class="animate-fade-in-up text-center" style="animation-delay: 800ms; opacity: 0;">
-                        <a href="{{ route('events.index', ['search' => $institution->name]) }}" wire:navigate
-                           class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700 transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
-                            {{ __('Lihat Semua Majlis') }} ({{ $totalEvents }})
-                        </a>
-                    </div>
-                @endif
             </div>
         </div>
     </div>

@@ -8,6 +8,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class VenueForm
@@ -85,32 +86,37 @@ class VenueForm
                     ->components([
                         Select::make('country_id')
                             ->relationship('country', 'name')
+                            ->default(132) // Malaysia
                             ->searchable()
                             ->preload()
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('state_id', null);
+                                $set('district_id', null);
+                                $set('subdistrict_id', null);
+                            }),
                         Select::make('state_id')
+                            ->label('State')
                             ->relationship('state', 'name', fn ($query, $get) => $query->where('country_id', $get('country_id')))
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->hidden(fn ($get) => ! $get('country_id')),
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('district_id', null);
+                                $set('subdistrict_id', null);
+                            }),
                         Select::make('district_id')
+                            ->label('District')
                             ->relationship('district', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->hidden(fn ($get) => ! $get('state_id')),
+                            ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null)),
                         Select::make('subdistrict_id')
                             ->label('Subdistrict / Mukim')
                             ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
                             ->searchable()
-                            ->preload()
-                            ->hidden(fn ($get) => ! $get('district_id')),
-                        Select::make('city_id')
-                            ->relationship('city', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
-                            ->searchable()
-                            ->preload()
-                            ->hidden(fn ($get) => ! $get('state_id')),
+                            ->preload(),
                         TextInput::make('line1')
                             ->maxLength(255),
                         TextInput::make('line2')

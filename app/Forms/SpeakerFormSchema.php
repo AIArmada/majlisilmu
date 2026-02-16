@@ -4,6 +4,7 @@ namespace App\Forms;
 
 use App\Enums\Gender;
 use App\Enums\Honorific;
+use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Forms\Components\Select;
 use App\Models\District;
@@ -14,7 +15,6 @@ use App\Models\Subdistrict;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Text;
@@ -92,19 +92,12 @@ class SpeakerFormSchema
                 ->searchable()
                 ->placeholder(__('Select pre-nominals')),
 
-            TagsInput::make('post_nominal')
+            Select::make('post_nominal')
                 ->label(__('Post-nominal'))
-                ->placeholder(__('e.g., PhD, MA, MSc'))
-                ->suggestions([
-                    'PhD',
-                    'MSc',
-                    'MA',
-                    'BA',
-                    'BSc',
-                    'HONS',
-                    'Lc.',
-                    'Dpl.',
-                ]),
+                ->multiple()
+                ->options(PostNominal::class)
+                ->searchable()
+                ->placeholder(__('Select post-nominals')),
 
             TextInput::make('job_title')
                 ->label(__('Job Title'))

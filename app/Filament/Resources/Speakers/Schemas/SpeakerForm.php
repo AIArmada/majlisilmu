@@ -2,14 +2,18 @@
 
 namespace App\Filament\Resources\Speakers\Schemas;
 
+use App\Enums\Gender;
+use App\Enums\Honorific;
+use App\Enums\PostNominal;
+use App\Enums\PreNominal;
 use App\Enums\SocialMediaPlatform;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Builder;
 
 class SpeakerForm
 {
@@ -17,120 +21,147 @@ class SpeakerForm
     {
         return $schema
             ->components([
-                Section::make('Profile')
+                Section::make(__('Profile'))
                     ->components([
                         TextInput::make('name')
+                            ->label(__('Speaker Name'))
                             ->required()
                             ->maxLength(255),
                         Select::make('gender')
-                            ->options([
-                                'male' => 'Male',
-                                'female' => 'Female',
-                            ])
-                            ->default('male')
+                            ->label(__('Gender'))
+                            ->options(Gender::class)
+                            ->default(Gender::Male->value)
                             ->required(),
                         \Filament\Forms\Components\Toggle::make('is_freelance')
                             ->label(__('Penceramah Bebas'))
                             ->live(),
                         TextInput::make('job_title')
-                            ->label('Job Title / Primary Designation')
-                            ->placeholder('e.g. Freelance Da\'i, Independent Researcher')
+                            ->label(__('Job Title'))
+                            ->placeholder(__('e.g., Imam, Lecturer'))
                             ->maxLength(255)
                             ->visible(fn (Get $get) => $get('is_freelance')),
                         Select::make('honorific')
-                            ->label('Honorific')
-                            ->options(\App\Enums\Honorific::class)
+                            ->label(__('Honorific'))
+                            ->options(Honorific::class)
                             ->multiple()
                             ->preload()
-                            ->searchable(),
+                            ->searchable()
+                            ->placeholder(__('Select honorifics')),
                         Select::make('pre_nominal')
-                            ->label('Pre-nominal')
-                            ->options(\App\Enums\PreNominal::class)
+                            ->label(__('Pre-nominal'))
+                            ->options(PreNominal::class)
                             ->multiple()
                             ->preload()
-                            ->searchable(),
-                        \Filament\Forms\Components\TagsInput::make('post_nominal')
-                            ->label('Post-nominal')
-                            ->placeholder('e.g. PhD, HONS, MSc')
-                            ->suggestions([
-                                'PhD',
-                                'MSc',
-                                'MA',
-                                'BA',
-                                'BSc',
-                                'HONS',
-                                'Lc.',
-                                'Dpl.',
-                            ]),
+                            ->searchable()
+                            ->placeholder(__('Select pre-nominals')),
+                        Select::make('post_nominal')
+                            ->label(__('Post-nominal'))
+                            ->options(PostNominal::class)
+                            ->multiple()
+                            ->preload()
+                            ->searchable()
+                            ->placeholder(__('Select post-nominals')),
                         TextInput::make('slug')
+                            ->label(__('Slug'))
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
                         RichEditor::make('bio')
+                            ->label(__('Biography'))
                             ->json()
                             ->columnSpanFull()
-                            ->placeholder('Speaker biography'),
-
-                        // Address Components
-                        Section::make('Location / Base')
-                            ->relationship('address')
-                            ->schema([
-                                Select::make('state_id')
-                                    ->label('State')
-                                    ->relationship('state', 'name')
-                                    ->searchable()
-                                    ->preload()
-                                    ->live(),
-                                Select::make('district_id')
-                                    ->label('District')
-                                    ->relationship('district', 'name', fn (Builder $query, Get $get) => $query->where('state_id', $get('state_id')))
-                                    ->searchable()
-                                    ->preload()
-                                    ->live()
-                                    ->visible(fn (Get $get) => $get('state_id')),
-                                Select::make('subdistrict_id')
-                                    ->label('Subdistrict / Mukim')
-                                    ->relationship('subdistrict', 'name', fn (Builder $query, Get $get) => $query->where('district_id', $get('district_id')))
-                                    ->searchable()
-                                    ->preload()
-                                    ->visible(fn (Get $get) => $get('district_id')),
-                            ])
-                            ->columns(2),
+                            ->placeholder(__('Share a short biography of the speaker')),
 
                         Select::make('languages')
+                            ->label(__('Languages'))
                             ->relationship('languages', 'name')
                             ->multiple()
                             ->preload()
                             ->searchable(),
                     ])
                     ->columns(2),
-                Section::make('Education')
+                Section::make(__('Location / Base'))
+                    ->relationship('address')
+                    ->components([
+                        Select::make('country_id')
+                            ->label(__('Country'))
+                            ->relationship('country', 'name')
+                            ->default(132) // Malaysia
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('state_id', null);
+                                $set('district_id', null);
+                                $set('subdistrict_id', null);
+                            }),
+                        Select::make('state_id')
+                            ->label(__('Negeri'))
+                            ->relationship('state', 'name', fn ($query, $get) => $query->where('country_id', $get('country_id')))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('district_id', null);
+                                $set('subdistrict_id', null);
+                            }),
+                        Select::make('district_id')
+                            ->label(__('Daerah'))
+                            ->relationship('district', 'name', fn ($query, $get) => $query->where('state_id', $get('state_id')))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null)),
+                        Select::make('subdistrict_id')
+                            ->label(__('Daerah Kecil / Bandar / Mukim'))
+                            ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
+                            ->searchable()
+                            ->preload(),
+                        TextInput::make('line1')
+                            ->label(__('Address Line 1'))
+                            ->maxLength(255),
+                        TextInput::make('line2')
+                            ->label(__('Address Line 2'))
+                            ->maxLength(255),
+                        TextInput::make('postcode')
+                            ->label(__('Postcode'))
+                            ->maxLength(16),
+                    ])
+                    ->columns(2),
+                Section::make(__('Education'))
                     ->components([
                         \Filament\Forms\Components\Repeater::make('qualifications')
+                            ->label(__('Qualifications'))
+                            ->default([])
                             ->schema([
                                 TextInput::make('institution')
+                                    ->label(__('Institution'))
                                     ->required(),
                                 TextInput::make('degree')
-                                    ->label('Degree / Level')
+                                    ->label(__('Degree / Level'))
                                     ->required(),
                                 TextInput::make('field')
-                                    ->label('Field of Study'),
+                                    ->label(__('Field of Study')),
                                 TextInput::make('year')
+                                    ->label(__('Year'))
                                     ->numeric()
                                     ->length(4),
                             ])
                             ->columns(2)
                             ->itemLabel(fn (array $state): string => ($state['degree'] ?? '').' - '.($state['institution'] ?? '')),
                     ]),
-                Section::make('Contact')
+                Section::make(__('Contact'))
                     ->components([
                         \Filament\Forms\Components\Repeater::make('contacts')
+                            ->label(__('Contact Details'))
                             ->relationship()
+                            ->default([])
                             ->schema([
                                 Select::make('category')
+                                    ->label(__('Category'))
                                     ->options([
-                                        'email' => 'Email',
-                                        'phone' => 'Phone',
+                                        'email' => __('Email'),
+                                        'phone' => __('Phone'),
                                     ])
                                     ->required()
                                     ->live(),
@@ -138,41 +169,43 @@ class SpeakerForm
                                     ->required()
                                     ->maxLength(255)
                                     ->label(fn (Get $get) => match ($get('category')) {
-                                        'email' => 'Email Address',
-                                        'phone' => 'Phone Number',
-                                        default => 'Value',
+                                        'email' => __('Email Address'),
+                                        'phone' => __('Phone Number'),
+                                        default => __('Value'),
                                     })
                                     ->email(fn (Get $get) => $get('category') === 'email')
                                     ->tel(fn (Get $get) => $get('category') === 'phone'),
                                 Select::make('type')
+                                    ->label(__('Type'))
                                     ->options([
-                                        'main' => 'Main',
-                                        'work' => 'Work',
-                                        'personal' => 'Personal',
-                                        'whatsapp' => 'WhatsApp',
+                                        'main' => __('Main'),
+                                        'work' => __('Work'),
+                                        'personal' => __('Personal'),
+                                        'whatsapp' => __('WhatsApp'),
                                     ])
                                     ->default('main')
                                     ->required(),
                                 \Filament\Forms\Components\Toggle::make('is_public')
-                                    ->label('Public')
+                                    ->label(__('Public'))
                                     ->default(true),
                             ])
                             ->columns(4)
-                            ->itemLabel(fn (array $state): string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
+                            ->itemLabel(fn (array $state): string => (__($state['category'] ?? 'Contact')).': '.($state['value'] ?? '')),
                     ]),
-                Section::make('Media')
+                Section::make(__('Media'))
                     ->components([
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('avatar')
+                            ->label(__('Avatar'))
                             ->collection('avatar')
                             ->image()
                             ->imageEditor()
                             ->circleCropper()
                             ->avatar()
                             ->conversion('thumb')
-                            ->helperText('Speaker photo (recommended: 400x400)'),
+                            ->helperText(__('Speaker photo (recommended: 400x400)')),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
                             ->collection('cover')
-                            ->label('Cover Image')
+                            ->label(__('Cover Image'))
                             ->image()
                             ->imageEditor()
                             ->imageAspectRatio('16:9')
@@ -180,33 +213,37 @@ class SpeakerForm
                             ->automaticallyCropImagesToAspectRatio()
                             ->responsiveImages()
                             ->conversion('banner')
-                            ->helperText('Cover featured image'),
+                            ->helperText(__('Cover featured image')),
                         \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                            ->label(__('Gallery'))
                             ->collection('gallery')
                             ->multiple()
                             ->reorderable()
                             ->image()
                             ->responsiveImages()
                             ->conversion('gallery_thumb')
-                            ->helperText('Additional images'),
+                            ->helperText(__('Additional images')),
                     ])
                     ->columns(2),
-                Section::make('Social Media')
+                Section::make(__('Social Media'))
                     ->components([
                         \Filament\Forms\Components\Repeater::make('socialMedia')
+                            ->label(__('Social Media Links'))
                             ->relationship()
+                            ->default([])
                             ->schema([
                                 Select::make('platform')
+                                    ->label(__('Platform'))
                                     ->options(\App\Enums\SocialMediaPlatform::class)
                                     ->searchable()
                                     ->required()
                                     ->columnSpan(1),
                                 TextInput::make('username')
-                                    ->label('Username / Handle')
+                                    ->label(__('Username / Handle'))
                                     ->placeholder('@username')
                                     ->columnSpan(1),
                                 TextInput::make('url')
-                                    ->label('URL')
+                                    ->label(__('URL'))
                                     ->url()
                                     ->required()
                                     ->columnSpanFull(),
@@ -226,18 +263,19 @@ class SpeakerForm
                                 return null;
                             }),
                     ]),
-                Section::make('Status')
+                Section::make(__('Status'))
                     ->components([
                         Select::make('status')
+                            ->label(__('Status'))
                             ->options([
-                                'unverified' => 'Unverified',
-                                'pending' => 'Pending',
-                                'verified' => 'Verified',
-                                'rejected' => 'Rejected',
+                                'unverified' => __('Unverified'),
+                                'pending' => __('Pending'),
+                                'verified' => __('Verified'),
+                                'rejected' => __('Rejected'),
                             ])
                             ->required(),
                         \Filament\Forms\Components\Toggle::make('is_active')
-                            ->label('Active')
+                            ->label(__('Active'))
                             ->default(true),
                     ])
                     ->columns(1),

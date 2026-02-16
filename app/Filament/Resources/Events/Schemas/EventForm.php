@@ -105,6 +105,7 @@ class EventForm
                                         TimePicker::make('custom_time')
                                             ->label('Masa Mula')
                                             ->native()
+                                            ->timezone(config('app.timezone'))
                                             ->seconds(false)
                                             ->minutesStep(5)
                                             ->required(fn (Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value)
@@ -112,6 +113,7 @@ class EventForm
                                         TimePicker::make('end_time')
                                             ->label('Masa Akhir')
                                             ->native()
+                                            ->timezone(config('app.timezone'))
                                             ->seconds(false)
                                             ->minutesStep(5),
                                         DateTimePicker::make('starts_at')

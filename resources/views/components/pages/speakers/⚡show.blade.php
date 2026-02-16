@@ -29,6 +29,8 @@ new class extends Component {
             'socialMedia',
             'address.state',
             'address.city',
+            'address.district',
+            'address.subdistrict',
             'address.country',
             'institutions' => fn ($q) => $q->orderByPivot('is_primary', 'desc')->limit(3),
             'institutions.media',
@@ -146,10 +148,12 @@ new class extends Component {
         : $speaker->default_avatar_url;
     $coverUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
     $gallery = $speaker->getMedia('gallery');
+    $bioRenderer = RichContentRenderer::make($speaker->bio);
     $bioHtml = is_array($speaker->bio)
-        ? RichContentRenderer::make($speaker->bio)->toHtml()
+        ? $bioRenderer->toHtml()
         : $speaker->bio;
-    $bioExcerpt = filled($bioHtml) ? Str::limit(strip_tags($bioHtml), 180) : null;
+    $isBioFilled = is_array($speaker->bio) ? filled($bioRenderer->toText()) : filled($speaker->bio);
+    $bioExcerpt = $isBioFilled ? Str::limit(strip_tags($bioHtml), 180) : null;
 
     // Social media
     $socialLinks = $speaker->socialMedia->mapWithKeys(fn ($s) => [$s->platform => $s->url]);
@@ -162,9 +166,9 @@ new class extends Component {
 
     // Location
     $locationParts = array_filter([
-        $speaker->addressModel?->city?->name,
+        $speaker->addressModel?->subdistrict?->name,
+        $speaker->addressModel?->district?->name,
         $speaker->addressModel?->state?->name,
-        $speaker->addressModel?->country?->name,
     ]);
     $locationString = implode(', ', $locationParts);
 
@@ -204,12 +208,19 @@ new class extends Component {
     };
 
     // Calendar data: map events to dates for the calendar view
-    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(fn ($e) => [
-        'id' => $e->id,
-        'title' => $e->title,
-        'url' => route('events.show', $e),
-        'type' => $resolveEventTypeLabel($e->event_type),
-    ])->values())->toArray();
+    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
+        $typeLabel = $resolveEventTypeLabel($e->event_type);
+
+        return [
+            'id' => $e->id,
+            'title' => (string) str($e->title)
+                ->replace($typeLabel.': ', '')
+                ->replace($typeLabel.' - ', '')
+                ->replace(' ('.$typeLabel.')', '')
+                ->trim(),
+            'url' => route('events.show', $e),
+        ];
+    })->values())->toArray();
 @endphp
 
 <div class="min-h-screen bg-slate-50/80">
@@ -236,21 +247,12 @@ new class extends Component {
         {{-- Side vignette for depth --}}
         <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.4)_100%)]"></div>
 
-        {{-- Breadcrumb --}}
-        <div class="container relative z-10 mx-auto max-w-6xl px-6 pt-8 lg:px-8">
-            <nav class="animate-fade-in-up flex items-center gap-2 text-sm" style="animation-delay: 100ms; opacity: 0;">
-                <a href="{{ route('speakers.index') }}" wire:navigate class="text-slate-400/80 transition-colors duration-300 hover:text-white">{{ __('Penceramah') }}</a>
-                <svg class="h-3.5 w-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                <span class="max-w-[200px] truncate text-slate-300/60">{{ $speaker->name }}</span>
-            </nav>
-        </div>
-
         {{-- Hero content: Avatar + Name side-by-side on the hero --}}
-        <div class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 pb-6 pt-6 sm:flex-row sm:items-stretch sm:gap-8 lg:px-8 lg:pb-8 lg:pt-8">
+        <div class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 pb-10 pt-12 sm:flex-row sm:items-center sm:gap-8 lg:px-8 lg:pb-12 lg:pt-16">
             {{-- Avatar with decorative ring --}}
-            <div class="animate-scale-in relative shrink-0 sm:self-stretch" style="animation-delay: 200ms; opacity: 0;">
+            <div class="animate-scale-in relative shrink-0" style="animation-delay: 200ms; opacity: 0;">
                 <div class="absolute -inset-2 rounded-full bg-gradient-to-br from-emerald-400/35 via-gold-400/20 to-emerald-600/35 blur-md"></div>
-                <div class="relative h-32 w-32 overflow-hidden rounded-full ring-2 ring-white/20 shadow-2xl shadow-emerald-950/35 sm:h-full sm:w-auto sm:aspect-square sm:min-h-36 sm:max-h-48 lg:max-h-52">
+                <div class="relative h-32 w-32 overflow-hidden rounded-full ring-2 ring-white/20 shadow-2xl shadow-emerald-950/35 sm:h-36 sm:w-36 lg:h-44 lg:w-44">
                     <img src="{{ $avatarUrl }}" alt="{{ $speaker->name }}" class="h-full w-full object-cover" width="160" height="160">
                 </div>
             </div>
@@ -364,19 +366,18 @@ new class extends Component {
 
                     <div class="flex items-center gap-3">
                         {{-- Tab toggle: Upcoming / Past --}}
-                        @if($pastEvents->isNotEmpty())
-                            <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
-                                <button @click="tab = 'upcoming'; view = 'list'" :class="tab === 'upcoming' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
-                                    {{ __('Akan Datang') }}
-                                </button>
-                                <button @click="tab = 'past'" :class="tab === 'past' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    {{ __('Lepas') }}
-                                    <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600" x-show="tab !== 'past'">{{ $pastTotal }}</span>
-                                </button>
-                            </div>
-                        @endif
+                        <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
+                            <button @click="tab = 'upcoming'; view = 'list'" :class="tab === 'upcoming' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                                {{ __('Akan Datang') }}
+                                <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $upcomingTotal }}</span>
+                            </button>
+                            <button @click="tab = 'past'" :class="tab === 'past' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50" @disabled($pastTotal === 0)>
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                {{ __('Lepas') }}
+                                <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $pastTotal }}</span>
+                            </button>
+                        </div>
 
                         {{-- View toggle (list/calendar) — only for upcoming tab --}}
                         @if($upcomingEvents->isNotEmpty())
@@ -528,7 +529,7 @@ new class extends Component {
                                                             <a :href="ev.url" class="block rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words text-emerald-700 transition hover:bg-emerald-100" x-text="ev.title"></a>
                                                         </template>
                                                         <template x-if="cell.events?.length > 2">
-                                                            <span class="block text-[9px] font-semibold text-emerald-500" x-text="'+' + (cell.events.length - 2) + ' lagi'"></span>
+                                                            <span class="block text-[9px] font-semibold text-emerald-500" x-text="'+' + (cell.events.length - 2) + ' ' + @js(__('lagi'))"></span>
                                                         </template>
                                                     </div>
                                                 </template>
@@ -720,7 +721,7 @@ new class extends Component {
             @endif
 
             {{-- ─── BIODATA ─── --}}
-            @if(filled($bioHtml))
+            @if($isBioFilled)
                 <section class="animate-fade-in-up" style="animation-delay: 950ms; opacity: 0;">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/20">
