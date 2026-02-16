@@ -172,6 +172,78 @@
     animation: scale-in 0.4s ease-out forwards;
 }
 
+/* Speaker hero — ambient floating orbs */
+@keyframes float-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(12px, -18px) scale(1.05); }
+    50% { transform: translate(-8px, 10px) scale(0.97); }
+    75% { transform: translate(6px, -6px) scale(1.02); }
+}
+@keyframes float-drift-alt {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    30% { transform: translate(-15px, 12px) scale(1.04); }
+    60% { transform: translate(10px, -14px) scale(0.96); }
+    80% { transform: translate(-5px, 8px) scale(1.01); }
+}
+@keyframes float-drift-slow {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    40% { transform: translate(8px, 14px) scale(1.06); }
+    70% { transform: translate(-12px, -8px) scale(0.98); }
+}
+
+.animate-float-drift {
+    animation: float-drift 20s ease-in-out infinite;
+}
+.animate-float-drift-alt {
+    animation: float-drift-alt 25s ease-in-out infinite;
+}
+.animate-float-drift-slow {
+    animation: float-drift-slow 30s ease-in-out infinite;
+}
+
+/* Avatar glow breathing */
+@keyframes glow-breathe {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.06); }
+}
+.animate-glow-breathe {
+    animation: glow-breathe 4s ease-in-out infinite;
+}
+
+/* Gold shimmer line */
+@keyframes shimmer-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+}
+.shimmer-line {
+    position: relative;
+    overflow: hidden;
+}
+.shimmer-line::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shimmer-slide 3s ease-in-out infinite;
+}
+
+/* Subtle text glow for hero name */
+.text-hero-glow {
+    text-shadow: 0 0 40px rgba(52, 211, 153, 0.15), 0 0 80px rgba(52, 211, 153, 0.08);
+}
+
+/* Noise texture overlay */
+.noise-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px;
+    pointer-events: none;
+    z-index: 1;
+}
+
 .delay-100 {
     animation-delay: 100ms;
 }
