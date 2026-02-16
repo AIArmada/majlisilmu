@@ -974,7 +974,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(fn () => Cache::remember('submit_speakers', 60, fn () => Speaker::query()
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->where('is_active', true)
-                                            ->pluck('name', 'id')))
+                                            ->get()
+                                            ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                            ->all()))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -1078,6 +1080,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->relationship('speakers', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending'])->where('is_active', true))
                                         ->searchable()
                                         ->preload()
+                                        ->getOptionLabelUsing(fn (mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
+                                        ->getOptionLabelsUsing(fn (array $values): array => Speaker::query()
+                                            ->whereIn('id', $values)
+                                            ->get()
+                                            ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                            ->toArray())
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
                                 ]),

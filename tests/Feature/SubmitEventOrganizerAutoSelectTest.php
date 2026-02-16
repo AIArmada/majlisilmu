@@ -72,3 +72,16 @@ it('assigns the speaker as event speaker when speaker is the organizer', functio
     expect($event->organizer_type)->toBe(Speaker::class);
     expect($event->organizer_id)->toBe($fixtures['speaker']->id);
 });
+
+it('shows formatted speaker names in submit event speaker selectors', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Aisyah binti Noor',
+        'status' => 'verified',
+        'is_active' => true,
+        'honorific' => ['toh_puan'],
+        'pre_nominal' => ['dr'],
+    ]);
+
+    Livewire::test('pages.submit-event.create')
+        ->assertSee($speaker->formatted_name);
+});

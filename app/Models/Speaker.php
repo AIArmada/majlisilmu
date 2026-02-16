@@ -115,10 +115,10 @@ class Speaker extends Model implements AuditableContract, HasMedia
         }
 
         if ($this->gender === 'female') {
-            return asset('images/avatar-female.png');
+            return asset('images/placeholders/speaker-female.png');
         }
 
-        return asset('images/avatar-male.png');
+        return asset('images/placeholders/speaker-male.png');
     }
 
     public function getFormattedNameAttribute(): string

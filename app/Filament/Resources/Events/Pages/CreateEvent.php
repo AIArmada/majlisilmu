@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Events\Pages;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Tag;
+use App\Support\Events\AdminEventTimeMapper;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
 
@@ -17,6 +18,8 @@ class CreateEvent extends CreateRecord
     #[\Override]
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data = AdminEventTimeMapper::normalizeForPersistence($data);
+
         unset(
             $data['languages'],
             $data['domain_tags'],

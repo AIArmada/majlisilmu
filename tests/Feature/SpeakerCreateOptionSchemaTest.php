@@ -18,7 +18,12 @@ it('includes biography, cover image, and institution position fields in speaker 
     expect($fieldNames)->toContain('cover');
     expect($fieldNames)->toContain('institution_position');
     expect($fieldNames)->toContain('institution_id');
+    expect($fieldNames)->toContain('honorific');
+    expect($fieldNames)->toContain('pre_nominal');
+    expect($fieldNames)->toContain('post_nominal');
     expect($components->get('institution_id')?->isMultiple())->toBeFalse();
+    expect($components->get('honorific')?->isMultiple())->toBeTrue();
+    expect($components->get('pre_nominal')?->isMultiple())->toBeTrue();
 });
 
 it('stores biography and institution pivot position when creating a speaker via create option', function () {
@@ -39,6 +44,7 @@ it('stores biography and institution pivot position when creating a speaker via 
         'name' => 'Ustaz Test Speaker',
         'gender' => 'male',
         'bio' => $bio,
+        'post_nominal' => ['PhD', 'MSc'],
         'institution_id' => $institution->id,
         'institution_position' => 'Mudir',
     ]);
@@ -51,6 +57,7 @@ it('stores biography and institution pivot position when creating a speaker via 
     $linkedInstitution = $speaker->institutions->firstWhere('id', $institution->id);
 
     expect($speaker->bio)->toBe($bio)
+        ->and($speaker->post_nominal)->toBe(['PhD', 'MSc'])
         ->and($speaker->status)->toBe('pending')
         ->and($linkedInstitution)->not->toBeNull()
         ->and($linkedInstitution?->pivot?->position)->toBe('Mudir');

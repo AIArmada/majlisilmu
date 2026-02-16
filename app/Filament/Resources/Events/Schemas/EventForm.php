@@ -5,15 +5,13 @@ namespace App\Filament\Resources\Events\Schemas;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
-use App\Enums\PrayerOffset;
-use App\Enums\PrayerReference;
 use App\Enums\RegistrationMode;
 use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
 use App\Enums\TagType;
-use App\Enums\TimingMode;
 use App\Forms\Components\Select;
 use App\Forms\InstitutionFormSchema;
 use App\Forms\SpeakerFormSchema;
@@ -23,13 +21,13 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Components\Callout;
-use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -89,50 +87,39 @@ class EventForm
                                 Section::make('Waktu & Format')
                                     ->columnSpanFull()
                                     ->schema([
-                                        Select::make('timing_mode')
-                                            ->label('Mode Waktu')
-                                            ->options(
-                                                collect(TimingMode::cases())
-                                                    ->mapWithKeys(fn (TimingMode $case): array => [$case->value => $case->label()])
-                                                    ->toArray(),
-                                            )
-                                            ->default(TimingMode::Absolute->value)
+                                        DatePicker::make('event_date')
+                                            ->label('Tarikh')
+                                            ->native()
                                             ->required()
                                             ->live(),
-                                        Callout::make('Waktu akan dikira secara automatik')
-                                            ->description('Pilih jenis waktu solat dan offset untuk memaparkan waktu relatif.')
-                                            ->warning()
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
-                                        Fieldset::make('Waktu Solat')
-                                            ->schema([
-                                                Select::make('prayer_reference')
-                                                    ->label('Waktu Solat')
-                                                    ->options(
-                                                        collect(PrayerReference::cases())
-                                                            ->mapWithKeys(fn (PrayerReference $case): array => [$case->value => $case->label()])
-                                                            ->toArray(),
-                                                    )
-                                                    ->required(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
-                                                Select::make('prayer_offset')
-                                                    ->label('Offset')
-                                                    ->options(
-                                                        collect(PrayerOffset::cases())
-                                                            ->mapWithKeys(fn (PrayerOffset $case): array => [$case->value => $case->label()])
-                                                            ->toArray(),
-                                                    )
-                                                    ->required(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
-                                            ])
-                                            ->columns(2)
-                                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value),
-                                        DateTimePicker::make('starts_at')
-                                            ->label('Waktu Mula')
+                                        Select::make('prayer_time')
+                                            ->label('Waktu')
+                                            ->options(
+                                                collect(EventPrayerTime::cases())
+                                                    ->mapWithKeys(fn (EventPrayerTime $case): array => [$case->value => $case->getLabel()])
+                                                    ->toArray(),
+                                            )
+                                            ->default(EventPrayerTime::LainWaktu->value)
+                                            ->required()
+                                            ->live(),
+                                        TimePicker::make('custom_time')
+                                            ->label('Masa Mula')
+                                            ->native()
                                             ->seconds(false)
                                             ->minutesStep(5)
-                                            ->required(),
-                                        DateTimePicker::make('ends_at')
-                                            ->label('Waktu Tamat')
+                                            ->required(fn (Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value)
+                                            ->visible(fn (Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value),
+                                        TimePicker::make('end_time')
+                                            ->label('Masa Akhir')
+                                            ->native()
                                             ->seconds(false)
                                             ->minutesStep(5),
+                                        DateTimePicker::make('starts_at')
+                                            ->dehydrated(false)
+                                            ->visible(false),
+                                        DateTimePicker::make('ends_at')
+                                            ->dehydrated(false)
+                                            ->visible(false),
                                         TextInput::make('timezone')
                                             ->label('Timezone')
                                             ->default('Asia/Kuala_Lumpur')
@@ -361,6 +348,12 @@ class EventForm
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
+                                            ->getOptionLabelUsing(fn (mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
+                                            ->getOptionLabelsUsing(fn (array $values): array => Speaker::query()
+                                                ->whereIn('id', $values)
+                                                ->get()
+                                                ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                                ->toArray())
                                             ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                             ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
                                     ]),
@@ -540,7 +533,8 @@ class EventForm
             Speaker::class, 'speaker' => Speaker::query()
                 ->whereIn('status', ['verified', 'pending'])
                 ->orderBy('name')
-                ->pluck('name', 'id')
+                ->get()
+                ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
                 ->toArray(),
             default => [],
         };

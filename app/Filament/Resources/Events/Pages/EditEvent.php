@@ -12,6 +12,7 @@ use App\States\EventStatus\Approved;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
+use App\Support\Events\AdminEventTimeMapper;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
@@ -40,12 +41,14 @@ class EditEvent extends EditRecord
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
 
-        return $data;
+        return AdminEventTimeMapper::injectFormTimeFields($data);
     }
 
     #[\Override]
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data = AdminEventTimeMapper::normalizeForPersistence($data);
+
         unset(
             $data['languages'],
             $data['domain_tags'],

@@ -14,6 +14,7 @@ use App\Models\Subdistrict;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Text;
@@ -86,9 +87,24 @@ class SpeakerFormSchema
 
             Select::make('pre_nominal')
                 ->label(__('Pre-nominal'))
+                ->multiple()
                 ->options(PreNominal::class)
                 ->searchable()
                 ->placeholder(__('Select pre-nominals')),
+
+            TagsInput::make('post_nominal')
+                ->label(__('Post-nominal'))
+                ->placeholder(__('e.g., PhD, MA, MSc'))
+                ->suggestions([
+                    'PhD',
+                    'MSc',
+                    'MA',
+                    'BA',
+                    'BSc',
+                    'HONS',
+                    'Lc.',
+                    'Dpl.',
+                ]),
 
             TextInput::make('job_title')
                 ->label(__('Job Title'))
@@ -179,6 +195,7 @@ class SpeakerFormSchema
             'gender' => $data['gender'] ?? Gender::Male->value,
             'honorific' => empty($data['honorific']) ? null : $data['honorific'],
             'pre_nominal' => empty($data['pre_nominal']) ? null : $data['pre_nominal'],
+            'post_nominal' => empty($data['post_nominal']) ? null : $data['post_nominal'],
             'job_title' => $data['job_title'] ?? null,
             'bio' => $data['bio'] ?? null,
             'is_freelance' => (bool) ($data['is_freelance'] ?? false),
