@@ -30,7 +30,7 @@ class VenueFactory extends Factory
             'Dewan Kuliah',
             'Dewan Seminar',
         ]);
-        $slug = Str::slug($name.'-'.Str::random(8));
+        $slug = Str::slug($name).'-'.Str::lower(Str::random(7));
 
         return [
             'name' => $name,

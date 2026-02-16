@@ -15,6 +15,7 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -159,6 +160,10 @@ class SpeakerFormSchema
                 ->maxLength(255)
                 ->placeholder(__('e.g., Imam, Mudir, Committee Member'))
                 ->visible(fn (Get $get): bool => filled($get('institution_id'))),
+
+            Toggle::make('is_freelance')
+                ->label(__('Penceramah Bebas'))
+                ->default(false),
         ];
     }
 
@@ -176,7 +181,8 @@ class SpeakerFormSchema
             'pre_nominal' => empty($data['pre_nominal']) ? null : $data['pre_nominal'],
             'job_title' => $data['job_title'] ?? null,
             'bio' => $data['bio'] ?? null,
-            'slug' => Str::slug($data['name']).'-'.Str::random(6),
+            'is_freelance' => (bool) ($data['is_freelance'] ?? false),
+            'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
             'status' => 'pending',
         ]);
 

@@ -512,7 +512,7 @@
                                 <div class="absolute top-4 left-4 z-20 flex flex-col gap-2">
                                     <div
                                         class="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 text-center shadow-sm border border-black/5 min-w-[3.5rem]">
-                                        <div class="text-[0.6rem] font-bold uppercase tracking-wider text-slate-500">
+                                        <div class="text-xs font-bold uppercase tracking-wider text-slate-500">
                                             {{ $event->starts_at?->format('M') }}
                                         </div>
                                         <div class="text-xl font-bold font-heading text-slate-900 leading-none">

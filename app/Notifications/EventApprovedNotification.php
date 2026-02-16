@@ -36,7 +36,7 @@ class EventApprovedNotification extends Notification implements ShouldQueue
             ->line("Great news! Your event **\"{$this->event->title}\"** has been approved and is now live.")
             ->line('Date: '.($this->event->starts_at?->format('l, F j, Y') ?? 'TBD'))
             ->line('Time: '.($this->event->starts_at?->format('h:i A') ?? 'TBD'))
-            ->action('View Your Event', route('events.show', $this->event->slug))
+            ->action('View Your Event', route('events.show', $this->event))
             ->line('Share this event with your community to maximize attendance!')
             ->line('Jazakallahu khair for using Majlis Ilmu.');
     }

@@ -29,7 +29,7 @@ class SpeakerForm
                             ->default('male')
                             ->required(),
                         \Filament\Forms\Components\Toggle::make('is_freelance')
-                            ->label('Freelance / Independent')
+                            ->label(__('Penceramah Bebas'))
                             ->live(),
                         TextInput::make('job_title')
                             ->label('Job Title / Primary Designation')

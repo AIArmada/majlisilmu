@@ -99,7 +99,7 @@ class CreateAdvanced extends Component
             'user_id' => $user->id,
             'submitter_id' => $user->id,
             'title' => (string) $validated['form']['title'],
-            'slug' => Str::slug((string) $validated['form']['title']).'-'.Str::lower(Str::random(6)),
+            'slug' => Str::slug((string) $validated['form']['title']).'-'.Str::lower(Str::random(7)),
             'description' => (string) ($validated['form']['description'] ?? ''),
             'starts_at' => now($timezone),
             'ends_at' => now($timezone)->addHours(2),

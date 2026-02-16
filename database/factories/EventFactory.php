@@ -122,7 +122,7 @@ class EventFactory extends Factory
             'institution_id' => Institution::factory(),
             'venue_id' => $venueId,
             'title' => $title,
-            'slug' => Str::slug($title.'-'.Str::random(8)),
+            'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),
             'description' => fake()->optional()->paragraphs(2, true),
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
