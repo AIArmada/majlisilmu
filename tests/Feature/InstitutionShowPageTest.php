@@ -230,3 +230,56 @@ it('does not show unapproved events', function () {
         ->assertSuccessful()
         ->assertDontSee('Pending Event ABC');
 });
+
+it('allows an authenticated user to follow and unfollow an institution', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    $this->actingAs($user);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee(__('Ikuti'));
+
+    expect($user->isFollowing($institution))->toBeFalse();
+
+    Livewire::actingAs($user)
+        ->test('pages.institutions.show', ['institution' => $institution])
+        ->assertSet('isFollowing', false)
+        ->call('toggleFollow')
+        ->assertSet('isFollowing', true)
+        ->call('toggleFollow')
+        ->assertSet('isFollowing', false);
+
+    expect($user->isFollowing($institution))->toBeFalse();
+});
+
+it('redirects guest to login when trying to follow an institution', function () {
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    Livewire::test('pages.institutions.show', ['institution' => $institution])
+        ->call('toggleFollow')
+        ->assertRedirect(route('login'));
+});
+
+it('does not render breadcrumb and removed hero/page summary actions', function () {
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'name' => 'Institusi Ujian',
+    ]);
+
+    Event::factory(2)
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'starts_at' => now()->addDays(2),
+        ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertDontSee('Lihat Semua Majlis')
+        ->assertDontSee('2 majlis')
+        ->assertDontSee('3 penceramah')
+        ->assertDontSee('<nav class="animate-fade-in-up flex items-center gap-2 text-sm" style="animation-delay: 100ms; opacity: 0;">', false);
+});

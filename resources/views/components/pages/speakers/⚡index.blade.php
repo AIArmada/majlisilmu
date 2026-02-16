@@ -14,15 +14,22 @@ new
     public function speakers(): LengthAwarePaginator
     {
         $search = request('search');
+        $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         return Speaker::query()
+            ->active()
             ->where('status', 'verified')
             ->withCount('events')
             ->with('media')
-            ->when($search, function ($query, $search) {
-                $query->where(function ($innerQuery) use ($search) {
-                    $innerQuery->where('name', 'like', "%{$search}%")
-                        ->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
+            ->when($search, function ($query, $search) use ($operator) {
+                $query->where(function ($innerQuery) use ($search, $operator) {
+                    $innerQuery->where('name', $operator, "%{$search}%");
+
+                    if (DB::connection()->getDriverName() === 'pgsql') {
+                        $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
+                    } else {
+                        $innerQuery->orWhere('bio', $operator, "%{$search}%");
+                    }
                 });
             })
             ->orderBy('name', 'asc')

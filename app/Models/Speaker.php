@@ -4,6 +4,7 @@ namespace App\Models;
 
 use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use App\Enums\Honorific;
+use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -72,6 +73,10 @@ class Speaker extends Model implements AuditableContract, HasMedia
         static::saving(function (Speaker $speaker) {
             if ($speaker->isDirty('qualifications')) {
                 $qualifications = $speaker->qualifications;
+                $allowedPostNominals = array_map(
+                    static fn (PostNominal $postNominal): string => $postNominal->value,
+                    PostNominal::cases()
+                );
 
                 if (! is_array($qualifications) || $qualifications === []) {
                     $speaker->post_nominal = null;
@@ -88,7 +93,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
                     $degree = $qualification['degree'] ?? null;
 
-                    if (is_string($degree) && $degree !== '') {
+                    if (is_string($degree) && in_array($degree, $allowedPostNominals, true)) {
                         $parts[] = $degree;
                     }
                 }

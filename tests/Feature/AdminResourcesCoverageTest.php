@@ -13,6 +13,7 @@ use App\Filament\Resources\Series\RelationManagers\EventsRelationManager as Seri
 use App\Filament\Resources\Series\SeriesResource;
 use App\Filament\Resources\Spaces\SpaceResource;
 use App\Filament\Resources\Speakers\RelationManagers\EventsRelationManager as SpeakerEventsRelationManager;
+use App\Filament\Resources\Speakers\RelationManagers\FollowersRelationManager as SpeakerFollowersRelationManager;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Filament\Resources\Tags\TagResource;
 use App\Filament\Resources\Venues\VenueResource;
@@ -50,6 +51,7 @@ it('allows super admin to access all core admin resource index pages', function 
 it('registers expected relation managers on core admin resources', function () {
     expect(SeriesResource::getRelations())->toContain(SeriesEventsRelationManager::class);
     expect(SpeakerResource::getRelations())->toContain(SpeakerEventsRelationManager::class);
+    expect(SpeakerResource::getRelations())->toContain(SpeakerFollowersRelationManager::class);
     expect(ReferenceResource::getRelations())->toContain(ReferenceEventsRelationManager::class);
     expect(InstitutionResource::getRelations())->toContain(InstitutionDonationChannelsRelationManager::class);
 });

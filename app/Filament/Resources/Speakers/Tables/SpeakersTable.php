@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Speakers\Tables;
 
+use App\Models\Speaker;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -22,9 +23,14 @@ class SpeakersTable
                     ->collection('avatar')
                     ->conversion('thumb')
                     ->circular()
-                    ->size(48),
+                    ->size(48)
+                    ->defaultImageUrl(fn (Speaker $record): string => $record->default_avatar_url),
                 TextColumn::make('name')
                     ->searchable()
+                    ->sortable(),
+                TextColumn::make('followers_count')
+                    ->label('Followers')
+                    ->counts('followers')
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
