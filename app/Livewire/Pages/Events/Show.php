@@ -64,12 +64,24 @@ class Show extends Component
         $event->load([
             'media',
             'institution.media',
+            'institution.address.state',
+            'institution.address.city',
+            'institution.address.district',
+            'institution.address.subdistrict',
+            'institution.contacts',
             'venue.media',
+            'venue.address.state',
+            'venue.address.city',
+            'venue.address.district',
+            'venue.address.subdistrict',
             'speakers.media',
             'tags',
-            'donationChannel',
+            'donationChannel.media',
             'settings',
             'sessions',
+            'series',
+            'references.media',
+            'languages',
         ]);
 
         $this->event = $event;
@@ -123,13 +135,7 @@ class Show extends Component
         $tagIds = $this->event->tags->pluck('id')->all();
         $query = Event::query()
             ->whereKeyNot($this->event->id)
-            ->where('visibility', EventVisibility::Public)
-            ->where('is_active', true)
-            ->where(function (Builder $statusQuery): void {
-                $statusQuery
-                    ->whereState('status', Approved::class)
-                    ->orWhereState('status', Pending::class);
-            })
+            ->active()
             ->with([
                 'institution:id,name,slug',
                 'institution.media',
@@ -193,6 +199,56 @@ class Show extends Component
         }
 
         return RegistrationMode::Event;
+    }
+
+    /**
+     * Determine the event's temporal status for display purposes.
+     */
+    #[Computed]
+    public function eventTimeStatus(): string
+    {
+        $now = now($this->event->timezone ?: 'Asia/Kuala_Lumpur');
+        $startsAt = $this->event->starts_at;
+        $endsAt = $this->event->ends_at;
+
+        if (! $startsAt instanceof Carbon) {
+            return 'upcoming';
+        }
+
+        if ($endsAt instanceof Carbon && $now->greaterThan($endsAt)) {
+            return 'past';
+        }
+
+        if ($startsAt->isPast() && (! $endsAt instanceof Carbon || $now->lessThanOrEqualTo($endsAt))) {
+            return 'happening_now';
+        }
+
+        if ($startsAt->isFuture() && $startsAt->diffInHours($now) <= 24) {
+            return 'starting_soon';
+        }
+
+        return 'upcoming';
+    }
+
+    /**
+     * Render the event description as safe HTML.
+     */
+    #[Computed]
+    public function descriptionHtml(): string
+    {
+        $description = $this->event->description;
+
+        if (is_array($description)) {
+            $html = $description['html'] ?? null;
+
+            if (is_string($html) && $html !== '') {
+                return $html;
+            }
+        }
+
+        $text = $this->event->description_text;
+
+        return $text !== '' ? nl2br(e($text)) : '';
     }
 
     /**

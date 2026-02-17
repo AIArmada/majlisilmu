@@ -15,8 +15,7 @@ new class extends Component {
 
         // Single query to get all event counts grouped by date
         $eventCounts = Event::query()
-            ->whereIn('status', ['approved', 'pending'])
-            ->where('visibility', 'public')
+            ->active()
             ->whereBetween('starts_at', [$startDate, $endDate])
             ->selectRaw('DATE(starts_at) as date, COUNT(*) as count')
             ->groupByRaw('DATE(starts_at)')

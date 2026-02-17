@@ -75,8 +75,7 @@ new class extends Component {
     public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->speaker->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '>=', now())
             ->with([
                 'institution',
@@ -93,8 +92,7 @@ new class extends Component {
     public function getUpcomingTotalProperty(): int
     {
         return $this->speaker->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '>=', now())
             ->count();
     }
@@ -105,8 +103,7 @@ new class extends Component {
     public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->speaker->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '<', now())
             ->with([
                 'institution',
@@ -123,8 +120,7 @@ new class extends Component {
     public function getPastTotalProperty(): int
     {
         return $this->speaker->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '<', now())
             ->count();
     }
@@ -207,9 +203,24 @@ new class extends Component {
         return implode(', ', $parts);
     };
 
+    $resolveEventTimeDisplay = static function (\App\Models\Event $event): string {
+        $eventTimezone = $event->timezone ?: 'Asia/Kuala_Lumpur';
+
+        return $event->timing_display !== ''
+            ? $event->timing_display
+            : ($event->starts_at?->copy()->timezone($eventTimezone)->format('h:i A') ?? '');
+    };
+
+    $resolveEventEndTimeDisplay = static function (\App\Models\Event $event): string {
+        $eventTimezone = $event->timezone ?: 'Asia/Kuala_Lumpur';
+
+        return $event->ends_at?->copy()->timezone($eventTimezone)->format('h:i A') ?? '';
+    };
+
     // Calendar data: map events to dates for the calendar view
     $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
         $typeLabel = $resolveEventTypeLabel($e->event_type);
+        $formatValue = $e->event_format?->value ?? $e->event_format;
 
         return [
             'id' => $e->id,
@@ -219,6 +230,8 @@ new class extends Component {
                 ->replace(' ('.$typeLabel.')', '')
                 ->trim(),
             'url' => route('events.show', $e),
+            'pending' => $e->status instanceof \App\States\EventStatus\Pending,
+            'is_remote' => in_array($formatValue, ['online', 'hybrid'], true),
         ];
     })->values())->toArray();
 @endphp
@@ -281,17 +294,17 @@ new class extends Component {
 
                 {{-- Institution affiliation --}}
                 @if($institutions->isNotEmpty())
-                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:justify-start">
                         @foreach($institutions as $inst)
                             @php
                                 $position = $inst->pivot->position;
                                 $isPrimary = $inst->pivot->is_primary;
-                                $logoUrl = $inst->getFirstMediaUrl('logo', 'thumb');
+                                $institutionChipImageUrl = $inst->getFirstMediaUrl('cover', 'banner') ?: $inst->getFirstMediaUrl('logo');
                             @endphp
                             <a href="{{ route('institutions.show', $inst) }}" wire:navigate
                                class="group inline-flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-sm transition-all duration-200 hover:border-emerald-400/30 hover:bg-white/10">
-                                @if($logoUrl)
-                                    <img src="{{ $logoUrl }}" alt="{{ $inst->name }}" class="h-5 w-5 shrink-0 rounded object-contain">
+                                @if($institutionChipImageUrl)
+                                    <img src="{{ $institutionChipImageUrl }}" alt="{{ $inst->name }}" class="aspect-video w-8 shrink-0 rounded object-cover">
                                 @else
                                     <svg class="h-4 w-4 shrink-0 text-emerald-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>
                                 @endif
@@ -347,6 +360,15 @@ new class extends Component {
                             {{ __('Bebas / Freelance') }}
                         </span>
                     @endif
+                    @can('update', $speaker)
+                        <a href="{{ route('filament.admin.resources.speakers.edit', ['record' => $speaker]) }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:border-gold-400/40 hover:bg-gold-500/20 hover:text-gold-200 backdrop-blur-sm">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.5 19.213l-4.5.9.9-4.5L16.862 3.487z"/></svg>
+                            {{ __('Edit Penceramah') }}
+                        </a>
+                    @endcan
                 </div>
 
             </div>
@@ -367,7 +389,8 @@ new class extends Component {
             <div class="space-y-10">
 
                 {{-- ─── EVENTS SECTION (Tabs: Upcoming / Past) ─── --}}
-                <section class="animate-fade-in-up" style="animation-delay: 500ms; opacity: 0;"
+                <section class="scroll-reveal reveal-up"
+                         x-intersect.once="$el.classList.add('revealed')"
                          x-data="{ tab: 'upcoming', view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
                     {{-- Section header --}}
                     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -429,15 +452,17 @@ new class extends Component {
                             @foreach($upcomingEvents as $event)
                                 @php
                                     $venueLocation = $resolveVenueLocation($event);
-                                    $isOnlineEvent = ($event->event_format?->value ?? $event->event_format) === 'online';
+                                    $eventFormatValue = $event->event_format?->value ?? $event->event_format;
+                                    $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
+                                    $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
                                 @endphp
                                 <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="upcoming-{{ $event->id }}"
                                    class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/80 hover:ring-emerald-100 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                     {{-- Date accent sidebar --}}
-                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-emerald-600 to-emerald-800 p-2.5 text-white sm:w-24 sm:p-3">
-                                        <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-200/80 sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
+                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800') }} p-2.5 text-white sm:w-24 sm:p-3">
+                                        <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
                                         <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide text-emerald-200/80 sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
                                     </div>
                                     {{-- Event details --}}
                                     <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -445,10 +470,15 @@ new class extends Component {
                                             <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
                                                 {{ $resolveEventTypeLabel($event->event_type) }}
                                             </span>
-                                            @if($isOnlineEvent)
+                                            @if($event->status instanceof \App\States\EventStatus\Pending)
+                                                <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                    {{ __('Menunggu Kelulusan') }}
+                                                </span>
+                                            @endif
+                                            @if($isRemoteEvent)
                                                 <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
                                                     <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                                                    {{ __('Online') }}
+                                                    {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
                                                 </span>
                                             @endif
                                         </div>
@@ -458,9 +488,9 @@ new class extends Component {
                                         <div class="space-y-1 text-sm text-slate-500">
                                             <div class="flex items-center gap-1.5">
                                                 <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                {{ $event->starts_at?->format('h:i A') }}
+                                                {{ $resolveEventTimeDisplay($event) }}
                                                 @if($event->ends_at)
-                                                    <span class="text-slate-300">–</span> {{ $event->ends_at?->format('h:i A') }}
+                                                    <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
                                                 @endif
                                             </div>
                                             @if($venueLocation)
@@ -539,21 +569,27 @@ new class extends Component {
                                          :class="cell.day === null ? 'bg-slate-50/30' : ''">
                                         <template x-if="cell.day !== null">
                                             <div>
-                                                <span class="text-xs font-medium" :class="cell.events?.length > 0 ? 'font-bold text-emerald-700' : 'text-slate-400'" x-text="cell.day"></span>
+                                                <span class="text-xs font-medium"
+                                                    :class="cell.events?.length > 0 ? (cell.events.some(ev => ev.pending) ? 'font-bold text-amber-700' : (cell.events.some(ev => ev.is_remote) ? 'font-bold text-sky-700' : 'font-bold text-emerald-700')) : 'text-slate-400'"
+                                                    x-text="cell.day"></span>
                                                 <template x-if="cell.events?.length > 0">
                                                     <div class="mt-0.5 space-y-0.5">
                                                         <template x-for="ev in cell.events.slice(0, 2)" :key="ev.id">
-                                                            <a :href="ev.url" class="block rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words text-emerald-700 transition hover:bg-emerald-100" x-text="ev.title"></a>
+                                                            <a :href="ev.url" class="block rounded px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words transition"
+                                                               :class="ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100')"
+                                                               x-text="ev.title"></a>
                                                         </template>
                                                         <template x-if="cell.events?.length > 2">
-                                                            <span class="block text-[9px] font-semibold text-emerald-500" x-text="'+' + (cell.events.length - 2) + ' ' + @js(__('lagi'))"></span>
+                                                            <span class="block text-[9px] font-semibold"
+                                                                  :class="cell.events.some(ev => ev.pending) ? 'text-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'text-sky-500' : 'text-emerald-500')"
+                                                                  x-text="'+' + (cell.events.length - 2) + ' ' + @js(__('lagi'))"></span>
                                                         </template>
                                                     </div>
                                                 </template>
                                                 <template x-if="cell.events?.length > 0">
                                                     <div class="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5 sm:hidden">
                                                         <template x-for="i in Math.min(cell.events.length, 3)" :key="i">
-                                                            <span class="h-1 w-1 rounded-full bg-emerald-500"></span>
+                                                            <span class="h-1 w-1 rounded-full" :class="cell.events.some(ev => ev.pending) ? 'bg-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'bg-sky-500' : 'bg-emerald-500')"></span>
                                                         </template>
                                                     </div>
                                                 </template>
@@ -574,15 +610,17 @@ new class extends Component {
                         @foreach($pastEvents as $event)
                             @php
                                 $pastVenueLocation = $resolveVenueLocation($event);
-                                $isOnlineEvent = ($event->event_format?->value ?? $event->event_format) === 'online';
+                                $eventFormatValue = $event->event_format?->value ?? $event->event_format;
+                                $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
+                                $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
                             @endphp
                             <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
                                class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:ring-slate-200 hover:shadow-xl hover:shadow-slate-500/[0.06]">
                                 {{-- Date accent sidebar --}}
-                                <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-slate-500 to-slate-700 p-2.5 text-white sm:w-24 sm:p-3">
-                                    <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300/80 sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
+                                <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700') }} p-2.5 text-white sm:w-24 sm:p-3">
+                                    <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
                                     <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                    <span class="mt-0.5 text-[11px] font-bold tracking-wide text-slate-300/80 sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                    <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
                                 </div>
                                 {{-- Event details --}}
                                 <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -590,10 +628,15 @@ new class extends Component {
                                         <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/60">
                                             {{ $resolveEventTypeLabel($event->event_type) }}
                                         </span>
-                                        @if($isOnlineEvent)
+                                        @if($event->status instanceof \App\States\EventStatus\Pending)
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                {{ __('Menunggu Kelulusan') }}
+                                            </span>
+                                        @endif
+                                        @if($isRemoteEvent)
                                             <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                                                {{ __('Online') }}
+                                                {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
                                             </span>
                                         @endif
                                         <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
@@ -606,9 +649,9 @@ new class extends Component {
                                     <div class="space-y-1 text-sm text-slate-500">
                                         <div class="flex items-center gap-1.5">
                                             <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                            {{ $event->starts_at?->format('h:i A') }}
+                                            {{ $resolveEventTimeDisplay($event) }}
                                             @if($event->ends_at)
-                                                <span class="text-slate-300">–</span> {{ $event->ends_at?->format('h:i A') }}
+                                                <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
                                             @endif
                                         </div>
                                         @if($pastVenueLocation)
@@ -653,14 +696,15 @@ new class extends Component {
 
             {{-- Cover image --}}
             @if($coverUrl)
-                <div class="animate-fade-in-up overflow-hidden rounded-2xl shadow-lg shadow-slate-900/5 ring-1 ring-slate-200/60" style="animation-delay: 700ms; opacity: 0;">
+                <div class="scroll-reveal reveal-scale overflow-hidden rounded-2xl shadow-lg shadow-slate-900/5 ring-1 ring-slate-200/60"
+                     x-data x-intersect.once="$el.classList.add('revealed')">
                     <img src="{{ $coverUrl }}" alt="{{ $speaker->name }}" class="w-full object-cover" loading="lazy">
                 </div>
             @endif
 
             {{-- ─── GALLERY ─── --}}
             @if($gallery->count() > 0)
-                <section class="animate-fade-in-up" style="animation-delay: 850ms; opacity: 0;">
+                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25zm15-14.25a1.125 1.125 0 11-2.25 0 1.125 1.125 0 012.25 0z"/></svg>
@@ -687,13 +731,13 @@ new class extends Component {
 
             {{-- Qualifications — Timeline style (hidden for now) --}}
             @if(false && $qualifications !== [])
-                <section class="animate-fade-in-up" style="animation-delay: 900ms; opacity: 0;">
+                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
-                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-white shadow-lg shadow-gold-500/20">
-                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342"/></svg>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-white shadow-lg shadow-gold-500/20">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342"/></svg>
                         </div>
                         <div>
-                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Kelayakan Akademik') }}</h2>
+                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Kelayakan Akademik') }}</h2>
                             <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-gold-500 to-transparent"></div>
                         </div>
                     </div>
@@ -739,7 +783,7 @@ new class extends Component {
 
             {{-- ─── BIODATA ─── --}}
             @if($isBioFilled)
-                <section class="animate-fade-in-up" style="animation-delay: 950ms; opacity: 0;">
+                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/25">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
@@ -763,7 +807,7 @@ new class extends Component {
 
             {{-- ─── SOCIAL MEDIA (Below Biodata) ─── --}}
             @if($socialLinks->isNotEmpty())
-                <section class="animate-fade-in-up" style="animation-delay: 1000ms; opacity: 0;">
+                <section class="scroll-reveal reveal-left" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>

@@ -56,23 +56,27 @@ class MediaFileNamer extends FileNamer
         }
 
         // Try slug first (Event, Speaker, Venue, Institution, Series)
-        if (filled($model->getAttribute('slug'))) {
-            return str($model->getAttribute('slug'))->slug()->toString();
+        $slug = isset($model->slug) ? $model->getAttribute('slug') : null;
+        if (filled($slug) && is_scalar($slug)) {
+            return str((string) $slug)->slug()->toString();
         }
 
         // Try name (DonationChannel, models with a name attribute)
-        if (filled($model->getAttribute('name'))) {
-            return str($model->getAttribute('name'))->slug()->limit(80, '')->toString();
+        $name = isset($model->name) ? $model->getAttribute('name') : null;
+        if (filled($name) && is_scalar($name)) {
+            return str((string) $name)->slug()->limit(80, '')->toString();
         }
 
         // Try title (Reference)
-        if (filled($model->getAttribute('title'))) {
-            return str($model->getAttribute('title'))->slug()->limit(80, '')->toString();
+        $title = isset($model->title) ? $model->getAttribute('title') : null;
+        if (filled($title) && is_scalar($title)) {
+            return str((string) $title)->slug()->limit(80, '')->toString();
         }
 
         // Try label (DonationChannel fallback)
-        if (filled($model->getAttribute('label'))) {
-            return str($model->getAttribute('label'))->slug()->limit(80, '')->toString();
+        $label = isset($model->label) ? $model->getAttribute('label') : null;
+        if (filled($label) && is_scalar($label)) {
+            return str((string) $label)->slug()->limit(80, '')->toString();
         }
 
         // Fallback: use morph alias or class basename
@@ -135,14 +139,16 @@ class MediaFileNamer extends FileNamer
         }
 
         foreach (['title', 'name', 'label', 'slug'] as $attribute) {
-            $value = $model->getAttribute($attribute);
+            if (isset($model->{$attribute})) {
+                $value = $model->getAttribute($attribute);
 
-            if (filled($value) && is_scalar($value)) {
-                return Str::of((string) $value)
-                    ->replace(['_', '-'], ' ')
-                    ->squish()
-                    ->title()
-                    ->toString();
+                if (filled($value) && is_scalar($value)) {
+                    return Str::of((string) $value)
+                        ->replace(['_', '-'], ' ')
+                        ->squish()
+                        ->title()
+                        ->toString();
+                }
             }
         }
 

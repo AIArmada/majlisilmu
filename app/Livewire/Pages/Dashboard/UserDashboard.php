@@ -269,9 +269,7 @@ class UserDashboard extends Component
      */
     protected function mySavedEventsQuery(User $user): BelongsToMany
     {
-        return $user->savedEvents()
-            ->where('status', 'approved')
-            ->where('visibility', 'public');
+        return $user->savedEvents()->active();
     }
 
     protected function hydrateDigestNotificationPreferences(User $user): void

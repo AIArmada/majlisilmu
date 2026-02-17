@@ -172,6 +172,48 @@
     animation: scale-in 0.4s ease-out forwards;
 }
 
+/* ── Scroll-triggered reveal animations ── */
+.scroll-reveal {
+    opacity: 0;
+    will-change: transform, opacity;
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                filter 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal.reveal-up {
+    transform: translateY(28px);
+}
+
+.scroll-reveal.reveal-scale {
+    transform: scale(0.92);
+}
+
+.scroll-reveal.reveal-left {
+    transform: translateX(-24px);
+}
+
+.scroll-reveal.reveal-right {
+    transform: translateX(24px);
+}
+
+.scroll-reveal.reveal-blur {
+    transform: translateY(14px);
+    filter: blur(6px);
+}
+
+/* Activated state – applied by x-intersect */
+.scroll-reveal.revealed {
+    opacity: 1;
+    transform: translateY(0) translateX(0) scale(1);
+    filter: blur(0);
+}
+
+/* Stagger children: use [style*="--reveal-d"] for per-element delay */
+.scroll-reveal {
+    transition-delay: var(--reveal-d, 0ms);
+}
+
 /* Speaker hero — ambient floating orbs */
 @keyframes float-drift {
     0%, 100% { transform: translate(0, 0) scale(1); }

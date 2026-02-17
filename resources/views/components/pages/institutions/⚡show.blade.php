@@ -73,8 +73,7 @@ new class extends Component {
     public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->institution->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '>=', now())
             ->with([
                 'venue.address.state',
@@ -91,8 +90,7 @@ new class extends Component {
     public function getUpcomingTotalProperty(): int
     {
         return $this->institution->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '>=', now())
             ->count();
     }
@@ -103,8 +101,7 @@ new class extends Component {
     public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->institution->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '<', now())
             ->with([
                 'venue.address.state',
@@ -121,8 +118,7 @@ new class extends Component {
     public function getPastTotalProperty(): int
     {
         return $this->institution->events()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->where('starts_at', '<', now())
             ->count();
     }
@@ -132,7 +128,20 @@ new class extends Component {
         $view->title($this->institution->name . ' - ' . config('app.name'));
     }
 };
+
 ?>
+
+<style>
+    @media (max-width: 1023px) {
+        .institution-main-column {
+            order: 2;
+        }
+
+        .institution-sidebar-column {
+            order: 1;
+        }
+    }
+</style>
 
 @php
     $institution = $this->institution;
@@ -143,22 +152,54 @@ new class extends Component {
 
     $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
     $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
+    $heroInstitutionImageUrl = $coverUrl ?: $institution->getFirstMediaUrl('logo');
     $gallery = $institution->getMedia('gallery');
     $speakers = $institution->speakers;
     $spaces = $institution->spaces;
     $donationChannels = $institution->donationChannels;
-    $socialLinks = $institution->socialMedia->mapWithKeys(fn ($s) => [$s->platform => $s->url]);
+    $socialLinks = $institution->socialMedia->filter(fn ($s) => filled($s->url));
     $contacts = $institution->contacts->where('is_public', true);
     $languages = $institution->languages;
 
     // Location
     $address = $institution->addressModel;
     $locationParts = array_filter([
-        $address?->city?->name,
+        $address?->subdistrict?->name,
+        $address?->district?->name,
         $address?->state?->name,
     ]);
     $locationString = implode(', ', $locationParts);
+    $googleMapsApiKey = (string) config('services.google.maps_api_key', '');
+    $mapQuery = implode(', ', array_filter([
+        $institution->name,
+        $address?->line1,
+        $address?->line2,
+        $address?->city?->name,
+        $address?->state?->name,
+        $address?->country?->name,
+    ]));
+    $normalizedMapQuery = null;
+    if (filled($address?->google_maps_url)) {
+        $parsedQueryString = parse_url((string) $address->google_maps_url, PHP_URL_QUERY);
+        if (is_string($parsedQueryString) && $parsedQueryString !== '') {
+            parse_str($parsedQueryString, $queryParams);
+            $queryValue = $queryParams['query'] ?? $queryParams['q'] ?? null;
+            if (is_string($queryValue) && $queryValue !== '') {
+                $normalizedMapQuery = $queryValue;
+            }
+        }
+    }
+    if (! filled($normalizedMapQuery) && filled($mapQuery)) {
+        $normalizedMapQuery = $mapQuery;
+    }
 
+    $googleMapsEmbedUrl = null;
+    if (filled($address?->google_maps_url) && filled($googleMapsApiKey) && filled($normalizedMapQuery)) {
+        $googleMapsEmbedUrl = 'https://www.google.com/maps/embed/v1/place?key=' . urlencode($googleMapsApiKey) . '&q=' . urlencode((string) $normalizedMapQuery);
+    } elseif (filled($address?->google_maps_url) && filled($normalizedMapQuery)) {
+        $googleMapsEmbedUrl = 'https://www.google.com/maps?q=' . urlencode((string) $normalizedMapQuery) . '&output=embed';
+    }
+    $wazeUrl = filled($address?->waze_url) ? (string) $address->waze_url : null;
     // Institution type label
     $typeLabel = $institution->type?->getLabel();
 
@@ -218,33 +259,44 @@ new class extends Component {
     {{-- ═══════════════════════════════════════════════════════════
          CINEMATIC HERO — Dramatic, atmospheric header
     ═══════════════════════════════════════════════════════════ --}}
-    <header class="relative isolate overflow-hidden bg-slate-950" style="min-height: 320px">
-        {{-- Ambient gradient background orbs --}}
+    <header class="noise-overlay relative isolate overflow-hidden bg-gradient-to-br from-slate-950 via-emerald-950/80 to-slate-950" style="min-height: 320px">
+        {{-- Ambient gradient background orbs — animated floating --}}
         <div class="pointer-events-none absolute inset-0">
-            <div class="absolute -top-24 left-[15%] h-[28rem] w-[28rem] rounded-full bg-emerald-600/20 blur-[120px]"></div>
-            <div class="absolute -bottom-20 right-[10%] h-[22rem] w-[22rem] rounded-full bg-gold-500/15 blur-[100px]"></div>
-            <div class="absolute top-10 right-[40%] h-[18rem] w-[18rem] rounded-full bg-teal-500/10 blur-[80px]"></div>
+            <div class="animate-float-drift absolute -top-24 left-[15%] h-[28rem] w-[28rem] rounded-full bg-emerald-500/25 blur-[100px]"></div>
+            <div class="animate-float-drift-alt absolute -bottom-20 right-[10%] h-[22rem] w-[22rem] rounded-full bg-gold-400/18 blur-[90px]"></div>
+            <div class="animate-float-drift-slow absolute top-10 right-[40%] h-[18rem] w-[18rem] rounded-full bg-teal-400/18 blur-[80px]"></div>
+            {{-- Extra accent orbs for richer depth --}}
+            <div class="animate-float-drift-alt absolute -top-10 right-[20%] h-[16rem] w-[16rem] rounded-full bg-emerald-400/12 blur-[70px]"></div>
+            <div class="animate-float-drift absolute -bottom-8 left-[25%] h-[18rem] w-[18rem] rounded-full bg-gold-300/10 blur-[100px]"></div>
         </div>
+
+        {{-- Spotlight radial glow behind content --}}
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_55%_50%,rgba(16,185,129,0.14)_0%,transparent_60%)]"></div>
 
         {{-- Cover image --}}
         @if($coverUrl)
-            <img src="{{ $coverUrl }}" alt="" class="absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-luminosity" loading="eager">
+            <img src="{{ $coverUrl }}" alt="" class="absolute inset-0 h-full w-full object-cover opacity-30 mix-blend-luminosity" loading="eager">
         @endif
         {{-- Islamic geometric pattern overlay --}}
-        <div class="absolute inset-0 opacity-[0.04]" style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 200px;"></div>
-        {{-- Bottom gradient fade --}}
-        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
-        {{-- Side vignette --}}
-        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.4)_100%)]"></div>
+        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 200px;"></div>
+        {{-- Mesh gradient layer for depth --}}
+        <div class="absolute inset-0 bg-[conic-gradient(from_140deg_at_75%_30%,transparent_35%,rgba(16,185,129,0.08)_50%,transparent_65%)]"></div>
+        {{-- Bottom gradient fade — lighter to let colors breathe --}}
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent"></div>
+        {{-- Side vignette for depth --}}
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.3)_100%)]"></div>
+        {{-- Top inner shadow for containment --}}
+        <div class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate-950/60 to-transparent"></div>
 
         {{-- Hero content: Logo + Name --}}
         <div class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 pb-10 pt-12 sm:flex-row sm:items-center sm:gap-8 lg:px-8 lg:pb-12 lg:pt-16">
-            {{-- Logo --}}
+            {{-- Logo with breathing glow --}}
             <div class="animate-scale-in relative shrink-0" style="animation-delay: 200ms; opacity: 0;">
-                <div class="absolute -inset-1.5 rounded-[1.25rem] bg-gradient-to-br from-emerald-400/40 via-gold-400/30 to-emerald-600/40 blur-sm"></div>
-                <div class="relative h-28 w-28 overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-800 shadow-2xl shadow-black/40 ring-1 ring-white/10 sm:h-36 sm:w-36">
-                    @if($logoUrl)
-                        <img src="{{ $logoUrl }}" alt="{{ $institution->name }}" class="h-full w-full object-cover" width="144" height="144">
+                <div class="animate-glow-breathe absolute -inset-2.5 rounded-[1.5rem] bg-gradient-to-br from-emerald-400/30 via-gold-400/15 to-emerald-600/30 blur-lg"></div>
+                <div class="absolute -inset-1.5 rounded-[1.25rem] bg-gradient-to-br from-emerald-400/20 via-transparent to-gold-400/20"></div>
+                <div class="relative aspect-video w-44 overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-800 shadow-2xl shadow-emerald-950/50 ring-1 ring-white/15 sm:w-56">
+                    @if($heroInstitutionImageUrl)
+                        <img src="{{ $heroInstitutionImageUrl }}" alt="{{ $institution->name }}" class="h-full w-full object-cover" width="224" height="126">
                     @else
                         <div class="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-800 to-emerald-950 relative">
                             <div class="absolute inset-0 opacity-10" style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 80px;"></div>
@@ -272,20 +324,14 @@ new class extends Component {
 
             {{-- Name & meta --}}
             <div class="animate-fade-in-up flex-1 text-center sm:text-left" style="animation-delay: 350ms; opacity: 0;">
-                <h1 class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                <h1 class="text-hero-glow font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
                     {{ $institution->name }}
                 </h1>
-                {{-- Gold accent line --}}
-                <div class="mx-auto mt-3 h-0.5 w-16 rounded-full bg-gradient-to-r from-gold-400/80 to-gold-600/40 sm:mx-0"></div>
+                {{-- Decorative gold shimmer line --}}
+                <div class="shimmer-line mx-auto mt-3 h-0.5 w-20 rounded-full bg-gradient-to-r from-gold-400/80 via-gold-300/60 to-gold-600/30 sm:mx-0"></div>
 
-                {{-- Location & quick stats --}}
+                {{-- Quick stats --}}
                 <div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
-                    @if($locationString)
-                        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                            <svg class="h-3 w-3 text-emerald-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
-                            {{ $locationString }}
-                        </span>
-                    @endif
                     @if($languages->isNotEmpty())
                         <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
                             <svg class="h-3 w-3 text-slate-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802"/></svg>
@@ -319,66 +365,48 @@ new class extends Component {
                             {{ __('Ikuti') }}
                         @endif
                     </button>
+
+                    @if($locationString)
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                            <svg class="h-3 w-3 text-emerald-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                            {{ $locationString }}
+                        </span>
+                    @endif
+
+                    @can('update', $institution)
+                        <a href="{{ route('filament.admin.resources.institutions.edit', ['record' => $institution]) }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:border-gold-400/40 hover:bg-gold-500/20 hover:text-gold-200 backdrop-blur-sm">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.5 19.213l-4.5.9.9-4.5L16.862 3.487z"/></svg>
+                            {{ __('Edit Institusi') }}
+                        </a>
+                    @endcan
                 </div>
 
-                {{-- Social links --}}
-                @if($socialLinks->isNotEmpty())
-                    <div class="mt-3 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
-                        @if($socialLinks->has('website'))
-                            <a href="{{ $socialLinks->get('website') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/10 hover:text-white" title="{{ __('Laman Web') }}">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
-                            </a>
-                        @endif
-                        @if($socialLinks->has('facebook'))
-                            <a href="{{ $socialLinks->get('facebook') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-blue-500/20 hover:text-blue-300" title="{{ __('Facebook') }}">
-                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                            </a>
-                        @endif
-                        @if($socialLinks->has('instagram'))
-                            <a href="{{ $socialLinks->get('instagram') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-pink-500/20 hover:text-pink-300" title="{{ __('Instagram') }}">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>
-                            </a>
-                        @endif
-                        @if($socialLinks->has('youtube'))
-                            <a href="{{ $socialLinks->get('youtube') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-red-500/20 hover:text-red-300" title="{{ __('YouTube') }}">
-                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
-                            </a>
-                        @endif
-                        @if($socialLinks->has('twitter') || $socialLinks->has('x'))
-                            <a href="{{ $socialLinks->get('twitter') ?? $socialLinks->get('x') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/10 hover:text-white" title="{{ __('X') }}">
-                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                            </a>
-                        @endif
-                        @if($socialLinks->has('tiktok'))
-                            <a href="{{ $socialLinks->get('tiktok') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/10 hover:text-white" title="{{ __('TikTok') }}">
-                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48V13a8.28 8.28 0 005.58 2.15V11.7a4.84 4.84 0 01-3.77-1.78v-.01l.01-.01V6.69h3.76z"/></svg>
-                            </a>
-                        @endif
-                        @if($socialLinks->has('telegram'))
-                            <a href="{{ $socialLinks->get('telegram') }}" target="_blank" rel="noopener" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-sky-500/20 hover:text-sky-300" title="{{ __('Telegram') }}">
-                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                            </a>
-                        @endif
-                    </div>
-                @endif
             </div>
         </div>
-        {{-- Bottom edge accent --}}
+        {{-- Layered bottom edge --}}
         <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent"></div>
+        <div class="absolute inset-x-0 bottom-px h-px bg-gradient-to-r from-transparent via-gold-400/20 to-transparent"></div>
+        <div class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-slate-50/80 to-transparent"></div>
     </header>
 
     {{-- ═══════════════════════════════════════════════════════════
          MAIN CONTENT
     ═══════════════════════════════════════════════════════════ --}}
-    <div class="container mx-auto mt-4 max-w-6xl px-6 pb-16 lg:px-8">
-        <div class="grid gap-8 lg:grid-cols-[1fr_340px]">
+    {{-- Gradient continuation from hero --}}
+    <div class="pointer-events-none relative -mt-1">
+        <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-emerald-950/[0.06] via-emerald-50/30 to-transparent"></div>
+    </div>
+    <div class="container relative mx-auto mt-4 max-w-6xl px-6 pb-16 lg:px-8">
+        <div class="flex flex-col gap-8 lg:grid lg:grid-cols-[1fr_340px]">
 
             {{-- LEFT COLUMN — Main Content --}}
-            <div class="space-y-10">
+            <div class="institution-main-column order-2 space-y-10 lg:order-1">
 
                 {{-- ─── EVENTS (Upcoming / Past) ─── --}}
-                <section class="animate-fade-in-up" style="animation-delay: 600ms; opacity: 0;"
-                         x-data="{ tab: 'upcoming', view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
+                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')" x-data="{ tab: 'upcoming', view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
                     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3">
                             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
@@ -390,16 +418,16 @@ new class extends Component {
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-wrap items-center gap-3">
                             {{-- Tab toggle: Upcoming / Past --}}
                             <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
                                 <button @click="tab = 'upcoming'; view = 'list'" :class="tab === 'upcoming' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                                    <svg class="hidden h-3.5 w-3.5 sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
                                     {{ __('Akan Datang') }}
                                     <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $upcomingTotal }}</span>
                                 </button>
                                 <button @click="tab = 'past'" :class="tab === 'past' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50" @disabled($pastTotal === 0)>
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <svg class="hidden h-3.5 w-3.5 sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     {{ __('Lepas') }}
                                     <span class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $pastTotal }}</span>
                                 </button>
@@ -409,11 +437,11 @@ new class extends Component {
                             @if($upcomingEvents->isNotEmpty())
                                 <div x-show="tab === 'upcoming'" class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
                                     <button @click="view = 'list'" :class="view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+                                        <svg class="hidden h-3.5 w-3.5 sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
                                         {{ __('Senarai') }}
                                     </button>
                                     <button @click="view = 'calendar'" :class="view === 'calendar' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200">
-                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"/></svg>
+                                        <svg class="hidden h-3.5 w-3.5 sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"/></svg>
                                         {{ __('Kalendar') }}
                                     </button>
                                 </div>
@@ -443,10 +471,10 @@ new class extends Component {
                                     <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="upcoming-{{ $event->id }}"
                                        class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                         {{-- Date accent sidebar --}}
-                                        <div class="flex w-20 shrink-0 flex-col items-center justify-center bg-gradient-to-b from-emerald-600 to-emerald-800 p-3 text-white sm:w-24">
-                                            <span class="text-[11px] font-bold uppercase tracking-widest text-emerald-200/80">{{ $event->starts_at?->translatedFormat('l') }}</span>
-                                            <span class="font-heading text-3xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                            <span class="mt-0.5 text-[13px] font-bold tracking-wide text-emerald-200/80">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                        <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-emerald-600 to-emerald-800 p-2.5 text-white sm:w-24 sm:p-3">
+                                            <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-200/80 sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
+                                            <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
+                                            <span class="mt-0.5 text-[11px] font-bold tracking-wide text-emerald-200/80 sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
                                         </div>
                                         {{-- Event details --}}
                                         <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -575,10 +603,10 @@ new class extends Component {
                                 @endphp
                                 <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
                                    class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/[0.06]">
-                                    <div class="flex w-20 shrink-0 flex-col items-center justify-center bg-gradient-to-b from-slate-500 to-slate-700 p-3 text-white sm:w-24">
-                                        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-300/80">{{ $event->starts_at?->translatedFormat('l') }}</span>
-                                        <span class="font-heading text-3xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                        <span class="mt-0.5 text-[13px] font-bold tracking-wide text-slate-300/80">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-slate-500 to-slate-700 p-2.5 text-white sm:w-24 sm:p-3">
+                                        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300/80 sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
+                                        <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
+                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide text-slate-300/80 sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
                                     </div>
                                     <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
                                         <div class="flex items-center gap-2">
@@ -641,14 +669,14 @@ new class extends Component {
 
                 {{-- ─── SPEAKERS ─── --}}
                 @if($speakers->isNotEmpty())
-                    <section class="animate-fade-in-up" style="animation-delay: 750ms; opacity: 0;">
+                    <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 80ms">
                         <div class="mb-5 flex items-center gap-3">
-                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-white shadow-lg shadow-gold-500/20">
-                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-white shadow-lg shadow-gold-500/20">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
                             </div>
                             <div>
-                                <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Barisan Penceramah') }}</h2>
-                                <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-gold-500 to-transparent"></div>
+                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Barisan Penceramah') }}</h2>
+                                <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-gold-500 to-transparent"></div>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -690,18 +718,20 @@ new class extends Component {
 
                 {{-- ─── ABOUT / DESCRIPTION ─── --}}
                 @if($institution->description)
-                    <section class="animate-fade-in-up" style="animation-delay: 800ms; opacity: 0;">
+                    <section class="scroll-reveal reveal-scale" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 120ms">
                         <div class="mb-5 flex items-center gap-3">
-                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/20">
-                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/20">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
                             </div>
                             <div>
-                                <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Mengenai Kami') }}</h2>
+                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Mengenai Kami') }}</h2>
                                 <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-emerald-500 to-transparent"></div>
                             </div>
                         </div>
-                        <div class="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm md:p-8">
-                            <div class="prose prose-slate prose-sm max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
+                        <div class="relative rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm md:p-8">
+                            {{-- Left accent bar --}}
+                            <div class="absolute inset-y-4 left-0 w-1 rounded-full bg-gradient-to-b from-emerald-400 via-emerald-500/60 to-transparent"></div>
+                            <div class="prose prose-slate prose-sm max-w-none pl-4 prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
                                 {!! $institution->description !!}
                             </div>
                         </div>
@@ -710,19 +740,19 @@ new class extends Component {
 
                 {{-- ─── GALLERY ─── --}}
                 @if($gallery->count() > 0)
-                    <section class="animate-fade-in-up" style="animation-delay: 850ms; opacity: 0;">
+                    <section class="scroll-reveal reveal-blur" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 160ms">
                         <div class="mb-5 flex items-center gap-3">
-                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
-                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25zm15-14.25a1.125 1.125 0 11-2.25 0 1.125 1.125 0 012.25 0z"/></svg>
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25zm15-14.25a1.125 1.125 0 11-2.25 0 1.125 1.125 0 012.25 0z"/></svg>
                             </div>
                             <div>
-                                <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Galeri') }}</h2>
-                                <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
+                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Galeri') }}</h2>
+                                <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             @foreach($gallery as $index => $image)
-                                <div class="group relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/50 {{ $index === 0 && $gallery->count() >= 3 ? 'col-span-2 row-span-2 aspect-square sm:aspect-[4/3]' : '' }}">
+                                <div class="group relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/50 transition-all duration-300 hover:ring-2 hover:ring-emerald-300/50 hover:shadow-lg {{ $index === 0 && $gallery->count() >= 3 ? 'col-span-2 row-span-2 aspect-square sm:aspect-[4/3]' : '' }}">
                                     <img src="{{ $image->getAvailableUrl(['gallery_thumb']) }}" alt="{{ __('Galeri') }}"
                                          class="h-full w-full object-cover transition-all duration-700 group-hover:scale-110" loading="lazy">
                                     <div class="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"></div>
@@ -734,14 +764,81 @@ new class extends Component {
                         </div>
                     </section>
                 @endif
+
+                {{-- ─── SOCIAL MEDIA (Below content, like speaker view) ─── --}}
+                @if($socialLinks->isNotEmpty())
+                    <section class="scroll-reveal reveal-left" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 180ms">
+                        <div class="mb-5 flex items-center gap-3">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>
+                            </div>
+                            <div>
+                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Media Sosial') }}</h2>
+                                <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-100/50">
+                            <div class="flex flex-wrap items-center gap-3">
+                                @foreach($socialLinks as $social)
+                                    @php
+                                        $platform = strtolower((string) $social->platform);
+                                        $linkClass = match ($platform) {
+                                            'website' => 'hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 hover:shadow-emerald-500/10',
+                                            'facebook' => 'hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-blue-500/10',
+                                            'instagram' => 'hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 hover:shadow-pink-500/10',
+                                            'youtube' => 'hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-red-500/10',
+                                            'telegram' => 'hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600 hover:shadow-sky-500/10',
+                                            'whatsapp' => 'hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-green-500/10',
+                                            default => 'hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 hover:shadow-slate-500/10',
+                                        };
+                                        $title = \App\Enums\SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? ucfirst($platform);
+                                    @endphp
+                                    <a href="{{ $social->url }}" target="_blank" rel="noopener noreferrer"
+                                       class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md {{ $linkClass }}"
+                                       title="{{ $title }}">
+                                        @switch($platform)
+                                            @case('website')
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
+                                                @break
+                                            @case('facebook')
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                                                @break
+                                            @case('instagram')
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>
+                                                @break
+                                            @case('youtube')
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                                                @break
+                                            @case('twitter')
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                                                @break
+                                            @case('tiktok')
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48V13a8.28 8.28 0 005.58 2.15V11.7a4.84 4.84 0 01-3.77-1.78v-.01l.01-.01V6.69h3.76z"/></svg>
+                                                @break
+                                            @case('telegram')
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                                                @break
+                                            @case('whatsapp')
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.52 3.48A11.86 11.86 0 0012.06 0C5.45 0 .08 5.37.08 11.98c0 2.11.55 4.17 1.59 5.99L0 24l6.2-1.63a11.9 11.9 0 005.86 1.49h.01c6.61 0 11.98-5.37 11.98-11.98 0-3.2-1.25-6.2-3.53-8.4zM12.07 21.8h-.01a9.8 9.8 0 01-5-1.37l-.36-.21-3.68.97.98-3.59-.23-.37a9.76 9.76 0 01-1.5-5.25c0-5.42 4.41-9.83 9.84-9.83 2.63 0 5.1 1.02 6.96 2.88a9.77 9.77 0 012.88 6.95c0 5.43-4.42 9.84-9.85 9.84zm5.4-7.35c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.95 1.18-.17.2-.35.23-.65.08-.3-.15-1.26-.46-2.4-1.48a8.96 8.96 0 01-1.66-2.07c-.18-.3-.02-.46.14-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.68-1.64-.94-2.25-.25-.6-.5-.52-.68-.53h-.58c-.2 0-.53.08-.8.38-.27.3-1.04 1.02-1.04 2.49 0 1.47 1.07 2.89 1.22 3.09.15.2 2.1 3.2 5.1 4.49.71.31 1.26.49 1.69.63.71.23 1.35.2 1.86.12.57-.08 1.78-.73 2.03-1.44.25-.71.25-1.31.17-1.44-.07-.13-.27-.2-.57-.35z"/></svg>
+                                                @break
+                                            @default
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-1.061l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/></svg>
+                                        @endswitch
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    </section>
+                @endif
             </div>
 
             {{-- RIGHT COLUMN — Sidebar --}}
-            <div class="space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <div class="institution-sidebar-column order-1 space-y-6 lg:order-2 lg:sticky lg:top-6 lg:self-start">
 
                 {{-- ─── CONTACT & ADDRESS ─── --}}
                 @if($contacts->isNotEmpty() || $address)
-                    <div class="animate-fade-in-up rounded-2xl border border-slate-200/70 bg-white shadow-sm" style="animation-delay: 550ms; opacity: 0;">
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
                                 <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
@@ -751,16 +848,15 @@ new class extends Component {
                         <div class="space-y-4 p-5">
                             @foreach($contacts as $contact)
                                 @if($contact->value)
-                                    <div class="flex items-start gap-3 group">
+                                    <div class="flex items-center gap-3 group">
                                         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
-                                            @if($contact->category === 'email')
+                                            @if(($contact->category instanceof \App\Enums\ContactCategory && $contact->category === \App\Enums\ContactCategory::Email) || $contact->category === 'email')
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                                             @else
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
                                             @endif
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $contact->type ?? __('Utama') }}</span>
                                             <span class="block break-all text-sm font-medium text-slate-800">{{ $contact->value }}</span>
                                         </div>
                                     </div>
@@ -768,12 +864,11 @@ new class extends Component {
                             @endforeach
 
                             @if($address && ($address->line1 || $address->city?->name || $address->state?->name))
-                                <div class="flex items-start gap-3 group">
+                                <div class="flex items-center gap-3 group">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
                                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ __('Alamat') }}</span>
                                         <p class="text-sm font-medium leading-snug text-slate-800">
                                             @if($address->line1) {{ $address->line1 }} @endif
                                             @if($address->line2), {{ $address->line2 }}@endif
@@ -788,17 +883,17 @@ new class extends Component {
                                 </div>
 
                                 {{-- Navigation buttons --}}
-                                @if($address->waze_url || ($address->lat && $address->lng))
+                                @if($wazeUrl || $address->google_maps_url)
                                     <div class="flex gap-2 pl-11">
-                                        @if($address->waze_url)
-                                            <a href="{{ $address->waze_url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 transition-colors hover:bg-cyan-100">
-                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/></svg>
+                                        @if($wazeUrl)
+                                            <a href="{{ $wazeUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 transition-colors hover:bg-cyan-100">
+                                                <img src="{{ asset('images/waze-app-icon-seeklogo.svg') }}" alt="Waze" class="h-3.5 w-3.5" loading="lazy">
                                                 Waze
                                             </a>
                                         @endif
-                                        @if($address->lat && $address->lng)
-                                            <a href="https://www.google.com/maps/search/?api=1&query={{ $address->lat }},{{ $address->lng }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100">
-                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                        @if($address->google_maps_url)
+                                            <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100">
+                                                <img src="{{ asset('images/google-maps.svg') }}" alt="Google Maps" class="h-3.5 w-3.5" loading="lazy">
                                                 Google Maps
                                             </a>
                                         @endif
@@ -806,16 +901,32 @@ new class extends Component {
                                 @endif
 
                                 {{-- Mini map preview --}}
-                                @if($address->lat && $address->lng)
-                                    <div class="overflow-hidden rounded-xl border border-slate-200/70">
-                                        <a href="https://www.google.com/maps/search/?api=1&query={{ $address->lat }},{{ $address->lng }}" target="_blank" rel="noopener" class="block">
-                                            <img src="https://maps.googleapis.com/maps/api/staticmap?center={{ $address->lat }},{{ $address->lng }}&zoom=15&size=340x180&scale=2&markers=color:0x059669%7C{{ $address->lat }},{{ $address->lng }}&style=feature:poi%7Cvisibility:off&key={{ config('services.google.maps_api_key', '') }}"
-                                                 alt="{{ __('Peta') }}"
-                                                 class="h-[140px] w-full object-cover transition-opacity hover:opacity-90"
-                                                 loading="lazy"
-                                                 onerror="this.parentElement.parentElement.style.display='none'">
+                                @if($address->google_maps_url)
+                                    @if($googleMapsEmbedUrl)
+                                        <div class="overflow-hidden rounded-xl border border-slate-200/70">
+                                            <iframe src="{{ $googleMapsEmbedUrl }}"
+                                                    class="h-[220px] w-full"
+                                                    loading="lazy"
+                                                    referrerpolicy="no-referrer-when-downgrade"
+                                                    allowfullscreen
+                                                    title="{{ __('Peta Lokasi') }}"></iframe>
+                                        </div>
+                                    @elseif($address->lat && $address->lng && filled($googleMapsApiKey))
+                                        <div class="overflow-hidden rounded-xl border border-slate-200/70">
+                                            <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener" class="block">
+                                                <img src="https://maps.googleapis.com/maps/api/staticmap?center={{ $address->lat }},{{ $address->lng }}&zoom=15&size=340x180&scale=2&markers=color:0x059669%7C{{ $address->lat }},{{ $address->lng }}&style=feature:poi%7Cvisibility:off&key={{ $googleMapsApiKey }}"
+                                                     alt="{{ __('Peta') }}"
+                                                     class="h-[140px] w-full object-cover transition-opacity hover:opacity-90"
+                                                     loading="lazy"
+                                                     onerror="this.parentElement.parentElement.style.display='none'">
+                                            </a>
+                                        </div>
+                                    @else
+                                        <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                            {{ __('Buka di Google Maps') }}
                                         </a>
-                                    </div>
+                                    @endif
                                 @endif
                             @endif
                         </div>
@@ -824,7 +935,7 @@ new class extends Component {
 
                 {{-- ─── SPACES / FACILITIES ─── --}}
                 @if($spaces->isNotEmpty())
-                    <div class="animate-fade-in-up rounded-2xl border border-slate-200/70 bg-white shadow-sm" style="animation-delay: 650ms; opacity: 0;">
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 100ms">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
                                 <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>
@@ -851,7 +962,7 @@ new class extends Component {
 
                 {{-- ─── DONATION CHANNELS ─── --}}
                 @if($donationChannels->isNotEmpty())
-                    <div class="animate-fade-in-up rounded-2xl border border-gold-200/60 bg-gradient-to-b from-gold-50/50 to-white shadow-sm" style="animation-delay: 700ms; opacity: 0;">
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-gold-200/60 bg-gradient-to-b from-gold-50/50 to-white shadow-sm" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 180ms">
                         <div class="border-b border-gold-200/40 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
                                 <svg class="h-4 w-4 text-gold-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>

@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Models\Country;
 use App\Models\Institution;
 use App\Models\State;
@@ -59,10 +61,9 @@ class InstitutionSeeder extends Seeder
         ];
 
         $countries = Country::query()->get();
-        $states = State::query()->with(['districts', 'cities'])->get();
-        User::query()->get();
-
         $malaysia = $countries->where('iso2', 'MY')->first() ?? $countries->first();
+        $states = State::query()->where('country_id', $malaysia->id)->with(['districts', 'cities'])->get();
+        User::query()->get();
 
         $this->command->info('Seeding featured institutions with coordinates...');
 
@@ -87,13 +88,13 @@ class InstitutionSeeder extends Seeder
 
             // Create contacts
             $inst->contacts()->firstOrCreate(
-                ['category' => 'email'],
-                ['value' => Str::slug($data['name']).'@example.com', 'type' => 'work']
+                ['category' => ContactCategory::Email->value],
+                ['value' => Str::slug($data['name']).'@example.com', 'type' => ContactType::Work->value]
             );
 
             $inst->contacts()->firstOrCreate(
-                ['category' => 'phone'],
-                ['value' => '03-'.fake()->numberBetween(1000000, 9999999), 'type' => 'work']
+                ['category' => ContactCategory::Phone->value],
+                ['value' => '03-'.fake()->numberBetween(1000000, 9999999), 'type' => ContactType::Work->value]
             );
 
             // Create or update address

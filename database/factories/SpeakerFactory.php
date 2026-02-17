@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -252,15 +254,15 @@ class SpeakerFactory extends Factory
             }
 
             $speaker->contacts()->create([
-                'category' => 'email',
+                'category' => ContactCategory::Email->value,
                 'value' => fake()->safeEmail(),
-                'type' => 'work',
+                'type' => ContactType::Work->value,
             ]);
 
             $speaker->contacts()->create([
-                'category' => 'phone',
+                'category' => ContactCategory::Phone->value,
                 'value' => fake()->phoneNumber(),
-                'type' => 'work',
+                'type' => ContactType::Work->value,
             ]);
 
             // Attach Languages

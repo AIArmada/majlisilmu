@@ -3,39 +3,41 @@
 use App\Models\Speaker;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
-use Livewire\Component;
-
 use Livewire\Attributes\Title;
+use Livewire\Component;
 
 new
     #[Title('Speakers - Majlis Ilmu')]
-    class extends Component {
-    #[Computed]
-    public function speakers(): LengthAwarePaginator
+    class extends Component
     {
-        $search = request('search');
-        $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        #[Computed]
+        public function speakers(): LengthAwarePaginator
+        {
+            $search = request('search');
+            $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
-        return Speaker::query()
-            ->active()
-            ->where('status', 'verified')
-            ->withCount('events')
-            ->with('media')
-            ->when($search, function ($query, $search) use ($operator) {
-                $query->where(function ($innerQuery) use ($search, $operator) {
-                    $innerQuery->where('name', $operator, "%{$search}%");
+            return Speaker::query()
+                ->active()
+                ->where('status', 'verified')
+                ->withCount(['events' => function ($query) {
+                    $query->active();
+                }])
+                ->with('media')
+                ->when($search, function ($query, $search) use ($operator) {
+                    $query->where(function ($innerQuery) use ($search, $operator) {
+                        $innerQuery->where('name', $operator, "%{$search}%");
 
-                    if (DB::connection()->getDriverName() === 'pgsql') {
-                        $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
-                    } else {
-                        $innerQuery->orWhere('bio', $operator, "%{$search}%");
-                    }
-                });
-            })
-            ->orderBy('name', 'asc')
-            ->paginate(12);
-    }
-};
+                        if (DB::connection()->getDriverName() === 'pgsql') {
+                            $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
+                        } else {
+                            $innerQuery->orWhere('bio', $operator, "%{$search}%");
+                        }
+                    });
+                })
+                ->orderBy('name', 'asc')
+                ->paginate(12);
+        }
+    };
 ?>
 
 @php
@@ -117,13 +119,6 @@ new
                             <div class="w-full h-full rounded-full overflow-hidden bg-slate-100 relative">
                                 <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
                                     class="w-full h-full object-cover" width="128" height="128" loading="lazy">
-                            </div>
-                            <div
-                                class="absolute bottom-1 right-1 bg-emerald-500 border-2 border-white rounded-full p-1.5 text-white">
-                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                </svg>
                             </div>
                         </div>
 

@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
@@ -38,10 +40,9 @@ class MasjidSeeder extends Seeder
         }
 
         $countries = Country::query()->get();
-        $states = State::query()->with(['districts'])->get();
-        User::query()->get();
-
         $malaysia = $countries->where('iso2', 'MY')->first() ?? $countries->first();
+        $states = State::query()->where('country_id', $malaysia->id)->with(['districts'])->get();
+        User::query()->get();
 
         // Read CSV file
         $handle = fopen($csvPath, 'r');
@@ -113,9 +114,9 @@ class MasjidSeeder extends Seeder
                 if ($cleanedPhone) {
                     try {
                         $inst->contacts()->create([
-                            'category' => 'phone',
+                            'category' => ContactCategory::Phone->value,
                             'value' => $cleanedPhone,
-                            'type' => 'work',
+                            'type' => ContactType::Work->value,
                         ]);
                     } catch (\Exception $e) {
                         $this->command->warn("Failed to create contact for {$nama}: ".$e->getMessage());

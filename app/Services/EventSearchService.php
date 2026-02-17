@@ -290,10 +290,7 @@ class EventSearchService
     {
         $timeScope = $this->normalizeTimeScope($filters['time_scope'] ?? null);
 
-        $queryBuilder = Event::query()
-            ->where('is_active', true)
-            ->whereIn('status', ['approved', 'pending'])
-            ->where('visibility', 'public');
+        $queryBuilder = Event::query()->active();
 
         $startsAfter = $this->startsAfterDateTime($filters, $timeScope);
 

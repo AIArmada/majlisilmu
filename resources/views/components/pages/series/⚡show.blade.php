@@ -15,8 +15,7 @@ new class extends Component
 
         $series->load([
             'events' => function ($query) {
-                $query->where('status', 'approved')
-                    ->where('visibility', 'public')
+                $query->active()
                     ->where('starts_at', '>=', now())
                     ->orderBy('starts_at', 'asc')
                     ->take(10);

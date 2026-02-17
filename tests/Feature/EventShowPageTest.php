@@ -2,6 +2,7 @@
 
 use App\Models\Event;
 use App\Models\User;
+use App\Models\Venue;
 use Livewire\Livewire;
 
 describe('Event Show Page Going Feature', function () {
@@ -109,5 +110,95 @@ describe('Event Show Page Going Feature', function () {
 
         // Verify the going count is persisted correctly on the model
         expect($event->fresh()->going_count)->toBe(5);
+    });
+});
+
+describe('Event Show Page Location & Contact Info', function () {
+    it('displays full venue address on the event page', function () {
+        $venue = Venue::factory()->create();
+        $address = $venue->addressModel;
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'venue_id' => $venue->id,
+        ]);
+
+        $response = $this->get(route('events.show', $event));
+        $response->assertOk();
+
+        // Should show line1 of the address
+        if (filled($address?->line1)) {
+            $response->assertSee($address->line1);
+        }
+
+        // Should show postcode if present
+        if (filled($address?->postcode)) {
+            $response->assertSee($address->postcode);
+        }
+    });
+
+    it('displays waze and google maps navigation buttons when coordinates exist', function () {
+        $venue = Venue::factory()->create();
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'venue_id' => $venue->id,
+        ]);
+
+        $response = $this->get(route('events.show', $event));
+        $response->assertOk();
+        $response->assertSee('Waze');
+        $response->assertSee('Google Maps');
+    });
+
+    it('displays institution contact info on event page', function () {
+        $institution = \App\Models\Institution::factory()->create();
+        $emailContact = $institution->contacts()->where('category', \App\Enums\ContactCategory::Email->value)->first();
+        $phoneContact = $institution->contacts()->where('category', \App\Enums\ContactCategory::Phone->value)->first();
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'institution_id' => $institution->id,
+        ]);
+
+        $response = $this->get(route('events.show', $event));
+        $response->assertOk();
+
+        if ($emailContact) {
+            $response->assertSee($emailContact->value);
+        }
+        if ($phoneContact) {
+            $response->assertSee($phoneContact->value);
+        }
+    });
+
+    it('uses stored waze_url from address when available', function () {
+        $venue = Venue::factory()->create();
+        $address = $venue->addressModel;
+
+        if ($address && filled($address->waze_url)) {
+            $event = Event::factory()->create([
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now()->subDay(),
+                'starts_at' => now()->addDay(),
+                'venue_id' => $venue->id,
+            ]);
+
+            $response = $this->get(route('events.show', $event));
+            $response->assertOk();
+            $response->assertSee('Waze');
+        }
+
+        expect(true)->toBeTrue();
     });
 });

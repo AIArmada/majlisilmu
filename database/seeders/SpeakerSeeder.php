@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -74,13 +76,13 @@ class SpeakerSeeder extends Seeder
             );
 
             $speaker->contacts()->updateOrCreate(
-                ['category' => 'email'],
-                ['value' => Str::slug($name).'@example.com', 'type' => 'work']
+                ['category' => ContactCategory::Email->value],
+                ['value' => Str::slug($name).'@example.com', 'type' => ContactType::Work->value]
             );
 
             $speaker->contacts()->updateOrCreate(
-                ['category' => 'phone'],
-                ['value' => $this->deterministicPhoneNumber($name), 'type' => 'work']
+                ['category' => ContactCategory::Phone->value],
+                ['value' => $this->deterministicPhoneNumber($name), 'type' => ContactType::Work->value]
             );
 
             if (! empty($userIds)) {
