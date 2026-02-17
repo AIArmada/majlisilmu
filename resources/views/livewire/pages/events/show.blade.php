@@ -219,7 +219,7 @@
                 @if($event->starts_at)
                     <span class="inline-flex items-center gap-1.5">
                         <svg class="size-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        {{ $event->starts_at->translatedFormat('l, j M Y') }}
+                        {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l, j M Y') }}
                     </span>
                 @endif
 
@@ -644,12 +644,12 @@
                                     <div class="absolute left-1.5 top-2 size-3 rounded-full border-2 border-emerald-500 bg-white"></div>
                                     <div class="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                                         <p class="text-sm font-semibold text-slate-800">
-                                            {{ $session->starts_at?->translatedFormat('l, j M Y') }}
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($session->starts_at, 'l, j M Y') }}
                                         </p>
                                         <p class="mt-0.5 text-xs text-slate-500">
-                                            {{ $session->starts_at?->format('h:i A') }}
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->starts_at, 'h:i A') }}
                                             @if($session->ends_at)
-                                                - {{ $session->ends_at->format('h:i A') }}
+                                                - {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->ends_at, 'h:i A') }}
                                             @endif
                                         </p>
                                     </div>
@@ -814,7 +814,7 @@
                                     class="h-32 w-full object-cover transition duration-500 group-hover:scale-[1.03]" loading="lazy">
                                 <div class="space-y-1.5 p-4">
                                     <h3 class="line-clamp-2 text-sm font-bold text-slate-900">{{ $relatedEvent->title }}</h3>
-                                    <p class="text-xs text-slate-500">{{ $relatedEvent->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}</p>
+                                    <p class="text-xs text-slate-500">{{ $relatedEvent->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($relatedEvent->starts_at, 'd M Y, h:i A') : __('TBC') }}</p>
                                     <p class="line-clamp-1 text-xs text-slate-400">{{ $relatedEvent->institution?->name ?? $relatedEvent->venue?->name ?? __('Independent') }}</p>
                                 </div>
                             </a>
@@ -840,16 +840,16 @@
                             </div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs font-medium text-slate-400">{{ __('Date & Time') }}</p>
-                                <p class="mt-0.5 font-bold text-slate-900">{{ $event->starts_at?->translatedFormat('l, j F Y') ?? __('TBC') }}</p>
+                                <p class="mt-0.5 font-bold text-slate-900">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l, j F Y') : __('TBC') }}</p>
                                 <p class="mt-0.5 text-sm text-slate-600">
                                     <x-event-timing :event="$event" :show-date="false" />
                                     @if($event->ends_at && $event->timing_mode === \App\Enums\TimingMode::Absolute)
-                                        - {{ $event->ends_at->format('h:i A') }}
+                                        - {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A') }}
                                     @endif
                                 </p>
                                 @if($nextSession)
                                     <p class="mt-1 text-xs text-emerald-600">
-                                        {{ __('Next session') }}: {{ $nextSession->starts_at?->translatedFormat('d M Y, h:i A') }}
+                                        {{ __('Next session') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($nextSession->starts_at, 'd M Y, h:i A') }}
                                     </p>
                                 @endif
                             </div>
@@ -1008,7 +1008,7 @@
                                 </button>
                             @elseif(!$regOpen)
                                 <button disabled class="flex w-full items-center justify-center rounded-xl bg-slate-100 px-6 py-3 text-sm font-bold text-slate-500 cursor-not-allowed">
-                                    {{ __('Opens') }} {{ $event->settings->registration_opens_at->format('M d, h:i A') }}
+                                    {{ __('Opens') }} {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->settings->registration_opens_at, 'M d, h:i A') }}
                                 </button>
                             @else
                                 <a href="#register" @click.prevent="registerOpen = true"
@@ -1153,7 +1153,7 @@
                         <img src="{{ $sharePreviewImage }}" alt="{{ $event->title }}" class="h-48 w-full object-cover" loading="lazy">
                         <div class="space-y-2 p-4">
                             <h4 class="font-bold text-slate-900">{{ $event->title }}</h4>
-                            <p class="text-sm text-slate-600">{{ $event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}</p>
+                            <p class="text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}</p>
                             <p class="line-clamp-2 text-sm text-slate-500">{{ Str::limit($event->description_text, 140) }}</p>
                         </div>
                     </article>
@@ -1209,8 +1209,8 @@
                                     <option value="">{{ __('Choose a session') }}</option>
                                     @foreach($upcomingSessions as $session)
                                         <option value="{{ $session->id }}">
-                                            {{ $session->starts_at?->translatedFormat('d M Y, h:i A') }}
-                                            @if($session->ends_at) - {{ $session->ends_at->format('h:i A') }} @endif
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($session->starts_at, 'd M Y, h:i A') }}
+                                            @if($session->ends_at) - {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->ends_at, 'h:i A') }} @endif
                                         </option>
                                     @endforeach
                                 </select>

@@ -21,7 +21,7 @@ new class extends Component {
     public function groupedEvents(): array
     {
         return $this->events->groupBy(function ($event) {
-            return $event->starts_at?->format('Y-m-d');
+            return \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'Y-m-d');
         })->toArray();
     }
 };
@@ -77,8 +77,8 @@ new class extends Component {
                             <div class="flex items-start gap-4">
                                 <!-- Date Block -->
                                 <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex flex-col items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                                    <span class="text-xs font-bold uppercase">{{ $event->starts_at?->translatedFormat('M') }}</span>
-                                    <span class="text-lg font-black leading-none">{{ $event->starts_at?->format('d') }}</span>
+                                    <span class="text-xs font-bold uppercase">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</span>
+                                    <span class="text-lg font-black leading-none">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
                                 </div>
                                 
                                 <div class="min-w-0 flex-1">
@@ -93,7 +93,7 @@ new class extends Component {
                                             @if($event->isPrayerRelative() && $event->prayer_display_text)
                                                 {{ $event->prayer_display_text }}
                                             @else
-                                                {{ $event->starts_at?->format('h:i A') }}
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                                             @endif
                                         </span>
                                     </div>

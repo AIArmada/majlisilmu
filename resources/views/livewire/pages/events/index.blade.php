@@ -12,45 +12,102 @@
 
 
 @php
+    $search = $this->search;
+    $stateId = $this->state_id;
+    $districtId = $this->district_id;
+    $subdistrictId = $this->subdistrict_id;
+    $institutionId = $this->institution_id;
+    $language = $this->language;
+    $eventType = $this->event_type;
+    $gender = $this->gender;
+    $childrenAllowed = $this->children_allowed;
+    $startsAfter = $this->starts_after;
+    $startsBefore = $this->starts_before;
+    $prayerTime = $this->prayer_time;
+    $timeScope = $this->time_scope ?? 'upcoming';
+    $lat = $this->lat;
+    $sort = $this->sort;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
     $topics = $this->topics;
-    $selectedAgeGroups = array_values(array_filter((array) request('age_group', [])));
-    $selectedTopicIds = array_values(array_filter((array) request('topic_ids', [])));
+    $institutions = $this->institutions;
+    $speakers = $this->speakers;
+    $selectedAgeGroups = array_values(array_filter((array) $this->age_group));
+    $selectedTopicIds = array_values(array_filter((array) $this->topic_ids));
+    $selectedSpeakerIds = array_values(array_filter((array) $this->speaker_ids));
     $selectedTopicLabels = collect($selectedTopicIds)
         ->map(fn (string $topicId): ?string => $topics->firstWhere('id', $topicId)?->name)
         ->filter()
         ->values();
+    $selectedSpeakerLabels = collect($selectedSpeakerIds)
+        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->filter()
+        ->values();
+    $savedSearchQuery = array_filter([
+        'search' => $search,
+        'state_id' => $stateId,
+        'district_id' => $districtId,
+        'subdistrict_id' => $subdistrictId,
+        'institution_id' => $institutionId,
+        'speaker_ids' => $selectedSpeakerIds,
+        'language' => $language,
+        'event_type' => $eventType,
+        'gender' => $gender,
+        'age_group' => $selectedAgeGroups,
+        'children_allowed' => $childrenAllowed,
+        'starts_after' => $startsAfter,
+        'starts_before' => $startsBefore,
+        'prayer_time' => $prayerTime,
+        'topic_ids' => $selectedTopicIds,
+        'lat' => $lat,
+        'lng' => $this->lng,
+        'radius_km' => $this->radius_km,
+        'sort' => $sort,
+        'time_scope' => $this->time_scope,
+    ], function (mixed $value): bool {
+        if (is_array($value)) {
+            return $value !== [];
+        }
+
+        return $value !== null && $value !== '';
+    });
     $activeFilterCount = collect([
-        request('state_id'),
-        request('district_id'),
-        request('subdistrict_id'),
-        request('language'),
-        request('event_type'),
-        request('gender'),
-        request('children_allowed'),
-        request('starts_after'),
-        request('starts_before'),
-        request('time_scope') !== null && request('time_scope') !== 'upcoming',
+        $stateId,
+        $districtId,
+        $subdistrictId,
+        $institutionId,
+        $language,
+        $eventType,
+        $gender,
+        $childrenAllowed,
+        $startsAfter,
+        $startsBefore,
+        $prayerTime,
+        $timeScope !== 'upcoming',
         count($selectedAgeGroups) > 0,
+        count($selectedSpeakerIds) > 0,
         count($selectedTopicIds) > 0,
     ])->filter(fn ($value) => $value !== null && $value !== '' && $value !== false)->count();
-    $hasActiveFilters = request()->hasAny([
-        'search',
-        'state_id',
-        'district_id',
-        'subdistrict_id',
-        'language',
-        'event_type',
-        'gender',
-        'age_group',
-        'children_allowed',
-        'starts_after',
-        'starts_before',
-        'topic_ids',
-        'lat',
-    ]) || (request('time_scope') !== null && request('time_scope') !== 'upcoming');
+    $hasActiveFilters = collect([
+        $search,
+        $stateId,
+        $districtId,
+        $subdistrictId,
+        $institutionId,
+        $language,
+        $eventType,
+        $gender,
+        $childrenAllowed,
+        $startsAfter,
+        $startsBefore,
+        $prayerTime,
+        $lat,
+        $timeScope !== 'upcoming',
+        count($selectedAgeGroups) > 0,
+        count($selectedSpeakerIds) > 0,
+        count($selectedTopicIds) > 0,
+    ])->contains(fn ($value) => $value !== null && $value !== '' && $value !== false);
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -74,7 +131,7 @@
                 </span>
                 @endplaceholder
                 {{ $this->events->total() }}
-                {{ match (request('time_scope', 'upcoming')) {
+                {{ match ($this->time_scope ?? 'upcoming') {
                     'past' => __('Past Gatherings'),
                     'all' => __('All Gatherings'),
                     default => __('Upcoming Gatherings'),
@@ -96,9 +153,9 @@
 
     <div class="container mx-auto px-6 lg:px-12 -mt-8 relative z-10">
         <!-- Search & Filter Card -->
-        <form action="{{ route('events.index') }}" method="GET" x-ref="form" x-data="{
+        <form wire:submit.prevent x-data="{
                     locating: false,
-                    showFilters: {{ request()->hasAny(['state_id', 'district_id', 'subdistrict_id', 'language', 'event_type', 'gender', 'age_group', 'children_allowed', 'starts_after', 'starts_before', 'topic_ids']) || (request('time_scope') !== null && request('time_scope') !== 'upcoming') ? 'true' : 'false' }},
+                    showFilters: {{ $hasActiveFilters ? 'true' : 'false' }},
                     locate() {
                         if (this.locating) return;
                         if (! navigator.geolocation) {
@@ -107,25 +164,29 @@
                         }
                         this.locating = true;
                         navigator.geolocation.getCurrentPosition((position) => {
-                            this.$refs.lat.value = position.coords.latitude;
-                            this.$refs.lng.value = position.coords.longitude;
-                            this.$refs.sort.value = 'distance';
-                            this.$refs.form.submit();
+                            this.$wire.setLocation(position.coords.latitude, position.coords.longitude);
+                            this.locating = false;
                         }, () => {
                             this.locating = false;
                             alert('{{ __("Unable to get your location. Please enable location services.") }}');
                         });
                     },
-                    setSort(sort) {
-                        this.$refs.sort.value = sort;
-                        this.$refs.form.submit();
-                    },
                 }" class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-6 md:p-8">
+
+            <div wire:loading.delay.short
+                wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters"
+                class="mb-4 inline-flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
+                    <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 00-10-10"></path>
+                </svg>
+                {{ __('Updating results...') }}
+            </div>
 
             <div class="grid lg:grid-cols-[1fr_auto_auto] gap-4 mb-6">
                 <!-- Text Search -->
                 <div class="relative group">
-                    <input type="text" id="event-search" name="search" value="{{ request('search') }}"
+                    <input type="text" id="event-search" wire:model.live.debounce.400ms="search"
                         placeholder="{{ __('Search by title, topic, or speaker...') }}"
                         class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 font-medium text-slate-900 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400">
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
@@ -155,16 +216,18 @@
                 </div>
 
                 <!-- Search Button -->
-                <button type="submit"
+                <button type="button" wire:click="$refresh"
+                    wire:loading.attr="disabled"
+                    wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters"
                     class="h-14 px-8 rounded-2xl bg-slate-900 text-white font-bold hover:bg-emerald-600 shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                    <span>{{ __('Search') }}</span>
+                    <svg wire:loading wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
+                        <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 00-10-10"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters">{{ __('Search') }}</span>
+                    <span wire:loading wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters">{{ __('Updating...') }}</span>
                 </button>
             </div>
-
-            <input type="hidden" name="lat" x-ref="lat" value="{{ request('lat') }}">
-            <input type="hidden" name="lng" x-ref="lng" value="{{ request('lng') }}">
-            <input type="hidden" name="radius_km" id="radius_km" value="{{ request('radius_km', 50) }}">
-            <input type="hidden" name="sort" x-ref="sort" value="{{ request('sort', 'time') }}">
 
             <!-- Filters Toggle -->
             <div class="flex items-center justify-between border-t border-slate-100 pt-5">
@@ -188,12 +251,12 @@
                 <div class="flex items-center gap-3">
                     <span class="text-sm font-medium text-slate-500">{{ __('Sort:') }}</span>
                     <div class="flex bg-slate-100 p-1 rounded-xl">
-                        <button type="button" @click="setSort('time')"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ request('sort', 'time') == 'time' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                        <button type="button" wire:click="$set('sort', 'time')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'time' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
                             {{ __('Latest') }}
                         </button>
-                        <button type="button" @click="setSort('relevance')"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ request('sort') == 'relevance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                        <button type="button" wire:click="$set('sort', 'relevance')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'relevance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
                             {{ __('Relevance') }}
                         </button>
                     </div>
@@ -206,127 +269,149 @@
                     <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('State') }}</label>
-                            <select name="state_id" onchange="this.form.elements['district_id'].value=''; this.form.elements['subdistrict_id'].value=''; this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="state_id">
                                 <option value="">{{ __('All States') }}</option>
                                 @foreach($states as $state)
-                                    <option value="{{ $state->id }}" @selected(request('state_id') == $state->id)>
+                                    <option value="{{ $state->id }}" @selected($stateId == $state->id)>
                                         {{ $state->name }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('District') }}</label>
-                            <select name="district_id" onchange="this.form.elements['subdistrict_id'].value=''; this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors"
-                                @disabled(! request('state_id'))>
+                            <flux:select wire:model.live="district_id" :disabled="! filled($stateId)">
                                 <option value="">{{ __('All Districts') }}</option>
                                 @foreach($districts as $district)
-                                    <option value="{{ $district->id }}" @selected(request('district_id') == $district->id)>
+                                    <option value="{{ $district->id }}" @selected($districtId == $district->id)>
                                         {{ $district->name }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Subdistrict') }}</label>
-                            <select name="subdistrict_id" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors"
-                                @disabled(! request('district_id'))>
+                            <flux:select wire:model.live="subdistrict_id" :disabled="! filled($districtId)">
                                 <option value="">{{ __('All Subdistricts') }}</option>
                                 @foreach($subdistricts as $subdistrict)
-                                    <option value="{{ $subdistrict->id }}" @selected(request('subdistrict_id') == $subdistrict->id)>
+                                    <option value="{{ $subdistrict->id }}" @selected($subdistrictId == $subdistrict->id)>
                                         {{ $subdistrict->name }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Start Date') }}</label>
-                            <input type="date" name="starts_after" value="{{ request('starts_after') }}" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:input type="date" wire:model.live="starts_after" />
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('End Date') }}</label>
-                            <input type="date" name="starts_before" value="{{ request('starts_before') }}" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:input type="date" wire:model.live="starts_before" />
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Time Scope') }}</label>
-                            <select name="time_scope" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
-                                <option value="upcoming" @selected(request('time_scope', 'upcoming') === 'upcoming')>{{ __('Upcoming') }}</option>
-                                <option value="past" @selected(request('time_scope') === 'past')>{{ __('Past') }}</option>
-                                <option value="all" @selected(request('time_scope') === 'all')>{{ __('All Time') }}</option>
-                            </select>
+                            <flux:select wire:model.live="time_scope">
+                                <option value="upcoming" @selected($timeScope === 'upcoming')>{{ __('Upcoming') }}</option>
+                                <option value="past" @selected($timeScope === 'past')>{{ __('Past') }}</option>
+                                <option value="all" @selected($timeScope === 'all')>{{ __('All Time') }}</option>
+                            </flux:select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Prayer Time') }}</label>
+                            <flux:select wire:model.live="prayer_time">
+                                <option value="">{{ __('Any') }}</option>
+                                <option value="Selepas Jumaat" @selected($prayerTime === 'Selepas Jumaat')>{{ __('Selepas Jumaat') }}</option>
+                                <option value="Selepas Maghrib" @selected($prayerTime === 'Selepas Maghrib')>{{ __('Selepas Maghrib') }}</option>
+                                <option value="Selepas Isyak" @selected($prayerTime === 'Selepas Isyak')>{{ __('Selepas Isyak') }}</option>
+                                <option value="Selepas Subuh" @selected($prayerTime === 'Selepas Subuh')>{{ __('Selepas Subuh') }}</option>
+                                <option value="Selepas Tarawih" @selected($prayerTime === 'Selepas Tarawih')>{{ __('Selepas Tarawih') }}</option>
+                            </flux:select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Institution') }}</label>
+                            <flux:select wire:model.live="institution_id">
+                                <option value="">{{ __('Any Institution') }}</option>
+                                @foreach($institutions as $institution)
+                                    <option value="{{ $institution->id }}" @selected($institutionId == $institution->id)>
+                                        {{ $institution->name }}
+                                    </option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Speaker') }}</label>
+                            <flux:select wire:model.live="speaker_ids" multiple>
+                                @foreach($speakers as $speaker)
+                                    <option value="{{ $speaker->id }}" @selected(in_array($speaker->id, $selectedSpeakerIds, true))>
+                                        {{ $speaker->name }}
+                                    </option>
+                                @endforeach
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Language') }}</label>
-                            <select name="language" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="language">
                                 <option value="">{{ __('Any Language') }}</option>
-                                <option value="malay" @selected(request('language') == 'malay')>Bahasa Melayu</option>
-                                <option value="english" @selected(request('language') == 'english')>English</option>
-                                <option value="arabic" @selected(request('language') == 'arabic')>العربية</option>
-                                <option value="mixed" @selected(request('language') == 'mixed')>Mixed</option>
-                            </select>
+                                <option value="malay" @selected($language === 'malay')>Bahasa Melayu</option>
+                                <option value="english" @selected($language === 'english')>English</option>
+                                <option value="arabic" @selected($language === 'arabic')>العربية</option>
+                                <option value="mixed" @selected($language === 'mixed')>Mixed</option>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Event Type') }}</label>
-                            <select name="event_type" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="event_type">
                                 <option value="">{{ __('Any Type') }}</option>
                                 @foreach(collect(\App\Enums\EventType::cases())->mapToGroups(fn(\App\Enums\EventType $type) => [$type->getGroup() => [$type->value => $type->getLabel()]])->map(fn($group) => $group->collapse()) as $groupLabel => $options)
                                     <optgroup label="{{ $groupLabel }}">
-                                        @foreach($options as $value => $label)
-                                            <option value="{{ $value }}" @selected(request('event_type') == $value)>{{ $label }}</option>
+                                        @foreach($options as $eventTypeValue => $eventTypeLabel)
+                                            <option value="{{ $eventTypeValue }}" @selected($eventType == $eventTypeValue)>{{ $eventTypeLabel }}</option>
                                         @endforeach
                                     </optgroup>
                                 @endforeach
-                            </select>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Gender') }}</label>
-                            <select name="gender" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="gender">
                                 <option value="">{{ __('Any') }}</option>
-                                @foreach(\App\Enums\EventGenderRestriction::cases() as $gender)
-                                    <option value="{{ $gender->value }}" @selected(request('gender') == $gender->value)>
-                                        {{ $gender->getLabel() }}
+                                @foreach(\App\Enums\EventGenderRestriction::cases() as $genderOption)
+                                    <option value="{{ $genderOption->value }}" @selected($gender === $genderOption->value)>
+                                        {{ $genderOption->getLabel() }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Age Group') }}</label>
-                            <select name="age_group[]" multiple onchange="this.form.submit()"
-                                class="w-full min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="age_group" multiple>
                                 @foreach(\App\Enums\EventAgeGroup::cases() as $age)
                                     <option value="{{ $age->value }}" @selected(in_array($age->value, $selectedAgeGroups, true))>
                                         {{ $age->getLabel() }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </flux:select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ __('Children Allowed') }}</label>
-                            <select name="children_allowed" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="children_allowed">
                                 <option value="">{{ __('Any') }}</option>
-                                <option value="1" @selected((string) request('children_allowed') === '1')>{{ __('Yes') }}</option>
-                                <option value="0" @selected((string) request('children_allowed') === '0')>{{ __('No') }}</option>
-                            </select>
+                                <option value="1" @selected((string) $childrenAllowed === '1')>{{ __('Yes') }}</option>
+                                <option value="0" @selected((string) $childrenAllowed === '0')>{{ __('No') }}</option>
+                            </flux:select>
                         </div>
                     </div>
 
@@ -335,14 +420,13 @@
                         @if($topics->isEmpty())
                             <p class="mt-2 text-sm text-slate-500">{{ __('No topics are available yet.') }}</p>
                         @else
-                            <select name="topic_ids[]" multiple onchange="this.form.submit()"
-                                class="mt-2 w-full min-h-12 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-0 cursor-pointer hover:border-emerald-400 transition-colors">
+                            <flux:select wire:model.live="topic_ids" multiple class="mt-2">
                                 @foreach($topics as $topic)
                                     <option value="{{ $topic->id }}" @selected(in_array($topic->id, $selectedTopicIds, true))>
                                         {{ $topic->name }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </flux:select>
                             <p class="mt-2 text-xs text-slate-500">
                                 {{ __('Choose one or more topics to narrow down relevant events.') }}
                             </p>
@@ -355,13 +439,13 @@
             @if($hasActiveFilters)
                 <div class="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100">
                     <span class="text-xs font-bold text-slate-400 uppercase mr-2">{{ __('Active:') }}</span>
-                    @if(request('search'))
+                    @if($search)
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            "{{ request('search') }}"
+                            "{{ $search }}"
                         </span>
                     @endif
-                    @if(request('lat'))
+                    @if($lat)
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -371,39 +455,49 @@
                             {{ __('Nearby') }}
                         </span>
                     @endif
-                    @if(request('state_id'))
+                    @if($stateId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $states->firstWhere('id', request('state_id'))?->name ?? __('State') }}
+                            {{ $states->firstWhere('id', $stateId)?->name ?? __('State') }}
                         </span>
                     @endif
-                    @if(request('district_id'))
+                    @if($districtId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $districts->firstWhere('id', request('district_id'))?->name ?? __('District') }}
+                            {{ $districts->firstWhere('id', $districtId)?->name ?? __('District') }}
                         </span>
                     @endif
-                    @if(request('subdistrict_id'))
+                    @if($subdistrictId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $subdistricts->firstWhere('id', request('subdistrict_id'))?->name ?? __('Subdistrict') }}
+                            {{ $subdistricts->firstWhere('id', $subdistrictId)?->name ?? __('Subdistrict') }}
                         </span>
                     @endif
-                    @if(request('language'))
+                    @if($institutionId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ str((string) request('language'))->headline() }}
+                            {{ $institutions->firstWhere('id', $institutionId)?->name ?? __('Institution') }}
                         </span>
                     @endif
-                    @if(request('event_type'))
+                    @if($language)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ str((string) request('event_type'))->replace('_', ' ')->headline() }}
+                            {{ str((string) $language)->headline() }}
                         </span>
                     @endif
-                    @if(request('gender'))
+                    @if($eventType)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ str((string) request('gender'))->replace('_', ' ')->headline() }}
+                            {{ str((string) $eventType)->replace('_', ' ')->headline() }}
                         </span>
                     @endif
-                    @if(request()->filled('children_allowed'))
+                    @if($gender)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ (string) request('children_allowed') === '1' ? __('Children Allowed') : __('No Children') }}
+                            {{ str((string) $gender)->replace('_', ' ')->headline() }}
+                        </span>
+                    @endif
+                    @if($prayerTime)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $prayerTime }}
+                        </span>
+                    @endif
+                    @if($childrenAllowed !== null && $childrenAllowed !== '')
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ (string) $childrenAllowed === '1' ? __('Children Allowed') : __('No Children') }}
                         </span>
                     @endif
                     @foreach($selectedAgeGroups as $ageGroup)
@@ -416,52 +510,70 @@
                             {{ $topicLabel }}
                         </span>
                     @endforeach
-                    @if(request('starts_after'))
+                    @foreach($selectedSpeakerLabels as $speakerLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $speakerLabel }}
+                        </span>
+                    @endforeach
+                    @if($startsAfter)
                         @php
-                            $startsAfterLabel = \Illuminate\Support\Carbon::make(request('starts_after'))?->format('d M Y') ?? request('starts_after');
+                            $startsAfterLabel = \Illuminate\Support\Carbon::make($startsAfter)?->format('d M Y') ?? $startsAfter;
                         @endphp
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ __('From') }} {{ $startsAfterLabel }}
                         </span>
                     @endif
-                    @if(request('starts_before'))
+                    @if($startsBefore)
                         @php
-                            $startsBeforeLabel = \Illuminate\Support\Carbon::make(request('starts_before'))?->format('d M Y') ?? request('starts_before');
+                            $startsBeforeLabel = \Illuminate\Support\Carbon::make($startsBefore)?->format('d M Y') ?? $startsBefore;
                         @endphp
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ __('Until') }} {{ $startsBeforeLabel }}
                         </span>
                     @endif
-                    @if(request('time_scope') === 'past')
+                    @if($timeScope === 'past')
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ __('Past') }}
                         </span>
                     @endif
-                    @if(request('time_scope') === 'all')
+                    @if($timeScope === 'all')
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ __('All Time') }}
                         </span>
                     @endif
                     @auth
-                        <a href="{{ route('saved-searches.index', request()->query()) }}" wire:navigate
+                        <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
                             class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
                             {{ __('Save This Search') }}
                         </a>
                     @endauth
-                    <a href="{{ route('events.index') }}" wire:navigate
+                    <button type="button" wire:click="clearAllFilters"
                         class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
                         {{ __('Clear All Filters') }}
-                    </a>
+                    </button>
                 </div>
             @endif
         </form>
 
         <!-- Results Grid -->
-        <div class="mt-16">
+        <div class="mt-16 relative"
+            wire:loading.class="opacity-60"
+            wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters">
+            <div wire:loading.flex
+                wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters"
+                class="pointer-events-none absolute inset-0 z-30 items-center justify-center rounded-3xl bg-white/50 backdrop-blur-[1px]">
+                <div class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow">
+                    <svg class="h-4 w-4 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
+                        <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 00-10-10"></path>
+                    </svg>
+                    {{ __('Refreshing events...') }}
+                </div>
+            </div>
             @island(name: 'grid', lazy: false)
             @placeholder
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -513,10 +625,10 @@
                                     <div
                                         class="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 text-center shadow-sm border border-black/5 min-w-[3.5rem]">
                                         <div class="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                            {{ $event->starts_at?->format('M') }}
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
                                         </div>
                                         <div class="text-xl font-bold font-heading text-slate-900 leading-none">
-                                            {{ $event->starts_at?->format('d') }}
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}
                                         </div>
                                     </div>
                                     @if($event->status instanceof \App\States\EventStatus\Pending)
@@ -577,7 +689,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
-                                        {{ $event->starts_at?->format('h:i A') }}
+                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                                     </div>
                                 </div>
 

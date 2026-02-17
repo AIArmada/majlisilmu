@@ -75,9 +75,9 @@ new class extends Component {
                                     <div
                                         class="flex-shrink-0 w-14 h-14 rounded-xl bg-emerald-50 flex flex-col items-center justify-center">
                                         <span
-                                            class="text-sm font-bold text-emerald-600 uppercase">{{ $event->starts_at?->translatedFormat('M') }}</span>
+                                            class="text-sm font-bold text-emerald-600 uppercase">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</span>
                                         <span
-                                            class="text-lg font-black text-emerald-700 leading-none">{{ $event->starts_at?->format('d') }}</span>
+                                            class="text-lg font-black text-emerald-700 leading-none">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <h3
@@ -94,7 +94,7 @@ new class extends Component {
                                                 @if($event->isPrayerRelative() && $event->prayer_display_text)
                                                     {{ $event->prayer_display_text }}
                                                 @else
-                                                    {{ $event->starts_at?->format('h:i A') }}
+                                                    {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                                                 @endif
                                             </span>
                                         </div>

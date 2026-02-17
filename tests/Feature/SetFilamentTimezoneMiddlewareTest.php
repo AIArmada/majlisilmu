@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\SetFilamentTimezone;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 /**
@@ -76,4 +77,31 @@ it('falls back to app timezone when provided values are invalid', function () {
     );
 
     expect($result['resolved_timezone'])->toBe('UTC');
+});
+
+it('prioritizes authenticated user timezone over cookie and session', function () {
+    $user = User::factory()->create([
+        'timezone' => 'Europe/London',
+    ]);
+
+    $this->actingAs($user);
+
+    $result = runTimezoneMiddleware(
+        cookie: 'Asia/Singapore',
+        session: 'Asia/Manila',
+    );
+
+    expect($result['resolved_timezone'])->toBe('Europe/London');
+});
+
+it('persists resolved timezone to authenticated user profile when null', function () {
+    $user = User::factory()->create([
+        'timezone' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    runTimezoneMiddleware(header: 'Asia/Jakarta');
+
+    expect($user->fresh()?->timezone)->toBe('Asia/Jakarta');
 });

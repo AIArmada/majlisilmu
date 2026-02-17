@@ -21,9 +21,10 @@ it('shows prayer-relative timing text on speaker page instead of absolute time',
 
     $speaker->events()->attach($event->id);
 
-    $expectedEndTime = $event->ends_at?->copy()->timezone($event->timezone ?: 'Asia/Kuala_Lumpur')->format('h:i A');
+    $expectedEndTime = $event->ends_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('h:i A');
 
-    $this->get(route('speakers.show', $speaker))
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertSee('Selepas Asar')
         ->assertSee($expectedEndTime)
@@ -47,7 +48,8 @@ it('renders event end time in event timezone on speaker page', function () {
 
     $speaker->events()->attach($event->id);
 
-    $this->get(route('speakers.show', $speaker))
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertSee('Selepas Asar')
         ->assertSee('8:40 PM')

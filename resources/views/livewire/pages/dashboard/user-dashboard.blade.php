@@ -102,7 +102,7 @@
                                             @endif
                                         </td>
                                         <td class="py-4 pr-4">
-                                            {{ $event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}
+                                            {{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}
                                         </td>
                                         <td class="py-4 pr-4">{{ $event->institution?->name ?? __('Independent') }}</td>
                                         <td class="py-4">
@@ -152,7 +152,7 @@
                                                 {{ $event->title }}
                                             </a>
                                             <p class="mt-1 text-xs text-slate-500">
-                                                {{ $event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}
+                                                {{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}
                                                 @if($event->institution?->name)
                                                     • {{ $event->institution->name }}
                                                 @endif
@@ -209,7 +209,7 @@
                                                 {{ $event->title }}
                                             </a>
                                         </td>
-                                        <td class="py-4 pr-4">{{ $event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}</td>
+                                        <td class="py-4 pr-4">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}</td>
                                         <td class="py-4 pr-4">{{ $event->institution?->name ?? __('Independent') }}</td>
                                         <td class="py-4">{{ $event->venue?->name ?? __('Online / TBD') }}</td>
                                     </tr>

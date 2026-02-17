@@ -87,9 +87,9 @@ new class extends Component {
                             <a href="{{ route('events.show', $event) }}" wire:navigate
                                 class="block bg-white rounded-xl border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all p-4 group">
                                 <div class="flex items-center gap-2 mb-3 text-xs text-slate-500">
-                                    <span class="font-bold text-emerald-600">{{ $event->starts_at?->format('d M') }}</span>
+                                    <span class="font-bold text-emerald-600">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M') }}</span>
                                     <span>•</span>
-                                    <span>{{ $event->starts_at?->format('h:i A') }}</span>
+                                    <span>{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}</span>
                                 </div>
                                 <h3
                                     class="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-2 mb-2 min-h-[3rem]">

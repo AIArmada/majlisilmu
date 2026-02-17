@@ -94,7 +94,7 @@
                                                     {{ $event->title }}
                                                 </a>
                                             </td>
-                                            <td class="py-4 pr-4">{{ $event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}</td>
+                                            <td class="py-4 pr-4">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}</td>
                                             <td class="py-4 pr-4">{{ $event->venue?->name ?? __('Online / TBD') }}</td>
                                             <td class="py-4 pr-4">
                                                 <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -134,7 +134,7 @@
                                                     {{ $registration->event->title }}
                                                 </a>
                                                 <p class="mt-1 text-xs text-slate-500">
-                                                    {{ $registration->event->starts_at?->translatedFormat('d M Y, h:i A') ?? __('TBC') }}
+                                                    {{ $registration->event?->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($registration->event->starts_at, 'd M Y, h:i A') : __('TBC') }}
                                                 </p>
                                             @endif
                                             <p class="mt-2 text-sm text-slate-700">

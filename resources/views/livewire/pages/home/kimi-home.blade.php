@@ -223,8 +223,8 @@
                             @endif
                             <!-- Date Badge -->
                             <div class="absolute top-4 left-4 bg-white rounded-xl px-3 py-2 shadow-lg text-center min-w-[60px]">
-                                <div class="text-xs font-bold text-emerald-600 uppercase">{{ $event->starts_at->format('M') }}</div>
-                                <div class="text-xl font-bold text-slate-900">{{ $event->starts_at->format('d') }}</div>
+                                <div class="text-xs font-bold text-emerald-600 uppercase">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</div>
+                                <div class="text-xl font-bold text-slate-900">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</div>
                             </div>
                         </div>
 
@@ -236,7 +236,7 @@
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    {{ $event->starts_at->format('g:i A') }}
+                                    {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'g:i A') }}
                                 </span>
                                 @if($event->institution)
                                     <span class="flex items-center gap-1">

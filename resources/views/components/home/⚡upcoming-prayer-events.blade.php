@@ -2,6 +2,7 @@
 
 use App\Enums\PrayerReference;
 use App\Models\Event;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -10,7 +11,7 @@ new class extends Component {
     #[Computed]
     public function currentPrayerPeriod(): array
     {
-        $now = now('Asia/Kuala_Lumpur')->hour;
+        $now = UserDateTimeFormatter::userNow()->hour;
 
         if ($now >= 5 && $now < 7) {
             return ['key' => 'subuh', 'label' => 'Subuh Hari Ini', 'prayer' => PrayerReference::Fajr];
@@ -33,7 +34,6 @@ new class extends Component {
     public function upcomingEvents(): Collection
     {
         $period = $this->currentPrayerPeriod();
-        $now = now('Asia/Kuala_Lumpur');
 
         $query = Event::active()
             ->orderBy('starts_at')
@@ -42,8 +42,8 @@ new class extends Component {
 
         // Simple time-based logic for now, utilizing the UTC timestamps in DB
         // We find events starting in the next 6 hours
-        $start = now()->timezone('UTC');
-        $end = now()->timezone('UTC')->addHours(8);
+        $start = UserDateTimeFormatter::userNow()->setTimezone('UTC');
+        $end = UserDateTimeFormatter::userNow()->addHours(8)->setTimezone('UTC');
 
         return $query->whereBetween('starts_at', [$start, $end])->get();
     }
@@ -87,7 +87,7 @@ new class extends Component {
                         <div class="flex items-start justify-between mb-4">
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                {{ $event->starts_at?->timezone('Asia/Kuala_Lumpur')->format('h:i A') }}
+                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                             </span>
                             @if($event->is_featured)
                                 <span class="text-amber-500">

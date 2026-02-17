@@ -309,3 +309,41 @@ Run and pass:
 ```bash
 vendor/bin/phpstan analyse --ansi
 ```
+
+---
+
+# Timezone Handling (Critical)
+
+## Core Rules
+- Store all timestamps in UTC at the database layer.
+- Resolve viewer timezone at request-time using `App\Support\Timezone\UserTimezoneResolver`.
+- For display formatting in Blade/Livewire, use `App\Support\Timezone\UserDateTimeFormatter`.
+- Do not hardcode region timezones (for example `Asia/Kuala_Lumpur`) in public query/filter logic.
+
+## Display Rules
+- Prefer:
+    - `UserDateTimeFormatter::format($date, 'h:i A')`
+    - `UserDateTimeFormatter::translatedFormat($date, 'l, j F Y')`
+- Avoid direct `->format()` / `->translatedFormat()` in public-facing views unless you intentionally need storage timezone output.
+
+## Date Filter Rules
+- For date-only filters (`starts_after`, `starts_before`, etc.), parse input as user-local date and convert to UTC boundaries before querying:
+    - start boundary => startOfDay in user timezone -> UTC
+    - end boundary => endOfDay in user timezone -> UTC
+- Use `UserDateTimeFormatter::parseUserDateToUtc(...)` for this conversion.
+
+## Prayer-Time Filter Notes
+- Advanced search may use prayer-relative labels (for example `Selepas Jumaat`, `Selepas Maghrib`, `Selepas Tarawih`).
+- Use `prayer_display_text` keyword matching and `prayer_reference` mapping where applicable.
+- `Tarawih` is label-based (text matching), not a `PrayerReference` enum value.
+
+---
+
+# Query Safety Notes
+
+## Qualified Columns in Scopes
+- When scopes are reused inside joined queries, qualify columns by table name to avoid ambiguous-column failures (especially in SQLite tests).
+- Example: in `Event::active()`, use `events.is_active` instead of plain `is_active`.
+
+## Public Listing Visibility
+- If a public page is expected to show only approved records, explicitly constrain `status = approved` even when using broader reusable scopes.

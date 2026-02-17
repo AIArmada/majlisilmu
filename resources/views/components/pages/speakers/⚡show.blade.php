@@ -204,21 +204,17 @@ new class extends Component {
     };
 
     $resolveEventTimeDisplay = static function (\App\Models\Event $event): string {
-        $eventTimezone = $event->timezone ?: 'Asia/Kuala_Lumpur';
-
         return $event->timing_display !== ''
             ? $event->timing_display
-            : ($event->starts_at?->copy()->timezone($eventTimezone)->format('h:i A') ?? '');
+            : \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A');
     };
 
     $resolveEventEndTimeDisplay = static function (\App\Models\Event $event): string {
-        $eventTimezone = $event->timezone ?: 'Asia/Kuala_Lumpur';
-
-        return $event->ends_at?->copy()->timezone($eventTimezone)->format('h:i A') ?? '';
+        return \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A');
     };
 
     // Calendar data: map events to dates for the calendar view
-    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
+    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => \App\Support\Timezone\UserDateTimeFormatter::format($e->starts_at, 'Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
         $typeLabel = $resolveEventTypeLabel($e->event_type);
         $formatValue = $e->event_format?->value ?? $e->event_format;
 
@@ -460,9 +456,9 @@ new class extends Component {
                                    class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/80 hover:ring-emerald-100 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                     {{-- Date accent sidebar --}}
                                     <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800') }} p-2.5 text-white sm:w-24 sm:p-3">
-                                        <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
-                                        <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                        <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
+                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                     </div>
                                     {{-- Event details --}}
                                     <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -618,9 +614,9 @@ new class extends Component {
                                class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:ring-slate-200 hover:shadow-xl hover:shadow-slate-500/[0.06]">
                                 {{-- Date accent sidebar --}}
                                 <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700') }} p-2.5 text-white sm:w-24 sm:p-3">
-                                    <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
-                                    <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                    <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                    <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
+                                    <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                 </div>
                                 {{-- Event details --}}
                                 <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">

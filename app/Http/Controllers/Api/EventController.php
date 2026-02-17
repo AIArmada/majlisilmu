@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\EventPrayerTime;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -62,25 +65,25 @@ class EventController extends Controller
                     });
                 }),
                 AllowedFilter::callback('starts_after', function (Builder $query, mixed $value): void {
-                    $startsAfter = $this->parseDate($value);
+                    $startsAfter = $this->parseDate($value, false);
                     if ($startsAfter instanceof Carbon) {
                         $query->where('starts_at', '>=', $startsAfter);
                     }
                 }),
                 AllowedFilter::callback('starts_before', function (Builder $query, mixed $value): void {
-                    $startsBefore = $this->parseDate($value);
+                    $startsBefore = $this->parseDate($value, true);
                     if ($startsBefore instanceof Carbon) {
                         $query->where('starts_at', '<=', $startsBefore);
                     }
                 }),
                 AllowedFilter::callback('ends_after', function (Builder $query, mixed $value): void {
-                    $endsAfter = $this->parseDate($value);
+                    $endsAfter = $this->parseDate($value, false);
                     if ($endsAfter instanceof Carbon) {
                         $query->where('ends_at', '>=', $endsAfter);
                     }
                 }),
                 AllowedFilter::callback('ends_before', function (Builder $query, mixed $value): void {
-                    $endsBefore = $this->parseDate($value);
+                    $endsBefore = $this->parseDate($value, true);
                     if ($endsBefore instanceof Carbon) {
                         $query->where('ends_at', '<=', $endsBefore);
                     }
@@ -158,6 +161,34 @@ class EventController extends Controller
                             ->orWhereRaw($this->descriptionSearchSql($operator), ["%{$searchTerm}%"]);
                     });
                 }),
+                AllowedFilter::callback('prayer_time', function (Builder $query, mixed $value): void {
+                    $prayerTime = is_string($value) ? trim($value) : '';
+
+                    if ($prayerTime === '') {
+                        return;
+                    }
+
+                    $enum = EventPrayerTime::tryFrom(Str::lower($prayerTime));
+
+                    if ($enum instanceof EventPrayerTime) {
+                        $prayerTime = $enum->getLabel();
+                    }
+
+                    $normalized = Str::lower($prayerTime);
+                    $operator = $this->databaseLikeOperator();
+
+                    $query
+                        ->where('timing_mode', 'prayer_relative')
+                        ->where(function (Builder $prayerQuery) use ($normalized, $operator): void {
+                            $prayerQuery->whereRaw('LOWER(prayer_display_text) '.$operator.' ?', ["%{$normalized}%"]);
+
+                            $reference = $this->resolvePrayerReference($normalized);
+
+                            if ($reference !== null) {
+                                $prayerQuery->orWhere('prayer_reference', $reference);
+                            }
+                        });
+                }),
             ])
             ->allowedIncludes([
                 'venue',
@@ -233,17 +264,40 @@ class EventController extends Controller
         return response()->json(['data' => $event]);
     }
 
-    private function parseDate(mixed $value): ?Carbon
+    private function parseDate(mixed $value, bool $endOfDay): ?Carbon
     {
-        if (! is_string($value) || trim($value) === '') {
-            return null;
+        $date = UserDateTimeFormatter::parseUserDateToUtc($value, $endOfDay);
+
+        return $date instanceof Carbon ? $date : null;
+    }
+
+    private function resolvePrayerReference(string $prayerTime): ?string
+    {
+        if (Str::contains($prayerTime, ['jumaat', 'friday'])) {
+            return 'friday_prayer';
         }
 
-        try {
-            return Carbon::parse($value, config('app.timezone'));
-        } catch (\Throwable) {
-            return null;
+        if (Str::contains($prayerTime, ['maghrib'])) {
+            return 'maghrib';
         }
+
+        if (Str::contains($prayerTime, ['asar', 'asr'])) {
+            return 'asr';
+        }
+
+        if (Str::contains($prayerTime, ['subuh', 'fajr'])) {
+            return 'fajr';
+        }
+
+        if (Str::contains($prayerTime, ['zohor', 'zuhur', 'dhuhr'])) {
+            return 'dhuhr';
+        }
+
+        if (Str::contains($prayerTime, ['isyak', 'isha'])) {
+            return 'isha';
+        }
+
+        return null;
     }
 
     /**

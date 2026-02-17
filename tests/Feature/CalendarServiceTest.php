@@ -196,6 +196,6 @@ describe('CalendarService', function () {
         expect($links['outlook'])->toStartWith('https://outlook.live.com');
         expect($links['office365'])->toStartWith('https://outlook.office.com');
         expect($links['yahoo'])->toStartWith('https://calendar.yahoo.com');
-        expect($links['ics'])->toContain('/calendar.ics');
+        expect($links['ics'])->toContain('/kalendar.ics');
     });
 });
