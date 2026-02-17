@@ -6,11 +6,12 @@
 
 @php
     use App\Enums\TimingMode;
+    use App\Support\Timezone\UserDateTimeFormatter;
     
     $isPrayerRelative = $event->timing_mode === TimingMode::PrayerRelative;
     $prayerDisplayText = $event->prayer_display_text;
-    $absoluteTime = $event->starts_at?->format('g:i A');
-    $date = $event->starts_at?->translatedFormat('l, j F Y');
+    $absoluteTime = UserDateTimeFormatter::format($event->starts_at, 'g:i A');
+    $date = UserDateTimeFormatter::translatedFormat($event->starts_at, 'l, j F Y');
 @endphp
 
 <div {{ $attributes->merge(['class' => 'event-timing']) }}>

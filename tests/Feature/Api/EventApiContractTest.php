@@ -7,6 +7,10 @@ use App\Models\Event;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+
+uses(RefreshDatabase::class);
 
 it('lists only active public approved or pending events', function () {
     $approvedPublic = Event::factory()->create([
@@ -170,4 +174,72 @@ it('filters events by district_id and subdistrict_id', function () {
     expect($subdistrictEventIds)
         ->toContain($districtMatch->id)
         ->not()->toContain($subdistrictNonMatch->id);
+});
+
+it('interprets starts_after filter in the user timezone', function () {
+    $userTimezone = 'Asia/Kuala_Lumpur';
+    $localFilterDate = now($userTimezone)->addDays(2)->toDateString();
+
+    $includedStartUtc = Carbon::parse($localFilterDate.' 01:00:00', $userTimezone)->setTimezone('UTC');
+    $excludedStartUtc = Carbon::parse($localFilterDate.' 23:30:00', $userTimezone)
+        ->subDay()
+        ->setTimezone('UTC');
+
+    $included = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $includedStartUtc,
+    ]);
+
+    $excluded = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $excludedStartUtc,
+    ]);
+
+    $response = $this
+        ->withHeader('X-Timezone', $userTimezone)
+        ->getJson('/api/v1/events?filter[starts_after]='.$localFilterDate);
+
+    $response->assertOk();
+
+    $eventIds = collect($response->json('data'))->pluck('id')->all();
+
+    expect($eventIds)
+        ->toContain($included->id)
+        ->not()->toContain($excluded->id);
+});
+
+it('filters events by prayer_time keyword', function () {
+    $maghribEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'timing_mode' => 'prayer_relative',
+        'prayer_reference' => 'maghrib',
+        'prayer_display_text' => 'Selepas Maghrib',
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $subuhEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'timing_mode' => 'prayer_relative',
+        'prayer_reference' => 'fajr',
+        'prayer_display_text' => 'Selepas Subuh',
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $response = $this->getJson('/api/v1/events?filter[prayer_time]=Selepas+Maghrib');
+
+    $response->assertOk();
+
+    $eventIds = collect($response->json('data'))->pluck('id')->all();
+
+    expect($eventIds)
+        ->toContain($maghribEvent->id)
+        ->not()->toContain($subuhEvent->id);
 });

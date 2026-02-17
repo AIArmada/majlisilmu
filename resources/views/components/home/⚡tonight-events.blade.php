@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Event;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -9,8 +10,8 @@ new class extends Component {
     #[Computed]
     public function events(): Collection
     {
-        $now = now('Asia/Kuala_Lumpur');
-        $start = $now->copy()->setTimezone('UTC'); // From current moment in KL
+        $now = UserDateTimeFormatter::userNow();
+        $start = $now->copy()->setTimezone('UTC');
         $end = $now->copy()->endOfDay()->setTimezone('UTC');
 
         return Event::active()
@@ -77,8 +78,8 @@ style="display: none;" @endif>
                             <div
                                 class="flex-shrink-0 w-14 h-14 rounded-lg bg-amber-100 flex flex-col items-center justify-center">
                                 <span
-                                    class="text-lg font-bold text-amber-600">{{ $event->starts_at?->format('h:i') }}</span>
-                                <span class="text-xs text-amber-500">{{ $event->starts_at?->format('A') }}</span>
+                                    class="text-lg font-bold text-amber-600">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i') }}</span>
+                                <span class="text-xs text-amber-500">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'A') }}</span>
                             </div>
                             <div class="min-w-0">
                                 <h3 class="font-bold text-slate-900 truncate">{{ $event->title }}</h3>

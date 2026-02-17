@@ -190,9 +190,11 @@ class Event extends Model implements AuditableContract, HasMedia
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
     protected function active(Builder $query): void
     {
-        $query->where('is_active', true)
-            ->whereIn('status', ['approved', 'pending'])
-            ->where('visibility', EventVisibility::Public);
+        $table = $query->getModel()->getTable();
+
+        $query->where("{$table}.is_active", true)
+            ->whereIn("{$table}.status", ['approved', 'pending'])
+            ->where("{$table}.visibility", EventVisibility::Public);
     }
 
     /**

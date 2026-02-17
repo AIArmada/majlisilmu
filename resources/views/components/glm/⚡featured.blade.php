@@ -94,8 +94,8 @@ new class extends Component {
                             <!-- Date Badge -->
                             <div class="absolute top-6 left-6 flex items-center gap-3">
                                 <div class="bg-white rounded-xl px-3 py-2 shadow-lg">
-                                    <div class="text-xs font-bold text-slate-400 uppercase">{{ $featuredEvent->starts_at?->translatedFormat('M') }}</div>
-                                    <div class="text-xl font-black text-slate-900 leading-none">{{ $featuredEvent->starts_at?->format('d') }}</div>
+                                    <div class="text-xs font-bold text-slate-400 uppercase">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($featuredEvent->starts_at, 'M') }}</div>
+                                    <div class="text-xl font-black text-slate-900 leading-none">{{ \App\Support\Timezone\UserDateTimeFormatter::format($featuredEvent->starts_at, 'd') }}</div>
                                 </div>
                                 @if($featuredEvent->isPrayerRelative() && $featuredEvent->prayer_display_text)
                                     <div class="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
@@ -135,7 +135,7 @@ new class extends Component {
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span>{{ $featuredEvent->starts_at?->format('h:i A') }}</span>
+                                    <span>{{ \App\Support\Timezone\UserDateTimeFormatter::format($featuredEvent->starts_at, 'h:i A') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -159,8 +159,8 @@ new class extends Component {
                         <div class="absolute inset-0 p-5 flex flex-col justify-end">
                             <!-- Date Badge -->
                             <div class="absolute top-4 left-4 bg-white rounded-lg px-2 py-1 shadow-md">
-                                <div class="text-xs font-bold text-slate-400 uppercase">{{ $event->starts_at?->translatedFormat('M') }}</div>
-                                <div class="text-lg font-black text-slate-900 leading-none">{{ $event->starts_at?->format('d') }}</div>
+                                <div class="text-xs font-bold text-slate-400 uppercase">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</div>
+                                <div class="text-lg font-black text-slate-900 leading-none">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</div>
                             </div>
                             
                             <!-- Title -->
@@ -172,7 +172,7 @@ new class extends Component {
                             
                             <!-- Meta -->
                             <div class="flex items-center gap-2 text-white/70 text-xs">
-                                <span>{{ $event->starts_at?->format('h:i A') }}</span>
+                                <span>{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}</span>
                                 <span>•</span>
                                 <span class="truncate">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}</span>
                             </div>

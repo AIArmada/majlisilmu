@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\EventPrayerTime;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
@@ -10,6 +12,7 @@ use App\Models\Venue;
 use App\Services\EventSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
@@ -61,6 +64,96 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Kuliah Maghrib Special')
             ->assertDontSee('Ceramah Subuh');
+    });
+
+    it('filters events by prayer_time enum value in advanced filters', function () {
+        Event::factory()->create([
+            'title' => 'Enum Filter Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
+            'prayer_reference' => \App\Enums\PrayerReference::Maghrib,
+            'prayer_display_text' => 'Selepas Maghrib',
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Enum Filter No Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
+            'prayer_reference' => \App\Enums\PrayerReference::Asr,
+            'prayer_display_text' => 'Selepas Asar',
+        ]);
+
+        $response = $this->get('/events?prayer_time='.EventPrayerTime::SelepasMaghrib->value);
+
+        $response->assertOk()
+            ->assertSee('Enum Filter Match')
+            ->assertDontSee('Enum Filter No Match');
+    });
+
+    it('filters events by institution in advanced filters', function () {
+        $includedInstitution = Institution::factory()->create(['status' => 'verified', 'is_active' => true]);
+        $excludedInstitution = Institution::factory()->create(['status' => 'verified', 'is_active' => true]);
+
+        Event::factory()->for($includedInstitution)->create([
+            'title' => 'Institution Match Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->for($excludedInstitution)->create([
+            'title' => 'Institution Excluded Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?institution_id='.$includedInstitution->id);
+
+        $response->assertOk()
+            ->assertSee('Institution Match Event')
+            ->assertDontSee('Institution Excluded Event');
+    });
+
+    it('filters events by selected speaker ids in advanced filters', function () {
+        $includedSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
+        $excludedSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
+
+        $includedEvent = Event::factory()->create([
+            'title' => 'Speaker Match Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $includedEvent->speakers()->attach($includedSpeaker->id);
+
+        $excludedEvent = Event::factory()->create([
+            'title' => 'Speaker Excluded Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $excludedEvent->speakers()->attach($excludedSpeaker->id);
+
+        $query = http_build_query([
+            'speaker_ids' => [$includedSpeaker->id],
+        ]);
+
+        $response = $this->get('/events?'.$query);
+
+        $response->assertOk()
+            ->assertSee('Speaker Match Event')
+            ->assertDontSee('Speaker Excluded Event');
     });
 
     it('filters events by language', function () {
@@ -471,6 +564,70 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Within Date Range')
             ->assertDontSee('Outside Date Range');
+    });
+
+    it('filters events by prayer_time keyword in advanced filters', function () {
+        Event::factory()->create([
+            'title' => 'Kuliah Selepas Maghrib',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
+            'prayer_reference' => \App\Enums\PrayerReference::Maghrib,
+            'prayer_display_text' => 'Selepas Maghrib',
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Kuliah Selepas Subuh',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
+            'prayer_reference' => \App\Enums\PrayerReference::Fajr,
+            'prayer_display_text' => 'Selepas Subuh',
+        ]);
+
+        $response = $this->get('/events?prayer_time=Selepas+Maghrib');
+
+        $response->assertOk()
+            ->assertSee('Kuliah Selepas Maghrib')
+            ->assertDontSee('Kuliah Selepas Subuh');
+    });
+
+    it('interprets starts_after date in the user timezone', function () {
+        $userTimezone = 'Asia/Kuala_Lumpur';
+        $localFilterDate = now($userTimezone)->addDays(2)->toDateString();
+
+        $includedStartUtc = Carbon::parse($localFilterDate.' 01:00:00', $userTimezone)->setTimezone('UTC');
+        $excludedStartUtc = Carbon::parse($localFilterDate.' 23:30:00', $userTimezone)
+            ->subDay()
+            ->setTimezone('UTC');
+
+        Event::factory()->create([
+            'title' => 'Timezone Included Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => $includedStartUtc,
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Timezone Excluded Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => $excludedStartUtc,
+        ]);
+
+        $response = $this
+            ->withCookie('user_timezone', $userTimezone)
+            ->get('/events?starts_after='.$localFilterDate);
+
+        $response->assertOk()
+            ->assertSee('Timezone Included Event')
+            ->assertDontSee('Timezone Excluded Event');
     });
 
     it('filters events to past only when time scope is past', function () {

@@ -85,9 +85,9 @@ new class extends Component {
                                         <!-- Date Badge -->
                                         <div class="absolute top-4 left-4 bg-white rounded-xl px-3 py-2 shadow-md">
                                             <div class="text-[13px] font-bold text-slate-400 uppercase">
-                                                {{ $event->starts_at?->translatedFormat('M') }}</div>
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</div>
                                             <div class="text-xl font-black text-slate-900 leading-none">
-                                                {{ $event->starts_at?->format('d') }}</div>
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</div>
                                         </div>
                                         @if($event->isPrayerRelative() && $event->prayer_display_text)
                                             <div
@@ -134,7 +134,7 @@ new class extends Component {
                                                     class="truncate max-w-[120px]">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}</span>
                                             </div>
                                             <span class="text-sm font-semibold text-emerald-600">
-                                                {{ $event->starts_at?->format('h:i A') }}
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                                             </span>
                                         </div>
                                     </div>

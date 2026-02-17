@@ -16,17 +16,15 @@ class UserTimezoneResolver
     {
         $request ??= request();
         $sessionTimezone = $request->hasSession() ? $request->session()->get('user_timezone') : null;
+        $authenticatedUserTimezone = Auth::check() ? data_get(Auth::user(), 'timezone') : null;
 
         $candidates = [
             $preferredTimezone,
+            $authenticatedUserTimezone,
             $request->header('X-Timezone'),
             $request->cookie('user_timezone'),
             $sessionTimezone,
         ];
-
-        if (Auth::check()) {
-            $candidates[] = data_get(Auth::user(), 'timezone');
-        }
 
         foreach ($candidates as $candidate) {
             if (! is_string($candidate) || $candidate === '') {

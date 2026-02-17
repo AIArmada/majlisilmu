@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\EventPrayerTime;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Venue;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class EventSearchService
@@ -61,6 +64,10 @@ class EventSearchService
         int $perPage = 20,
         string $sort = 'time'
     ): LengthAwarePaginator {
+        if (filled($filters['prayer_time'] ?? null)) {
+            return $this->searchWithDatabase($query, $filters, $perPage, $sort);
+        }
+
         if (config('scout.driver') === 'typesense') {
             try {
                 return $this->searchWithTypesense($query, $filters, $perPage, $sort);
@@ -150,6 +157,10 @@ class EventSearchService
         array $filters = [],
         int $perPage = 20
     ): LengthAwarePaginator {
+        if (filled($filters['prayer_time'] ?? null)) {
+            return $this->searchNearbyWithDatabase($lat, $lng, $radiusKm, $filters, $perPage);
+        }
+
         if (config('scout.driver') === 'typesense') {
             try {
                 $search = Event::search('');
@@ -412,6 +423,20 @@ class EventSearchService
             });
         }
 
+        $prayerTime = $this->normalizePrayerTimeFilter($filters['prayer_time'] ?? null);
+
+        if ($prayerTime !== null) {
+            $queryBuilder
+                ->where('timing_mode', TimingMode::PrayerRelative->value)
+                ->where(function (Builder $prayerQuery) use ($prayerTime): void {
+                    $prayerQuery->where('prayer_display_text', $this->databaseLikeOperator(), "%{$prayerTime}%");
+
+                    if (($prayerReference = $this->resolvePrayerReferenceFromFilter($prayerTime)) instanceof PrayerReference) {
+                        $prayerQuery->orWhere('prayer_reference', $prayerReference->value);
+                    }
+                });
+        }
+
         return $queryBuilder;
     }
 
@@ -520,17 +545,7 @@ class EventSearchService
 
     protected function parseDateFilter(mixed $value, bool $endOfDay): ?CarbonInterface
     {
-        if (! is_string($value) || trim($value) === '') {
-            return null;
-        }
-
-        try {
-            $date = Carbon::parse($value, config('app.timezone'));
-        } catch (\Throwable) {
-            return null;
-        }
-
-        return $endOfDay ? $date->endOfDay() : $date->startOfDay();
+        return UserDateTimeFormatter::parseUserDateToUtc($value, $endOfDay);
     }
 
     /**
@@ -563,6 +578,56 @@ class EventSearchService
 
         if (in_array($value, [0, '0', 'false', 'off', 'no'], true)) {
             return false;
+        }
+
+        return null;
+    }
+
+    protected function normalizePrayerTimeFilter(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = mb_strtolower(trim($value));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        $enum = EventPrayerTime::tryFrom($normalized);
+
+        if ($enum instanceof EventPrayerTime) {
+            return mb_strtolower($enum->getLabel());
+        }
+
+        return $normalized;
+    }
+
+    protected function resolvePrayerReferenceFromFilter(string $prayerTime): ?PrayerReference
+    {
+        if (str_contains($prayerTime, 'jumaat') || str_contains($prayerTime, 'friday')) {
+            return PrayerReference::FridayPrayer;
+        }
+
+        if (str_contains($prayerTime, 'maghrib')) {
+            return PrayerReference::Maghrib;
+        }
+
+        if (str_contains($prayerTime, 'asar') || str_contains($prayerTime, 'asr')) {
+            return PrayerReference::Asr;
+        }
+
+        if (str_contains($prayerTime, 'subuh') || str_contains($prayerTime, 'fajr')) {
+            return PrayerReference::Fajr;
+        }
+
+        if (str_contains($prayerTime, 'zohor') || str_contains($prayerTime, 'zuhur') || str_contains($prayerTime, 'dhuhr')) {
+            return PrayerReference::Dhuhr;
+        }
+
+        if (str_contains($prayerTime, 'isyak') || str_contains($prayerTime, 'isha')) {
+            return PrayerReference::Isha;
         }
 
         return null;

@@ -6,8 +6,10 @@ use A909M\FilamentStateFusion\Tables\Filters\StateFusionSelectFilter;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use BackedEnum;
@@ -15,12 +17,16 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class EventsTable
 {
@@ -149,6 +155,90 @@ class EventsTable
                                 fn ($q, $value) => $q->whereJsonContains('event_type', $value)
                             )
                     ),
+                SelectFilter::make('timing_mode')
+                    ->label('Timing Mode')
+                    ->options([
+                        TimingMode::Absolute->value => TimingMode::Absolute->label(),
+                        TimingMode::PrayerRelative->value => TimingMode::PrayerRelative->label(),
+                    ]),
+                SelectFilter::make('prayer_reference')
+                    ->label('Prayer Reference')
+                    ->options(
+                        collect(PrayerReference::cases())
+                            ->mapWithKeys(fn (PrayerReference $reference): array => [$reference->value => $reference->label()])
+                            ->all()
+                    ),
+                SelectFilter::make('prayer_time')
+                    ->label('Prayer Time')
+                    ->options(
+                        collect(EventPrayerTime::cases())
+                            ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
+                            ->all()
+                    )
+                    ->query(function (Builder $query, array $data): Builder {
+                        $value = $data['value'] ?? null;
+
+                        if (! is_string($value) || $value === '') {
+                            return $query;
+                        }
+
+                        $prayerTime = EventPrayerTime::tryFrom($value);
+
+                        if (! $prayerTime instanceof EventPrayerTime) {
+                            return $query;
+                        }
+
+                        if ($prayerTime->isCustomTime()) {
+                            return $query->where('timing_mode', TimingMode::Absolute->value);
+                        }
+
+                        $query->where('timing_mode', TimingMode::PrayerRelative->value)
+                            ->where(function (Builder $timingQuery) use ($prayerTime): void {
+                                $timingQuery->where('prayer_display_text', 'like', '%'.$prayerTime->getLabel().'%');
+
+                                if (($reference = $prayerTime->toPrayerReference()) instanceof PrayerReference) {
+                                    $timingQuery->orWhere('prayer_reference', $reference->value);
+                                }
+                            });
+
+                        if (($reference = $prayerTime->toPrayerReference()) instanceof PrayerReference) {
+                            $query->where('prayer_reference', $reference->value);
+                        }
+
+                        return $query;
+                    }),
+                Filter::make('starts_at_range')
+                    ->label('Start Date Range')
+                    ->form([
+                        DatePicker::make('starts_after')
+                            ->label('Starts After'),
+                        DatePicker::make('starts_before')
+                            ->label('Starts Before'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                filled($data['starts_after'] ?? null),
+                                fn (Builder $builder): Builder => $builder->whereDate('starts_at', '>=', (string) $data['starts_after'])
+                            )
+                            ->when(
+                                filled($data['starts_before'] ?? null),
+                                fn (Builder $builder): Builder => $builder->whereDate('starts_at', '<=', (string) $data['starts_before'])
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+
+                        if (filled($data['starts_after'] ?? null)) {
+                            $indicators[] = 'Starts after '.Str::of((string) $data['starts_after'])->toString();
+                        }
+
+                        if (filled($data['starts_before'] ?? null)) {
+                            $indicators[] = 'Starts before '.Str::of((string) $data['starts_before'])->toString();
+                        }
+
+                        return $indicators;
+                    }),
             ])
             ->recordActions([
                 ViewAction::make(),

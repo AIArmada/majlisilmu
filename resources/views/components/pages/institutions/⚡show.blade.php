@@ -74,6 +74,7 @@ new class extends Component {
     {
         return $this->institution->events()
             ->active()
+            ->where('status', 'approved')
             ->where('starts_at', '>=', now())
             ->with([
                 'venue.address.state',
@@ -91,6 +92,7 @@ new class extends Component {
     {
         return $this->institution->events()
             ->active()
+            ->where('status', 'approved')
             ->where('starts_at', '>=', now())
             ->count();
     }
@@ -102,6 +104,7 @@ new class extends Component {
     {
         return $this->institution->events()
             ->active()
+            ->where('status', 'approved')
             ->where('starts_at', '<', now())
             ->with([
                 'venue.address.state',
@@ -119,6 +122,7 @@ new class extends Component {
     {
         return $this->institution->events()
             ->active()
+            ->where('status', 'approved')
             ->where('starts_at', '<', now())
             ->count();
     }
@@ -239,7 +243,7 @@ new class extends Component {
     };
 
     // Calendar data: map events to dates for the calendar view
-    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => $e->starts_at?->format('Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
+    $calendarEvents = $upcomingEvents->groupBy(fn ($e) => \App\Support\Timezone\UserDateTimeFormatter::format($e->starts_at, 'Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
         $typeLabel = $resolveEventTypeLabel($e->event_type);
 
         return [
@@ -472,9 +476,9 @@ new class extends Component {
                                        class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                         {{-- Date accent sidebar --}}
                                         <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-emerald-600 to-emerald-800 p-2.5 text-white sm:w-24 sm:p-3">
-                                            <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-200/80 sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
-                                            <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                            <span class="mt-0.5 text-[11px] font-bold tracking-wide text-emerald-200/80 sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                            <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-200/80 sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                            <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
+                                            <span class="mt-0.5 text-[11px] font-bold tracking-wide text-emerald-200/80 sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                         </div>
                                         {{-- Event details --}}
                                         <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -495,9 +499,9 @@ new class extends Component {
                                             <div class="space-y-1 text-sm text-slate-500">
                                                 <div class="flex items-center gap-1.5">
                                                     <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                    {{ $event->starts_at?->format('h:i A') }}
+                                                    {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                                                     @if($event->ends_at)
-                                                        <span class="text-slate-300">–</span> {{ $event->ends_at?->format('h:i A') }}
+                                                        <span class="text-slate-300">–</span> {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A') }}
                                                     @endif
                                                 </div>
                                                 @if($venueLocation)
@@ -604,9 +608,9 @@ new class extends Component {
                                 <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
                                    class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/[0.06]">
                                     <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-slate-500 to-slate-700 p-2.5 text-white sm:w-24 sm:p-3">
-                                        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300/80 sm:text-[11px]">{{ $event->starts_at?->translatedFormat('l') }}</span>
-                                        <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ $event->starts_at?->format('d') }}</span>
-                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide text-slate-300/80 sm:text-[13px]">{{ $event->starts_at?->translatedFormat('F') }}</span>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300/80 sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                        <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
+                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide text-slate-300/80 sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                     </div>
                                     <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
                                         <div class="flex items-center gap-2">
@@ -629,9 +633,9 @@ new class extends Component {
                                         <div class="space-y-1 text-sm text-slate-500">
                                             <div class="flex items-center gap-1.5">
                                                 <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                {{ $event->starts_at?->format('h:i A') }}
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
                                                 @if($event->ends_at)
-                                                    <span class="text-slate-300">–</span> {{ $event->ends_at?->format('h:i A') }}
+                                                    <span class="text-slate-300">–</span> {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A') }}
                                                 @endif
                                             </div>
                                             @if($pastVenueLocation)
