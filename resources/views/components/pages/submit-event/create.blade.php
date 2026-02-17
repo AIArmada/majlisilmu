@@ -1,6 +1,8 @@
 <?php
 
 use App\Enums\EventAgeGroup;
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
@@ -1655,8 +1657,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         if (filled($email)) {
             $submission->contacts()->create([
-                'type' => 'main',
-                'category' => 'email',
+                'type' => ContactType::Main->value,
+                'category' => ContactCategory::Email->value,
                 'value' => $email,
                 'is_public' => false,
             ]);
@@ -1664,8 +1666,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         if (filled($phone)) {
             $submission->contacts()->create([
-                'type' => 'main',
-                'category' => 'phone',
+                'type' => ContactType::Main->value,
+                'category' => ContactCategory::Phone->value,
                 'value' => $phone,
                 'is_public' => false,
             ]);

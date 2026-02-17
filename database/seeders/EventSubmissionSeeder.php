@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\User;
@@ -53,8 +55,8 @@ class EventSubmissionSeeder extends Seeder
                             'id' => (string) \Illuminate\Support\Str::uuid(),
                             'contactable_type' => 'event_submission',
                             'contactable_id' => $submissionId,
-                            'type' => 'main',
-                            'category' => 'email',
+                            'type' => ContactType::Main->value,
+                            'category' => ContactCategory::Email->value,
                             'value' => fake()->safeEmail(),
                             'created_at' => now(),
                             'updated_at' => now(),

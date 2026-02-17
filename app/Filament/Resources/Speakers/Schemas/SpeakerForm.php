@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Speakers\Schemas;
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\Gender;
 use App\Enums\Honorific;
 use App\Enums\PostNominal;
@@ -159,38 +161,46 @@ class SpeakerForm
                             ->schema([
                                 Select::make('category')
                                     ->label(__('Category'))
-                                    ->options([
-                                        'email' => __('Email'),
-                                        'phone' => __('Phone'),
-                                    ])
+                                    ->options(ContactCategory::class)
                                     ->required()
                                     ->live(),
                                 TextInput::make('value')
                                     ->required()
                                     ->maxLength(255)
                                     ->label(fn (Get $get) => match ($get('category')) {
+                                        ContactCategory::Email => __('Email Address'),
+                                        ContactCategory::Phone => __('Phone Number'),
+                                        ContactCategory::WhatsApp => __('WhatsApp Number'),
                                         'email' => __('Email Address'),
                                         'phone' => __('Phone Number'),
+                                        'whatsapp' => __('WhatsApp Number'),
                                         default => __('Value'),
                                     })
-                                    ->email(fn (Get $get) => $get('category') === 'email')
-                                    ->tel(fn (Get $get) => $get('category') === 'phone'),
+                                    ->email(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Email, ContactCategory::Email->value], true))
+                                    ->tel(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Phone, ContactCategory::Phone->value, ContactCategory::WhatsApp, ContactCategory::WhatsApp->value], true)),
                                 Select::make('type')
                                     ->label(__('Type'))
-                                    ->options([
-                                        'main' => __('Main'),
-                                        'work' => __('Work'),
-                                        'personal' => __('Personal'),
-                                        'whatsapp' => __('WhatsApp'),
-                                    ])
-                                    ->default('main')
+                                    ->options(ContactType::class)
+                                    ->default(ContactType::Main)
                                     ->required(),
                                 \Filament\Forms\Components\Toggle::make('is_public')
                                     ->label(__('Public'))
                                     ->default(true),
                             ])
                             ->columns(4)
-                            ->itemLabel(fn (array $state): string => (__($state['category'] ?? 'Contact')).': '.($state['value'] ?? '')),
+                            ->itemLabel(function (array $state): string {
+                                $category = $state['category'] ?? null;
+
+                                if ($category instanceof ContactCategory) {
+                                    $categoryLabel = $category->getLabel();
+                                } elseif (is_string($category)) {
+                                    $categoryLabel = ContactCategory::tryFrom($category)?->getLabel() ?? $category;
+                                } else {
+                                    $categoryLabel = __('Contact');
+                                }
+
+                                return $categoryLabel.': '.($state['value'] ?? '');
+                            }),
                     ]),
                 Section::make(__('Media'))
                     ->components([

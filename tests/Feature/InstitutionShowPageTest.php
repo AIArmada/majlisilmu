@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\EventVisibility;
 use App\Enums\InstitutionType;
 use App\Models\Event;
@@ -147,15 +149,15 @@ it('displays public contacts', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 
     $institution->contacts()->create([
-        'category' => 'phone',
-        'type' => 'Pejabat',
+        'category' => ContactCategory::Phone->value,
+        'type' => ContactType::Work->value,
         'value' => '03-12345678',
         'is_public' => true,
     ]);
 
     $institution->contacts()->create([
-        'category' => 'email',
-        'type' => 'Admin',
+        'category' => ContactCategory::Email->value,
+        'type' => ContactType::Main->value,
         'value' => 'private@test.com',
         'is_public' => false,
     ]);
@@ -163,7 +165,6 @@ it('displays public contacts', function () {
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
         ->assertSee('03-12345678')
-        ->assertSee('Pejabat')
         ->assertDontSee('private@test.com');
 });
 

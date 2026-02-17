@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Institutions\Schemas;
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\InstitutionType;
 use App\Enums\SocialMediaPlatform;
 use Filament\Forms\Components\Select;
@@ -72,37 +74,45 @@ class InstitutionForm
                             ->relationship()
                             ->schema([
                                 Select::make('category')
-                                    ->options([
-                                        'email' => 'Email',
-                                        'phone' => 'Phone',
-                                    ])
+                                    ->options(ContactCategory::class)
                                     ->required()
                                     ->live(),
                                 TextInput::make('value')
                                     ->required()
                                     ->maxLength(255)
                                     ->label(fn (Get $get) => match ($get('category')) {
+                                        ContactCategory::Email => 'Email Address',
+                                        ContactCategory::Phone => 'Phone Number',
+                                        ContactCategory::WhatsApp => 'WhatsApp Number',
                                         'email' => 'Email Address',
                                         'phone' => 'Phone Number',
+                                        'whatsapp' => 'WhatsApp Number',
                                         default => 'Value',
                                     })
-                                    ->email(fn (Get $get) => $get('category') === 'email')
-                                    ->tel(fn (Get $get) => $get('category') === 'phone'),
+                                    ->email(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Email, ContactCategory::Email->value], true))
+                                    ->tel(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Phone, ContactCategory::Phone->value, ContactCategory::WhatsApp, ContactCategory::WhatsApp->value], true)),
                                 Select::make('type')
-                                    ->options([
-                                        'main' => 'Main',
-                                        'work' => 'Work',
-                                        'personal' => 'Personal',
-                                        'whatsapp' => 'WhatsApp',
-                                    ])
-                                    ->default('main')
+                                    ->options(ContactType::class)
+                                    ->default(ContactType::Main)
                                     ->required(),
                                 \Filament\Forms\Components\Toggle::make('is_public')
                                     ->label('Public')
                                     ->default(true),
                             ])
                             ->columns(4)
-                            ->itemLabel(fn (array $state): string => ($state['category'] ?? 'Contact').': '.($state['value'] ?? '')),
+                            ->itemLabel(function (array $state): string {
+                                $category = $state['category'] ?? null;
+
+                                if ($category instanceof ContactCategory) {
+                                    $categoryLabel = $category->getLabel();
+                                } elseif (is_string($category)) {
+                                    $categoryLabel = ContactCategory::tryFrom($category)?->getLabel() ?? $category;
+                                } else {
+                                    $categoryLabel = 'Contact';
+                                }
+
+                                return $categoryLabel.': '.($state['value'] ?? '');
+                            }),
                     ]),
                 Section::make('Location')
                     ->relationship('address')

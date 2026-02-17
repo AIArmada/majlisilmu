@@ -84,7 +84,12 @@ class InstitutionDashboard extends Component
         }
 
         return $this->availableInstitutionsQuery($user)
-            ->withCount(['events', 'members'])
+            ->withCount([
+                'events' => function (Builder $query) {
+                    $query->active();
+                },
+                'members',
+            ])
             ->orderBy('name')
             ->get();
     }

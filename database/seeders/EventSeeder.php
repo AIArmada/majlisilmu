@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -146,13 +148,13 @@ class EventSeeder extends Seeder
         ]);
 
         $institution->contacts()->firstOrCreate(
-            ['category' => 'email'],
-            ['value' => 'mtajbj@gmail.com', 'type' => 'work']
+            ['category' => ContactCategory::Email->value],
+            ['value' => 'mtajbj@gmail.com', 'type' => ContactType::Work->value]
         );
 
         $institution->contacts()->firstOrCreate(
-            ['category' => 'phone'],
-            ['value' => '03-78313641', 'type' => 'work']
+            ['category' => ContactCategory::Phone->value],
+            ['value' => '03-78313641', 'type' => ContactType::Work->value]
         );
 
         if (! $institution->address) {

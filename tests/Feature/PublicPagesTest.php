@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ContactCategory;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
@@ -112,5 +113,5 @@ it('records guest submissions without a submitter id', function () {
 
     expect($submission)->not->toBeNull();
     expect($submission->submitted_by)->toBeNull();
-    expect($submission->contacts()->where('category', 'email')->where('value', $email)->exists())->toBeTrue();
+    expect($submission->contacts()->where('category', ContactCategory::Email->value)->where('value', $email)->exists())->toBeTrue();
 });

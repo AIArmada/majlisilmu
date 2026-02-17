@@ -58,6 +58,29 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(function (self $channel): void {
+            if (! $channel->is_default) {
+                return;
+            }
+
+            if (blank($channel->donatable_type) || blank($channel->donatable_id)) {
+                return;
+            }
+
+            self::query()
+                ->where('donatable_type', $channel->donatable_type)
+                ->where('donatable_id', $channel->donatable_id)
+                ->whereKeyNot($channel->getKey())
+                ->where('is_default', true)
+                ->update([
+                    'is_default' => false,
+                    'updated_at' => now(),
+                ]);
+        });
+    }
+
     /**
      * @return MorphTo<Model, $this>
      */

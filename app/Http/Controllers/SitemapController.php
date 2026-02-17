@@ -25,8 +25,7 @@ class SitemapController extends Controller
     public function events(): Response
     {
         $events = Event::query()
-            ->where('status', 'approved')
-            ->where('visibility', 'public')
+            ->active()
             ->orderBy('updated_at', 'desc')
             ->take(50000)
             ->get(['slug', 'updated_at']);

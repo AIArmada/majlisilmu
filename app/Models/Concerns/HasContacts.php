@@ -2,6 +2,7 @@
 
 namespace App\Models\Concerns;
 
+use App\Enums\ContactCategory;
 use App\Models\Contact;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -17,11 +18,11 @@ trait HasContacts
 
     public function getEmailAttribute(): ?string
     {
-        return $this->contacts()->where('category', 'email')->value('value');
+        return $this->contacts()->where('category', ContactCategory::Email->value)->value('value');
     }
 
     public function getPhoneAttribute(): ?string
     {
-        return $this->contacts()->where('category', 'phone')->value('value');
+        return $this->contacts()->where('category', ContactCategory::Phone->value)->value('value');
     }
 }

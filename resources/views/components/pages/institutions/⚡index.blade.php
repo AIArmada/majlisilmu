@@ -4,11 +4,10 @@ use App\Models\Institution;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
-use Livewire\Attributes\Title;
-
-new 
+new
 #[Title('Institutions - Majlis Ilmu')]
 class extends Component
 {
@@ -20,7 +19,9 @@ class extends Component
 
         return Institution::query()
             ->where('status', 'verified')
-            ->withCount('events')
+            ->withCount(['events' => function ($query) {
+                $query->active();
+            }])
             ->with(['address.state', 'media'])
             ->when($search, function ($query, $search) use ($operator) {
                 $query->where(function ($q) use ($search, $operator) {
@@ -90,31 +91,25 @@ class extends Component
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($institutions as $institution)
                         @php
-                            $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
+                            $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
+                            $cardInstitutionImageUrl = $coverUrl ?: $institution->getFirstMediaUrl('logo');
                         @endphp
                         <a href="{{ route('institutions.show', $institution) }}" wire:navigate class="group relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden">
-                            <!-- Banner Area (Abstract) -->
-                            <div class="h-32 bg-slate-50 relative overflow-hidden">
-                                <div class="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-100 group-hover:opacity-90 transition-opacity"></div>
-                                <svg class="absolute right-0 bottom-0 text-emerald-100/50 w-32 h-32 transform translate-x-8 translate-y-8" fill="currentColor" viewBox="0 0 24 24">
-                                     <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
+                            <!-- Banner Area (16:9, cover-first) -->
+                            <div class="aspect-video bg-slate-50 relative overflow-hidden">
+                                @if($cardInstitutionImageUrl)
+                                    <img src="{{ $cardInstitutionImageUrl }}" alt="{{ $institution->name }}" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy">
+                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/35 via-slate-900/10 to-transparent"></div>
+                                @else
+                                    <div class="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-100 group-hover:opacity-90 transition-opacity"></div>
+                                    <svg class="absolute right-0 bottom-0 text-emerald-100/50 w-32 h-32 transform translate-x-8 translate-y-8" fill="currentColor" viewBox="0 0 24 24">
+                                         <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                @endif
                             </div>
                             
-                            <div class="p-6 pt-12 relative flex-1 flex flex-col">
-                                <!-- Logo/Initial -->
-                                <div class="absolute -top-10 left-6 h-20 w-20 rounded-2xl bg-white border-[3px] border-white shadow-lg flex items-center justify-center overflow-hidden z-10">
-                                     @if($logoUrl)
-                                        <img src="{{ $logoUrl }}" alt="{{ $institution->name }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" width="80" height="80" loading="lazy">
-                                    @else
-                                        <div class="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white relative group-hover:scale-105 transition-transform duration-500">
-                                            <div class="absolute inset-0 opacity-20 bg-[url('/images/pattern-bg.png')] bg-repeat"></div>
-                                            <span class="font-heading font-bold text-3xl shadow-sm relative z-10 select-none">{{ substr($institution->name, 0, 1) }}</span>
-                                        </div>
-                                    @endif
-                                </div>
-                                
-                                <h3 class="font-heading text-lg font-bold text-slate-900 group-hover:text-emerald-700 transition-colors mb-2 mt-2 leading-tight">
+                            <div class="p-6 pt-6 relative flex-1 flex flex-col">
+                                <h3 class="font-heading text-lg font-bold text-slate-900 group-hover:text-emerald-700 transition-colors mb-2 leading-tight">
                                     {{ $institution->name }}
                                 </h3>
                                 

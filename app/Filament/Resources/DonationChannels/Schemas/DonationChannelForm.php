@@ -2,10 +2,13 @@
 
 namespace App\Filament\Resources\DonationChannels\Schemas;
 
+use App\Models\DonationChannel;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Model;
 
 class DonationChannelForm
 {
@@ -29,7 +32,7 @@ class DonationChannelForm
                         ->searchable()
                         ->preload()
                         ->required()
-                        ->options(function (\Filament\Schemas\Components\Utilities\Get $get) {
+                        ->options(function (Get $get) {
                             $type = $get('donatable_type');
                             if (! $type) {
                                 return [];
@@ -61,31 +64,31 @@ class DonationChannelForm
             ->schema([
                 // Bank Account Fields
                 TextInput::make('bank_name')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'bank_account')
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'bank_account'),
+                    ->visible(fn (Get $get) => $get('method') === 'bank_account')
+                    ->required(fn (Get $get) => $get('method') === 'bank_account'),
                 TextInput::make('bank_code')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'bank_account')
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'bank_account'),
+                    ->visible(fn (Get $get) => $get('method') === 'bank_account')
+                    ->required(fn (Get $get) => $get('method') === 'bank_account'),
                 TextInput::make('account_number')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'bank_account')
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'bank_account'),
+                    ->visible(fn (Get $get) => $get('method') === 'bank_account')
+                    ->required(fn (Get $get) => $get('method') === 'bank_account'),
 
                 // DuitNow Fields
                 TextInput::make('duitnow_type')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'duitnow')
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'duitnow'),
+                    ->visible(fn (Get $get) => $get('method') === 'duitnow')
+                    ->required(fn (Get $get) => $get('method') === 'duitnow'),
                 TextInput::make('duitnow_value')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'duitnow')
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'duitnow'),
+                    ->visible(fn (Get $get) => $get('method') === 'duitnow')
+                    ->required(fn (Get $get) => $get('method') === 'duitnow'),
 
                 // E-Wallet Fields
                 TextInput::make('ewallet_provider')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'ewallet')
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'ewallet'),
+                    ->visible(fn (Get $get) => $get('method') === 'ewallet')
+                    ->required(fn (Get $get) => $get('method') === 'ewallet'),
                 TextInput::make('ewallet_handle')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'ewallet'),
+                    ->visible(fn (Get $get) => $get('method') === 'ewallet'),
                 Textarea::make('ewallet_qr_payload')
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('method') === 'ewallet'),
+                    ->visible(fn (Get $get) => $get('method') === 'ewallet'),
             ])->columns(3);
 
         $components[] = \Filament\Schemas\Components\Section::make('QR Code')
@@ -111,9 +114,37 @@ class DonationChannelForm
                     ])
                     ->default('unverified')
                     ->required(),
+                Toggle::make('confirm_default_replacement')
+                    ->label('Replace existing default')
+                    ->helperText('Enable this to replace the current default channel for this owner.')
+                    ->dehydrated(false)
+                    ->live()
+                    ->visible(function (Get $get, ?DonationChannel $record = null, mixed $livewire = null): bool {
+                        return self::hasAnotherDefaultChannel($get, $record, $livewire)
+                            && ! (bool) $get('is_default');
+                    }),
                 Toggle::make('is_default')
                     ->label('Default')
-                    ->helperText('Only one default channel per method is allowed'),
+                    ->live()
+                    ->disabled(function (Get $get, ?DonationChannel $record = null, mixed $livewire = null): bool {
+                        if ($record?->is_default) {
+                            return false;
+                        }
+
+                        return self::hasAnotherDefaultChannel($get, $record, $livewire)
+                            && ! (bool) $get('confirm_default_replacement');
+                    })
+                    ->helperText(function (Get $get, ?DonationChannel $record = null, mixed $livewire = null): string {
+                        if (
+                            self::hasAnotherDefaultChannel($get, $record, $livewire)
+                            && ! (bool) $get('confirm_default_replacement')
+                            && ! $record?->is_default
+                        ) {
+                            return 'Another default channel already exists. Enable "Replace existing default" first.';
+                        }
+
+                        return 'Only one default channel is allowed for this owner.';
+                    }),
                 Textarea::make('reference_note')
                     ->label('Reference Note')
                     ->columnSpanFull(),
@@ -121,5 +152,64 @@ class DonationChannelForm
 
         return $schema
             ->components($components);
+    }
+
+    private static function hasAnotherDefaultChannel(Get $get, ?DonationChannel $record = null, mixed $livewire = null): bool
+    {
+        [$ownerType, $ownerId] = self::resolveOwnerContext($get, $record, $livewire);
+
+        if (blank($ownerType) || blank($ownerId)) {
+            return false;
+        }
+
+        $query = DonationChannel::query()
+            ->where('donatable_type', $ownerType)
+            ->where('donatable_id', $ownerId)
+            ->where('is_default', true);
+
+        if ($record?->exists) {
+            $query->whereKeyNot($record->getKey());
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function resolveOwnerContext(Get $get, ?DonationChannel $record = null, mixed $livewire = null): array
+    {
+        $ownerType = $get('donatable_type');
+        $ownerId = $get('donatable_id');
+
+        if (filled($ownerType) && filled($ownerId)) {
+            return [self::normalizeOwnerType((string) $ownerType), (string) $ownerId];
+        }
+
+        if ($record?->exists && filled($record->donatable_type) && filled($record->donatable_id)) {
+            return [(string) $record->donatable_type, (string) $record->donatable_id];
+        }
+
+        if (is_object($livewire) && method_exists($livewire, 'getOwnerRecord')) {
+            $ownerRecord = $livewire->getOwnerRecord();
+
+            if ($ownerRecord instanceof Model && filled($ownerRecord->getKey())) {
+                return [(string) $ownerRecord->getMorphClass(), (string) $ownerRecord->getKey()];
+            }
+        }
+
+        return [null, null];
+    }
+
+    private static function normalizeOwnerType(string $ownerType): string
+    {
+        if (class_exists($ownerType) && is_subclass_of($ownerType, Model::class)) {
+            /** @var Model $model */
+            $model = new $ownerType;
+
+            return (string) $model->getMorphClass();
+        }
+
+        return $ownerType;
     }
 }

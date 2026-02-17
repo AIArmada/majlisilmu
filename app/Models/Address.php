@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use GuzzleHttp\TransferStats;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Http;
 
 class Address extends Model
 {
@@ -34,6 +36,119 @@ class Address extends Model
         'lat' => 'float',
         'lng' => 'float',
     ];
+
+    #[\Override]
+    protected static function booted(): void
+    {
+        static::saving(function (Address $address): void {
+            if (! $address->isDirty('google_maps_url')) {
+                return;
+            }
+
+            $address->google_maps_url = self::resolveGoogleMapsUrl($address->google_maps_url);
+        });
+    }
+
+    private static function resolveGoogleMapsUrl(?string $url): ?string
+    {
+        $trimmedUrl = is_string($url) ? trim($url) : null;
+
+        if (! filled($trimmedUrl)) {
+            return null;
+        }
+
+        $host = parse_url($trimmedUrl, PHP_URL_HOST);
+        $host = is_string($host) ? strtolower($host) : '';
+
+        if ($host !== 'maps.app.goo.gl') {
+            return self::normalizeGoogleMapsUrlLength($trimmedUrl);
+        }
+
+        $effectiveUrl = null;
+
+        try {
+            Http::withHeaders([
+                'User-Agent' => 'MajlisIlmu/1.0 (+https://majlisilmu.test)',
+            ])
+                ->withOptions([
+                    'allow_redirects' => [
+                        'max' => 10,
+                        'track_redirects' => true,
+                    ],
+                    'on_stats' => static function (TransferStats $stats) use (&$effectiveUrl): void {
+                        $effectiveUri = $stats->getEffectiveUri();
+                        $effectiveUrl = $effectiveUri ? (string) $effectiveUri : null;
+                    },
+                ])
+                ->timeout(10)
+                ->get($trimmedUrl);
+        } catch (\Throwable) {
+            return self::normalizeGoogleMapsUrlLength($trimmedUrl);
+        }
+
+        $resolvedUrl = filled($effectiveUrl) ? (string) $effectiveUrl : $trimmedUrl;
+
+        return self::normalizeGoogleMapsUrlLength($resolvedUrl);
+    }
+
+    private static function normalizeGoogleMapsUrlLength(string $url): string
+    {
+        if (strlen($url) <= 255) {
+            return $url;
+        }
+
+        $placeName = self::extractGooglePlaceName($url);
+
+        if (preg_match('/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/', $url, $matches) === 1) {
+            $placeCoordinates = $matches[1].','.$matches[2];
+            $preciseQuery = trim($placeName !== '' ? $placeName.' '.$placeCoordinates : $placeCoordinates);
+            $compactUrl = 'https://www.google.com/maps/search/?api=1&query='.urlencode($preciseQuery);
+
+            if (strlen($compactUrl) <= 255) {
+                return $compactUrl;
+            }
+
+            $coordsOnlyCompactUrl = 'https://www.google.com/maps/search/?api=1&query='.$placeCoordinates;
+
+            if (strlen($coordsOnlyCompactUrl) <= 255) {
+                return $coordsOnlyCompactUrl;
+            }
+        }
+
+        if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches) === 1) {
+            $compactUrl = 'https://www.google.com/maps/search/?api=1&query='.$matches[1].','.$matches[2];
+
+            if (strlen($compactUrl) <= 255) {
+                return $compactUrl;
+            }
+        }
+
+        $strippedUrl = preg_replace('/[?#].*$/', '', $url) ?? $url;
+
+        if (strlen($strippedUrl) <= 255) {
+            return $strippedUrl;
+        }
+
+        return 'https://www.google.com/maps';
+    }
+
+    private static function extractGooglePlaceName(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($path) || $path === '') {
+            return '';
+        }
+
+        if (preg_match('#/maps/place/([^/]+)#', $path, $matches) !== 1) {
+            return '';
+        }
+
+        $rawName = urldecode((string) $matches[1]);
+        $normalizedName = str_replace('+', ' ', $rawName);
+
+        return trim($normalizedName);
+    }
 
     /**
      * @return MorphTo<Model, $this>
