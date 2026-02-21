@@ -94,6 +94,33 @@ it('prioritizes authenticated user timezone over cookie and session', function (
     expect($result['resolved_timezone'])->toBe('Europe/London');
 });
 
+it('uses request timezone when authenticated user timezone is null', function () {
+    $user = User::factory()->create([
+        'timezone' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    $result = runTimezoneMiddleware(cookie: 'Asia/Singapore');
+
+    expect($result['resolved_timezone'])->toBe('Asia/Singapore');
+});
+
+it('does not persist fallback timezone to authenticated user when request timezone is missing', function () {
+    config()->set('app.timezone', 'UTC');
+
+    $user = User::factory()->create([
+        'timezone' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    $result = runTimezoneMiddleware();
+
+    expect($result['resolved_timezone'])->toBe('UTC');
+    expect($user->fresh()?->timezone)->toBeNull();
+});
+
 it('persists resolved timezone to authenticated user profile when null', function () {
     $user = User::factory()->create([
         'timezone' => null,

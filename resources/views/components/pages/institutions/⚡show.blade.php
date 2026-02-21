@@ -2,6 +2,7 @@
 
 use App\Models\Institution;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 new class extends Component {
@@ -138,11 +139,11 @@ new class extends Component {
 <style>
     @media (max-width: 1023px) {
         .institution-main-column {
-            order: 2;
+            order: 1 !important;
         }
 
         .institution-sidebar-column {
-            order: 1;
+            order: 2 !important;
         }
     }
 </style>
@@ -223,28 +224,58 @@ new class extends Component {
         return __('Umum');
     };
 
-    // Venue location helper
-    $resolveVenueLocation = static function (\App\Models\Event $event): string {
-        $venue = $event->venue;
-        if (! $venue) {
-            return '';
+    // Event location helper — Venue/Institution, subdistrict, district, state
+    $resolveVenueLocation = static function (\App\Models\Event $event) use ($institution): string {
+        $venueName = $event->venue?->name;
+        $institutionName = $event->institution?->name ?? $institution->name;
+        $primaryLocationName = $venueName ?: $institutionName;
+        $address = $event->venue?->addressModel ?? $event->institution?->addressModel ?? $institution->addressModel;
+
+        $districtName = $address->district?->name;
+        $stateName = $address->state?->name;
+
+        $stateHiddenDistricts = [
+            'kuala lumpur',
+            'putrajaya',
+            'labuan',
+        ];
+
+        if (is_string($districtName) && in_array(Str::lower(trim($districtName)), $stateHiddenDistricts, true)) {
+            $stateName = null;
         }
-        $address = $venue->addressModel;
-        if (! $address) {
-            return $venue->name;
-        }
+
         $parts = array_filter([
-            $venue->name,
+            $primaryLocationName,
             $address->subdistrict?->name,
-            $address->district?->name,
-            $address->state?->name,
+            $districtName,
+            $stateName,
         ]);
+
+        if ($parts !== []) {
+            return implode(', ', $parts);
+        }
+
+        if (is_string($primaryLocationName) && $primaryLocationName !== '') {
+            return $primaryLocationName;
+        }
+
         return implode(', ', $parts);
+    };
+
+    $resolveEventTimeDisplay = static function (\App\Models\Event $event): string {
+        return $event->timing_display !== ''
+            ? $event->timing_display
+            : \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A');
+    };
+
+    $resolveEventEndTimeDisplay = static function (\App\Models\Event $event): string {
+        return \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A');
     };
 
     // Calendar data: map events to dates for the calendar view
     $calendarEvents = $upcomingEvents->groupBy(fn ($e) => \App\Support\Timezone\UserDateTimeFormatter::format($e->starts_at, 'Y-m-d'))->map(fn ($group) => $group->map(function (\App\Models\Event $e) use ($resolveEventTypeLabel) {
         $typeLabel = $resolveEventTypeLabel($e->event_type);
+        $formatValue = $e->event_format?->value ?? $e->event_format;
 
         return [
             'id' => $e->id,
@@ -254,6 +285,7 @@ new class extends Component {
                 ->replace(' ('.$typeLabel.')', '')
                 ->trim(),
             'url' => route('events.show', $e),
+            'is_remote' => in_array($formatValue, ['online', 'hybrid'], true),
         ];
     })->values())->toArray();
 @endphp
@@ -470,15 +502,16 @@ new class extends Component {
                                 @foreach($upcomingEvents as $event)
                                     @php
                                         $venueLocation = $resolveVenueLocation($event);
-                                        $isOnlineEvent = ($event->event_format?->value ?? $event->event_format) === 'online';
+                                        $eventFormatValue = $event->event_format?->value ?? $event->event_format;
+                                        $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                     @endphp
                                     <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="upcoming-{{ $event->id }}"
                                        class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                         {{-- Date accent sidebar --}}
-                                        <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-emerald-600 to-emerald-800 p-2.5 text-white sm:w-24 sm:p-3">
-                                            <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-200/80 sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                        <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800' }} p-2.5 text-white sm:w-24 sm:p-3">
+                                            <span class="text-[10px] font-bold uppercase tracking-widest {{ $isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80' }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                             <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
-                                            <span class="mt-0.5 text-[11px] font-bold tracking-wide text-emerald-200/80 sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
+                                            <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80' }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                         </div>
                                         {{-- Event details --}}
                                         <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -486,10 +519,10 @@ new class extends Component {
                                                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
                                                     {{ $resolveEventTypeLabel($event->event_type) }}
                                                 </span>
-                                                @if($isOnlineEvent)
+                                                @if($isRemoteEvent)
                                                     <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
                                                         <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                                                        {{ __('Online') }}
+                                                        {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
                                                     </span>
                                                 @endif
                                             </div>
@@ -499,15 +532,20 @@ new class extends Component {
                                             <div class="space-y-1 text-sm text-slate-500">
                                                 <div class="flex items-center gap-1.5">
                                                     <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                    {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
+                                                    {{ $resolveEventTimeDisplay($event) }}
                                                     @if($event->ends_at)
-                                                        <span class="text-slate-300">–</span> {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A') }}
+                                                        <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
                                                     @endif
                                                 </div>
-                                                @if($venueLocation)
+                                                @if($venueLocation && $eventFormatValue !== 'online')
                                                     <div class="flex items-center gap-1.5">
                                                         <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
                                                         <span class="line-clamp-1">{{ $venueLocation }}</span>
+                                                    </div>
+                                                @elseif($event->institution && $eventFormatValue !== 'online')
+                                                    <div class="flex items-center gap-1.5">
+                                                        <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
+                                                        {{ $event->institution->name }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -579,10 +617,14 @@ new class extends Component {
                                                     <template x-if="cell.events?.length > 0">
                                                         <div class="mt-0.5 space-y-0.5">
                                                             <template x-for="ev in cell.events.slice(0, 2)" :key="ev.id">
-                                                                <a :href="ev.url" class="block rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words text-emerald-700 transition hover:bg-emerald-100" x-text="ev.title"></a>
+                                                                <a :href="ev.url" class="block rounded px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words transition"
+                                                                   :class="ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'"
+                                                                   x-text="ev.title"></a>
                                                             </template>
                                                             <template x-if="cell.events?.length > 2">
-                                                                <span class="block text-[9px] font-semibold text-emerald-500" x-text="'+' + (cell.events.length - 2) + ' lagi'"></span>
+                                                                <span class="block text-[9px] font-semibold"
+                                                                      :class="cell.events.some(ev => ev.is_remote) ? 'text-sky-500' : 'text-emerald-500'"
+                                                                      x-text="'+' + (cell.events.length - 2) + ' lagi'"></span>
                                                             </template>
                                                         </div>
                                                     </template>
@@ -603,24 +645,25 @@ new class extends Component {
                             @foreach($pastEvents as $event)
                                 @php
                                     $pastVenueLocation = $resolveVenueLocation($event);
-                                    $isOnlineEvent = ($event->event_format?->value ?? $event->event_format) === 'online';
+                                    $eventFormatValue = $event->event_format?->value ?? $event->event_format;
+                                    $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                 @endphp
                                 <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
                                    class="group relative flex overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/[0.06]">
-                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b from-slate-500 to-slate-700 p-2.5 text-white sm:w-24 sm:p-3">
-                                        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300/80 sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700' }} p-2.5 text-white sm:w-24 sm:p-3">
+                                        <span class="text-[10px] font-bold uppercase tracking-widest {{ $isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80' }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                         <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
-                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide text-slate-300/80 sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
+                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80' }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                     </div>
                                     <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
                                         <div class="flex items-center gap-2">
                                             <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/60">
                                                 {{ $resolveEventTypeLabel($event->event_type) }}
                                             </span>
-                                            @if($isOnlineEvent)
+                                            @if($isRemoteEvent)
                                                 <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
                                                     <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                                                    {{ __('Online') }}
+                                                    {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
                                                 </span>
                                             @endif
                                             <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
@@ -633,15 +676,20 @@ new class extends Component {
                                         <div class="space-y-1 text-sm text-slate-500">
                                             <div class="flex items-center gap-1.5">
                                                 <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
+                                                {{ $resolveEventTimeDisplay($event) }}
                                                 @if($event->ends_at)
-                                                    <span class="text-slate-300">–</span> {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A') }}
+                                                    <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
                                                 @endif
                                             </div>
-                                            @if($pastVenueLocation)
+                                            @if($pastVenueLocation && $eventFormatValue !== 'online')
                                                 <div class="flex items-center gap-1.5">
                                                     <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
                                                     <span class="line-clamp-1">{{ $pastVenueLocation }}</span>
+                                                </div>
+                                            @elseif($event->institution && $eventFormatValue !== 'online')
+                                                <div class="flex items-center gap-1.5">
+                                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
+                                                    {{ $event->institution->name }}
                                                 </div>
                                             @endif
                                         </div>
@@ -769,76 +817,78 @@ new class extends Component {
                     </section>
                 @endif
 
-                {{-- ─── SOCIAL MEDIA (Below content, like speaker view) ─── --}}
-                @if($socialLinks->isNotEmpty())
-                    <section class="scroll-reveal reveal-left" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 180ms">
-                        <div class="mb-5 flex items-center gap-3">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>
-                            </div>
-                            <div>
-                                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Media Sosial') }}</h2>
-                                <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-100/50">
-                            <div class="flex flex-wrap items-center gap-3">
-                                @foreach($socialLinks as $social)
-                                    @php
-                                        $platform = strtolower((string) $social->platform);
-                                        $linkClass = match ($platform) {
-                                            'website' => 'hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 hover:shadow-emerald-500/10',
-                                            'facebook' => 'hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-blue-500/10',
-                                            'instagram' => 'hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 hover:shadow-pink-500/10',
-                                            'youtube' => 'hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-red-500/10',
-                                            'telegram' => 'hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600 hover:shadow-sky-500/10',
-                                            'whatsapp' => 'hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-green-500/10',
-                                            default => 'hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 hover:shadow-slate-500/10',
-                                        };
-                                        $title = \App\Enums\SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? ucfirst($platform);
-                                    @endphp
-                                    <a href="{{ $social->url }}" target="_blank" rel="noopener noreferrer"
-                                       class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md {{ $linkClass }}"
-                                       title="{{ $title }}">
-                                        @switch($platform)
-                                            @case('website')
-                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
-                                                @break
-                                            @case('facebook')
-                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                                                @break
-                                            @case('instagram')
-                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>
-                                                @break
-                                            @case('youtube')
-                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
-                                                @break
-                                            @case('twitter')
-                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                                                @break
-                                            @case('tiktok')
-                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48V13a8.28 8.28 0 005.58 2.15V11.7a4.84 4.84 0 01-3.77-1.78v-.01l.01-.01V6.69h3.76z"/></svg>
-                                                @break
-                                            @case('telegram')
-                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                                                @break
-                                            @case('whatsapp')
-                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.52 3.48A11.86 11.86 0 0012.06 0C5.45 0 .08 5.37.08 11.98c0 2.11.55 4.17 1.59 5.99L0 24l6.2-1.63a11.9 11.9 0 005.86 1.49h.01c6.61 0 11.98-5.37 11.98-11.98 0-3.2-1.25-6.2-3.53-8.4zM12.07 21.8h-.01a9.8 9.8 0 01-5-1.37l-.36-.21-3.68.97.98-3.59-.23-.37a9.76 9.76 0 01-1.5-5.25c0-5.42 4.41-9.83 9.84-9.83 2.63 0 5.1 1.02 6.96 2.88a9.77 9.77 0 012.88 6.95c0 5.43-4.42 9.84-9.85 9.84zm5.4-7.35c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.95 1.18-.17.2-.35.23-.65.08-.3-.15-1.26-.46-2.4-1.48a8.96 8.96 0 01-1.66-2.07c-.18-.3-.02-.46.14-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.68-1.64-.94-2.25-.25-.6-.5-.52-.68-.53h-.58c-.2 0-.53.08-.8.38-.27.3-1.04 1.02-1.04 2.49 0 1.47 1.07 2.89 1.22 3.09.15.2 2.1 3.2 5.1 4.49.71.31 1.26.49 1.69.63.71.23 1.35.2 1.86.12.57-.08 1.78-.73 2.03-1.44.25-.71.25-1.31.17-1.44-.07-.13-.27-.2-.57-.35z"/></svg>
-                                                @break
-                                            @default
-                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-1.061l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/></svg>
-                                        @endswitch
-                                    </a>
-                                @endforeach
-                            </div>
-                        </div>
-                    </section>
-                @endif
             </div>
 
             {{-- RIGHT COLUMN — Sidebar --}}
             <div class="institution-sidebar-column order-1 space-y-6 lg:order-2 lg:sticky lg:top-6 lg:self-start">
+
+                {{-- ─── ISLAMIC INSPIRATION ─── --}}
+                <x-sidebar-inspiration />
+
+                {{-- ─── SOCIAL MEDIA (Mobile: below inspiration) ─── --}}
+                @if($socialLinks->isNotEmpty())
+                    <section class="scroll-reveal reveal-right rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-100/50" x-intersect.once="$el.classList.add('revealed')">
+                        <div class="mb-4 flex items-center gap-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900">{{ __('Media Sosial') }}</h3>
+                                <div class="mt-0.5 h-0.5 w-10 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            @foreach($socialLinks as $social)
+                                @php
+                                    $platform = strtolower((string) $social->platform);
+                                    $linkClass = match ($platform) {
+                                        'website' => 'hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 hover:shadow-emerald-500/10',
+                                        'facebook' => 'hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-blue-500/10',
+                                        'instagram' => 'hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 hover:shadow-pink-500/10',
+                                        'youtube' => 'hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-red-500/10',
+                                        'telegram' => 'hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600 hover:shadow-sky-500/10',
+                                        'whatsapp' => 'hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-green-500/10',
+                                        default => 'hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 hover:shadow-slate-500/10',
+                                    };
+                                    $title = \App\Enums\SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? ucfirst($platform);
+                                @endphp
+                                <a href="{{ $social->url }}" target="_blank" rel="noopener noreferrer"
+                                   class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md {{ $linkClass }}"
+                                   title="{{ $title }}">
+                                    @switch($platform)
+                                        @case('website')
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
+                                            @break
+                                        @case('facebook')
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                                            @break
+                                        @case('instagram')
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>
+                                            @break
+                                        @case('youtube')
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                                            @break
+                                        @case('twitter')
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                                            @break
+                                        @case('tiktok')
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48V13a8.28 8.28 0 005.58 2.15V11.7a4.84 4.84 0 01-3.77-1.78v-.01l.01-.01V6.69h3.76z"/></svg>
+                                            @break
+                                        @case('telegram')
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                                            @break
+                                        @case('whatsapp')
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.52 3.48A11.86 11.86 0 0012.06 0C5.45 0 .08 5.37.08 11.98c0 2.11.55 4.17 1.59 5.99L0 24l6.2-1.63a11.9 11.9 0 005.86 1.49h.01c6.61 0 11.98-5.37 11.98-11.98 0-3.2-1.25-6.2-3.53-8.4zM12.07 21.8h-.01a9.8 9.8 0 01-5-1.37l-.36-.21-3.68.97.98-3.59-.23-.37a9.76 9.76 0 01-1.5-5.25c0-5.42 4.41-9.83 9.84-9.83 2.63 0 5.1 1.02 6.96 2.88a9.77 9.77 0 012.88 6.95c0 5.43-4.42 9.84-9.85 9.84zm5.4-7.35c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.95 1.18-.17.2-.35.23-.65.08-.3-.15-1.26-.46-2.4-1.48a8.96 8.96 0 01-1.66-2.07c-.18-.3-.02-.46.14-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.68-1.64-.94-2.25-.25-.6-.5-.52-.68-.53h-.58c-.2 0-.53.08-.8.38-.27.3-1.04 1.02-1.04 2.49 0 1.47 1.07 2.89 1.22 3.09.15.2 2.1 3.2 5.1 4.49.71.31 1.26.49 1.69.63.71.23 1.35.2 1.86.12.57-.08 1.78-.73 2.03-1.44.25-.71.25-1.31.17-1.44-.07-.13-.27-.2-.57-.35z"/></svg>
+                                            @break
+                                        @default
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-1.061l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/></svg>
+                                    @endswitch
+                                </a>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
 
                 {{-- ─── CONTACT & ADDRESS ─── --}}
                 @if($contacts->isNotEmpty() || $address)
@@ -1002,6 +1052,9 @@ new class extends Component {
                         </div>
                     </div>
                 @endif
+
+                {{-- ─── JOIN MAJLISILMU CTA ─── --}}
+                <x-join-majlisilmu-cta />
 
             </div>
         </div>

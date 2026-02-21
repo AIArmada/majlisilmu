@@ -76,6 +76,23 @@ it('can submit event with custom prayer time (lain_waktu)', function () {
     expect($event->timing_mode)->toBe(TimingMode::Absolute);
 });
 
+it('requires custom_time when prayer_time is lain_waktu', function () {
+    $fixtures = submitEventTimingFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventTimingFormData($fixtures, [
+            'title' => 'Custom Time Required Event',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => null,
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.custom_time']);
+
+    expect(Event::where('title', 'Custom Time Required Event')->exists())->toBeFalse();
+});
+
 it('saves timing mode as prayer_relative when using prayer time', function () {
     $fixtures = submitEventTimingFixtures();
 

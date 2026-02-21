@@ -1,9 +1,13 @@
 <?php
 
 use App\Enums\TimingMode;
+use App\Models\District;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Speaker;
+use App\Models\Venue;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 it('shows prayer-relative timing text on speaker page instead of absolute time', function () {
     $speaker = Speaker::factory()->create([
@@ -54,4 +58,116 @@ it('renders event end time in event timezone on speaker page', function () {
         ->assertSee('Selepas Asar')
         ->assertSee('8:40 PM')
         ->assertDontSee('12:40 PM');
+});
+
+it('shows dedicated venue name for event location on speaker page when available', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al-Hidayah Test',
+    ]);
+
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan Utama Test',
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+        'starts_at' => now()->addDay()->setTime(17, 45),
+        'ends_at' => now()->addDay()->setTime(19, 15),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_display_text' => 'Selepas Asar',
+    ]);
+
+    $speaker->events()->attach($event->id);
+
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee('Dewan Utama Test');
+});
+
+it('falls back to institution name for event location on speaker page when venue is missing', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al-Hidayah Test',
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'institution_id' => $institution->id,
+        'venue_id' => null,
+        'starts_at' => now()->addDay()->setTime(17, 45),
+        'ends_at' => now()->addDay()->setTime(19, 15),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_display_text' => 'Selepas Asar',
+    ]);
+
+    $speaker->events()->attach($event->id);
+
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee('Masjid Al-Hidayah Test');
+});
+
+it('hides state when district is kuala lumpur putrajaya or labuan', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al-Hidayah Test',
+    ]);
+
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan Utama Test',
+    ]);
+
+    $stateId = DB::table('states')->insertGetId([
+        'country_id' => 132,
+        'name' => 'Kuala Lumpur',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $stateId,
+        'country_code' => 'MY',
+        'name' => 'Kuala Lumpur',
+    ]);
+
+    $venue->address()->update([
+        'state_id' => (int) $stateId,
+        'district_id' => $district->id,
+        'subdistrict_id' => null,
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+        'starts_at' => now()->addDay()->setTime(17, 45),
+        'ends_at' => now()->addDay()->setTime(19, 15),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_display_text' => 'Selepas Asar',
+    ]);
+
+    $speaker->events()->attach($event->id);
+
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee('Dewan Utama Test, '.$district->name)
+        ->assertDontSee('Dewan Utama Test, '.$district->name.', Kuala Lumpur');
 });

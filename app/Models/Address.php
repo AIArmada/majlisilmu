@@ -46,6 +46,15 @@ class Address extends Model
             }
 
             $address->google_maps_url = self::resolveGoogleMapsUrl($address->google_maps_url);
+
+            $coordinates = self::extractCoordinatesFromGoogleMapsUrl($address->google_maps_url);
+
+            if ($coordinates === null) {
+                return;
+            }
+
+            $address->lat = $coordinates['lat'];
+            $address->lng = $coordinates['lng'];
         });
     }
 
@@ -148,6 +157,39 @@ class Address extends Model
         $normalizedName = str_replace('+', ' ', $rawName);
 
         return trim($normalizedName);
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    private static function extractCoordinatesFromGoogleMapsUrl(?string $url): ?array
+    {
+        if (! is_string($url) || ! filled($url)) {
+            return null;
+        }
+
+        if (preg_match('/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/', $url, $matches) === 1) {
+            return [
+                'lat' => (float) $matches[1],
+                'lng' => (float) $matches[2],
+            ];
+        }
+
+        if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches) === 1) {
+            return [
+                'lat' => (float) $matches[1],
+                'lng' => (float) $matches[2],
+            ];
+        }
+
+        if (preg_match('/(?:query|destination)=[^&#]*?(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)/i', $url, $matches) === 1) {
+            return [
+                'lat' => (float) $matches[1],
+                'lng' => (float) $matches[2],
+            ];
+        }
+
+        return null;
     }
 
     /**

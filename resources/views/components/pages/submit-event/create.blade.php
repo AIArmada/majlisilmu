@@ -318,6 +318,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     Select::make('prayer_time')
                                         ->label(__('Waktu'))
                                         ->required()
+                                        ->afterStateUpdatedJs(<<<'JS'
+                                            if ($state !== 'lain_waktu') {
+                                                $set('custom_time', null)
+                                            }
+                                        JS)
                                         ->options(function (Get $get): array {
                                             $eventDate = $get('event_date');
 
@@ -385,11 +390,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->visibleJs(<<<'JS'
                                                             $get('prayer_time') === 'lain_waktu'
                                                             JS)
-                                        ->required(function (Get $get): bool {
-                                            $prayerTime = $get('prayer_time');
-
-                                            return $prayerTime === EventPrayerTime::LainWaktu || $prayerTime === 'lain_waktu';
-                                        })
+                                        ->requiredIf('prayer_time', EventPrayerTime::LainWaktu)
+                                        ->markAsRequired()
                                         ->columnSpan(['default' => 1, 'md' => 2])
                                         ->rule(function (Get $get): Closure {
                                             return function (string $attribute, $value, Closure $fail) use ($get) {

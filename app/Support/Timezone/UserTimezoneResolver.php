@@ -14,35 +14,52 @@ class UserTimezoneResolver
 
     public static function resolve(?Request $request = null, ?string $preferredTimezone = null): string
     {
+        return self::resolveWithSource($request, $preferredTimezone)['timezone'];
+    }
+
+    /**
+     * @return array{timezone: string, source: 'preferred'|'authenticated_user'|'header'|'cookie'|'session'|'app_fallback'|'system_fallback'}
+     */
+    public static function resolveWithSource(?Request $request = null, ?string $preferredTimezone = null): array
+    {
         $request ??= request();
         $sessionTimezone = $request->hasSession() ? $request->session()->get('user_timezone') : null;
         $authenticatedUserTimezone = Auth::check() ? data_get(Auth::user(), 'timezone') : null;
 
         $candidates = [
-            $preferredTimezone,
-            $authenticatedUserTimezone,
-            $request->header('X-Timezone'),
-            $request->cookie('user_timezone'),
-            $sessionTimezone,
+            'preferred' => $preferredTimezone,
+            'authenticated_user' => $authenticatedUserTimezone,
+            'header' => $request->header('X-Timezone'),
+            'cookie' => $request->cookie('user_timezone'),
+            'session' => $sessionTimezone,
         ];
 
-        foreach ($candidates as $candidate) {
+        foreach ($candidates as $source => $candidate) {
             if (! is_string($candidate) || $candidate === '') {
                 continue;
             }
 
             if (self::isValid($candidate)) {
-                return $candidate;
+                return [
+                    'timezone' => $candidate,
+                    'source' => $source,
+                ];
             }
         }
 
         $fallback = (string) config('app.timezone', 'UTC');
 
         if (self::isValid($fallback)) {
-            return $fallback;
+            return [
+                'timezone' => $fallback,
+                'source' => 'app_fallback',
+            ];
         }
 
-        return 'UTC';
+        return [
+            'timezone' => 'UTC',
+            'source' => 'system_fallback',
+        ];
     }
 
     protected static function isValid(string $timezone): bool

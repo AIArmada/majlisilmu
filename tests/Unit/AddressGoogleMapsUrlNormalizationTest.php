@@ -16,6 +16,36 @@ it('prefers place coordinates over viewport coordinates when compacting long goo
         'google_maps_url' => $longGoogleUrl,
     ]);
 
-    expect($address->fresh()->google_maps_url)
-        ->toBe('https://www.google.com/maps/search/?api=1&query=Surau+An-Nur+Taman+Cahaya+Alam+Seksyen+U12+3.0878096%2C101.4884755');
+    $freshAddress = $address->fresh();
+
+    expect($freshAddress->google_maps_url)
+        ->toBe('https://www.google.com/maps/search/?api=1&query=Surau+An-Nur+Taman+Cahaya+Alam+Seksyen+U12+3.0878096%2C101.4884755')
+        ->and($freshAddress->lat)->toBe(3.0878096)
+        ->and($freshAddress->lng)->toBe(101.4884755);
+});
+
+it('extracts latitude and longitude from short google maps urls after redirect resolution', function () {
+    $address = Address::query()->create([
+        'addressable_type' => 'institution',
+        'addressable_id' => (string) Str::uuid(),
+        'google_maps_url' => 'https://www.google.com/maps/@3.139003,101.686855,17z',
+    ]);
+
+    $freshAddress = $address->fresh();
+
+    expect($freshAddress->lat)->toBe(3.139003)
+        ->and($freshAddress->lng)->toBe(101.686855);
+});
+
+it('extracts latitude and longitude from compact google maps search query urls', function () {
+    $address = Address::query()->create([
+        'addressable_type' => 'institution',
+        'addressable_id' => (string) Str::uuid(),
+        'google_maps_url' => 'https://www.google.com/maps/search/?api=1&query=Surau+An-Nur+Taman+Cahaya+Alam+Seksyen+U12+3.0878096%2C101.4884755',
+    ]);
+
+    $freshAddress = $address->fresh();
+
+    expect($freshAddress->lat)->toBe(3.0878096)
+        ->and($freshAddress->lng)->toBe(101.4884755);
 });
