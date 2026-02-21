@@ -2,13 +2,19 @@
 
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
+use App\Enums\EventFormat;
 use App\Enums\EventVisibility;
 use App\Enums\InstitutionType;
+use App\Enums\TimingMode;
+use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Models\Venue;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 it('renders the institution show page for a verified institution', function () {
@@ -283,4 +289,69 @@ it('does not render breadcrumb and removed hero/page summary actions', function 
         ->assertDontSee('2 majlis')
         ->assertDontSee('3 penceramah')
         ->assertDontSee('<nav class="animate-fade-in-up flex items-center gap-2 text-sm" style="animation-delay: 100ms; opacity: 0;">', false);
+});
+
+it('renders prayer-relative start time and event timezone end time in institution event list', function () {
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    Event::factory()
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'starts_at' => Carbon::parse('2026-02-18 09:00:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-02-18 12:40:00', 'UTC'),
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_display_text' => 'Selepas Asar',
+            'title' => 'Kuliah Khas Timing',
+        ]);
+
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('Kuliah Khas Timing')
+        ->assertSee('Selepas Asar')
+        ->assertSee('8:40 PM')
+        ->assertDontSee('12:40 PM');
+});
+
+it('hides duplicated state for kuala lumpur putrajaya and labuan in institution event location list', function () {
+    $institution = Institution::factory()->create(['status' => 'verified']);
+    $venue = Venue::factory()->create(['name' => 'Dewan Utama KL']);
+
+    $stateId = DB::table('states')->insertGetId([
+        'country_id' => 132,
+        'name' => 'Kuala Lumpur',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $stateId,
+        'country_code' => 'MY',
+        'name' => 'Kuala Lumpur',
+    ]);
+
+    $venue->address()->update([
+        'state_id' => (int) $stateId,
+        'district_id' => $district->id,
+        'subdistrict_id' => null,
+    ]);
+
+    Event::factory()
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'event_format' => EventFormat::Physical,
+            'venue_id' => $venue->id,
+            'starts_at' => now()->addDay(),
+            'title' => 'Kuliah KL',
+        ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('Dewan Utama KL, Kuala Lumpur')
+        ->assertDontSee('Dewan Utama KL, Kuala Lumpur, Kuala Lumpur');
 });

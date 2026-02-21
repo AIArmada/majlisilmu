@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventRecurrenceRule;
 use App\Models\EventSession;
 use App\Models\EventSubmission;
+use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Report;
@@ -106,6 +107,7 @@ class AppServiceProvider extends ServiceProvider
             'donation_channel' => DonationChannel::class,
             'reference' => Reference::class,
             'report' => Report::class,
+            'inspiration' => Inspiration::class,
         ]);
 
         if (! Select::hasMacro('closeOnSelect')) {

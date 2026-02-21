@@ -79,6 +79,9 @@ new class extends Component {
             ->where('starts_at', '>=', now())
             ->with([
                 'institution',
+                'institution.address.state',
+                'institution.address.district',
+                'institution.address.subdistrict',
                 'venue.address.state',
                 'venue.address.district',
                 'venue.address.subdistrict',
@@ -107,6 +110,9 @@ new class extends Component {
             ->where('starts_at', '<', now())
             ->with([
                 'institution',
+                'institution.address.state',
+                'institution.address.district',
+                'institution.address.subdistrict',
                 'venue.address.state',
                 'venue.address.district',
                 'venue.address.subdistrict',
@@ -153,6 +159,10 @@ new class extends Component {
 
     // Social media
     $socialLinks = $speaker->socialMedia->mapWithKeys(fn ($s) => [$s->platform => $s->url]);
+    $hasSocialLinks = $socialLinks->isNotEmpty();
+    $showJoinCta = auth()->guest();
+    $hasInspiration = \App\Models\Inspiration::query()->active()->forLocale()->exists();
+    $useDesktopSidebar = $showJoinCta || $hasInspiration;
 
     // Institutions (primary first, max 3)
     $institutions = $speaker->institutions;
@@ -184,22 +194,41 @@ new class extends Component {
         return __('Umum');
     };
 
-    // Venue location helper — state, district, subdistrict
+    // Event location helper — Venue/Institution, subdistrict, district, state
     $resolveVenueLocation = static function (\App\Models\Event $event): string {
-        $venue = $event->venue;
-        if (! $venue) {
-            return '';
+        $venueName = $event->venue?->name;
+        $institutionName = $event->institution?->name;
+        $primaryLocationName = $venueName ?: $institutionName;
+        $address = $event->venue?->addressModel ?? $event->institution?->addressModel;
+
+        $districtName = $address->district?->name;
+        $stateName = $address->state?->name;
+
+        $stateHiddenDistricts = [
+            'kuala lumpur',
+            'putrajaya',
+            'labuan',
+        ];
+
+        if (is_string($districtName) && in_array(Str::lower(trim($districtName)), $stateHiddenDistricts, true)) {
+            $stateName = null;
         }
-        $address = $venue->addressModel;
-        if (! $address) {
-            return $venue->name;
-        }
+
         $parts = array_filter([
-            $venue->name,
+            $primaryLocationName,
             $address->subdistrict?->name,
-            $address->district?->name,
-            $address->state?->name,
+            $districtName,
+            $stateName,
         ]);
+
+        if ($parts !== []) {
+            return implode(', ', $parts);
+        }
+
+        if (is_string($primaryLocationName) && $primaryLocationName !== '') {
+            return $primaryLocationName;
+        }
+
         return implode(', ', $parts);
     };
 
@@ -381,8 +410,11 @@ new class extends Component {
         {{-- Subtle continuation of hero atmosphere into content --}}
         <div class="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-emerald-50/60 via-slate-50/40 to-transparent"></div>
 
-        <div class="container relative z-10 mx-auto mt-0 max-w-5xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
-            <div class="space-y-10">
+        <div class="container relative z-10 mx-auto mt-0 max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+            <div class="flex flex-col gap-8 {{ $useDesktopSidebar ? 'lg:grid lg:grid-cols-[1fr_340px]' : '' }}">
+
+            {{-- LEFT COLUMN — Main Content --}}
+            <div class="speaker-main-column order-1 space-y-10">
 
                 {{-- ─── EVENTS SECTION (Tabs: Upcoming / Past) ─── --}}
                 <section class="scroll-reveal reveal-up"
@@ -489,12 +521,12 @@ new class extends Component {
                                                     <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
                                                 @endif
                                             </div>
-                                            @if($venueLocation)
+                                            @if($venueLocation && $eventFormatValue !== 'online')
                                                 <div class="flex items-center gap-1.5">
                                                     <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
                                                     <span class="line-clamp-1">{{ $venueLocation }}</span>
                                                 </div>
-                                            @elseif($event->institution)
+                                            @elseif($event->institution && $eventFormatValue !== 'online')
                                                 <div class="flex items-center gap-1.5">
                                                     <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
                                                     {{ $event->institution->name }}
@@ -650,12 +682,12 @@ new class extends Component {
                                                 <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
                                             @endif
                                         </div>
-                                        @if($pastVenueLocation)
+                                        @if($pastVenueLocation && $eventFormatValue !== 'online')
                                             <div class="flex items-center gap-1.5">
                                                 <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
                                                 <span class="line-clamp-1">{{ $pastVenueLocation }}</span>
                                             </div>
-                                        @elseif($event->institution)
+                                        @elseif($event->institution && $eventFormatValue !== 'online')
                                             <div class="flex items-center gap-1.5">
                                                 <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75"/></svg>
                                                 {{ $event->institution->name }}
@@ -801,21 +833,25 @@ new class extends Component {
                 </section>
             @endif
 
-            {{-- ─── SOCIAL MEDIA (Below Biodata) ─── --}}
-            @if($socialLinks->isNotEmpty())
-                <section class="scroll-reveal reveal-left" x-data x-intersect.once="$el.classList.add('revealed')">
-                    <div class="mb-5 flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>
-                        </div>
-                        <div>
-                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Media Sosial') }}</h2>
-                            <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-slate-400 to-transparent"></div>
-                        </div>
-                    </div>
+            </div>
 
-                    <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-100/50">
-                        <div class="flex flex-wrap items-center gap-3">
+            {{-- RIGHT COLUMN — Sidebar --}}
+            @if($hasSocialLinks || $showJoinCta || $hasInspiration)
+                <div class="speaker-sidebar-column order-2 space-y-6 {{ $useDesktopSidebar ? 'lg:sticky lg:top-6 lg:self-start' : '' }}">
+
+                {{-- ─── ISLAMIC INSPIRATION ─── --}}
+                <x-sidebar-inspiration />
+                {{-- ─── SOCIAL MEDIA ─── --}}
+                @if($hasSocialLinks)
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                        <div class="border-b border-slate-100 px-5 py-4">
+                            <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>
+                                {{ __('Media Sosial') }}
+                            </h3>
+                        </div>
+                        <div class="p-5">
+                            <div class="flex flex-wrap items-center gap-3">
                             @if($socialLinks->has('website'))
                                 <a href="{{ $socialLinks->get('website') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 hover:shadow-md hover:shadow-emerald-500/10 hover:-translate-y-0.5" title="{{ __('Laman Web') }}">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
@@ -851,9 +887,15 @@ new class extends Component {
                                     <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
                                 </a>
                             @endif
+                            </div>
                         </div>
                     </div>
-                </section>
+                @endif
+
+                {{-- ─── JOIN MAJLISILMU CTA ─── --}}
+                <x-join-majlisilmu-cta />
+
+                </div>
             @endif
         </div>
     </div>

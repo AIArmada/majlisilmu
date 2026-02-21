@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\District;
 use App\Models\Event;
 use App\Models\User;
 use App\Models\Venue;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 describe('Event Show Page Going Feature', function () {
@@ -200,5 +202,43 @@ describe('Event Show Page Location & Contact Info', function () {
         }
 
         expect(true)->toBeTrue();
+    });
+
+    it('hides duplicated state for kuala lumpur putrajaya and labuan in location display', function () {
+        $venue = Venue::factory()->create([
+            'name' => 'Dewan Utama KL',
+        ]);
+
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => 132,
+            'name' => 'Kuala Lumpur',
+            'country_code' => 'MY',
+        ]);
+
+        $district = District::query()->create([
+            'country_id' => 132,
+            'state_id' => (int) $stateId,
+            'country_code' => 'MY',
+            'name' => 'Kuala Lumpur',
+        ]);
+
+        $venue->address()->update([
+            'state_id' => (int) $stateId,
+            'district_id' => $district->id,
+            'subdistrict_id' => null,
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'venue_id' => $venue->id,
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('Dewan Utama KL')
+            ->assertDontSee('Kuala Lumpur, Kuala Lumpur');
     });
 });

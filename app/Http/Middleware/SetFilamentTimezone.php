@@ -18,12 +18,15 @@ class SetFilamentTimezone
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $timezone = UserTimezoneResolver::resolve($request);
+        $resolution = UserTimezoneResolver::resolveWithSource($request);
+        $timezone = $resolution['timezone'];
 
         FilamentTimezone::set($timezone);
 
         $user = Auth::user();
-        if ($user !== null && data_get($user, 'timezone') !== $timezone) {
+        $shouldPersistTimezone = in_array($resolution['source'], ['preferred', 'header', 'cookie'], true);
+
+        if ($user !== null && $shouldPersistTimezone && data_get($user, 'timezone') !== $timezone) {
             $user->forceFill(['timezone' => $timezone])->save();
         }
 

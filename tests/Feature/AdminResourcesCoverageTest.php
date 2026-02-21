@@ -4,6 +4,7 @@ use App\Filament\Resources\AiModelPricings\AiModelPricingResource;
 use App\Filament\Resources\AiUsageLogs\AiUsageLogResource;
 use App\Filament\Resources\DonationChannels\DonationChannelResource;
 use App\Filament\Resources\Events\EventResource;
+use App\Filament\Resources\Inspirations\InspirationResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager as InstitutionDonationChannelsRelationManager;
 use App\Filament\Resources\References\ReferenceResource;
@@ -39,6 +40,7 @@ it('allows super admin to access all core admin resource index pages', function 
         SpaceResource::class,
         AiUsageLogResource::class,
         AiModelPricingResource::class,
+        InspirationResource::class,
     ];
 
     foreach ($resources as $resource) {
