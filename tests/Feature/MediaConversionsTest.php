@@ -34,7 +34,26 @@ it('registers media conversions for Event model', function () {
 
     $conversions = $media->getMediaConversionNames();
     expect($conversions)->toContain('thumb');
+    expect($conversions)->toContain('card');
     expect($conversions)->toContain('preview');
+});
+
+it('detects portrait poster orientation', function () {
+    $event = Event::factory()->create();
+
+    $event->addMedia(UploadedFile::fake()->image('poster-portrait.jpg', 800, 1200))
+        ->toMediaCollection('poster');
+
+    expect($event->poster_orientation)->toBe('portrait');
+});
+
+it('detects landscape poster orientation', function () {
+    $event = Event::factory()->create();
+
+    $event->addMedia(UploadedFile::fake()->image('poster-landscape.jpg', 1200, 800))
+        ->toMediaCollection('poster');
+
+    expect($event->poster_orientation)->toBe('landscape');
 });
 
 it('defines accepted MIME types for Event poster collection', function () {

@@ -529,9 +529,14 @@ class Event extends Model implements AuditableContract, HasMedia
             ->sharpen(10)
             ->format('webp');
 
+        $this->addMediaConversion('card')
+            ->performOnCollections('poster')
+            ->fit(Fit::Max, 960, 1200)
+            ->format('webp');
+
         $this->addMediaConversion('preview')
             ->performOnCollections('poster')
-            ->fit(Fit::Crop, 1200, 800)
+            ->fit(Fit::Max, 1400, 1800)
             ->format('webp');
     }
 
@@ -590,13 +595,13 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Get the card image URL for frontend.
-     * Priority: Poster thumb -> Institution logo thumb -> Speaker avatar -> Default.
+     * Priority: Poster thumb -> Institution logo thumb -> Default.
      */
     public function getCardImageUrlAttribute(): string
     {
         // 1. Poster thumb conversion from Spatie Media Library
         if ($this->hasMedia('poster')) {
-            return $this->getFirstMediaUrl('poster', 'thumb');
+            return (string) $this->getFirstMedia('poster')?->getAvailableUrl(['card', 'preview', 'thumb']);
         }
 
         // 2. Institution logo thumb
@@ -604,14 +609,34 @@ class Event extends Model implements AuditableContract, HasMedia
             return $this->institution->getFirstMediaUrl('logo', 'thumb');
         }
 
-        $firstSpeaker = $this->speakers->first();
+        // 3. Global default (placeholder)
+        return asset('images/placeholders/event.png');
+    }
 
-        if ($firstSpeaker instanceof Speaker && filled($firstSpeaker->avatar_url)) {
-            return (string) $firstSpeaker->avatar_url;
+    public function getPosterOrientationAttribute(): string
+    {
+        $posterMedia = $this->getFirstMedia('poster');
+
+        if (! $posterMedia instanceof Media) {
+            return 'landscape';
         }
 
-        // 4. Global default (placeholder)
-        return asset('images/placeholders/event.png');
+        $width = (int) ($posterMedia->width ?? 0);
+        $height = (int) ($posterMedia->height ?? 0);
+
+        if ($width <= 0 || $height <= 0) {
+            return 'landscape';
+        }
+
+        if ($height > $width) {
+            return 'portrait';
+        }
+
+        if ($height === $width) {
+            return 'square';
+        }
+
+        return 'landscape';
     }
 
     /**

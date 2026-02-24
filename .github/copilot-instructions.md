@@ -380,6 +380,61 @@ These improve collection fetch ordering and maintenance/reporting queries.
 
 === .ai/general rules ===
 
+## Workflow Orchestration
+
+### 1. Plan Node Default
+Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately – don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One tack per subagent for focused execution
+
+### 3. Self-Improvement Loop
+- After ANY correction from the user: update 'tasks/lessons.md' with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
+
+### 4. Verification Before Done
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
+
+### 5. Demand Elegant (Balanced)
+- For non-trivial changes: pause and ask "Is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes – don't over-engineer
+- Challenge your own work before presenting it
+
+### 6. Autonomous Bug Fixing
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests – then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+## Task Management
+
+1. *Plan First*: Write plan to 'tasks/todo.md' with checkable items
+2. *Verify Plan*: Check in before starting implementation
+3. *Track Progress*: Mark items complete as you go
+4. *Explain Changes*: High-level summary at each step
+5. *Document Results*: Add review section to 'tasks/todo.md'
+6. *Capture Lessons*: Update 'tasks/lessons.md' after corrections
+
+## Core Principles
+
+- *Simplicity First*: Make every change as simple as possible. Impact minimal code.
+- *No Laziness*: Find root causes. No temporary fixes. Senior developer standards.
+- *Minimat Impact*: Changes should only touch what's necessary. Avoid introducing bugs.
+
+---------
+
 # Filament Form Data Handling with Enums
 
 ## Critical: Enum Serialization/Deserialization in Filament Forms
@@ -692,6 +747,44 @@ Run and pass:
 vendor/bin/phpstan analyse --ansi
 ```
 
+---
+
+# Timezone Handling (Critical)
+
+## Core Rules
+- Store all timestamps in UTC at the database layer.
+- Resolve viewer timezone at request-time using `App\Support\Timezone\UserTimezoneResolver`.
+- For display formatting in Blade/Livewire, use `App\Support\Timezone\UserDateTimeFormatter`.
+- Do not hardcode region timezones (for example `Asia/Kuala_Lumpur`) in public query/filter logic.
+
+## Display Rules
+- Prefer:
+    - `UserDateTimeFormatter::format($date, 'h:i A')`
+    - `UserDateTimeFormatter::translatedFormat($date, 'l, j F Y')`
+- Avoid direct `->format()` / `->translatedFormat()` in public-facing views unless you intentionally need storage timezone output.
+
+## Date Filter Rules
+- For date-only filters (`starts_after`, `starts_before`, etc.), parse input as user-local date and convert to UTC boundaries before querying:
+    - start boundary => startOfDay in user timezone -> UTC
+    - end boundary => endOfDay in user timezone -> UTC
+- Use `UserDateTimeFormatter::parseUserDateToUtc(...)` for this conversion.
+
+## Prayer-Time Filter Notes
+- Advanced search may use prayer-relative labels (for example `Selepas Jumaat`, `Selepas Maghrib`, `Selepas Tarawih`).
+- Use `prayer_display_text` keyword matching and `prayer_reference` mapping where applicable.
+- `Tarawih` is label-based (text matching), not a `PrayerReference` enum value.
+
+---
+
+# Query Safety Notes
+
+## Qualified Columns in Scopes
+- When scopes are reused inside joined queries, qualify columns by table name to avoid ambiguous-column failures (especially in SQLite tests).
+- Example: in `Event::active()`, use `events.is_active` instead of plain `is_active`.
+
+## Public Listing Visibility
+- If a public page is expected to show only approved records, explicitly constrain `status = approved` even when using broader reusable scopes.
+
 === foundation rules ===
 
 # Laravel Boost Guidelines
@@ -701,7 +794,7 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 ## Foundational Context
 This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
-- php - 8.4.17
+- php - 8.4.18
 - filament/filament (FILAMENT) - v5
 - laravel/fortify (FORTIFY) - v1
 - laravel/framework (LARAVEL) - v12
@@ -961,8 +1054,8 @@ avatar, badge, brand, breadcrumbs, button, callout, checkbox, dropdown, field, h
 
 ## Laravel Pint Code Formatter
 
-- You must run `vendor/bin/pint --dirty` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test`, simply run `vendor/bin/pint` to fix any formatting issues.
+- You must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
 
 === pest/core rules ===
 
