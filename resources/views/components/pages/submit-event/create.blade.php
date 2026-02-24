@@ -1101,9 +1101,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->collection('poster')
                                         ->image()
                                         ->imageEditor()
-                                        ->imageAspectRatio('3:2')
-                                        ->imageEditorAspectRatioOptions(['3:2'])
-                                        ->automaticallyCropImagesToAspectRatio()
+                                        ->imageAspectRatio(['3:2', '4:5'])
+                                        ->imageEditorAspectRatioOptions(['3:2', '4:5'])
                                         ->conversion('thumb')
                                         ->responsiveImages()
                                         ->helperText(__('Gambar utama untuk paparan majlis.')),

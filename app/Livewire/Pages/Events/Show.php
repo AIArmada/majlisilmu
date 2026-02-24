@@ -106,17 +106,7 @@ class Show extends Component
         $images = [];
         $imageCounter = 1;
 
-        $poster = $this->event->getFirstMedia('poster');
-
-        if ($poster instanceof Media) {
-            $images[] = $this->buildGalleryImagePayload($poster, __('Poster'));
-        }
-
         foreach ($this->event->getMedia('gallery') as $galleryMedia) {
-            if ($galleryMedia->id === $poster?->id) {
-                continue;
-            }
-
             $images[] = $this->buildGalleryImagePayload(
                 $galleryMedia,
                 __('Photo :number', ['number' => $imageCounter++])
@@ -252,7 +242,7 @@ class Show extends Component
     }
 
     /**
-     * @return array{whatsapp: string, telegram: string, facebook: string, x: string, email: string}
+     * @return array{whatsapp: string, telegram: string, line: string, facebook: string, x: string, instagram: string, tiktok: string, email: string}
      */
     #[Computed]
     public function shareLinks(): array
@@ -266,8 +256,11 @@ class Show extends Component
         return [
             'whatsapp' => "https://wa.me/?text={$encodedText}%20{$encodedUrl}",
             'telegram' => "https://t.me/share/url?url={$encodedUrl}&text={$encodedText}",
+            'line' => "https://social-plugins.line.me/lineit/share?url={$encodedUrl}",
             'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedUrl}",
             'x' => "https://x.com/intent/tweet?text={$encodedText}&url={$encodedUrl}",
+            'instagram' => 'https://www.instagram.com/',
+            'tiktok' => 'https://www.tiktok.com/',
             'email' => "mailto:?subject={$encodedText}&body={$encodedBody}",
         ];
     }

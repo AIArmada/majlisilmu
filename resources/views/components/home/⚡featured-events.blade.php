@@ -72,14 +72,18 @@ new class extends Component {
             <div class="relative" x-data="{ scroll: 0 }">
                 <div class="flex gap-6 overflow-x-auto pb-6 snap-x snap-mandatory scrollbar-hide" id="featuredCarousel">
                     @foreach($this->events as $event)
+                        @php
+                            $eventHasPoster = $event->hasMedia('poster');
+                            $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
+                        @endphp
                         <div wire:key="featured-{{ $event->id }}" class="flex-shrink-0">
                             <article class="w-80 lg:w-96 snap-start">
                                 <div
                                     class="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow border border-slate-100 h-full flex flex-col">
                                     <!-- Image -->
-                                    <div class="relative h-44 bg-slate-100 overflow-hidden">
+                                    <div class="relative bg-slate-100 overflow-hidden {{ $eventPosterIsPortrait ? 'aspect-[4/5]' : 'h-44' }}">
                                         <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy"
-                                            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                                            class="w-full h-full transition-transform duration-500 group-hover:scale-110 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                         <!-- Gradient Overlay -->
                                         <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                                         <!-- Date Badge -->

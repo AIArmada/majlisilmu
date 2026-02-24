@@ -607,17 +607,21 @@
             @else
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($events as $event)
+                        @php
+                            $eventHasPoster = $event->hasMedia('poster');
+                            $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
+                        @endphp
                         <article
                             class="group h-full flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 border border-slate-100">
                             <!-- Image/Date -->
                             <a href="{{ route('events.show', $event) }}" wire:navigate
-                                class="relative aspect-[3/2] overflow-hidden bg-slate-100 block">
+                                class="relative overflow-hidden bg-slate-100 block {{ $eventPosterIsPortrait ? 'aspect-[4/5]' : 'aspect-[3/2]' }}">
                                 <div
                                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70">
                                 </div>
                                 <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-300">
                                     <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy"
-                                        class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                        class="w-full h-full transition-transform duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                 </div>
 
                                 <!-- Badges -->

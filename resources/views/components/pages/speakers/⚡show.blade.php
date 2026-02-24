@@ -156,6 +156,26 @@ new class extends Component {
         : $speaker->bio;
     $isBioFilled = is_array($speaker->bio) ? filled($bioRenderer->toText()) : filled($speaker->bio);
     $bioExcerpt = $isBioFilled ? Str::limit(strip_tags($bioHtml), 180) : null;
+    $speakerUrl = route('speakers.show', $speaker);
+    $shareText = trim($speaker->formatted_name . ' - ' . config('app.name'));
+    $encodedSpeakerUrl = urlencode($speakerUrl);
+    $encodedShareText = urlencode($shareText);
+    $encodedShareBody = urlencode($shareText . "\n" . $speakerUrl);
+    $shareData = [
+        'title' => $speaker->formatted_name,
+        'text' => $bioExcerpt ?: __('Lihat profil penceramah ini di :app', ['app' => config('app.name')]),
+        'url' => $speakerUrl,
+    ];
+    $shareLinks = [
+        'whatsapp' => "https://wa.me/?text={$encodedShareText}%20{$encodedSpeakerUrl}",
+        'telegram' => "https://t.me/share/url?url={$encodedSpeakerUrl}&text={$encodedShareText}",
+        'line' => "https://social-plugins.line.me/lineit/share?url={$encodedSpeakerUrl}",
+        'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedSpeakerUrl}",
+        'x' => "https://x.com/intent/tweet?text={$encodedShareText}&url={$encodedSpeakerUrl}",
+        'instagram' => 'https://www.instagram.com/',
+        'tiktok' => 'https://www.tiktok.com/',
+        'email' => "mailto:?subject={$encodedShareText}&body={$encodedShareBody}",
+    ];
 
     // Social media
     $socialLinks = $speaker->socialMedia->mapWithKeys(fn ($s) => [$s->platform => $s->url]);
@@ -261,7 +281,35 @@ new class extends Component {
     })->values())->toArray();
 @endphp
 
-<div class="min-h-screen bg-slate-50/80">
+<div class="min-h-screen bg-slate-50/80"
+     x-data='{
+        shareModalOpen: false,
+        copied: false,
+        shareData: @json($shareData),
+        copyMessage: @json(__('Pautan disalin ke papan klip!')),
+        copyPrompt: @json(__('Copy this link:')),
+        nativeShare() {
+            if (navigator.share) {
+                navigator.share(this.shareData);
+                return;
+            }
+            this.copyLink();
+        },
+        copyLink() {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(this.shareData.url).then(() => {
+                    this.copied = true;
+                    setTimeout(() => { this.copied = false; }, 2000);
+                });
+                return;
+            }
+            window.prompt(this.copyPrompt, this.shareData.url);
+        },
+        openShareModal() {
+            this.shareModalOpen = true;
+            this.copied = false;
+        },
+     }'>
 
     {{-- ═══════════════════════════════════════════════════════════
          CINEMATIC HERO — Dramatic, layered depth with atmosphere
@@ -372,6 +420,11 @@ new class extends Component {
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                             {{ __('Ikuti') }}
                         @endif
+                    </button>
+                    <button type="button" @click="openShareModal()"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:border-emerald-400/40 hover:bg-emerald-500/20 hover:text-emerald-300 backdrop-blur-sm">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                        {{ __('Kongsi') }}
                     </button>
                     @if($locationString)
                         <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm">
@@ -897,6 +950,65 @@ new class extends Component {
 
                 </div>
             @endif
+        </div>
+    </div>
+
+    <div x-show="shareModalOpen" x-cloak x-transition.opacity @keydown.escape.window="shareModalOpen = false"
+        class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm" aria-modal="true" role="dialog">
+        <div class="flex min-h-screen items-center justify-center p-4 sm:p-6">
+            <div @click.away="shareModalOpen = false"
+                x-show="shareModalOpen"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-8 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 translate-y-8 scale-95"
+                class="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200/50">
+
+                <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-5">
+                    <h3 class="font-heading text-xl font-bold text-slate-900">{{ __('Kongsi Profil') }}</h3>
+                    <button type="button" @click="shareModalOpen = false" class="inline-flex size-10 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-700">
+                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="space-y-6 p-6 sm:p-8">
+                    <div class="grid grid-cols-2 gap-4">
+                        <button type="button" @click="nativeShare()" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-emerald-700">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684l6.632 3.316m-6.632-6l6.632-3.316"/></svg>
+                            {{ __('Share Now') }}
+                        </button>
+                        <button type="button" @click="copyLink()" class="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16h8M8 12h8m-6-8H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-4"/></svg>
+                            {{ __('Copy Link') }}
+                        </button>
+                    </div>
+
+                    <div x-show="copied"
+                        x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0 -translate-y-2"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        class="flex items-center justify-center gap-2 rounded-xl bg-emerald-50 py-2 text-sm font-bold text-emerald-600">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        {{ __('Pautan disalin ke papan klip!') }}
+                    </div>
+
+                    <div>
+                        <p class="mb-4 text-center text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Or share via') }}</p>
+                        <div class="grid grid-cols-4 gap-3">
+                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">WhatsApp</a>
+                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10 hover:text-[#0088cc]">Telegram</a>
+                            <a href="{{ $shareLinks['line'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#06C755] hover:bg-[#06C755]/10 hover:text-[#06C755]">LINE</a>
+                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10 hover:text-[#1877F2]">Facebook</a>
+                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10 hover:text-slate-900">X</a>
+                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink()" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10 hover:text-[#E4405F]">Instagram</a>
+                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink()" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-black hover:bg-black/10 hover:text-black">TikTok</a>
+                            <a href="{{ $shareLinks['email'] }}" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600">Email</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
