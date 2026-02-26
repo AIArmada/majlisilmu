@@ -624,6 +624,19 @@ class Event extends Model implements AuditableContract, HasMedia
         $width = (int) ($posterMedia->width ?? 0);
         $height = (int) ($posterMedia->height ?? 0);
 
+        if (($width <= 0 || $height <= 0) && is_string($posterMedia->file_name) && $posterMedia->file_name !== '') {
+            try {
+                $dimensions = @getimagesize($posterMedia->getPath());
+            } catch (\Throwable) {
+                $dimensions = false;
+            }
+
+            if (is_array($dimensions)) {
+                $width = (int) ($dimensions[0] ?? 0);
+                $height = (int) ($dimensions[1] ?? 0);
+            }
+        }
+
         if ($width <= 0 || $height <= 0) {
             return 'landscape';
         }

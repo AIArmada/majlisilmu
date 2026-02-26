@@ -4,96 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ea08a1f904d98b09686180b66c08ebff",
+    "content-hash": "9c1412690c6b41a57314a54a4e2ae4d5",
     "packages": [
-        {
-            "name": "a909m/filament-statefusion",
-            "version": "v2.3.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/A909M/Filament-StateFusion.git",
-                "reference": "ad8904426012c51255670bcd30520ca031bb71a8"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/A909M/Filament-StateFusion/zipball/ad8904426012c51255670bcd30520ca031bb71a8",
-                "reference": "ad8904426012c51255670bcd30520ca031bb71a8",
-                "shasum": ""
-            },
-            "require": {
-                "filament/filament": "^4.0|^5.0",
-                "php": "^8.2",
-                "spatie/laravel-model-states": "^2.10",
-                "spatie/laravel-package-tools": "^1.15.0"
-            },
-            "require-dev": {
-                "laravel/pint": "^1.24",
-                "nunomaduro/collision": "^8.8",
-                "nunomaduro/larastan": "^3.7",
-                "orchestra/testbench": "^8.0|^9.0|^10.0",
-                "pestphp/pest": "^4.1",
-                "pestphp/pest-plugin-arch": "^4.0",
-                "phpstan/extension-installer": "^1.4"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "aliases": {
-                        "FilamentStateFusion": "A909M\\FilamentStateFusion\\Facades\\FilamentStateFusion"
-                    },
-                    "providers": [
-                        "A909M\\FilamentStateFusion\\FilamentStateFusionServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "A909M\\FilamentStateFusion\\": "src/",
-                    "A909M\\FilamentStateFusion\\Database\\Factories\\": "database/factories/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "A909M",
-                    "email": "assemcc2022@gmail.com",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Filament StateFusion is a powerful FilamentPHP plugin that seamlessly integrates Spatie Laravel Model States into the Filament admin panel. This package provides an intuitive way to manage model states, transitions, and filtering within Filament, enhancing the user experience and developer productivity.",
-            "homepage": "https://github.com/a909m/filament-statefusion",
-            "keywords": [
-                "A909M",
-                "admin-panel",
-                "filament",
-                "filament-admin",
-                "filament-form",
-                "filament-infolist",
-                "filament-plugin",
-                "filament-statefusion",
-                "filament-table",
-                "filamentphp",
-                "laravel",
-                "spatie",
-                "stae-p",
-                "state-machine",
-                "state-management"
-            ],
-            "support": {
-                "issues": "https://github.com/a909m/filament-statefusion/issues",
-                "source": "https://github.com/a909m/filament-statefusion"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/A909M",
-                    "type": "github"
-                }
-            ],
-            "time": "2026-01-16T21:21:14+00:00"
-        },
         {
             "name": "aiarmada/commerce-support",
             "version": "dev-develop",
@@ -5063,6 +4975,63 @@
                 }
             ],
             "time": "2026-01-15T06:54:53+00:00"
+        },
+        {
+            "name": "livewire/blaze",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/livewire/blaze.git",
+                "reference": "f585b2af3c319ac71553cf93e780a626c4ebe02b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/livewire/blaze/zipball/f585b2af3c319ac71553cf93e780a626c4ebe02b",
+                "reference": "f585b2af3c319ac71553cf93e780a626c4ebe02b",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "illuminate/view": "^10.0|^11.0|^12.0",
+                "php": "^8.1"
+            },
+            "conflict": {
+                "livewire/flux": "<2.12.1"
+            },
+            "require-dev": {
+                "livewire/flux": "dev-main",
+                "orchestra/testbench": "^8.0|^9.0|^10.0",
+                "pestphp/pest": "^2.0|^3.0",
+                "pestphp/pest-plugin-laravel": "^2.0|^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Livewire\\Blaze\\BlazeServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Livewire\\Blaze\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Caleb Porzio"
+                }
+            ],
+            "description": "A tool for optimizing Blade component performance by folding them into parent templates",
+            "support": {
+                "issues": "https://github.com/livewire/blaze/issues",
+                "source": "https://github.com/livewire/blaze/tree/v1.0.0"
+            },
+            "time": "2026-02-24T16:02:42+00:00"
         },
         {
             "name": "livewire/flux",

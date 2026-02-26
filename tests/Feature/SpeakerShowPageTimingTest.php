@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TimingMode;
+use App\Enums\EventFormat;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
@@ -76,6 +77,7 @@ it('shows dedicated venue name for event location on speaker page when available
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
+        'event_format' => EventFormat::Physical,
         'institution_id' => $institution->id,
         'venue_id' => $venue->id,
         'starts_at' => now()->addDay()->setTime(17, 45),
@@ -104,6 +106,7 @@ it('falls back to institution name for event location on speaker page when venue
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
+        'event_format' => EventFormat::Physical,
         'institution_id' => $institution->id,
         'venue_id' => null,
         'starts_at' => now()->addDay()->setTime(17, 45),
@@ -155,6 +158,7 @@ it('hides state when district is kuala lumpur putrajaya or labuan', function () 
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
+        'event_format' => EventFormat::Physical,
         'institution_id' => $institution->id,
         'venue_id' => $venue->id,
         'starts_at' => now()->addDay()->setTime(17, 45),
