@@ -950,7 +950,8 @@ describe('Event Registration', function () {
         $response = $this->get("/events/{$event->slug}");
 
         $response->assertOk()
-            ->assertSee('No registration required');
+            ->assertSee('Terbuka tanpa pendaftaran')
+            ->assertSee('Tidak perlu pendaftaran');
     });
 
     it('allows guest registration', function () {

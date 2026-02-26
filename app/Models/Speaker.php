@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\Image\Enums\AlignPosition;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -250,6 +251,12 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->performOnCollections('avatar')
             ->width(400)
             ->height(400)
+            ->format('webp');
+
+        $this->addMediaConversion('profile_card')
+            ->performOnCollections('avatar')
+            ->fit(Fit::Contain, 280, 280)
+            ->resizeCanvas(400, 400, AlignPosition::Center, false, '#f8fafc')
             ->format('webp');
 
         $this->addMediaConversion('banner')

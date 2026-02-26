@@ -2,23 +2,17 @@
 
 namespace App\States\EventStatus;
 
-use A909M\FilamentStateFusion\Concerns\StateFusionInfo;
-use A909M\FilamentStateFusion\Contracts\HasFilamentStateFusion;
 use App\Models\Event;
+use App\Support\State\StateMetadata;
 use Spatie\ModelStates\State;
 use Spatie\ModelStates\StateConfig;
 
 /**
  * @extends State<Event>
- *
- * @implements HasFilamentStateFusion<Event>
- *
- * @use StateFusionInfo<Event>
  */
-abstract class EventStatus extends State implements HasFilamentStateFusion
+abstract class EventStatus extends State
 {
-    /** @use StateFusionInfo<Event> */
-    use StateFusionInfo;
+    use StateMetadata;
 
     #[\Override]
     public static function config(): StateConfig

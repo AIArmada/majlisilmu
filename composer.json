@@ -10,7 +10,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
-        "a909m/filament-statefusion": "^2.3.0",
         "aiarmada/filament-authz": "dev-develop",
         "bezhansalleh/filament-language-switch": "dev-main",
         "cocosmos/filament-quick-add-select": "^1.1",
@@ -28,6 +27,7 @@
         "laravel/scout": "^10.23",
         "laravel/socialite": "^5.24",
         "laravel/tinker": "^2.10.1",
+        "livewire/blaze": "^1.0",
         "livewire/flux": "^2.10",
         "lorisleiva/laravel-actions": "^2.9",
         "nnjeim/world": "^1.1",
@@ -37,6 +37,7 @@
         "spatie/laravel-activitylog": "^4.10",
         "spatie/laravel-data": "^4.19",
         "spatie/laravel-deleted-models": "^1.1",
+        "spatie/laravel-model-states": "^2.13",
         "spatie/laravel-query-builder": "^6.4",
         "spatie/laravel-sluggable": "^3.7",
         "typesense/typesense-php": "^5.2"
