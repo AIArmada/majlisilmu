@@ -104,10 +104,6 @@
         $institutionEmail = $event->institution->contacts->firstWhere('category', \App\Enums\ContactCategory::Email)?->value;
         $institutionPhone = $event->institution->contacts->firstWhere('category', \App\Enums\ContactCategory::Phone)?->value;
     }
-
-    $locationImageUrl = $event->venue?->getFirstMedia('cover')?->getAvailableUrl(['banner', 'thumb'])
-        ?? $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner', 'thumb']);
-    $locationImageLabel = $event->venue?->name ?? $event->institution?->name ?? __('Lokasi Majlis');
 @endphp
 
 <div class="min-h-screen bg-slate-50 pb-28 lg:pb-16"
@@ -658,44 +654,49 @@
                         {{-- Single speaker: full-width horizontal featured card --}}
                         @php
                             $sp = $event->speakers->first();
-                            $spProfile = $sp->getFirstMedia('avatar')?->getAvailableUrl(['profile', 'thumb'])
-                                ?: $sp->avatar_url
-                                ?: $sp->default_avatar_url;
+                            $spProfile = $sp->getFirstMediaUrl('avatar', 'profile') ?: $sp->avatar_url ?: $sp->default_avatar_url;
                             $spCover = $sp->getMedia('cover')->isNotEmpty() ? $sp->getFirstMediaUrl('cover', 'banner') : null;
                             $spBio = $sp->bio ? Str::limit(strip_tags(is_array($sp->bio) ? ($sp->bio['html'] ?? '') : $sp->bio), 220) : null;
                         @endphp
                         <a href="{{ route('speakers.show', $sp) }}" wire:navigate
-                            class="group relative isolate flex flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.48)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300/80 hover:shadow-[0_30px_70px_-35px_rgba(16,185,129,0.5)] lg:flex-row">
-
-                            <div class="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/70"></div>
-                            <div class="pointer-events-none absolute -right-24 -top-24 size-56 rounded-full bg-emerald-200/30 blur-3xl"></div>
+                            class="group relative flex flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-white/90 shadow-xl shadow-emerald-100/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-100/60 sm:flex-row">
 
                             {{-- Left: cover/portrait panel --}}
-                            <div class="relative z-10 w-full shrink-0 overflow-hidden bg-slate-100 lg:w-[18.5rem]">
+                            <div class="relative h-56 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-auto sm:w-56">
                                 @if($spCover)
-                                    <img src="{{ $spCover }}" alt="" class="absolute inset-0 size-full object-cover transition duration-700 group-hover:scale-105" loading="lazy">
-                                    <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/25"></div>
-                                @else
-                                    <div class="absolute inset-0 bg-gradient-to-br from-emerald-400/40 via-teal-300/20 to-cyan-300/35"></div>
-                                @endif
-
-                                <div class="relative flex min-h-[14.5rem] items-center justify-center px-0 py-2 sm:min-h-[16rem] sm:px-0.5 sm:py-3 lg:min-h-[17rem] lg:px-0.5 lg:py-3">
-                                    <div class="relative flex size-[12.5rem] items-center justify-center rounded-full border border-white/80 bg-white/90 p-[2px] shadow-[0_28px_60px_-30px_rgba(15,23,42,0.65)] transition-transform duration-300 group-hover:scale-[1.03] sm:size-[14.5rem] lg:size-[16rem]">
-                                        <img src="{{ $spProfile }}" alt="{{ $sp->name }}" class="size-full rounded-full object-cover" width="420" height="420" loading="lazy">
+                                    {{-- Real cover photo behind a floating avatar --}}
+                                    <img src="{{ $spCover }}" alt="" class="size-full object-cover transition duration-700 group-hover:scale-105" loading="lazy">
+                                    <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <div class="size-24 overflow-hidden rounded-full bg-white shadow-xl transition-transform duration-300 group-hover:scale-105">
+                                            <img src="{{ $spProfile }}" alt="{{ $sp->name }}" class="size-full object-contain" width="96" height="96" loading="lazy">
+                                        </div>
                                     </div>
-                                </div>
+                                @else
+                                    {{-- Gradient bg + centred avatar: object-contain on white so the illustration disc fills cleanly --}}
+                                    <div class="absolute inset-0 bg-gradient-to-br from-emerald-400/30 via-teal-400/20 to-cyan-400/30"></div>
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <div class="size-32 overflow-hidden rounded-full bg-white shadow-2xl transition-transform duration-300 group-hover:scale-105">
+                                            <img src="{{ $spProfile }}" alt="{{ $sp->name }}" class="size-full object-contain" width="128" height="128" loading="lazy">
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
 
                             {{-- Right: details --}}
-                            <div class="relative z-10 flex flex-col items-center justify-center text-center sm:px-9 sm:py-9 lg:items-start lg:px-10 lg:text-left">
-                                <h3 class="font-heading text-[clamp(1.9rem,2.8vw,2.6rem)] font-bold leading-[1.1] text-slate-900 transition-colors group-hover:text-emerald-700">{{ $sp->formatted_name ?? $sp->name }}</h3>
+                            <div class="flex flex-col justify-center gap-1 p-7 sm:p-8">
+                                <p class="text-[11px] font-bold uppercase tracking-widest text-emerald-600">{{ __('Penceramah') }}</p>
+                                <h3 class="mt-1 font-heading text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">{{ $sp->formatted_name ?? $sp->name }}</h3>
                                 @if($sp->title)
-                                    <p class="mt-2 text-sm font-semibold tracking-wide text-slate-500">{{ $sp->title }}</p>
+                                    <p class="mt-0.5 text-sm font-semibold text-slate-500">{{ $sp->title }}</p>
                                 @endif
-                                <div class="mt-4 h-px w-20 bg-gradient-to-r from-emerald-500/55 via-emerald-300/45 to-transparent"></div>
                                 @if($spBio)
-                                    <p class="mt-4 max-w-[42ch] text-sm leading-relaxed text-slate-600">{{ $spBio }}</p>
+                                    <p class="mt-4 text-sm leading-relaxed text-slate-600">{{ $spBio }}</p>
                                 @endif
+                                <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 transition-colors group-hover:text-emerald-700">
+                                    {{ __('Lihat Profil') }}
+                                    <svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                </span>
                             </div>
                         </a>
 
@@ -704,77 +705,49 @@
                         <div class="grid gap-5 sm:grid-cols-2 {{ $event->speakers->count() >= 3 ? 'lg:grid-cols-3' : '' }}">
                             @foreach($event->speakers as $speaker)
                                 @php
-                                    $speakerProfileImg = $speaker->getFirstMedia('avatar')?->getAvailableUrl(['profile', 'thumb']) ?: null;
+                                    $speakerProfileImg = $speaker->getFirstMediaUrl('avatar', 'profile') ?: null;
                                     $speakerThumbImg = $speaker->avatar_url ?: $speaker->default_avatar_url;
-                                    $speakerAvatarUrl = $speakerProfileImg ?: $speakerThumbImg;
-                                    $speakerCoverImg = $speaker->getMedia('cover')->isNotEmpty()
-                                        ? $speaker->getFirstMediaUrl('cover', 'banner')
-                                        : null;
-                                    $speakerBio = $speaker->bio ? Str::limit(strip_tags(is_array($speaker->bio) ? ($speaker->bio['html'] ?? '') : $speaker->bio), 120) : null;
+                                    $speakerCoverImg = $speaker->getFirstMediaUrl('cover', 'banner') ?: null;
                                 @endphp
                                 <a wire:key="speaker-{{ $speaker->id }}" href="{{ route('speakers.show', $speaker) }}" wire:navigate
-                                    class="group relative isolate flex h-full flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-[0_20px_48px_-30px_rgba(15,23,42,0.48)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300/80 hover:shadow-[0_28px_60px_-34px_rgba(16,185,129,0.5)]">
-
-                                    <div class="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/70"></div>
-                                    <div class="pointer-events-none absolute -right-14 -top-14 size-36 rounded-full bg-emerald-200/25 blur-2xl"></div>
+                                    class="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100">
 
                                     {{-- Cover background --}}
                                     <div class="relative h-32 w-full overflow-hidden bg-slate-100">
                                         @if($speakerCoverImg)
                                             <img src="{{ $speakerCoverImg }}" alt="" class="size-full object-cover transition duration-700 group-hover:scale-105 group-hover:opacity-80" loading="lazy">
                                         @else
-                                            <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/25 via-teal-400/15 to-cyan-400/25"></div>
+                                            <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-cyan-500/20"></div>
+                                            <div class="absolute inset-0 opacity-[0.05]" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
                                         @endif
-                                        <div class="absolute inset-0 bg-gradient-to-t from-slate-900/20 via-slate-900/5 to-transparent"></div>
+                                        <div class="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent"></div>
                                     </div>
 
                                     {{-- Profile overlay --}}
-                                    <div class="relative z-10 -mt-28 flex flex-1 flex-col items-center px-3 pb-5 text-center">
-                                        <div class="relative flex size-48 shrink-0 items-center justify-center rounded-full border border-white/85 bg-white/90 p-[2px] shadow-[0_24px_48px_-28px_rgba(15,23,42,0.65)] transition-transform duration-300 group-hover:scale-[1.03]">
-                                            <img src="{{ $speakerAvatarUrl }}" alt="{{ $speaker->name }}"
-                                                class="size-full rounded-full object-cover" width="160" height="160" loading="lazy">
+                                    <div class="relative -mt-12 flex flex-col items-center px-6 pb-6 text-center">
+                                        <div class="relative size-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-xl transition-transform duration-300 group-hover:-translate-y-2">
+                                            <img src="{{ $speakerProfileImg ?: $speakerThumbImg }}" alt="{{ $speaker->name }}"
+                                                class="size-full object-cover" width="96" height="96" loading="lazy">
                                         </div>
 
-                                        <div class="mt-4 w-full">
-                                            <h4 class="font-heading text-xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">{{ $speaker->formatted_name ?? $speaker->name }}</h4>
+                                        <div class="mt-3">
+                                            <h4 class="font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-emerald-700">{{ $speaker->formatted_name ?? $speaker->name }}</h4>
                                             @if($speaker->title)
-                                                <p class="mt-1 text-sm font-semibold tracking-wide text-slate-500">{{ $speaker->title }}</p>
+                                                <p class="mt-1 text-sm font-medium text-slate-500">{{ $speaker->title }}</p>
                                             @endif
                                         </div>
-
-                                        @if($speakerBio)
-                                            <div class="mt-3 h-px w-14 bg-gradient-to-r from-emerald-500/50 via-emerald-300/45 to-transparent"></div>
-                                            <p class="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{{ $speakerBio }}</p>
-                                        @endif
                                     </div>
 
-                                    {{-- Hover edge accent --}}
-                                    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-emerald-400/0 via-emerald-400/60 to-emerald-400/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                                    {{-- Bio snippet --}}
+                                    @if($speaker->bio)
+                                        <div class="mt-auto border-t border-slate-100 bg-slate-50/50 px-6 py-4 transition-colors group-hover:bg-emerald-50/30">
+                                            <p class="line-clamp-2 text-sm leading-relaxed text-slate-600">{{ Str::limit(strip_tags(is_array($speaker->bio) ? ($speaker->bio['html'] ?? '') : $speaker->bio), 120) }}</p>
+                                        </div>
+                                    @endif
                                 </a>
                             @endforeach
                         </div>
                     @endif
-                </section>
-            @endif
-
-            {{-- LOCATION IMAGE --}}
-            @if($locationImageUrl)
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
-                    <div class="overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-xl shadow-slate-200/40 backdrop-blur-xl">
-                        <div class="relative aspect-[16/7] overflow-hidden bg-slate-100">
-                            <img src="{{ $locationImageUrl }}" alt="{{ $locationImageLabel }}"
-                                class="size-full object-cover transition duration-700 hover:scale-[1.02]"
-                                loading="lazy">
-                            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent"></div>
-                            <div class="absolute inset-x-0 bottom-0 p-5 sm:p-6">
-                                <p class="text-[11px] font-bold uppercase tracking-widest text-white/75">{{ __('Lokasi Majlis') }}</p>
-                                <p class="mt-1 font-heading text-xl font-bold text-white">{{ $locationImageLabel }}</p>
-                                @if($locationShortLabel)
-                                    <p class="mt-1 text-sm font-medium text-white/80">{{ $locationShortLabel }}</p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
                 </section>
             @endif
 
@@ -788,53 +761,42 @@
                         <div class="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
-                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Tentang Majlis Ini') }}</h2>
+                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('About this Event') }}</h2>
                     </div>
                     
                     <div class="prose prose-slate prose-lg mt-6 max-w-none prose-headings:font-heading prose-headings:font-bold prose-a:text-emerald-600 hover:prose-a:text-emerald-500 prose-img:rounded-2xl">
                         {!! $descriptionHtml !!}
                     </div>
 
-                    @php
-                        $tagSections = [
-                            \App\Enums\TagType::Domain,
-                            \App\Enums\TagType::Discipline,
-                            \App\Enums\TagType::Source,
-                            \App\Enums\TagType::Issue,
-                        ];
-                    @endphp
-
-                    <div class="mt-8 border-t border-slate-100 pt-6">
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            @foreach($tagSections as $tagSection)
+                    {{-- Tags Organized by Type --}}
+                    @if($event->tags->isNotEmpty())
+                        <div class="mt-8 border-t border-slate-100 pt-6">
+                            @foreach($tagsByType as $type => $tags)
                                 @php
-                                    $tagType = $tagSection->value;
-                                    $sectionTags = $tagsByType->get($tagType, collect());
-                                    $tagColor = match($tagType) {
-                                        \App\Enums\TagType::Domain->value => 'bg-blue-50 text-blue-700 border-blue-200',
-                                        \App\Enums\TagType::Discipline->value => 'bg-cyan-50 text-cyan-700 border-cyan-200',
-                                        \App\Enums\TagType::Source->value => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                        \App\Enums\TagType::Issue->value => 'bg-amber-50 text-amber-700 border-amber-200',
-                                        default => 'bg-slate-50 text-slate-600 border-slate-200',
+                                    $typeEnum = \App\Enums\TagType::tryFrom($type);
+                                    $tagColor = match($type) {
+                                        'domain' => 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+                                        'discipline' => 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100',
+                                        'source' => 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+                                        'issue' => 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+                                        default => 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
                                     };
                                 @endphp
-                                <div class="rounded-2xl border border-slate-100 bg-slate-50/40 p-4">
-                                    <p class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ $tagSection->label() }}</p>
-                                    <div class="mt-2.5 flex flex-wrap gap-2">
-                                        @forelse($sectionTags as $tag)
-                                            <span wire:key="tag-{{ $tagType }}-{{ $tag->id }}" class="inline-flex items-center rounded-xl border px-3.5 py-1.5 text-xs font-bold {{ $tagColor }}">
+                                <div class="{{ !$loop->first ? 'mt-4' : '' }}">
+                                    @if($typeEnum)
+                                        <p class="mb-2.5 text-xs font-bold uppercase tracking-widest text-slate-400">{{ $typeEnum->label() }}</p>
+                                    @endif
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach($tags as $tag)
+                                            <span wire:key="tag-{{ $tag->id }}" class="inline-flex items-center rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-colors {{ $tagColor }}">
                                                 {{ $tag->name }}
                                             </span>
-                                        @empty
-                                            <span class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500">
-                                                {{ __('Tiada') }}
-                                            </span>
-                                        @endforelse
+                                        @endforeach
                                     </div>
                                 </div>
                             @endforeach
                         </div>
-                    </div>
+                    @endif
                 </div>
             </section>
 
@@ -1312,7 +1274,7 @@
                                     <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                                 </div>
                                 <div class="min-w-0 flex-1 pt-0.5">
-                                    <p class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Jemputan') }}</p>
+                                    <p class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Audience') }}</p>
                                     <div class="mt-1.5 space-y-1.5 text-sm font-medium text-slate-700">
                                         @if($event->gender && $event->gender->value !== 'all')
                                             <p class="flex items-center gap-2">
@@ -1381,43 +1343,31 @@
                         $regOpensAt  = $event->settings?->registration_opens_at;
                         $regClosesAt = $event->settings?->registration_closes_at;
                         $regCapacity = $event->settings?->capacity;
-                        $registeredCount = (int) $event->registrations_count;
-                        $capacityPercent = $regCapacity ? min(100, (int) round(($registeredCount / $regCapacity) * 100)) : 0;
                     @endphp
                     <div class="border-t border-slate-100/80 px-6 py-5">
                         @if($regRequired)
-                            <div class="rounded-2xl border border-amber-200/60 bg-amber-50/70 p-4">
+                            <div class="flex items-center gap-3">
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
                                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                    {{ __('Pendaftaran Diperlukan') }}
+                                    {{ __('Registration Required') }}
                                 </span>
-
                                 @if($regCapacity)
-                                    <div class="mt-3">
-                                        <div class="mb-1.5 flex items-center justify-between text-xs font-semibold text-amber-800">
-                                            <span>{{ __('Jemputan Berdaftar') }}</span>
-                                            <span>{{ $registeredCount }}/{{ $regCapacity }}</span>
-                                        </div>
-                                        <div class="h-2 overflow-hidden rounded-full bg-amber-100">
-                                            <div class="h-full rounded-full bg-amber-500 transition-all" style="width: {{ $capacityPercent }}%"></div>
-                                        </div>
-                                    </div>
+                                    <span class="text-xs font-medium text-slate-500">{{ $event->registrations_count }}/{{ $regCapacity }} {{ __('spots taken') }}</span>
                                 @endif
-
-                                <div class="mt-3 space-y-1 text-xs font-medium text-slate-600">
-                                    @if($regOpensAt && $regOpensAt->isFuture())
-                                        <p>{{ __('Dibuka: :time', ['time' => \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regOpensAt, 'j M Y, g:i A')]) }}</p>
-                                    @endif
-                                    @if($regClosesAt)
-                                        <p>{{ __('Ditutup: :time', ['time' => \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regClosesAt, 'j M Y, g:i A')]) }}</p>
-                                    @endif
-                                </div>
+                            </div>
+                            <div class="mt-2 space-y-1 text-xs font-medium text-slate-500">
+                                @if($regOpensAt && $regOpensAt->isFuture())
+                                    <p>{{ __('Opens') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regOpensAt, 'j M Y, g:i A') }}</p>
+                                @endif
+                                @if($regClosesAt)
+                                    <p>{{ __('Closes') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regClosesAt, 'j M Y, g:i A') }}</p>
+                                @endif
                             </div>
                         @else
-                            <div class="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm font-bold text-emerald-700">
-                                <svg class="size-5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                {{ __('Terbuka tanpa pendaftaran') }}
-                            </div>
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                {{ __('Open to All — No Registration Needed') }}
+                            </span>
                         @endif
                     </div>
 
@@ -1429,42 +1379,41 @@
                                 $regClosed = $event->settings?->registration_closes_at && $event->settings->registration_closes_at < now();
                                 $atCapacity = $registrationMode === \App\Enums\RegistrationMode::Event && $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity;
                                 $sessionModeUnavailable = $registrationMode === \App\Enums\RegistrationMode::Session && $upcomingSessions->isEmpty();
-                                $remainingSlots = $event->settings?->capacity ? max(0, $event->settings->capacity - $event->registrations_count) : null;
                             @endphp
 
                             @if($regClosed)
                                 <button disabled class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed">
-                                    {{ __('Pendaftaran Ditutup') }}
+                                    {{ __('Registration Closed') }}
                                 </button>
                             @elseif($sessionModeUnavailable)
                                 <button disabled class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed">
-                                    {{ __('Tiada sesi tersedia') }}
+                                    {{ __('No available sessions') }}
                                 </button>
                             @elseif($atCapacity)
                                 <button disabled class="flex w-full items-center justify-center rounded-2xl bg-amber-100 px-6 py-4 text-sm font-bold text-amber-700 cursor-not-allowed">
-                                    {{ __('Jemputan Penuh') }}
+                                    {{ __('Fully Booked') }}
                                 </button>
                             @elseif(!$regOpen)
                                 <button disabled class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-600 cursor-not-allowed">
-                                    {{ __('Dibuka :time', ['time' => \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->settings->registration_opens_at, 'j M, g:i A')]) }}
+                                    {{ __('Opens') }} {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->settings->registration_opens_at, 'M d, h:i A') }}
                                 </button>
                             @else
                                 <a href="#register" @click.prevent="registerOpen = true"
                                     class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-emerald-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/30">
                                     <div class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
                                     <span class="relative flex items-center gap-2">
-                                        {{ __('Daftar Sekarang') }}
+                                        {{ __('Register Now') }}
                                         <svg class="size-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                                     </span>
-                                    @if($registrationMode === \App\Enums\RegistrationMode::Event && $remainingSlots !== null)
-                                        <span class="relative ml-2 text-xs opacity-80">({{ __(':count kekosongan', ['count' => $remainingSlots]) }})</span>
+                                    @if($registrationMode === \App\Enums\RegistrationMode::Event && $event->settings?->capacity)
+                                        <span class="relative ml-2 text-xs opacity-80">({{ $event->settings->capacity - $event->registrations_count }} {{ __('spots left') }})</span>
                                     @endif
                                 </a>
                             @endif
                         @else
                             <div class="flex items-center justify-center gap-2 rounded-2xl bg-emerald-50/50 py-3 text-sm font-bold text-emerald-700 border border-emerald-100/50">
                                 <svg class="size-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                {{ __('Tidak perlu pendaftaran') }}
+                                {{ __('No registration required') }}
                             </div>
                         @endif
                     </div>
@@ -1544,9 +1493,6 @@
                     </div>
                 @endif
 
-                {{-- ISLAMIC INSPIRATION --}}
-                <x-sidebar-inspiration />
-
                 {{-- GUEST BENEFITS CTA --}}
                 @guest
                     <div class="group relative overflow-hidden rounded-3xl border border-emerald-200/60 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-6 shadow-xl shadow-emerald-100/50 transition-all hover:shadow-2xl hover:shadow-emerald-200/50">
@@ -1590,7 +1536,7 @@
                                     {{ __('Daftar Akaun Percuma') }}
                                 </a>
                                 <a href="{{ route('login') }}" class="flex w-full items-center justify-center rounded-2xl border-2 border-emerald-200/60 bg-white/50 py-3 text-sm font-bold text-emerald-700 transition-all hover:border-emerald-300 hover:bg-white">
-                                    {{ __('Log Masuk untuk Hadir') }}
+                                    {{ __('Log Masuk') }}
                                 </a>
                             </div>
                         </div>

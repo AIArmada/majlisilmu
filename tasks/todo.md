@@ -135,3 +135,20 @@
 - Avatar block is larger (`size-32`) with stronger overlap and placeholder-avatar zoom treatment.
 - Verification:
   - `php artisan view:cache` => **Blade templates cached successfully.**
+
+---
+
+# Series Detail Missing Attribute Fix
+
+- [x] Replace deprecated `poster_url` usage on series detail cards
+- [x] Eager-load event media for series detail card image rendering
+- [x] Add regression test for series detail with attached upcoming event
+- [x] Run focused Pest verification in parallel
+
+## Review
+
+- Replaced series card image binding from `$event->poster_url` (missing accessor) to `$event->card_image_url`, which is the canonical accessor used across public pages.
+- Updated series page query to eager-load `media` and `institution.media` for event card image rendering without per-item relationship fetches.
+- Extended `tests/Feature/PublicPagesTest.php` to attach an upcoming event to a public series and assert the series page renders both series and event titles.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **6 passed**.
