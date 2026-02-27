@@ -688,11 +688,7 @@
 
                             {{-- Right: details --}}
                             <div class="relative z-10 flex flex-col items-center justify-center text-center sm:px-9 sm:py-9 lg:items-start lg:px-10 lg:text-left">
-                                <span class="inline-flex items-center rounded-full border border-emerald-200/70 bg-emerald-50/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-700">
-                                    {{ __('Speaker') }}
-                                </span>
-
-                                <h3 class="mt-4 font-heading text-[clamp(1.9rem,2.8vw,2.6rem)] font-bold leading-[1.1] text-slate-900 transition-colors group-hover:text-emerald-700">{{ $sp->formatted_name ?? $sp->name }}</h3>
+                                <h3 class="font-heading text-[clamp(1.9rem,2.8vw,2.6rem)] font-bold leading-[1.1] text-slate-900 transition-colors group-hover:text-emerald-700">{{ $sp->formatted_name ?? $sp->name }}</h3>
                                 @if($sp->title)
                                     <p class="mt-2 text-sm font-semibold tracking-wide text-slate-500">{{ $sp->title }}</p>
                                 @endif
@@ -739,23 +735,16 @@
                                                 class="size-full rounded-full object-cover" width="160" height="160" loading="lazy">
                                         </div>
 
-                                        <span class="mt-3 inline-flex items-center rounded-full border border-emerald-200/70 bg-emerald-50/75 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                                            {{ __('Speaker') }}
-                                        </span>
-
-                                        <div class="mt-2 w-full">
+                                        <div class="mt-4 w-full">
                                             <h4 class="font-heading text-xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">{{ $speaker->formatted_name ?? $speaker->name }}</h4>
                                             @if($speaker->title)
                                                 <p class="mt-1 text-sm font-semibold tracking-wide text-slate-500">{{ $speaker->title }}</p>
                                             @endif
                                         </div>
 
-                                        <div class="mt-3 h-px w-14 bg-gradient-to-r from-emerald-500/50 via-emerald-300/45 to-transparent"></div>
-
                                         @if($speakerBio)
+                                            <div class="mt-3 h-px w-14 bg-gradient-to-r from-emerald-500/50 via-emerald-300/45 to-transparent"></div>
                                             <p class="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{{ $speakerBio }}</p>
-                                        @else
-                                            <div class="mt-3 text-xs font-medium text-slate-400">{{ __('Speaker details to be announced.') }}</div>
                                         @endif
                                     </div>
 
