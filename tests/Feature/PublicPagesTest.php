@@ -35,11 +35,18 @@ it('loads public detail pages', function () {
     $series = Series::factory()->create([
         'visibility' => 'public',
     ]);
+    $series->events()->attach($event->id, [
+        'id' => (string) \Illuminate\Support\Str::uuid(),
+        'order_column' => 1,
+    ]);
 
     $this->get(route('events.show', $event))->assertSuccessful()->assertSee($event->title);
     $this->get(route('institutions.show', $institution))->assertSuccessful()->assertSee($institution->name);
     $this->get(route('speakers.show', $speaker))->assertSuccessful()->assertSee($speaker->name);
-    $this->get(route('series.show', $series))->assertSuccessful()->assertSee($series->title);
+    $this->get(route('series.show', $series))
+        ->assertSuccessful()
+        ->assertSee($series->title)
+        ->assertSee($event->title);
 });
 
 it('loads institution detail page with upcoming event type enum collection', function () {

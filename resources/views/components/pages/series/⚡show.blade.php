@@ -16,6 +16,7 @@ new class extends Component
         $series->load([
             'events' => function ($query) {
                 $query->active()
+                    ->with(['media', 'institution.media'])
                     ->where('starts_at', '>=', now())
                     ->orderBy('starts_at', 'asc')
                     ->take(10);
@@ -69,8 +70,8 @@ new class extends Component
                                 @foreach($series->events as $event)
                                     <article class="flex flex-col md:flex-row gap-6 bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all group">
                                          <div class="md:w-48 h-32 md:h-auto rounded-2xl bg-slate-100 relative overflow-hidden flex-shrink-0">
-                                            @if($event->poster_url)
-                                                <img src="{{ $event->poster_url }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                            @if($event->card_image_url)
+                                                <img src="{{ $event->card_image_url }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                                             @else
                                                 <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-200">
                                                     <svg class="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
