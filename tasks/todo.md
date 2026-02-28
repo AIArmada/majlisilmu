@@ -152,3 +152,184 @@
 - Extended `tests/Feature/PublicPagesTest.php` to attach an upcoming event to a public series and assert the series page renders both series and event titles.
 - Verification:
   - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **6 passed**.
+
+---
+
+# Social Media Handle Refactor
+
+- [x] Build centralized parser + URL builder for social platforms (username-first)
+- [x] Normalize SocialMedia model persistence (extract from full URL, strip `@`, canonical URL rendering)
+- [x] Update Filament/form schemas to accept handle or full URL and relax URL-only requirements
+- [x] Update public/admin rendering to consume canonical/resolved URLs
+- [x] Add migration/backfill for username-first storage model
+- [x] Add regression tests for parsing, normalization, and rendering behavior
+- [x] Run focused Pest verification in parallel
+
+## Review
+
+- Added `App\Support\SocialMedia\SocialMediaLinkResolver` as the single source of truth for platform aliasing, username extraction (full URL / `@handle` / raw handle), and canonical URL generation.
+- Updated `App\Models\SocialMedia` to normalize on save and expose `resolved_url` + `display_username` accessors.
+- Updated all social media repeaters (Speaker, Institution, Venue, Reference, SharedFormSchema) so either handle or URL is accepted (`requiredWithout` pairing), with URL no longer hard-required.
+- Updated frontend/admin rendering paths to use canonical resolved URLs:
+  - speaker/institution public pages
+  - institution/venue infolists
+- Added migration `2026_02_28_000001_make_social_media_url_nullable.php` and normalization command `social-media:normalize`.
+- Ran normalization command in local environment:
+  - `php artisan social-media:normalize --dry-run`
+  - `php artisan social-media:normalize --force`
+- Added regression suite `tests/Feature/SocialMediaNormalizationTest.php` for extraction + URL resolution behavior.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter="(SocialMediaTest|SocialMediaNormalizationTest|EditInstitutionSocialMediaTest|SpeakerShowSocialPlacementTest)"` => **11 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Support/SocialMedia/SocialMediaLinkResolver.php app/Models/SocialMedia.php app/Console/Commands/NormalizeSocialMediaHandles.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
+# Social Media SVG Icon Wiring
+
+- [x] Simplify icon naming rule to `<platform>.svg`
+- [x] Replace inline social SVGs with storage-based icon images on speaker page
+- [x] Replace inline social SVGs with storage-based icon images on institution page
+- [x] Create storage folder scaffold and filename guide
+- [x] Run focused verification for social rendering changes
+
+## Review
+
+- `App\Models\SocialMedia` now resolves icon file names directly as `<platform>.svg` (with `link.svg` fallback when platform is empty).
+- Speaker and institution public social cards now render icon images via `$social->icon_url`, so the displayed icon is always driven by stored platform name.
+- Added icon drop path and usage guide at:
+  - `storage/app/public/social-media-icons/README.md`
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact --filter="(SpeakerShowSocialPlacementTest|EditInstitutionSocialMediaTest|SocialMediaNormalizationTest)"` => **7 passed (20 assertions)**
+
+---
+
+# Inspiration Main Content Missing
+
+- [x] Identify whether missing text is rendering issue or data issue
+- [x] Patch inspiration seeder to repair stale records instead of skipping existing rows
+- [x] Reseed inspiration data locally and verify content is present
+- [x] Run focused verification
+
+## Review
+
+- Root cause was stale seeded rows where `inspirations.content` was `NULL` for existing records; sidebar had no text to render.
+- Updated seeder to use `updateOrCreate` (instead of `firstOrCreate`) so future reseeds backfill/fix existing inspiration content.
+- Executed `php artisan db:seed --class=Database\\Seeders\\InspirationSeeder` to repair current local data.
+- Validation after reseed:
+  - `inspirations.content` null count is now **0**
+  - `Jangan Berputus Asa` and `Perancangan Allah Yang Terbaik` now return full `contentPreviewText`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter=\"(seeds inspirations via InspirationSeeder|shows sidebar inspiration on speaker page|shows sidebar inspiration on institution page)\"` => **3 passed**
+  - Note: existing unrelated failure persists in full `InspirationTest` for event-page expectation (`Test Did You Know`).
+
+---
+
+# Speaker Freelance Badge Position
+
+- [x] Remove freelance badge from hero action row (next to `Kongsi`)
+- [x] Render freelance badge in right sidebar below social media
+- [x] Ensure sidebar still appears when speaker is freelance
+- [x] Run view/test verification
+
+## Review
+
+- Moved `Bebas / Freelance` out of the hero action buttons and into the sidebar directly after the social media card.
+- Updated sidebar render condition to include `$speaker->is_freelance`, preventing the badge from disappearing when social links are absent.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact --filter=SpeakerShowSocialPlacementTest` => **1 passed**
+
+---
+
+# Social Platform Save Regression (Admin Speaker Edit)
+
+- [x] Reproduce and isolate why platform flips to `Lain-lain` after clearing URL
+- [x] Patch `SocialMedia` normalization to accept enum-backed platform values
+- [x] Add regression test for enum platform + handle-only save
+- [x] Run focused verification
+
+## Review
+
+- Root cause: Filament can hydrate `platform` as a backed enum instance; `SocialMedia` normalization only accepted strings, causing platform to be treated as null and fallback to `other` + website URL coercion.
+- Updated `App\Models\SocialMedia` to normalize platform from both string and `BackedEnum` values before resolve/save/accessor logic.
+- Added regression test to ensure `platform => SocialMediaPlatform::Facebook`, `username => nurul`, `url => null` persists as `facebook` and resolves to `https://www.facebook.com/nurul`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter=SocialMediaNormalizationTest` => **6 passed**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
+# Social Icon Wrapper Removal
+
+- [x] Remove boxed/bordered wrapper styling from social icons in speaker sidebar
+- [x] Remove boxed/bordered wrapper styling from social icons in institution sidebar
+- [x] Keep hover color by platform while rendering plain icon links
+- [x] Run focused verification
+
+## Review
+
+- Social media links now display as plain clickable icons without rounded bordered background wrappers in both speaker and institution sidebars.
+- Platform-specific hover colors are preserved (`Facebook` blue, `Instagram` pink, etc.) with lightweight link styling.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact --filter=\"(SpeakerShowSocialPlacementTest|EditInstitutionSocialMediaTest)\"` => **2 passed**
+
+---
+
+# Share Modal Clarity + Icon Targets
+
+- [x] Add explicit "Akan Dikongsi" entity name in speaker share modal
+- [x] Add explicit "Akan Dikongsi" entity name in institution share modal
+- [x] Add explicit "Akan Dikongsi" entity name in event share modal
+- [x] Convert share targets to icon-only buttons for speaker/institution/event modals
+- [x] Run focused verification
+
+## Review
+
+- Added an explicit shared-entity block in all three share modals:
+  - speaker: shows `formatted_name`
+  - institution: shows institution `name`
+  - event: shows event `title`
+- Replaced text-labeled share targets with icon-only buttons using `storage/social-media-icons/*.svg` across speaker, institution, and event modals.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact --filter=\"(EventShowPageTest|SpeakerShowSocialPlacementTest|EditInstitutionSocialMediaTest)\"` => **13 passed**
+
+---
+
+# Share Modal Cleanup Pass
+
+- [x] Show speaker avatar together with speaker name in share modal
+- [x] Remove "Akan Dikongsi" label text from speaker/institution/event modals
+- [x] Keep entity name/title visible for share clarity
+- [x] Run focused verification
+
+## Review
+
+- Speaker share modal now displays avatar + speaker name in one row for clearer context.
+- Removed the extra "Akan Dikongsi" label text from all three share modals while preserving the entity name/title.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact --filter=\"(EventShowPageTest|SpeakerShowSocialPlacementTest|EditInstitutionSocialMediaTest)\"` => **13 passed**
+
+---
+
+# Share UI Sync (Remaining Contexts)
+
+- [x] Find remaining share modal implementations not yet aligned
+- [x] Sync legacy event share modal (`show-old`) to icon-only channels
+- [x] Show clear shared entity title in legacy event share modal
+- [x] Run focused verification and scan for stale text-button share grids
+
+## Review
+
+- Updated legacy event share modal in `resources/views/livewire/pages/events/show-old.blade.php` to follow the same pattern:
+  - clear shared entity title block (event title)
+  - icon-only share channel buttons using `storage/social-media-icons/*.svg`
+- Kept context-specific channel list for the legacy modal (WhatsApp, Telegram, Facebook, X, Email) according to existing data flow.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact --filter=\"(EventShowPageTest|SpeakerShowSocialPlacementTest|EditInstitutionSocialMediaTest)\"` => **13 passed**
+  - `rg` scan confirms active share modals now use the new icon-oriented pattern.

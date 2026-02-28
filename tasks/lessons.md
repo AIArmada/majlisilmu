@@ -10,3 +10,12 @@
 - For multi-speaker premium grids, users still expect avatar presence; avoid over-shrinking profile images when improving typography and card materials.
 - Always verify speaker-card changes on both a single-speaker event and a multi-speaker event; placeholder media fallbacks can behave differently and hide regressions.
 - To make avatars feel "much bigger," increase avatar diameter and overlap while reducing header-panel height; changing only one of these is usually not enough.
+- In a dirty branch with frequent parallel edits, re-open the exact target file right before finalizing UI-order changes; otherwise stale assumptions can reintroduce recently fixed element ordering.
+- For asset naming requests like social icons, follow the exact file-name convention the user gives (`<platform>.svg`) and avoid adding extra mapping logic unless explicitly asked.
+- For seed data that may evolve (like inspiration text), use `updateOrCreate` instead of `firstOrCreate` so reseeding repairs stale/null fields in existing rows.
+- For UI ordering requests, remove the old element placement and widen container visibility conditions so the moved element never disappears on edge states.
+- For model normalization hooks, treat enum-backed form values as first-class input (not only strings) to prevent accidental fallback logic on save.
+- For icon-only UI requests, remove decorative button wrappers and keep click targets minimal unless the user explicitly asks for boxed/filled icon buttons.
+- In share modals, always show a clear "what will be shared" entity name and use icon-only social targets when requested for faster visual scanning.
+- For person share previews, pair avatar and name in one compact row; avoid extra meta labels when the user asks for cleaner content.
+- After updating a primary page pattern, immediately sync legacy/alternate variants (for example `show-old`) to avoid inconsistent UX across routes.

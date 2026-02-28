@@ -20,12 +20,19 @@ new class extends Component {
 
     public function mount(Speaker $speaker): void
     {
-        if ($speaker->status !== 'verified' && ! auth()->user()?->hasAnyRole(['super_admin', 'moderator'])) {
+        if (! $speaker->is_active) {
+            abort(404);
+        }
+
+        $canBypassVisibility = auth()->user()?->hasAnyRole(['super_admin', 'moderator']) ?? false;
+
+        if ($speaker->status !== 'verified' && ! $canBypassVisibility) {
             abort(404);
         }
 
         $speaker->load([
             'media',
+            'contacts',
             'socialMedia',
             'address.state',
             'address.city',
@@ -178,8 +185,17 @@ new class extends Component {
     ];
 
     // Social media
-    $socialLinks = $speaker->socialMedia->mapWithKeys(fn ($s) => [$s->platform => $s->url]);
+    $socialLinks = $speaker->socialMedia
+        ->filter(fn ($social) => filled($social->resolved_url) && filled($social->platform))
+        ->mapWithKeys(fn ($social) => [strtolower((string) $social->platform) => $social])
+        ->values();
+    $contacts = $speaker->contacts
+        ->where('is_public', true)
+        ->filter(fn ($contact) => filled($contact->value))
+        ->values();
     $hasSocialLinks = $socialLinks->isNotEmpty();
+    $hasPublicContacts = $contacts->isNotEmpty();
+    $showPendingStatusNotice = $speaker->status === 'pending';
     $showJoinCta = auth()->guest();
     $hasInspiration = \App\Models\Inspiration::query()->active()->forLocale()->exists();
     $useDesktopSidebar = $showJoinCta || $hasInspiration;
@@ -432,12 +448,6 @@ new class extends Component {
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
                         {{ __('Kongsi') }}
                     </button>
-                    @if($speaker->is_freelance)
-                        <span class="inline-flex items-center gap-1.5 rounded-full border border-gold-500/20 bg-gold-500/10 px-3 py-1 text-xs font-semibold text-gold-300 backdrop-blur-sm">
-                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
-                            {{ __('Bebas / Freelance') }}
-                        </span>
-                    @endif
                     @can('update', $speaker)
                         <a href="{{ route('filament.admin.resources.speakers.edit', ['record' => $speaker]) }}"
                            target="_blank"
@@ -889,7 +899,7 @@ new class extends Component {
             </div>
 
             {{-- RIGHT COLUMN — Sidebar --}}
-            @if($hasSocialLinks || $showJoinCta || $hasInspiration)
+            @if($hasSocialLinks || $hasPublicContacts || $showPendingStatusNotice || $showJoinCta || $hasInspiration || $speaker->is_freelance)
                 <div class="speaker-sidebar-column order-2 space-y-6 {{ $useDesktopSidebar ? 'lg:sticky lg:top-6 lg:self-start' : '' }}">
 
                 {{-- ─── ISLAMIC INSPIRATION ─── --}}
@@ -899,49 +909,117 @@ new class extends Component {
                     <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
-                                <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75m-9 0h9m-9 0l-1.5 9.75h12L22.5 10.5m-9 0V4.875a2.625 2.625 0 00-5.25 0V10.5"/></svg>
+                                <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
                                 {{ __('Media Sosial') }}
                             </h3>
                         </div>
                         <div class="p-5">
                             <div class="flex flex-wrap items-center gap-3">
-                            @if($socialLinks->has('website'))
-                                <a href="{{ $socialLinks->get('website') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 hover:shadow-md hover:shadow-emerald-500/10 hover:-translate-y-0.5" title="{{ __('Laman Web') }}">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
+                            @foreach($socialLinks as $social)
+                                @php
+                                    $platform = strtolower((string) $social->platform);
+                                    $linkClass = match ($platform) {
+                                        'website' => 'hover:text-emerald-600',
+                                        'facebook' => 'hover:text-blue-600',
+                                        'instagram' => 'hover:text-pink-600',
+                                        'youtube' => 'hover:text-red-600',
+                                        'telegram' => 'hover:text-sky-600',
+                                        'whatsapp' => 'hover:text-green-600',
+                                        default => 'hover:text-slate-900',
+                                    };
+                                    $title = \App\Enums\SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? ucfirst($platform);
+                                @endphp
+                                <a href="{{ $social->resolved_url }}" target="_blank" rel="noopener noreferrer"
+                                    class="group inline-flex items-center justify-center p-1 text-slate-500 transition-all duration-200 hover:-translate-y-0.5 {{ $linkClass }}"
+                                    title="{{ $title }}">
+                                    <img src="{{ $social->icon_url }}" alt="{{ $title }}" class="h-8 w-8" loading="lazy">
                                 </a>
-                            @endif
-                            @if($socialLinks->has('facebook'))
-                                <a href="{{ $socialLinks->get('facebook') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md hover:shadow-blue-500/10 hover:-translate-y-0.5" title="{{ __('Facebook') }}">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                                </a>
-                            @endif
-                            @if($socialLinks->has('instagram'))
-                                <a href="{{ $socialLinks->get('instagram') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 hover:shadow-md hover:shadow-pink-500/10 hover:-translate-y-0.5" title="{{ __('Instagram') }}">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>
-                                </a>
-                            @endif
-                            @if($socialLinks->has('youtube'))
-                                <a href="{{ $socialLinks->get('youtube') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-md hover:shadow-red-500/10 hover:-translate-y-0.5" title="{{ __('YouTube') }}">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
-                                </a>
-                            @endif
-                            @if($socialLinks->has('twitter') || $socialLinks->has('x'))
-                                <a href="{{ $socialLinks->get('twitter') ?? $socialLinks->get('x') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 hover:shadow-md hover:shadow-slate-500/10 hover:-translate-y-0.5" title="{{ __('X') }}">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                                </a>
-                            @endif
-                            @if($socialLinks->has('tiktok'))
-                                <a href="{{ $socialLinks->get('tiktok') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 hover:shadow-md hover:shadow-slate-500/10 hover:-translate-y-0.5" title="{{ __('TikTok') }}">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48V13a8.28 8.28 0 005.58 2.15V11.7a4.84 4.84 0 01-3.77-1.78v-.01l.01-.01V6.69h3.76z"/></svg>
-                                </a>
-                            @endif
-                            @if($socialLinks->has('telegram'))
-                                <a href="{{ $socialLinks->get('telegram') }}" target="_blank" rel="noopener" class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/50 text-slate-500 transition-all duration-200 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600 hover:shadow-md hover:shadow-sky-500/10 hover:-translate-y-0.5" title="{{ __('Telegram') }}">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                                </a>
-                            @endif
+                            @endforeach
                             </div>
                         </div>
+                    </div>
+                @endif
+
+                @if($hasPublicContacts)
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                        <div class="border-b border-slate-100 px-5 py-4">
+                            <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                                {{ __('Hubungi') }}
+                            </h3>
+                        </div>
+                        <div class="space-y-3 p-5">
+                            @foreach($contacts as $contact)
+                                @php
+                                    $categoryValue = $contact->category instanceof \App\Enums\ContactCategory
+                                        ? $contact->category->value
+                                        : strtolower((string) $contact->category);
+                                    $category = \App\Enums\ContactCategory::tryFrom($categoryValue);
+                                    $categoryLabel = $category?->getLabel() ?? ucfirst($categoryValue);
+                                    $contactValue = (string) $contact->value;
+                                    $phoneValue = preg_replace('/[^0-9+]/', '', $contactValue);
+                                    $whatsAppValue = preg_replace('/\D+/', '', $contactValue);
+                                    $contactHref = match ($categoryValue) {
+                                        'email' => 'mailto:' . $contactValue,
+                                        'phone' => filled($phoneValue) ? 'tel:' . $phoneValue : null,
+                                        'whatsapp' => filled($whatsAppValue) ? 'https://wa.me/' . $whatsAppValue : null,
+                                        default => null,
+                                    };
+                                @endphp
+                                @if($contactHref)
+                                    <a href="{{ $contactHref }}" target="_blank" rel="noopener noreferrer" class="group flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/40 p-3 transition hover:border-emerald-200 hover:bg-emerald-50/40">
+                                        <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
+                                            @if($categoryValue === 'email')
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                                            @elseif($categoryValue === 'whatsapp')
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75A.375.375 0 009 9.375h6a.375.375 0 01.375.375v4.5a.375.375 0 01-.375.375H9a.375.375 0 01-.375-.375v-4.5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 4.5h10.5A2.25 2.25 0 0119.5 6.75v10.5A2.25 2.25 0 0117.25 19.5H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5z"/></svg>
+                                            @else
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">{{ $categoryLabel }}</p>
+                                            <p class="break-all text-sm font-semibold text-slate-900 transition-colors group-hover:text-emerald-700">{{ $contactValue }}</p>
+                                        </div>
+                                    </a>
+                                @else
+                                    <div class="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/40 p-3">
+                                        <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">{{ $categoryLabel }}</p>
+                                            <p class="break-all text-sm font-semibold text-slate-900">{{ $contactValue }}</p>
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                @if($speaker->is_freelance)
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-gold-200/60 bg-gold-50/70 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-gold-500/20 bg-gold-500/10 px-3 py-1 text-xs font-semibold text-gold-700">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                            </svg>
+                            {{ __('Bebas / Freelance') }}
+                        </span>
+                    </div>
+                @endif
+
+                @if($showPendingStatusNotice)
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                        <p class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-800">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {{ __('Status Profil: Menunggu Semakan') }}
+                        </p>
+                        <p class="mt-2 text-xs leading-relaxed text-amber-900/80">
+                            {{ __('Profil ini masih dalam status semakan. Sila berhati-hati dengan sebarang info / pautan peribadi.') }}
+                        </p>
                     </div>
                 @endif
 
@@ -974,6 +1052,13 @@ new class extends Component {
                 </div>
 
                 <div class="space-y-6 p-6 sm:p-8">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                        <div class="flex items-center gap-3">
+                            <img src="{{ $avatarUrl }}" alt="{{ $speaker->formatted_name }}" class="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-sm" loading="lazy">
+                            <p class="text-sm font-semibold text-slate-900">{{ $speaker->formatted_name }}</p>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <button type="button" @click="nativeShare()" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-emerald-700">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684l6.632 3.316m-6.632-6l6.632-3.316"/></svg>
@@ -995,16 +1080,35 @@ new class extends Component {
                     </div>
 
                     <div>
-                        <p class="mb-4 text-center text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Or share via') }}</p>
+                        <p class="mb-4 flex items-center justify-center gap-1.5 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
+                            <svg class="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                            <span>{{ __('Or share via') }}</span>
+                        </p>
                         <div class="grid grid-cols-4 gap-3">
-                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">WhatsApp</a>
-                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10 hover:text-[#0088cc]">Telegram</a>
-                            <a href="{{ $shareLinks['line'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#06C755] hover:bg-[#06C755]/10 hover:text-[#06C755]">LINE</a>
-                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10 hover:text-[#1877F2]">Facebook</a>
-                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10 hover:text-slate-900">X</a>
-                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink()" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10 hover:text-[#E4405F]">Instagram</a>
-                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink()" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-black hover:bg-black/10 hover:text-black">TikTok</a>
-                            <a href="{{ $shareLinks['email'] }}" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 text-[10px] font-bold transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600">Email</a>
+                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" title="WhatsApp" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10">
+                                <img src="{{ asset('storage/social-media-icons/whatsapp.svg') }}" alt="WhatsApp" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" title="Telegram" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10">
+                                <img src="{{ asset('storage/social-media-icons/telegram.svg') }}" alt="Telegram" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['line'] }}" target="_blank" rel="noopener" title="LINE" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#06C755] hover:bg-[#06C755]/10">
+                                <img src="{{ asset('storage/social-media-icons/line.svg') }}" alt="LINE" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" title="Facebook" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10">
+                                <img src="{{ asset('storage/social-media-icons/facebook.svg') }}" alt="Facebook" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" title="X" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10">
+                                <img src="{{ asset('storage/social-media-icons/x.svg') }}" alt="X" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink()" title="Instagram" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10">
+                                <img src="{{ asset('storage/social-media-icons/instagram.svg') }}" alt="Instagram" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink()" title="TikTok" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
+                                <img src="{{ asset('storage/social-media-icons/tiktok.svg') }}" alt="TikTok" class="h-6 w-6" loading="lazy">
+                            </a>
+                            <a href="{{ $shareLinks['email'] }}" title="Email" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10">
+                                <img src="{{ asset('storage/social-media-icons/email.svg') }}" alt="Email" class="h-6 w-6" loading="lazy">
+                            </a>
                         </div>
                     </div>
                 </div>

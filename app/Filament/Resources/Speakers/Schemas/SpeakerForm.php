@@ -250,12 +250,13 @@ class SpeakerForm
                                     ->columnSpan(1),
                                 TextInput::make('username')
                                     ->label(__('Username / Handle'))
-                                    ->placeholder('@username')
+                                    ->requiredWithout('url')
+                                    ->placeholder('@username / https://...')
                                     ->columnSpan(1),
                                 TextInput::make('url')
                                     ->label(__('URL'))
+                                    ->requiredWithout('username')
                                     ->url()
-                                    ->required()
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
@@ -278,14 +279,20 @@ class SpeakerForm
                         Select::make('status')
                             ->label(__('Status'))
                             ->options([
-                                'unverified' => __('Unverified'),
                                 'pending' => __('Pending'),
                                 'verified' => __('Verified'),
                                 'rejected' => __('Rejected'),
                             ])
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, mixed $state): void {
+                                if ($state === 'rejected') {
+                                    $set('is_active', false);
+                                }
+                            })
                             ->required(),
                         \Filament\Forms\Components\Toggle::make('is_active')
                             ->label(__('Active'))
+                            ->disabled(fn (Get $get): bool => $get('status') === 'rejected')
                             ->default(true),
                     ])
                     ->columns(1),

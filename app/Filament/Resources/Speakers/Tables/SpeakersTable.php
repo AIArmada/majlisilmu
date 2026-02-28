@@ -49,7 +49,6 @@ class SpeakersTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'unverified' => 'Unverified',
                         'pending' => 'Pending',
                         'verified' => 'Verified',
                         'rejected' => 'Rejected',
