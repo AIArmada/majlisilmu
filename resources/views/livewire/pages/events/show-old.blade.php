@@ -697,6 +697,10 @@
                     </div>
 
                     <div class="space-y-5 p-6">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                            <p class="text-sm font-semibold text-slate-900">{{ $event->title }}</p>
+                        </div>
+
                         <article class="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
                             <img src="{{ $sharePreviewImage }}" alt="{{ $event->title }}" class="h-48 w-full object-cover" loading="lazy">
                             <div class="space-y-2 p-4">
@@ -726,26 +730,26 @@
 
                         <p x-show="copied" class="text-sm font-semibold text-emerald-600">{{ $copyMessage }}</p>
 
-                        <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener"
-                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
-                                WhatsApp
+                        <div class="grid grid-cols-4 gap-3">
+                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" title="WhatsApp"
+                                class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10">
+                                <img src="{{ asset('storage/social-media-icons/whatsapp.svg') }}" alt="WhatsApp" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener"
-                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
-                                Telegram
+                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" title="Telegram"
+                                class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10">
+                                <img src="{{ asset('storage/social-media-icons/telegram.svg') }}" alt="Telegram" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener"
-                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
-                                Facebook
+                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" title="Facebook"
+                                class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10">
+                                <img src="{{ asset('storage/social-media-icons/facebook.svg') }}" alt="Facebook" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener"
-                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
-                                X
+                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" title="X"
+                                class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10">
+                                <img src="{{ asset('storage/social-media-icons/x.svg') }}" alt="X" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['email'] }}"
-                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700">
-                                Email
+                            <a href="{{ $shareLinks['email'] }}" title="Email"
+                                class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10">
+                                <img src="{{ asset('storage/social-media-icons/email.svg') }}" alt="Email" class="h-6 w-6" loading="lazy">
                             </a>
                         </div>
                     </div>

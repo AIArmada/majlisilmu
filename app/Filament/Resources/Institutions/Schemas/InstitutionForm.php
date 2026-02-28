@@ -206,12 +206,13 @@ class InstitutionForm
                                     ->columnSpan(1),
                                 TextInput::make('username')
                                     ->label('Username / Handle')
-                                    ->placeholder('@username')
+                                    ->requiredWithout('url')
+                                    ->placeholder('@username / https://...')
                                     ->columnSpan(1),
                                 TextInput::make('url')
                                     ->label('URL')
+                                    ->requiredWithout('username')
                                     ->url()
-                                    ->required()
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)

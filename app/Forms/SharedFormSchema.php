@@ -113,16 +113,17 @@ class SharedFormSchema
                     ->required()
                     ->options(SocialMediaPlatform::class)
                     ->searchable(),
+                TextInput::make('username')
+                    ->label(__('Username / Handle'))
+                    ->requiredWithout('url')
+                    ->maxLength(255)
+                    ->placeholder(__('@username / https://...')),
                 TextInput::make('url')
                     ->label(__('URL'))
-                    ->required()
+                    ->requiredWithout('username')
                     ->url()
                     ->maxLength(255)
                     ->placeholder(__('https://...')),
-                TextInput::make('username')
-                    ->label(__('Username'))
-                    ->maxLength(255)
-                    ->placeholder(__('@username')),
             ])
             ->collapsible()
             ->defaultItems(0)
@@ -164,7 +165,7 @@ class SharedFormSchema
             foreach ($data['social_media'] as $social) {
                 $model->socialMedia()->create([
                     'platform' => $social['platform'],
-                    'url' => $social['url'],
+                    'url' => $social['url'] ?? null,
                     'username' => $social['username'] ?? null,
                 ]);
             }

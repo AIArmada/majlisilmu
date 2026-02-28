@@ -1570,6 +1570,10 @@
                 </div>
                 
                 <div class="p-6 sm:p-8">
+                    <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                        <p class="text-sm font-semibold text-slate-900">{{ $event->title }}</p>
+                    </div>
+
                     <article class="overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-lg shadow-slate-200/40">
                         <div class="relative h-56 overflow-hidden bg-slate-100">
                             <img src="{{ $sharePreviewImage }}" alt="{{ $event->title }}" class="size-full {{ $eventHasPoster ? 'object-contain' : 'object-cover' }}" loading="lazy">
@@ -1609,39 +1613,34 @@
                     </div>
                     
                     <div class="mt-8">
-                        <p class="mb-4 text-center text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Or share via') }}</p>
+                        <p class="mb-4 flex items-center justify-center gap-1.5 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
+                            <svg class="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                            <span>{{ __('Or share via') }}</span>
+                        </p>
                         <div class="grid grid-cols-4 gap-3">
-                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                                <span class="text-[10px] font-bold">WhatsApp</span>
+                            <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" title="WhatsApp" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10">
+                                <img src="{{ asset('storage/social-media-icons/whatsapp.svg') }}" alt="WhatsApp" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10 hover:text-[#0088cc]">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                                <span class="text-[10px] font-bold">Telegram</span>
+                            <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" title="Telegram" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10">
+                                <img src="{{ asset('storage/social-media-icons/telegram.svg') }}" alt="Telegram" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['line'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-[#06C755] hover:bg-[#06C755]/10 hover:text-[#06C755]">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 5.612 2 10.067c0 3.99 3.63 7.331 8.53 7.96.332.07.784.216.899.495.103.254.067.65.033.907l-.145.87c-.045.257-.205 1.008.884.55 1.09-.457 5.885-3.466 8.029-5.934C21.71 13.333 22 11.802 22 10.067 22 5.612 17.523 2 12 2Zm-4.05 10.5a.45.45 0 0 1-.45.45h-2.1a.45.45 0 0 1-.45-.45V8.45a.45.45 0 1 1 .9 0v3.6H7.5a.45.45 0 0 1 .45.45Zm2.15.45a.45.45 0 0 1-.9 0v-4.5a.45.45 0 1 1 .9 0v4.5Zm4.7 0a.45.45 0 0 1-.805.278l-2.195-2.977v2.699a.45.45 0 0 1-.9 0v-4.5a.45.45 0 0 1 .805-.278l2.195 2.977V8.45a.45.45 0 1 1 .9 0v4.5Zm3.75-3.6h-2.1v1.05h2.1a.45.45 0 0 1 0 .9h-2.1v1.05h2.1a.45.45 0 0 1 0 .9h-2.55a.45.45 0 0 1-.45-.45v-4.5a.45.45 0 0 1 .45-.45h2.55a.45.45 0 0 1 0 .9Z"/></svg>
-                                <span class="text-[10px] font-bold">LINE</span>
+                            <a href="{{ $shareLinks['line'] }}" target="_blank" rel="noopener" title="LINE" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#06C755] hover:bg-[#06C755]/10">
+                                <img src="{{ asset('storage/social-media-icons/line.svg') }}" alt="LINE" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10 hover:text-[#1877F2]">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                                <span class="text-[10px] font-bold">Facebook</span>
+                            <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" title="Facebook" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10">
+                                <img src="{{ asset('storage/social-media-icons/facebook.svg') }}" alt="Facebook" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10 hover:text-slate-900">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>
-                                <span class="text-[10px] font-bold">X</span>
+                            <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" title="X" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10">
+                                <img src="{{ asset('storage/social-media-icons/x.svg') }}" alt="X" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink()" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10 hover:text-[#E4405F]">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5a4.25 4.25 0 0 0 4.25 4.25h8.5a4.25 4.25 0 0 0 4.25-4.25v-8.5a4.25 4.25 0 0 0-4.25-4.25h-8.5Zm9.5 1.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>
-                                <span class="text-[10px] font-bold">Instagram</span>
+                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink()" title="Instagram" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10">
+                                <img src="{{ asset('storage/social-media-icons/instagram.svg') }}" alt="Instagram" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink()" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-black hover:bg-black/10 hover:text-black">
-                                <svg class="size-6" fill="currentColor" viewBox="0 0 24 24"><path d="M14.5 2h2.66c.23 1.77 1.31 3.36 2.84 4.22v2.74a7.34 7.34 0 0 1-2.82-.94v6.18a5.2 5.2 0 1 1-5.2-5.2c.28 0 .55.03.82.07v2.7a2.5 2.5 0 1 0 1.7 2.38V2Z"/></svg>
-                                <span class="text-[10px] font-bold">TikTok</span>
+                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink()" title="TikTok" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
+                                <img src="{{ asset('storage/social-media-icons/tiktok.svg') }}" alt="TikTok" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['email'] }}" class="flex flex-col items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50 p-3 transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600">
-                                <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                <span class="text-[10px] font-bold">Email</span>
+                            <a href="{{ $shareLinks['email'] }}" title="Email" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10">
+                                <img src="{{ asset('storage/social-media-icons/email.svg') }}" alt="Email" class="h-6 w-6" loading="lazy">
                             </a>
                         </div>
                     </div>

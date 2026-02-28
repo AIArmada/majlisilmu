@@ -174,7 +174,7 @@ class InstitutionInfolist
                                                     ->badge(),
                                                 TextEntry::make('username')
                                                     ->label('Username'),
-                                                TextEntry::make('url')
+                                                TextEntry::make('resolved_url')
                                                     ->label('URL')
                                                     ->url(fn (?string $state): ?string => filled($state) ? $state : null)
                                                     ->openUrlInNewTab(),

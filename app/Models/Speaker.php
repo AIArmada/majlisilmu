@@ -71,6 +71,10 @@ class Speaker extends Model implements AuditableContract, HasMedia
     protected static function booted(): void
     {
         static::saving(function (Speaker $speaker) {
+            if ($speaker->status === 'rejected') {
+                $speaker->is_active = false;
+            }
+
             if ($speaker->isDirty('qualifications')) {
                 $qualifications = $speaker->qualifications;
                 $allowedPostNominals = array_map(
