@@ -1,8 +1,6 @@
 <?php
 
 use App\Models\Institution;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 new class extends Component {
@@ -197,12 +195,23 @@ new class extends Component {
 
     // Location
     $address = $institution->addressModel;
-    $locationParts = array_filter([
-        $address?->subdistrict?->name,
-        $address?->district?->name,
-        $address?->state?->name,
-    ]);
-    $locationString = implode(', ', $locationParts);
+    $formatAddressHierarchy = static function ($addressModel): string {
+        $stateName = $addressModel?->state?->name;
+        $districtName = $addressModel?->district?->name;
+        $subdistrictName = $addressModel?->subdistrict?->name;
+
+        $stateHiddenDistricts = ['kuala lumpur', 'putrajaya', 'labuan'];
+        if (is_string($districtName) && in_array(mb_strtolower(trim($districtName)), $stateHiddenDistricts, true)) {
+            $stateName = null;
+        }
+
+        return implode(' • ', [
+            __('Negeri').': '.($stateName ?? '-'),
+            __('Daerah').': '.($districtName ?? '-'),
+            __('Daerah Kecil').': '.($subdistrictName ?? '-'),
+        ]);
+    };
+    $locationString = $formatAddressHierarchy($address);
     $googleMapsApiKey = (string) config('services.google.maps_api_key', '');
     $mapQuery = implode(', ', array_filter([
         $institution->name,
@@ -253,42 +262,19 @@ new class extends Component {
         return __('Umum');
     };
 
-    // Event location helper — Venue/Institution, subdistrict, district, state
-    $resolveVenueLocation = static function (\App\Models\Event $event) use ($institution): string {
+    // Event location helper — Venue/Institution plus labeled hierarchy (Negeri, Daerah, Daerah Kecil)
+    $resolveVenueLocation = static function (\App\Models\Event $event) use ($institution, $formatAddressHierarchy): string {
         $venueName = $event->venue?->name;
         $institutionName = $event->institution?->name ?? $institution->name;
         $primaryLocationName = $venueName ?: $institutionName;
         $address = $event->venue?->addressModel ?? $event->institution?->addressModel ?? $institution->addressModel;
-
-        $districtName = $address->district?->name;
-        $stateName = $address->state?->name;
-
-        $stateHiddenDistricts = [
-            'kuala lumpur',
-            'putrajaya',
-            'labuan',
-        ];
-
-        if (is_string($districtName) && in_array(Str::lower(trim($districtName)), $stateHiddenDistricts, true)) {
-            $stateName = null;
-        }
-
-        $parts = array_filter([
-            $primaryLocationName,
-            $address->subdistrict?->name,
-            $districtName,
-            $stateName,
-        ]);
-
-        if ($parts !== []) {
-            return implode(', ', $parts);
-        }
+        $hierarchy = $formatAddressHierarchy($address);
 
         if (is_string($primaryLocationName) && $primaryLocationName !== '') {
-            return $primaryLocationName;
+            return $primaryLocationName.' • '.$hierarchy;
         }
 
-        return implode(', ', $parts);
+        return $hierarchy;
     };
 
     $resolveEventTimeDisplay = static function (\App\Models\Event $event): string {

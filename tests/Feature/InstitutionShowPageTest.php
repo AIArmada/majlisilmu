@@ -352,6 +352,6 @@ it('hides duplicated state for kuala lumpur putrajaya and labuan in institution 
 
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
-        ->assertSee('Dewan Utama KL, Kuala Lumpur')
-        ->assertDontSee('Dewan Utama KL, Kuala Lumpur, Kuala Lumpur');
+        ->assertSee('Dewan Utama KL • Negeri: - • Daerah: Kuala Lumpur • Daerah Kecil: -')
+        ->assertDontSee('Dewan Utama KL • Negeri: Kuala Lumpur • Daerah: Kuala Lumpur');
 });

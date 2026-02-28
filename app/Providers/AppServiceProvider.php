@@ -14,11 +14,16 @@ use App\Models\Reference;
 use App\Models\Report;
 use App\Models\Series;
 use App\Models\Speaker;
+use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Observers\EventObserver;
 use App\Observers\EventRecurrenceRuleObserver;
 use App\Observers\EventSessionObserver;
+use App\Observers\InstitutionObserver;
+use App\Observers\SpeakerObserver;
+use App\Observers\TagObserver;
+use App\Observers\VenueObserver;
 use App\Support\Media\MediaFileNamer;
 use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Forms\Components\Select;
@@ -46,6 +51,8 @@ class AppServiceProvider extends ServiceProvider
 
     protected static bool $eventScheduleObserversRegistered = false;
 
+    protected static bool $publicListingObserversRegistered = false;
+
     /**
      * Register any application services.
      */
@@ -66,15 +73,32 @@ class AppServiceProvider extends ServiceProvider
             Js::make('user-timezone', __DIR__.'/../../resources/js/filament/user-timezone.js'),
         ]);
 
-        if (! self::$eventObserverRegistered) {
+        if (app()->runningUnitTests() || ! self::$eventObserverRegistered) {
             Event::observe(EventObserver::class);
-            self::$eventObserverRegistered = true;
+
+            if (! app()->runningUnitTests()) {
+                self::$eventObserverRegistered = true;
+            }
         }
 
-        if (! self::$eventScheduleObserversRegistered) {
+        if (app()->runningUnitTests() || ! self::$eventScheduleObserversRegistered) {
             EventSession::observe(EventSessionObserver::class);
             EventRecurrenceRule::observe(EventRecurrenceRuleObserver::class);
-            self::$eventScheduleObserversRegistered = true;
+
+            if (! app()->runningUnitTests()) {
+                self::$eventScheduleObserversRegistered = true;
+            }
+        }
+
+        if (app()->runningUnitTests() || ! self::$publicListingObserversRegistered) {
+            Institution::observe(InstitutionObserver::class);
+            Speaker::observe(SpeakerObserver::class);
+            Venue::observe(VenueObserver::class);
+            Tag::observe(TagObserver::class);
+
+            if (! app()->runningUnitTests()) {
+                self::$publicListingObserversRegistered = true;
+            }
         }
 
         if (! app()->bound('ai.usage.listeners.registered')) {

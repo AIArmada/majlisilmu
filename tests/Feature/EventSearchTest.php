@@ -13,7 +13,9 @@ use App\Services\EventSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -42,6 +44,71 @@ describe('Event Search Filters', function () {
             ->assertSee('Advanced Filters');
     });
 
+    it('shows event location with subdistrict, district, and state on cards', function () {
+        $state = State::where('country_code', 'MY')->first();
+
+        if (! $state) {
+            $countryId = DB::table('countries')->insertGetId([
+                'iso2' => 'MY',
+                'name' => 'Malaysia',
+                'status' => 1,
+                'phone_code' => '60',
+                'iso3' => 'MYS',
+                'region' => 'Asia',
+                'subregion' => 'South-Eastern Asia',
+            ]);
+
+            $stateId = DB::table('states')->insertGetId([
+                'country_id' => $countryId,
+                'name' => 'Selangor',
+                'country_code' => 'MY',
+            ]);
+
+            $state = State::query()->findOrFail($stateId);
+        }
+        $district = District::query()->create([
+            'country_id' => (int) $state->country_id,
+            'state_id' => (int) $state->id,
+            'country_code' => 'MY',
+            'name' => 'Gombak',
+        ]);
+        $subdistrict = Subdistrict::query()->create([
+            'country_id' => (int) $state->country_id,
+            'state_id' => (int) $state->id,
+            'district_id' => (int) $district->id,
+            'country_code' => 'MY',
+            'name' => 'Taman Melawati',
+        ]);
+
+        $venue = Venue::factory()->create([
+            'name' => 'Surau Taman Melawati',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $venue->addressModel?->update([
+            'state_id' => (int) $state->id,
+            'district_id' => (int) $district->id,
+            'subdistrict_id' => (int) $subdistrict->id,
+        ]);
+
+        Event::factory()
+            ->for($venue)
+            ->create([
+                'title' => 'Lokasi Hierarki Event',
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+                'starts_at' => now()->addDays(1),
+            ]);
+
+        $response = $this->get('/events');
+
+        $response->assertOk()
+            ->assertSee('Surau Taman Melawati')
+            ->assertSee('Taman Melawati, Gombak & '.$state->name);
+    });
+
     it('searches events by title', function () {
         Event::factory()->create([
             'title' => 'Kuliah Maghrib Special',
@@ -64,6 +131,196 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Kuliah Maghrib Special')
             ->assertDontSee('Ceramah Subuh');
+    });
+
+    it('searches events by institution name', function () {
+        $matchInstitution = Institution::factory()->create([
+            'name' => 'Pusat Tarbiah Al Hikmah',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $otherInstitution = Institution::factory()->create([
+            'name' => 'Kompleks Ilmu An Nur',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Event::factory()->for($matchInstitution)->create([
+            'title' => 'Kuliah Di Al Hikmah',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->for($otherInstitution)->create([
+            'title' => 'Kuliah Di An Nur',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $response = $this->get('/events?search=Al%20Hikmah');
+
+        $response->assertOk()
+            ->assertSee('Kuliah Di Al Hikmah')
+            ->assertDontSee('Kuliah Di An Nur');
+    });
+
+    it('searches events by venue name', function () {
+        $matchVenue = Venue::factory()->create([
+            'name' => 'Surau Taman Melawati',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $otherVenue = Venue::factory()->create([
+            'name' => 'Masjid Al Falah',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Event::factory()->for($matchVenue)->create([
+            'title' => 'Kuliah Di Melawati',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->for($otherVenue)->create([
+            'title' => 'Kuliah Di Al Falah',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $response = $this->get('/events?search=Melawati');
+
+        $response->assertOk()
+            ->assertSee('Kuliah Di Melawati')
+            ->assertDontSee('Kuliah Di Al Falah');
+    });
+
+    it('searches events by speaker name', function () {
+        $matchSpeaker = Speaker::factory()->create([
+            'name' => 'Ustaz Samad Al-Bakri',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $otherSpeaker = Speaker::factory()->create([
+            'name' => 'Ustaz Ahmad Zain',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $matchEvent = Event::factory()->create([
+            'title' => 'Kuliah Samad',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $matchEvent->speakers()->attach($matchSpeaker->id);
+
+        $otherEvent = Event::factory()->create([
+            'title' => 'Kuliah Ahmad',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $otherEvent->speakers()->attach($otherSpeaker->id);
+
+        $response = $this->get('/events?search=Samad');
+
+        $response->assertOk()
+            ->assertSee('Kuliah Samad')
+            ->assertDontSee('Kuliah Ahmad');
+    });
+
+    it('supports fuzzy search with minor venue name typos', function () {
+        $matchVenue = Venue::factory()->create([
+            'name' => 'Surau Taman Melawati',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $otherVenue = Venue::factory()->create([
+            'name' => 'Masjid Al Irsyad',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Event::factory()->for($matchVenue)->create([
+            'title' => 'Kuliah Maghrib Melawati',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->for($otherVenue)->create([
+            'title' => 'Kuliah Maghrib Irsyad',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $response = $this->get('/events?search=Melawti');
+
+        $response->assertOk()
+            ->assertSee('Kuliah Maghrib Melawati')
+            ->assertDontSee('Kuliah Maghrib Irsyad');
+    });
+
+    it('updates event results live when search changes', function () {
+        $matchVenue = Venue::factory()->create([
+            'name' => 'Surau Taman Melawati',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $otherVenue = Venue::factory()->create([
+            'name' => 'Masjid Al Irsyad',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Event::factory()->for($matchVenue)->create([
+            'title' => 'Live Search Melawati',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->for($otherVenue)->create([
+            'title' => 'Live Search Irsyad',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $component = Livewire::test(\App\Livewire\Pages\Events\Index::class)
+            ->set('search', 'Melawti')
+            ->assertSet('search', 'Melawti');
+
+        $eventTitles = $component->instance()
+            ->events
+            ->getCollection()
+            ->pluck('title')
+            ->all();
+
+        expect($eventTitles)
+            ->toContain('Live Search Melawati')
+            ->not->toContain('Live Search Irsyad');
     });
 
     it('filters events by prayer_time enum value in advanced filters', function () {

@@ -118,6 +118,7 @@
     "Cover Image": "Cover Image",
     "Cover image for speaker profile": "Cover image for speaker profile",
     "Daerah": "District",
+    "Daerah Kecil": "Subdistrict",
     "Daerah Kecil / Bandar / Mukim": "Subdistrict / Town / Mukim",
     "Dai": "Da'i",
     "Date": "Date",
@@ -643,5 +644,19 @@
     "unlisted": "Unlisted",
     "unverified": "Unverified",
     "verified": "Verified",
-    "your@email.com": "your@email.com"
+    "your@email.com": "your@email.com",
+    "Centers of": "Centers of",
+    "Knowledge & Community": "Knowledge & Community",
+    "Connect with the mosques, suraus, and educational centers nurturing our community.": "Connect with the mosques, suraus, and educational centers nurturing our community.",
+    "Search institutions": "Search institutions",
+    "Search institutions...": "Search institutions...",
+    "Search institutions by name...": "Search institutions by name...",
+    "Clear": "Clear",
+    "We couldn't find any institutions matching your search.": "We couldn't find any institutions matching your search.",
+    "Clear Search": "Clear Search",
+    "Showing": "Showing",
+    "to": "to",
+    "of": "of",
+    "Pagination Navigation": "Pagination Navigation",
+    "Go to page :page": "Go to page :page"
 }

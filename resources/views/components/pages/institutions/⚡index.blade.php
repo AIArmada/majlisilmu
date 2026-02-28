@@ -1,42 +1,227 @@
 <?php
 
 use App\Models\Institution;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new
 #[Title('Institutions - Majlis Ilmu')]
 class extends Component
 {
-    #[Computed]
-    public function institutions(): LengthAwarePaginator
-    {
-        $search = request('search');
-        $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+    use WithPagination;
 
+    #[Url]
+    public ?string $search = null;
+
+    #[Computed]
+    public function institutions(): LengthAwarePaginatorContract
+    {
+        $search = $this->normalizedSearch();
+        $baseQuery = $this->baseInstitutionsQuery();
+
+        if ($search === null) {
+            return $baseQuery
+                ->orderBy('name', 'asc')
+                ->paginate(12)
+                ->withQueryString();
+        }
+
+        $directMatches = $this->applyDirectSearch($baseQuery, $search)
+            ->orderBy('name', 'asc')
+            ->paginate(12)
+            ->withQueryString();
+
+        if ($directMatches->total() > 0 || mb_strlen($search) < 3) {
+            return $directMatches;
+        }
+
+        return $this->fuzzySearch($search);
+    }
+
+    private function baseInstitutionsQuery(): Builder
+    {
         return Institution::query()
             ->where('status', 'verified')
             ->withCount(['events' => function ($query) {
                 $query->active();
             }])
-            ->with(['address.state', 'media'])
-            ->when($search, function ($query, $search) use ($operator) {
-                $query->where(function ($q) use ($search, $operator) {
-                    $q->where('name', $operator, "%{$search}%")
-                        ->orWhere('description', $operator, "%{$search}%");
-                });
+            ->with(['address.state', 'address.district', 'address.subdistrict', 'media']);
+    }
+
+    private function applyDirectSearch(Builder $query, string $search): Builder
+    {
+        $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
+        $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
+        $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
+
+        return $query->where(function (Builder $innerQuery) use ($search, $operator, $collapsedWildcardSearch, $searchTokens) {
+            $innerQuery->where('name', $operator, "%{$search}%")
+                ->orWhere('name', $operator, $collapsedWildcardSearch)
+                ->orWhere('description', $operator, "%{$search}%")
+                ->orWhere('description', $operator, $collapsedWildcardSearch);
+
+            foreach ($searchTokens as $token) {
+                if (mb_strlen($token) < 2) {
+                    continue;
+                }
+
+                $innerQuery->orWhere('name', $operator, "%{$token}%")
+                    ->orWhere('description', $operator, "%{$token}%");
+            }
+        });
+    }
+
+    private function fuzzySearch(string $search): LengthAwarePaginatorContract
+    {
+        $normalizedSearch = $this->normalizeForSimilarity($search);
+        if ($normalizedSearch === '') {
+            return $this->baseInstitutionsQuery()
+                ->orderBy('name', 'asc')
+                ->paginate(12)
+                ->withQueryString();
+        }
+
+        $rankedCandidates = Institution::query()
+            ->where('status', 'verified')
+            ->select(['id', 'name', 'description'])
+            ->get()
+            ->map(function (Institution $institution) use ($normalizedSearch): array {
+                $normalizedName = $this->normalizeForSimilarity($institution->name);
+                $normalizedDescription = $this->normalizeForSimilarity((string) $institution->description);
+
+                $scoreCandidates = [];
+
+                if ($normalizedName !== '') {
+                    $scoreCandidates[] = $this->similarityScore($normalizedSearch, $normalizedName);
+
+                    $nameTokens = array_values(array_filter(explode(' ', $normalizedName), static fn (string $token): bool => mb_strlen($token) >= 2));
+                    foreach ($nameTokens as $token) {
+                        $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
+                    }
+                }
+
+                if ($normalizedDescription !== '') {
+                    $scoreCandidates[] = $this->similarityScore($normalizedSearch, $normalizedDescription);
+                }
+
+                return [
+                    'id' => $institution->id,
+                    'score' => $scoreCandidates === [] ? 0.0 : max($scoreCandidates),
+                ];
             })
-            ->orderBy('name', 'asc')
-            ->paginate(12);
+            ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
+            ->sortByDesc('score')
+            ->values();
+
+        $currentPage = max(1, (int) $this->getPage());
+        $perPage = 12;
+        $paginationMeta = [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ];
+
+        if ($rankedCandidates->isEmpty()) {
+            return new LengthAwarePaginator(collect(), 0, $perPage, $currentPage, $paginationMeta);
+        }
+
+        $orderedIds = $rankedCandidates->pluck('id')->all();
+        $paginatedIds = array_slice($orderedIds, ($currentPage - 1) * $perPage, $perPage);
+
+        if ($paginatedIds === []) {
+            return new LengthAwarePaginator(collect(), count($orderedIds), $perPage, $currentPage, $paginationMeta);
+        }
+
+        $institutions = $this->baseInstitutionsQuery()
+            ->whereIn('id', $paginatedIds)
+            ->get()
+            ->sortBy(static function (Institution $institution) use ($paginatedIds): int {
+                $position = array_search($institution->id, $paginatedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values();
+
+        return new LengthAwarePaginator($institutions, count($orderedIds), $perPage, $currentPage, $paginationMeta);
+    }
+
+    private function normalizedSearch(): ?string
+    {
+        if (! is_string($this->search)) {
+            return null;
+        }
+
+        $normalizedSearch = trim($this->search);
+
+        return $normalizedSearch === '' ? null : $normalizedSearch;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->search = null;
+        $this->resetPage();
+    }
+
+    private function normalizeForSimilarity(string $value): string
+    {
+        return (string) Str::of($value)
+            ->lower()
+            ->ascii()
+            ->replaceMatches('/[^a-z0-9\s]+/u', ' ')
+            ->replaceMatches('/\s+/u', ' ')
+            ->trim();
+    }
+
+    private function similarityScore(string $search, string $candidate): float
+    {
+        if ($search === '' || $candidate === '') {
+            return 0.0;
+        }
+
+        $distance = levenshtein($search, $candidate);
+        $maxLength = max(mb_strlen($search), mb_strlen($candidate));
+        $distanceScore = $maxLength > 0 ? 1 - ($distance / $maxLength) : 0.0;
+
+        similar_text($search, $candidate, $similarityPercent);
+        $similarityScore = $similarityPercent / 100;
+
+        return max($distanceScore, $similarityScore);
     }
 };
 ?>
 
 @php
     $institutions = $this->institutions;
+    $search = $this->search;
+    $formatInstitutionLocation = static function ($addressModel): string {
+        $stateName = $addressModel?->state?->name;
+        $districtName = $addressModel?->district?->name;
+        $subdistrictName = $addressModel?->subdistrict?->name;
+
+        $stateHiddenDistricts = ['kuala lumpur', 'putrajaya', 'labuan'];
+        if (is_string($districtName) && in_array(mb_strtolower(trim($districtName)), $stateHiddenDistricts, true)) {
+            $stateName = null;
+        }
+
+        return implode(' • ', [
+            __('Negeri').': '.($stateName ?? '-'),
+            __('Daerah').': '.($districtName ?? '-'),
+            __('Daerah Kecil').': '.($subdistrictName ?? '-'),
+        ]);
+    };
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -47,30 +232,32 @@ class extends Component
 
             <div class="container relative mx-auto px-6 lg:px-12 text-center">
                  <h1 class="font-heading text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight text-balance mb-6">
-                    Centers of <br class="hidden md:block" />
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">Knowledge & Community</span>
+                    {{ __('Centers of') }} <br class="hidden md:block" />
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{{ __('Knowledge & Community') }}</span>
                 </h1>
                 <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto text-balance">
-                    Connect with the mosques, suraus, and educational centers nurturing our community.
+                    {{ __('Connect with the mosques, suraus, and educational centers nurturing our community.') }}
                 </p>
                 
                  <!-- Search Box -->
                  <div class="max-w-xl mx-auto mt-8">
-                    <form action="{{ route('institutions.index') }}" method="GET" class="relative group">
+                    <div class="relative group">
+                        <label for="institution-search" class="sr-only">{{ __('Search institutions') }}</label>
                         <input 
                             type="text" 
-                            name="search" 
-                            value="{{ request('search') }}"
-                            placeholder="{{ __('Search institutions by name...') }}" 
+                            id="institution-search"
+                            wire:model.live.debounce.300ms="search"
+                            wire:keydown.escape="clearSearch"
+                            placeholder="{{ __('Search institutions...') }}" 
                             class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-white shadow-lg shadow-slate-200/50 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
                         >
                         <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                         @if(request('search'))
-                            <a href="{{ route('institutions.index') }}" class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500 hover:underline">
+                         @if(filled($search))
+                            <button type="button" wire:click="clearSearch" class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500 hover:underline">
                                 {{ __('Clear') }}
-                            </a>
+                            </button>
                         @endif
-                    </form>
+                    </div>
                  </div>
             </div>
         </div>
@@ -83,7 +270,7 @@ class extends Component
                     </div>
                     <h3 class="text-xl font-bold text-slate-900">{{ __('No institutions found') }}</h3>
                     <p class="text-slate-500 mt-2 max-w-md mx-auto">{{ __('We couldn\'t find any institutions matching your search.') }}</p>
-                    <button type="button" @click="window.location.href='{{ route('institutions.index') }}'" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
+                    <button type="button" wire:click="clearSearch" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
                         {{ __('Clear Search') }} &rarr;
                     </button>
                 </div>
@@ -114,14 +301,13 @@ class extends Component
                                 </h3>
                                 
                                 @php
-                                    $stateName = $institution->addressModel?->state?->name;
+                                    $address = $institution->addressModel;
+                                    $locationDisplay = $formatInstitutionLocation($address);
                                 @endphp
-                                @if($stateName)
-                                    <p class="text-sm text-slate-500 flex items-center gap-1.5 mb-4 font-medium">
-                                        <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                        {{ $stateName }}
-                                    </p>
-                                @endif
+                                <p class="text-sm text-slate-500 flex items-start gap-1.5 mb-4 font-medium">
+                                    <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span class="line-clamp-2">{{ $locationDisplay }}</span>
+                                </p>
                                 
                                 <div class="mt-auto pt-5 border-t border-slate-50 flex items-center justify-between">
                                     <span class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">

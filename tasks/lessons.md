@@ -1,5 +1,7 @@
 # Lessons
 
+- On Livewire pages with `wire:model.live` search, avoid wrapping reactive result regions in `@island` unless intentionally isolated; island skip mode can update URL/chips while leaving stale result grids unchanged.
+- For `/majlis` event search, do not limit DB fallback to title/description; include institution, venue, and speaker names in direct matching and add typo-tolerant fuzzy fallback so behavior stays consistent when Typesense is unavailable.
 - When removing Laravel packages, clear and regenerate the exact PHPUnit cache targets (`APP_PACKAGES_CACHE`, `APP_SERVICES_CACHE`) instead of only running `php artisan package:discover` with `APP_ENV=testing`.
 - Parallel Pest runs can expose Blaze compiled-view race issues; keep `BLAZE_ENABLED=false` in `phpunit.xml` unless test-specific Blaze coverage is explicitly required.
 - When users request "badges under About", confirm the target domain model (tag categories vs generic metadata) before expanding scope; prefer preserving existing taxonomy UI with fixed category ordering.
@@ -30,3 +32,5 @@
 - In Blade helpers that build event location strings, always null-safe the base address object first (`$address?->...`) because online events can intentionally have no location rows.
 - For Livewire pages using scroll-reveal classes, avoid relying only on client-added `.revealed` state; Livewire re-renders can drop that transient class and hide sections after actions.
 - Whenever a new domain seeder is added (for example inspirations), also wire it into `DatabaseSeeder` and lock it with a pipeline-order test so `php artisan migrate:fresh --seed` cannot silently skip it.
+- For search UX copy tweaks, match user-requested placeholder text exactly (character-for-character), then verify the real DOM placeholder attribute in browser, not only translation keys.
+- For pages where users expect instant search, implement `wire:model.live` state binding (not GET form submit) and include a Livewire test that asserts result updates on `set('search', ...)`.
