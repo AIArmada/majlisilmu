@@ -7,7 +7,6 @@ use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Institution;
-use App\Models\Venue;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -105,27 +104,34 @@ class EventFactory extends Factory
             EventFormat::Hybrid,
         ]);
 
-        // Adjust venue_id and URLs based on format
+        // Assign a single location target (institution OR venue) based on format.
+        $institutionId = Institution::factory();
         $venueId = null;
         $liveUrl = null;
         $recordingUrlFinal = null;
 
         if ($eventFormat === EventFormat::Physical) {
-            $venueId = Venue::factory();
+            // Default physical events are institution-located.
+            $institutionId = Institution::factory();
+            $venueId = null;
             $liveUrl = null;
             $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
         } elseif ($eventFormat === EventFormat::Online) {
+            // Online events do not have a physical location.
+            $institutionId = null;
             $venueId = null;
             $liveUrl = $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
             $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
         } else { // Hybrid
-            $venueId = fake()->boolean(75) ? Venue::factory() : null;
+            // Keep single-location invariant for hybrid events too.
+            $institutionId = Institution::factory();
+            $venueId = null;
             $liveUrl = $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
             $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
         }
 
         return [
-            'institution_id' => Institution::factory(),
+            'institution_id' => $institutionId,
             'venue_id' => $venueId,
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),

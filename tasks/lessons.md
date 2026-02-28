@@ -21,3 +21,7 @@
 - After updating a primary page pattern, immediately sync legacy/alternate variants (for example `show-old`) to avoid inconsistent UX across routes.
 - Never use `translatedFormat(..., '... A')` for user-facing clock time when strict `AM/PM` output is expected; split date translation and time formatting (`format`) to avoid locale meridiem words like `tengah malam`.
 - When event times differ between pages, validate storage semantics first (UTC vs local) and normalize existing records before tweaking view formatting.
+- Treat event location as a strict XOR domain rule (`institution_id` or `venue_id`, never both); allow `space_id` only when institution-based location is selected.
+- For native Filament `TimePicker`, avoid strict `minutesStep()` on admin edit forms with legacy data unless timestamps are guaranteed normalized; step mismatch (`:13` vs step `5`) can silently block submit via browser `checkValidity()` before Livewire runs.
+- When a Filament select is filtered by a pivot relation (for example spaces by institution), provide a safe fallback for unlinked/global records (`orWhereDoesntHave(...)`) or ensure seeders populate the pivot; otherwise dropdowns appear empty despite valid base data.
+- For event public tag display, mirror submit-event taxonomy structure (Domain/Sumber/Disiplin/Isu) in a fixed order and cloud-chip style instead of iterating raw grouped tags, so `Isu` support and visual consistency are preserved.

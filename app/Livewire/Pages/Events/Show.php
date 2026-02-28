@@ -62,6 +62,7 @@ class Show extends Component
 
         $event->load([
             'media',
+            'organizer',
             'institution.media',
             'institution.address.state',
             'institution.address.city',
@@ -81,6 +82,12 @@ class Show extends Component
             'series',
             'references.media',
             'languages',
+        ]);
+
+        $event->loadMorph('organizer', [
+            \App\Models\Institution::class => ['media', 'contacts'],
+            \App\Models\Speaker::class => ['media'],
+            \App\Models\Venue::class => ['media'],
         ]);
 
         $this->event = $event;

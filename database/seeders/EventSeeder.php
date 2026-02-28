@@ -76,18 +76,40 @@ class EventSeeder extends Seeder
                 $randomSeriesId = empty($seriesIds) ? null : $seriesIds[array_rand($seriesIds)];
                 $randomVenueId = empty($venueIds) ? null : $venueIds[array_rand($venueIds)];
 
-                $baseAttributes = [
-                    'institution_id' => $institution->id,
-                ];
-
                 // Create 10 events per institution
-                // Factory will determine venue_id based on event_format
-                $events = Event::factory()->count(10)->create($baseAttributes);
+                // Start with no location, then assign exactly one location per event.
+                $events = Event::factory()->count(10)->create([
+                    'institution_id' => null,
+                    'venue_id' => null,
+                    'space_id' => null,
+                ]);
 
-                // For physical/hybrid events that need a venue, assign a random venue
+                // Ensure seeded events follow location invariant:
+                // - online: no physical location
+                // - non-online: institution XOR venue
                 foreach ($events as $event) {
-                    if ($event->event_format !== \App\Enums\EventFormat::Online && ! $event->venue_id && $randomVenueId) {
-                        $event->update(['venue_id' => $randomVenueId]);
+                    if ($event->event_format === \App\Enums\EventFormat::Online) {
+                        $event->update([
+                            'institution_id' => null,
+                            'venue_id' => null,
+                            'space_id' => null,
+                        ]);
+                        continue;
+                    }
+
+                    $useVenueLocation = $randomVenueId !== null && random_int(0, 1) === 1;
+
+                    if ($useVenueLocation) {
+                        $event->update([
+                            'institution_id' => null,
+                            'venue_id' => $randomVenueId,
+                            'space_id' => null,
+                        ]);
+                    } else {
+                        $event->update([
+                            'institution_id' => $institution->id,
+                            'venue_id' => null,
+                        ]);
                     }
                 }
 
@@ -334,7 +356,7 @@ class EventSeeder extends Seeder
             $event = Event::query()->updateOrCreate([
                 'slug' => $slug,
             ], [
-                'institution_id' => $institution->id,
+                'institution_id' => null,
                 'venue_id' => $venue->id,
                 'organizer_type' => $organizerType,
                 'organizer_id' => $organizerId,
@@ -583,6 +605,25 @@ class EventSeeder extends Seeder
 
                     if (! $hasAgeGroup) {
                         $updates['age_group'] = [EventAgeGroup::AllAges->value];
+                    }
+
+                    $hasInstitutionLocation = is_string($event->institution_id) && $event->institution_id !== '';
+                    $hasVenueLocation = is_string($event->venue_id) && $event->venue_id !== '';
+                    $hasSpace = is_string($event->space_id) && $event->space_id !== '';
+
+                    // Enforce location invariant for seeded rows:
+                    // location is institution XOR venue, never both.
+                    if ($hasInstitutionLocation && $hasVenueLocation) {
+                        if ($hasSpace) {
+                            // Space belongs to institution location.
+                            $updates['venue_id'] = null;
+                        } else {
+                            // Default conflict resolution: keep venue location.
+                            $updates['institution_id'] = null;
+                        }
+                    } elseif ($hasVenueLocation && $hasSpace) {
+                        // Space is only valid for institution-based locations.
+                        $updates['space_id'] = null;
                     }
 
                     if (empty($event->organizer_type) || empty($event->organizer_id)) {

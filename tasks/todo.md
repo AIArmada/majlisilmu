@@ -221,6 +221,59 @@
 
 ---
 
+# Event Location Invariant Alignment
+
+- [x] Verify public submit-event flow constraints for organizer/location combinations
+- [x] Fix event factory defaults to avoid dual institution+venue location assignment
+- [x] Fix event seeder generation/backfill to enforce institution XOR venue location
+- [x] Align admin event form to prevent selecting institution and venue together
+- [x] Add regression assertion for seeded schedule event location invariants
+- [x] Run focused verification (Pest + PHPStan + Blade compile)
+
+## Review
+
+- Confirmed submit-event public flow enforces location as mutually exclusive (`institution` or `venue`), with `space` only for institution-based locations.
+- Updated `database/factories/EventFactory.php` so default generated events no longer carry both `institution_id` and `venue_id`.
+- Updated `database/seeders/EventSeeder.php`:
+  - Bulk seeding now starts location-empty and assigns exactly one location for non-online events.
+  - Schedule seeding no longer writes both institution and venue in the same row.
+  - Backfill now normalizes seeded rows with dual locations and clears invalid `space_id` on venue-located rows.
+- Updated admin schema in `app/Filament/Resources/Events/Schemas/EventForm.php` to enforce mutual exclusivity in UI and hydration.
+- Extended `tests/Feature/EventSeederSubmitEventCompatibilityTest.php` to assert location XOR (`institution_id` xor `venue_id`).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSeederSubmitEventCompatibilityTest.php` => **1 passed (8 assertions)**
+  - `vendor/bin/phpstan analyse --ansi database/factories/EventFactory.php database/seeders/EventSeeder.php app/Filament/Resources/Events/Schemas/EventForm.php tests/Feature/EventSeederSubmitEventCompatibilityTest.php app/Livewire/Pages/Events/Show.php resources/views/livewire/pages/events/show.blade.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+- `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **1 existing unrelated failure** (`A909M\FilamentStateFusion\Tables\Filters\StateFusionSelectFilter` class missing in EventsTable)
+
+---
+
+# Event Show Redundancy Cleanup
+
+- [x] Show location cover image below speaker cards when location cover exists
+- [x] Move "Tambah ke Kalendar" into floating action bar with Hadir/Minat/Simpan actions
+- [x] Remove redundant open-registration messages from sidebar
+- [x] Run Blade compile + focused event show verification
+
+## Review
+
+- Event page now computes canonical location media (institution `cover`, venue `main` with legacy `cover` fallback) and renders a dedicated location-cover section immediately below speaker cards when media exists.
+- Moved calendar actions into the floating engagement bar as `Tambah ke Kalendar` dropdown beside `Hadir/Minat/Simpan` and removed the duplicated sidebar calendar card.
+- Removed non-essential open-event registration text labels:
+  - `Open to All — No Registration Needed`
+  - `No registration required`
+- Also removed the extra hero organizer chip below title to avoid duplicated institution display in hero.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **11 passed (32 assertions)**
+  - Browser check (`https://majlisilmu.test/majlis/forum-perdana-bersama-asatizah-uu8oszr` + `https://majlisilmu.test/majlis/kuliah-ceramah-bersama-asatizah-apbzpdh`) confirms:
+    - `Tambah ke Kalendar` present in action bar
+    - `Open to All — No Registration Needed` absent
+    - `No registration required` absent
+    - `Lokasi` section renders after `Penceramah` on location-cover event page
+
+---
+
 # Event Timezone + Meridiem Consistency
 
 - [x] Trace time rendering differences between event detail and speaker detail pages
@@ -365,3 +418,72 @@
   - `php artisan view:cache` => **Blade templates cached successfully**
   - `vendor/bin/pest --parallel --compact --filter=\"(EventShowPageTest|SpeakerShowSocialPlacementTest|EditInstitutionSocialMediaTest)\"` => **13 passed**
   - `rg` scan confirms active share modals now use the new icon-oriented pattern.
+
+---
+
+# Admin Event Save Block (Time Step Validation)
+
+- [x] Reproduce save failure on `/admin/events/{id}/edit` for affected record
+- [x] Identify frontend/blocking validation source
+- [x] Patch form time fields to avoid silent submit blocking
+- [x] Verify save flow via browser + focused Pest check
+
+## Review
+
+- Root cause: native browser form validation blocked submit before Livewire request because `custom_time` / `end_time` values (for example `02:13`) violated `minutesStep(5)` (`step=300`).
+- Updated admin event form time fields in `app/Filament/Resources/Events/Schemas/EventForm.php`:
+  - removed `->minutesStep(5)` from `custom_time`
+  - removed `->minutesStep(5)` from `end_time`
+- Browser verification on `https://majlisilmu.test/admin/events/019c6687-6308-73ee-8d94-6d18ab194129/edit?tab=penganjur-lokasi%3A%3Adata%3A%3Atab`:
+  - `form.checkValidity()` changed from `false` to `true`
+  - save now sends Livewire update request and returns success notification `Disimpan`
+- Verification:
+  - `php artisan view:clear && php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php --filter=\"shows typed event fields on the admin edit form\"` => **1 passed (11 assertions)**
+
+---
+
+# Event Space Dropdown Empty (Institution Location)
+
+- [x] Inspect target event and institution-space linkage
+- [x] Patch event form `space_id` query to avoid empty dropdown when institution has no pivot-linked spaces
+- [x] Verify in browser on target admin event URL
+- [x] Run focused verification
+
+## Review
+
+- Root cause: target event institution (`019c6687-4f4b-72f1-b644-e114a5a50695`) has no rows in `institution_space`, while `space_id` options were filtered strictly by `whereHas('institutions', institution_id)`, resulting in empty options.
+- Updated `app/Filament/Resources/Events/Schemas/EventForm.php` `space_id` relationship query:
+  - keep active-space filter
+  - include both institution-linked spaces and global spaces with no institution links (`orWhereDoesntHave('institutions')`)
+- Browser verification on:
+  - `https://majlisilmu.test/admin/events/019c6687-5cb3-736b-a832-d53e5a6b85fa/edit?tab=penganjur-lokasi%3A%3Adata%3A%3Atab`
+  - `Ruang` dropdown now shows options (for example `Dewan Utama`, `Dewan Solat Lelaki`, `Dewan Serbaguna`, `Dewan Jamuan`).
+- Verification:
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/Schemas/EventForm.php` => **No errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php --filter=\"shows typed event fields on the admin edit form\"` => **1 passed (11 assertions)**
+
+---
+
+# Event Tags Cloud Layout
+
+- [x] Replace event detail tag rendering with fixed taxonomy cloud layout
+- [x] Include `Isu` taxonomy slot in the same pattern as submit-event categories
+- [x] Verify Blade/test/browser rendering on target event URL
+
+## Review
+
+- Updated `resources/views/livewire/pages/events/show.blade.php` tag section under About:
+  - switched from unordered `groupBy` loop to fixed taxonomy order:
+    1. Domain
+    2. Sumber
+    3. Disiplin
+    4. Isu
+  - rendered each taxonomy as compact rounded tag chips (cloud style), matching the requested style direction.
+- `Isu` is now supported explicitly in this layout and appears when issue tags exist.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **11 passed (30 assertions)**
+  - Browser check on `https://majlisilmu.test/majlis/fiqh-solat-tazkirah-tz50o46` confirms cloud layout with:
+    - labels: `Domain`, `Sumber`, `Disiplin`
+    - chips: `Akidah (Iman & Tauhid)`, `Al-Qur'an`, `Tafsir`
