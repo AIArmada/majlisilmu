@@ -787,7 +787,7 @@ new class extends Component {
                                 <div class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-gold-500 to-transparent"></div>
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                             @foreach($speakers as $speaker)
                                 @php
                                     $speakerAvatarUrl = $speaker->hasMedia('avatar')
@@ -803,12 +803,12 @@ new class extends Component {
                                             <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6L5.7 21l2.3-7L2 9.4h7.6z"/></svg>
                                         </div>
                                     @endif
-                                    <div class="relative h-20 w-20 overflow-hidden rounded-full border-2 border-slate-100 bg-slate-100 transition-all duration-300 group-hover:border-gold-200 group-hover:shadow-md">
+                                    <div class="relative h-36 w-36 sm:h-28 sm:w-28 md:h-32 md:w-32 overflow-hidden rounded-full border-2 border-slate-100 bg-slate-100 transition-all duration-300 group-hover:border-gold-200 group-hover:shadow-md">
                                         @if($speakerAvatarUrl)
                                             <img src="{{ $speakerAvatarUrl }}" alt="{{ $speaker->name }}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy">
                                         @else
                                             <div class="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                                                <svg class="h-8 w-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                                                <svg class="h-14 w-14 sm:h-12 sm:w-12 md:h-14 md:w-14 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
                                             </div>
                                         @endif
                                     </div>
