@@ -52,6 +52,7 @@ class InstitutionForm
                             ->image()
                             ->imageEditor()
                             ->imageAspectRatio('16:9')
+                            ->automaticallyOpenImageEditorForAspectRatio()
                             ->imageEditorAspectRatioOptions(['16:9'])
                             ->automaticallyCropImagesToAspectRatio()
                             ->responsiveImages()
