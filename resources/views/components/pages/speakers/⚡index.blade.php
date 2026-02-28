@@ -1,47 +1,225 @@
 <?php
 
 use App\Models\Speaker;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new
     #[Title('Speakers - Majlis Ilmu')]
     class extends Component
     {
-        #[Computed]
-        public function speakers(): LengthAwarePaginator
-        {
-            $search = request('search');
-            $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        use WithPagination;
 
+        #[Url]
+        public ?string $search = null;
+
+        #[Computed]
+        public function speakers(): LengthAwarePaginatorContract
+        {
+            $search = $this->normalizedSearch();
+            $baseQuery = $this->baseSpeakersQuery();
+
+            if ($search === null) {
+                return $baseQuery
+                    ->orderBy('name', 'asc')
+                    ->paginate(12);
+            }
+
+            $directMatches = $this->applyDirectSearch($baseQuery, $search)
+                ->orderBy('name', 'asc')
+                ->paginate(12);
+
+            if ($directMatches->total() > 0 || mb_strlen($search) < 3) {
+                return $directMatches;
+            }
+
+            return $this->fuzzySearch($search);
+        }
+
+        public function updatedSearch(): void
+        {
+            $this->resetPage();
+        }
+
+        public function clearSearch(): void
+        {
+            $this->search = null;
+            $this->resetPage();
+        }
+
+        private function baseSpeakersQuery(): Builder
+        {
             return Speaker::query()
                 ->active()
                 ->where('status', 'verified')
                 ->withCount(['events' => function ($query) {
                     $query->active();
                 }])
-                ->with('media')
-                ->when($search, function ($query, $search) use ($operator) {
-                    $query->where(function ($innerQuery) use ($search, $operator) {
+                ->with('media');
+        }
+
+        private function applyDirectSearch(Builder $query, string $search): Builder
+        {
+            $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
+            $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
+            $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
+
+            return $query->where(function (Builder $innerQuery) use ($search, $operator, $collapsedWildcardSearch, $searchTokens) {
                         $innerQuery->where('name', $operator, "%{$search}%");
+                        $innerQuery->orWhere('name', $operator, $collapsedWildcardSearch);
+
+                        foreach ($searchTokens as $token) {
+                            if (mb_strlen($token) < 2) {
+                                continue;
+                            }
+
+                            $innerQuery->orWhere('name', $operator, "%{$token}%");
+                        }
 
                         if (DB::connection()->getDriverName() === 'pgsql') {
                             $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
+                            $innerQuery->orWhereRaw('bio::text ILIKE ?', [$collapsedWildcardSearch]);
+
+                            foreach ($searchTokens as $token) {
+                                if (mb_strlen($token) < 2) {
+                                    continue;
+                                }
+
+                                $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$token}%"]);
+                            }
                         } else {
                             $innerQuery->orWhere('bio', $operator, "%{$search}%");
+                            $innerQuery->orWhere('bio', $operator, $collapsedWildcardSearch);
+
+                            foreach ($searchTokens as $token) {
+                                if (mb_strlen($token) < 2) {
+                                    continue;
+                                }
+
+                                $innerQuery->orWhere('bio', $operator, "%{$token}%");
+                            }
                         }
                     });
+        }
+
+        private function fuzzySearch(string $search): LengthAwarePaginatorContract
+        {
+            $normalizedSearch = $this->normalizeForSimilarity($search);
+            if ($normalizedSearch === '') {
+                return $this->baseSpeakersQuery()
+                    ->orderBy('name', 'asc')
+                    ->paginate(12);
+            }
+
+            $rankedCandidates = $this->baseSpeakersQuery()
+                ->select(['id', 'name'])
+                ->get()
+                ->map(function (Speaker $speaker) use ($normalizedSearch): array {
+                    $normalizedName = $this->normalizeForSimilarity($speaker->name);
+                    if ($normalizedName === '') {
+                        return ['id' => $speaker->id, 'score' => 0.0];
+                    }
+
+                    $scoreCandidates = [
+                        $this->similarityScore($normalizedSearch, $normalizedName),
+                    ];
+
+                    $nameTokens = array_values(array_filter(explode(' ', $normalizedName), static fn (string $token): bool => mb_strlen($token) >= 2));
+                    foreach ($nameTokens as $token) {
+                        $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
+                    }
+
+                    return [
+                        'id' => $speaker->id,
+                        'score' => max($scoreCandidates),
+                    ];
                 })
-                ->orderBy('name', 'asc')
-                ->paginate(12);
+                ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
+                ->sortByDesc('score')
+                ->values();
+
+            $currentPage = max(1, (int) $this->getPage());
+            $perPage = 12;
+            $paginationMeta = [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ];
+
+            if ($rankedCandidates->isEmpty()) {
+                return new LengthAwarePaginator(collect(), 0, $perPage, $currentPage, $paginationMeta);
+            }
+
+            $orderedIds = $rankedCandidates->pluck('id')->all();
+            $paginatedIds = array_slice($orderedIds, ($currentPage - 1) * $perPage, $perPage);
+
+            if ($paginatedIds === []) {
+                return new LengthAwarePaginator(collect(), count($orderedIds), $perPage, $currentPage, $paginationMeta);
+            }
+
+            $speakers = $this->baseSpeakersQuery()
+                ->whereIn('id', $paginatedIds)
+                ->get()
+                ->sortBy(static function (Speaker $speaker) use ($paginatedIds): int {
+                    $position = array_search($speaker->id, $paginatedIds, true);
+
+                    return is_int($position) ? $position : PHP_INT_MAX;
+                })
+                ->values();
+
+            return new LengthAwarePaginator($speakers, count($orderedIds), $perPage, $currentPage, $paginationMeta);
+        }
+
+        private function normalizedSearch(): ?string
+        {
+            if (! is_string($this->search)) {
+                return null;
+            }
+
+            $search = trim($this->search);
+
+            return $search === '' ? null : $search;
+        }
+
+        private function normalizeForSimilarity(string $value): string
+        {
+            return (string) Str::of($value)
+                ->lower()
+                ->ascii()
+                ->replaceMatches('/[^a-z0-9\s]+/u', ' ')
+                ->replaceMatches('/\s+/u', ' ')
+                ->trim();
+        }
+
+        private function similarityScore(string $search, string $candidate): float
+        {
+            if ($search === '' || $candidate === '') {
+                return 0.0;
+            }
+
+            $distance = levenshtein($search, $candidate);
+            $maxLength = max(mb_strlen($search), mb_strlen($candidate));
+            $distanceScore = $maxLength > 0 ? 1 - ($distance / $maxLength) : 0.0;
+
+            similar_text($search, $candidate, $similarityPercent);
+            $similarityScore = $similarityPercent / 100;
+
+            return max($distanceScore, $similarityScore);
         }
     };
 ?>
 
 @php
     $speakers = $this->speakers;
+    $search = $this->search;
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -63,23 +241,24 @@ new
 
             <!-- Search Box -->
             <div class="max-w-xl mx-auto mt-8">
-                <form action="{{ route('speakers.index') }}" method="GET" class="relative group">
+                <div class="relative group">
                     <label for="speaker-search" class="sr-only">{{ __('Search speakers') }}</label>
-                    <input type="text" id="speaker-search" name="search" value="{{ request('search') }}"
-                        placeholder="{{ __('Search speakers by name...') }}"
+                    <input type="text" id="speaker-search" wire:model.live.debounce.300ms="search"
+                        wire:keydown.escape="clearSearch"
+                        placeholder="{{ __('Search speakers...') }}"
                         class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-white shadow-lg shadow-slate-200/50 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400">
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    @if(request('search'))
-                        <a href="{{ route('speakers.index') }}"
+                    @if(filled($search))
+                        <button type="button" wire:click="clearSearch"
                             class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500 hover:underline">
                             {{ __('Clear') }}
-                        </a>
+                        </button>
                     @endif
-                </form>
+                </div>
             </div>
         </div>
     </div>
@@ -98,7 +277,7 @@ new
                 <p class="text-slate-500 mt-2 max-w-md mx-auto">
                     {{ __('We couldn\'t find any speakers matching your search.') }}
                 </p>
-                <button type="button" @click="window.location.href='{{ route('speakers.index') }}'"
+                <button type="button" wire:click="clearSearch"
                     class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
                     {{ __('Clear Search') }} &rarr;
                 </button>

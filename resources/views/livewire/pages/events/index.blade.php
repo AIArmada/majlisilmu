@@ -124,19 +124,12 @@
                         class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                @island(name: 'count', lazy: false)
-                @placeholder
-                <span class="inline-flex items-center gap-1.5 animate-pulse">
-                    <span class="h-4 w-8 bg-slate-200 rounded"></span> {{ __('Gatherings') }}
-                </span>
-                @endplaceholder
                 {{ $this->events->total() }}
                 {{ match ($this->time_scope ?? 'upcoming') {
                     'past' => __('Past Gatherings'),
                     'all' => __('All Gatherings'),
                     default => __('Upcoming Gatherings'),
                 } }}
-                @endisland
             </span>
 
             <h1
@@ -183,11 +176,11 @@
                 {{ __('Updating results...') }}
             </div>
 
-            <div class="grid lg:grid-cols-[1fr_auto_auto] gap-4 mb-6">
+            <div class="grid lg:grid-cols-[1fr_auto] gap-4 mb-6">
                 <!-- Text Search -->
                 <div class="relative group">
                     <input type="text" id="event-search" wire:model.live.debounce.400ms="search"
-                        placeholder="{{ __('Search by title, topic, or speaker...') }}"
+                        placeholder="{{ __('Cari mengikut tajuk, surau, masjid atau penceramah') }}"
                         class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 font-medium text-slate-900 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400">
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -215,18 +208,6 @@
                     </button>
                 </div>
 
-                <!-- Search Button -->
-                <button type="button" wire:click="$refresh"
-                    wire:loading.attr="disabled"
-                    wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters"
-                    class="h-14 px-8 rounded-2xl bg-slate-900 text-white font-bold hover:bg-emerald-600 shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                    <svg wire:loading wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
-                        <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 00-10-10"></path>
-                    </svg>
-                    <span wire:loading.remove wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters">{{ __('Search') }}</span>
-                    <span wire:loading wire:target="search,state_id,district_id,subdistrict_id,language,event_type,gender,age_group,children_allowed,institution_id,speaker_ids,topic_ids,starts_after,starts_before,time_scope,prayer_time,sort,setLocation,clearAllFilters">{{ __('Updating...') }}</span>
-                </button>
             </div>
 
             <!-- Filters Toggle -->
@@ -574,15 +555,6 @@
                     {{ __('Refreshing events...') }}
                 </div>
             </div>
-            @island(name: 'grid', lazy: false)
-            @placeholder
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                @foreach(range(1, 6) as $i)
-                    <div class="h-[450px] bg-slate-100 animate-pulse rounded-3xl"></div>
-                @endforeach
-            </div>
-            @endplaceholder
-
             @php
                 $events = $this->events;
             @endphp
@@ -605,14 +577,49 @@
                     </button>
                 </div>
             @else
-                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="grid items-start md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($events as $event)
                         @php
-                            $eventHasPoster = $event->hasMedia('poster');
+                            $posterMedia = $event->getFirstMedia('poster');
+                            $eventHasPoster = $posterMedia !== null;
+                            $posterUrl = $eventHasPoster ? (string) $posterMedia->getAvailableUrl(['card', 'preview', 'thumb']) : '';
+                            $eventCardImageUrl = $posterUrl !== '' ? $posterUrl : $event->card_image_url;
                             $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
+                            $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
+                            $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
+                            $subdistrictName = $addressModel?->subdistrict?->name;
+                            $districtName = $addressModel?->district?->name;
+                            $stateName = $addressModel?->state?->name;
+
+                            $stateHiddenDistricts = ['kuala lumpur', 'putrajaya', 'labuan'];
+                            if (is_string($districtName) && in_array(mb_strtolower(trim($districtName)), $stateHiddenDistricts, true)) {
+                                $stateName = null;
+                            }
+
+                            $hierarchyParts = array_values(array_filter([
+                                $subdistrictName,
+                                $districtName,
+                                $stateName,
+                            ], static fn (?string $part): bool => is_string($part) && $part !== ''));
+
+                            $hierarchyText = match (count($hierarchyParts)) {
+                                0 => '',
+                                1 => $hierarchyParts[0],
+                                2 => $hierarchyParts[0].' & '.$hierarchyParts[1],
+                                default => implode(', ', array_slice($hierarchyParts, 0, -1)).' & '.$hierarchyParts[array_key_last($hierarchyParts)],
+                            };
+
+                            $locationPrimaryText = is_string($primaryLocationName) && $primaryLocationName !== ''
+                                ? $primaryLocationName
+                                : null;
+                            $locationSecondaryText = $hierarchyText !== '' ? $hierarchyText : null;
+
+                            if ($locationPrimaryText === null && $locationSecondaryText === null) {
+                                $locationPrimaryText = __('Online');
+                            }
                         @endphp
                         <article
-                            class="group h-full flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 border border-slate-100">
+                            class="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 border border-slate-100">
                             <!-- Image/Date -->
                             <a href="{{ route('events.show', $event) }}" wire:navigate
                                 class="relative overflow-hidden bg-slate-100 block {{ $eventPosterIsPortrait ? 'aspect-[4/5]' : 'aspect-[3/2]' }}">
@@ -620,7 +627,7 @@
                                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70">
                                 </div>
                                 <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-300">
-                                    <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy"
+                                    <img src="{{ $eventCardImageUrl }}" alt="{{ $event->title }}" loading="lazy"
                                         class="w-full h-full transition-transform duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                 </div>
 
@@ -665,7 +672,7 @@
                                 </div>
                             </a>
 
-                            <div class="flex-1 p-6 flex flex-col">
+                            <div class="p-6 flex flex-col">
                                 <div class="flex justify-between items-start mb-3 gap-4">
                                     <a href="{{ route('events.show', $event) }}" wire:navigate
                                         class="group-hover:text-emerald-700 transition-colors">
@@ -675,7 +682,7 @@
                                     </a>
                                 </div>
 
-                                <div class="space-y-3 mb-6">
+                                <div class="space-y-3">
                                     <div class="flex items-start gap-2.5 text-sm text-slate-600">
                                         <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24"
                                             stroke="currentColor">
@@ -684,8 +691,12 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
-                                        <span
-                                            class="line-clamp-1">{{ $event->venue?->name ?? ($event->institution?->name ?? __('Online')) }}</span>
+                                        <span class="min-w-0">
+                                            <span class="block line-clamp-1">{{ $locationPrimaryText }}</span>
+                                            @if($locationSecondaryText)
+                                                <span class="mt-0.5 block line-clamp-1 text-xs text-slate-500">{{ $locationSecondaryText }}</span>
+                                            @endif
+                                        </span>
                                     </div>
                                     <div class="flex items-center gap-2.5 text-sm text-slate-600">
                                         <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24"
@@ -693,28 +704,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
-                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A') }}
+                                        {{ $event->timing_display }}
                                     </div>
                                 </div>
 
-                                <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
-                                    @if($event->gender && $event->gender->value !== 'all')
-                                        <span
-                                            class="text-xs font-semibold text-slate-400 uppercase tracking-widest">{{ $event->gender->getLabel() }}</span>
-                                    @else
-                                        <span></span>
-                                    @endif
-
-                                    <a href="{{ route('events.show', $event) }}" wire:navigate
-                                        class="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">
-                                        {{ __('Join') }}
-                                        <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                        </svg>
-                                    </a>
-                                </div>
                             </div>
                         </article>
                     @endforeach
@@ -724,7 +717,6 @@
                     {{ $events->withQueryString()->links() }}
                 </div>
             @endif
-            @endisland
         </div>
     </div>
 </div>

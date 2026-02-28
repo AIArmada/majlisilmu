@@ -1,3 +1,28 @@
+# Event Majlis Search Live + Fuzzy Todo
+
+- [x] Expand `/majlis` DB search to include title, institution, venue, and speaker names
+- [x] Add fuzzy fallback for typo-tolerant search across those fields
+- [x] Add regression tests for direct field search, fuzzy typo search, and Livewire live updates
+- [x] Run focused Pest verification
+
+## Review
+
+- Updated `EventSearchService` database search to:
+  - direct-match `events.title`, `events.description`, `institution.name`, `venue.name`, and `speakers.name`
+  - tokenize collapsed queries for broad partial matching (minimum token length 3)
+  - run typo-tolerant fuzzy fallback when direct matches are empty
+- Added regressions in `tests/Feature/EventSearchTest.php` for:
+  - institution-name search
+  - venue-name search
+  - speaker-name search
+  - typo fuzzy search (`Melawti` -> `Melawati`)
+  - live update behavior via Livewire component state change
+- Verification:
+  - `vendor/bin/pest --compact tests/Feature/EventSearchTest.php --filter=\"(searches events by institution name|searches events by venue name|searches events by speaker name|supports fuzzy search with minor venue name typos|updates event results live when search changes|searches events by title)\"` => **6 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Services/EventSearchService.php tests/Feature/EventSearchTest.php` => **No errors**
+
+---
+
 # Blaze Integration Todo
 
 - [x] Research Blaze package behavior and project compatibility constraints
@@ -601,3 +626,92 @@
   - `vendor/bin/pest --parallel --compact tests/Feature/InspirationTest.php --filter="seeds inspirations via InspirationSeeder"` => **1 passed (14 assertions)**
   - `php artisan migrate:fresh --seed --no-interaction` now shows `Database\Seeders\InspirationSeeder ... DONE`
   - Post-seed count check: `App\Models\Inspiration::query()->count()` => **20**
+
+---
+
+# Speaker Index Search UX (Translateable + Live Fuzzy)
+
+- [x] Make speaker search placeholder use a translatable key already present in locale files
+- [x] Convert speaker index search to Livewire live search (debounced) with URL query sync
+- [x] Add fuzzy fallback matching for typo-tolerant speaker search results
+- [x] Add/extend feature tests for translation, fuzzy behavior, and live updates
+- [x] Verify with focused Pest + browser check
+
+## Review
+
+- Updated `resources/views/components/pages/speakers/⚡index.blade.php`:
+  - Added Livewire URL-bound `search` property with `wire:model.live.debounce.300ms`.
+  - Replaced request-driven GET form flow with live in-place filtering and `clearSearch()` action.
+  - Switched placeholder to `__('Search speakers...')`, which maps to Malay (`Cari penceramah...`) in `resources/lang/ms.json`.
+  - Implemented fuzzy fallback ranking (token-aware similarity) when direct SQL search returns no results.
+- Added/updated tests in `tests/Feature/SpeakerIndexTest.php`:
+  - translated placeholder rendering
+  - fuzzy typo match (`Smad` -> `Samad`)
+  - live updates through `Livewire::test(...)->set('search', ...)`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **5 passed (16 assertions)**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - Chrome MCP:
+    - placeholder resolves as `Cari penceramah...`
+    - typo query updates URL live (`?search=Mzan`) and returns fuzzy matches (`Dr Mizan Mohamed`).
+
+---
+
+# Institution Index Translation + Fuzzy Search
+
+- [x] Audit `/institusi` for hardcoded English and missing translation keys
+- [x] Make hero/search/no-result copy fully translation-driven
+- [x] Add typo-tolerant fuzzy fallback search for institutions
+- [x] Add focused regression tests
+- [x] Verify with Pest + Chrome MCP
+
+## Review
+
+- Updated `resources/views/components/pages/institutions/⚡index.blade.php`:
+  - Replaced hardcoded hero copy with translation lookups (`Centers of`, `Knowledge & Community`, hero description).
+  - Added translated accessible label for search input and ensured all page copy remains translation-driven.
+  - Enhanced search logic:
+    - keeps direct SQL matching (name + description, tokenized),
+    - adds fuzzy fallback ranking (Levenshtein/similar_text) when direct matches are empty,
+    - preserves pagination + query string behavior.
+- Added translation keys to:
+  - `resources/lang/ms.json`
+  - `resources/lang/ms_MY.json`
+  - `resources/lang/en.json`
+  - including pagination UI phrases used on this page (`Showing`, `to`, `of`, `Pagination Navigation`, `Go to page :page`) and search controls (`Clear`, `Clear Search`, etc.).
+- Added test coverage in `tests/Feature/InstitutionIndexTest.php`:
+  - translated hero/search copy
+  - translated no-result state
+  - fuzzy typo search (`Hidayh` -> `Masjid Al Hidayah`)
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **3 passed (10 assertions)**
+  - JSON validation for locale files => **json-ok**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - Chrome MCP on `https://majlisilmu.test/institusi`:
+    - hero/search/pagination text in Malay
+    - typo query `Klng` returns fuzzy matches like `Kompleks Islam Klang`.
+
+---
+
+# Institution Search Follow-up (Exact Placeholder + Live Fuzzy)
+
+- [x] Set institutions placeholder text to exact copy `Cari institusi...`
+- [x] Convert institutions search input from GET form submit to Livewire live search binding
+- [x] Ensure fuzzy matching executes in live mode (no Enter/submit required)
+- [x] Extend tests for live institution search updates
+- [x] Re-verify in Chrome MCP
+
+## Review
+
+- Updated institutions search input in `resources/views/components/pages/institutions/⚡index.blade.php`:
+  - placeholder now uses `__('Search institutions...')` mapped to `Cari institusi...`
+  - `wire:model.live.debounce.300ms="search"` enabled
+  - clear action switched to `wire:click="clearSearch"`
+  - search state moved to URL-bound Livewire property (`#[Url] public ?string $search`)
+- Added live regression test in `tests/Feature/InstitutionIndexTest.php`:
+  - `Livewire::test('pages.institutions.index')->set('search', 'Hidayh')` asserts fuzzy live result.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **4 passed (12 assertions)**
+  - Chrome MCP on `https://majlisilmu.test/institusi`:
+    - placeholder attribute is exactly `Cari institusi...`
+    - typing `Klng` updates URL to `?search=Klng` and immediately shows `Kompleks Islam Klang` (live fuzzy behavior).

@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Services\PrayerTimeService;
+use App\Support\Cache\PublicListingsCache;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,8 @@ use Illuminate\Support\Facades\Log;
 class EventObserver
 {
     public function __construct(
-        protected PrayerTimeService $prayerTimeService
+        protected PrayerTimeService $prayerTimeService,
+        protected PublicListingsCache $publicListingsCache
     ) {}
 
     public function creating(Event $event): void
@@ -36,6 +38,21 @@ class EventObserver
         ) {
             $this->calculatePrayerRelativeTime($event);
         }
+    }
+
+    public function created(Event $event): void
+    {
+        $this->publicListingsCache->bustMajlisListing();
+    }
+
+    public function updated(Event $event): void
+    {
+        $this->publicListingsCache->bustMajlisListing();
+    }
+
+    public function deleted(Event $event): void
+    {
+        $this->publicListingsCache->bustMajlisListing();
     }
 
     /**
