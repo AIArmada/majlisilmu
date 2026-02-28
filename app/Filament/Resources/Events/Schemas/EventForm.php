@@ -59,7 +59,7 @@ class EventForm
                                             ->required()
                                             ->maxLength(255)
                                             ->live(onBlur: true)
-                                            ->afterStateUpdated(fn (Set $set, ?string $state): mixed => $set('slug', Str::slug($state))),
+                                            ->afterStateUpdated(fn(Set $set, ?string $state): mixed => $set('slug', Str::slug($state))),
                                         TextInput::make('slug')
                                             ->label('Slug')
                                             ->required()
@@ -96,7 +96,7 @@ class EventForm
                                             ->label('Waktu')
                                             ->options(
                                                 collect(EventPrayerTime::cases())
-                                                    ->mapWithKeys(fn (EventPrayerTime $case): array => [$case->value => $case->getLabel()])
+                                                    ->mapWithKeys(fn(EventPrayerTime $case): array => [$case->value => $case->getLabel()])
                                                     ->toArray(),
                                             )
                                             ->default(EventPrayerTime::LainWaktu->value)
@@ -108,8 +108,8 @@ class EventForm
                                             ->timezone(config('app.timezone'))
                                             ->seconds(false)
                                             ->minutesStep(5)
-                                            ->required(fn (Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value)
-                                            ->visible(fn (Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value),
+                                            ->required(fn(Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value)
+                                            ->visible(fn(Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value),
                                         TimePicker::make('end_time')
                                             ->label('Masa Akhir')
                                             ->native()
@@ -131,7 +131,7 @@ class EventForm
                                             ->label('Format Majlis')
                                             ->options(
                                                 collect(EventFormat::cases())
-                                                    ->mapWithKeys(fn (EventFormat $case): array => [$case->value => $case->label()])
+                                                    ->mapWithKeys(fn(EventFormat $case): array => [$case->value => $case->label()])
                                                     ->toArray(),
                                             )
                                             ->required(),
@@ -139,7 +139,7 @@ class EventForm
                                             ->label('Jenis Jadual')
                                             ->options(
                                                 collect(ScheduleKind::cases())
-                                                    ->mapWithKeys(fn (ScheduleKind $case): array => [$case->value => $case->label()])
+                                                    ->mapWithKeys(fn(ScheduleKind $case): array => [$case->value => $case->label()])
                                                     ->toArray(),
                                             )
                                             ->default(ScheduleKind::Single->value)
@@ -148,7 +148,7 @@ class EventForm
                                             ->label('Status Jadual')
                                             ->options(
                                                 collect(ScheduleState::cases())
-                                                    ->mapWithKeys(fn (ScheduleState $case): array => [$case->value => $case->label()])
+                                                    ->mapWithKeys(fn(ScheduleState $case): array => [$case->value => $case->label()])
                                                     ->toArray(),
                                             )
                                             ->default(ScheduleState::Active->value)
@@ -156,7 +156,7 @@ class EventForm
                                         Select::make('visibility')
                                             ->label('Keterlihatan')
                                             ->options(EventVisibility::class)
-                                            ->default(EventVisibility::Public->value)
+                                            ->default(EventVisibility::Public ->value)
                                             ->required(),
                                         TextInput::make('event_url')
                                             ->label('Pautan Majlis')
@@ -201,7 +201,7 @@ class EventForm
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getLanguageOptions()),
+                                            ->options(fn(): array => self::getLanguageOptions()),
                                     ]),
                             ]),
                         Tab::make('Kategori & Bidang')
@@ -224,50 +224,50 @@ class EventForm
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getTagOptions(TagType::Domain))
-                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
-                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values)),
+                                            ->options(fn(): array => self::getTagOptions(TagType::Domain))
+                                            ->getOptionLabelUsing(fn(mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn(array $values): array => self::getTagLabels($values)),
                                         Select::make('discipline_tags')
                                             ->label('Bidang Ilmu')
                                             ->multiple()
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getTagOptions(TagType::Discipline))
-                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
-                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values))
+                                            ->options(fn(): array => self::getTagOptions(TagType::Discipline))
+                                            ->getOptionLabelUsing(fn(mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn(array $values): array => self::getTagLabels($values))
                                             ->createOptionForm([
                                                 TextInput::make('name')
                                                     ->label('Nama Bidang')
                                                     ->required()
                                                     ->maxLength(255),
                                             ])
-                                            ->createOptionUsing(fn (array $data): string => self::createPendingTag($data, TagType::Discipline)),
+                                            ->createOptionUsing(fn(array $data): string => self::createPendingTag($data, TagType::Discipline)),
                                         Select::make('source_tags')
                                             ->label('Sumber Utama')
                                             ->multiple()
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getTagOptions(TagType::Source))
-                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
-                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values)),
+                                            ->options(fn(): array => self::getTagOptions(TagType::Source))
+                                            ->getOptionLabelUsing(fn(mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn(array $values): array => self::getTagLabels($values)),
                                         Select::make('issue_tags')
                                             ->label('Tema / Isu')
                                             ->multiple()
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (): array => self::getTagOptions(TagType::Issue))
-                                            ->getOptionLabelUsing(fn (mixed $value): ?string => self::getTagLabel($value))
-                                            ->getOptionLabelsUsing(fn (array $values): array => self::getTagLabels($values))
+                                            ->options(fn(): array => self::getTagOptions(TagType::Issue))
+                                            ->getOptionLabelUsing(fn(mixed $value): ?string => self::getTagLabel($value))
+                                            ->getOptionLabelsUsing(fn(array $values): array => self::getTagLabels($values))
                                             ->createOptionForm([
                                                 TextInput::make('name')
                                                     ->label('Nama Tema')
                                                     ->required()
                                                     ->maxLength(255),
                                             ])
-                                            ->createOptionUsing(fn (array $data): string => self::createPendingTag($data, TagType::Issue)),
+                                            ->createOptionUsing(fn(array $data): string => self::createPendingTag($data, TagType::Issue)),
                                     ])
                                     ->columns(2),
                                 Section::make('Rujukan')
@@ -300,8 +300,8 @@ class EventForm
                                             ->label('Penganjur')
                                             ->searchable()
                                             ->preload()
-                                            ->options(fn (Get $get): array => self::getOrganizerOptions($get('organizer_type')))
-                                            ->required(fn (Get $get): bool => filled($get('organizer_type'))),
+                                            ->options(fn(Get $get): array => self::getOrganizerOptions($get('organizer_type')))
+                                            ->required(fn(Get $get): bool => filled($get('organizer_type'))),
                                         Select::make('series')
                                             ->label('Siri')
                                             ->relationship('series', 'title')
@@ -319,18 +319,18 @@ class EventForm
                                             ->searchable()
                                             ->preload()
                                             ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                                            ->createOptionUsing(fn (array $data): string => InstitutionFormSchema::createOptionUsing($data)),
+                                            ->createOptionUsing(fn(array $data): string => InstitutionFormSchema::createOptionUsing($data)),
                                         Select::make('venue_id')
                                             ->label('Lokasi')
                                             ->relationship('venue', 'name')
                                             ->searchable()
                                             ->preload()
                                             ->createOptionForm(VenueFormSchema::createOptionForm())
-                                            ->createOptionUsing(fn (array $data): string => VenueFormSchema::createOptionUsing($data)),
+                                            ->createOptionUsing(fn(array $data): string => VenueFormSchema::createOptionUsing($data)),
                                         Select::make('space_id')
                                             ->label('Ruang')
-                                            ->relationship('space', 'name', fn ($query, Get $get): mixed => $get('institution_id')
-                                                ? $query->whereHas('institutions', fn ($relatedQuery): mixed => $relatedQuery->where('institutions.id', $get('institution_id')))->where('is_active', true)
+                                            ->relationship('space', 'name', fn($query, Get $get): mixed => $get('institution_id')
+                                                ? $query->whereHas('institutions', fn($relatedQuery): mixed => $relatedQuery->where('institutions.id', $get('institution_id')))->where('is_active', true)
                                                 : $query->where('is_active', true))
                                             ->searchable()
                                             ->preload(),
@@ -345,19 +345,19 @@ class EventForm
                                     ->schema([
                                         Select::make('speakers')
                                             ->label('Penceramah')
-                                            ->relationship('speakers', 'name', fn ($query): mixed => $query->whereIn('status', ['verified', 'pending']))
+                                            ->relationship('speakers', 'name', fn($query): mixed => $query->whereIn('status', ['verified', 'pending']))
                                             ->multiple()
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
-                                            ->getOptionLabelUsing(fn (mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
-                                            ->getOptionLabelsUsing(fn (array $values): array => Speaker::query()
+                                            ->getOptionLabelUsing(fn(mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
+                                            ->getOptionLabelsUsing(fn(array $values): array => Speaker::query()
                                                 ->whereIn('id', $values)
                                                 ->get()
-                                                ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                                ->mapWithKeys(fn(Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
                                                 ->toArray())
                                             ->createOptionForm(SpeakerFormSchema::createOptionForm())
-                                            ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
+                                            ->createOptionUsing(fn(array $data): string => SpeakerFormSchema::createOptionUsing($data)),
                                     ]),
                                 Section::make('Media')
                                     ->columnSpanFull()
@@ -426,11 +426,11 @@ class EventForm
                                             ->label('Mod Pendaftaran')
                                             ->options(
                                                 collect(RegistrationMode::cases())
-                                                    ->mapWithKeys(fn (RegistrationMode $mode): array => [$mode->value => $mode->label()])
+                                                    ->mapWithKeys(fn(RegistrationMode $mode): array => [$mode->value => $mode->label()])
                                                     ->toArray(),
                                             )
-                                            ->disabled(fn (?Event $record): bool => $record?->registrations()->exists() ?? false)
-                                            ->helperText(fn (?Event $record): ?string => ($record?->registrations()->exists() ?? false)
+                                            ->disabled(fn(?Event $record): bool => $record?->registrations()->exists() ?? false)
+                                            ->helperText(fn(?Event $record): ?string => ($record?->registrations()->exists() ?? false)
                                                 ? __('Registration mode is locked after first registration.')
                                                 : null)
                                             ->default(RegistrationMode::Event->value),
@@ -448,10 +448,10 @@ class EventForm
     protected static function getEventTypeOptions(): array
     {
         return collect(EventType::cases())
-            ->mapToGroups(fn (EventType $type): array => [
+            ->mapToGroups(fn(EventType $type): array => [
                 $type->getGroup() => [$type->value => $type->getLabel()],
             ])
-            ->map(fn (Collection $group): array => $group->collapse()->toArray())
+            ->map(fn(Collection $group): array => $group->collapse()->toArray())
             ->toArray();
     }
 
@@ -476,7 +476,7 @@ class EventForm
             ->whereIn('status', ['verified', 'pending'])
             ->ordered()
             ->get()
-            ->mapWithKeys(fn (Tag $tag): array => [
+            ->mapWithKeys(fn(Tag $tag): array => [
                 (string) $tag->id => $tag->getTranslation('name', app()->getLocale()),
             ])
             ->toArray();
@@ -498,7 +498,7 @@ class EventForm
 
     protected static function getTagLabel(mixed $value): ?string
     {
-        if (! $value) {
+        if (!$value) {
             return null;
         }
 
@@ -514,7 +514,7 @@ class EventForm
         return Tag::query()
             ->whereIn('id', $values)
             ->get()
-            ->mapWithKeys(fn (Tag $tag): array => [
+            ->mapWithKeys(fn(Tag $tag): array => [
                 (string) $tag->id => $tag->getTranslation('name', app()->getLocale()),
             ])
             ->toArray();
@@ -535,7 +535,7 @@ class EventForm
                 ->whereIn('status', ['verified', 'pending'])
                 ->orderBy('name')
                 ->get()
-                ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                ->mapWithKeys(fn(Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
                 ->toArray(),
             default => [],
         };

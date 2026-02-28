@@ -51,6 +51,7 @@ class SeriesForm
                             ->image()
                             ->imageEditor()
                             ->imageAspectRatio('16:9')
+                            ->automaticallyOpenImageEditorForAspectRatio()
                             ->imageEditorAspectRatioOptions(['16:9'])
                             ->automaticallyCropImagesToAspectRatio()
                             ->conversion('thumb')
