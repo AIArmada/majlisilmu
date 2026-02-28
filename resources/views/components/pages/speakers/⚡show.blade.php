@@ -237,8 +237,8 @@ new class extends Component {
         $primaryLocationName = $venueName ?: $institutionName;
         $address = $event->venue?->addressModel ?? $event->institution?->addressModel;
 
-        $districtName = $address->district?->name;
-        $stateName = $address->state?->name;
+        $districtName = $address?->district?->name;
+        $stateName = $address?->state?->name;
 
         $stateHiddenDistricts = [
             'kuala lumpur',
@@ -252,7 +252,7 @@ new class extends Component {
 
         $parts = array_filter([
             $primaryLocationName,
-            $address->subdistrict?->name,
+            $address?->subdistrict?->name,
             $districtName,
             $stateName,
         ]);

@@ -18,7 +18,7 @@ describe('Event Show Page Going Feature', function () {
 
         $this->get(route('events.show', $event))
             ->assertOk()
-            ->assertSee(__('Saya Akan Hadir')); // Button always visible, redirects guests to login
+            ->assertSee(__('Akan Hadir')); // Button always visible, redirects guests to login
     });
 
     it('does not show the going button for past events', function () {
@@ -31,7 +31,7 @@ describe('Event Show Page Going Feature', function () {
 
         $this->get(route('events.show', $event))
             ->assertOk()
-            ->assertDontSee(__('Saya Akan Hadir'));
+            ->assertDontSee(__('Akan Hadir'));
     });
 
     it('authenticated user can toggle going status via livewire', function () {
@@ -108,7 +108,7 @@ describe('Event Show Page Going Feature', function () {
 
         $this->get(route('events.show', $event))
             ->assertOk()
-            ->assertSee(__('Saya Akan Hadir')); // Button always visible regardless of auth
+            ->assertSee(__('Akan Hadir')); // Button always visible regardless of auth
 
         // Verify the going count is persisted correctly on the model
         expect($event->fresh()->going_count)->toBe(5);
