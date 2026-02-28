@@ -107,15 +107,13 @@ class EventForm
                                             ->native()
                                             ->timezone(config('app.timezone'))
                                             ->seconds(false)
-                                            ->minutesStep(5)
                                             ->required(fn(Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value)
                                             ->visible(fn(Get $get): bool => $get('prayer_time') === EventPrayerTime::LainWaktu->value),
                                         TimePicker::make('end_time')
                                             ->label('Masa Akhir')
                                             ->native()
                                             ->timezone(config('app.timezone'))
-                                            ->seconds(false)
-                                            ->minutesStep(5),
+                                            ->seconds(false),
                                         DateTimePicker::make('starts_at')
                                             ->dehydrated(false)
                                             ->visible(false),
@@ -318,6 +316,18 @@ class EventForm
                                             ->relationship('institution', 'name')
                                             ->searchable()
                                             ->preload()
+                                            ->live()
+                                            ->disabled(fn(Get $get): bool => filled($get('venue_id')))
+                                            ->afterStateUpdated(function (Set $set, Get $get, mixed $state): void {
+                                                if (filled($state)) {
+                                                    $set('venue_id', null);
+                                                }
+
+                                                if (! filled($get('institution_id'))) {
+                                                    $set('space_id', null);
+                                                }
+                                            })
+                                            ->helperText('Pilih institusi ATAU lokasi (venue), bukan kedua-duanya.')
                                             ->createOptionForm(InstitutionFormSchema::createOptionForm())
                                             ->createOptionUsing(fn(array $data): string => InstitutionFormSchema::createOptionUsing($data)),
                                         Select::make('venue_id')
@@ -325,15 +335,39 @@ class EventForm
                                             ->relationship('venue', 'name')
                                             ->searchable()
                                             ->preload()
+                                            ->live()
+                                            ->disabled(fn(Get $get): bool => filled($get('institution_id')))
+                                            ->afterStateUpdated(function (Set $set, mixed $state): void {
+                                                if (filled($state)) {
+                                                    $set('institution_id', null);
+                                                    $set('space_id', null);
+                                                }
+                                            })
+                                            ->helperText('Pilih institusi ATAU lokasi (venue), bukan kedua-duanya.')
                                             ->createOptionForm(VenueFormSchema::createOptionForm())
                                             ->createOptionUsing(fn(array $data): string => VenueFormSchema::createOptionUsing($data)),
                                         Select::make('space_id')
                                             ->label('Ruang')
-                                            ->relationship('space', 'name', fn($query, Get $get): mixed => $get('institution_id')
-                                                ? $query->whereHas('institutions', fn($relatedQuery): mixed => $relatedQuery->where('institutions.id', $get('institution_id')))->where('is_active', true)
-                                                : $query->where('is_active', true))
+                                            ->relationship('space', 'name', function ($query, Get $get): mixed {
+                                                $institutionId = $get('institution_id');
+
+                                                if (! filled($institutionId)) {
+                                                    return $query->where('is_active', true);
+                                                }
+
+                                                // Include institution-linked spaces and global spaces (not linked to any institution).
+                                                return $query
+                                                    ->where('is_active', true)
+                                                    ->where(function ($spaceQuery) use ($institutionId): void {
+                                                        $spaceQuery
+                                                            ->whereHas('institutions', fn($relatedQuery): mixed => $relatedQuery->where('institutions.id', $institutionId))
+                                                            ->orWhereDoesntHave('institutions');
+                                                    });
+                                            })
                                             ->searchable()
-                                            ->preload(),
+                                            ->preload()
+                                            ->visible(fn(Get $get): bool => filled($get('institution_id')) && blank($get('venue_id')))
+                                            ->dehydrated(fn(Get $get): bool => filled($get('institution_id')) && blank($get('venue_id'))),
                                     ])
                                     ->columns(2),
                             ]),

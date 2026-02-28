@@ -30,4 +30,9 @@ it('seeds schedule events with required submit-event fields', function () {
     expect($tagTypes)
         ->toContain('domain')
         ->toContain('discipline');
+
+    $hasInstitutionLocation = is_string($event?->institution_id) && $event->institution_id !== '';
+    $hasVenueLocation = is_string($event?->venue_id) && $event->venue_id !== '';
+
+    expect($hasInstitutionLocation xor $hasVenueLocation)->toBeTrue();
 });
