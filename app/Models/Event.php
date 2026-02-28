@@ -15,6 +15,7 @@ use App\Enums\ScheduleState;
 use App\Enums\SessionStatus;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -558,8 +559,8 @@ class Event extends Model implements AuditableContract, HasMedia
             return $this->prayer_display_text;
         }
 
-        // Fallback to formatted time
-        return $this->starts_at?->format('g:i A') ?? '';
+        // Fallback to timezone-aware formatted time (viewer timezone)
+        return UserDateTimeFormatter::format($this->starts_at, 'g:i A');
     }
 
     /**

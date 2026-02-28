@@ -64,8 +64,12 @@ class EventFactory extends Factory
             'Umdatul Ahkam',
         ];
 
-        $startsAt = Carbon::instance(fake()->dateTimeBetween('now', '+2 months'));
-        $endsAt = (clone $startsAt)->addHours(fake()->numberBetween(1, 3));
+        $eventTimezone = 'Asia/Kuala_Lumpur';
+        $startsAtLocal = Carbon::instance(fake()->dateTimeBetween('now', '+2 months', $eventTimezone))
+            ->setTimezone($eventTimezone);
+        $endsAtLocal = $startsAtLocal->copy()->addHours(fake()->numberBetween(1, 3));
+        $startsAt = $startsAtLocal->copy()->utc();
+        $endsAt = $endsAtLocal->copy()->utc();
         $type = fake()->randomElement($eventTypes);
         $topic = fake()->randomElement($topics);
         $book = fake()->randomElement($books);
@@ -79,7 +83,9 @@ class EventFactory extends Factory
             $type.' bersama Asatizah',
         ]);
         $status = fake()->randomElement(['approved', 'approved', 'pending', 'draft']);
-        $publishedAt = $status === 'approved' ? (clone $startsAt)->subDays(fake()->numberBetween(1, 14)) : null;
+        $publishedAt = $status === 'approved'
+            ? $startsAtLocal->copy()->subDays(fake()->numberBetween(1, 14))->utc()
+            : null;
         $livestreamUrl = fake()->optional()->url();
         $recordingUrl = fake()->optional()->url();
 
@@ -126,7 +132,7 @@ class EventFactory extends Factory
             'description' => fake()->optional()->paragraphs(2, true),
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
-            'timezone' => 'Asia/Kuala_Lumpur',
+            'timezone' => $eventTimezone,
             'timing_mode' => TimingMode::Absolute->value,
             'prayer_reference' => null,
             'prayer_offset' => null,

@@ -22,9 +22,18 @@
     $upcomingSessions = $this->upcomingSessions;
     $nextSession = $upcomingSessions->first();
     $registrationMode = $this->registrationMode();
-    $relatedEvents = $this->relatedEvents;
     $shareLinks = $this->shareLinks;
     $sharePreviewImage = $event->card_image_url;
+    $sharePreviewDateTime = __('TBC');
+    if ($event->starts_at) {
+        $sharePreviewDateTime = \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y')
+            .', '
+            .\App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'h:i A');
+
+        if ($event->ends_at && $event->timing_mode === \App\Enums\TimingMode::Absolute) {
+            $sharePreviewDateTime .= ' — '.\App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A');
+        }
+    }
     $eventTimeStatus = $this->eventTimeStatus;
     $descriptionHtml = $this->descriptionHtml;
 
@@ -283,7 +292,7 @@
                                             {{ $event->timing_display }}
                                             @if($event->ends_at) — {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'g:i A') }}@endif
                                         @else
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'g:i A') }}
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'g:i A') }}
                                             @if($event->ends_at) — {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'g:i A') }}@endif
                                         @endif
                                     </p>
@@ -448,7 +457,7 @@
                                         {{ $event->timing_display }}
                                         @if($event->ends_at) — {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'g:i A') }}@endif
                                     @else
-                                        {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'g:i A') }}
+                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'g:i A') }}
                                         @if($event->ends_at) — {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'g:i A') }}@endif
                                     @endif
                                 </p>
@@ -659,10 +668,10 @@
                             $spBio = $sp->bio ? Str::limit(strip_tags(is_array($sp->bio) ? ($sp->bio['html'] ?? '') : $sp->bio), 220) : null;
                         @endphp
                         <a href="{{ route('speakers.show', $sp) }}" wire:navigate
-                            class="group relative flex flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-white/90 shadow-xl shadow-emerald-100/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-100/60 sm:flex-row">
+                            class="group relative flex flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-white/90 shadow-xl shadow-emerald-100/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-100/60 sm:min-h-56 sm:flex-row">
 
                             {{-- Left: cover/portrait panel --}}
-                            <div class="relative h-56 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-auto sm:w-56">
+                            <div class="relative h-56 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-full sm:min-h-56 sm:w-56">
                                 @if($spCover)
                                     {{-- Real cover photo behind a floating avatar --}}
                                     <img src="{{ $spCover }}" alt="" class="size-full object-cover transition duration-700 group-hover:scale-105" loading="lazy">
@@ -685,32 +694,27 @@
 
                             {{-- Right: details --}}
                             <div class="flex flex-col justify-center gap-1 p-7 sm:p-8">
-                                <p class="text-[11px] font-bold uppercase tracking-widest text-emerald-600">{{ __('Penceramah') }}</p>
-                                <h3 class="mt-1 font-heading text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">{{ $sp->formatted_name ?? $sp->name }}</h3>
+                                <h3 class="font-heading text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">{{ $sp->formatted_name ?? $sp->name }}</h3>
                                 @if($sp->title)
                                     <p class="mt-0.5 text-sm font-semibold text-slate-500">{{ $sp->title }}</p>
                                 @endif
                                 @if($spBio)
                                     <p class="mt-4 text-sm leading-relaxed text-slate-600">{{ $spBio }}</p>
                                 @endif
-                                <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 transition-colors group-hover:text-emerald-700">
-                                    {{ __('Lihat Profil') }}
-                                    <svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                                </span>
                             </div>
                         </a>
 
                     @else
                         {{-- Multiple speakers: responsive grid --}}
-                        <div class="grid gap-5 sm:grid-cols-2 {{ $event->speakers->count() >= 3 ? 'lg:grid-cols-3' : '' }}">
+                        <div class="flex flex-wrap justify-center gap-5">
                             @foreach($event->speakers as $speaker)
                                 @php
                                     $speakerProfileImg = $speaker->getFirstMediaUrl('avatar', 'profile') ?: null;
                                     $speakerThumbImg = $speaker->avatar_url ?: $speaker->default_avatar_url;
-                                    $speakerCoverImg = $speaker->getFirstMediaUrl('cover', 'banner') ?: null;
+                                    $speakerCoverImg = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? null;
                                 @endphp
                                 <a wire:key="speaker-{{ $speaker->id }}" href="{{ route('speakers.show', $speaker) }}" wire:navigate
-                                    class="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100">
+                                    class="group relative w-[240px] flex flex-col overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100">
 
                                     {{-- Cover background --}}
                                     <div class="relative h-32 w-full overflow-hidden bg-slate-100">
@@ -724,13 +728,13 @@
                                     </div>
 
                                     {{-- Profile overlay --}}
-                                    <div class="relative -mt-12 flex flex-col items-center px-6 pb-6 text-center">
-                                        <div class="relative size-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-xl transition-transform duration-300 group-hover:-translate-y-2">
+                                    <div class="relative -mt-16 flex flex-col items-center px-4 pb-4 text-center">
+                                        <div class="relative size-32 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-xl transition-transform duration-300 group-hover:-translate-y-2">
                                             <img src="{{ $speakerProfileImg ?: $speakerThumbImg }}" alt="{{ $speaker->name }}"
-                                                class="size-full object-cover" width="96" height="96" loading="lazy">
+                                                class="size-full object-cover" width="128" height="128" loading="lazy">
                                         </div>
 
-                                        <div class="mt-3">
+                                        <div class="mt-2">
                                             <h4 class="font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-emerald-700">{{ $speaker->formatted_name ?? $speaker->name }}</h4>
                                             @if($speaker->title)
                                                 <p class="mt-1 text-sm font-medium text-slate-500">{{ $speaker->title }}</p>
@@ -740,7 +744,7 @@
 
                                     {{-- Bio snippet --}}
                                     @if($speaker->bio)
-                                        <div class="mt-auto border-t border-slate-100 bg-slate-50/50 px-6 py-4 transition-colors group-hover:bg-emerald-50/30">
+                                        <div class="mt-auto border-t border-slate-100 bg-slate-50/50 px-4 py-3 transition-colors group-hover:bg-emerald-50/30">
                                             <p class="line-clamp-2 text-sm leading-relaxed text-slate-600">{{ Str::limit(strip_tags(is_array($speaker->bio) ? ($speaker->bio['html'] ?? '') : $speaker->bio), 120) }}</p>
                                         </div>
                                     @endif
@@ -1060,55 +1064,6 @@
                 </section>
             @endif
 
-            {{-- RELATED EVENTS --}}
-            @if($relatedEvents->isNotEmpty())
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
-                    <div class="mb-6 flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-3">
-                            <div class="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                            </div>
-                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Related Events') }}</h2>
-                        </div>
-                        <a href="{{ route('events.index') }}" wire:navigate
-                            class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-bold text-slate-600 shadow-sm backdrop-blur-md border border-slate-200/60 transition hover:bg-white hover:text-emerald-600">
-                            {{ __('Browse All') }}
-                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        </a>
-                    </div>
-                    
-                    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        @foreach($relatedEvents as $relatedEvent)
-                            @php
-                                $relatedHasPoster = $relatedEvent->hasMedia('poster');
-                                $relatedPosterIsPortrait = $relatedHasPoster && in_array($relatedEvent->poster_orientation, ['portrait', 'square'], true);
-                            @endphp
-                            <a wire:key="related-{{ $relatedEvent->id }}" href="{{ route('events.show', $relatedEvent) }}" wire:navigate
-                                class="group flex flex-col overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100">
-                                <div class="relative overflow-hidden {{ $relatedPosterIsPortrait ? 'aspect-[4/5]' : 'h-40' }}">
-                                    <img src="{{ $relatedEvent->card_image_url }}" alt="{{ $relatedEvent->title }}"
-                                        class="size-full transition duration-700 group-hover:scale-105 {{ $relatedHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}" loading="lazy">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
-                                    <div class="absolute bottom-3 left-3 right-3">
-                                        <span class="inline-flex items-center rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-md">
-                                            {{ $relatedEvent->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($relatedEvent->starts_at, 'd M Y') : __('TBC') }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="flex flex-1 flex-col p-5">
-                                    <h3 class="font-heading text-base font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">{{ $relatedEvent->title }}</h3>
-                                    <div class="mt-auto pt-4">
-                                        <p class="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                                            <svg class="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                            <span class="truncate">{{ $relatedEvent->institution?->name ?? $relatedEvent->venue?->name ?? __('Independent') }}</span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
         </div>
 
         {{-- ====== RIGHT COLUMN (Sidebar) ====== --}}
@@ -1130,16 +1085,33 @@
                             <div class="min-w-0 flex-1 pt-0.5">
                                 <p class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Date & Time') }}</p>
                                 <p class="mt-1.5 font-heading text-base font-bold text-slate-900">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l, j F Y') : __('TBC') }}</p>
-                                <p class="mt-1 text-sm font-medium text-slate-600">
-                                    <x-event-timing :event="$event" :show-date="false" :show-absolute-time="false" />
-                                    @if($event->ends_at && $event->timing_mode === \App\Enums\TimingMode::Absolute)
-                                        - {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A') }}
-                                    @endif
+                                @php
+                                    $sidebarStartTime = null;
+                                    if ($event->starts_at) {
+                                        $sidebarStartTime = $event->isPrayerRelative()
+                                            ? (string) $event->timing_display
+                                            : \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'g:i A');
+                                    }
+                                    $sidebarEndTime = $event->ends_at
+                                        ? \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'g:i A')
+                                        : null;
+                                    $sidebarTimeText = $sidebarStartTime ?: __('Waktu belum ditetapkan');
+                                    if ($sidebarEndTime) {
+                                        $sidebarTimeText .= ' — '.$sidebarEndTime;
+                                    }
+                                @endphp
+                                <p class="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm ring-1 ring-white/10 whitespace-nowrap {{ $event->isPrayerRelative() ? 'bg-gradient-to-r from-emerald-700 to-emerald-800' : 'bg-gradient-to-r from-slate-800 to-slate-900' }}">
+                                    <svg class="size-4 shrink-0 {{ $event->isPrayerRelative() ? 'text-emerald-200' : 'text-sky-200' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span class="truncate">{{ $sidebarTimeText }}</span>
                                 </p>
                                 @if($nextSession)
                                     <div class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                                         <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        {{ __('Next:') }} {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($nextSession->starts_at, 'd M, h:i A') }}
+                                        {{ __('Next:') }}
+                                        {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($nextSession->starts_at, 'd M') }},
+                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($nextSession->starts_at, 'h:i A') }}
                                     </div>
                                 @endif
                             </div>
@@ -1357,10 +1329,10 @@
                             </div>
                             <div class="mt-2 space-y-1 text-xs font-medium text-slate-500">
                                 @if($regOpensAt && $regOpensAt->isFuture())
-                                    <p>{{ __('Opens') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regOpensAt, 'j M Y, g:i A') }}</p>
+                                    <p>{{ __('Opens') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regOpensAt, 'j M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($regOpensAt, 'g:i A') }}</p>
                                 @endif
                                 @if($regClosesAt)
-                                    <p>{{ __('Closes') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regClosesAt, 'j M Y, g:i A') }}</p>
+                                    <p>{{ __('Closes') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regClosesAt, 'j M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($regClosesAt, 'g:i A') }}</p>
                                 @endif
                             </div>
                         @else
@@ -1570,10 +1542,6 @@
                 </div>
                 
                 <div class="p-6 sm:p-8">
-                    <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                        <p class="text-sm font-semibold text-slate-900">{{ $event->title }}</p>
-                    </div>
-
                     <article class="overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-lg shadow-slate-200/40">
                         <div class="relative h-56 overflow-hidden bg-slate-100">
                             <img src="{{ $sharePreviewImage }}" alt="{{ $event->title }}" class="size-full {{ $eventHasPoster ? 'object-contain' : 'object-cover' }}" loading="lazy">
@@ -1583,7 +1551,7 @@
                             <h4 class="font-heading text-lg font-bold leading-tight text-slate-900">{{ $event->title }}</h4>
                             <p class="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                                 <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                {{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}
+                                {{ $sharePreviewDateTime }}
                             </p>
                             <p class="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-600">{{ Str::limit($event->description_text, 140) }}</p>
                         </div>
@@ -1691,7 +1659,7 @@
                                     <option value="">{{ __('Choose a session') }}</option>
                                     @foreach($upcomingSessions as $session)
                                         <option value="{{ $session->id }}">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($session->starts_at, 'd M Y, h:i A') }}
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($session->starts_at, 'd M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->starts_at, 'h:i A') }}
                                             @if($session->ends_at) - {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->ends_at, 'h:i A') }} @endif
                                         </option>
                                     @endforeach

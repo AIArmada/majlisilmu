@@ -13,7 +13,6 @@ use App\States\EventStatus\Approved;
 use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -114,42 +113,6 @@ class Show extends Component
         }
 
         return $images;
-    }
-
-    /**
-     * @return Collection<int, Event>
-     */
-    #[Computed]
-    public function relatedEvents(): Collection
-    {
-        $tagIds = $this->event->tags->pluck('id')->all();
-        $query = Event::query()
-            ->whereKeyNot($this->event->id)
-            ->active()
-            ->with([
-                'institution:id,name,slug',
-                'institution.media',
-                'venue:id,name',
-                'speakers:id,name',
-                'speakers.media',
-                'media',
-            ])
-            ->withCount([
-                'tags as shared_tags_count' => fn (Builder $tagQuery) => $tagQuery->whereIn('tags.id', $tagIds),
-            ])
-            ->orderByDesc('shared_tags_count');
-
-        if ($this->event->institution_id !== null) {
-            $query->orderByRaw(
-                'CASE WHEN institution_id = ? THEN 1 ELSE 0 END DESC',
-                [$this->event->institution_id]
-            );
-        }
-
-        return $query
-            ->orderBy('starts_at')
-            ->limit(6)
-            ->get();
     }
 
     /**
