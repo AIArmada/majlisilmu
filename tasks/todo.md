@@ -218,6 +218,38 @@
 - Updated seeder to use `updateOrCreate` (instead of `firstOrCreate`) so future reseeds backfill/fix existing inspiration content.
 - Executed `php artisan db:seed --class=Database\\Seeders\\InspirationSeeder` to repair current local data.
 - Validation after reseed:
+
+---
+
+# Event Timezone + Meridiem Consistency
+
+- [x] Trace time rendering differences between event detail and speaker detail pages
+- [x] Replace meridiem localization paths that produced `tengah malam` with explicit `AM/PM` formatting for time displays on event page
+- [x] Normalize existing `events`, `event_sessions`, and `event_settings` datetime records to UTC using each row timezone context
+- [x] Fix UTC persistence in factories/seeders/observer for future data correctness
+- [x] Ensure default viewer-timezone fallback uses Malaysia timezone when no explicit user timezone is present
+- [x] Verify on target URLs with Chrome MCP
+
+## Review
+
+- Root cause was twofold:
+  - mixed formatting (`translatedFormat(... A)`) generated localized meridiem text like `tengah malam`
+  - legacy records were stored as local time while app expected UTC for rendering
+- Updated event page time displays to use explicit `format(..., 'g:i A'/'h:i A')` for AM/PM output while keeping translated dates.
+- Normalized existing DB timestamps (one-time local execution):
+  - `events_updated: 662`
+  - `event_sessions_updated: 0`
+  - `event_settings_updated: 169`
+- Fixed future data writes:
+  - `database/factories/EventFactory.php` now generates local schedule time then stores UTC
+  - `database/factories/EventSessionFactory.php` now stores UTC
+  - `database/seeders/EventSeeder.php` now stores UTC
+  - `app/Observers/EventObserver.php` now persists prayer-relative calculated times in UTC
+- Added `config('app.default_user_timezone')` fallback (`Asia/Kuala_Lumpur`) and wired it in `UserTimezoneResolver` so guest/no-cookie rendering does not default to UTC.
+- Chrome MCP verification:
+  - `https://majlisilmu.test/majlis/forum-perdana-bersama-asatizah-uu8oszr` now shows `Ahad, 22 Mac 2026` and `4:08 PM — 7:08 PM`
+  - `https://majlisilmu.test/penceramah/nadia-azzahra-binti-othman-xoqg6ug` now shows the same event as `4:08 PM — 07:08 PM`
+  - Event share modal now shows `22 Mac 2026, 04:08 PM — 07:08 PM`
   - `inspirations.content` null count is now **0**
   - `Jangan Berputus Asa` and `Perancangan Allah Yang Terbaik` now return full `contentPreviewText`.
 - Verification:

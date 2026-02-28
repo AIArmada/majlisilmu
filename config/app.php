@@ -67,6 +67,9 @@ return [
 
     'timezone' => 'UTC',
 
+    // Display fallback when viewer timezone is not provided by profile/header/cookie/session.
+    'default_user_timezone' => env('APP_DEFAULT_USER_TIMEZONE', 'Asia/Kuala_Lumpur'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

@@ -71,17 +71,17 @@ class EventObserver
             return;
         }
 
-        // Determine the event date from the current starts_at payload first, then fallback to now.
+        // Determine the event date in event timezone from the current starts_at payload first, then fallback to now.
         $eventTimezone = $event->timezone ?? 'Asia/Kuala_Lumpur';
         $startsAt = $event->starts_at;
         $rawStartsAt = $event->getAttributes()['starts_at'] ?? null;
 
-        if (is_string($rawStartsAt) && trim($rawStartsAt) !== '') {
-            $eventDate = Carbon::parse($rawStartsAt, $eventTimezone);
-        } elseif ($startsAt instanceof \DateTimeInterface) {
-            $eventDate = Carbon::parse($startsAt->format('Y-m-d H:i:s'), $eventTimezone);
+        if ($startsAt instanceof \DateTimeInterface) {
+            $eventDate = Carbon::instance($startsAt)->setTimezone($eventTimezone);
         } elseif (is_string($startsAt) && trim($startsAt) !== '') {
             $eventDate = Carbon::parse($startsAt, $eventTimezone);
+        } elseif (is_string($rawStartsAt) && trim($rawStartsAt) !== '') {
+            $eventDate = Carbon::parse($rawStartsAt, $eventTimezone);
         } else {
             $eventDate = Carbon::now($eventTimezone);
         }
@@ -97,7 +97,8 @@ class EventObserver
         );
 
         if ($calculatedTime instanceof CarbonInterface) {
-            $event->starts_at = \Illuminate\Support\Carbon::instance($calculatedTime);
+            // Persist starts_at in UTC for storage consistency.
+            $event->starts_at = \Illuminate\Support\Carbon::instance($calculatedTime)->utc();
 
             // Update display text if not already set
             if (empty($event->prayer_display_text)) {

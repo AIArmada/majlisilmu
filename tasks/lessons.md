@@ -19,3 +19,5 @@
 - In share modals, always show a clear "what will be shared" entity name and use icon-only social targets when requested for faster visual scanning.
 - For person share previews, pair avatar and name in one compact row; avoid extra meta labels when the user asks for cleaner content.
 - After updating a primary page pattern, immediately sync legacy/alternate variants (for example `show-old`) to avoid inconsistent UX across routes.
+- Never use `translatedFormat(..., '... A')` for user-facing clock time when strict `AM/PM` output is expected; split date translation and time formatting (`format`) to avoid locale meridiem words like `tengah malam`.
+- When event times differ between pages, validate storage semantics first (UTC vs local) and normalize existing records before tweaking view formatting.

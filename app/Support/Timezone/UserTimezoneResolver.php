@@ -47,7 +47,7 @@ class UserTimezoneResolver
             }
         }
 
-        $fallback = (string) config('app.timezone', 'UTC');
+        $fallback = (string) config('app.default_user_timezone', config('app.timezone', 'UTC'));
 
         if (self::isValid($fallback)) {
             return [

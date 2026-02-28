@@ -17,14 +17,18 @@ class EventSessionFactory extends Factory
      */
     public function definition(): array
     {
-        $startsAt = fake()->dateTimeBetween('now', '+2 months');
+        $sessionTimezone = 'Asia/Kuala_Lumpur';
+        $startsAtLocal = \Illuminate\Support\Carbon::instance(
+            fake()->dateTimeBetween('now', '+2 months', $sessionTimezone)
+        )->setTimezone($sessionTimezone);
+        $endsAtLocal = $startsAtLocal->copy()->addHours(2);
 
         return [
             'event_id' => Event::factory(),
             'recurrence_rule_id' => null,
-            'starts_at' => $startsAt,
-            'ends_at' => (clone $startsAt)->modify('+2 hours'),
-            'timezone' => 'Asia/Kuala_Lumpur',
+            'starts_at' => $startsAtLocal->copy()->utc(),
+            'ends_at' => $endsAtLocal->copy()->utc(),
+            'timezone' => $sessionTimezone,
             'status' => SessionStatus::Scheduled,
             'is_generated' => false,
             'capacity' => fake()->optional()->numberBetween(20, 300),

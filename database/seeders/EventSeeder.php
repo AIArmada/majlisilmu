@@ -270,8 +270,10 @@ class EventSeeder extends Seeder
         ];
 
         foreach ($schedule as $entry) {
-            $startsAt = \Illuminate\Support\Carbon::parse($entry['date'].' '.$entry['time'], 'Asia/Kuala_Lumpur');
-            $endsAt = $startsAt->copy()->addMinutes(90);
+            $startsAtLocal = \Illuminate\Support\Carbon::parse($entry['date'].' '.$entry['time'], 'Asia/Kuala_Lumpur');
+            $endsAtLocal = $startsAtLocal->copy()->addMinutes(90);
+            $startsAt = $startsAtLocal->copy()->utc();
+            $endsAt = $endsAtLocal->copy()->utc();
             $topic = $entry['topic'] ?? null;
             $note = $entry['note'] ?? null;
 
@@ -350,7 +352,7 @@ class EventSeeder extends Seeder
                 'visibility' => EventVisibility::Public,
                 'is_muslim_only' => false,
                 'status' => 'approved',
-                'published_at' => $startsAt->copy()->subDays(7),
+                'published_at' => $startsAtLocal->copy()->subDays(7)->utc(),
                 'timing_mode' => $timingMode,
                 'prayer_reference' => $prayerReference,
                 'prayer_offset' => $prayerOffset,
