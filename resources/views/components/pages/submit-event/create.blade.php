@@ -59,8 +59,7 @@ use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
-new #[Layout('layouts.app')] class extends Component implements HasActions, HasForms
-{
+new #[Layout('layouts.app')] class extends Component implements HasActions, HasForms {
     use InteractsWithActions;
     use InteractsWithForms;
     use WithFileUploads;
@@ -81,7 +80,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'age_group' => [EventAgeGroup::AllAges],
             'languages' => [101], // Malay as default
             'event_format' => EventFormat::Physical,
-            'visibility' => EventVisibility::Public->value,
+            'visibility' => EventVisibility::Public ->value,
             'location_same_as_institution' => true,
             'location_type' => 'institution',
             'is_muslim_only' => false,
@@ -100,7 +99,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'image/webp',
         ]);
 
-        if (! is_array($acceptedMimeTypes) || $acceptedMimeTypes === []) {
+        if (!is_array($acceptedMimeTypes) || $acceptedMimeTypes === []) {
             $acceptedMimeTypes = [
                 'application/pdf',
                 'image/jpeg',
@@ -116,7 +115,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     'required',
                     'file',
                     "max:{$maxFileSizeKb}",
-                    'mimetypes:'.implode(',', $acceptedMimeTypes),
+                    'mimetypes:' . implode(',', $acceptedMimeTypes),
                 ],
             ],
             [
@@ -163,7 +162,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $this->data = $mergedState;
 
         $wizard = $this->form->getComponent(
-            fn (mixed $component): bool => $component instanceof Wizard
+            fn(mixed $component): bool => $component instanceof Wizard
         );
 
         if ($wizard instanceof Wizard) {
@@ -203,10 +202,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 })
                                 ->options(function (): array {
                                     return collect(EventType::cases())
-                                        ->mapToGroups(fn (EventType $type) => [
+                                        ->mapToGroups(fn(EventType $type) => [
                                             $type->getGroup() => [$type->value => $type->getLabel()],
                                         ])
-                                        ->map(fn ($group) => $group->collapse())
+                                        ->map(fn($group) => $group->collapse())
                                         ->toArray();
                                 })
                                 ->searchable(),
@@ -223,17 +222,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     }
 
                                     $results = Event::query()
-                                        ->whereRaw('LOWER(title) LIKE ?', ['%'.strtolower($search).'%'])
+                                        ->whereRaw('LOWER(title) LIKE ?', ['%' . strtolower($search) . '%'])
                                         ->where('status', 'approved')
                                         ->limit(10)
                                         ->pluck('title', 'title')
                                         ->toArray();
 
                                     // Add Quick Add option if no exact match
-                                    $exactMatch = collect($results)->contains(fn ($value) => strtolower($value) === strtolower($search));
+                                    $exactMatch = collect($results)->contains(fn($value) => strtolower($value) === strtolower($search));
 
-                                    if (! $exactMatch) {
-                                        $results = ["__quick_add__{$search}" => "<span class='text-primary-600'>+ ".__('Tambah')." '{$search}'</span>"] + $results;
+                                    if (!$exactMatch) {
+                                        $results = ["__quick_add__{$search}" => "<span class='text-primary-600'>+ " . __('Tambah') . " '{$search}'</span>"] + $results;
                                     }
 
                                     return $results;
@@ -253,7 +252,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 JS)
                                 ->afterStateUpdated(function (mixed $state, Set $set): void {
                                     // Skip quick-add values — they're new titles, not existing events
-                                    if (! $state || str_starts_with($state, '__quick_add__')) {
+                                    if (!$state || str_starts_with($state, '__quick_add__')) {
                                         return;
                                     }
 
@@ -265,13 +264,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->latest()
                                         ->first();
 
-                                    if (! $existingEvent) {
+                                    if (!$existingEvent) {
                                         return;
                                     }
 
                                     // Populate event type
                                     if ($existingEvent->event_type) {
-                                        $set('event_type', $existingEvent->event_type->map(fn ($e) => $e->value)->toArray());
+                                        $set('event_type', $existingEvent->event_type->map(fn($e) => $e->value)->toArray());
                                     }
 
                                     // Populate tags by type
@@ -328,9 +327,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                             return collect(EventPrayerTime::cases())
                                                 ->filter(function (EventPrayerTime $case) use ($eventDate) {
-                                                    if (! $eventDate) {
+                                                    if (!$eventDate) {
                                                         // No date selected — show base options only (no Jumaat/Tarawih/Ramadhan-only options)
-                                                        return ! in_array($case, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat, EventPrayerTime::SebelumMaghrib, EventPrayerTime::SelepasTarawih], true);
+                                                        return !in_array($case, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat, EventPrayerTime::SebelumMaghrib, EventPrayerTime::SelepasTarawih], true);
                                                     }
 
                                                     $timezone = $this->resolveUserTimezone();
@@ -354,7 +353,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                                     return true;
                                                 })
-                                                ->mapWithKeys(fn (EventPrayerTime $case) => [$case->value => $case->getLabel()])
+                                                ->mapWithKeys(fn(EventPrayerTime $case) => [$case->value => $case->getLabel()])
                                                 ->toArray();
                                         })
                                         ->columnSpan(['default' => 1, 'md' => 2]),
@@ -399,7 +398,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 $timezone = $this->resolveUserTimezone((string) ($get('timezone') ?? ''));
                                                 $now = Carbon::now($timezone);
 
-                                                if (! $eventDate || ! $value) {
+                                                if (!$eventDate || !$value) {
                                                     return;
                                                 }
 
@@ -465,7 +464,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->columnSpan(['default' => 1, 'md' => 2])
                                         ->rule(function (Get $get): Closure {
                                             return function (string $attribute, $value, Closure $fail) use ($get) {
-                                                if (! $value) {
+                                                if (!$value) {
                                                     return; // Optional field
                                                 }
 
@@ -499,7 +498,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->required()
                                         ->options(EventFormat::class)
                                         ->default(EventFormat::Physical)
-                                        ->disableOptionWhen(fn (string $value, Get $get): bool =>
+                                        ->disableOptionWhen(
+                                            fn(string $value, Get $get): bool =>
                                             $this->hasCommunityEventTypeSelection($get('event_type'))
                                             && $value !== EventFormat::Physical->value
                                         )
@@ -526,7 +526,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->visibleJs(<<<'JS'
                                                     ['online', 'hybrid'].includes($get('event_format'))
                                                     JS)
-                                        ->required(fn (Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true)),
+                                        ->required(fn(Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true)),
                                 ]),
 
                             Grid::make(['default' => 1, 'sm' => 2])
@@ -560,7 +560,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             if (in_array(EventAgeGroup::AllAges->value, $ageGroups, true) && count($ageGroups) > 1) {
                                                 $ageGroups = array_values(array_filter(
                                                     $ageGroups,
-                                                    fn (string $ageGroup): bool => $ageGroup !== EventAgeGroup::AllAges->value
+                                                    fn(string $ageGroup): bool => $ageGroup !== EventAgeGroup::AllAges->value
                                                 ));
                                                 $set('age_group', $ageGroups);
                                             }
@@ -595,10 +595,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 'jv' => 'Bahasa Jawa',
                                             ];
 
-                                            $getLanguages = fn () => \Nnjeim\World\Models\Language::query()
+                                            $getLanguages = fn() => \Nnjeim\World\Models\Language::query()
                                                 ->whereIn('code', $preferredOrder)
                                                 ->get()
-                                                ->sortBy(fn ($lang) => array_search($lang->code, $preferredOrder))
+                                                ->sortBy(fn($lang) => array_search($lang->code, $preferredOrder))
                                                 ->mapWithKeys(function ($lang) use ($preferredLabels): array {
                                                     $label = $preferredLabels[$lang->code]
                                                         ?? $lang->name
@@ -651,25 +651,25 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             $uuids = [];
 
                                             foreach ($values as $value) {
-                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                if (is_string($value) && !Str::isUuid($value)) {
                                                     $labels[$value] = $value;
                                                 } else {
                                                     $uuids[] = $value;
                                                 }
                                             }
 
-                                            if (! empty($uuids)) {
+                                            if (!empty($uuids)) {
                                                 $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
                                             }
 
                                             return $labels;
                                         })
-                                        ->options(fn () => Cache::remember('submit_tags_domain_'.app()->getLocale(), 60, fn () => Tag::query()
+                                        ->options(fn() => Cache::remember('submit_tags_domain_' . app()->getLocale(), 60, fn() => Tag::query()
                                             ->where('type', TagType::Domain)
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->orderBy('order_column')
                                             ->get()
-                                            ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
                                         ->rules(['max:3'])
                                         ->validationMessages([
                                             'max' => __('Maksimum 3 kategori sahaja.'),
@@ -683,12 +683,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->searchable()
                                         ->preload()
                                         ->allowHtml()
-                                        ->options(fn () => Cache::remember('submit_tags_discipline_verified_'.app()->getLocale(), 60, fn () => Tag::query()
+                                        ->options(fn() => Cache::remember('submit_tags_discipline_verified_' . app()->getLocale(), 60, fn() => Tag::query()
                                             ->where('type', TagType::Discipline)
                                             ->where('status', 'verified')
                                             ->orderBy('order_column')
                                             ->get()
-                                            ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
                                         ->getSearchResultsUsing(function (string $search): array {
                                             if (blank($search)) {
                                                 // No search, let options() handle preload
@@ -704,21 +704,21 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->pluck('name', 'id')
                                                 ->toArray();
 
-                                            return ["__quick_add__{$search}" => "<span class='text-primary-600'>+ ".__('Tambah')." '{$search}'</span>"] + $results;
+                                            return ["__quick_add__{$search}" => "<span class='text-primary-600'>+ " . __('Tambah') . " '{$search}'</span>"] + $results;
                                         })
                                         ->getOptionLabelsUsing(function (array $values): array {
                                             $labels = [];
                                             $uuids = [];
 
                                             foreach ($values as $value) {
-                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                if (is_string($value) && !Str::isUuid($value)) {
                                                     $labels[$value] = $value;
                                                 } else {
                                                     $uuids[] = $value;
                                                 }
                                             }
 
-                                            if (! empty($uuids)) {
+                                            if (!empty($uuids)) {
                                                 $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
                                             }
 
@@ -757,25 +757,25 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             $uuids = [];
 
                                             foreach ($values as $value) {
-                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                if (is_string($value) && !Str::isUuid($value)) {
                                                     $labels[$value] = $value;
                                                 } else {
                                                     $uuids[] = $value;
                                                 }
                                             }
 
-                                            if (! empty($uuids)) {
+                                            if (!empty($uuids)) {
                                                 $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
                                             }
 
                                             return $labels;
                                         })
-                                        ->options(fn () => Cache::remember('submit_tags_source_'.app()->getLocale(), 60, fn () => Tag::query()
+                                        ->options(fn() => Cache::remember('submit_tags_source_' . app()->getLocale(), 60, fn() => Tag::query()
                                             ->where('type', TagType::Source)
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->orderBy('order_column')
                                             ->get()
-                                            ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))),
+                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())]))),
 
                                     Select::make('issue_tags')
                                         ->label(__('Tema / Isu'))
@@ -785,12 +785,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->searchable()
                                         ->preload()
                                         ->allowHtml()
-                                        ->options(fn () => Cache::remember('submit_tags_issue_verified_'.app()->getLocale(), 60, fn () => Tag::query()
+                                        ->options(fn() => Cache::remember('submit_tags_issue_verified_' . app()->getLocale(), 60, fn() => Tag::query()
                                             ->where('type', TagType::Issue)
                                             ->where('status', 'verified')
                                             ->orderBy('order_column')
                                             ->get()
-                                            ->mapWithKeys(fn (Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
+                                            ->mapWithKeys(fn(Tag $tag) => [$tag->id => $tag->getTranslation('name', app()->getLocale())])))
                                         ->getSearchResultsUsing(function (string $search): array {
                                             if (blank($search)) {
                                                 // No search, let options() handle preload
@@ -806,21 +806,21 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->pluck('name', 'id')
                                                 ->toArray();
 
-                                            return ["__quick_add__{$search}" => "<span class='text-primary-600'>+ ".__('Tambah')." '{$search}'</span>"] + $results;
+                                            return ["__quick_add__{$search}" => "<span class='text-primary-600'>+ " . __('Tambah') . " '{$search}'</span>"] + $results;
                                         })
                                         ->getOptionLabelsUsing(function (array $values): array {
                                             $labels = [];
                                             $uuids = [];
 
                                             foreach ($values as $value) {
-                                                if (is_string($value) && ! Str::isUuid($value)) {
+                                                if (is_string($value) && !Str::isUuid($value)) {
                                                     $labels[$value] = $value;
                                                 } else {
                                                     $uuids[] = $value;
                                                 }
                                             }
 
-                                            if (! empty($uuids)) {
+                                            if (!empty($uuids)) {
                                                 $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
                                             }
 
@@ -852,7 +852,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->searchable()
                                 ->preload()
                                 ->native(false)
-                                ->relationship('references', 'title', fn (Builder $query) => $query->where('is_active', true))
+                                ->relationship('references', 'title', fn(Builder $query) => $query->where('is_active', true))
                                 ->createOptionForm([
                                     TextInput::make('title')
                                         ->label(__('Tajuk Kitab / Buku'))
@@ -935,7 +935,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     $schema?->model($reference)->saveRelationships();
 
                                     // Save reference URL as social media link
-                                    if (! empty($data['reference_url'])) {
+                                    if (!empty($data['reference_url'])) {
                                         $reference->socialMedia()->create([
                                             'platform' => 'website',
                                             'url' => $data['reference_url'],
@@ -963,30 +963,30 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('organizer_institution_id')
                                         ->label(__('Institusi'))
-                                        ->options(fn () => Cache::remember('submit_institutions', 60, fn () => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
+                                        ->options(fn() => Cache::remember('submit_institutions', 60, fn() => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'institution'
                                                             JS)
-                                        ->required(fn (Get $get): bool => $get('organizer_type') === 'institution')
+                                        ->required(fn(Get $get): bool => $get('organizer_type') === 'institution')
                                         ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('organizer_speaker_id')
                                         ->label(__('Penceramah'))
-                                        ->options(fn () => Cache::remember('submit_speakers', 60, fn () => Speaker::query()
+                                        ->options(fn() => Cache::remember('submit_speakers', 60, fn() => Speaker::query()
                                             ->whereIn('status', ['verified', 'pending'])
                                             ->where('is_active', true)
                                             ->get()
-                                            ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                            ->mapWithKeys(fn(Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
                                             ->all()))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'speaker'
                                                             JS)
-                                        ->required(fn (Get $get): bool => $get('organizer_type') === 'speaker')
+                                        ->required(fn(Get $get): bool => $get('organizer_type') === 'speaker')
                                         ->afterStateUpdatedJs(<<<'JS'
                                                             if ($state) {
                                                                 const currentSpeakers = $get('speakers') || []
@@ -1025,31 +1025,31 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
                                                             JS)
-                                        ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('event_format') !== 'online'),
+                                        ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('event_format') !== 'online'),
 
                                     Select::make('location_institution_id')
                                         ->label(__('Institusi'))
-                                        ->options(fn () => Cache::remember('submit_institutions', 60, fn () => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
+                                        ->options(fn() => Cache::remember('submit_institutions', 60, fn() => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
                                                             ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution'
                                                             JS)
-                                        ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('location_type') === 'institution')
+                                        ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution')
                                         ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('location_venue_id')
                                         ->label(__('Lokasi'))
-                                        ->options(fn () => Cache::remember('submit_venues', 60, fn () => Venue::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
+                                        ->options(fn() => Cache::remember('submit_venues', 60, fn() => Venue::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
                                                             ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue'
                                                             JS)
-                                        ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('location_type') === 'venue')
+                                        ->required(fn(Get $get): bool => ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue')
                                         ->createOptionForm(VenueFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn (array $data, Schema $schema): string => VenueFormSchema::createOptionUsing($data, $schema)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => VenueFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('space_id')
                                         ->label(__('Ruang'))
@@ -1062,11 +1062,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ($get('organizer_type') === 'institution' && ($get('location_same_as_institution') !== false)) || 
                                                             (($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution')
                                                             JS)
-                                        ->options(fn (): array => Space::query()
-                                            ->where('is_active', true)
-                                            ->orderBy('name')
-                                            ->pluck('name', 'id')
-                                            ->toArray()
+                                        ->options(
+                                            fn(): array => Space::query()
+                                                ->where('is_active', true)
+                                                ->orderBy('name')
+                                                ->pluck('name', 'id')
+                                                ->toArray()
                                         ),
                                 ]),
                         ]),
@@ -1081,17 +1082,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->required()
                                         ->multiple()
                                         ->closeOnSelect()
-                                        ->relationship('speakers', 'name', fn (Builder $query) => $query->whereIn('status', ['verified', 'pending'])->where('is_active', true))
+                                        ->relationship('speakers', 'name', fn(Builder $query) => $query->whereIn('status', ['verified', 'pending'])->where('is_active', true))
                                         ->searchable()
                                         ->preload()
-                                        ->getOptionLabelUsing(fn (mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
-                                        ->getOptionLabelsUsing(fn (array $values): array => Speaker::query()
+                                        ->getOptionLabelUsing(fn(mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
+                                        ->getOptionLabelsUsing(fn(array $values): array => Speaker::query()
                                             ->whereIn('id', $values)
                                             ->get()
-                                            ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                            ->mapWithKeys(fn(Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
                                             ->toArray())
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
-                                        ->createOptionUsing(fn (array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
+                                        ->createOptionUsing(fn(array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
                                 ]),
 
                             Section::make(__('Media'))
@@ -1126,7 +1127,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                         ->schema([
                             Hidden::make('timezone')
                                 ->dehydrated()
-                                ->default(fn (): string => $this->resolveUserTimezone()),
+                                ->default(fn(): string => $this->resolveUserTimezone()),
 
                             Hidden::make('captcha_token')
                                 ->dehydrated(),
@@ -1150,16 +1151,16 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->label(__('Email'))
                                                 ->email()
                                                 ->maxLength(255)
-                                                ->required(fn (Get $get) => ! auth()->check() && empty($get('submitter_phone'))),
+                                                ->required(fn(Get $get) => !auth()->check() && empty($get('submitter_phone'))),
 
                                             TextInput::make('submitter_phone')
                                                 ->label(__('Telefon'))
                                                 ->tel()
                                                 ->maxLength(20)
-                                                ->required(fn (Get $get) => ! auth()->check() && empty($get('submitter_email'))),
+                                                ->required(fn(Get $get) => !auth()->check() && empty($get('submitter_email'))),
                                         ]),
                                 ])
-                                ->visible(fn () => ! auth()->check()),
+                                ->visible(fn() => !auth()->check()),
 
                             Section::make(__('Nota untuk Pentadbir'))
                                 ->description(__('Pilihan: Tambah maklumat atau permintaan khas untuk moderator.'))
@@ -1254,20 +1255,20 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         if (
             in_array($selectedPrayer, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat], true)
-            && ! $eventDate->isFriday()
+            && !$eventDate->isFriday()
         ) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'data.prayer_time' => __('Pilihan waktu Jumaat hanya boleh dipilih untuk hari Jumaat.'),
             ]);
         }
 
-        if ($selectedPrayer === EventPrayerTime::SebelumMaghrib && ! $this->isRamadhan($eventDate, $timezone)) {
+        if ($selectedPrayer === EventPrayerTime::SebelumMaghrib && !$this->isRamadhan($eventDate, $timezone)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'data.prayer_time' => __('Sebelum Maghrib hanya boleh dipilih semasa bulan Ramadhan.'),
             ]);
         }
 
-        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && ! $this->isRamadhan($eventDate, $timezone)) {
+        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && !$this->isRamadhan($eventDate, $timezone)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'data.prayer_time' => __('Selepas Tarawih hanya boleh dipilih semasa bulan Ramadhan.'),
             ]);
@@ -1290,7 +1291,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $locationInstitutionId = null;
         }
 
-        if (($validated['organizer_type'] ?? null) === 'institution' && ! empty($validated['organizer_institution_id'])) {
+        if (($validated['organizer_type'] ?? null) === 'institution' && !empty($validated['organizer_institution_id'])) {
             $organizerType = Institution::class;
             $organizerId = $validated['organizer_institution_id'];
 
@@ -1310,7 +1311,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     $targetInstitutionId = null;
                 }
             }
-        } elseif (($validated['organizer_type'] ?? null) === 'speaker' && ! empty($validated['organizer_speaker_id'])) {
+        } elseif (($validated['organizer_type'] ?? null) === 'speaker' && !empty($validated['organizer_speaker_id'])) {
             $organizerType = Speaker::class;
             $organizerId = $validated['organizer_speaker_id'];
 
@@ -1329,7 +1330,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             : EventPrayerTime::tryFrom($prayerTimeValue);
         $prayerReference = $prayerTime?->toPrayerReference();
         $prayerOffset = $prayerTime?->getDefaultOffset();
-        $prayerDisplayText = $prayerTime && ! $prayerTime->isCustomTime() ? $prayerTime->getLabel() : null;
+        $prayerDisplayText = $prayerTime && !$prayerTime->isCustomTime() ? $prayerTime->getLabel() : null;
 
         $this->validateEndsAtAfterStartsAt($validated, $startsAt, $timezone);
 
@@ -1344,7 +1345,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $event = Event::create([
             'title' => $validated['title'],
-            'slug' => Str::slug($validated['title']).'-'.Str::random(7),
+            'slug' => Str::slug($validated['title']) . '-' . Str::random(7),
             'description' => $validated['description'] ?? null,
             'timezone' => $timezone,
             'starts_at' => $startsAt,
@@ -1366,24 +1367,24 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'event_format' => $validated['event_format'] ?? EventFormat::Physical->value,
             'event_url' => $validated['event_url'] ?? null,
             'live_url' => $validated['live_url'] ?? null,
-            'visibility' => $validated['visibility'] ?? EventVisibility::Public,
+            'visibility' => $validated['visibility'] ?? EventVisibility::Public ,
             'submitter_id' => auth()->id(),
         ]);
 
         // Attach selected space to institution if not already attached
-        if (! empty($validated['space_id']) && ! empty($event->institution_id)) {
+        if (!empty($validated['space_id']) && !empty($event->institution_id)) {
             $institution = Institution::find($event->institution_id);
-            if ($institution && ! $institution->spaces()->where('spaces.id', $validated['space_id'])->exists()) {
+            if ($institution && !$institution->spaces()->where('spaces.id', $validated['space_id'])->exists()) {
                 $institution->spaces()->attach($validated['space_id']);
             }
         }
 
-        if (! empty($validated['speakers'])) {
+        if (!empty($validated['speakers'])) {
             $event->speakers()->attach($validated['speakers']);
         }
 
         // Sync selected languages
-        if (! empty($validated['languages'])) {
+        if (!empty($validated['languages'])) {
             $event->syncLanguages($validated['languages']);
         }
 
@@ -1397,7 +1398,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $validated['domain_tags'] ?? [],
             $validated['source_tags'] ?? [],
         ))
-            ->filter(fn (mixed $value): bool => is_string($value) && Str::isUuid($value))
+            ->filter(fn(mixed $value): bool => is_string($value) && Str::isUuid($value))
             ->values()
             ->all();
 
@@ -1412,7 +1413,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                         ->whereRaw("LOWER(name->>'ms') = ?", [strtolower($value)])
                         ->first();
 
-                    if (! $tag) {
+                    if (!$tag) {
                         $tag = Tag::create([
                             'name' => ['ms' => $value, 'en' => $value],
                             'type' => $tagType->value,
@@ -1426,7 +1427,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $allTagIds = collect($allTagIds)
-            ->filter(fn (mixed $value): bool => is_string($value) && Str::isUuid($value))
+            ->filter(fn(mixed $value): bool => is_string($value) && Str::isUuid($value))
             ->unique()
             ->values()
             ->all();
@@ -1448,7 +1449,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        if (! auth()->check()) {
+        if (!auth()->check()) {
             $this->storeSubmitterContacts($submission, $validated);
         }
 
@@ -1469,7 +1470,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $state = $state->all();
         }
 
-        if (! is_array($state)) {
+        if (!is_array($state)) {
             $state = [$state];
         }
 
@@ -1496,7 +1497,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $eventTypes = $eventTypes->all();
         }
 
-        if (! is_array($eventTypes)) {
+        if (!is_array($eventTypes)) {
             $eventTypes = [$eventTypes];
         }
 
@@ -1527,7 +1528,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ? $prayerTimeValue
             : EventPrayerTime::tryFrom($prayerTimeValue);
 
-        if ($prayerTime?->isCustomTime() && ! empty($validated['custom_time'])) {
+        if ($prayerTime?->isCustomTime() && !empty($validated['custom_time'])) {
             $time = Carbon::parse($validated['custom_time']);
 
             return $eventDate->setTime($time->hour, $time->minute)->utc();
@@ -1564,7 +1565,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $endTimeValue = $validated['end_time'] ?? null;
 
-        if (! is_string($endTimeValue) || $endTimeValue === '') {
+        if (!is_string($endTimeValue) || $endTimeValue === '') {
             return;
         }
 
@@ -1589,7 +1590,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             return is_string($customTime) && $customTime !== '' ? $customTime : null;
         }
 
-        if (! $prayerTime instanceof EventPrayerTime) {
+        if (!$prayerTime instanceof EventPrayerTime) {
             return null;
         }
 
@@ -1632,7 +1633,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             2030 => ['start' => '01-05', 'end' => '02-03'],
         ];
 
-        if (! isset($ramadhanPeriods[$year])) {
+        if (!isset($ramadhanPeriods[$year])) {
             return false;
         }
 
@@ -1679,7 +1680,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $verifier = app(TurnstileVerifier::class);
 
-        if (! $verifier->verify($captchaToken, request()->ip())) {
+        if (!$verifier->verify($captchaToken, request()->ip())) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'data.captcha_token' => __('Sila lengkapkan pengesahan keselamatan sebelum menghantar.'),
             ]);
@@ -1747,20 +1748,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 </p>
 
                 <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
-                    <input
-                        type="file"
-                        wire:model="event_source_attachment"
+                    <input type="file" wire:model="event_source_attachment"
                         accept=".pdf,image/jpeg,image/png,image/webp"
-                        class="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
-                    >
+                        class="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200">
 
-                    <x-filament::button
-                        type="button"
-                        wire:click="extractEventFromMedia"
-                        wire:loading.attr="disabled"
-                        wire:target="event_source_attachment,extractEventFromMedia"
-                        class="whitespace-nowrap"
-                    >
+                    <x-filament::button type="button" wire:click="extractEventFromMedia" wire:loading.attr="disabled"
+                        wire:target="event_source_attachment,extractEventFromMedia" class="whitespace-nowrap">
                         {{ __('Ekstrak Dengan AI') }}
                     </x-filament::button>
                 </div>
