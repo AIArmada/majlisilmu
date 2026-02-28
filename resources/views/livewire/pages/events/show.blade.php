@@ -49,22 +49,53 @@
     $eventPosterPreviewUrl = $eventHasPoster ? $event->getFirstMedia('poster')?->getAvailableUrl(['preview', 'card', 'thumb']) : null;
     $eventPosterOriginalUrl = $eventHasPoster ? $event->getFirstMediaUrl('poster') : null;
 
-    // Hero atmospheric background: institution cover → venue cover/main → gradient fallback
+    // Hero atmospheric background:
+    // institution cover -> venue cover/main -> organizer/speaker media -> gradient fallback.
     // The event poster is NEVER used as background — it is a factual flyer and must be displayed clearly.
     $heroImage = $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
-    if (!$heroImage) {
+    if (! $heroImage) {
         $heroImage = $event->venue?->getFirstMedia('main')?->getAvailableUrl(['banner'])
             ?? $event->venue?->getFirstMedia('cover')?->getAvailableUrl(['banner'])
             ?? '';
     }
 
-    // Format label
-    $formatLabel = $event->event_format?->getLabel() ?? __('Physical');
-    $formatIcon = match($event->event_format) {
-        \App\Enums\EventFormat::Online => 'globe',
-        \App\Enums\EventFormat::Hybrid => 'arrows-right-left',
-        default => 'map-pin',
+    if (! $heroImage && $event->organizer instanceof \App\Models\Institution) {
+        $heroImage = $event->organizer->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
+    }
+
+    if (! $heroImage && $event->organizer instanceof \App\Models\Speaker) {
+        $heroImage = $event->organizer->getFirstMedia('main')?->getAvailableUrl(['banner'])
+            ?? $event->organizer->getFirstMedia('avatar')?->getAvailableUrl(['profile', 'thumb'])
+            ?? '';
+    }
+
+    if (! $heroImage) {
+        $firstSpeaker = $event->speakers->first();
+        $heroImage = $firstSpeaker?->getFirstMedia('main')?->getAvailableUrl(['banner'])
+            ?? $firstSpeaker?->getFirstMedia('avatar')?->getAvailableUrl(['profile', 'thumb'])
+            ?? '';
+    }
+
+    $eventFormat = $event->event_format;
+    $eventFormatValue = $eventFormat instanceof \App\Enums\EventFormat
+        ? $eventFormat->value
+        : (is_string($eventFormat) ? $eventFormat : null);
+    $isOnlineFormat = $eventFormatValue === \App\Enums\EventFormat::Online->value;
+    $isHybridFormat = $eventFormatValue === \App\Enums\EventFormat::Hybrid->value;
+    $heroFallbackGradient = match ($eventFormatValue) {
+        \App\Enums\EventFormat::Online->value => 'from-sky-950 via-indigo-950 to-slate-950',
+        \App\Enums\EventFormat::Hybrid->value => 'from-cyan-950 via-slate-950 to-emerald-950',
+        default => 'from-emerald-950 via-slate-950 to-teal-950',
     };
+
+    // Format label
+    $formatLabel = $eventFormat instanceof \App\Enums\EventFormat
+        ? $eventFormat->getLabel()
+        : match ($eventFormatValue) {
+            \App\Enums\EventFormat::Online->value => __('Dalam talian'),
+            \App\Enums\EventFormat::Hybrid->value => __('Hibrid'),
+            default => __('Fizikal'),
+        };
 
     // Schedule kind label
     $scheduleKindLabel = $event->schedule_kind?->label();
@@ -103,6 +134,26 @@
     $locationShortLabel = implode(', ', array_filter(
         $locationDistrict !== $locationState ? [$locationDistrict, $locationState] : [$locationState]
     ));
+
+    $hasPhysicalHeroLocation = $event->venue !== null || $event->institution !== null;
+    if ($hasPhysicalHeroLocation) {
+        $heroLocationTitle = $event->venue?->name ?? $event->institution?->name ?? __('Lokasi');
+        $heroLocationSubtitle = $locationShortLabel !== '' ? $locationShortLabel : __('Lokasi fizikal');
+        $heroLocationIcon = 'map-pin';
+    } elseif ($isOnlineFormat) {
+        $heroLocationTitle = __('Acara Dalam Talian');
+        $heroLocationSubtitle = __('Sertai melalui pautan siaran langsung');
+        $heroLocationIcon = 'globe';
+    } elseif ($isHybridFormat) {
+        $heroLocationTitle = __('Mod Hibrid');
+        $heroLocationSubtitle = __('Sertai secara fizikal atau maya');
+        $heroLocationIcon = 'arrows-right-left';
+    } else {
+        $heroLocationTitle = __('Lokasi Akan Dikemaskini');
+        $heroLocationSubtitle = __('Butiran lokasi akan diumumkan kemudian');
+        $heroLocationIcon = 'clock';
+    }
+    $showHeroLocationChip = true;
 
     // Navigation URLs: prefer stored URLs, fall back to lat/lng
     $wazeNavUrl = filled($primaryAddress?->waze_url) ? (string) $primaryAddress->waze_url : ($lat && $lng ? "https://www.waze.com/ul?ll={$lat},{$lng}&navigate=yes" : null);
@@ -232,8 +283,8 @@
                 {{-- Poster/image becomes the atmosphere at ~65% opacity --}}
                 <img src="{{ $heroImage }}" alt="" class="size-full object-cover opacity-65" loading="eager" aria-hidden="true">
             @else
-                {{-- No image: deep emerald gradient base --}}
-                <div class="absolute inset-0 bg-gradient-to-br from-emerald-950 via-slate-950 to-teal-950" aria-hidden="true"></div>
+                {{-- No image: enriched format-aware gradient base --}}
+                <div class="absolute inset-0 bg-gradient-to-br {{ $heroFallbackGradient }}" aria-hidden="true"></div>
                 {{-- Islamic hexagonal tessellation --}}
                 <div class="absolute inset-0 opacity-[0.07]" aria-hidden="true">
                     <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -247,8 +298,15 @@
                     </svg>
                 </div>
                 {{-- Ambient glow orbs --}}
-                <div class="absolute -left-40 -top-40 size-[600px] rounded-full bg-emerald-500/25 blur-[120px]" aria-hidden="true"></div>
-                <div class="absolute -bottom-20 right-20 size-[500px] rounded-full bg-teal-400/15 blur-[100px]" aria-hidden="true"></div>
+                <div class="absolute -left-40 -top-40 size-[600px] rounded-full {{ $isOnlineFormat ? 'bg-sky-500/25' : ($isHybridFormat ? 'bg-cyan-400/25' : 'bg-emerald-500/25') }} blur-[120px]" aria-hidden="true"></div>
+                <div class="absolute -bottom-20 right-20 size-[500px] rounded-full {{ $isOnlineFormat ? 'bg-indigo-400/20' : ($isHybridFormat ? 'bg-emerald-400/20' : 'bg-teal-400/15') }} blur-[100px]" aria-hidden="true"></div>
+
+                {{-- Geometric glass accents to keep hero intentional even without media --}}
+                <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] lg:block" aria-hidden="true">
+                    <div class="absolute right-14 top-24 size-56 rotate-6 rounded-[2.25rem] border border-white/20 bg-white/[0.06] backdrop-blur-sm"></div>
+                    <div class="absolute bottom-14 right-28 size-44 -rotate-6 rounded-[1.8rem] border border-white/15 bg-white/[0.04]"></div>
+                    <div class="absolute inset-y-14 left-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent"></div>
+                </div>
             @endif
 
             {{-- Bottom-to-top gradient: protects text legibility, fades into page --}}
@@ -350,17 +408,23 @@
                             </div>
                         @endif
 
-                        @if($event->venue || $event->institution)
+                        @if($showHeroLocationChip)
                             <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] p-3 backdrop-blur-md shadow-lg shadow-black/20">
                                 {{-- Translucent pin block --}}
                                 <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 shadow-inner">
-                                    <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                    @if($heroLocationIcon === 'globe')
+                                        <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                                    @elseif($heroLocationIcon === 'arrows-right-left')
+                                        <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+                                    @elseif($heroLocationIcon === 'clock')
+                                        <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6 0A10 10 0 1112 2a10 10 0 0110 10z"/></svg>
+                                    @else
+                                        <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                    @endif
                                 </div>
                                 <div>
-                                    <p class="text-sm font-bold text-white">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}</p>
-                                    @if($locationShortLabel)
-                                        <p class="mt-0.5 text-xs font-medium text-white/60">{{ $locationShortLabel }}</p>
-                                    @endif
+                                    <p class="text-sm font-bold text-white">{{ $heroLocationTitle }}</p>
+                                    <p class="mt-0.5 text-xs font-medium text-white/60">{{ $heroLocationSubtitle }}</p>
                                 </div>
                             </div>
                         @endif
@@ -497,17 +561,23 @@
                         </div>
                     @endif
 
-                    @if($event->venue || $event->institution)
+                    @if($showHeroLocationChip)
                         <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] p-3 backdrop-blur-md shadow-lg shadow-black/20">
                             {{-- Translucent pin block --}}
                             <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 shadow-inner">
-                                <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                @if($heroLocationIcon === 'globe')
+                                    <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                                @elseif($heroLocationIcon === 'arrows-right-left')
+                                    <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+                                @elseif($heroLocationIcon === 'clock')
+                                    <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6 0A10 10 0 1112 2a10 10 0 0110 10z"/></svg>
+                                @else
+                                    <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                @endif
                             </div>
                             <div>
-                                <p class="text-sm font-bold text-white">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}</p>
-                                @if($locationShortLabel)
-                                    <p class="mt-0.5 text-xs font-medium text-white/60">{{ $locationShortLabel }}</p>
-                                @endif
+                                <p class="text-sm font-bold text-white">{{ $heroLocationTitle }}</p>
+                                <p class="mt-0.5 text-xs font-medium text-white/60">{{ $heroLocationSubtitle }}</p>
                             </div>
                         </div>
                     @endif
@@ -522,7 +592,7 @@
     {{-- ==============================
          FLOATING ACTION BAR
          ============================== --}}
-    <div class="container relative z-30 mx-auto px-5 sm:px-8 lg:px-12 -mt-12 mb-12">
+    <div class="container relative z-30 mx-auto -mt-12 mb-12 hidden px-5 sm:px-8 lg:block lg:px-12">
         <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/40 bg-white/80 p-4 shadow-2xl shadow-slate-200/50 backdrop-blur-xl sm:p-6">
             <div class="flex flex-wrap items-center gap-3">
                 @if(!$event->starts_at || !$event->starts_at->isPast())
@@ -538,7 +608,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         @endif
                     </svg>
-                    {{ $isGoing ? __('Saya Hadir') : __('Saya Akan Hadir') }}
+                    {{ $isGoing ? __('Hadir') : __('Akan Hadir') }}
                     @if($goingCount > 0)
                         <span class="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ $goingCount }}</span>
                     @endif
@@ -722,7 +792,7 @@
 
             {{-- SPEAKERS — shown first: people come for the speaker --}}
             @if($event->speakers->isNotEmpty())
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-teal-100 text-teal-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -828,7 +898,7 @@
 
             {{-- Location cover (institution/venue) --}}
             @if($locationCover)
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -861,7 +931,7 @@
             @endif
 
             {{-- ABOUT --}}
-            <section class="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all hover:shadow-2xl hover:shadow-slate-200/50 sm:p-8 scroll-reveal reveal-up"
+            <section class="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all hover:shadow-2xl hover:shadow-slate-200/50 sm:p-8 scroll-reveal reveal-up revealed"
                 x-intersect.once="$el.classList.add('revealed')">
                 <div class="absolute -right-20 -top-20 size-64 rounded-full bg-emerald-50 opacity-50 blur-3xl transition-opacity group-hover:opacity-100"></div>
                 
@@ -904,12 +974,13 @@
                             ];
                         @endphp
                         <div class="mt-8 border-t border-slate-100 pt-6">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                             @foreach($tagCloudSections as $section)
                                 @php
                                     $sectionTags = $tagsByType->get($section['key']);
                                 @endphp
                                 @if($sectionTags instanceof \Illuminate\Support\Collection && $sectionTags->isNotEmpty())
-                                    <div class="{{ $loop->first ? '' : 'mt-4' }}">
+                                    <div>
                                         <p class="mb-2.5 text-xs font-bold uppercase tracking-widest text-slate-400">{{ $section['label'] }}</p>
                                         <div class="flex flex-wrap gap-2.5">
                                             @foreach($sectionTags as $tag)
@@ -922,6 +993,7 @@
                                     </div>
                                 @endif
                             @endforeach
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -931,7 +1003,7 @@
                  Organizer/Location context card is intentionally disabled per product request.
                  Keep this block intact so it can be re-enabled quickly when requested. --}}
             @if(false && $showContextCard)
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-6 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z"/></svg>
@@ -1039,7 +1111,7 @@
 
             {{-- REFERENCES --}}
             @if($event->references->isNotEmpty())
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-6 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
@@ -1077,7 +1149,7 @@
 
             {{-- SERIES CONTEXT --}}
             @if($event->series->isNotEmpty())
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-6 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-fuchsia-100 text-fuchsia-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
@@ -1116,7 +1188,7 @@
 
             {{-- GALLERY --}}
             @if($galleryImages !== [])
-                <section class="scroll-reveal reveal-up"
+                <section class="scroll-reveal reveal-up revealed"
                     x-intersect.once="$el.classList.add('revealed')"
                     x-data="{ active: 0, images: @js($galleryImages), next() { this.active = (this.active + 1) % this.images.length }, prev() { this.active = (this.active - 1 + this.images.length) % this.images.length }, go(index) { this.active = index } }">
                     <div class="mb-6 flex items-center justify-between">
@@ -1168,7 +1240,7 @@
 
             {{-- WATCH ONLINE --}}
             @if($event->live_url || $event->recording_url)
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-6 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-red-100 text-red-600">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
@@ -1455,28 +1527,49 @@
                         $regOpensAt  = $event->settings?->registration_opens_at;
                         $regClosesAt = $event->settings?->registration_closes_at;
                         $regCapacity = $event->settings?->capacity;
+                        $spotsTaken = (int) $event->registrations_count;
+                        $capacityRatio = $regCapacity
+                            ? min(100, (int) round(($spotsTaken / max(1, (int) $regCapacity)) * 100))
+                            : null;
                     @endphp
-                    <div class="border-t border-slate-100/80 px-6 py-5">
-                        @if($regRequired)
-                            <div class="flex items-center gap-3">
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
-                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                    {{ __('Registration Required') }}
-                                </span>
+                    @if($regRequired)
+                        <div class="border-t border-slate-100/80 px-6 py-5">
+                            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 sm:p-4">
+                                <div class="flex flex-wrap items-center justify-between gap-2.5">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
+                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                        {{ __('Registration Required') }}
+                                    </span>
+                                    @if($regCapacity)
+                                        <span class="text-xs font-semibold text-slate-500">
+                                            <span class="text-slate-700">{{ $spotsTaken }}/{{ $regCapacity }}</span> {{ __('spots taken') }}
+                                        </span>
+                                    @endif
+                                </div>
+
                                 @if($regCapacity)
-                                    <span class="text-xs font-medium text-slate-500">{{ $event->registrations_count }}/{{ $regCapacity }} {{ __('spots taken') }}</span>
+                                    <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                                        <div class="h-full rounded-full bg-amber-500/80 transition-all duration-500" style="width: {{ $capacityRatio }}%"></div>
+                                    </div>
                                 @endif
+
+                                <div class="mt-3 space-y-1.5 text-xs font-medium text-slate-500">
+                                    @if($regOpensAt && $regOpensAt->isFuture())
+                                        <p class="flex items-center gap-1.5">
+                                            <svg class="size-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/></svg>
+                                            <span>{{ __('Opens') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regOpensAt, 'j M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($regOpensAt, 'g:i A') }}</span>
+                                        </p>
+                                    @endif
+                                    @if($regClosesAt)
+                                        <p class="flex items-center gap-1.5">
+                                            <svg class="size-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/></svg>
+                                            <span>{{ __('Closes') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regClosesAt, 'j M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($regClosesAt, 'g:i A') }}</span>
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
-                            <div class="mt-2 space-y-1 text-xs font-medium text-slate-500">
-                                @if($regOpensAt && $regOpensAt->isFuture())
-                                    <p>{{ __('Opens') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regOpensAt, 'j M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($regOpensAt, 'g:i A') }}</p>
-                                @endif
-                                @if($regClosesAt)
-                                    <p>{{ __('Closes') }}: {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($regClosesAt, 'j M Y') }}, {{ \App\Support\Timezone\UserDateTimeFormatter::format($regClosesAt, 'g:i A') }}</p>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
+                        </div>
+                    @endif
 
                     {{-- Registration CTA --}}
                     <div class="border-t border-slate-100/80 bg-slate-50/50 p-6">
@@ -1821,6 +1914,53 @@
                         {{ __('Log Masuk') }}
                     </a>
                 @endauth
+
+                <div class="relative" x-data="{ calendarOpen: false }">
+                    <button
+                        type="button"
+                        @click="calendarOpen = !calendarOpen"
+                        class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+                        aria-label="{{ __('Tambah ke Kalendar') }}"
+                    >
+                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </button>
+
+                    <div
+                        x-show="calendarOpen"
+                        @click.away="calendarOpen = false"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+                        class="absolute bottom-full right-0 z-50 mb-2 w-72 max-w-[85vw] overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 p-2 shadow-2xl backdrop-blur-xl"
+                        x-cloak
+                    >
+                        <a href="{{ $this->calendarLinks['google'] }}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 22h-15A2.5 2.5 0 012 19.5v-15A2.5 2.5 0 014.5 2H9v2H4.5a.5.5 0 00-.5.5v15a.5.5 0 00.5.5h15a.5.5 0 00.5-.5V15h2v4.5a2.5 2.5 0 01-2.5 2.5z"/><path d="M8 10h2v2H8v-2zm0 4h2v2H8v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2z"/></svg>
+                            <span class="text-sm font-bold text-slate-700">Google Calendar</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['ics'] }}" download class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            <span class="text-sm font-bold text-slate-700">Apple / iCal (.ics)</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['outlook'] }}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#0078D4]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                            <span class="text-sm font-bold text-slate-700">Outlook.com</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['office365'] }}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#D83B01]" viewBox="0 0 24 24" fill="currentColor"><path d="M21 5H3a1 1 0 00-1 1v12a1 1 0 001 1h18a1 1 0 001-1V6a1 1 0 00-1-1zM3 6h18v2H3V6zm0 12V10h18v8H3z"/></svg>
+                            <span class="text-sm font-bold text-slate-700">Office 365</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['yahoo'] }}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#6001D2]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                            <span class="text-sm font-bold text-slate-700">Yahoo Calendar</span>
+                        </a>
+                    </div>
+                </div>
 
                 <button type="button" @click="openShareModal()"
                     class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700">

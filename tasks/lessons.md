@@ -25,3 +25,8 @@
 - For native Filament `TimePicker`, avoid strict `minutesStep()` on admin edit forms with legacy data unless timestamps are guaranteed normalized; step mismatch (`:13` vs step `5`) can silently block submit via browser `checkValidity()` before Livewire runs.
 - When a Filament select is filtered by a pivot relation (for example spaces by institution), provide a safe fallback for unlinked/global records (`orWhereDoesntHave(...)`) or ensure seeders populate the pivot; otherwise dropdowns appear empty despite valid base data.
 - For event public tag display, mirror submit-event taxonomy structure (Domain/Sumber/Disiplin/Isu) in a fixed order and cloud-chip style instead of iterating raw grouped tags, so `Isu` support and visual consistency are preserved.
+- When normalizing seeded events, enforce `event_format` invariants explicitly: `online` must always clear `institution_id`, `venue_id`, and `space_id`, not just satisfy location XOR checks.
+- In event hero design, never hide location metadata when physical location is missing; render explicit state messaging (`online`, `hybrid`, or `location pending`) and strengthen visual fallback so the header does not feel empty.
+- In Blade helpers that build event location strings, always null-safe the base address object first (`$address?->...`) because online events can intentionally have no location rows.
+- For Livewire pages using scroll-reveal classes, avoid relying only on client-added `.revealed` state; Livewire re-renders can drop that transient class and hide sections after actions.
+- Whenever a new domain seeder is added (for example inspirations), also wire it into `DatabaseSeeder` and lock it with a pipeline-order test so `php artisan migrate:fresh --seed` cannot silently skip it.

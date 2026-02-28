@@ -487,3 +487,117 @@
   - Browser check on `https://majlisilmu.test/majlis/fiqh-solat-tazkirah-tz50o46` confirms cloud layout with:
     - labels: `Domain`, `Sumber`, `Disiplin`
     - chips: `Akidah (Iman & Tauhid)`, `Al-Qur'an`, `Tafsir`
+
+---
+
+# Online Event Seeder Location Fix
+
+- [x] Reproduce and isolate why seeded online events can still show physical location
+- [x] Update `EventSeeder` backfill normalization to clear location fields for online events
+- [x] Add/extend regression coverage for online seeded event location cleanup
+- [x] Run focused parallel Pest verification and document review
+
+## Review
+
+- Root cause: seeded legacy rows with `event_format = online` were not normalized by `backfillSeededEventRequiredFields()`, so stale `institution_id`/`venue_id`/`space_id` values could persist.
+- Updated `database/seeders/EventSeeder.php` backfill logic to enforce:
+  - online events => always clear `institution_id`, `venue_id`, and `space_id`
+  - non-online events => keep existing XOR normalization (`institution_id` xor `venue_id`) and `space_id` cleanup.
+- Added regression coverage in `tests/Feature/EventSeederSubmitEventCompatibilityTest.php`:
+  - creates an invalid online seeded event with physical location fields set
+  - runs `EventSeeder`
+  - asserts all physical location fields are cleared.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSeederSubmitEventCompatibilityTest.php` => **2 passed (12 assertions)**
+  - `vendor/bin/phpstan analyse --ansi database/seeders/EventSeeder.php tests/Feature/EventSeederSubmitEventCompatibilityTest.php` => **No errors**
+
+---
+
+# Event Hero Fallback Polish (No Location/Image)
+
+- [x] Inspect hero fallback behavior when event has no location or no location cover image
+- [x] Improve hero atmosphere fallback source chain beyond location media
+- [x] Add intentional no-location hero metadata chip state (instead of omitting location chip)
+- [x] Run focused verification and document review
+
+## Review
+
+- Updated hero media fallback chain in `resources/views/livewire/pages/events/show.blade.php`:
+  - institution cover -> venue main/cover -> organizer media (institution cover / speaker main-avatar) -> first speaker media -> visual gradient fallback.
+- Added format-aware no-image hero styling (online/hybrid/physical gradients + geometric glass accents), so empty-media states keep visual depth instead of a flat block.
+- Replaced "show location chip only when physical location exists" with explicit hero location-state metadata:
+  - physical location => existing place label
+  - online => `Acara Dalam Talian` + live-join subtitle
+  - hybrid/no-location => `Mod Hibrid` or `Lokasi Akan Dikemaskini` states.
+- Verification:
+  - `php artisan view:clear && php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **11 passed (30 assertions)**
+  - Browser check on `https://majlisilmu.test/majlis/forum-perdana-bersama-asatizah-uu8oszr` confirms hero now shows `Acara Dalam Talian` + `Sertai melalui pautan siaran langsung` in the hero chip.
+
+---
+
+# Speaker Page Null-Safe Location Fix
+
+- [x] Reproduce source of null `district` access on speaker show route
+- [x] Patch speaker page location helper to safely handle events without location addresses
+- [x] Add regression coverage for speaker page with online/no-location events
+- [x] Run focused verification and document review
+
+## Review
+
+- Root cause in `resources/views/components/pages/speakers/⚡show.blade.php`: event-location helper dereferenced nested address relations without null-safe access (`$address->district`, `$address->subdistrict`) for online/no-location events.
+- Patched helper to use full null-safe access:
+  - `$address?->district?->name`
+  - `$address?->state?->name`
+  - `$address?->subdistrict?->name`
+- Added regression test in `tests/Feature/SpeakerShowPageTimingTest.php`:
+  - online event with `institution_id`, `venue_id`, `space_id` all null
+  - speaker page renders successfully and includes event title.
+- Verification:
+  - `php artisan view:clear && php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php` => **6 passed (17 assertions)**
+  - Browser check on `https://majlisilmu.test/penceramah/nadia-azzahra-binti-othman-xoqg6ug` now renders successfully (no 500).
+  - `vendor/bin/phpstan analyse --ansi` still reports pre-existing unrelated project errors (17), with no new speaker-page runtime issue.
+
+---
+
+# Event Left Column Disappears After Engagement Click
+
+- [x] Reproduce issue on target event URL with Chrome MCP
+- [x] Isolate root cause in Livewire re-render behavior
+- [x] Patch event-show reveal wrappers so sections stay visible after action updates
+- [x] Re-verify with Chrome MCP and focused tests
+
+## Review
+
+- Reproduced on `https://majlisilmu.test/majlis/kuliah-ceramah-bersama-asatizah-apbzpdh` while logged in:
+  - clicking `Saya Akan Hadir` / `Minat` / `Simpan` updated counts
+  - left-column sections (speakers/about/etc.) became visually hidden.
+- Root cause: `scroll-reveal` sections in `resources/views/livewire/pages/events/show.blade.php` rely on client-applied `.revealed`; Livewire updates remove that transient class and sections return to hidden state (`opacity: 0`).
+- Fix: added `revealed` directly in the event-show section class lists (`scroll-reveal reveal-up revealed`) for all affected content sections.
+- Verification:
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **11 passed (30 assertions)**
+  - Chrome MCP before/after screenshots confirm left column remains visible after engagement clicks.
+
+---
+
+# Missing Inspiration Quotes on `migrate:fresh --seed`
+
+- [x] Trace why inspiration quotes are missing from the full seed pipeline
+- [x] Wire `InspirationSeeder` into `DatabaseSeeder`
+- [x] Update seeding pipeline regression test expectations
+- [x] Verify with focused Pest tests
+- [x] Verify with real `php artisan migrate:fresh --seed` run
+
+## Review
+
+- Root cause: `database/seeders/InspirationSeeder.php` existed but was not included in `database/seeders/DatabaseSeeder.php`, so full database seed runs skipped inspiration quotes.
+- Fix:
+  - Added `InspirationSeeder::class` to the primary seeder batch in `DatabaseSeeder`.
+  - Updated `tests/Feature/InstitutionSeederTest.php` expected batch list to include `InspirationSeeder::class`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionSeederTest.php` => **3 passed (12 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InspirationTest.php --filter="seeds inspirations via InspirationSeeder"` => **1 passed (14 assertions)**
+  - `php artisan migrate:fresh --seed --no-interaction` now shows `Database\Seeders\InspirationSeeder ... DONE`
+  - Post-seed count check: `App\Models\Inspiration::query()->count()` => **20**

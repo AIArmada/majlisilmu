@@ -171,3 +171,28 @@ it('hides state when district is kuala lumpur putrajaya or labuan', function () 
         ->assertSee('Dewan Utama Test, '.$district->name)
         ->assertDontSee('Dewan Utama Test, '.$district->name.', Kuala Lumpur');
 });
+
+it('renders speaker page when linked event has online format and no location address', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'event_format' => \App\Enums\EventFormat::Online,
+        'institution_id' => null,
+        'venue_id' => null,
+        'space_id' => null,
+        'starts_at' => now()->addDay()->setTime(17, 45),
+        'ends_at' => now()->addDay()->setTime(19, 15),
+        'timing_mode' => TimingMode::Absolute,
+    ]);
+
+    $speaker->events()->attach($event->id);
+
+    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee($event->title);
+});

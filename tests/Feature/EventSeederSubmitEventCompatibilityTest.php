@@ -1,6 +1,10 @@
 <?php
 
+use App\Enums\EventFormat;
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Space;
+use App\Models\Venue;
 use Database\Seeders\EventSeeder;
 use Database\Seeders\TagSeeder;
 
@@ -35,4 +39,30 @@ it('seeds schedule events with required submit-event fields', function () {
     $hasVenueLocation = is_string($event?->venue_id) && $event->venue_id !== '';
 
     expect($hasInstitutionLocation xor $hasVenueLocation)->toBeTrue();
+});
+
+it('clears seeded online event physical location during backfill', function () {
+    $this->seed(TagSeeder::class);
+
+    $institution = Institution::factory()->create();
+    $venue = Venue::factory()->create();
+    $space = Space::factory()->create();
+
+    $event = Event::factory()->create([
+        'event_format' => EventFormat::Online,
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+        'space_id' => $space->id,
+        'submitter_id' => null,
+        'user_id' => null,
+    ]);
+
+    $this->seed(EventSeeder::class);
+
+    $event->refresh();
+
+    expect($event->event_format)->toBe(EventFormat::Online)
+        ->and($event->institution_id)->toBeNull()
+        ->and($event->venue_id)->toBeNull()
+        ->and($event->space_id)->toBeNull();
 });

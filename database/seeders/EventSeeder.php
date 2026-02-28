@@ -610,10 +610,20 @@ class EventSeeder extends Seeder
                     $hasInstitutionLocation = is_string($event->institution_id) && $event->institution_id !== '';
                     $hasVenueLocation = is_string($event->venue_id) && $event->venue_id !== '';
                     $hasSpace = is_string($event->space_id) && $event->space_id !== '';
+                    $eventFormat = $event->event_format;
+                    $isOnlineEvent = $eventFormat === EventFormat::Online
+                        || (is_string($eventFormat) && $eventFormat === EventFormat::Online->value);
 
                     // Enforce location invariant for seeded rows:
-                    // location is institution XOR venue, never both.
-                    if ($hasInstitutionLocation && $hasVenueLocation) {
+                    // - online: no physical location fields at all.
+                    // - non-online: location is institution XOR venue, never both.
+                    if ($isOnlineEvent) {
+                        if ($hasInstitutionLocation || $hasVenueLocation || $hasSpace) {
+                            $updates['institution_id'] = null;
+                            $updates['venue_id'] = null;
+                            $updates['space_id'] = null;
+                        }
+                    } elseif ($hasInstitutionLocation && $hasVenueLocation) {
                         if ($hasSpace) {
                             // Space belongs to institution location.
                             $updates['venue_id'] = null;

@@ -5,6 +5,7 @@ use Database\Seeders\DistrictSeeder;
 use Database\Seeders\DonationChannelSeeder;
 use Database\Seeders\EventSeeder;
 use Database\Seeders\EventSubmissionSeeder;
+use Database\Seeders\InspirationSeeder;
 use Database\Seeders\InstitutionSeeder;
 use Database\Seeders\MalaysiaCitySeeder;
 use Database\Seeders\MasjidSeeder;
@@ -65,6 +66,7 @@ it('runs the full demo seeding pipeline in the expected order', function () {
         SeriesSeeder::class,
         EventSeeder::class,
         ReferenceSeeder::class,
+        InspirationSeeder::class,
         DonationChannelSeeder::class,
         MediaLinkSeeder::class,
     ]);
