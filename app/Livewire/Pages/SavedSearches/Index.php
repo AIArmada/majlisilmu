@@ -155,10 +155,21 @@ class Index extends Component
             'subdistrict_id',
             'language',
             'event_type',
+            'event_format',
             'gender',
             'institution_id',
             'starts_after',
             'starts_before',
+            'time_scope',
+            'prayer_time',
+            'timing_mode',
+            'starts_time_from',
+            'starts_time_until',
+            'children_allowed',
+            'is_muslim_only',
+            'has_event_url',
+            'has_live_url',
+            'has_end_time',
         ];
 
         $filters = [];
@@ -179,6 +190,30 @@ class Index extends Component
 
         if ($topicIds !== []) {
             $filters['topic_ids'] = $topicIds;
+        }
+
+        $speakerIds = array_values(array_filter((array) request()->input('speaker_ids', [])));
+
+        if ($speakerIds !== []) {
+            $filters['speaker_ids'] = $speakerIds;
+        }
+
+        $eventType = array_values(array_filter((array) request()->input('event_type', [])));
+
+        if ($eventType !== []) {
+            $filters['event_type'] = $eventType;
+        }
+
+        $eventFormat = array_values(array_filter((array) request()->input('event_format', [])));
+
+        if ($eventFormat !== []) {
+            $filters['event_format'] = $eventFormat;
+        }
+
+        $languageCodes = array_values(array_filter((array) request()->input('language_codes', [])));
+
+        if ($languageCodes !== []) {
+            $filters['language_codes'] = $languageCodes;
         }
 
         return $filters;

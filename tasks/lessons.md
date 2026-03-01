@@ -34,3 +34,15 @@
 - Whenever a new domain seeder is added (for example inspirations), also wire it into `DatabaseSeeder` and lock it with a pipeline-order test so `php artisan migrate:fresh --seed` cannot silently skip it.
 - For search UX copy tweaks, match user-requested placeholder text exactly (character-for-character), then verify the real DOM placeholder attribute in browser, not only translation keys.
 - For pages where users expect instant search, implement `wire:model.live` state binding (not GET form submit) and include a Livewire test that asserts result updates on `set('search', ...)`.
+- When a user asks to "reapply everything from the beginning," restart with a fresh file-by-file audit and rebuild from current disk state; do not trust prior partial patches without revalidation.
+- For public institution and speaker event surfaces, use the same `active()` visibility semantics (approved + pending) across listing counts and detail tabs; avoid adding extra `status='approved'` filters unless explicitly requested.
+- When public pages share the same event states (like pending), reuse the same visual semantics across templates (badge label + color hierarchy), not just the same query scope.
+- When a visibility rule is already centralized in a shared scope (`Event::active()`), use that scope directly instead of duplicating equivalent `whereIn` clauses in page queries.
+- For UI “restore” requests tied to a specific day, anchor the rollback to the exact dated commit snapshot and restore only the requested surface (for example main search) without reintroducing unrelated older layout parts.
+- When aligning one page’s search UI with other public index pages, copy the shared visual pattern and interaction affordances (`Clear`, `Esc`, same input shell), but keep each page’s filter/state architecture untouched.
+- For Livewire loading indicators in interactive search forms, avoid in-flow placement (`mb-*` blocks) because it causes layout shift while typing; prefer absolute overlay badges anchored to a `relative` container.
+- For dense advanced-search UIs, group filters into labeled Filament sub-sections inside a collapsed parent section, then verify each group’s state sync and dependency behavior in-browser (not only by schema review).
+- When expanding `/majlis` location filtering, always keep organizer dimensions paired: if `institution_id` exists in UI/state/search pipeline, add `venue_id` through the same end-to-end path (URL props, normalized filters, query payload, DB filter, active chips, and test).
+- For UI text-only filter requests, update both Filament field labels and Blade fallback chip labels together; otherwise mixed terminology appears (field uses new label but active chips still show old wording).
+- When users clarify that a filter issue is about query semantics (not labels), immediately verify and update both DB and search-engine filter logic, then add overlap-focused tests to lock behavior.
+- In conditional filter UIs, if a field should only apply in one mode, hide it (not only disable it), and add normalization/query guards so stale URL params cannot produce conflicting filters.

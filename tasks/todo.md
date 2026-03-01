@@ -715,3 +715,470 @@
   - Chrome MCP on `https://majlisilmu.test/institusi`:
     - placeholder attribute is exactly `Cari institusi...`
     - typing `Klng` updates URL to `?search=Klng` and immediately shows `Kompleks Islam Klang` (live fuzzy behavior).
+
+---
+
+# Majlis Advanced Filter Filament Refactor
+
+- [x] Audit and map every `Maklumat Majlis` field from submit-event flow into `/majlis` advanced filter semantics
+- [x] Refactor `app/Livewire/Pages/Events/Index.php` to Filament form-driven filter state with URL synchronization
+- [x] Extend `EventSearchService` for comprehensive filtering (language codes, event format, muslim-only, timing mode, link/end-time toggles)
+- [x] Replace old `/majlis` Flux filter UI with Filament form rendering and tidy scoped CSS styling
+- [x] Expand saved-search request extraction for the new advanced filter keys
+- [x] Add/adjust feature tests for newly supported filters and run verification (`pest --parallel`, `phpstan`, `view:cache`)
+
+## Review
+
+- Rebuilt `/majlis` page filtering around a Filament form state (`filterData`) in `app/Livewire/Pages/Events/Index.php`:
+  - URL-synced advanced filters include: `event_type` (multi), `event_format` (multi), `language_codes` (multi), `gender`, `age_group`, `children_allowed`, `is_muslim_only`, `prayer_time`, `timing_mode`, `starts_after`, `starts_before`, `time_scope`, `institution_id`, `speaker_ids`, `topic_ids`, link/end-time toggles (`has_event_url`, `has_live_url`, `has_end_time`), plus geolocation + sort.
+  - Added smart behavior for location controls, sort state, age-group to children-allowed assist, and full clear/reset.
+- Replaced old Flux advanced filter markup in `resources/views/livewire/pages/events/index.blade.php`:
+  - now renders `{{ $this->form }}` (Filament form-driven filtering),
+  - added scoped tidy styling for Filament sections/inputs (`.mi-filter-shell ...`),
+  - expanded active filter chips and saved-search query payload to include all new advanced fields.
+- Extended `app/Services/EventSearchService.php`:
+  - added DB-forced filtering gate for fields not indexed in Typesense (`language_codes`, `timing_mode`, `is_muslim_only`, URL/end-time presence toggles, `prayer_time`),
+  - added `event_format` filters to Typesense and DB paths,
+  - added DB filters for `language_codes`, `timing_mode`, `is_muslim_only`, `has_event_url`, `has_live_url`, `has_end_time`.
+- Updated `app/Livewire/Pages/SavedSearches/Index.php` request extraction to capture new scalar/array filters (`event_format`, `language_codes`, `speaker_ids`, timing/link/muslim-only flags, etc.).
+- Added new regression coverage in `tests/Feature/EventSearchTest.php`:
+  - `filters events by language_codes array filter`
+  - `filters events by event_format array filter`
+  - `filters events by is_muslim_only toggle`
+  - `filters events by link presence and timing mode`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="language_codes array filter|event_format array filter|is_muslim_only toggle|link presence and timing mode|filters events by language|filters events by prayer_time enum value in advanced filters"` => **6 passed (18 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php` => **4 passed (13 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php app/Livewire/Pages/SavedSearches/Index.php tests/Feature/EventSearchTest.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` still has **2 pre-existing unrelated failures**:
+    - `Event Detail Page` expects `Related Events`
+    - `Event Registration` expects `No registration required`
+
+---
+
+# Institution Pending Event Visual Parity
+
+- [x] Compare institution event list/calendar rendering with speaker pending-event treatment
+- [x] Add pending state payload (`pending`) to institution calendar event data
+- [x] Apply speaker-matching pending visuals on institution upcoming and past cards (amber accent + pending badge)
+- [x] Apply pending-aware color priority in institution calendar cells and mobile dots
+- [x] Extend feature assertion for pending badge and run focused verification
+
+## Review
+
+- Updated `resources/views/components/pages/institutions/⚡show.blade.php` to mirror speaker pending rendering:
+  - Added `pending` flag in calendar event payload.
+  - Upcoming and past list cards now use pending-aware date sidebar gradients (`from-amber-600 to-amber-800`) and date text tones.
+  - Added explicit `Menunggu Kelulusan` badge for pending events in both upcoming and past cards.
+  - Calendar day number, event chips, overflow text, and mobile dots now prioritize pending amber styling over remote/default colors.
+- Updated `tests/Feature/InstitutionShowPageTest.php` pending event assertion to also verify `Menunggu Kelulusan` is rendered.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **18 passed (54 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **6 passed (20 assertions)**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
+# Institution Status Guard Follow-up
+
+- [x] Re-validate status filtering semantics for institution show event queries
+- [x] Confirm `active()` is the canonical approved+pending visibility scope and keep institution queries aligned to it
+- [x] Add regression test to ensure non-approved/pending statuses are hidden
+- [x] Re-run focused verification
+
+## Review
+
+- Confirmed `App\Models\Event::active()` already constrains to `approved` + `pending` public active events.
+- Kept institution show queries on `->active()` without duplicating status clauses, so visibility remains centralized in one app-wide scope.
+- Added `tests/Feature/InstitutionShowPageTest.php` coverage:
+  - `does not show events outside approved and pending statuses`
+  - verifies `rejected` and `draft` events are not rendered on institution detail.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **19 passed (57 assertions)**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
+# Majlis Main Search Prominence Rollback
+
+- [x] Inspect current `/majlis` Filament section styling overrides affecting search UI
+- [x] Restore original look for main search section only, without changing advanced filter behavior
+- [x] Keep advanced filter visual polish scoped to advanced section only
+- [x] Run focused verification
+
+## Review
+
+- Added section-level classes in `app/Livewire/Pages/Events/Index.php`:
+  - `Search & Sort` => `mi-main-search-section`
+  - `Advanced Filters` => `mi-advanced-filter-section`
+- Updated `resources/views/livewire/pages/events/index.blade.php` CSS so custom Filament styling applies only to `.mi-advanced-filter-section`.
+- Result: main search section returns to its original/default prominent Filament look; advanced filters keep the custom tidy styling.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="updates event results live when search changes"` => **1 passed (3 assertions)**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
+# Majlis Main Search Snapshot Restore (2026-02-28)
+
+- [x] Inspect yesterday git snapshot for `/majlis` main search UI
+- [x] Restore main search bar to the previous prominent style only
+- [x] Keep advanced filter behavior and Filament state synchronization intact
+- [x] Run focused verification
+
+## Review
+
+- Used snapshot commit `e2312cd` (2026-02-28) as visual reference for the prominent main search input.
+- Removed the duplicate Filament `Search & Sort` section from `app/Livewire/Pages/Events/Index.php` and kept `Advanced Filters` in Filament.
+- Restored the prominent top search input UI in `resources/views/livewire/pages/events/index.blade.php` with:
+  - icon-leading text input styling from snapshot
+  - Livewire binding to `filterData.search` (`wire:model.live.debounce.400ms`) so advanced filter updates do not desync/clear search state.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="updates event results live when search changes"` => **1 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php resources/views/livewire/pages/events/index.blade.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
+# Majlis Search Style Alignment (Institusi + Penceramah)
+
+- [x] Compare `/majlis` main search with `/institusi` and `/penceramah` search UI patterns
+- [x] Update `/majlis` main search markup to match shared search pattern (shape, shadow, clear affordance)
+- [x] Preserve advanced filter behavior and Filament synchronization
+- [x] Run focused verification and browser check
+
+## Review
+
+- Updated `resources/views/livewire/pages/events/index.blade.php` main search block to mirror institution/speaker search styling:
+  - `max-w-xl` centered search container
+  - white input with elevated shadow treatment
+  - `Clear` action on filled search
+  - `Esc` key clear behavior (`wire:keydown.escape="clearSearch"`).
+- Added `clearSearch()` action in `app/Livewire/Pages/Events/Index.php` to keep both `search` and `filterData.search` synchronized while resetting pagination.
+- Kept all advanced filter schema and search pipeline behavior intact.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="updates event results live when search changes"` => **1 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - Chrome MCP snapshot on `https://majlisilmu.test/majlis` confirms updated search textbox is rendered in the hero/filter card area.
+
+---
+
+# Majlis Search Loading Jitter Fix
+
+- [x] Reproduce loading-jitter behavior on `/majlis` search input via Chrome MCP
+- [x] Move loading feedback from document flow to non-disruptive overlay position
+- [x] Verify search UI no longer shifts while typing
+
+## Review
+
+- Updated `resources/views/livewire/pages/events/index.blade.php` filter card wrapper to `relative`.
+- Changed loading indicator from inline-flow (`mb-4`) into absolute overlay:
+  - `absolute right-4 top-4 ... md:right-6 md:top-6`
+  - kept existing loading target + spinner text behavior.
+- Result: `Updating results...` no longer pushes the search input/sort row during typing.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="updates event results live when search changes"` => **1 passed (3 assertions)**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - Chrome MCP run on `https://majlisilmu.test/majlis` under `Slow 3G` shows stable search layout while typing.
+
+---
+
+# Majlis Advanced Filter Grouping Verification
+
+- [x] Confirm advanced filter fields are grouped into logical subsections in Filament schema
+- [x] Verify advanced filter remains collapsed on first page load
+- [x] Validate grouped filter behavior and URL synchronization via Chrome MCP
+- [x] Validate timing dependency behavior (`timing_mode` controls `prayer_time` enablement/reset)
+
+## Review
+
+- Confirmed grouped subsections are present in `app/Livewire/Pages/Events/Index.php` under the Filament `Advanced Filters` section:
+  - `Location`
+  - `People & Content`
+  - `Audience`
+  - `Time & Date`
+  - `Links & Visibility`
+- Confirmed advanced filter panel is collapsed by default on initial load (`->collapsible()->collapsed()`).
+- Chrome MCP verification on `https://majlisilmu.test/majlis`:
+  - Initial state: advanced section closed.
+  - Expanded state: grouped sections render with clean hierarchy.
+  - `time_scope=past` updates results and active chips, and syncs to URL.
+  - `timing_mode=prayer_relative` enables prayer-time selection.
+  - Switching `timing_mode` to `absolute` clears `prayer_time` and keeps URL/query state consistent.
+  - Search typing keeps layout stable while loading badge appears (no input row shift observed).
+
+---
+
+# Majlis Venue Filter In Location Group
+
+- [x] Add `venue_id` to `/majlis` filter state + URL normalization pipeline
+- [x] Add `Venue` select into Location group (Filament schema)
+- [x] Apply venue filter in search service query path
+- [x] Surface venue in active filter chips / saved-search payload
+- [x] Add focused feature test for `venue_id` filtering and run verification
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - Added `#[Url] public ?string $venue_id = null;`
+  - Added `Venue` select to Location group in Filament advanced filters.
+  - Added computed `venues()` options source (`verified|pending`, `is_active=true`).
+  - Wired `venue_id` through default state, URL normalization, form-state normalization, public-property fill, and search filter payload.
+- Updated `app/Services/EventSearchService.php`:
+  - Added `venue_id` handling in database query builder (`where('venue_id', ...)`).
+  - Added `venue_id` in Typesense filter parts for parity.
+  - Added `filled($filters['venue_id'])` to `requiresDatabaseFiltering()` so venue-filtered searches use DB path safely.
+- Updated `resources/views/livewire/pages/events/index.blade.php`:
+  - Added venue state variables/collection.
+  - Added `venue_id` into saved-search query payload.
+  - Included venue in active-filter count / active state detection.
+  - Added venue chip rendering in active filters area.
+- Added test coverage in `tests/Feature/EventSearchTest.php`:
+  - `filters events by venue in advanced filters`.
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l app/Services/EventSearchService.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter=\"filters events by venue in advanced filters\"` => **1 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php` => **No errors**
+  - Chrome MCP on `https://majlisilmu.test/majlis` confirms:
+    - `Venue` field appears under Location group.
+    - URL sync includes `venue_id=...`.
+    - Results reduce correctly when venue filter is applied.
+
+---
+
+# Majlis Label Tweak (Kawasan + Remove Masa Tamat)
+
+- [x] Rename `Subdistrict` field label to `Kawasan` in advanced location group
+- [x] Remove `Masa Tamat` (`has_end_time`) control from Links & Visibility UI
+- [x] Remove `has_end_time` from active-filter summary payload and chips
+- [x] Verify syntax and UI rendering
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - `subdistrict_id` label now `Kawasan`.
+  - Removed `has_end_time` select from `Links & Visibility` and adjusted layout columns from 3 to 2.
+  - Updated section description to reflect URL-only filters.
+- Updated `resources/views/livewire/pages/events/index.blade.php`:
+  - Subdistrict fallback chip text now `Kawasan`.
+  - Removed `has_end_time` from saved-search query payload and active-filter counters/state.
+  - Removed `Has End Time / No End Time` active chip rendering block.
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
+  - Chrome MCP snapshot on `https://majlisilmu.test/majlis` confirms:
+    - Location group label shows `Kawasan`.
+    - `Masa Tamat` field no longer appears in advanced filters.
+
+---
+
+# Majlis Desktop Filter Row (Institusi + Tempat)
+
+- [x] Identify `/majlis` location filter layout source
+- [x] Update desktop column layout so `Institusi` and `Tempat` appear on same row
+- [x] Run syntax verification on modified file
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - Changed Location section columns from `['default' => 1, 'md' => 2, 'xl' => 4]` to `['default' => 1, 'md' => 2, 'lg' => 3]`.
+  - Result on desktop breakpoints (`lg` and up): first row keeps location hierarchy fields, second row places `Institusi` and `Tempat` side-by-side.
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - Chrome MCP on `https://majlisilmu.test/majlis` confirms `Institusi` and `Tempat` share the same row at `1024px` and `1440px` widths.
+
+---
+
+# Majlis Location Labels + Dependent Institution/Venue Options
+
+- [x] Change `Kawasan` label to `Daerah Kecil / Bandar / Mukim`
+- [x] Make `Institusi` options follow selected `Negeri`, `Daerah`, and `Daerah Kecil / Bandar / Mukim`
+- [x] Make `Tempat` options follow selected `Negeri`, `Daerah`, and `Daerah Kecil / Bandar / Mukim`
+- [x] Reset selected `institusi`/`tempat` when geography chain changes to prevent stale mismatches
+- [x] Run syntax/static/test checks and browser verification
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - Changed `subdistrict_id` filter label to `Daerah Kecil / Bandar / Mukim`.
+  - Added dependent resets:
+    - `state_id` change now clears `district_id`, `subdistrict_id`, `institution_id`, `venue_id`.
+    - `district_id` change now clears `subdistrict_id`, `institution_id`, `venue_id`.
+    - `subdistrict_id` change now clears `institution_id`, `venue_id`.
+  - Replaced static options for `institution_id` and `venue_id` with dynamic options closures based on current location selection.
+  - Added helper methods:
+    - `institutionOptions(...)`
+    - `venueOptions(...)`
+    - `applyAddressLocationFilters(...)` using `whereHas('address', ...)` for `state_id`/`district_id`/`subdistrict_id`
+    - `normalizeNullableString(...)`
+  - Added PHPStan-safe generic PHPDoc on `applyAddressLocationFilters(...)`.
+- Updated `resources/views/livewire/pages/events/index.blade.php`:
+  - Updated subdistrict active-chip fallback label to `Daerah Kecil / Bandar / Mukim`.
+
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php` => **No errors**
+  - Chrome MCP on `https://majlisilmu.test/majlis` confirms:
+    - Location label renders as `Daerah Kecil / Bandar / Mukim`.
+    - After selecting `Negeri: Johor`, `Institusi` search results are narrowed (e.g., `Masjid` results reduced compared to unfiltered state).
+    - After selecting `Negeri: Johor`, `Tempat` search results are narrowed (e.g., `Dewan` shows Johor-matching venue list).
+
+---
+
+# Majlis Advanced Filters Order (Time Group on Top)
+
+- [x] Move `Time & Date` advanced filter group to the top position
+- [x] Keep other groups and field behavior unchanged
+- [x] Verify syntax and UI ordering
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - Reordered advanced filter sections so `Time & Date` is now the first group under `Advanced Filters`.
+  - Removed the original lower-position `Time & Date` block to avoid duplication.
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - Chrome MCP on `https://majlisilmu.test/majlis?state_id=2489` confirms expanded order starts with `Time & Date`, followed by `Lokasi`.
+
+---
+
+# Majlis Date Range Wording Clarification
+
+- [x] Clarify `Tarikh Mula` / `Tarikh Tamat` as event-held date range filters (not per-event duration)
+- [x] Update active filter chips wording for date range clarity
+- [x] Add Malay locale translations for new date-range wording
+- [x] Verify syntax, JSON validity, test, and UI copy
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - `Time & Date` section description now clarifies this is a held-date range filter.
+  - Date labels changed to `Held From Date` and `Held Until Date`.
+  - Added helper text on both date pickers:
+    - `Filters events held on or after this date.`
+    - `Filters events held on or before this date.`
+- Updated `resources/views/livewire/pages/events/index.blade.php`:
+  - Active chips now read `Held from` / `Held until` instead of generic `From` / `Until`.
+- Updated translations:
+  - `resources/lang/ms.json`
+  - `resources/lang/ms_MY.json`
+  - Added localized strings for the new labels, helper texts, section description, and chip wording.
+
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `php -r` JSON decode checks => **ms.json OK**, **ms_MY.json OK**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
+  - Chrome MCP on `https://majlisilmu.test/majlis?state_id=2489` confirms:
+    - `Tarikh Majlis Dari` / `Tarikh Majlis Hingga` labels appear.
+    - Helper text explicitly states date range filtering for events being held.
+
+---
+
+# Majlis Date Range Query Semantics (Held-Period Overlap)
+
+- [x] Update `/majlis` search query to treat `starts_after` / `starts_before` as held-period overlap filters (using `ends_at` fallback)
+- [x] Align Typesense filter construction to the same overlap semantics
+- [x] Add/adjust focused tests proving overlap behavior (not just label wording)
+- [x] Run focused verification and document review
+
+## Review
+
+- Updated `app/Services/EventSearchService.php`:
+  - Database query now treats date filters as held-period overlap:
+    - `starts_after` => event is held on/after boundary using `ends_at >= boundary` OR (`ends_at` null and `starts_at >= boundary`).
+    - `starts_before` => event starts on/before boundary (`starts_at <= boundary`).
+  - Typesense filter builder now uses the same overlap semantics for lower-bound filtering:
+    - `(ends_at:>=X||starts_at:>=X)` plus `starts_at:<=Y` when upper bound is set.
+- Updated tests:
+  - `tests/Feature/EventSearchTest.php`:
+    - Reworked date-range test to prove overlap behavior with a multi-day event crossing into the selected range.
+    - Kept timezone boundary behavior deterministic by setting `ends_at` to `null` in `starts_after` timezone test fixtures.
+  - `tests/Feature/EventSearchTypesenseFilterTest.php`:
+    - Added assertion that Typesense date lower-bound filter includes the overlap expression with `ends_at` fallback.
+- Verification:
+  - `php -l app/Services/EventSearchService.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTypesenseFilterTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTypesenseFilterTest.php` => **3 passed (3 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="held date overlap range|interprets starts_after date in the user timezone|filters events to past only when time scope is past|shows both past and upcoming events when time scope is all"` => **4 passed (14 assertions)**
+
+---
+
+# Majlis Timing Mode Absolute Time Range Fields
+
+- [x] Add conditional time-range fields in `Time & Date` when `Mod Masa` is `Waktu Tepat`
+- [x] Sync new time-range fields through URL/filter state and active filter chips
+- [x] Apply absolute-time range filtering in `EventSearchService` query path
+- [x] Add focused regression test and run verification
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - Added URL-synced fields: `starts_time_from`, `starts_time_until`.
+  - In `Time & Date`, added `TimePicker` fields `Masa Dari` and `Masa Hingga`, shown only when `timing_mode = absolute` (`Waktu Tepat`).
+  - `timing_mode` state change now clears irrelevant time fields when switching away from `Waktu Tepat`.
+  - Wired both time fields through default filter state, normalized URL state, normalized form state, public-property hydration, and search-filter payload.
+  - Added `normalizeTimeString(...)` helper to keep persisted values consistent (`H:i`).
+- Updated `resources/views/livewire/pages/events/index.blade.php`:
+  - Added both time fields to saved-search query payload.
+  - Included them in active-filter count/active-state detection.
+  - Added active chips: `Masa Dari` and `Masa Hingga`.
+- Updated `app/Services/EventSearchService.php`:
+  - Added normalization for time-range input via `normalizeTimeFilter(...)`.
+  - Added DB query filtering for absolute timing mode with start-time range:
+    - supports from-only, until-only, and from+until.
+    - supports wrap-around ranges (e.g., 22:00 → 02:00).
+  - Time filtering uses user-timezone offset conversion in SQL expression for `events.starts_at`.
+  - Added time-range flags to `requiresDatabaseFiltering(...)` to keep this path on DB.
+- Updated `tests/Feature/EventSearchTest.php`:
+  - Added `filters absolute timing events by selected start time range`.
+- Updated `app/Livewire/Pages/SavedSearches/Index.php`:
+  - Added `starts_time_from` and `starts_time_until` to request extraction filter keys so saved searches retain the new time range filters.
+
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l app/Services/EventSearchService.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `php -l app/Livewire/Pages/SavedSearches/Index.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="filters absolute timing events by selected start time range|filters events by link presence and timing mode|displays the events index page"` => **3 passed (10 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php --filter="save|request|filters"` => **4 passed (13 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php app/Livewire/Pages/SavedSearches/Index.php tests/Feature/EventSearchTest.php` => **No errors**
+
+---
+
+# Majlis Timing UI Follow-up (Prayer Visibility + Start-Time Semantics)
+
+- [x] Show `Waktu Solat` filter only when `Mod Masa` is `Waktu Solat`
+- [x] Ensure `Masa Dari / Masa Hingga` semantics remain based on event start time (`starts_at`) only
+- [x] Prevent stale `prayer_time` URL params from conflicting when `Mod Masa` is `Waktu Tepat`
+- [x] Add focused regression checks and verify
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - `prayer_time` field now uses `->visible(...)` and appears only when `timing_mode` is prayer-relative.
+  - Added helper text to `Masa Dari` / `Masa Hingga` clarifying it filters by **masa mula majlis** (event start time).
+  - Added state normalization guard so `prayer_time` is cleared when `timing_mode` is `absolute`.
+- Updated `app/Services/EventSearchService.php`:
+  - `prayer_time` filter is ignored when `timing_mode=absolute` (absolute mode takes precedence).
+  - Kept absolute time-range filtering based on localized `starts_at` time-of-day only.
+- Updated `tests/Feature/EventSearchTest.php`:
+  - Added `ignores prayer time filter when timing mode is absolute`.
+  - Added `applies absolute time range to event start time only, not event end time`.
+
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l app/Services/EventSearchService.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="ignores prayer time filter when timing mode is absolute|filters absolute timing events by selected start time range|applies absolute time range to event start time only, not event end time"` => **3 passed (10 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php tests/Feature/EventSearchTest.php` => **No errors**
