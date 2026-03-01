@@ -73,6 +73,7 @@
     $startsTimeUntil = $this->starts_time_until;
     $timeScope = $this->time_scope ?? 'upcoming';
     $lat = $this->lat;
+    $lng = $this->lng;
     $sort = $this->sort;
     $states = $this->states;
     $districts = $this->districts;
@@ -144,9 +145,9 @@
         'has_event_url' => $this->has_event_url,
         'has_live_url' => $this->has_live_url,
         'topic_ids' => $selectedTopicIds,
-        'lat' => $lat,
-        'lng' => $this->lng,
-        'radius_km' => $this->radius_km,
+        'lat' => filled($lat) && filled($lng) ? $lat : null,
+        'lng' => filled($lat) && filled($lng) ? $lng : null,
+        'radius_km' => filled($lat) && filled($lng) ? $this->radius_km : null,
         'sort' => $sort,
         'time_scope' => $this->time_scope,
     ], function (mixed $value): bool {
@@ -158,59 +159,34 @@
     });
 
     $activeFilterCount = collect([
-        $stateId,
-        $districtId,
-        $subdistrictId,
-        $institutionId,
-        $venueId,
+        filled($search),
+        filled($stateId),
+        filled($districtId),
+        filled($subdistrictId),
+        filled($institutionId),
+        filled($venueId),
         count($selectedLanguageCodes) > 0,
         count($selectedEventTypes) > 0,
         count($selectedEventFormats) > 0,
-        $gender,
+        filled($gender),
         count($selectedAgeGroups) > 0,
-        $childrenAllowed,
-        $isMuslimOnly,
+        $childrenAllowed !== null,
+        $isMuslimOnly !== null,
         count($selectedSpeakerIds) > 0,
         count($selectedTopicIds) > 0,
-        $startsAfter,
-        $startsBefore,
-        $prayerTime,
-        $timingMode,
-        $startsTimeFrom,
-        $startsTimeUntil,
-        $this->has_event_url,
-        $this->has_live_url,
+        filled($startsAfter),
+        filled($startsBefore),
+        filled($prayerTime),
+        filled($timingMode),
+        filled($startsTimeFrom),
+        filled($startsTimeUntil),
+        $this->has_event_url !== null,
+        $this->has_live_url !== null,
         $timeScope !== 'upcoming',
-        $lat,
-    ])->filter(fn ($value) => $value !== null && $value !== '' && $value !== false)->count();
+        filled($lat),
+    ])->filter()->count();
 
-    $hasActiveFilters = collect([
-        $search,
-        $stateId,
-        $districtId,
-        $subdistrictId,
-        $institutionId,
-        $venueId,
-        count($selectedLanguageCodes) > 0,
-        count($selectedEventTypes) > 0,
-        count($selectedEventFormats) > 0,
-        $gender,
-        count($selectedAgeGroups) > 0,
-        $childrenAllowed,
-        $isMuslimOnly,
-        count($selectedSpeakerIds) > 0,
-        count($selectedTopicIds) > 0,
-        $startsAfter,
-        $startsBefore,
-        $prayerTime,
-        $timingMode,
-        $startsTimeFrom,
-        $startsTimeUntil,
-        $this->has_event_url,
-        $this->has_live_url,
-        $timeScope !== 'upcoming',
-        $lat,
-    ])->contains(fn ($value) => $value !== null && $value !== '' && $value !== false);
+    $hasActiveFilters = $activeFilterCount > 0;
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -532,6 +508,11 @@
                         <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
                             class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
                             {{ __('Save This Search') }}
+                        </a>
+                    @else
+                        <a href="{{ route('login') }}"
+                            class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Log Masuk') }} · {{ __('Save This Search') }}
                         </a>
                     @endauth
 

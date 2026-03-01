@@ -1182,3 +1182,94 @@
   - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
   - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="ignores prayer time filter when timing mode is absolute|filters absolute timing events by selected start time range|applies absolute time range to event start time only, not event end time"` => **3 passed (10 assertions)**
   - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php tests/Feature/EventSearchTest.php` => **No errors**
+
+---
+
+# Majlis Save Search Visibility Regression (False Filter Values)
+
+- [x] Compare git-history save-search behavior with current active-filter rendering
+- [x] Restore active-filter visibility for explicit false-valued filters (`0` / `No ...`)
+- [x] Add regression test to prevent save/search bar disappearing for false filters
+- [x] Run focused verification
+
+## Review
+
+- Root cause identified in `resources/views/livewire/pages/events/index.blade.php`:
+  - Active-filter detection used `value !== false`, so explicit `false` selections (for example `has_event_url=0`) were treated as inactive.
+  - That hid the active-filter row where `Save This Search` is rendered.
+- Fix:
+  - Replaced generic value checks with explicit boolean activity checks (`... !== null`, `filled(...)`, `count(...) > 0`).
+  - `hasActiveFilters` now derives from `activeFilterCount > 0`.
+- Added test in `tests/Feature/EventSearchTest.php`:
+  - `treats explicit false URL filter as active and keeps active filter chips visible`.
+  - Confirms `No Event URL` chip and `Clear All Filters` appear for `has_event_url=0`.
+
+- Verification:
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="treats explicit false URL filter as active and keeps active filter chips visible|ignores prayer time filter when timing mode is absolute|filters absolute timing events by selected start time range|applies absolute time range to event start time only, not event end time"` => **4 passed (15 assertions)**
+  - `vendor/bin/phpstan analyse --ansi resources/views/livewire/pages/events/index.blade.php tests/Feature/EventSearchTest.php` => **No errors**
+
+---
+
+# Majlis Save Search Guest CTA (Chrome MCP Verification)
+
+- [x] Reproduce missing save option in browser and confirm auth/filter state
+- [x] Show a visible guest CTA for save-search when active filters are present
+- [x] Add regression assertion and verify in browser
+
+## Review
+
+- Browser diagnosis (Chrome MCP):
+  - On `/majlis`, no active filters and guest state resulted in no active-filter row.
+  - On `/majlis?has_event_url=0`, active-filter row showed but had no save action because save link was `@auth` only.
+- UI update in `resources/views/livewire/pages/events/index.blade.php`:
+  - Kept authenticated save link as-is.
+  - Added guest fallback CTA in active-filter bar:
+    - `Log Masuk · Save This Search` linking to login route.
+- Test update in `tests/Feature/EventSearchTest.php`:
+  - Extended false-filter visibility test to assert `Save This Search` is visible.
+- Verification:
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="treats explicit false URL filter as active and keeps active filter chips visible"` => **1 passed (6 assertions)**
+  - Chrome MCP `evaluate_script` on `https://majlisilmu.test/majlis?has_event_url=0` => `hasSaveSearch: true`, `hasLoginSaveCta: true`
+
+---
+
+# Majlis GPS UX Cleanup (Internal Coordinates + Radius + State Label)
+
+- [x] Remove user-facing latitude/longitude (and manual radius) from saved-search create form
+- [x] Show `Radius (km)` in `/majlis` advanced filters only when location is active (GPS detected/used)
+- [x] Render human-readable geo labels in saved-search captured filters (fix `State Id: 2489`)
+- [x] Add focused regression tests and run verification
+
+## Review
+
+- Saved search form UI cleanup:
+  - Removed user-facing `Radius (km)`, `Latitude`, and `Longitude` inputs from `resources/views/livewire/pages/saved-searches/index.blade.php`.
+  - Kept GPS fields internal in `app/Livewire/Pages/SavedSearches/Index.php` and only prefill `radius_km` when both `lat` and `lng` are present.
+- Captured filters readability:
+  - Added filter formatting helpers in `app/Livewire/Pages/SavedSearches/Index.php` to map location IDs to human-readable names (`State`, `District`, `Daerah Kecil / Bandar / Mukim`, institution, venue) before rendering chips.
+  - Updated both captured-filter chip blocks in `resources/views/livewire/pages/saved-searches/index.blade.php` to use formatted label/value output.
+- `/majlis` radius behavior:
+  - Replaced `radius_km` select with an incrementable integer input inside the advanced `Location` section in `app/Livewire/Pages/Events/Index.php`.
+  - Radius input uses step `1` with explicit `min=1` and `max=1000` (browser attributes and backend normalization).
+  - Radius control is visible only when both `lat` and `lng` exist.
+  - Updated `resources/views/livewire/pages/events/index.blade.php` so saved-search query params include `radius_km` only when location coordinates are present.
+  - Updated radius bounds across app/API validation and normalization from `500` to `1000`.
+- Verification:
+  - `php -l app/Livewire/Pages/SavedSearches/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/saved-searches/index.blade.php` => **No syntax errors**
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `php -l tests/Feature/SavedSearchPageTest.php` => **No syntax errors**
+  - `php -l tests/Feature/EventSearchTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php` => **7 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="shows radius control only when a nearby location is available"` => **1 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchApiTest.php --filter="(requires lat/lng when radius_km is provided|accepts radius up to 1000 km when coordinates are provided)"` => **2 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/SavedSearches/Index.php app/Livewire/Pages/Events/Index.php tests/Feature/SavedSearchPageTest.php tests/Feature/EventSearchTest.php` => **No errors**
+  - Chrome MCP:
+    - `/majlis?state_id=2489` shows active chip with state name (`Johor` in seeded local data), not `State Id:<id>`.
+    - `/majlis?lat=3.1390&lng=101.6869` only shows `Radius (km)` after expanding Advanced Filters, confirming location-gated visibility.
+    - Radius input is `type=number` with `min=1`, `max=1000`, `step=1`.

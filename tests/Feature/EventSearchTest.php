@@ -46,6 +46,16 @@ describe('Event Search Filters', function () {
             ->assertSee('Advanced Filters');
     });
 
+    it('shows radius control only when a nearby location is available', function () {
+        $this->get('/events')
+            ->assertOk()
+            ->assertDontSee('Radius (km)');
+
+        $this->get('/events?lat=3.1390&lng=101.6869')
+            ->assertOk()
+            ->assertSee('Radius (km)');
+    });
+
     it('shows event location with subdistrict, district, and state on cards', function () {
         $state = State::where('country_code', 'MY')->first();
 
@@ -1061,6 +1071,35 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Absolute Timing Event')
             ->assertDontSee('Prayer Relative Timing Event');
+    });
+
+    it('treats explicit false URL filter as active and keeps active filter chips visible', function () {
+        Event::factory()->create([
+            'title' => 'No URL Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'event_url' => null,
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Has URL Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'event_url' => 'https://example.com/event',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?has_event_url=0');
+
+        $response->assertOk()
+            ->assertSee('No URL Event')
+            ->assertDontSee('Has URL Event')
+            ->assertSee('No Event URL')
+            ->assertSee('Clear All Filters')
+            ->assertSee('Save This Search');
     });
 
     it('filters events by held date overlap range', function () {

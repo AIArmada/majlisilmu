@@ -46,3 +46,7 @@
 - For UI text-only filter requests, update both Filament field labels and Blade fallback chip labels together; otherwise mixed terminology appears (field uses new label but active chips still show old wording).
 - When users clarify that a filter issue is about query semantics (not labels), immediately verify and update both DB and search-engine filter logic, then add overlap-focused tests to lock behavior.
 - In conditional filter UIs, if a field should only apply in one mode, hide it (not only disable it), and add normalization/query guards so stale URL params cannot produce conflicting filters.
+- For location UX on public filters, keep coordinates (`lat`/`lng`) internal and only expose user-facing radius controls when location is actually active; also resolve geography IDs to names in saved-filter chips to avoid technical `*_id` leakage.
+- When users ask for numeric stepping behavior, use a number input (not a select) and enforce bounds in both UI attributes (`min`/`max`/`step`) and backend normalization/validation to avoid mismatched limits.
+- For default filter changes on Livewire pages, update both the public property default and `defaultFilterData()` value; changing only one causes inconsistent initial UI/query state.
+- If coordinates are intentionally hidden from users, still expose user-meaningful geo context (like `Radius`) in captured-filter summaries when location-based search is active.
