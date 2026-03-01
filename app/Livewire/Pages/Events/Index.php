@@ -153,7 +153,7 @@ class Index extends Component implements HasForms
     public ?string $lng = null;
 
     #[Url]
-    public int $radius_km = 10;
+    public int $radius_km = 15;
 
     #[Url]
     public string $sort = 'time';
@@ -533,10 +533,12 @@ class Index extends Component implements HasForms
     {
         $this->lat = (string) $lat;
         $this->lng = (string) $lng;
+        $this->radius_km = 15;
         $this->sort = 'distance';
 
         $this->filterData['lat'] = $this->lat;
         $this->filterData['lng'] = $this->lng;
+        $this->filterData['radius_km'] = $this->radius_km;
         $this->filterData['sort'] = $this->sort;
 
         $this->resetPage();
@@ -912,7 +914,7 @@ class Index extends Component implements HasForms
             'has_end_time' => null,
             'lat' => null,
             'lng' => null,
-            'radius_km' => 10,
+            'radius_km' => 15,
             'sort' => 'time',
         ];
     }

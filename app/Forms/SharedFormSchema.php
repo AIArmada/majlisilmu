@@ -23,7 +23,7 @@ class SharedFormSchema
      *
      * @return array<int, \Filament\Schemas\Components\Component>
      */
-    public static function addressFields(): array
+    public static function addressFields(bool $requireGoogleMaps = false): array
     {
         return [
             TextInput::make('line1')
@@ -89,6 +89,7 @@ class SharedFormSchema
             TextInput::make('google_maps_url')
                 ->label(__('Google Maps URL'))
                 ->url()
+                ->required($requireGoogleMaps)
                 ->maxLength(255)
                 ->placeholder(__('https://maps.google.com/...')),
 
@@ -138,7 +139,13 @@ class SharedFormSchema
      */
     public static function createAddressFromData(Event|Institution|Speaker|Venue $model, array $data, string $type = 'main'): void
     {
-        if (! empty($data['line1']) || ! empty($data['state_id'])) {
+        if (
+            ! empty($data['line1'])
+            || ! empty($data['state_id'])
+            || ! empty($data['google_maps_url'])
+            || ! empty($data['lat'])
+            || ! empty($data['lng'])
+        ) {
             $model->address()->create([
                 'type' => $type,
                 'line1' => $data['line1'] ?? null,

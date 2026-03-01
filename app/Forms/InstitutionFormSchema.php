@@ -56,7 +56,7 @@ class InstitutionFormSchema
                 ->maxFiles(10)
                 ->helperText(__('Up to 10 photos of the institution')),
 
-            ...SharedFormSchema::addressFields(),
+            ...SharedFormSchema::addressFields(requireGoogleMaps: true),
 
             SharedFormSchema::socialMediaRepeater('Add social media links for this institution'),
         ];

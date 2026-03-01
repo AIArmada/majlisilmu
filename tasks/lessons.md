@@ -50,3 +50,6 @@
 - When users ask for numeric stepping behavior, use a number input (not a select) and enforce bounds in both UI attributes (`min`/`max`/`step`) and backend normalization/validation to avoid mismatched limits.
 - For default filter changes on Livewire pages, update both the public property default and `defaultFilterData()` value; changing only one causes inconsistent initial UI/query state.
 - If coordinates are intentionally hidden from users, still expose user-meaningful geo context (like `Radius`) in captured-filter summaries when location-based search is active.
+- For public `/majlis` active-filter CTAs, avoid `@auth`-only rendering when the requirement is discoverability; show `Save This Search` to guests too and let auth middleware handle redirect.
+- For location-default requests, align both defaults (`public $radius_km`, `defaultFilterData`) and action behavior (`setLocation`) so clicking `Berhampiran` and opening the radius field always show the same value.
+- Nearby radius logic must follow canonical event-location rules: use only `venue.address` or `institution.address`; never use `event.address` fallback for public distance search.
