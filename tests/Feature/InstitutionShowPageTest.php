@@ -223,7 +223,7 @@ it('does not show private events', function () {
         ->assertDontSee('Secret Event XYZ');
 });
 
-it('does not show unapproved events', function () {
+it('shows pending public events', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 
     Event::factory()->for($institution)->create([
@@ -235,7 +235,31 @@ it('does not show unapproved events', function () {
 
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
-        ->assertDontSee('Pending Event ABC');
+        ->assertSee('Pending Event ABC')
+        ->assertSee('Menunggu Kelulusan');
+});
+
+it('does not show events outside approved and pending statuses', function () {
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    Event::factory()->for($institution)->create([
+        'status' => 'rejected',
+        'visibility' => EventVisibility::Public,
+        'starts_at' => now()->addDay(),
+        'title' => 'Rejected Event Hidden',
+    ]);
+
+    Event::factory()->for($institution)->create([
+        'status' => 'draft',
+        'visibility' => EventVisibility::Public,
+        'starts_at' => now()->addDays(2),
+        'title' => 'Draft Event Hidden',
+    ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertDontSee('Rejected Event Hidden')
+        ->assertDontSee('Draft Event Hidden');
 });
 
 it('allows an authenticated user to follow and unfollow an institution', function () {

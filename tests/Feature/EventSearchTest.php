@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\EventFormat;
 use App\Enums\EventPrayerTime;
+use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
@@ -380,6 +382,33 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Institution Excluded Event');
     });
 
+    it('filters events by venue in advanced filters', function () {
+        $includedVenue = Venue::factory()->create(['status' => 'verified', 'is_active' => true]);
+        $excludedVenue = Venue::factory()->create(['status' => 'verified', 'is_active' => true]);
+
+        Event::factory()->for($includedVenue)->create([
+            'title' => 'Venue Match Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->for($excludedVenue)->create([
+            'title' => 'Venue Excluded Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?venue_id='.$includedVenue->id);
+
+        $response->assertOk()
+            ->assertSee('Venue Match Event')
+            ->assertDontSee('Venue Excluded Event');
+    });
+
     it('filters events by selected speaker ids in advanced filters', function () {
         $includedSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
         $excludedSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
@@ -440,6 +469,219 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('English Event')
             ->assertDontSee('Malay Event');
+    });
+
+    it('filters events by language_codes array filter', function () {
+        $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
+        $english = \Nnjeim\World\Models\Language::where('code', 'en')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
+
+        $englishEvent = Event::factory()->create([
+            'title' => 'English Language Codes Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $englishEvent->languages()->sync([$english->id]);
+
+        $malayEvent = Event::factory()->create([
+            'title' => 'Malay Language Codes Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $malayEvent->languages()->sync([$malay->id]);
+
+        $query = http_build_query([
+            'language_codes' => ['en'],
+        ]);
+
+        $response = $this->get('/events?'.$query);
+
+        $response->assertOk()
+            ->assertSee('English Language Codes Event')
+            ->assertDontSee('Malay Language Codes Event');
+    });
+
+    it('filters events by event_format array filter', function () {
+        Event::factory()->create([
+            'title' => 'Online Format Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'event_format' => EventFormat::Online,
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Physical Format Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'event_format' => EventFormat::Physical,
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $query = http_build_query([
+            'event_format' => [EventFormat::Online->value],
+        ]);
+
+        $response = $this->get('/events?'.$query);
+
+        $response->assertOk()
+            ->assertSee('Online Format Event')
+            ->assertDontSee('Physical Format Event');
+    });
+
+    it('filters events by is_muslim_only toggle', function () {
+        Event::factory()->create([
+            'title' => 'Muslim Only Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'is_muslim_only' => true,
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Open Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'is_muslim_only' => false,
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $response = $this->get('/events?is_muslim_only=1');
+
+        $response->assertOk()
+            ->assertSee('Muslim Only Event')
+            ->assertDontSee('Open Event');
+    });
+
+    it('filters events by link presence and timing mode', function () {
+        Event::factory()->create([
+            'title' => 'Absolute With Links Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::Absolute,
+            'event_url' => 'https://example.com/event',
+            'live_url' => 'https://youtube.com/live/test',
+            'ends_at' => now()->addDays(2),
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Prayer Relative Without Links Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_display_text' => 'Selepas Maghrib',
+            'event_url' => null,
+            'live_url' => null,
+            'ends_at' => null,
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $query = http_build_query([
+            'timing_mode' => TimingMode::Absolute->value,
+            'has_event_url' => 1,
+            'has_live_url' => 1,
+            'has_end_time' => 1,
+        ]);
+
+        $response = $this->get('/events?'.$query);
+
+        $response->assertOk()
+            ->assertSee('Absolute With Links Event')
+            ->assertDontSee('Prayer Relative Without Links Event');
+    });
+
+    it('filters absolute timing events by selected start time range', function () {
+        Event::factory()->create([
+            'title' => 'Evening Absolute Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::Absolute,
+            'published_at' => now(),
+            'starts_at' => now('UTC')->addDays(2)->setTime(20, 0),
+            'ends_at' => null,
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Morning Absolute Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::Absolute,
+            'published_at' => now(),
+            'starts_at' => now('UTC')->addDays(2)->setTime(9, 0),
+            'ends_at' => null,
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Evening Prayer Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_display_text' => 'Selepas Maghrib',
+            'published_at' => now(),
+            'starts_at' => now('UTC')->addDays(2)->setTime(20, 0),
+            'ends_at' => null,
+        ]);
+
+        $query = http_build_query([
+            'timing_mode' => TimingMode::Absolute->value,
+            'starts_time_from' => '19:00',
+            'starts_time_until' => '21:00',
+        ]);
+
+        $response = $this
+            ->withCookie('user_timezone', 'UTC')
+            ->get('/events?'.$query);
+
+        $response->assertOk()
+            ->assertSee('Evening Absolute Event')
+            ->assertDontSee('Morning Absolute Event')
+            ->assertDontSee('Evening Prayer Event');
+    });
+
+    it('applies absolute time range to event start time only, not event end time', function () {
+        Event::factory()->create([
+            'title' => 'Start In Range Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::Absolute,
+            'published_at' => now(),
+            'starts_at' => now('UTC')->addDays(2)->setTime(20, 0),
+            'ends_at' => now('UTC')->addDays(2)->setTime(22, 30),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Start Out Of Range But Ends In Range Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::Absolute,
+            'published_at' => now(),
+            'starts_at' => now('UTC')->addDays(2)->setTime(18, 0),
+            'ends_at' => now('UTC')->addDays(2)->setTime(20, 30),
+        ]);
+
+        $query = http_build_query([
+            'timing_mode' => TimingMode::Absolute->value,
+            'starts_time_from' => '19:00',
+            'starts_time_until' => '21:00',
+        ]);
+
+        $response = $this
+            ->withCookie('user_timezone', 'UTC')
+            ->get('/events?'.$query);
+
+        $response->assertOk()
+            ->assertSee('Start In Range Event')
+            ->assertDontSee('Start Out Of Range But Ends In Range Event');
     });
 
     it('filters events by district', function () {
@@ -794,33 +1036,82 @@ describe('Event Search Filters', function () {
             ->assertSee('Upcoming Gatherings');
     });
 
-    it('filters events by a start date range', function () {
+    it('ignores prayer time filter when timing mode is absolute', function () {
         Event::factory()->create([
-            'title' => 'Within Date Range',
+            'title' => 'Absolute Timing Event',
             'status' => 'approved',
             'visibility' => 'public',
+            'timing_mode' => TimingMode::Absolute,
             'published_at' => now(),
-            'starts_at' => now()->addDays(7),
+            'starts_at' => now()->addDays(2)->setTime(20, 0),
         ]);
 
         Event::factory()->create([
-            'title' => 'Outside Date Range',
+            'title' => 'Prayer Relative Timing Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_display_text' => 'Selepas Maghrib',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2)->setTime(20, 0),
+        ]);
+
+        $response = $this->get('/events?timing_mode='.TimingMode::Absolute->value.'&prayer_time=Selepas+Maghrib');
+
+        $response->assertOk()
+            ->assertSee('Absolute Timing Event')
+            ->assertDontSee('Prayer Relative Timing Event');
+    });
+
+    it('filters events by held date overlap range', function () {
+        Event::factory()->create([
+            'title' => 'Overlap Via End Time',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
-            'starts_at' => now()->addDays(20),
+            'starts_at' => now()->addDays(4)->setTime(20, 0),
+            'ends_at' => now()->addDays(5)->setTime(9, 0),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Within Held Range',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(6)->setTime(12, 0),
+            'ends_at' => null,
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Outside Before Range',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2)->setTime(10, 0),
+            'ends_at' => now()->addDays(3)->setTime(10, 0),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Outside After Range',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(7)->setTime(10, 0),
+            'ends_at' => now()->addDays(8)->setTime(10, 0),
         ]);
 
         $query = http_build_query([
             'starts_after' => now()->addDays(5)->toDateString(),
-            'starts_before' => now()->addDays(10)->toDateString(),
+            'starts_before' => now()->addDays(6)->toDateString(),
         ]);
 
         $response = $this->get("/events?{$query}");
 
         $response->assertOk()
-            ->assertSee('Within Date Range')
-            ->assertDontSee('Outside Date Range');
+            ->assertSee('Overlap Via End Time')
+            ->assertSee('Within Held Range')
+            ->assertDontSee('Outside Before Range')
+            ->assertDontSee('Outside After Range');
     });
 
     it('filters events by prayer_time keyword in advanced filters', function () {
@@ -868,6 +1159,7 @@ describe('Event Search Filters', function () {
             'visibility' => 'public',
             'published_at' => now(),
             'starts_at' => $includedStartUtc,
+            'ends_at' => null,
         ]);
 
         Event::factory()->create([
@@ -876,6 +1168,7 @@ describe('Event Search Filters', function () {
             'visibility' => 'public',
             'published_at' => now(),
             'starts_at' => $excludedStartUtc,
+            'ends_at' => null,
         ]);
 
         $response = $this
