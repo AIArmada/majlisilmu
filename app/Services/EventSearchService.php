@@ -212,7 +212,7 @@ class EventSearchService
         $startsAfterTimestamp = $this->startsAfterTimestamp($filters, $timeScope);
 
         if ($startsAfterTimestamp !== null) {
-            $filterParts[] = 'starts_at:>='.$startsAfterTimestamp;
+            $filterParts[] = '(ends_at:>='.$startsAfterTimestamp.'||starts_at:>='.$startsAfterTimestamp.')';
         }
 
         $startsBeforeTimestamp = $this->startsBeforeTimestamp($filters, $timeScope);
@@ -291,6 +291,10 @@ class EventSearchService
             $filterParts[] = 'institution_id:='.$filters['institution_id'];
         }
 
+        if (! empty($filters['venue_id'])) {
+            $filterParts[] = 'venue_id:='.$filters['venue_id'];
+        }
+
         if (! empty($filters['speaker_ids'])) {
             $speakerIds = $this->normalizeArrayFilter($filters['speaker_ids']);
 
@@ -319,17 +323,26 @@ class EventSearchService
         $timeScope = $this->normalizeTimeScope($filters['time_scope'] ?? null);
 
         $queryBuilder = Event::query()->active();
+        $table = $queryBuilder->getModel()->getTable();
 
         $startsAfter = $this->startsAfterDateTime($filters, $timeScope);
 
         if ($startsAfter instanceof \Carbon\CarbonInterface) {
-            $queryBuilder->where('starts_at', '>=', $startsAfter);
+            $queryBuilder->where(function (Builder $heldAfterQuery) use ($startsAfter, $table): void {
+                $heldAfterQuery
+                    ->where("{$table}.ends_at", '>=', $startsAfter)
+                    ->orWhere(function (Builder $openEndedQuery) use ($startsAfter, $table): void {
+                        $openEndedQuery
+                            ->whereNull("{$table}.ends_at")
+                            ->where("{$table}.starts_at", '>=', $startsAfter);
+                    });
+            });
         }
 
         $startsBefore = $this->startsBeforeDateTime($filters, $timeScope);
 
         if ($startsBefore instanceof \Carbon\CarbonInterface) {
-            $queryBuilder->where('starts_at', '<=', $startsBefore);
+            $queryBuilder->where("{$table}.starts_at", '<=', $startsBefore);
         }
 
         if (filled($query)) {
@@ -434,6 +447,10 @@ class EventSearchService
             $queryBuilder->where('institution_id', $filters['institution_id']);
         }
 
+        if (! empty($filters['venue_id'])) {
+            $queryBuilder->where('venue_id', $filters['venue_id']);
+        }
+
         $speakerIds = $this->normalizeArrayFilter($filters['speaker_ids'] ?? null);
 
         if ($speakerIds !== []) {
@@ -453,9 +470,10 @@ class EventSearchService
             });
         }
 
+        $timingMode = $this->normalizeTimingModeFilter($filters['timing_mode'] ?? null);
         $prayerTime = $this->normalizePrayerTimeFilter($filters['prayer_time'] ?? null);
 
-        if ($prayerTime !== null) {
+        if ($prayerTime !== null && $timingMode !== TimingMode::Absolute->value) {
             $queryBuilder
                 ->where('timing_mode', TimingMode::PrayerRelative->value)
                 ->where(function (Builder $prayerQuery) use ($prayerTime): void {
@@ -467,10 +485,18 @@ class EventSearchService
                 });
         }
 
-        $timingMode = $this->normalizeTimingModeFilter($filters['timing_mode'] ?? null);
-
         if ($timingMode !== null) {
             $queryBuilder->where('timing_mode', $timingMode);
+        }
+
+        $startsTimeFrom = $this->normalizeTimeFilter($filters['starts_time_from'] ?? null);
+        $startsTimeUntil = $this->normalizeTimeFilter($filters['starts_time_until'] ?? null);
+
+        if (
+            $timingMode === TimingMode::Absolute->value
+            && ($startsTimeFrom !== null || $startsTimeUntil !== null)
+        ) {
+            $this->applyAbsoluteTimeRangeFilter($queryBuilder, $startsTimeFrom, $startsTimeUntil);
         }
 
         $hasEventUrl = $this->normalizeBooleanFilter($filters['has_event_url'] ?? null);
@@ -850,6 +876,68 @@ class EventSearchService
             : null;
     }
 
+    protected function normalizeTimeFilter(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = trim($value);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        try {
+            return now(UserDateTimeFormatter::resolveTimezone())
+                ->setTimeFromTimeString($normalized)
+                ->format('H:i');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  Builder<Event>  $queryBuilder
+     */
+    protected function applyAbsoluteTimeRangeFilter(
+        Builder $queryBuilder,
+        ?string $startsTimeFrom,
+        ?string $startsTimeUntil
+    ): void {
+        if ($startsTimeFrom === null && $startsTimeUntil === null) {
+            return;
+        }
+
+        $expression = $this->startsAtUserTimeSqlExpression($this->userUtcOffsetMinutes());
+
+        if ($startsTimeFrom !== null && $startsTimeUntil !== null) {
+            if ($startsTimeFrom <= $startsTimeUntil) {
+                $queryBuilder
+                    ->whereRaw("{$expression} >= ?", [$startsTimeFrom])
+                    ->whereRaw("{$expression} <= ?", [$startsTimeUntil]);
+
+                return;
+            }
+
+            $queryBuilder->where(function (Builder $timeQuery) use ($expression, $startsTimeFrom, $startsTimeUntil): void {
+                $timeQuery
+                    ->whereRaw("{$expression} >= ?", [$startsTimeFrom])
+                    ->orWhereRaw("{$expression} <= ?", [$startsTimeUntil]);
+            });
+
+            return;
+        }
+
+        if ($startsTimeFrom !== null) {
+            $queryBuilder->whereRaw("{$expression} >= ?", [$startsTimeFrom]);
+
+            return;
+        }
+
+        $queryBuilder->whereRaw("{$expression} <= ?", [(string) $startsTimeUntil]);
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -858,6 +946,9 @@ class EventSearchService
         return $this->normalizePrayerTimeFilter($filters['prayer_time'] ?? null) !== null
             || $this->normalizeArrayFilter($filters['language_codes'] ?? null) !== []
             || $this->normalizeTimingModeFilter($filters['timing_mode'] ?? null) !== null
+            || $this->normalizeTimeFilter($filters['starts_time_from'] ?? null) !== null
+            || $this->normalizeTimeFilter($filters['starts_time_until'] ?? null) !== null
+            || filled($filters['venue_id'] ?? null)
             || $this->normalizeBooleanFilter($filters['is_muslim_only'] ?? null) !== null
             || $this->normalizeBooleanFilter($filters['has_event_url'] ?? null) !== null
             || $this->normalizeBooleanFilter($filters['has_live_url'] ?? null) !== null
@@ -913,6 +1004,22 @@ class EventSearchService
             'mysql', 'mariadb' => "COALESCE(CAST(events.description AS CHAR), '')",
             default => "COALESCE(CAST(events.description AS TEXT), '')",
         };
+    }
+
+    private function startsAtUserTimeSqlExpression(int $offsetMinutes): string
+    {
+        $safeOffsetMinutes = (int) $offsetMinutes;
+
+        return match ($this->databaseDriver()) {
+            'pgsql' => "to_char(events.starts_at + interval '{$safeOffsetMinutes} minutes', 'HH24:MI')",
+            'mysql', 'mariadb' => "DATE_FORMAT(DATE_ADD(events.starts_at, INTERVAL {$safeOffsetMinutes} MINUTE), '%H:%i')",
+            default => "strftime('%H:%M', datetime(events.starts_at, '{$safeOffsetMinutes} minutes'))",
+        };
+    }
+
+    private function userUtcOffsetMinutes(): int
+    {
+        return now(UserDateTimeFormatter::resolveTimezone())->utcOffset();
     }
 
     private function normalizeSearchQuery(?string $query): ?string

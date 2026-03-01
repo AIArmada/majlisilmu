@@ -16,9 +16,12 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
+use App\Models\Venue;
 use App\Services\EventSearchService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Grid;
@@ -26,6 +29,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -90,6 +95,9 @@ class Index extends Component implements HasForms
     #[Url]
     public ?string $institution_id = null;
 
+    #[Url]
+    public ?string $venue_id = null;
+
     /**
      * @var list<string>
      */
@@ -117,6 +125,12 @@ class Index extends Component implements HasForms
     #[Url]
     public ?string $timing_mode = null;
 
+    #[Url]
+    public ?string $starts_time_from = null;
+
+    #[Url]
+    public ?string $starts_time_until = null;
+
     /**
      * @var list<string>|string|null
      */
@@ -139,7 +153,7 @@ class Index extends Component implements HasForms
     public ?string $lng = null;
 
     #[Url]
-    public int $radius_km = 50;
+    public int $radius_km = 10;
 
     #[Url]
     public string $sort = 'time';
@@ -169,10 +183,88 @@ class Index extends Component implements HasForms
                     ->collapsible()
                     ->collapsed()
                     ->schema([
+                        Section::make(__('Time & Date'))
+                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
+                            ->description(__('Set the date range when events are held, then choose timing mode.'))
+                            ->columns(['default' => 1, 'md' => 2, 'xl' => 5])
+                            ->schema([
+                                DatePicker::make('starts_after')
+                                    ->label(__('Held From Date'))
+                                    ->helperText(__('Filters events held on or after this date.'))
+                                    ->native()
+                                    ->maxDate(fn (Get $get): ?string => $get('starts_before'))
+                                    ->live(),
+
+                                DatePicker::make('starts_before')
+                                    ->label(__('Held Until Date'))
+                                    ->helperText(__('Filters events held on or before this date.'))
+                                    ->native()
+                                    ->minDate(fn (Get $get): ?string => $get('starts_after'))
+                                    ->live(),
+
+                                Select::make('time_scope')
+                                    ->label(__('Time Scope'))
+                                    ->options([
+                                        'upcoming' => __('Upcoming'),
+                                        'past' => __('Past'),
+                                        'all' => __('All Time'),
+                                    ])
+                                    ->default('upcoming')
+                                    ->live(),
+
+                                Select::make('timing_mode')
+                                    ->label(__('Timing Mode'))
+                                    ->placeholder(__('Any'))
+                                    ->options([
+                                        TimingMode::Absolute->value => TimingMode::Absolute->label(),
+                                        TimingMode::PrayerRelative->value => TimingMode::PrayerRelative->label(),
+                                    ])
+                                    ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                        if ($state !== TimingMode::PrayerRelative->value) {
+                                            $set('prayer_time', null);
+                                        }
+
+                                        if ($state !== TimingMode::Absolute->value) {
+                                            $set('starts_time_from', null);
+                                            $set('starts_time_until', null);
+                                        }
+                                    })
+                                    ->live(),
+
+                                Select::make('prayer_time')
+                                    ->label(__('Prayer Time'))
+                                    ->placeholder(__('Any'))
+                                    ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                                    ->searchable()
+                                    ->options(collect(EventPrayerTime::cases())
+                                        ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
+                                    ->all()
+                                    )
+                                    ->live(),
+
+                                TimePicker::make('starts_time_from')
+                                    ->label(__('Masa Dari'))
+                                    ->helperText(__('Tapis berdasarkan masa mula majlis dari waktu ini.'))
+                                    ->placeholder(__('Any'))
+                                    ->seconds(false)
+                                    ->native(false)
+                                    ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
+                                    ->live(),
+
+                                TimePicker::make('starts_time_until')
+                                    ->label(__('Masa Hingga'))
+                                    ->helperText(__('Tapis berdasarkan masa mula majlis hingga waktu ini.'))
+                                    ->placeholder(__('Any'))
+                                    ->seconds(false)
+                                    ->native(false)
+                                    ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
+                                    ->live(),
+                            ]),
+
                         Section::make(__('Location'))
                             ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Narrow events by geography and institution.'))
-                            ->columns(['default' => 1, 'md' => 2, 'xl' => 4])
+                            ->description(__('Narrow events by geography, institution, and venue.'))
+                            ->columns(['default' => 1, 'md' => 2, 'lg' => 3])
                             ->schema([
                                 Select::make('state_id')
                                     ->label(__('State'))
@@ -187,6 +279,8 @@ class Index extends Component implements HasForms
                                     ->afterStateUpdated(function (Set $set): void {
                                         $set('district_id', null);
                                         $set('subdistrict_id', null);
+                                        $set('institution_id', null);
+                                        $set('venue_id', null);
                                     }),
 
                                 Select::make('district_id')
@@ -209,10 +303,14 @@ class Index extends Component implements HasForms
                                     ->disabled(fn (Get $get): bool => ! filled($get('state_id')))
                                     ->searchable()
                                     ->live()
-                                    ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null)),
+                                    ->afterStateUpdated(function (Set $set): void {
+                                        $set('subdistrict_id', null);
+                                        $set('institution_id', null);
+                                        $set('venue_id', null);
+                                    }),
 
                                 Select::make('subdistrict_id')
-                                    ->label(__('Subdistrict'))
+                                    ->label(__('Daerah Kecil / Bandar / Mukim'))
                                     ->placeholder(__('All Subdistricts'))
                                     ->options(function (Get $get): array {
                                         $districtId = $get('district_id');
@@ -230,16 +328,54 @@ class Index extends Component implements HasForms
                                     })
                                     ->disabled(fn (Get $get): bool => ! filled($get('district_id')))
                                     ->searchable()
-                                    ->live(),
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set): void {
+                                        $set('institution_id', null);
+                                        $set('venue_id', null);
+                                    }),
 
                                 Select::make('institution_id')
                                     ->label(__('Institution'))
                                     ->placeholder(__('Any Institution'))
                                     ->searchable()
-                                    ->options(fn (): array => $this->institutions()
-                                        ->pluck('name', 'id')
-                                        ->all()
-                                    )
+                                    ->options(function (Get $get): array {
+                                        return $this->institutionOptions(
+                                            stateId: $this->normalizeNullableString($get('state_id')),
+                                            districtId: $this->normalizeNullableString($get('district_id')),
+                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        );
+                                    })
+                                    ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
+                                    ->live(),
+
+                                Select::make('venue_id')
+                                    ->label(__('Tempat'))
+                                    ->placeholder(__('Any Venue'))
+                                    ->searchable()
+                                    ->options(function (Get $get): array {
+                                        return $this->venueOptions(
+                                            stateId: $this->normalizeNullableString($get('state_id')),
+                                            districtId: $this->normalizeNullableString($get('district_id')),
+                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        );
+                                    })
+                                    ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
+                                    ->live(),
+
+                                TextInput::make('radius_km')
+                                    ->label(__('Radius (km)'))
+                                    ->helperText(__('Applied when searching nearby events from your detected location.'))
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->maxValue(1000)
+                                    ->step(1)
+                                    ->extraInputAttributes([
+                                        'min' => 1,
+                                        'max' => 1000,
+                                        'step' => 1,
+                                    ])
+                                    ->suffix(__('km'))
+                                    ->visible(fn (Get $get): bool => filled($get('lat')) && filled($get('lng')))
                                     ->live(),
                             ]),
 
@@ -358,63 +494,10 @@ class Index extends Component implements HasForms
                                     ->live(),
                             ]),
 
-                        Section::make(__('Time & Date'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Control when events happened and how time is interpreted.'))
-                            ->columns(['default' => 1, 'md' => 2, 'xl' => 5])
-                            ->schema([
-                                DatePicker::make('starts_after')
-                                    ->label(__('Start Date'))
-                                    ->native()
-                                    ->maxDate(fn (Get $get): ?string => $get('starts_before'))
-                                    ->live(),
-
-                                DatePicker::make('starts_before')
-                                    ->label(__('End Date'))
-                                    ->native()
-                                    ->minDate(fn (Get $get): ?string => $get('starts_after'))
-                                    ->live(),
-
-                                Select::make('time_scope')
-                                    ->label(__('Time Scope'))
-                                    ->options([
-                                        'upcoming' => __('Upcoming'),
-                                        'past' => __('Past'),
-                                        'all' => __('All Time'),
-                                    ])
-                                    ->default('upcoming')
-                                    ->live(),
-
-                                Select::make('timing_mode')
-                                    ->label(__('Timing Mode'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        TimingMode::Absolute->value => TimingMode::Absolute->label(),
-                                        TimingMode::PrayerRelative->value => TimingMode::PrayerRelative->label(),
-                                    ])
-                                    ->afterStateUpdated(function (mixed $state, Set $set): void {
-                                        if ($state !== TimingMode::PrayerRelative->value) {
-                                            $set('prayer_time', null);
-                                        }
-                                    })
-                                    ->live(),
-
-                                Select::make('prayer_time')
-                                    ->label(__('Prayer Time'))
-                                    ->placeholder(__('Any'))
-                                    ->disabled(fn (Get $get): bool => $get('timing_mode') !== TimingMode::PrayerRelative->value)
-                                    ->searchable()
-                                    ->options(collect(EventPrayerTime::cases())
-                                        ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
-                                    ->all()
-                                    )
-                                    ->live(),
-                            ]),
-
                         Section::make(__('Links & Visibility'))
                             ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Filter events by URL and end-time metadata availability.'))
-                            ->columns(['default' => 1, 'md' => 3])
+                            ->description(__('Filter events by event and live URL availability.'))
+                            ->columns(['default' => 1, 'md' => 2])
                             ->schema([
                                 Select::make('has_event_url')
                                     ->label(__('Event URL'))
@@ -431,15 +514,6 @@ class Index extends Component implements HasForms
                                     ->options([
                                         '1' => __('Has Live URL'),
                                         '0' => __('No Live URL'),
-                                    ])
-                                    ->live(),
-
-                                Select::make('has_end_time')
-                                    ->label(__('End Time'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Has End Time'),
-                                        '0' => __('No End Time'),
                                     ])
                                     ->live(),
                             ]),
@@ -596,6 +670,89 @@ class Index extends Component implements HasForms
     }
 
     /**
+     * @return Collection<int, Venue>
+     */
+    #[Computed]
+    public function venues(): Collection
+    {
+        return cache()->remember('events_venues_'.app()->getLocale(), 300, fn () => Venue::query()
+            ->whereIn('status', ['verified', 'pending'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['id', 'name'])
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function institutionOptions(?string $stateId, ?string $districtId, ?string $subdistrictId): array
+    {
+        $query = Institution::query()
+            ->whereIn('status', ['verified', 'pending'])
+            ->where('is_active', true);
+
+        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
+
+        return $query
+            ->orderBy('name')
+            ->limit(400)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
+            ->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function venueOptions(?string $stateId, ?string $districtId, ?string $subdistrictId): array
+    {
+        $query = Venue::query()
+            ->whereIn('status', ['verified', 'pending'])
+            ->where('is_active', true);
+
+        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
+
+        return $query
+            ->orderBy('name')
+            ->limit(500)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
+            ->all();
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     */
+    private function applyAddressLocationFilters(
+        Builder $query,
+        ?string $stateId,
+        ?string $districtId,
+        ?string $subdistrictId
+    ): void {
+        if (! filled($stateId) && ! filled($districtId) && ! filled($subdistrictId)) {
+            return;
+        }
+
+        $query->whereHas('address', function (Builder $addressQuery) use ($stateId, $districtId, $subdistrictId): void {
+            if (filled($stateId)) {
+                $addressQuery->where('state_id', $stateId);
+            }
+
+            if (filled($districtId)) {
+                $addressQuery->where('district_id', $districtId);
+            }
+
+            if (filled($subdistrictId)) {
+                $addressQuery->where('subdistrict_id', $subdistrictId);
+            }
+        });
+    }
+
+    /**
      * @return Collection<int, Speaker>
      */
     #[Computed]
@@ -630,6 +787,7 @@ class Index extends Component implements HasForms
             'children_allowed' => $filters['children_allowed'],
             'is_muslim_only' => $filters['is_muslim_only'],
             'institution_id' => $filters['institution_id'],
+            'venue_id' => $filters['venue_id'],
             'speaker_ids' => $filters['speaker_ids'],
             'topic_ids' => $filters['topic_ids'],
             'starts_after' => $filters['starts_after'],
@@ -637,6 +795,8 @@ class Index extends Component implements HasForms
             'time_scope' => $filters['time_scope'],
             'prayer_time' => $filters['prayer_time'],
             'timing_mode' => $filters['timing_mode'],
+            'starts_time_from' => $filters['starts_time_from'],
+            'starts_time_until' => $filters['starts_time_until'],
             'event_format' => $filters['event_format'],
             'has_event_url' => $filters['has_event_url'],
             'has_live_url' => $filters['has_live_url'],
@@ -717,6 +877,12 @@ class Index extends Component implements HasForms
      */
     private function defaultFilterData(): array
     {
+        $prayerTime = filled($this->prayer_time) ? (string) $this->prayer_time : null;
+
+        if ($this->timing_mode === TimingMode::Absolute->value) {
+            $prayerTime = null;
+        }
+
         return [
             'search' => null,
             'state_id' => null,
@@ -730,6 +896,7 @@ class Index extends Component implements HasForms
             'children_allowed' => null,
             'is_muslim_only' => null,
             'institution_id' => null,
+            'venue_id' => null,
             'speaker_ids' => [],
             'topic_ids' => [],
             'starts_after' => null,
@@ -737,13 +904,15 @@ class Index extends Component implements HasForms
             'time_scope' => 'upcoming',
             'prayer_time' => null,
             'timing_mode' => null,
+            'starts_time_from' => null,
+            'starts_time_until' => null,
             'event_format' => [],
             'has_event_url' => null,
             'has_live_url' => null,
             'has_end_time' => null,
             'lat' => null,
             'lng' => null,
-            'radius_km' => 50,
+            'radius_km' => 10,
             'sort' => 'time',
         ];
     }
@@ -761,6 +930,12 @@ class Index extends Component implements HasForms
             $languageCodes = [(string) $this->language];
         }
 
+        $prayerTime = filled($this->prayer_time) ? (string) $this->prayer_time : null;
+
+        if ($this->timing_mode === TimingMode::Absolute->value) {
+            $prayerTime = null;
+        }
+
         return [
             'search' => filled($this->search) ? trim((string) $this->search) : null,
             'state_id' => filled($this->state_id) ? (string) $this->state_id : null,
@@ -774,22 +949,25 @@ class Index extends Component implements HasForms
             'children_allowed' => $this->normalizeNullableBoolean($this->children_allowed),
             'is_muslim_only' => $this->normalizeNullableBoolean($this->is_muslim_only),
             'institution_id' => filled($this->institution_id) ? (string) $this->institution_id : null,
+            'venue_id' => filled($this->venue_id) ? (string) $this->venue_id : null,
             'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
             'topic_ids' => $this->normalizeStringArray($this->topic_ids),
             'starts_after' => filled($this->starts_after) ? (string) $this->starts_after : null,
             'starts_before' => filled($this->starts_before) ? (string) $this->starts_before : null,
             'time_scope' => in_array($this->time_scope, ['upcoming', 'past', 'all'], true) ? $this->time_scope : $defaults['time_scope'],
-            'prayer_time' => filled($this->prayer_time) ? (string) $this->prayer_time : null,
+            'prayer_time' => $prayerTime,
             'timing_mode' => in_array($this->timing_mode, [TimingMode::Absolute->value, TimingMode::PrayerRelative->value], true)
                 ? $this->timing_mode
                 : null,
+            'starts_time_from' => $this->normalizeTimeString($this->starts_time_from),
+            'starts_time_until' => $this->normalizeTimeString($this->starts_time_until),
             'event_format' => $this->normalizeStringArray($this->event_format),
             'has_event_url' => $this->normalizeNullableBoolean($this->has_event_url),
             'has_live_url' => $this->normalizeNullableBoolean($this->has_live_url),
             'has_end_time' => $this->normalizeNullableBoolean($this->has_end_time),
             'lat' => filled($this->lat) ? (string) $this->lat : null,
             'lng' => filled($this->lng) ? (string) $this->lng : null,
-            'radius_km' => max(1, min(500, (int) $this->radius_km)),
+            'radius_km' => max(1, min(1000, (int) $this->radius_km)),
             'sort' => in_array($this->sort, ['time', 'relevance', 'distance'], true) ? $this->sort : $defaults['sort'],
         ];
     }
@@ -811,6 +989,7 @@ class Index extends Component implements HasForms
         $this->children_allowed = $filters['children_allowed'];
         $this->is_muslim_only = $filters['is_muslim_only'];
         $this->institution_id = $filters['institution_id'];
+        $this->venue_id = $filters['venue_id'];
         $this->speaker_ids = $filters['speaker_ids'];
         $this->topic_ids = $filters['topic_ids'];
         $this->starts_after = $filters['starts_after'];
@@ -818,6 +997,8 @@ class Index extends Component implements HasForms
         $this->time_scope = $filters['time_scope'];
         $this->prayer_time = $filters['prayer_time'];
         $this->timing_mode = $filters['timing_mode'];
+        $this->starts_time_from = $filters['starts_time_from'];
+        $this->starts_time_until = $filters['starts_time_until'];
         $this->event_format = $filters['event_format'];
         $this->has_event_url = $filters['has_event_url'];
         $this->has_live_url = $filters['has_live_url'];
@@ -865,6 +1046,19 @@ class Index extends Component implements HasForms
             $timingMode = '';
         }
 
+        $startsTimeFrom = $this->normalizeTimeString($normalized['starts_time_from'] ?? null);
+        $startsTimeUntil = $this->normalizeTimeString($normalized['starts_time_until'] ?? null);
+        $prayerTime = filled($normalized['prayer_time']) ? (string) $normalized['prayer_time'] : null;
+
+        if ($timingMode !== TimingMode::Absolute->value) {
+            $startsTimeFrom = null;
+            $startsTimeUntil = null;
+        }
+
+        if ($timingMode === TimingMode::Absolute->value) {
+            $prayerTime = null;
+        }
+
         return [
             'search' => filled($normalized['search']) ? trim((string) $normalized['search']) : null,
             'state_id' => filled($normalized['state_id']) ? (string) $normalized['state_id'] : null,
@@ -878,20 +1072,23 @@ class Index extends Component implements HasForms
             'children_allowed' => $this->normalizeNullableBoolean($normalized['children_allowed'] ?? null),
             'is_muslim_only' => $this->normalizeNullableBoolean($normalized['is_muslim_only'] ?? null),
             'institution_id' => filled($normalized['institution_id']) ? (string) $normalized['institution_id'] : null,
+            'venue_id' => filled($normalized['venue_id']) ? (string) $normalized['venue_id'] : null,
             'speaker_ids' => $this->normalizeStringArray($normalized['speaker_ids'] ?? []),
             'topic_ids' => $this->normalizeStringArray($normalized['topic_ids'] ?? []),
             'starts_after' => filled($normalized['starts_after']) ? (string) $normalized['starts_after'] : null,
             'starts_before' => filled($normalized['starts_before']) ? (string) $normalized['starts_before'] : null,
             'time_scope' => $timeScope,
-            'prayer_time' => filled($normalized['prayer_time']) ? (string) $normalized['prayer_time'] : null,
+            'prayer_time' => $prayerTime,
             'timing_mode' => $timingMode !== '' ? $timingMode : null,
+            'starts_time_from' => $startsTimeFrom,
+            'starts_time_until' => $startsTimeUntil,
             'event_format' => $this->normalizeStringArray($normalized['event_format'] ?? []),
             'has_event_url' => $this->normalizeNullableBoolean($normalized['has_event_url'] ?? null),
             'has_live_url' => $this->normalizeNullableBoolean($normalized['has_live_url'] ?? null),
             'has_end_time' => $this->normalizeNullableBoolean($normalized['has_end_time'] ?? null),
             'lat' => filled($normalized['lat']) ? (string) $normalized['lat'] : null,
             'lng' => filled($normalized['lng']) ? (string) $normalized['lng'] : null,
-            'radius_km' => max(1, min(500, (int) ($normalized['radius_km'] ?? $defaults['radius_km']))),
+            'radius_km' => max(1, min(1000, (int) ($normalized['radius_km'] ?? $defaults['radius_km']))),
             'sort' => $sort,
         ];
     }
@@ -908,6 +1105,36 @@ class Index extends Component implements HasForms
         $values = is_array($value) ? $value : [$value];
 
         return array_values(array_filter(array_map('strval', $values), static fn (string $item): bool => $item !== ''));
+    }
+
+    private function normalizeNullableString(mixed $value): ?string
+    {
+        if (! filled($value)) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function normalizeTimeString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = trim($value);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        try {
+            return now()->setTimeFromTimeString($normalized)->format('H:i');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function normalizeNullableBoolean(mixed $value): ?bool
