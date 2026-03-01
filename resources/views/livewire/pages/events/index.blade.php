@@ -61,6 +61,7 @@
     $districtId = $this->district_id;
     $subdistrictId = $this->subdistrict_id;
     $institutionId = $this->institution_id;
+    $venueId = $this->venue_id;
     $gender = $this->gender;
     $childrenAllowed = $this->children_allowed;
     $isMuslimOnly = $this->is_muslim_only;
@@ -68,14 +69,18 @@
     $startsBefore = $this->starts_before;
     $prayerTime = $this->prayer_time;
     $timingMode = $this->timing_mode;
+    $startsTimeFrom = $this->starts_time_from;
+    $startsTimeUntil = $this->starts_time_until;
     $timeScope = $this->time_scope ?? 'upcoming';
     $lat = $this->lat;
+    $lng = $this->lng;
     $sort = $this->sort;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
     $topics = $this->topics;
     $institutions = $this->institutions;
+    $venues = $this->venues;
     $speakers = $this->speakers;
     $languageOptions = $this->languageOptions();
     $selectedAgeGroups = array_values(array_filter((array) $this->age_group));
@@ -122,6 +127,7 @@
         'district_id' => $districtId,
         'subdistrict_id' => $subdistrictId,
         'institution_id' => $institutionId,
+        'venue_id' => $venueId,
         'speaker_ids' => $selectedSpeakerIds,
         'language_codes' => $selectedLanguageCodes,
         'event_type' => $selectedEventTypes,
@@ -134,13 +140,14 @@
         'starts_before' => $startsBefore,
         'prayer_time' => $prayerTime,
         'timing_mode' => $timingMode,
+        'starts_time_from' => $startsTimeFrom,
+        'starts_time_until' => $startsTimeUntil,
         'has_event_url' => $this->has_event_url,
         'has_live_url' => $this->has_live_url,
-        'has_end_time' => $this->has_end_time,
         'topic_ids' => $selectedTopicIds,
-        'lat' => $lat,
-        'lng' => $this->lng,
-        'radius_km' => $this->radius_km,
+        'lat' => filled($lat) && filled($lng) ? $lat : null,
+        'lng' => filled($lat) && filled($lng) ? $lng : null,
+        'radius_km' => filled($lat) && filled($lng) ? $this->radius_km : null,
         'sort' => $sort,
         'time_scope' => $this->time_scope,
     ], function (mixed $value): bool {
@@ -152,55 +159,34 @@
     });
 
     $activeFilterCount = collect([
-        $stateId,
-        $districtId,
-        $subdistrictId,
-        $institutionId,
+        filled($search),
+        filled($stateId),
+        filled($districtId),
+        filled($subdistrictId),
+        filled($institutionId),
+        filled($venueId),
         count($selectedLanguageCodes) > 0,
         count($selectedEventTypes) > 0,
         count($selectedEventFormats) > 0,
-        $gender,
+        filled($gender),
         count($selectedAgeGroups) > 0,
-        $childrenAllowed,
-        $isMuslimOnly,
+        $childrenAllowed !== null,
+        $isMuslimOnly !== null,
         count($selectedSpeakerIds) > 0,
         count($selectedTopicIds) > 0,
-        $startsAfter,
-        $startsBefore,
-        $prayerTime,
-        $timingMode,
-        $this->has_event_url,
-        $this->has_live_url,
-        $this->has_end_time,
+        filled($startsAfter),
+        filled($startsBefore),
+        filled($prayerTime),
+        filled($timingMode),
+        filled($startsTimeFrom),
+        filled($startsTimeUntil),
+        $this->has_event_url !== null,
+        $this->has_live_url !== null,
         $timeScope !== 'upcoming',
-        $lat,
-    ])->filter(fn ($value) => $value !== null && $value !== '' && $value !== false)->count();
+        filled($lat),
+    ])->filter()->count();
 
-    $hasActiveFilters = collect([
-        $search,
-        $stateId,
-        $districtId,
-        $subdistrictId,
-        $institutionId,
-        count($selectedLanguageCodes) > 0,
-        count($selectedEventTypes) > 0,
-        count($selectedEventFormats) > 0,
-        $gender,
-        count($selectedAgeGroups) > 0,
-        $childrenAllowed,
-        $isMuslimOnly,
-        count($selectedSpeakerIds) > 0,
-        count($selectedTopicIds) > 0,
-        $startsAfter,
-        $startsBefore,
-        $prayerTime,
-        $timingMode,
-        $this->has_event_url,
-        $this->has_live_url,
-        $this->has_end_time,
-        $timeScope !== 'upcoming',
-        $lat,
-    ])->contains(fn ($value) => $value !== null && $value !== '' && $value !== false);
+    $hasActiveFilters = $activeFilterCount > 0;
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -378,13 +364,19 @@
 
                     @if($subdistrictId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $subdistricts->firstWhere('id', $subdistrictId)?->name ?? __('Subdistrict') }}
+                            {{ $subdistricts->firstWhere('id', $subdistrictId)?->name ?? __('Daerah Kecil / Bandar / Mukim') }}
                         </span>
                     @endif
 
                     @if($institutionId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ $institutions->firstWhere('id', $institutionId)?->name ?? __('Institution') }}
+                        </span>
+                    @endif
+
+                    @if($venueId)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $venues->firstWhere('id', $venueId)?->name ?? __('Tempat') }}
                         </span>
                     @endif
 
@@ -424,6 +416,18 @@
                         </span>
                     @endif
 
+                    @if($startsTimeFrom)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                            {{ __('Masa Dari') }} {{ \Illuminate\Support\Carbon::make($startsTimeFrom)?->format('h:i A') ?? $startsTimeFrom }}
+                        </span>
+                    @endif
+
+                    @if($startsTimeUntil)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                            {{ __('Masa Hingga') }} {{ \Illuminate\Support\Carbon::make($startsTimeUntil)?->format('h:i A') ?? $startsTimeUntil }}
+                        </span>
+                    @endif
+
                     @if($childrenAllowed !== null)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ $childrenAllowed ? __('Children Allowed') : __('No Children') }}
@@ -445,12 +449,6 @@
                     @if($this->has_live_url !== null)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ $this->has_live_url ? __('Has Live URL') : __('No Live URL') }}
-                        </span>
-                    @endif
-
-                    @if($this->has_end_time !== null)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $this->has_end_time ? __('Has End Time') : __('No End Time') }}
                         </span>
                     @endif
 
@@ -478,7 +476,7 @@
                         @endphp
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ __('From') }} {{ $startsAfterLabel }}
+                            {{ __('Held from') }} {{ $startsAfterLabel }}
                         </span>
                     @endif
 
@@ -488,7 +486,7 @@
                         @endphp
                         <span
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ __('Until') }} {{ $startsBeforeLabel }}
+                            {{ __('Held until') }} {{ $startsBeforeLabel }}
                         </span>
                     @endif
 
@@ -506,10 +504,17 @@
                         </span>
                     @endif
 
-                    <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
-                        class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                        {{ __('Save This Search') }}
-                    </a>
+                    @auth
+                        <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
+                            class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Save This Search') }}
+                        </a>
+                    @else
+                        <a href="{{ route('login') }}"
+                            class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Log Masuk') }} · {{ __('Save This Search') }}
+                        </a>
+                    @endauth
 
                     <button type="button" wire:click="clearAllFilters"
                         class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
