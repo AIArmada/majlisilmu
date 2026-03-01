@@ -2,7 +2,12 @@
 
 namespace App\Livewire\Pages\SavedSearches;
 
+use App\Models\District;
+use App\Models\Institution;
 use App\Models\SavedSearch;
+use App\Models\State;
+use App\Models\Subdistrict;
+use App\Models\Venue;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -33,6 +38,31 @@ class Index extends Component
      */
     public array $filters = [];
 
+    /**
+     * @var array<int, string|null>
+     */
+    private array $stateNames = [];
+
+    /**
+     * @var array<int, string|null>
+     */
+    private array $districtNames = [];
+
+    /**
+     * @var array<int, string|null>
+     */
+    private array $subdistrictNames = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private array $institutionNames = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private array $venueNames = [];
+
     public function mount(): void
     {
         $this->prefillFromRequest();
@@ -61,7 +91,7 @@ class Index extends Component
             'name' => ['required', 'string', 'max:100'],
             'query' => ['nullable', 'string', 'max:255'],
             'notify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
-            'radius_km' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'radius_km' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'lat' => ['nullable', 'required_with:radius_km', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'required_with:radius_km', 'numeric', 'between:-180,180'],
         ]);
@@ -130,12 +160,56 @@ class Index extends Component
         return view('livewire.pages.saved-searches.index');
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  float|int|string|null  $lat
+     * @param  float|int|string|null  $lng
+     * @return list<array{label: string, value: string}>
+     */
+    public function formatCapturedFilters(
+        array $filters,
+        ?int $radiusKm = null,
+        float|int|string|null $lat = null,
+        float|int|string|null $lng = null
+    ): array
+    {
+        $formatted = [];
+
+        foreach ($filters as $filterKey => $filterValue) {
+            if (! is_string($filterKey)) {
+                continue;
+            }
+
+            $valueLabel = $this->capturedFilterValue($filterKey, $filterValue);
+
+            if (! filled($valueLabel)) {
+                continue;
+            }
+
+            $formatted[] = [
+                'label' => $this->capturedFilterLabel($filterKey),
+                'value' => $valueLabel,
+            ];
+        }
+
+        if ($radiusKm !== null && $radiusKm > 0 && filled($lat) && filled($lng)) {
+            $formatted[] = [
+                'label' => __('Radius'),
+                'value' => __(':distance km', ['distance' => $radiusKm]),
+            ];
+        }
+
+        return $formatted;
+    }
+
     protected function prefillFromRequest(): void
     {
         $this->query = request()->filled('search') ? (string) request('search') : null;
-        $this->radius_km = request()->filled('radius_km') ? (int) request('radius_km') : null;
         $this->lat = request()->filled('lat') ? (string) request('lat') : null;
         $this->lng = request()->filled('lng') ? (string) request('lng') : null;
+        $this->radius_km = ($this->lat !== null && $this->lng !== null && request()->filled('radius_km'))
+            ? (int) request('radius_km')
+            : null;
 
         $this->filters = $this->extractRequestFilters();
 
@@ -238,5 +312,114 @@ class Index extends Component
         }
 
         return __('Carian Majlis Saya');
+    }
+
+    private function capturedFilterLabel(string $filterKey): string
+    {
+        return match ($filterKey) {
+            'state_id' => __('State'),
+            'district_id' => __('District'),
+            'subdistrict_id' => __('Daerah Kecil / Bandar / Mukim'),
+            'institution_id' => __('Institution'),
+            'venue_id' => __('Tempat'),
+            'time_scope' => __('Time Scope'),
+            default => str($filterKey)->replace('_', ' ')->title()->toString(),
+        };
+    }
+
+    private function capturedFilterValue(string $filterKey, mixed $filterValue): ?string
+    {
+        if (is_array($filterValue)) {
+            $values = array_values(array_filter(
+                array_map(fn (mixed $value): ?string => $this->capturedFilterValue($filterKey, $value), $filterValue),
+                filled(...)
+            ));
+
+            return $values === [] ? null : implode(', ', $values);
+        }
+
+        $value = trim((string) $filterValue);
+
+        if ($value === '') {
+            return null;
+        }
+
+        return match ($filterKey) {
+            'state_id' => $this->stateName($value) ?? $value,
+            'district_id' => $this->districtName($value) ?? $value,
+            'subdistrict_id' => $this->subdistrictName($value) ?? $value,
+            'institution_id' => $this->institutionName($value) ?? $value,
+            'venue_id' => $this->venueName($value) ?? $value,
+            'time_scope' => match ($value) {
+                'upcoming' => __('Upcoming'),
+                'past' => __('Past'),
+                'all' => __('All Time'),
+                default => $value,
+            },
+            default => $value,
+        };
+    }
+
+    private function stateName(string $id): ?string
+    {
+        $stateId = (int) $id;
+
+        if ($stateId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($stateId, $this->stateNames)) {
+            $this->stateNames[$stateId] = State::query()->whereKey($stateId)->value('name');
+        }
+
+        return $this->stateNames[$stateId];
+    }
+
+    private function districtName(string $id): ?string
+    {
+        $districtId = (int) $id;
+
+        if ($districtId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($districtId, $this->districtNames)) {
+            $this->districtNames[$districtId] = District::query()->whereKey($districtId)->value('name');
+        }
+
+        return $this->districtNames[$districtId];
+    }
+
+    private function subdistrictName(string $id): ?string
+    {
+        $subdistrictId = (int) $id;
+
+        if ($subdistrictId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($subdistrictId, $this->subdistrictNames)) {
+            $this->subdistrictNames[$subdistrictId] = Subdistrict::query()->whereKey($subdistrictId)->value('name');
+        }
+
+        return $this->subdistrictNames[$subdistrictId];
+    }
+
+    private function institutionName(string $id): ?string
+    {
+        if (! array_key_exists($id, $this->institutionNames)) {
+            $this->institutionNames[$id] = Institution::query()->whereKey($id)->value('name');
+        }
+
+        return $this->institutionNames[$id];
+    }
+
+    private function venueName(string $id): ?string
+    {
+        if (! array_key_exists($id, $this->venueNames)) {
+            $this->venueNames[$id] = Venue::query()->whereKey($id)->value('name');
+        }
+
+        return $this->venueNames[$id];
     }
 }

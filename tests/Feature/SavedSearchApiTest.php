@@ -89,6 +89,19 @@ describe('Saved Search API Endpoints', function () {
                     ->assertJsonValidationErrors(['lat', 'lng']);
             });
 
+            it('accepts radius up to 1000 km when coordinates are provided', function () {
+                $response = $this->postJson('/api/v1/saved-searches', [
+                    'name' => 'Wide Nearby Search',
+                    'radius_km' => 1000,
+                    'lat' => 3.1390,
+                    'lng' => 101.6869,
+                    'notify' => 'daily',
+                ]);
+
+                $response->assertCreated()
+                    ->assertJsonPath('data.radius_km', 1000);
+            });
+
             it('rejects non-numeric geography filter ids', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Geography Filter Test',

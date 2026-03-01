@@ -42,59 +42,31 @@
                         </div>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-4">
-                        <div class="space-y-2">
-                            <label for="saved-search-notify" class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
-                            <select id="saved-search-notify" wire:model="notify"
-                                class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                                <option value="off">{{ __('Off') }}</option>
-                                <option value="instant">{{ __('Instant') }}</option>
-                                <option value="daily">{{ __('Daily') }}</option>
-                                <option value="weekly">{{ __('Weekly') }}</option>
-                            </select>
-                            @error('notify')
-                                <p class="text-sm text-danger-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="space-y-2">
-                            <label for="saved-search-radius" class="text-sm font-semibold text-slate-700">{{ __('Radius (km)') }}</label>
-                            <input id="saved-search-radius" type="number" min="1" max="500" wire:model.blur="radius_km"
-                                class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                            @error('radius_km')
-                                <p class="text-sm text-danger-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="space-y-2">
-                            <label for="saved-search-lat" class="text-sm font-semibold text-slate-700">{{ __('Latitude') }}</label>
-                            <input id="saved-search-lat" type="text" wire:model.blur="lat"
-                                class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                            @error('lat')
-                                <p class="text-sm text-danger-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="space-y-2">
-                            <label for="saved-search-lng" class="text-sm font-semibold text-slate-700">{{ __('Longitude') }}</label>
-                            <input id="saved-search-lng" type="text" wire:model.blur="lng"
-                                class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                            @error('lng')
-                                <p class="text-sm text-danger-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                    <div class="max-w-sm space-y-2">
+                        <label for="saved-search-notify" class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
+                        <select id="saved-search-notify" wire:model="notify"
+                            class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
+                            <option value="off">{{ __('Off') }}</option>
+                            <option value="instant">{{ __('Instant') }}</option>
+                            <option value="daily">{{ __('Daily') }}</option>
+                            <option value="weekly">{{ __('Weekly') }}</option>
+                        </select>
+                        @error('notify')
+                            <p class="text-sm text-danger-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
-                    @if($filters !== [])
+                    @php
+                        $capturedFilters = $this->formatCapturedFilters($filters, $radius_km, $lat, $lng);
+                    @endphp
+
+                    @if($capturedFilters !== [])
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                             <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{{ __('Captured Filters') }}</p>
                             <div class="flex flex-wrap gap-2">
-                                @foreach($filters as $filterKey => $filterValue)
-                                    @php
-                                        $valueLabel = is_array($filterValue) ? implode(', ', $filterValue) : (string) $filterValue;
-                                    @endphp
+                                @foreach($capturedFilters as $capturedFilter)
                                     <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                                        {{ str($filterKey)->replace('_', ' ')->title() }}: {{ $valueLabel }}
+                                        {{ $capturedFilter['label'] }}: {{ $capturedFilter['value'] }}
                                     </span>
                                 @endforeach
                             </div>
@@ -144,12 +116,9 @@
 
                                 @if(is_array($savedSearch->filters) && $savedSearch->filters !== [])
                                     <div class="mt-3 flex flex-wrap gap-2">
-                                        @foreach($savedSearch->filters as $filterKey => $filterValue)
-                                            @php
-                                                $filterLabel = is_array($filterValue) ? implode(', ', $filterValue) : (string) $filterValue;
-                                            @endphp
+                                        @foreach($this->formatCapturedFilters($savedSearch->filters, $savedSearch->radius_km, $savedSearch->lat, $savedSearch->lng) as $capturedFilter)
                                             <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                                {{ str($filterKey)->replace('_', ' ')->title() }}: {{ $filterLabel }}
+                                                {{ $capturedFilter['label'] }}: {{ $capturedFilter['value'] }}
                                             </span>
                                         @endforeach
                                     </div>

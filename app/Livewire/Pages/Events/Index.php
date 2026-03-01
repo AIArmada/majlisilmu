@@ -20,6 +20,7 @@ use App\Models\Venue;
 use App\Services\EventSearchService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -152,7 +153,7 @@ class Index extends Component implements HasForms
     public ?string $lng = null;
 
     #[Url]
-    public int $radius_km = 50;
+    public int $radius_km = 10;
 
     #[Url]
     public string $sort = 'time';
@@ -359,6 +360,22 @@ class Index extends Component implements HasForms
                                         );
                                     })
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
+                                    ->live(),
+
+                                TextInput::make('radius_km')
+                                    ->label(__('Radius (km)'))
+                                    ->helperText(__('Applied when searching nearby events from your detected location.'))
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->maxValue(1000)
+                                    ->step(1)
+                                    ->extraInputAttributes([
+                                        'min' => 1,
+                                        'max' => 1000,
+                                        'step' => 1,
+                                    ])
+                                    ->suffix(__('km'))
+                                    ->visible(fn (Get $get): bool => filled($get('lat')) && filled($get('lng')))
                                     ->live(),
                             ]),
 
@@ -895,7 +912,7 @@ class Index extends Component implements HasForms
             'has_end_time' => null,
             'lat' => null,
             'lng' => null,
-            'radius_km' => 50,
+            'radius_km' => 10,
             'sort' => 'time',
         ];
     }
@@ -950,7 +967,7 @@ class Index extends Component implements HasForms
             'has_end_time' => $this->normalizeNullableBoolean($this->has_end_time),
             'lat' => filled($this->lat) ? (string) $this->lat : null,
             'lng' => filled($this->lng) ? (string) $this->lng : null,
-            'radius_km' => max(1, min(500, (int) $this->radius_km)),
+            'radius_km' => max(1, min(1000, (int) $this->radius_km)),
             'sort' => in_array($this->sort, ['time', 'relevance', 'distance'], true) ? $this->sort : $defaults['sort'],
         ];
     }
@@ -1071,7 +1088,7 @@ class Index extends Component implements HasForms
             'has_end_time' => $this->normalizeNullableBoolean($normalized['has_end_time'] ?? null),
             'lat' => filled($normalized['lat']) ? (string) $normalized['lat'] : null,
             'lng' => filled($normalized['lng']) ? (string) $normalized['lng'] : null,
-            'radius_km' => max(1, min(500, (int) ($normalized['radius_km'] ?? $defaults['radius_km']))),
+            'radius_km' => max(1, min(1000, (int) ($normalized['radius_km'] ?? $defaults['radius_km']))),
             'sort' => $sort,
         ];
     }
