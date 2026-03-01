@@ -56,7 +56,7 @@ class VenueFormSchema
                 ->maxFiles(10)
                 ->helperText(__('Sehingga 10 gambar lokasi')),
 
-            ...SharedFormSchema::addressFields(),
+            ...SharedFormSchema::addressFields(requireGoogleMaps: true),
 
             SharedFormSchema::socialMediaRepeater('Add social media links for this venue'),
         ];

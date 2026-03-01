@@ -46,6 +46,14 @@ describe('Event Search Filters', function () {
             ->assertSee('Advanced Filters');
     });
 
+    it('shows save this search link for guests when search query is active', function () {
+        $response = $this->get('/events?search=halaqah');
+
+        $response->assertOk()
+            ->assertSee('Save This Search')
+            ->assertSee('/carian-tersimpan?search=halaqah', false);
+    });
+
     it('shows radius control only when a nearby location is available', function () {
         $this->get('/events')
             ->assertOk()
@@ -54,6 +62,16 @@ describe('Event Search Filters', function () {
         $this->get('/events?lat=3.1390&lng=101.6869')
             ->assertOk()
             ->assertSee('Radius (km)');
+    });
+
+    it('sets default nearby radius to 15 km when location is detected', function () {
+        Livewire::test(\App\Livewire\Pages\Events\Index::class)
+            ->call('setLocation', 3.0969303799671, 101.48910903397)
+            ->assertSet('lat', '3.0969303799671')
+            ->assertSet('lng', '101.48910903397')
+            ->assertSet('radius_km', 15)
+            ->assertSet('filterData.radius_km', 15)
+            ->assertSet('sort', 'distance');
     });
 
     it('shows event location with subdistrict, district, and state on cards', function () {
@@ -1317,6 +1335,92 @@ describe('Event Search Filters', function () {
 
         expect($nearest)->not->toBeNull()
             ->and($nearest->distance_km ?? null)->not->toBeNull();
+    });
+
+    it('returns institution-based events in nearby search when venue is not set', function () {
+        config(['scout.driver' => 'database']);
+
+        $nearInstitution = Institution::factory()->create();
+        $nearInstitution->address()->update([
+            'lat' => 3.1390,
+            'lng' => 101.6869,
+        ]);
+
+        $farInstitution = Institution::factory()->create();
+        $farInstitution->address()->update([
+            'lat' => 3.2600,
+            'lng' => 101.8600,
+        ]);
+
+        Event::factory()->for($nearInstitution)->create([
+            'title' => 'Nearby Institution Event',
+            'venue_id' => null,
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(4),
+        ]);
+
+        Event::factory()->for($farInstitution)->create([
+            'title' => 'Far Institution Event',
+            'venue_id' => null,
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(4),
+        ]);
+
+        $events = app(EventSearchService::class)->searchNearby(
+            lat: 3.1390,
+            lng: 101.6869,
+            radiusKm: 15,
+            filters: [],
+            perPage: 20
+        );
+
+        $eventTitles = collect($events->items())->pluck('title')->all();
+
+        expect($eventTitles)->toContain('Nearby Institution Event');
+        expect($eventTitles)->not->toContain('Far Institution Event');
+
+        $nearest = collect($events->items())->firstWhere('title', 'Nearby Institution Event');
+
+        expect($nearest)->not->toBeNull()
+            ->and($nearest->distance_km ?? null)->not->toBeNull();
+    });
+
+    it('ignores event-level address records in nearby search', function () {
+        config(['scout.driver' => 'database']);
+
+        $institution = Institution::factory()->create();
+
+        $event = Event::factory()->for($institution)->create([
+            'title' => 'Event Address Should Be Ignored',
+            'event_format' => EventFormat::Online,
+            'institution_id' => null,
+            'venue_id' => null,
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(4),
+        ]);
+
+        $event->address()->create([
+            'lat' => 3.1390,
+            'lng' => 101.6869,
+        ]);
+
+        $events = app(EventSearchService::class)->searchNearby(
+            lat: 3.1390,
+            lng: 101.6869,
+            radiusKm: 15,
+            filters: [],
+            perPage: 20
+        );
+
+        $eventTitles = collect($events->items())->pluck('title')->all();
+
+        expect($eventTitles)->not->toContain('Event Address Should Be Ignored');
     });
 });
 

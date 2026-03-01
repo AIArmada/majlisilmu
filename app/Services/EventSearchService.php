@@ -6,6 +6,7 @@ use App\Enums\EventPrayerTime;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Venue;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
@@ -350,21 +351,15 @@ class EventSearchService
         }
 
         if (! empty($filters['state_id'])) {
-            $queryBuilder->whereHas('venue.address', function (Builder $addressQuery) use ($filters) {
-                $addressQuery->where('state_id', $filters['state_id']);
-            });
+            $this->applyLocationAddressFilter($queryBuilder, 'state_id', $filters['state_id']);
         }
 
         if (! empty($filters['district_id'])) {
-            $queryBuilder->whereHas('venue.address', function (Builder $addressQuery) use ($filters) {
-                $addressQuery->where('district_id', $filters['district_id']);
-            });
+            $this->applyLocationAddressFilter($queryBuilder, 'district_id', $filters['district_id']);
         }
 
         if (! empty($filters['subdistrict_id'])) {
-            $queryBuilder->whereHas('venue.address', function (Builder $addressQuery) use ($filters) {
-                $addressQuery->where('subdistrict_id', $filters['subdistrict_id']);
-            });
+            $this->applyLocationAddressFilter($queryBuilder, 'subdistrict_id', $filters['subdistrict_id']);
         }
 
         if (! empty($filters['language'])) {
@@ -712,21 +707,23 @@ class EventSearchService
         array $filters,
         int $perPage
     ): LengthAwarePaginator {
-        $distanceSql = '(6371 * acos(cos(radians(?)) * cos(radians(coalesce(venue_addresses.lat, event_addresses.lat))) * cos(radians(coalesce(venue_addresses.lng, event_addresses.lng)) - radians(?)) + sin(radians(?)) * sin(radians(coalesce(venue_addresses.lat, event_addresses.lat)))))';
+        $latitudeExpression = 'coalesce(venue_addresses.lat, institution_addresses.lat)';
+        $longitudeExpression = 'coalesce(venue_addresses.lng, institution_addresses.lng)';
+        $distanceSql = "(6371 * acos(cos(radians(?)) * cos(radians({$latitudeExpression})) * cos(radians({$longitudeExpression}) - radians(?)) + sin(radians(?)) * sin(radians({$latitudeExpression}))))";
         $venueMorphType = (new Venue)->getMorphClass();
-        $eventMorphType = (new Event)->getMorphClass();
+        $institutionMorphType = (new Institution)->getMorphClass();
 
         $queryBuilder = $this->buildDatabaseQuery(null, $filters)
             ->leftJoin('addresses as venue_addresses', function ($join) use ($venueMorphType) {
                 $join->on('venue_addresses.addressable_id', '=', 'events.venue_id')
                     ->where('venue_addresses.addressable_type', $venueMorphType);
             })
-            ->leftJoin('addresses as event_addresses', function ($join) use ($eventMorphType) {
-                $join->on('event_addresses.addressable_id', '=', 'events.id')
-                    ->where('event_addresses.addressable_type', $eventMorphType);
+            ->leftJoin('addresses as institution_addresses', function ($join) use ($institutionMorphType) {
+                $join->on('institution_addresses.addressable_id', '=', 'events.institution_id')
+                    ->where('institution_addresses.addressable_type', $institutionMorphType);
             })
-            ->whereRaw('coalesce(venue_addresses.lat, event_addresses.lat) is not null')
-            ->whereRaw('coalesce(venue_addresses.lng, event_addresses.lng) is not null')
+            ->whereRaw("{$latitudeExpression} is not null")
+            ->whereRaw("{$longitudeExpression} is not null")
             ->select('events.*')
             ->selectRaw("{$distanceSql} as distance_km", [$lat, $lng, $lat])
             ->whereRaw("{$distanceSql} <= ?", [$lat, $lng, $lat, $radiusKm])
@@ -757,6 +754,22 @@ class EventSearchService
         }
 
         return null;
+    }
+
+    /**
+     * @param  Builder<Event>  $queryBuilder
+     */
+    protected function applyLocationAddressFilter(Builder $queryBuilder, string $column, mixed $value): void
+    {
+        $queryBuilder->where(function (Builder $locationQuery) use ($column, $value): void {
+            $locationQuery
+                ->whereHas('venue.address', function (Builder $addressQuery) use ($column, $value): void {
+                    $addressQuery->where($column, $value);
+                })
+                ->orWhereHas('institution.address', function (Builder $addressQuery) use ($column, $value): void {
+                    $addressQuery->where($column, $value);
+                });
+        });
     }
 
     /**

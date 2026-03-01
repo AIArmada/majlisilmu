@@ -217,9 +217,9 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'venue', 'venue.address', 'speakers', 'address', 'tags']);
+        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'tags']);
         $venueAddress = $this->venue?->addressModel;
-        $eventAddress = $this->addressModel;
+        $institutionAddress = $this->institution?->addressModel;
         $institution = $this->institution;
         $venue = $this->venue;
         $gender = $this->gender;
@@ -250,9 +250,21 @@ class Event extends Model implements AuditableContract, HasMedia
             'speaker_names' => $this->speakers->pluck('name')->implode(', '),
             'institution_name' => $institution instanceof Institution ? $institution->name : '',
             'venue_name' => $venue instanceof Venue ? $venue->name : '',
-            'state_id' => $venueAddress instanceof Address ? $venueAddress->state_id : ($eventAddress instanceof Address ? $eventAddress->state_id : ''),
-            'district_id' => $venueAddress instanceof Address ? $venueAddress->district_id : ($eventAddress instanceof Address ? $eventAddress->district_id : ''),
-            'subdistrict_id' => $venueAddress instanceof Address ? $venueAddress->subdistrict_id : ($eventAddress instanceof Address ? $eventAddress->subdistrict_id : ''),
+            'state_id' => $venueAddress instanceof Address
+                ? $venueAddress->state_id
+                : ($institutionAddress instanceof Address
+                    ? $institutionAddress->state_id
+                    : ''),
+            'district_id' => $venueAddress instanceof Address
+                ? $venueAddress->district_id
+                : ($institutionAddress instanceof Address
+                    ? $institutionAddress->district_id
+                    : ''),
+            'subdistrict_id' => $venueAddress instanceof Address
+                ? $venueAddress->subdistrict_id
+                : ($institutionAddress instanceof Address
+                    ? $institutionAddress->subdistrict_id
+                    : ''),
             'language' => $this->language,
             'event_type' => $this->normalizedEventTypeValues(),
             'gender' => $gender instanceof EventGenderRestriction ? $gender->value : ((is_string($gender) && $gender !== '') ? $gender : 'all'),
@@ -273,8 +285,8 @@ class Event extends Model implements AuditableContract, HasMedia
 
         if ($venueAddress instanceof Address && $venueAddress->lat !== null && $venueAddress->lng !== null) {
             $array['location'] = [(float) $venueAddress->lat, (float) $venueAddress->lng];
-        } elseif ($eventAddress instanceof Address && $eventAddress->lat !== null && $eventAddress->lng !== null) {
-            $array['location'] = [(float) $eventAddress->lat, (float) $eventAddress->lng];
+        } elseif ($institutionAddress instanceof Address && $institutionAddress->lat !== null && $institutionAddress->lng !== null) {
+            $array['location'] = [(float) $institutionAddress->lat, (float) $institutionAddress->lng];
         }
 
         return $array;

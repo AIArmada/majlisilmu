@@ -504,17 +504,10 @@
                         </span>
                     @endif
 
-                    @auth
-                        <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
-                            class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                            {{ __('Save This Search') }}
-                        </a>
-                    @else
-                        <a href="{{ route('login') }}"
-                            class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                            {{ __('Log Masuk') }} · {{ __('Save This Search') }}
-                        </a>
-                    @endauth
+                    <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
+                        class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                        {{ __('Save This Search') }}
+                    </a>
 
                     <button type="button" wire:click="clearAllFilters"
                         class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
