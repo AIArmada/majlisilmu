@@ -515,7 +515,7 @@
                                 class="group relative block w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
                                 aria-label="{{ __('Lihat poster penuh') }}">
                                 <img src="{{ $eventPosterPreviewUrl }}" alt="{{ $event->title }}"
-                                    class="w-full {{ $eventPosterIsPortrait ? 'object-contain bg-slate-900' : 'aspect-[3/4] object-cover' }}"
+                                    class="w-full object-contain {{ $eventPosterIsPortrait ? 'max-h-[480px] bg-slate-900' : 'bg-slate-900' }}"
                                     loading="lazy">
                                 {{-- Tap-to-expand hint --}}
                                 <div
@@ -743,7 +743,7 @@
                 @if(!$event->starts_at || !$event->starts_at->isPast())
                             <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
                                 class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all
-                                {{ $isGoing
+                                            {{ $isGoing
                     ? 'bg-emerald-600 text-white shadow-emerald-200'
                     : 'bg-slate-900 text-white hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/30' }}">
                                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -761,8 +761,7 @@
                             </button>
                 @endif
 
-                <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"
-                    class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
                     {{ $isInterested
     ? 'border-rose-200 bg-rose-50 text-rose-600'
     : 'border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600' }}">
@@ -777,8 +776,7 @@
                     @endif
                 </button>
 
-                <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
-                    class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                <button type="button" wire:click="toggleSave" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
                     {{ $isSaved
     ? 'border-blue-200 bg-blue-50 text-blue-600'
     : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600' }}">
@@ -912,7 +910,8 @@
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <p class="text-sm font-medium text-slate-600">{{ __('Majlis ini telah berlalu.') }}
-                        {{ $event->recording_url ? __('Anda boleh menonton rakaman di bawah.') : '' }}</p>
+                        {{ $event->recording_url ? __('Anda boleh menonton rakaman di bawah.') : '' }}
+                    </p>
                 </div>
             </div>
         @elseif($eventTimeStatus === 'happening_now')
@@ -938,16 +937,16 @@
         @elseif($eventTimeStatus === 'starting_soon' && $event->starts_at)
             <div class="relative z-30 {{ $event->status instanceof \App\States\EventStatus\Pending ? '' : '-mt-4' }} mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4" x-data="{
-                            target: {{ $event->starts_at->timestamp * 1000 }},
-                            display: '',
-                            update() {
-                                const diff = this.target - Date.now();
-                                if (diff <= 0) { this.display = ''; return; }
-                                const h = Math.floor(diff / 3600000);
-                                const m = Math.floor((diff % 3600000) / 60000);
-                                this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
-                            }
-                        }" x-init="update(); setInterval(() => update(), 60000)">
+                                target: {{ $event->starts_at->timestamp * 1000 }},
+                                display: '',
+                                update() {
+                                    const diff = this.target - Date.now();
+                                    if (diff <= 0) { this.display = ''; return; }
+                                    const h = Math.floor(diff / 3600000);
+                                    const m = Math.floor((diff % 3600000) / 60000);
+                                    this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
+                                }
+                            }" x-init="update(); setInterval(() => update(), 60000)">
                     <svg class="size-5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1002,7 +1001,8 @@
                             </svg>
                         </div>
                         <h2 class="font-heading text-2xl font-bold text-slate-900">
-                            {{ $event->speakers->count() === 1 ? __('Speaker') : __('Speakers') }}</h2>
+                            {{ $event->speakers->count() === 1 ? __('Speaker') : __('Speakers') }}
+                        </h2>
                     </div>
 
                     @if($event->speakers->count() === 1)
@@ -1051,7 +1051,8 @@
                             <div class="flex flex-col justify-center gap-1 p-7 sm:p-8">
                                 <h3
                                     class="font-heading text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">
-                                    {{ $sp->formatted_name ?? $sp->name }}</h3>
+                                    {{ $sp->formatted_name ?? $sp->name }}
+                                </h3>
                                 @if($sp->title)
                                     <p class="mt-0.5 text-sm font-semibold text-slate-500">{{ $sp->title }}</p>
                                 @endif
@@ -1100,7 +1101,8 @@
                                         <div class="mt-2">
                                             <h4
                                                 class="font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-emerald-700">
-                                                {{ $speaker->formatted_name ?? $speaker->name }}</h4>
+                                                {{ $speaker->formatted_name ?? $speaker->name }}
+                                            </h4>
                                             @if($speaker->title)
                                                 <p class="mt-1 text-sm font-medium text-slate-500">{{ $speaker->title }}</p>
                                             @endif
@@ -1156,7 +1158,8 @@
                                         <p class="text-xs font-bold uppercase tracking-widest text-white/70">{{ __('Lokasi') }}
                                         </p>
                                         <p class="mt-1 text-lg font-bold text-white sm:text-xl">
-                                            {{ $locationEntity?->name ?? __('TBC') }}</p>
+                                            {{ $locationEntity?->name ?? __('TBC') }}
+                                        </p>
                                     </div>
                                 </div>
                                 @if($locationHref)
@@ -1226,7 +1229,8 @@
                                 @if($sectionTags instanceof \Illuminate\Support\Collection && $sectionTags->isNotEmpty())
                                     <div>
                                         <p class="mb-2.5 text-xs font-bold uppercase tracking-widest text-slate-400">
-                                            {{ $section['label'] }}</p>
+                                            {{ $section['label'] }}
+                                        </p>
                                         <div class="flex flex-wrap gap-2.5">
                                             @foreach($sectionTags as $tag)
                                                 <span wire:key="tag-cloud-{{ $section['key'] }}-{{ $tag->id }}"
@@ -1303,7 +1307,8 @@
                                             class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ $contextLabel }}</span>
                                         <h3
                                             class="mt-1 font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-emerald-600">
-                                            {{ $contextName }}</h3>
+                                            {{ $contextName }}
+                                        </h3>
                                     </div>
                                     @if($contextHref)
                                         <div
@@ -1430,7 +1435,8 @@
                         <div class="min-w-0 flex-1 py-1">
                             <h4
                                 class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-indigo-700">
-                                {{ $reference->title }}</h4>
+                                {{ $reference->title }}
+                            </h4>
                             @if($reference->author)
                                 <p class="mt-1.5 text-sm font-medium text-slate-600">{{ $reference->author }}</p>
                             @endif
@@ -1480,10 +1486,12 @@
                         <div class="min-w-0 flex-1">
                             <h4
                                 class="font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-fuchsia-700">
-                                {{ $series->title }}</h4>
+                                {{ $series->title }}
+                            </h4>
                             @if($series->description)
                                 <p class="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-600">
-                                    {{ Str::limit(strip_tags($series->description), 120) }}</p>
+                                    {{ Str::limit(strip_tags($series->description), 120) }}
+                                </p>
                             @endif
                         </div>
                         <div
@@ -2046,9 +2054,11 @@
                     </h3>
                     <div class="mt-5 rounded-2xl border border-amber-200/60 bg-white/60 p-5 backdrop-blur-sm">
                         <p class="text-xs font-bold uppercase tracking-widest text-amber-600">
-                            {{ $event->donationChannel->bank_name }}</p>
+                            {{ $event->donationChannel->bank_name }}
+                        </p>
                         <p class="mt-1.5 font-mono text-xl font-bold tracking-tight text-amber-900">
-                            {{ $event->donationChannel->account_number }}</p>
+                            {{ $event->donationChannel->account_number }}
+                        </p>
                         <p class="mt-1 text-sm font-medium text-amber-800">{{ $event->donationChannel->account_name }}</p>
                         @if($event->donationChannel->reference_note)
                             <div
@@ -2191,7 +2201,8 @@ SHARE MODAL
                             {{ $sharePreviewDateTime }}
                         </p>
                         <p class="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-600">
-                            {{ Str::limit($event->description_text, 140) }}</p>
+                            {{ Str::limit($event->description_text, 140) }}
+                        </p>
                     </div>
                 </article>
 
@@ -2383,7 +2394,7 @@ MOBILE BOTTOM ACTION BAR
         <div class="flex items-center gap-2">
             @auth
                     <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
-                                {{ $isGoing
+                                        {{ $isGoing
                 ? 'border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-inner'
                 : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' }}">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -2399,7 +2410,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
+                                        {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
                         <svg class="size-5 {{ $isInterested ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -2409,7 +2420,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
+                                        {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
                         <svg class="size-5 {{ $isSaved ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
