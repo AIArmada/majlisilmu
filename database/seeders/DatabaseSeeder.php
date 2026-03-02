@@ -64,6 +64,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SeriesSeeder::class,
             EventSeeder::class,
+            AdvancedEventSeeder::class,
             ReferenceSeeder::class,
             InspirationSeeder::class,
             DonationChannelSeeder::class,
