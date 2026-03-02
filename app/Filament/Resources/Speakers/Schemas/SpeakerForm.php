@@ -115,7 +115,7 @@ class SpeakerForm
                             ->live()
                             ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null)),
                         Select::make('subdistrict_id')
-                            ->label(__('Daerah Kecil / Bandar / Mukim'))
+                            ->label(__('Bandar / Mukim / Zon'))
                             ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
                             ->searchable()
                             ->preload(),

@@ -1,3 +1,107 @@
+# Event Advanced Filter Taxonomy Parity Todo
+
+- [x] Rename `Topic/Tajuk` advanced filter label to `Bidang Ilmu`
+- [x] Add `Sumber Rujukan Utama`, `Tema / Isu`, and `Rujukan Kitab/Buku` controls to `/majlis` advanced filters
+- [x] Wire new filters through URL state normalization and search filter payload
+- [x] Implement DB + Typesense filter handling for new fields
+- [x] Extend searchable index payload/schema for new tag/reference filter fields
+- [x] Extend saved-search capture/labels/API validation for new filters
+- [x] Add focused tests and run verification
+- [x] Verify field visibility in browser via Chrome MCP
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php`:
+  - relabeled `topic_ids` field to `Bidang Ilmu`
+  - added new advanced filter state and controls for:
+    - `source_tag_ids` (`Sumber Rujukan Utama`)
+    - `issue_tag_ids` (`Tema / Isu`)
+    - `reference_ids` (`Rujukan Kitab/Buku`)
+  - added computed option sources for disciplines/sources/issues/references
+  - propagated new keys through default/normalized/hydrated filter state and `searchFilters`
+- Updated `resources/views/livewire/pages/events/index.blade.php`:
+  - wired selected labels/chips for the new filters
+  - included new keys in saved-search query payload and active-filter counter
+- Updated `app/Services/EventSearchService.php`:
+  - Typesense filter parts now include `source_tag_ids`, `issue_tag_ids`, `reference_ids`
+  - DB filters now include tag-type constrained `whereHas` for source/issue and `references` relation filter
+- Updated search index payload:
+  - `app/Models/Event.php` now includes `source_tag_ids`, `issue_tag_ids`, `reference_ids` in `toSearchableArray()`
+  - `config/scout.php` schema now includes these fields as facet-enabled `string[]`
+- Updated saved-search pipeline:
+  - `app/Livewire/Pages/SavedSearches/Index.php` captures and renders human-readable labels for the new filter keys
+  - `app/Http/Controllers/Api/SavedSearchController.php` validates the new filter arrays
+- Added/updated tests:
+  - `tests/Feature/EventSearchTest.php`
+  - `tests/Feature/EventSearchTypesenseFilterTest.php`
+  - `tests/Feature/SavedSearchPageTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="(filters events by selected bidang ilmu|filters events by selected kategori \(domain tags\)|filters events by selected sumber rujukan utama tags|filters events by selected tema isu tags|filters events by selected rujukan kitab buku)"` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTypesenseFilterTest.php` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php --filter="(renders source issue and reference chips using human-readable values|renders domain kategori chip using human-readable tag name|prefills domain kategori filters from query string when saving searches)"` => **3 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php app/Models/Event.php resources/views/livewire/pages/events/index.blade.php app/Livewire/Pages/SavedSearches/Index.php app/Http/Controllers/Api/SavedSearchController.php tests/Feature/EventSearchTest.php tests/Feature/EventSearchTypesenseFilterTest.php tests/Feature/SavedSearchPageTest.php` => **No errors**
+  - Chrome MCP verification on `https://majlisilmu.test/majlis` confirms advanced filter now shows:
+    - `Bidang Ilmu`
+    - `Sumber Rujukan Utama`
+    - `Tema / Isu`
+    - `Rujukan Kitab/Buku`
+
+# Event Filter Kategori Domain Todo
+
+- [x] Add URL-backed `domain_tag_ids` state to `/majlis` advanced filters with category options sourced from Domain tags
+- [x] Include `domain_tag_ids` in event filtering pipeline (Livewire filter normalization + EventSearchService DB + Typesense filter parts)
+- [x] Extend searchable payload/schema for Typesense (`domain_tag_ids`) so non-DB path supports the new filter
+- [x] Include `domain_tag_ids` in saved-search capture payload from `/majlis`
+- [x] Add/adjust feature tests for category filtering and Typesense filter-part generation
+- [x] Run focused Pest verification and document review notes
+
+## Review
+
+- Added `domain_tag_ids` as a URL-backed advanced filter in `app/Livewire/Pages/Events/Index.php` with options sourced from Domain tags (`TagType::Domain`) and wired through filter normalization/state hydration.
+- Added filter UI chip/saved-search payload support in `resources/views/livewire/pages/events/index.blade.php`, including readable selected category chips in active filters.
+- Extended search filtering:
+  - `app/Services/EventSearchService.php` now applies `domain_tag_ids` in both DB query (`whereHas(tags.type = domain)`) and Typesense filter parts (`domain_tag_ids:[...]`).
+  - `app/Models/Event.php` searchable array now includes `domain_tag_ids` from attached Domain tags.
+  - `config/scout.php` Typesense schema now defines `domain_tag_ids` as `string[]` facet field.
+- Extended saved-search handling:
+  - `app/Livewire/Pages/SavedSearches/Index.php` now captures `domain_tag_ids` from request and renders chip label/value as `Kategori: <Tag Name>`.
+  - `app/Http/Controllers/Api/SavedSearchController.php` now validates `filters.domain_tag_ids`.
+- Added regressions:
+  - `tests/Feature/EventSearchTest.php`: domain category filtering behavior.
+  - `tests/Feature/EventSearchTypesenseFilterTest.php`: Typesense filter part generation for `domain_tag_ids`.
+  - `tests/Feature/SavedSearchPageTest.php`: query prefill + readable captured chip for kategori domain tag.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="(filters events by selected topics|filters events by selected kategori \(domain tags\)|shows title-only search placeholder on events index)"` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTypesenseFilterTest.php` => **4 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php` => **10 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php app/Models/Event.php app/Livewire/Pages/SavedSearches/Index.php app/Http/Controllers/Api/SavedSearchController.php tests/Feature/EventSearchTest.php tests/Feature/EventSearchTypesenseFilterTest.php tests/Feature/SavedSearchPageTest.php` => **No errors**
+
+# Institution Location Scope Todo
+
+- [x] Add URL-backed location scope state (`state_id`, `district_id`, `subdistrict_id`) to `/institusi` page component
+- [x] Add cascading option providers and dependent resets for Negeri -> Daerah -> Daerah Kecil / Bandar / Mukim
+- [x] Apply institution query filtering through `address` relation based on selected location scope
+- [x] Render location scope filter controls in institution index UI
+- [x] Add feature tests for state/district/subdistrict scoped filtering on institution index
+- [x] Run focused Pest verification and record review notes
+
+## Review
+
+- Updated `resources/views/components/pages/institutions/⚡index.blade.php` to support URL-backed location scopes:
+  - added `state_id`, `district_id`, `subdistrict_id` properties
+  - added cascading options for `Negeri -> Daerah -> Daerah Kecil / Bandar / Mukim`
+  - added dependent resets (`updatedStateId`, `updatedDistrictId`) and `clearFilters()`
+  - applied address-based query scoping in both direct and fuzzy search paths
+- Added UI controls under search input for the three location scopes with disabled child selects until parent is chosen.
+- Added regressions in `tests/Feature/InstitutionIndexTest.php`:
+  - scope control visibility assertion
+  - end-to-end filtering assertions for state, district, and subdistrict URL query scopes
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **8 passed**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
+---
+
 # Event Majlis Search Live + Fuzzy Todo
 
 - [x] Expand `/majlis` DB search to include title, institution, venue, and speaker names
@@ -1273,3 +1377,66 @@
     - `/majlis?state_id=2489` shows active chip with state name (`Johor` in seeded local data), not `State Id:<id>`.
     - `/majlis?lat=3.1390&lng=101.6869` only shows `Radius (km)` after expanding Advanced Filters, confirming location-gated visibility.
     - Radius input is `type=number` with `min=1`, `max=1000`, `step=1`.
+
+---
+
+# Majlis Advanced Filter Group Split (People & Content vs Event Settings)
+
+- [x] Split event-specific filters out of `People & Content` into a dedicated section
+- [x] Keep content/taxonomy filters grouped under `People & Content`
+- [x] Verify `/majlis` renders both groups correctly
+- [x] Run focused test + PHPStan verification
+
+## Review
+
+- Updated `app/Livewire/Pages/Events/Index.php` advanced filter schema:
+  - Kept `People & Content` for speaker/taxonomy/reference filters.
+  - Added new `Event Settings` section for:
+    - `Jenis Majlis` (`event_type`)
+    - `Format Majlis` (`event_format`)
+    - `Jantina` (`gender`)
+    - `Kumpulan Umur` (`age_group`)
+    - `Bahasa` (`language_codes`)
+- Verified in browser (Chrome MCP) on `/majlis` that advanced filters now render as two sections: `People & Content` and `Event Settings`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php` => **No errors**
+
+---
+
+# Majlis Filter Field Order Tweak (Kategori before Bidang Ilmu)
+
+- [x] Reorder `People & Content` fields so `Kategori` appears before `Bidang Ilmu`
+- [x] Keep active-filter chip order consistent with the same ordering
+- [x] Verify syntax/tests and browser rendering
+
+## Review
+
+- Updated field order in `app/Livewire/Pages/Events/Index.php` (`People & Content`): `Kategori` now comes before `Bidang Ilmu`.
+- Updated active chip rendering order in `resources/views/livewire/pages/events/index.blade.php` so category chips render before knowledge-field chips.
+- Verification:
+  - `php -l app/Livewire/Pages/Events/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/events/index.blade.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
+  - Chrome MCP on `/majlis` confirms `People & Content` order shows `Kategori` before `Bidang Ilmu`.
+
+---
+
+# Majlis Advanced Filter Translation Coverage
+
+- [x] Audit `/majlis` advanced-filter related translation keys used by Livewire schema and Blade active-filter chips
+- [x] Add missing locale entries in `ms.json` and `ms_MY.json`
+- [x] Validate locale JSON and verify no missing keys remain for this page's `__()` usage
+- [x] Verify browser rendering on `/majlis` in Malay locale
+
+## Review
+
+- Added missing translation keys for advanced-filter sections, descriptions, placeholders, option labels, and related chip text in:
+  - `resources/lang/ms.json`
+  - `resources/lang/ms_MY.json`
+- This includes strings such as `Advanced Filters`, `People & Content`, `Event Settings`, `Links & Visibility`, `Any ...` placeholders, URL availability labels, and nearby-radius helper text.
+- Verification:
+  - JSON decode checks for both locale files => **No error**
+  - Scripted key audit against `app/Livewire/Pages/Events/Index.php` and `resources/views/livewire/pages/events/index.blade.php` => **No missing keys** in `ms.json` and `ms_MY.json`
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
+  - Chrome MCP on `https://majlisilmu.test/majlis` confirms advanced-filter headings and descriptions are now Malay (`Penapis Lanjutan`, `Masa & Tarikh`, `Penceramah & Kandungan`, `Tetapan Majlis`, etc.).

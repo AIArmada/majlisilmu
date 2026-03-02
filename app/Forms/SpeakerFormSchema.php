@@ -136,7 +136,7 @@ class SpeakerFormSchema
                     JS),
 
             Select::make('subdistrict_id')
-                ->label(__('Daerah Kecil / Bandar / Mukim'))
+                ->label(__('Bandar / Mukim / Zon'))
                 ->options(function (Get $get) {
                     $districtId = $get('district_id');
                     if (! $districtId) {

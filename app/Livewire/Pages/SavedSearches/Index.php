@@ -4,9 +4,11 @@ namespace App\Livewire\Pages\SavedSearches;
 
 use App\Models\District;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\SavedSearch;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Models\Tag;
 use App\Models\Venue;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -62,6 +64,16 @@ class Index extends Component
      * @var array<string, string|null>
      */
     private array $venueNames = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private array $tagNames = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private array $referenceTitles = [];
 
     public function mount(): void
     {
@@ -266,6 +278,30 @@ class Index extends Component
             $filters['topic_ids'] = $topicIds;
         }
 
+        $domainTagIds = array_values(array_filter((array) request()->input('domain_tag_ids', [])));
+
+        if ($domainTagIds !== []) {
+            $filters['domain_tag_ids'] = $domainTagIds;
+        }
+
+        $sourceTagIds = array_values(array_filter((array) request()->input('source_tag_ids', [])));
+
+        if ($sourceTagIds !== []) {
+            $filters['source_tag_ids'] = $sourceTagIds;
+        }
+
+        $issueTagIds = array_values(array_filter((array) request()->input('issue_tag_ids', [])));
+
+        if ($issueTagIds !== []) {
+            $filters['issue_tag_ids'] = $issueTagIds;
+        }
+
+        $referenceIds = array_values(array_filter((array) request()->input('reference_ids', [])));
+
+        if ($referenceIds !== []) {
+            $filters['reference_ids'] = $referenceIds;
+        }
+
         $speakerIds = array_values(array_filter((array) request()->input('speaker_ids', [])));
 
         if ($speakerIds !== []) {
@@ -319,9 +355,14 @@ class Index extends Component
         return match ($filterKey) {
             'state_id' => __('State'),
             'district_id' => __('District'),
-            'subdistrict_id' => __('Daerah Kecil / Bandar / Mukim'),
+            'subdistrict_id' => __('Bandar / Mukim / Zon'),
             'institution_id' => __('Institution'),
             'venue_id' => __('Tempat'),
+            'domain_tag_ids' => __('Kategori'),
+            'topic_ids' => __('Bidang Ilmu'),
+            'source_tag_ids' => __('Sumber Rujukan Utama'),
+            'issue_tag_ids' => __('Tema / Isu'),
+            'reference_ids' => __('Rujukan Kitab/Buku'),
             'time_scope' => __('Time Scope'),
             default => str($filterKey)->replace('_', ' ')->title()->toString(),
         };
@@ -350,6 +391,8 @@ class Index extends Component
             'subdistrict_id' => $this->subdistrictName($value) ?? $value,
             'institution_id' => $this->institutionName($value) ?? $value,
             'venue_id' => $this->venueName($value) ?? $value,
+            'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
+            'reference_ids' => $this->referenceTitle($value) ?? $value,
             'time_scope' => match ($value) {
                 'upcoming' => __('Upcoming'),
                 'past' => __('Past'),
@@ -421,5 +464,51 @@ class Index extends Component
         }
 
         return $this->venueNames[$id];
+    }
+
+    private function tagName(string $id): ?string
+    {
+        if (! array_key_exists($id, $this->tagNames)) {
+            $tag = Tag::query()->whereKey($id)->first(['id', 'name']);
+
+            if (! $tag instanceof Tag) {
+                $this->tagNames[$id] = null;
+            } else {
+                $name = $tag->name;
+
+                if (is_array($name)) {
+                    $locale = app()->getLocale();
+                    $fallback = null;
+
+                    foreach ($name as $value) {
+                        if (is_string($value) && $value !== '') {
+                            $fallback = $value;
+                            break;
+                        }
+                    }
+
+                    $this->tagNames[$id] = (is_string($name[$locale] ?? null) && ($name[$locale] ?? '') !== '')
+                        ? $name[$locale]
+                        : ((is_string($name['ms'] ?? null) && ($name['ms'] ?? '') !== '')
+                            ? $name['ms']
+                            : ((is_string($name['en'] ?? null) && ($name['en'] ?? '') !== '')
+                                ? $name['en']
+                                : $fallback));
+                } else {
+                    $this->tagNames[$id] = is_string($name) ? $name : null;
+                }
+            }
+        }
+
+        return $this->tagNames[$id];
+    }
+
+    private function referenceTitle(string $id): ?string
+    {
+        if (! array_key_exists($id, $this->referenceTitles)) {
+            $this->referenceTitles[$id] = Reference::query()->whereKey($id)->value('title');
+        }
+
+        return $this->referenceTitles[$id];
     }
 }

@@ -53,3 +53,7 @@
 - For public `/majlis` active-filter CTAs, avoid `@auth`-only rendering when the requirement is discoverability; show `Save This Search` to guests too and let auth middleware handle redirect.
 - For location-default requests, align both defaults (`public $radius_km`, `defaultFilterData`) and action behavior (`setLocation`) so clicking `Berhampiran` and opening the radius field always show the same value.
 - Nearby radius logic must follow canonical event-location rules: use only `venue.address` or `institution.address`; never use `event.address` fallback for public distance search.
+- When users ask to mirror submit-event taxonomy fields into `/majlis` advanced filters, implement the full set they reference (for example `Bidang Ilmu`, `Sumber Rujukan Utama`, `Tema / Isu`, `Rujukan Kitab/Buku`) and verify visibility in browser after expanding the collapsible section.
+- For advanced search UIs, split dense mixed-purpose groups into intent-based sections (for example taxonomy/content vs event settings) so users can scan and adjust filters faster.
+- For filter-order requests, align both form-field order and active-chip rendering order so users see a consistent sequence across input and feedback areas.
+- When adding or regrouping `/majlis` advanced filters, immediately audit locale coverage (`ms.json` + `ms_MY.json`) for every new `__()` key to prevent mixed-language UI in production.

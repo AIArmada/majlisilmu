@@ -2,6 +2,7 @@
 
 use App\Livewire\Pages\SavedSearches\Index as SavedSearchesIndex;
 use App\Models\SavedSearch;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +79,59 @@ it('prefills subdistrict filter from query string when saving searches', functio
         ->assertSet('filters.state_id', '10')
         ->assertSet('filters.district_id', '20')
         ->assertSet('filters.subdistrict_id', '30');
+});
+
+it('prefills domain kategori filters from query string when saving searches', function () {
+    $user = User::factory()->create();
+    $domainTag = Tag::factory()->domain()->create([
+        'name' => ['en' => 'Aqidah', 'ms' => 'Aqidah'],
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams([
+        'domain_tag_ids' => [$domainTag->id],
+    ])->test(SavedSearchesIndex::class)
+        ->assertSet('filters.domain_tag_ids.0', $domainTag->id);
+});
+
+it('renders domain kategori chip using human-readable tag name', function () {
+    $user = User::factory()->create();
+    $domainTag = Tag::factory()->domain()->create([
+        'name' => ['en' => 'Aqidah', 'ms' => 'Aqidah'],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index', [
+            'domain_tag_ids' => [$domainTag->id],
+        ]))
+        ->assertOk()
+        ->assertSee('Kategori: Aqidah');
+});
+
+it('renders source issue and reference chips using human-readable values', function () {
+    $user = User::factory()->create();
+    $sourceTag = Tag::factory()->source()->create([
+        'name' => ['en' => 'Quran', 'ms' => 'Quran'],
+    ]);
+    $issueTag = Tag::factory()->issue()->create([
+        'name' => ['en' => 'Keluarga', 'ms' => 'Keluarga'],
+    ]);
+    $reference = \App\Models\Reference::factory()->create([
+        'title' => 'Riyadhus Solihin',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index', [
+            'source_tag_ids' => [$sourceTag->id],
+            'issue_tag_ids' => [$issueTag->id],
+            'reference_ids' => [$reference->id],
+        ]))
+        ->assertOk()
+        ->assertSee('Sumber Rujukan Utama: Quran')
+        ->assertSee('Tema / Isu: Keluarga')
+        ->assertSee('Rujukan Kitab/Buku: Riyadhus Solihin');
 });
 
 it('does not show manual latitude/longitude inputs on the saved search form', function () {

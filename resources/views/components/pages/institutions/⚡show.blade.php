@@ -204,7 +204,7 @@ new class extends Component {
         return implode(' • ', [
             __('Negeri').': '.($stateName ?? '-'),
             __('Daerah').': '.($districtName ?? '-'),
-            __('Daerah Kecil').': '.($subdistrictName ?? '-'),
+            __('Bandar / Mukim / Zon').': '.($subdistrictName ?? '-'),
         ]);
     };
     $locationString = $formatAddressHierarchy($address);
@@ -258,7 +258,7 @@ new class extends Component {
         return __('Umum');
     };
 
-    // Event location helper — Venue/Institution plus labeled hierarchy (Negeri, Daerah, Daerah Kecil)
+    // Event location helper — Venue/Institution plus labeled hierarchy (Negeri, Daerah, Bandar / Mukim / Zon)
     $resolveVenueLocation = static function (\App\Models\Event $event) use ($institution, $formatAddressHierarchy): string {
         $venueName = $event->venue?->name;
         $institutionName = $event->institution?->name ?? $institution->name;
