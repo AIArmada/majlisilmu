@@ -208,3 +208,108 @@ it('shows radius in captured filters when location radius is present in query pa
         ->assertOk()
         ->assertSee('Radius: 10 km');
 });
+
+it('hides the create saved search form when no filters are present', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index'))
+        ->assertOk()
+        ->assertDontSee('Create Saved Search');
+});
+
+it('shows the create saved search form when filters are present in the url', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index', ['time_scope' => 'upcoming']))
+        ->assertOk()
+        ->assertSee('Create Saved Search');
+});
+
+it('shows the create saved search form when location coordinates are present in the url', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index', [
+            'lat' => '3.14',
+            'lng' => '101.68',
+            'radius_km' => '20',
+        ]))
+        ->assertOk()
+        ->assertSee('Create Saved Search');
+});
+
+it('hides the create saved search form when only a keyword is present without filters', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index', ['search' => 'tafsir']))
+        ->assertOk()
+        ->assertDontSee('Create Saved Search');
+});
+
+it('allows authenticated users to edit a saved search name and notification', function () {
+    $user = User::factory()->create();
+
+    $savedSearch = SavedSearch::factory()->create([
+        'user_id' => $user->id,
+        'name' => 'Original Name',
+        'notify' => 'off',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SavedSearchesIndex::class)
+        ->call('startEdit', $savedSearch->id)
+        ->assertSet('editingId', $savedSearch->id)
+        ->assertSet('editName', 'Original Name')
+        ->assertSet('editNotify', 'off')
+        ->set('editName', 'Updated Name')
+        ->set('editNotify', 'weekly')
+        ->call('update', $savedSearch->id)
+        ->assertHasNoErrors()
+        ->assertSet('editingId', null);
+
+    $savedSearch->refresh();
+    expect($savedSearch->name)->toBe('Updated Name');
+    expect($savedSearch->notify)->toBe('weekly');
+});
+
+it('validates edit name field is required', function () {
+    $user = User::factory()->create();
+
+    $savedSearch = SavedSearch::factory()->create([
+        'user_id' => $user->id,
+        'name' => 'My Search',
+        'notify' => 'daily',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SavedSearchesIndex::class)
+        ->call('startEdit', $savedSearch->id)
+        ->set('editName', '')
+        ->call('update', $savedSearch->id)
+        ->assertHasErrors(['editName' => 'required']);
+});
+
+it('cancels editing and clears edit state', function () {
+    $user = User::factory()->create();
+
+    $savedSearch = SavedSearch::factory()->create([
+        'user_id' => $user->id,
+        'name' => 'My Search',
+        'notify' => 'daily',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SavedSearchesIndex::class)
+        ->call('startEdit', $savedSearch->id)
+        ->assertSet('editingId', $savedSearch->id)
+        ->call('cancelEdit')
+        ->assertSet('editingId', null)
+        ->assertSet('editName', '')
+        ->assertSet('editNotify', 'daily');
+});

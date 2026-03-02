@@ -11,18 +11,21 @@
             </div>
 
             @if (session('status'))
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
+                <div
+                    class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
                     {{ session('status') }}
                 </div>
             @endif
 
-            <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                <h2 class="font-heading text-xl font-bold text-slate-900 mb-4">{{ __('Create Saved Search') }}</h2>
+            {{-- Create section: only show when arriving from /majlis with actual filters --}}
+            @if ($hasFilters)
+                <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <h2 class="font-heading text-xl font-bold text-slate-900 mb-4">{{ __('Create Saved Search') }}</h2>
 
-                <form wire:submit="save" class="space-y-4">
-                    <div class="grid gap-4 md:grid-cols-2">
+                    <form wire:submit="save" class="space-y-4">
                         <div class="space-y-2">
-                            <label for="saved-search-name" class="text-sm font-semibold text-slate-700">{{ __('Name') }}</label>
+                            <label for="saved-search-name"
+                                class="text-sm font-semibold text-slate-700">{{ __('Name') }}</label>
                             <input id="saved-search-name" type="text" wire:model.blur="name"
                                 placeholder="{{ __('e.g. Kuliah Maghrib KL') }}"
                                 class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
@@ -31,110 +34,192 @@
                             @enderror
                         </div>
 
-                        <div class="space-y-2">
-                            <label for="saved-search-query" class="text-sm font-semibold text-slate-700">{{ __('Keyword') }}</label>
-                            <input id="saved-search-query" type="text" wire:model.blur="query"
-                                placeholder="{{ __('Optional keyword search') }}"
+                        <div class="max-w-sm space-y-2">
+                            <label for="saved-search-notify"
+                                class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
+                            <select id="saved-search-notify" wire:model="notify"
                                 class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                            @error('query')
+                                <option value="off">{{ __('Off') }}</option>
+                                <option value="instant">{{ __('Instant') }}</option>
+                                <option value="daily">{{ __('Daily') }}</option>
+                                <option value="weekly">{{ __('Weekly') }}</option>
+                            </select>
+                            @error('notify')
                                 <p class="text-sm text-danger-600">{{ $message }}</p>
                             @enderror
                         </div>
-                    </div>
 
-                    <div class="max-w-sm space-y-2">
-                        <label for="saved-search-notify" class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
-                        <select id="saved-search-notify" wire:model="notify"
-                            class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                            <option value="off">{{ __('Off') }}</option>
-                            <option value="instant">{{ __('Instant') }}</option>
-                            <option value="daily">{{ __('Daily') }}</option>
-                            <option value="weekly">{{ __('Weekly') }}</option>
-                        </select>
-                        @error('notify')
-                            <p class="text-sm text-danger-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+                        @php
+                            $capturedFilters = $this->formatCapturedFilters($filters, $radius_km, $lat, $lng);
+                            $hasCriteria = $query || $capturedFilters !== [];
+                        @endphp
 
-                    @php
-                        $capturedFilters = $this->formatCapturedFilters($filters, $radius_km, $lat, $lng);
-                    @endphp
-
-                    @if($capturedFilters !== [])
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                            <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{{ __('Captured Filters') }}</p>
-                            <div class="flex flex-wrap gap-2">
-                                @foreach($capturedFilters as $capturedFilter)
-                                    <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                                        {{ $capturedFilter['label'] }}: {{ $capturedFilter['value'] }}
-                                    </span>
-                                @endforeach
+                        @if($hasCriteria)
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
+                                    {{ __('Captured Criteria') }}
+                                </p>
+                                <div class="flex flex-wrap gap-2">
+                                    @if($query)
+                                        <span
+                                            class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                                            {{ __('Keyword') }}: {{ $query }}
+                                        </span>
+                                    @endif
+                                    @foreach($capturedFilters as $capturedFilter)
+                                        <span
+                                            class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                                            {{ $capturedFilter['label'] }}: {{ $capturedFilter['value'] }}
+                                        </span>
+                                    @endforeach
+                                </div>
                             </div>
-                        </div>
-                    @endif
+                        @endif
 
-                    <div class="flex justify-end">
-                        <button type="submit"
-                            class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                            {{ __('Save Search') }}
-                        </button>
-                    </div>
-                </form>
-            </section>
+                        <div class="flex justify-end">
+                            <button type="submit"
+                                class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+                                {{ __('Save Search') }}
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            @endif
 
             <section class="space-y-4">
-                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Your Saved Searches') }}</h2>
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Your Saved Searches') }}</h2>
+                    <a href="{{ route('events.index') }}" wire:navigate
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shrink-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        {{ __('New Saved Search') }}
+                    </a>
+                </div>
 
                 @if($this->savedSearches->isEmpty())
                     <div class="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
                         <p class="text-slate-600 font-medium">{{ __('No saved searches yet.') }}</p>
-                        <p class="text-slate-500 text-sm mt-1">{{ __('Use the form above or save active filters from the events page.') }}</p>
+                        <p class="text-slate-500 text-sm mt-1">
+                            {{ __('Go to the events page, apply filters, and save them from there.') }}
+                        </p>
+                        <a href="{{ route('events.index') }}" wire:navigate
+                            class="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                            {{ __('Browse Events') }}
+                        </a>
                     </div>
                 @else
                     <div class="grid gap-4 md:grid-cols-2">
                         @foreach($this->savedSearches as $savedSearch)
                             <article wire:key="saved-search-{{ $savedSearch->id }}"
                                 class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-                                <div class="flex items-start justify-between gap-4">
-                                    <div>
-                                        <h3 class="font-heading text-lg font-bold text-slate-900">{{ $savedSearch->name }}</h3>
-                                        <p class="text-xs text-slate-500 mt-1">
-                                            {{ __('Updated') }} {{ $savedSearch->updated_at?->diffForHumans() }}
+
+                                {{-- View mode --}}
+                                @if($editingId !== $savedSearch->id)
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 class="font-heading text-lg font-bold text-slate-900">{{ $savedSearch->name }}</h3>
+                                            <p class="text-xs text-slate-500 mt-1">
+                                                {{ __('Updated') }} {{ $savedSearch->updated_at?->diffForHumans() }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 shrink-0">
+                                            {{ str($savedSearch->notify)->title() }}
+                                        </span>
+                                    </div>
+
+                                    @if($savedSearch->query)
+                                        <p class="mt-3 text-sm text-slate-600">
+                                            <span class="font-semibold text-slate-800">{{ __('Keyword:') }}</span>
+                                            {{ $savedSearch->query }}
                                         </p>
+                                    @endif
+
+                                    @if(is_array($savedSearch->filters) && $savedSearch->filters !== [])
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            @foreach($this->formatCapturedFilters($savedSearch->filters, $savedSearch->radius_km, $savedSearch->lat, $savedSearch->lng) as $capturedFilter)
+                                                <span
+                                                    class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                                    {{ $capturedFilter['label'] }}: {{ $capturedFilter['value'] }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    <div class="mt-4 flex items-center gap-3">
+                                        <a href="{{ route('events.index', $this->toEventQueryParams($savedSearch)) }}" wire:navigate
+                                            class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
+                                            {{ __('Run Search') }}
+                                        </a>
+                                        <button type="button" wire:click="startEdit('{{ $savedSearch->id }}')"
+                                            class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors gap-1.5">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            {{ __('Edit') }}
+                                        </button>
+                                        <button type="button" wire:click="delete('{{ $savedSearch->id }}')"
+                                            wire:confirm="{{ __('Delete this saved search?') }}"
+                                            class="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
+                                            {{ __('Delete') }}
+                                        </button>
                                     </div>
-                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                        {{ str($savedSearch->notify)->title() }}
-                                    </span>
-                                </div>
 
-                                @if($savedSearch->query)
-                                    <p class="mt-3 text-sm text-slate-600">
-                                        <span class="font-semibold text-slate-800">{{ __('Keyword:') }}</span>
-                                        {{ $savedSearch->query }}
-                                    </p>
-                                @endif
+                                    {{-- Edit mode --}}
+                                @else
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <span
+                                                class="text-xs font-bold uppercase tracking-wide text-emerald-600">{{ __('Editing') }}</span>
+                                            <button type="button" wire:click="cancelEdit"
+                                                class="text-slate-400 hover:text-slate-700 transition-colors">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
 
-                                @if(is_array($savedSearch->filters) && $savedSearch->filters !== [])
-                                    <div class="mt-3 flex flex-wrap gap-2">
-                                        @foreach($this->formatCapturedFilters($savedSearch->filters, $savedSearch->radius_km, $savedSearch->lat, $savedSearch->lng) as $capturedFilter)
-                                            <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                                {{ $capturedFilter['label'] }}: {{ $capturedFilter['value'] }}
-                                            </span>
-                                        @endforeach
+                                        <div class="space-y-2">
+                                            <label for="edit-name-{{ $savedSearch->id }}"
+                                                class="text-sm font-semibold text-slate-700">{{ __('Name') }}</label>
+                                            <input id="edit-name-{{ $savedSearch->id }}" type="text" wire:model.blur="editName"
+                                                class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
+                                            @error('editName')
+                                                <p class="text-sm text-danger-600">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <label for="edit-notify-{{ $savedSearch->id }}"
+                                                class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
+                                            <select id="edit-notify-{{ $savedSearch->id }}" wire:model="editNotify"
+                                                class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
+                                                <option value="off">{{ __('Off') }}</option>
+                                                <option value="instant">{{ __('Instant') }}</option>
+                                                <option value="daily">{{ __('Daily') }}</option>
+                                                <option value="weekly">{{ __('Weekly') }}</option>
+                                            </select>
+                                            @error('editNotify')
+                                                <p class="text-sm text-danger-600">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+
+                                        <div class="flex items-center gap-3 pt-1">
+                                            <button type="button" wire:click="update('{{ $savedSearch->id }}')"
+                                                class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+                                                {{ __('Save Changes') }}
+                                            </button>
+                                            <button type="button" wire:click="cancelEdit"
+                                                class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                                                {{ __('Cancel') }}
+                                            </button>
+                                        </div>
                                     </div>
                                 @endif
-
-                                <div class="mt-4 flex items-center gap-3">
-                                    <a href="{{ route('events.index', $this->toEventQueryParams($savedSearch)) }}" wire:navigate
-                                        class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
-                                        {{ __('Run Search') }}
-                                    </a>
-                                    <button type="button" wire:click="delete('{{ $savedSearch->id }}')"
-                                        wire:confirm="{{ __('Delete this saved search?') }}"
-                                        class="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
-                                        {{ __('Delete') }}
-                                    </button>
-                                </div>
                             </article>
                         @endforeach
                     </div>

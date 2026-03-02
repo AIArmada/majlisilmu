@@ -40,6 +40,12 @@ class Index extends Component
      */
     public array $filters = [];
 
+    public ?string $editingId = null;
+
+    public string $editName = '';
+
+    public string $editNotify = 'daily';
+
     /**
      * @var array<int, string|null>
      */
@@ -75,9 +81,12 @@ class Index extends Component
      */
     private array $referenceTitles = [];
 
+    public bool $hasFilters = false;
+
     public function mount(): void
     {
         $this->prefillFromRequest();
+        $this->hasFilters = $this->filters !== [] || ($this->lat !== null && $this->lng !== null);
     }
 
     /**
@@ -145,6 +154,52 @@ class Index extends Component
         session()->flash('status', __('Carian tersimpan telah dipadam.'));
     }
 
+    public function startEdit(string $savedSearchId): void
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            abort(403);
+        }
+
+        $savedSearch = $user->savedSearches()->where('id', $savedSearchId)->firstOrFail();
+
+        $this->editingId = $savedSearch->id;
+        $this->editName = $savedSearch->name;
+        $this->editNotify = $savedSearch->notify;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingId = null;
+        $this->editName = '';
+        $this->editNotify = 'daily';
+    }
+
+    public function update(string $savedSearchId): void
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            abort(403);
+        }
+
+        $validated = $this->validate([
+            'editName' => ['required', 'string', 'max:100'],
+            'editNotify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
+        ]);
+
+        $savedSearch = $user->savedSearches()->where('id', $savedSearchId)->firstOrFail();
+        $savedSearch->update([
+            'name' => $validated['editName'],
+            'notify' => $validated['editNotify'],
+        ]);
+
+        $this->cancelEdit();
+
+        session()->flash('status', __('Carian tersimpan telah dikemaskini.'));
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -174,8 +229,6 @@ class Index extends Component
 
     /**
      * @param  array<string, mixed>  $filters
-     * @param  float|int|string|null  $lat
-     * @param  float|int|string|null  $lng
      * @return list<array{label: string, value: string}>
      */
     public function formatCapturedFilters(
@@ -183,8 +236,7 @@ class Index extends Component
         ?int $radiusKm = null,
         float|int|string|null $lat = null,
         float|int|string|null $lng = null
-    ): array
-    {
+    ): array {
         $formatted = [];
 
         foreach ($filters as $filterKey => $filterValue) {
