@@ -333,7 +333,8 @@
 
             @if($eventHasPoster)
                 {{-- ── POSTER LAYOUT: 12-col grid — event details left (7 cols), poster card right (5 cols) ── --}}
-                <div class="relative z-10 grid items-end gap-8 pt-12 pb-10 lg:grid-cols-12 lg:gap-12 lg:pt-32 lg:pb-16">
+                <div
+                    class="relative z-10 grid items-end gap-8 pt-12 pb-10 lg:grid-cols-12 lg:gap-12 {{ $eventPosterIsPortrait ? 'lg:pt-32' : 'lg:pt-12' }} lg:pb-16">
 
                     {{-- Left (7 cols): event details --}}
                     <div class="order-2 flex flex-col lg:order-1 lg:col-span-7">
@@ -561,7 +562,7 @@
             @else
                 {{-- ── NO-POSTER LAYOUT: full-width text column, speakers emerge from bottom-right ── --}}
                 <div
-                    class="relative z-10 flex flex-col justify-end pb-16 pt-12 lg:max-w-[60%] lg:pb-24 lg:pt-36 xl:max-w-[55%]">
+                    class="relative z-10 flex flex-col justify-end pb-16 pt-12 lg:max-w-[60%] lg:pb-24 lg:pt-12 xl:max-w-[55%]">
 
                     {{-- Badges --}}
                     <div class="animate-fade-in-up" style="--reveal-d: 100ms;">
@@ -743,7 +744,7 @@
                 @if(!$event->starts_at || !$event->starts_at->isPast())
                             <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
                                 class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all
-                                            {{ $isGoing
+                                                                    {{ $isGoing
                     ? 'bg-emerald-600 text-white shadow-emerald-200'
                     : 'bg-slate-900 text-white hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/30' }}">
                                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -937,16 +938,16 @@
         @elseif($eventTimeStatus === 'starting_soon' && $event->starts_at)
             <div class="relative z-30 {{ $event->status instanceof \App\States\EventStatus\Pending ? '' : '-mt-4' }} mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4" x-data="{
-                                target: {{ $event->starts_at->timestamp * 1000 }},
-                                display: '',
-                                update() {
-                                    const diff = this.target - Date.now();
-                                    if (diff <= 0) { this.display = ''; return; }
-                                    const h = Math.floor(diff / 3600000);
-                                    const m = Math.floor((diff % 3600000) / 60000);
-                                    this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
-                                }
-                            }" x-init="update(); setInterval(() => update(), 60000)">
+                                        target: {{ $event->starts_at->timestamp * 1000 }},
+                                        display: '',
+                                        update() {
+                                            const diff = this.target - Date.now();
+                                            if (diff <= 0) { this.display = ''; return; }
+                                            const h = Math.floor(diff / 3600000);
+                                            const m = Math.floor((diff % 3600000) / 60000);
+                                            this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
+                                        }
+                                    }" x-init="update(); setInterval(() => update(), 60000)">
                     <svg class="size-5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2394,7 +2395,7 @@ MOBILE BOTTOM ACTION BAR
         <div class="flex items-center gap-2">
             @auth
                     <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
-                                        {{ $isGoing
+                                                        {{ $isGoing
                 ? 'border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-inner'
                 : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' }}">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -2410,7 +2411,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                        {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
+                                                        {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
                         <svg class="size-5 {{ $isInterested ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -2420,7 +2421,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                        {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
+                                                        {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
                         <svg class="size-5 {{ $isSaved ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
