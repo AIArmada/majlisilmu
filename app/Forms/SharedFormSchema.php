@@ -72,7 +72,7 @@ class SharedFormSchema
                 ->visible(fn (Get $get): bool => filled($get('state_id'))),
 
             Select::make('subdistrict_id')
-                ->label(__('Daerah Kecil / Bandar / Mukim'))
+                ->label(__('Bandar / Mukim / Zon'))
                 ->options(function (Get $get) {
                     $districtId = $get('district_id');
                     if (! $districtId) {

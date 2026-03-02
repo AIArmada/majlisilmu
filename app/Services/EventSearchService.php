@@ -112,6 +112,7 @@ class EventSearchService
         $search->options([
             'filter_by' => implode(' && ', $this->buildTypesenseFilterParts($filters)),
             'sort_by' => $sortBy,
+            'query_by' => 'title',
         ]);
 
         return $search->paginate($perPage);
@@ -312,6 +313,38 @@ class EventSearchService
             }
         }
 
+        if (! empty($filters['domain_tag_ids'])) {
+            $domainTagIds = $this->normalizeArrayFilter($filters['domain_tag_ids']);
+
+            if ($domainTagIds !== []) {
+                $filterParts[] = 'domain_tag_ids:['.implode(',', $domainTagIds).']';
+            }
+        }
+
+        if (! empty($filters['source_tag_ids'])) {
+            $sourceTagIds = $this->normalizeArrayFilter($filters['source_tag_ids']);
+
+            if ($sourceTagIds !== []) {
+                $filterParts[] = 'source_tag_ids:['.implode(',', $sourceTagIds).']';
+            }
+        }
+
+        if (! empty($filters['issue_tag_ids'])) {
+            $issueTagIds = $this->normalizeArrayFilter($filters['issue_tag_ids']);
+
+            if ($issueTagIds !== []) {
+                $filterParts[] = 'issue_tag_ids:['.implode(',', $issueTagIds).']';
+            }
+        }
+
+        if (! empty($filters['reference_ids'])) {
+            $referenceIds = $this->normalizeArrayFilter($filters['reference_ids']);
+
+            if ($referenceIds !== []) {
+                $filterParts[] = 'reference_ids:['.implode(',', $referenceIds).']';
+            }
+        }
+
         return $filterParts;
     }
 
@@ -465,6 +498,47 @@ class EventSearchService
             });
         }
 
+        $domainTagIds = $this->normalizeArrayFilter($filters['domain_tag_ids'] ?? null);
+
+        if ($domainTagIds !== []) {
+            $queryBuilder->whereHas('tags', function (Builder $tagQuery) use ($domainTagIds) {
+                $tagQuery
+                    ->whereIn('tags.id', $domainTagIds)
+                    ->where('tags.type', 'domain')
+                    ->whereIn('tags.status', ['verified', 'pending']);
+            });
+        }
+
+        $sourceTagIds = $this->normalizeArrayFilter($filters['source_tag_ids'] ?? null);
+
+        if ($sourceTagIds !== []) {
+            $queryBuilder->whereHas('tags', function (Builder $tagQuery) use ($sourceTagIds) {
+                $tagQuery
+                    ->whereIn('tags.id', $sourceTagIds)
+                    ->where('tags.type', 'source')
+                    ->whereIn('tags.status', ['verified', 'pending']);
+            });
+        }
+
+        $issueTagIds = $this->normalizeArrayFilter($filters['issue_tag_ids'] ?? null);
+
+        if ($issueTagIds !== []) {
+            $queryBuilder->whereHas('tags', function (Builder $tagQuery) use ($issueTagIds) {
+                $tagQuery
+                    ->whereIn('tags.id', $issueTagIds)
+                    ->where('tags.type', 'issue')
+                    ->whereIn('tags.status', ['verified', 'pending']);
+            });
+        }
+
+        $referenceIds = $this->normalizeArrayFilter($filters['reference_ids'] ?? null);
+
+        if ($referenceIds !== []) {
+            $queryBuilder->whereHas('references', function (Builder $referenceQuery) use ($referenceIds): void {
+                $referenceQuery->whereIn('references.id', $referenceIds);
+            });
+        }
+
         $timingMode = $this->normalizeTimingModeFilter($filters['timing_mode'] ?? null);
         $prayerTime = $this->normalizePrayerTimeFilter($filters['prayer_time'] ?? null);
 
@@ -537,8 +611,6 @@ class EventSearchService
         }
 
         $operator = strtolower($this->databaseLikeOperator());
-        $descriptionExpression = $this->searchableDescriptionExpression();
-        $rawOperator = $this->databaseLikeOperator();
         $collapsedSearch = preg_replace('/\s+/u', ' ', $normalizedSearch) ?? '';
         $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
 
@@ -548,45 +620,17 @@ class EventSearchService
             static fn (string $token): bool => $token !== ''
         ));
 
-        $queryBuilder->where(function (Builder $nestedQuery) use ($descriptionExpression, $normalizedSearch, $operator, $rawOperator, $collapsedWildcardSearch, $searchTokens): void {
+        $queryBuilder->where(function (Builder $nestedQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch, $searchTokens): void {
             $nestedQuery
                 ->where('title', $operator, "%{$normalizedSearch}%")
-                ->orWhere('title', $operator, $collapsedWildcardSearch)
-                ->orWhereRaw("{$descriptionExpression} {$rawOperator} ?", ["%{$normalizedSearch}%"])
-                ->orWhereRaw("{$descriptionExpression} {$rawOperator} ?", [$collapsedWildcardSearch])
-                ->orWhereHas('institution', function (Builder $institutionQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch): void {
-                    $institutionQuery
-                        ->where('name', $operator, "%{$normalizedSearch}%")
-                        ->orWhere('name', $operator, $collapsedWildcardSearch);
-                })
-                ->orWhereHas('venue', function (Builder $venueQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch): void {
-                    $venueQuery
-                        ->where('name', $operator, "%{$normalizedSearch}%")
-                        ->orWhere('name', $operator, $collapsedWildcardSearch);
-                })
-                ->orWhereHas('speakers', function (Builder $speakerQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch): void {
-                    $speakerQuery
-                        ->where('name', $operator, "%{$normalizedSearch}%")
-                        ->orWhere('name', $operator, $collapsedWildcardSearch);
-                });
+                ->orWhere('title', $operator, $collapsedWildcardSearch);
 
             foreach ($searchTokens as $token) {
                 if (mb_strlen($token) < 3) {
                     continue;
                 }
 
-                $nestedQuery
-                    ->orWhere('title', $operator, "%{$token}%")
-                    ->orWhereRaw("{$descriptionExpression} {$rawOperator} ?", ["%{$token}%"])
-                    ->orWhereHas('institution', function (Builder $institutionQuery) use ($operator, $token): void {
-                        $institutionQuery->where('name', $operator, "%{$token}%");
-                    })
-                    ->orWhereHas('venue', function (Builder $venueQuery) use ($operator, $token): void {
-                        $venueQuery->where('name', $operator, "%{$token}%");
-                    })
-                    ->orWhereHas('speakers', function (Builder $speakerQuery) use ($operator, $token): void {
-                        $speakerQuery->where('name', $operator, "%{$token}%");
-                    });
+                $nestedQuery->orWhere('title', $operator, "%{$token}%");
             }
         });
     }
@@ -598,34 +642,13 @@ class EventSearchService
     {
         if ($sort === 'relevance' && is_string($query) && $query !== '') {
             $operator = $this->databaseLikeOperator();
-            $descriptionExpression = $this->searchableDescriptionExpression();
 
             $queryBuilder->orderByRaw(
                 "CASE
                     WHEN events.title {$operator} ? THEN 1
-                    WHEN {$descriptionExpression} {$operator} ? THEN 2
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM institutions
-                        WHERE institutions.id = events.institution_id
-                        AND institutions.name {$operator} ?
-                    ) THEN 3
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM venues
-                        WHERE venues.id = events.venue_id
-                        AND venues.name {$operator} ?
-                    ) THEN 4
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM event_speaker
-                        INNER JOIN speakers ON speakers.id = event_speaker.speaker_id
-                        WHERE event_speaker.event_id = events.id
-                        AND speakers.name {$operator} ?
-                    ) THEN 5
-                    ELSE 6
+                    ELSE 2
                 END, events.starts_at ASC",
-                ["%{$query}%", "%{$query}%", "%{$query}%", "%{$query}%", "%{$query}%"]
+                ["%{$query}%"]
             );
 
             return;
@@ -651,8 +674,7 @@ class EventSearchService
         }
 
         $rankedCandidates = $this->buildDatabaseQuery(null, $filters)
-            ->with(['institution:id,name', 'venue:id,name', 'speakers:id,name'])
-            ->select(['events.id', 'events.title', 'events.description', 'events.institution_id', 'events.venue_id'])
+            ->select(['events.id', 'events.title'])
             ->get()
             ->map(function (Event $event) use ($normalizedSearch): array {
                 return [
@@ -1010,15 +1032,6 @@ class EventSearchService
         return $this->databaseDriver() === 'pgsql' ? 'ILIKE' : 'LIKE';
     }
 
-    private function searchableDescriptionExpression(): string
-    {
-        return match ($this->databaseDriver()) {
-            'pgsql' => "COALESCE(events.description::text, '')",
-            'mysql', 'mariadb' => "COALESCE(CAST(events.description AS CHAR), '')",
-            default => "COALESCE(CAST(events.description AS TEXT), '')",
-        };
-    }
-
     private function startsAtUserTimeSqlExpression(int $offsetMinutes): string
     {
         $safeOffsetMinutes = (int) $offsetMinutes;
@@ -1074,41 +1087,31 @@ class EventSearchService
 
     private function eventSimilarityScore(string $normalizedSearch, Event $event): float
     {
-        /** @var list<string> $candidates */
-        $candidates = array_values(array_filter([
-            $event->title,
-            $event->description_text,
-            $event->institution?->name,
-            $event->venue?->name,
-            $event->speakers->pluck('name')->implode(' '),
-        ], static fn (mixed $value): bool => is_string($value) && $value !== ''));
+        $title = trim((string) $event->title);
 
-        if ($candidates === []) {
+        if ($title === '') {
+            return 0.0;
+        }
+
+        $normalizedCandidate = $this->normalizeForSimilarity($title);
+
+        if ($normalizedCandidate === '') {
             return 0.0;
         }
 
         $scoreCandidates = [];
+        $scoreCandidates[] = $this->similarityScore($normalizedSearch, $normalizedCandidate);
 
-        foreach ($candidates as $candidate) {
-            $normalizedCandidate = $this->normalizeForSimilarity($candidate);
+        /** @var list<string> $candidateTokens */
+        $candidateTokens = array_values(array_filter(
+            explode(' ', $normalizedCandidate),
+            static fn (string $token): bool => mb_strlen($token) >= 2
+        ));
 
-            if ($normalizedCandidate === '') {
-                continue;
-            }
-
-            $scoreCandidates[] = $this->similarityScore($normalizedSearch, $normalizedCandidate);
-
-            /** @var list<string> $candidateTokens */
-            $candidateTokens = array_values(array_filter(
-                explode(' ', $normalizedCandidate),
-                static fn (string $token): bool => mb_strlen($token) >= 2
-            ));
-
-            foreach ($candidateTokens as $token) {
-                $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
-            }
+        foreach ($candidateTokens as $token) {
+            $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
         }
 
-        return $scoreCandidates === [] ? 0.0 : max($scoreCandidates);
+        return max($scoreCandidates);
     }
 }

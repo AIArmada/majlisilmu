@@ -12,6 +12,7 @@ use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
@@ -109,6 +110,30 @@ class Index extends Component implements HasForms
      */
     #[Url]
     public array $topic_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $domain_tag_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $source_tag_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $issue_tag_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $reference_ids = [];
 
     #[Url]
     public ?string $starts_after = null;
@@ -310,7 +335,7 @@ class Index extends Component implements HasForms
                                     }),
 
                                 Select::make('subdistrict_id')
-                                    ->label(__('Daerah Kecil / Bandar / Mukim'))
+                                    ->label(__('Bandar / Mukim / Zon'))
                                     ->placeholder(__('All Subdistricts'))
                                     ->options(function (Get $get): array {
                                         $districtId = $get('district_id');
@@ -381,7 +406,7 @@ class Index extends Component implements HasForms
 
                         Section::make(__('People & Content'))
                             ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Filter by speakers, topics, type, format, and language.'))
+                            ->description(__('Filter by speakers, categories, knowledge fields, themes, and references.'))
                             ->columns(['default' => 1, 'md' => 2, 'xl' => 3])
                             ->schema([
                                 Select::make('speaker_ids')
@@ -395,17 +420,67 @@ class Index extends Component implements HasForms
                                     )
                                     ->live(),
 
-                                Select::make('topic_ids')
-                                    ->label(__('Topic'))
-                                    ->placeholder(__('Any Topic'))
+                                Select::make('domain_tag_ids')
+                                    ->label(__('Kategori'))
+                                    ->placeholder(__('Any Category'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(fn (): array => $this->topics()
+                                    ->options(fn (): array => $this->domains()
                                         ->pluck('name', 'id')
                                         ->all()
                                     )
                                     ->live(),
 
+                                Select::make('topic_ids')
+                                    ->label(__('Bidang Ilmu'))
+                                    ->placeholder(__('Any Knowledge Field'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->disciplines()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('source_tag_ids')
+                                    ->label(__('Sumber Rujukan Utama'))
+                                    ->placeholder(__('Pilih sumber...'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->sources()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('issue_tag_ids')
+                                    ->label(__('Tema / Isu'))
+                                    ->placeholder(__('Pilih atau taip untuk tambah tema...'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->issues()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('reference_ids')
+                                    ->label(__('Rujukan Kitab/Buku'))
+                                    ->placeholder(__('Cari atau pilih rujukan...'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->references()
+                                        ->pluck('title', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+                            ]),
+
+                        Section::make(__('Event Settings'))
+                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
+                            ->description(__('Filter by event type, format, age group, gender, and language.'))
+                            ->columns(['default' => 1, 'md' => 2, 'xl' => 3])
+                            ->schema([
                                 Select::make('event_type')
                                     ->label(__('Event Type'))
                                     ->placeholder(__('Any Type'))
@@ -646,13 +721,69 @@ class Index extends Component implements HasForms
      * @return Collection<int, Tag>
      */
     #[Computed]
-    public function topics(): Collection
+    public function disciplines(): Collection
     {
-        return cache()->remember('events_topics_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->whereIn('type', [TagType::Discipline->value, TagType::Issue->value])
+        return cache()->remember('events_disciplines_'.app()->getLocale(), 300, fn () => Tag::query()
+            ->where('type', TagType::Discipline->value)
             ->whereIn('status', ['verified', 'pending'])
             ->ordered()
             ->get()
+        );
+    }
+
+    /**
+     * @return Collection<int, Tag>
+     */
+    #[Computed]
+    public function domains(): Collection
+    {
+        return cache()->remember('events_domains_'.app()->getLocale(), 300, fn () => Tag::query()
+            ->where('type', TagType::Domain->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->ordered()
+            ->get()
+        );
+    }
+
+    /**
+     * @return Collection<int, Tag>
+     */
+    #[Computed]
+    public function sources(): Collection
+    {
+        return cache()->remember('events_sources_'.app()->getLocale(), 300, fn () => Tag::query()
+            ->where('type', TagType::Source->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->ordered()
+            ->get()
+        );
+    }
+
+    /**
+     * @return Collection<int, Tag>
+     */
+    #[Computed]
+    public function issues(): Collection
+    {
+        return cache()->remember('events_issues_'.app()->getLocale(), 300, fn () => Tag::query()
+            ->where('type', TagType::Issue->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->ordered()
+            ->get()
+        );
+    }
+
+    /**
+     * @return Collection<int, Reference>
+     */
+    #[Computed]
+    public function references(): Collection
+    {
+        return cache()->remember('events_references_'.app()->getLocale(), 300, fn () => Reference::query()
+            ->where('is_active', true)
+            ->orderBy('title')
+            ->limit(400)
+            ->get(['id', 'title'])
         );
     }
 
@@ -792,6 +923,10 @@ class Index extends Component implements HasForms
             'venue_id' => $filters['venue_id'],
             'speaker_ids' => $filters['speaker_ids'],
             'topic_ids' => $filters['topic_ids'],
+            'domain_tag_ids' => $filters['domain_tag_ids'],
+            'source_tag_ids' => $filters['source_tag_ids'],
+            'issue_tag_ids' => $filters['issue_tag_ids'],
+            'reference_ids' => $filters['reference_ids'],
             'starts_after' => $filters['starts_after'],
             'starts_before' => $filters['starts_before'],
             'time_scope' => $filters['time_scope'],
@@ -901,6 +1036,10 @@ class Index extends Component implements HasForms
             'venue_id' => null,
             'speaker_ids' => [],
             'topic_ids' => [],
+            'domain_tag_ids' => [],
+            'source_tag_ids' => [],
+            'issue_tag_ids' => [],
+            'reference_ids' => [],
             'starts_after' => null,
             'starts_before' => null,
             'time_scope' => 'upcoming',
@@ -954,6 +1093,10 @@ class Index extends Component implements HasForms
             'venue_id' => filled($this->venue_id) ? (string) $this->venue_id : null,
             'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
             'topic_ids' => $this->normalizeStringArray($this->topic_ids),
+            'domain_tag_ids' => $this->normalizeStringArray($this->domain_tag_ids),
+            'source_tag_ids' => $this->normalizeStringArray($this->source_tag_ids),
+            'issue_tag_ids' => $this->normalizeStringArray($this->issue_tag_ids),
+            'reference_ids' => $this->normalizeStringArray($this->reference_ids),
             'starts_after' => filled($this->starts_after) ? (string) $this->starts_after : null,
             'starts_before' => filled($this->starts_before) ? (string) $this->starts_before : null,
             'time_scope' => in_array($this->time_scope, ['upcoming', 'past', 'all'], true) ? $this->time_scope : $defaults['time_scope'],
@@ -994,6 +1137,10 @@ class Index extends Component implements HasForms
         $this->venue_id = $filters['venue_id'];
         $this->speaker_ids = $filters['speaker_ids'];
         $this->topic_ids = $filters['topic_ids'];
+        $this->domain_tag_ids = $filters['domain_tag_ids'];
+        $this->source_tag_ids = $filters['source_tag_ids'];
+        $this->issue_tag_ids = $filters['issue_tag_ids'];
+        $this->reference_ids = $filters['reference_ids'];
         $this->starts_after = $filters['starts_after'];
         $this->starts_before = $filters['starts_before'];
         $this->time_scope = $filters['time_scope'];
@@ -1077,6 +1224,10 @@ class Index extends Component implements HasForms
             'venue_id' => filled($normalized['venue_id']) ? (string) $normalized['venue_id'] : null,
             'speaker_ids' => $this->normalizeStringArray($normalized['speaker_ids'] ?? []),
             'topic_ids' => $this->normalizeStringArray($normalized['topic_ids'] ?? []),
+            'domain_tag_ids' => $this->normalizeStringArray($normalized['domain_tag_ids'] ?? []),
+            'source_tag_ids' => $this->normalizeStringArray($normalized['source_tag_ids'] ?? []),
+            'issue_tag_ids' => $this->normalizeStringArray($normalized['issue_tag_ids'] ?? []),
+            'reference_ids' => $this->normalizeStringArray($normalized['reference_ids'] ?? []),
             'starts_after' => filled($normalized['starts_after']) ? (string) $normalized['starts_after'] : null,
             'starts_before' => filled($normalized['starts_before']) ? (string) $normalized['starts_before'] : null,
             'time_scope' => $timeScope,

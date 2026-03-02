@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Institution;
+use App\Models\District;
+use App\Models\State;
+use App\Models\Subdistrict;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -20,6 +23,15 @@ class extends Component
 
     #[Url]
     public ?string $search = null;
+
+    #[Url]
+    public ?string $state_id = null;
+
+    #[Url]
+    public ?string $district_id = null;
+
+    #[Url]
+    public ?string $subdistrict_id = null;
 
     #[Computed]
     public function institutions(): LengthAwarePaginatorContract
@@ -48,12 +60,14 @@ class extends Component
 
     private function baseInstitutionsQuery(): Builder
     {
-        return Institution::query()
+        $query = Institution::query()
             ->where('status', 'verified')
             ->withCount(['events' => function ($query) {
                 $query->active();
             }])
             ->with(['address.state', 'address.district', 'address.subdistrict', 'media']);
+
+        return $this->applyLocationScope($query);
     }
 
     private function applyDirectSearch(Builder $query, string $search): Builder
@@ -90,9 +104,11 @@ class extends Component
                 ->withQueryString();
         }
 
-        $rankedCandidates = Institution::query()
+        $rankedCandidatesQuery = Institution::query()
             ->where('status', 'verified')
-            ->select(['id', 'name', 'description'])
+            ->select(['id', 'name', 'description']);
+
+        $rankedCandidates = $this->applyLocationScope($rankedCandidatesQuery)
             ->get()
             ->map(function (Institution $institution) use ($normalizedSearch): array {
                 $normalizedName = $this->normalizeForSimilarity($institution->name);
@@ -153,6 +169,48 @@ class extends Component
         return new LengthAwarePaginator($institutions, count($orderedIds), $perPage, $currentPage, $paginationMeta);
     }
 
+    #[Computed]
+    public function states(): array
+    {
+        return State::query()
+            ->where('country_id', 132)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    #[Computed]
+    public function districts(): array
+    {
+        $stateId = $this->normalizedLocationId($this->state_id);
+
+        if ($stateId === null) {
+            return [];
+        }
+
+        return District::query()
+            ->where('state_id', $stateId)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    #[Computed]
+    public function subdistricts(): array
+    {
+        $districtId = $this->normalizedLocationId($this->district_id);
+
+        if ($districtId === null) {
+            return [];
+        }
+
+        return Subdistrict::query()
+            ->where('district_id', $districtId)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     private function normalizedSearch(): ?string
     {
         if (! is_string($this->search)) {
@@ -169,10 +227,77 @@ class extends Component
         $this->resetPage();
     }
 
+    public function updatedStateId(): void
+    {
+        $this->district_id = null;
+        $this->subdistrict_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedDistrictId(): void
+    {
+        $this->subdistrict_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedSubdistrictId(): void
+    {
+        $this->resetPage();
+    }
+
     public function clearSearch(): void
     {
         $this->search = null;
         $this->resetPage();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->search = null;
+        $this->state_id = null;
+        $this->district_id = null;
+        $this->subdistrict_id = null;
+        $this->resetPage();
+    }
+
+    private function applyLocationScope(Builder $query): Builder
+    {
+        $stateId = $this->normalizedLocationId($this->state_id);
+        $districtId = $this->normalizedLocationId($this->district_id);
+        $subdistrictId = $this->normalizedLocationId($this->subdistrict_id);
+
+        if ($stateId === null && $districtId === null && $subdistrictId === null) {
+            return $query;
+        }
+
+        return $query->whereHas('address', function (Builder $addressQuery) use ($stateId, $districtId, $subdistrictId): void {
+            if ($stateId !== null) {
+                $addressQuery->where('state_id', $stateId);
+            }
+
+            if ($districtId !== null) {
+                $addressQuery->where('district_id', $districtId);
+            }
+
+            if ($subdistrictId !== null) {
+                $addressQuery->where('subdistrict_id', $subdistrictId);
+            }
+        });
+    }
+
+    private function normalizedLocationId(?string $value): ?int
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = trim($value);
+
+        if ($normalized === '' || ! ctype_digit($normalized)) {
+            return null;
+        }
+
+        return (int) $normalized;
     }
 
     private function normalizeForSimilarity(string $value): string
@@ -206,6 +331,13 @@ class extends Component
 @php
     $institutions = $this->institutions;
     $search = $this->search;
+    $states = $this->states;
+    $districts = $this->districts;
+    $subdistricts = $this->subdistricts;
+    $stateId = $this->state_id;
+    $districtId = $this->district_id;
+    $subdistrictId = $this->subdistrict_id;
+    $hasScopedFilters = filled($stateId) || filled($districtId) || filled($subdistrictId);
     $formatInstitutionLocation = static function ($addressModel): string {
         $stateName = $addressModel?->state?->name;
         $districtName = $addressModel?->district?->name;
@@ -216,11 +348,13 @@ class extends Component
             $stateName = null;
         }
 
-        return implode(' • ', [
-            __('Negeri').': '.($stateName ?? '-'),
-            __('Daerah').': '.($districtName ?? '-'),
-            __('Daerah Kecil').': '.($subdistrictName ?? '-'),
-        ]);
+        $parts = array_values(array_filter([
+            $stateName,
+            $districtName,
+            $subdistrictName,
+        ], static fn (mixed $value): bool => is_string($value) && filled($value)));
+
+        return $parts === [] ? '-' : implode(', ', $parts);
     };
 @endphp
 
@@ -258,6 +392,70 @@ class extends Component
                             </button>
                         @endif
                     </div>
+
+                    <div class="mt-4 grid grid-cols-1 gap-3 text-left md:grid-cols-3">
+                        <div>
+                            <label for="institution-state-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                {{ __('Negeri') }}
+                            </label>
+                            <select
+                                id="institution-state-filter"
+                                wire:model.live="state_id"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                            >
+                                <option value="">{{ __('Semua Negeri') }}</option>
+                                @foreach($states as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="institution-district-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                {{ __('Daerah') }}
+                            </label>
+                            <select
+                                id="institution-district-filter"
+                                wire:model.live="district_id"
+                                @disabled(! filled($stateId))
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                                <option value="">{{ __('Semua Daerah') }}</option>
+                                @foreach($districts as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="institution-subdistrict-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                {{ __('Bandar / Mukim / Zon') }}
+                            </label>
+                            <select
+                                id="institution-subdistrict-filter"
+                                wire:model.live="subdistrict_id"
+                                @disabled(! filled($districtId))
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                                <option value="">{{ __('Semua Bandar / Mukim / Zon') }}</option>
+                                @foreach($subdistricts as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    @if($hasScopedFilters)
+                        <div class="mt-3 flex justify-end">
+                            <button
+                                type="button"
+                                wire:click="clearFilters"
+                                class="text-xs font-bold text-red-500 hover:underline"
+                            >
+                                {{ __('Clear Location Scope') }}
+                            </button>
+                        </div>
+                    @endif
                  </div>
             </div>
         </div>
@@ -270,8 +468,8 @@ class extends Component
                     </div>
                     <h3 class="text-xl font-bold text-slate-900">{{ __('No institutions found') }}</h3>
                     <p class="text-slate-500 mt-2 max-w-md mx-auto">{{ __('We couldn\'t find any institutions matching your search.') }}</p>
-                    <button type="button" wire:click="clearSearch" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
-                        {{ __('Clear Search') }} &rarr;
+                    <button type="button" wire:click="clearFilters" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
+                        {{ __('Clear Filters') }} &rarr;
                     </button>
                 </div>
             @else

@@ -217,7 +217,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'tags']);
+        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'tags', 'references']);
         $venueAddress = $this->venue?->addressModel;
         $institutionAddress = $this->institution?->addressModel;
         $institution = $this->institution;
@@ -237,6 +237,27 @@ class Event extends Model implements AuditableContract, HasMedia
 
         $topicIds = $tags
             ->filter(fn (Tag $tag): bool => in_array($tag->type, [TagType::Discipline->value, TagType::Issue->value], true))
+            ->whereIn('status', ['verified', 'pending'])
+            ->pluck('id')
+            ->values()
+            ->all();
+
+        $domainTagIds = $tags
+            ->filter(fn (Tag $tag): bool => $tag->type === TagType::Domain->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->pluck('id')
+            ->values()
+            ->all();
+
+        $sourceTagIds = $tags
+            ->filter(fn (Tag $tag): bool => $tag->type === TagType::Source->value)
+            ->whereIn('status', ['verified', 'pending'])
+            ->pluck('id')
+            ->values()
+            ->all();
+
+        $issueTagIds = $tags
+            ->filter(fn (Tag $tag): bool => $tag->type === TagType::Issue->value)
             ->whereIn('status', ['verified', 'pending'])
             ->pluck('id')
             ->values()
@@ -276,6 +297,10 @@ class Event extends Model implements AuditableContract, HasMedia
             'status' => (string) $this->status,
             'visibility' => $visibility instanceof EventVisibility ? $visibility->value : ((is_string($visibility) && $visibility !== '') ? $visibility : 'public'),
             'topic_ids' => $topicIds,
+            'domain_tag_ids' => $domainTagIds,
+            'source_tag_ids' => $sourceTagIds,
+            'issue_tag_ids' => $issueTagIds,
+            'reference_ids' => $this->references->pluck('id')->values()->all(),
             'speaker_ids' => $this->speakers->pluck('id')->toArray(),
             'starts_at' => $this->starts_at instanceof \Illuminate\Support\Carbon ? $this->starts_at->timestamp : 0,
             'ends_at' => $this->ends_at instanceof \Illuminate\Support\Carbon ? $this->ends_at->timestamp : null,

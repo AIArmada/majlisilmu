@@ -78,23 +78,47 @@
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
-    $topics = $this->topics;
+    $disciplines = $this->disciplines;
+    $domains = $this->domains;
+    $sources = $this->sources;
+    $issues = $this->issues;
+    $references = $this->references;
     $institutions = $this->institutions;
     $venues = $this->venues;
     $speakers = $this->speakers;
     $languageOptions = $this->languageOptions();
     $selectedAgeGroups = array_values(array_filter((array) $this->age_group));
     $selectedTopicIds = array_values(array_filter((array) $this->topic_ids));
+    $selectedDomainTagIds = array_values(array_filter((array) $this->domain_tag_ids));
+    $selectedSourceTagIds = array_values(array_filter((array) $this->source_tag_ids));
+    $selectedIssueTagIds = array_values(array_filter((array) $this->issue_tag_ids));
+    $selectedReferenceIds = array_values(array_filter((array) $this->reference_ids));
     $selectedSpeakerIds = array_values(array_filter((array) $this->speaker_ids));
     $selectedEventTypes = array_values(array_filter((array) $this->event_type));
     $selectedEventFormats = array_values(array_filter((array) $this->event_format));
     $selectedLanguageCodes = array_values(array_filter((array) $this->language_codes));
     $selectedTopicLabels = collect($selectedTopicIds)
-        ->map(fn (string $topicId): ?string => $topics->firstWhere('id', $topicId)?->name)
+        ->map(fn (string $topicId): ?string => $disciplines->firstWhere('id', $topicId)?->name)
         ->filter()
         ->values();
     $selectedSpeakerLabels = collect($selectedSpeakerIds)
         ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->filter()
+        ->values();
+    $selectedDomainTagLabels = collect($selectedDomainTagIds)
+        ->map(fn (string $tagId): ?string => $domains->firstWhere('id', $tagId)?->name)
+        ->filter()
+        ->values();
+    $selectedSourceTagLabels = collect($selectedSourceTagIds)
+        ->map(fn (string $tagId): ?string => $sources->firstWhere('id', $tagId)?->name)
+        ->filter()
+        ->values();
+    $selectedIssueTagLabels = collect($selectedIssueTagIds)
+        ->map(fn (string $tagId): ?string => $issues->firstWhere('id', $tagId)?->name)
+        ->filter()
+        ->values();
+    $selectedReferenceLabels = collect($selectedReferenceIds)
+        ->map(fn (string $referenceId): ?string => $references->firstWhere('id', $referenceId)?->title)
         ->filter()
         ->values();
     $selectedLanguageLabels = collect($selectedLanguageCodes)
@@ -145,6 +169,10 @@
         'has_event_url' => $this->has_event_url,
         'has_live_url' => $this->has_live_url,
         'topic_ids' => $selectedTopicIds,
+        'domain_tag_ids' => $selectedDomainTagIds,
+        'source_tag_ids' => $selectedSourceTagIds,
+        'issue_tag_ids' => $selectedIssueTagIds,
+        'reference_ids' => $selectedReferenceIds,
         'lat' => filled($lat) && filled($lng) ? $lat : null,
         'lng' => filled($lat) && filled($lng) ? $lng : null,
         'radius_km' => filled($lat) && filled($lng) ? $this->radius_km : null,
@@ -174,6 +202,10 @@
         $isMuslimOnly !== null,
         count($selectedSpeakerIds) > 0,
         count($selectedTopicIds) > 0,
+        count($selectedDomainTagIds) > 0,
+        count($selectedSourceTagIds) > 0,
+        count($selectedIssueTagIds) > 0,
+        count($selectedReferenceIds) > 0,
         filled($startsAfter),
         filled($startsBefore),
         filled($prayerTime),
@@ -260,7 +292,7 @@
                         id="event-search"
                         wire:model.live.debounce.300ms="filterData.search"
                         wire:keydown.escape="clearSearch"
-                        placeholder="{{ __('Cari mengikut tajuk, surau, masjid atau penceramah') }}"
+                        placeholder="{{ __('Cari mengikut tajuk...') }}"
                         class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-white shadow-lg shadow-slate-200/50 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
                     >
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
@@ -364,7 +396,7 @@
 
                     @if($subdistrictId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $subdistricts->firstWhere('id', $subdistrictId)?->name ?? __('Daerah Kecil / Bandar / Mukim') }}
+                            {{ $subdistricts->firstWhere('id', $subdistrictId)?->name ?? __('Bandar / Mukim / Zon') }}
                         </span>
                     @endif
 
@@ -458,9 +490,33 @@
                         </span>
                     @endforeach
 
+                    @foreach($selectedDomainTagLabels as $domainTagLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
+                            {{ $domainTagLabel }}
+                        </span>
+                    @endforeach
+
                     @foreach($selectedTopicLabels as $topicLabel)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
                             {{ $topicLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedSourceTagLabels as $sourceTagLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            {{ $sourceTagLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedIssueTagLabels as $issueTagLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100">
+                            {{ $issueTagLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedReferenceLabels as $referenceLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                            {{ $referenceLabel }}
                         </span>
                     @endforeach
 

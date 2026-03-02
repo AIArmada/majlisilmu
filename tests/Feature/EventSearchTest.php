@@ -46,6 +46,12 @@ describe('Event Search Filters', function () {
             ->assertSee('Advanced Filters');
     });
 
+    it('shows title-only search placeholder on events index', function () {
+        $this->get('/events')
+            ->assertOk()
+            ->assertSee('Cari mengikut tajuk...');
+    });
+
     it('shows save this search link for guests when search query is active', function () {
         $response = $this->get('/events?search=halaqah');
 
@@ -163,7 +169,7 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Ceramah Subuh');
     });
 
-    it('searches events by institution name', function () {
+    it('does not search events by institution name when title does not match', function () {
         $matchInstitution = Institution::factory()->create([
             'name' => 'Pusat Tarbiah Al Hikmah',
             'status' => 'verified',
@@ -177,7 +183,7 @@ describe('Event Search Filters', function () {
         ]);
 
         Event::factory()->for($matchInstitution)->create([
-            'title' => 'Kuliah Di Al Hikmah',
+            'title' => 'Kuliah Subuh Institusi A',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -185,7 +191,7 @@ describe('Event Search Filters', function () {
         ]);
 
         Event::factory()->for($otherInstitution)->create([
-            'title' => 'Kuliah Di An Nur',
+            'title' => 'Kuliah Subuh Institusi B',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -195,11 +201,11 @@ describe('Event Search Filters', function () {
         $response = $this->get('/events?search=Al%20Hikmah');
 
         $response->assertOk()
-            ->assertSee('Kuliah Di Al Hikmah')
-            ->assertDontSee('Kuliah Di An Nur');
+            ->assertDontSee('Kuliah Subuh Institusi A')
+            ->assertDontSee('Kuliah Subuh Institusi B');
     });
 
-    it('searches events by venue name', function () {
+    it('does not search events by venue name when title does not match', function () {
         $matchVenue = Venue::factory()->create([
             'name' => 'Surau Taman Melawati',
             'status' => 'verified',
@@ -213,7 +219,7 @@ describe('Event Search Filters', function () {
         ]);
 
         Event::factory()->for($matchVenue)->create([
-            'title' => 'Kuliah Di Melawati',
+            'title' => 'Kuliah Malam Lokasi A',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -221,7 +227,7 @@ describe('Event Search Filters', function () {
         ]);
 
         Event::factory()->for($otherVenue)->create([
-            'title' => 'Kuliah Di Al Falah',
+            'title' => 'Kuliah Malam Lokasi B',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -231,11 +237,11 @@ describe('Event Search Filters', function () {
         $response = $this->get('/events?search=Melawati');
 
         $response->assertOk()
-            ->assertSee('Kuliah Di Melawati')
-            ->assertDontSee('Kuliah Di Al Falah');
+            ->assertDontSee('Kuliah Malam Lokasi A')
+            ->assertDontSee('Kuliah Malam Lokasi B');
     });
 
-    it('searches events by speaker name', function () {
+    it('does not search events by speaker name when title does not match', function () {
         $matchSpeaker = Speaker::factory()->create([
             'name' => 'Ustaz Samad Al-Bakri',
             'status' => 'verified',
@@ -249,7 +255,7 @@ describe('Event Search Filters', function () {
         ]);
 
         $matchEvent = Event::factory()->create([
-            'title' => 'Kuliah Samad',
+            'title' => 'Kuliah Speaker A',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -258,7 +264,7 @@ describe('Event Search Filters', function () {
         $matchEvent->speakers()->attach($matchSpeaker->id);
 
         $otherEvent = Event::factory()->create([
-            'title' => 'Kuliah Ahmad',
+            'title' => 'Kuliah Speaker B',
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -269,11 +275,11 @@ describe('Event Search Filters', function () {
         $response = $this->get('/events?search=Samad');
 
         $response->assertOk()
-            ->assertSee('Kuliah Samad')
-            ->assertDontSee('Kuliah Ahmad');
+            ->assertDontSee('Kuliah Speaker A')
+            ->assertDontSee('Kuliah Speaker B');
     });
 
-    it('supports fuzzy search with minor venue name typos', function () {
+    it('supports fuzzy search with minor title typos', function () {
         $matchVenue = Venue::factory()->create([
             'name' => 'Surau Taman Melawati',
             'status' => 'verified',
@@ -911,7 +917,7 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Kuliah Event');
     });
 
-    it('filters events by selected topics', function () {
+    it('filters events by selected bidang ilmu', function () {
         $tafsirTag = Tag::factory()->discipline()->create([
             'name' => ['en' => 'Tafsir', 'ms' => 'Tafsir'],
         ]);
@@ -946,6 +952,153 @@ describe('Event Search Filters', function () {
             ->assertSee('Tafsir Session')
             ->assertDontSee('Fiqh Session')
             ->assertSee('Tafsir');
+    });
+
+    it('filters events by selected kategori (domain tags)', function () {
+        $aqidahTag = Tag::factory()->domain()->create([
+            'name' => ['en' => 'Aqidah', 'ms' => 'Aqidah'],
+        ]);
+
+        $akhlakTag = Tag::factory()->domain()->create([
+            'name' => ['en' => 'Akhlak', 'ms' => 'Akhlak'],
+        ]);
+
+        $aqidahEvent = Event::factory()->create([
+            'title' => 'Aqidah Intensive',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $aqidahEvent->attachTag($aqidahTag);
+
+        $akhlakEvent = Event::factory()->create([
+            'title' => 'Akhlak Session',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $akhlakEvent->attachTag($akhlakTag);
+
+        $query = http_build_query(['domain_tag_ids' => [$aqidahTag->id]]);
+
+        $response = $this->get("/events?{$query}");
+
+        $response->assertOk()
+            ->assertSee('Aqidah Intensive')
+            ->assertDontSee('Akhlak Session')
+            ->assertSee('Aqidah');
+    });
+
+    it('filters events by selected sumber rujukan utama tags', function () {
+        $quranTag = Tag::factory()->source()->create([
+            'name' => ['en' => 'Quran', 'ms' => 'Quran'],
+        ]);
+
+        $hadithTag = Tag::factory()->source()->create([
+            'name' => ['en' => 'Hadith', 'ms' => 'Hadith'],
+        ]);
+
+        $quranEvent = Event::factory()->create([
+            'title' => 'Quran Study Circle',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $quranEvent->attachTag($quranTag);
+
+        $hadithEvent = Event::factory()->create([
+            'title' => 'Hadith Workshop',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $hadithEvent->attachTag($hadithTag);
+
+        $query = http_build_query(['source_tag_ids' => [$quranTag->id]]);
+
+        $response = $this->get("/events?{$query}");
+
+        $response->assertOk()
+            ->assertSee('Quran Study Circle')
+            ->assertDontSee('Hadith Workshop');
+    });
+
+    it('filters events by selected tema isu tags', function () {
+        $familyTag = Tag::factory()->issue()->create([
+            'name' => ['en' => 'Keluarga', 'ms' => 'Keluarga'],
+        ]);
+
+        $economyTag = Tag::factory()->issue()->create([
+            'name' => ['en' => 'Ekonomi', 'ms' => 'Ekonomi'],
+        ]);
+
+        $familyEvent = Event::factory()->create([
+            'title' => 'Isu Keluarga Semasa',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $familyEvent->attachTag($familyTag);
+
+        $economyEvent = Event::factory()->create([
+            'title' => 'Perbincangan Isu Ekonomi',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $economyEvent->attachTag($economyTag);
+
+        $query = http_build_query(['issue_tag_ids' => [$familyTag->id]]);
+
+        $response = $this->get("/events?{$query}");
+
+        $response->assertOk()
+            ->assertSee('Isu Keluarga Semasa')
+            ->assertDontSee('Perbincangan Isu Ekonomi');
+    });
+
+    it('filters events by selected rujukan kitab buku', function () {
+        $riyadhRef = \App\Models\Reference::factory()->create([
+            'title' => 'Riyadhus Solihin',
+            'is_active' => true,
+        ]);
+
+        $bulughRef = \App\Models\Reference::factory()->create([
+            'title' => 'Bulughul Maram',
+            'is_active' => true,
+        ]);
+
+        $riyadhEvent = Event::factory()->create([
+            'title' => 'Riyadh Session',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $riyadhEvent->references()->attach($riyadhRef->id);
+
+        $bulughEvent = Event::factory()->create([
+            'title' => 'Bulugh Session',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $bulughEvent->references()->attach($bulughRef->id);
+
+        $query = http_build_query(['reference_ids' => [$riyadhRef->id]]);
+
+        $response = $this->get("/events?{$query}");
+
+        $response->assertOk()
+            ->assertSee('Riyadh Session')
+            ->assertDontSee('Bulugh Session');
     });
 
     it('shows approved and pending public events', function () {
