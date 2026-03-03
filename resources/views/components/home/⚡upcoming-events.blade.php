@@ -20,7 +20,7 @@ new class extends Component {
 ?>
 
 @placeholder
-<section class="bg-slate-50 py-20">
+<section class="bg-slate-50 pt-8 pb-20">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="flex items-center justify-center py-12">
             <svg class="animate-spin h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24">
@@ -34,7 +34,7 @@ new class extends Component {
 </section>
 @endplaceholder
 
-<section class="bg-slate-50 py-20">
+<section class="bg-slate-50 pt-8 pb-20">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="flex items-end justify-between mb-12">
             <div>

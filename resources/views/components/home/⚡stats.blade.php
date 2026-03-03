@@ -46,33 +46,34 @@ new class extends Component {
 ?>
 
 @placeholder
-<div class="mt-16 grid grid-cols-3 gap-4 max-w-lg mx-auto">
+<div class="grid grid-cols-3 gap-4 max-w-lg mx-auto">
     <div class="text-center">
         <div class="h-10 w-16 bg-white/20 rounded animate-pulse mx-auto"></div>
-        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Majlis Akan Datang') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 leading-none">{{ __('Majlis Akan Datang') }}</div>
     </div>
     <div class="text-center border-x border-white/10">
         <div class="h-10 w-16 bg-white/20 rounded animate-pulse mx-auto"></div>
-        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Penceramah') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 leading-none">{{ __('Penceramah') }}</div>
     </div>
     <div class="text-center">
         <div class="h-10 w-16 bg-white/20 rounded animate-pulse mx-auto"></div>
-        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Institusi') }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 leading-none">{{ __('Institusi') }}</div>
     </div>
 </div>
 @endplaceholder
 
-<div class="mt-16 grid grid-cols-3 gap-4 max-w-lg mx-auto">
+<div class="grid grid-cols-3 gap-4 max-w-lg mx-auto">
     <div class="text-center">
-        <div class="text-3xl sm:text-4xl font-bold text-white">{{ number_format($this->events) }}</div>
-        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Majlis Akan Datang') }}</div>
+        <div class="text-3xl sm:text-4xl font-bold leading-none text-white">{{ number_format($this->events) }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 leading-none">{{ __('Majlis Akan Datang') }}</div>
     </div>
     <div class="text-center border-x border-white/10">
-        <div class="text-3xl sm:text-4xl font-bold text-white">{{ number_format($this->speakers) }}</div>
-        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Penceramah') }}</div>
+        <div class="text-3xl sm:text-4xl font-bold leading-none text-white">{{ number_format($this->speakers) }}</div>
+        <div class="text-xs sm:text-sm text-slate-400 leading-none">{{ __('Penceramah') }}</div>
     </div>
     <div class="text-center">
-        <div class="text-3xl sm:text-4xl font-bold text-white">{{ number_format($this->institutions) }}</div>
-        <div class="text-xs sm:text-sm text-slate-400 mt-1">{{ __('Institusi') }}</div>
+        <div class="text-3xl sm:text-4xl font-bold leading-none text-white">{{ number_format($this->institutions) }}
+        </div>
+        <div class="text-xs sm:text-sm text-slate-400 leading-none">{{ __('Institusi') }}</div>
     </div>
 </div>

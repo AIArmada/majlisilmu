@@ -1,11 +1,22 @@
 <?php
 
-use Livewire\Component;
+use App\Models\Tag;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Component;
 
 new
     #[Title('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')]
     class extends Component {
+        #[Computed]
+        public function categoryTagIds(): array
+        {
+            return [
+                'aqidah' => Tag::where('slug->en', 'aqidah')->orWhere('slug->ms', 'aqidah')->first()?->id,
+                'syariah' => Tag::where('slug->en', 'syariah')->orWhere('slug->ms', 'syariah')->first()?->id,
+                'akhlak' => Tag::where('slug->en', 'akhlak')->orWhere('slug->ms', 'akhlak')->first()?->id,
+            ];
+        }
     };
 ?>
 
@@ -18,7 +29,7 @@ new
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- HERO SECTION — Shared, but adapts for auth vs guest     --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
-    <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-32 pb-20">
+    <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-12 pb-12">
         {{-- Background Layer --}}
         <div class="absolute inset-0 z-0 bg-slate-950">
             {{-- Islamic Pattern Base --}}
@@ -156,21 +167,17 @@ new
                         class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         {{ __('Hujung Minggu') }}
                     </a>
-                    <a href="{{ route('events.index', ['search' => 'Tazkirah']) }}" wire:navigate
-                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
-                        #Tazkirah
-                    </a>
-                    <a href="{{ route('events.index', ['search' => 'Tafsir']) }}" wire:navigate
-                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
-                        #Tafsir
-                    </a>
-                    <a href="{{ route('events.index', ['search' => 'Fiqh']) }}" wire:navigate
-                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
-                        #Fiqh
-                    </a>
-                    <a href="{{ route('events.index', ['search' => 'Aqidah']) }}" wire:navigate
+                    <a href="{{ route('events.index', ['domain_tag_ids' => [$this->categoryTagIds['aqidah']]]) }}" wire:navigate
                         class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         #Aqidah
+                    </a>
+                    <a href="{{ route('events.index', ['domain_tag_ids' => [$this->categoryTagIds['syariah']]]) }}" wire:navigate
+                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        #Syariah
+                    </a>
+                    <a href="{{ route('events.index', ['domain_tag_ids' => [$this->categoryTagIds['akhlak']]]) }}" wire:navigate
+                        class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
+                        #Akhlak
                     </a>
 
                     <button type="button" @click="document.querySelector('[x-data]').__x.$data.locate()"
@@ -183,7 +190,7 @@ new
                 </div>
 
                 {{-- Live Stats (Floating) --}}
-                <div class="mt-16 sm:mt-24">
+                <div class="mt-10 sm:mt-12">
                     <livewire:home.stats lazy.bundle />
                 </div>
             </div>
@@ -299,9 +306,9 @@ new
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- BROWSE BY DATE                                          --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
-    <section class="bg-slate-50 pb-20 pt-10">
+    <section class="bg-slate-50 py-0">
         <div class="container mx-auto px-6 lg:px-12">
-            <div class="p-8 bg-white border shadow-sm rounded-3xl border-slate-100">
+            <div class="p-2 bg-white border shadow-sm rounded-3xl border-slate-100">
                 <livewire:home.date-filter defer.bundle />
             </div>
         </div>

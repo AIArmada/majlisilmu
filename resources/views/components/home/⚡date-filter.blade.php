@@ -42,22 +42,22 @@ new class extends Component {
 ?>
 
 @placeholder
-<div class="flex flex-wrap items-center justify-center gap-3">
+<div class="flex flex-wrap items-center justify-center gap-1.5">
     @for($i = 0; $i < 7; $i++)
-        <div class="flex flex-col items-center p-4 rounded-2xl border-2 border-slate-100 min-w-[100px] animate-pulse">
-            <span class="w-12 h-3 bg-slate-200 rounded mb-2"></span>
-            <span class="w-8 h-6 bg-slate-200 rounded mb-1"></span>
+        <div class="flex flex-col items-center py-1 px-3 rounded-2xl border-2 border-slate-100 min-w-[85px] animate-pulse">
+            <span class="w-12 h-3 bg-slate-200 rounded mb-1"></span>
+            <span class="w-8 h-6 bg-slate-200 rounded"></span>
             <span class="w-8 h-3 bg-slate-200 rounded"></span>
         </div>
     @endfor
 </div>
 @endplaceholder
 
-<div class="flex flex-wrap items-center justify-center gap-3">
+<div class="flex flex-wrap items-center justify-center gap-1.5">
     @foreach($this->upcomingDates as $dateItem)
         <a wire:key="date-{{ $dateItem['date']->format('Y-m-d') }}"
             href="{{ route('events.index', ['date' => $dateItem['date']->format('Y-m-d')]) }}" wire:navigate
-            class="group flex flex-col items-center p-4 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all min-w-[100px] {{ $loop->first ? 'bg-emerald-50 border-emerald-500' : '' }}">
+            class="group flex flex-col items-center py-1 px-3 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all min-w-[85px] {{ $loop->first ? 'bg-emerald-50 border-emerald-500' : '' }}">
             <span
                 class="text-xs font-semibold text-slate-400 uppercase tracking-wide group-hover:text-emerald-600 {{ $loop->first ? 'text-emerald-600' : '' }}">
                 {{ $dateItem['day_name'] }}
@@ -69,7 +69,7 @@ new class extends Component {
             <span class="text-xs text-slate-400">{{ $dateItem['month_short'] }}</span>
             @if($dateItem['count'] > 0)
                 <span
-                    class="mt-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                    class="mt-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
                     {{ $dateItem['count'] }}
                 </span>
             @endif
