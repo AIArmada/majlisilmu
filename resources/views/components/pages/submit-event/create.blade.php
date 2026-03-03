@@ -1457,6 +1457,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $event->status->transitionTo(\App\States\EventStatus\Pending::class);
 
         session()->flash('event_title', $event->title);
+        session()->flash('event_slug', $event->slug);
+        session()->flash('event_visibility', $event->visibility->value ?? 'public');
 
         return redirect()->route('submit-event.success');
     }

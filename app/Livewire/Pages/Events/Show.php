@@ -43,8 +43,12 @@ class Show extends Component
         $isViewable = $event->is_active && $this->isApprovedOrPending($event);
         $isOwner = $this->isEventOwner($event);
 
+        // Owners can always view their own events (drafts, pending, approved, etc)
+        if ($isOwner) {
+            // Allow access
+        }
         // Public events: anyone can view if active and approved/pending
-        if ($isViewable && $event->visibility === EventVisibility::Public) {
+        elseif ($isViewable && $event->visibility === EventVisibility::Public) {
             // Allow access
         }
         // Unlisted events: anyone with link can view if active and approved/pending
@@ -348,6 +352,12 @@ class Show extends Component
             return false;
         }
 
-        return $event->user_id === $user->id || $event->submitter_id === $user->id;
+        if ($event->user_id === $user->id || $event->submitter_id === $user->id) {
+            return true;
+        }
+
+        return \App\Models\EventSubmission::where('event_id', $event->id)
+            ->where('submitted_by', $user->id)
+            ->exists();
     }
 }

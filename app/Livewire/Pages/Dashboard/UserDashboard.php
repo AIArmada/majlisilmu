@@ -260,6 +260,8 @@ class UserDashboard extends Component
             ->where(function (Builder $eventQuery) use ($user): void {
                 $eventQuery
                     ->where('user_id', $user->id)
+                    ->orWhere('submitter_id', $user->id)
+                    ->orWhereIn('id', \App\Models\EventSubmission::where('submitted_by', $user->id)->select('event_id'))
                     ->orWhereIn('institution_id', $user->institutions()->select('institutions.id'));
             });
     }

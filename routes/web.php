@@ -59,6 +59,9 @@ Route::livewire('/penceramah/{speaker:slug}', 'pages.speakers.show')->name('spea
 // Series
 Route::livewire('/siri/{series:slug}', 'pages.series.show')->name('series.show');
 
+// References
+Route::livewire('/rujukan/{reference}', 'pages.references.show')->name('references.show');
+
 // Sitemap
 Route::get('/peta-laman.xml', [\App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap.index');
 Route::get('/peta-laman-majlis.xml', [\App\Http\Controllers\SitemapController::class, 'events'])->name('sitemap.events');
