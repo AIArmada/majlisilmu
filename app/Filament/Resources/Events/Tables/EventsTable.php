@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Events\Tables;
 
-use A909M\FilamentStateFusion\Tables\Filters\StateFusionSelectFilter;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -134,7 +133,13 @@ class EventsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                StateFusionSelectFilter::make('status'),
+                SelectFilter::make('status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'pending' => 'Pending',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                    ]),
                 SelectFilter::make('visibility')
                     ->options([
                         'public' => 'Public',

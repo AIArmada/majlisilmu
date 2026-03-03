@@ -286,7 +286,7 @@
                 {{-- No image: enriched format-aware gradient base --}}
                 <div class="absolute inset-0 bg-gradient-to-br {{ $heroFallbackGradient }}" aria-hidden="true"></div>
                 {{-- Islamic hexagonal tessellation --}}
-                <div class="absolute inset-0 opacity-[0.07]" aria-hidden="true">
+                <div class="absolute inset-0 opacity-15" aria-hidden="true">
                     <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <pattern id="hero-hex" x="0" y="0" width="56" height="96" patternUnits="userSpaceOnUse">
@@ -300,18 +300,18 @@
                     </svg>
                 </div>
                 {{-- Ambient glow orbs --}}
-                <div class="absolute -left-40 -top-40 size-[600px] rounded-full {{ $isOnlineFormat ? 'bg-sky-500/25' : ($isHybridFormat ? 'bg-cyan-400/25' : 'bg-emerald-500/25') }} blur-[120px]"
+                <div class="absolute -left-40 -top-40 size-[600px] rounded-full {{ $isOnlineFormat ? 'bg-sky-500/40' : ($isHybridFormat ? 'bg-cyan-400/40' : 'bg-emerald-500/40') }} blur-[120px]"
                     aria-hidden="true"></div>
-                <div class="absolute -bottom-20 right-20 size-[500px] rounded-full {{ $isOnlineFormat ? 'bg-indigo-400/20' : ($isHybridFormat ? 'bg-emerald-400/20' : 'bg-teal-400/15') }} blur-[100px]"
+                <div class="absolute -bottom-20 right-20 size-[500px] rounded-full {{ $isOnlineFormat ? 'bg-indigo-400/30' : ($isHybridFormat ? 'bg-emerald-400/30' : 'bg-teal-400/30') }} blur-[100px]"
                     aria-hidden="true"></div>
 
                 {{-- Geometric glass accents to keep hero intentional even without media --}}
                 <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] lg:block" aria-hidden="true">
                     <div
-                        class="absolute right-14 top-24 size-56 rotate-6 rounded-[2.25rem] border border-white/20 bg-white/[0.06] backdrop-blur-sm">
+                        class="absolute right-14 top-24 size-56 rotate-6 rounded-[2.25rem] border border-white/30 bg-white/10 backdrop-blur-sm">
                     </div>
                     <div
-                        class="absolute bottom-14 right-28 size-44 -rotate-6 rounded-[1.8rem] border border-white/15 bg-white/[0.04]">
+                        class="absolute bottom-14 right-28 size-44 -rotate-6 rounded-[1.8rem] border border-white/20 bg-white/5">
                     </div>
                     <div
                         class="absolute inset-y-14 left-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent">
@@ -342,7 +342,17 @@
                         {{-- Badges --}}
                         <div class="animate-fade-in-up" style="--reveal-d: 100ms;">
                             <div class="flex flex-wrap gap-2">
-                                @if($event->status instanceof \App\States\EventStatus\Pending)
+                                @if($event->status instanceof \App\States\EventStatus\Draft)
+                                    <span
+                                        class="inline-flex items-center gap-1.5 rounded-full border border-slate-400/50 bg-slate-400/20 px-3 py-1 text-xs font-semibold tracking-wide text-slate-200 backdrop-blur-md">
+                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                        </svg>
+                                        {{ __('Draf') }}
+                                    </span>
+                                @elseif($event->status instanceof \App\States\EventStatus\Pending)
                                     <span
                                         class="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-amber-300 backdrop-blur-md">
                                         <span class="relative flex size-2"><span
@@ -567,7 +577,17 @@
                     {{-- Badges --}}
                     <div class="animate-fade-in-up" style="--reveal-d: 100ms;">
                         <div class="flex flex-wrap gap-2">
-                            @if($event->status instanceof \App\States\EventStatus\Pending)
+                            @if($event->status instanceof \App\States\EventStatus\Draft)
+                                <span
+                                    class="inline-flex items-center gap-1.5 rounded-full border border-slate-400/50 bg-slate-400/20 px-3 py-1 text-xs font-semibold tracking-wide text-slate-200 backdrop-blur-md">
+                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                    </svg>
+                                    {{ __('Draf') }}
+                                </span>
+                            @elseif($event->status instanceof \App\States\EventStatus\Pending)
                                 <span
                                     class="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-amber-300 backdrop-blur-md">
                                     <span class="relative flex size-2"><span
@@ -744,7 +764,7 @@
                 @if(!$event->starts_at || !$event->starts_at->isPast())
                             <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
                                 class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all
-                                                                    {{ $isGoing
+                                                                                                                                                                                            {{ $isGoing
                     ? 'bg-emerald-600 text-white shadow-emerald-200'
                     : 'bg-slate-900 text-white hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/30' }}">
                                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -938,16 +958,17 @@
         @elseif($eventTimeStatus === 'starting_soon' && $event->starts_at)
             <div class="relative z-30 {{ $event->status instanceof \App\States\EventStatus\Pending ? '' : '-mt-4' }} mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4" x-data="{
-                                        target: {{ $event->starts_at->timestamp * 1000 }},
-                                        display: '',
-                                        update() {
-                                            const diff = this.target - Date.now();
-                                            if (diff <= 0) { this.display = ''; return; }
-                                            const h = Math.floor(diff / 3600000);
-                                            const m = Math.floor((diff % 3600000) / 60000);
-                                            this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
-                                        }
-                                    }" x-init="update(); setInterval(() => update(), 60000)">
+                                                                            target: {{ $event->starts_at->timestamp * 1000 }},
+                                                                            display: '',
+                                                                            update() {
+                                                                                const diff = this.target - Date.now();
+                                                                                if (diff <= 0) { this.display = ''; return; }
+                                                                                const h = Math.floor(diff / 3600000);
+                                                                                const m = Math.floor((diff % 3600000) / 60000);
+                                                                                this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
+                                                                            }
+                                                                        }"
+                    x-init="update(); setInterval(() => update(), 60000)">
                     <svg class="size-5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1015,11 +1036,11 @@
                             $spBio = $sp->bio ? Str::limit(strip_tags(is_array($sp->bio) ? ($sp->bio['html'] ?? '') : $sp->bio), 220) : null;
                         @endphp
                         <a href="{{ route('speakers.show', $sp) }}" wire:navigate
-                            class="group relative flex flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-white/90 shadow-xl shadow-emerald-100/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-100/60 sm:min-h-56 sm:flex-row">
+                            class="group relative flex flex-col overflow-hidden rounded-3xl border border-emerald-200/60 bg-white/90 shadow-xl shadow-emerald-100/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-100/60 sm:min-h-44 sm:flex-row">
 
                             {{-- Left: cover/portrait panel --}}
                             <div
-                                class="relative h-56 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-full sm:min-h-56 sm:w-56">
+                                class="relative h-44 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-full sm:min-h-44 sm:w-44">
                                 @if($spCover)
                                     {{-- Real cover photo behind a floating avatar --}}
                                     <img src="{{ $spCover }}" alt=""
@@ -1049,7 +1070,7 @@
                             </div>
 
                             {{-- Right: details --}}
-                            <div class="flex flex-col justify-center gap-1 p-7 sm:p-8">
+                            <div class="flex flex-col justify-center gap-1 p-3 sm:p-4">
                                 <h3
                                     class="font-heading text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">
                                     {{ $sp->formatted_name ?? $sp->name }}
@@ -1076,7 +1097,7 @@
                                     class="group relative w-[240px] flex flex-col overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100">
 
                                     {{-- Cover background --}}
-                                    <div class="relative h-32 w-full overflow-hidden bg-slate-100">
+                                    <div class="relative h-24 w-full overflow-hidden bg-slate-100">
                                         @if($speakerCoverImg)
                                             <img src="{{ $speakerCoverImg }}" alt=""
                                                 class="size-full object-cover transition duration-700 group-hover:scale-105 group-hover:opacity-80"
@@ -1092,7 +1113,7 @@
                                     </div>
 
                                     {{-- Profile overlay --}}
-                                    <div class="relative -mt-16 flex flex-col items-center px-4 pb-4 text-center">
+                                    <div class="relative -mt-16 flex flex-col items-center px-3 pb-2 text-center">
                                         <div
                                             class="relative size-32 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-xl transition-transform duration-300 group-hover:-translate-y-2">
                                             <img src="{{ $speakerProfileImg ?: $speakerThumbImg }}" alt="{{ $speaker->name }}"
@@ -1415,7 +1436,7 @@
 
             <div class="grid gap-5 sm:grid-cols-2">
                 @foreach($event->references as $reference)
-                    <div wire:key="ref-{{ $reference->id }}"
+                    <a href="{{ route('references.show', $reference) }}" wire:navigate wire:key="ref-{{ $reference->id }}"
                         class="group flex gap-5 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-100">
                         @php $coverUrl = $reference->getFirstMediaUrl('front_cover', 'thumb'); @endphp
                         @if($coverUrl)
@@ -1445,7 +1466,15 @@
                                 <p class="mt-1 text-xs text-slate-400">{{ $reference->publisher }}</p>
                             @endif
                         </div>
-                    </div>
+                        <div class="flex shrink-0 items-center">
+                            <div
+                                class="flex size-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all duration-300 group-hover:bg-indigo-100 group-hover:text-indigo-600">
+                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                </svg>
+                            </div>
+                        </div>
+                    </a>
                 @endforeach
             </div>
         </section>
@@ -2395,7 +2424,7 @@ MOBILE BOTTOM ACTION BAR
         <div class="flex items-center gap-2">
             @auth
                     <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
-                                                        {{ $isGoing
+                                                                                                                                        {{ $isGoing
                 ? 'border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-inner'
                 : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' }}">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -2411,7 +2440,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                                        {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
+                                                                                                                                        {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
                         <svg class="size-5 {{ $isInterested ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -2421,7 +2450,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                                        {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
+                                                                                                                                        {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
                         <svg class="size-5 {{ $isSaved ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"

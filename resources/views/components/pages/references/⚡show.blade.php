@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Series;
+use App\Models\Reference;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
@@ -9,9 +9,9 @@ use Livewire\Attributes\Title;
 
 new
     #[Layout('layouts.app')]
-    #[Title('Siri')]
+    #[Title('Reference')]
     class extends Component {
-    public Series $series;
+    public Reference $reference;
 
     public bool $isFollowing = false;
 
@@ -19,16 +19,16 @@ new
 
     public int $pastPerPage = 10;
 
-    public function mount(Series $series): void
+    public function mount(Reference $reference): void
     {
-        if ($series->visibility !== 'public' && (!auth()->user()?->hasAnyRole(['super_admin', 'moderator']))) {
+        if (!$reference->is_active) {
             abort(404);
         }
 
-        $series->load(['media']);
+        $reference->load(['media', 'socialMedia']);
 
-        $this->series = $series;
-        $this->isFollowing = Auth::user()?->isFollowing($series) ?? false;
+        $this->reference = $reference;
+        $this->isFollowing = Auth::user()?->isFollowing($reference) ?? false;
     }
 
     /**
@@ -45,17 +45,17 @@ new
         }
 
         if ($this->isFollowing) {
-            $user->unfollow($this->series);
+            $user->unfollow($this->reference);
             $this->isFollowing = false;
         } else {
-            $user->follow($this->series);
+            $user->follow($this->reference);
             $this->isFollowing = true;
         }
     }
 
     public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
-        return $this->series->events()
+        return $this->reference->events()
             ->active()
             ->where('starts_at', '>=', now())
             ->with([
@@ -75,7 +75,7 @@ new
 
     public function getUpcomingTotalProperty(): int
     {
-        return $this->series->events()
+        return $this->reference->events()
             ->active()
             ->where('starts_at', '>=', now())
             ->count();
@@ -86,7 +86,7 @@ new
      */
     public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
-        return $this->series->events()
+        return $this->reference->events()
             ->active()
             ->where('starts_at', '<', now())
             ->with([
@@ -106,7 +106,7 @@ new
 
     public function getPastTotalProperty(): int
     {
-        return $this->series->events()
+        return $this->reference->events()
             ->active()
             ->where('starts_at', '<', now())
             ->count();
@@ -124,20 +124,26 @@ new
 
     public function rendering($view): void
     {
-        $view->title($this->series->title . ' - ' . config('app.name'));
+        $view->title($this->reference->title . ' - ' . config('app.name'));
     }
 };
 ?>
 
 @php
-    $series = $this->series;
+    $reference = $this->reference;
     $upcomingEvents = $this->upcomingEvents;
     $pastEvents = $this->pastEvents;
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
 
-    $frontCover = $series->getFirstMediaUrl('cover', 'thumb');
-    $backCover = null;
+    $frontCover = $reference->getFirstMediaUrl('front_cover', 'thumb');
+    $backCover = $reference->getFirstMediaUrl('back_cover', 'thumb');
+
+    $socialLinks = $reference->socialMedia
+        ->filter(fn($social) => filled($social->resolved_url) && filled($social->platform))
+        ->mapWithKeys(fn($social) => [strtolower((string) $social->platform) => $social])
+        ->values();
+    $hasSocialLinks = $socialLinks->isNotEmpty();
 
     // ── Helpers identical to speaker page ────────────────────────────────────
     $resolveEventTypeLabel = static function (mixed $eventType): string {
@@ -192,232 +198,158 @@ new
 
 <div class="min-h-screen bg-slate-50/80">
 
-
     {{-- ═══ HERO ═══ --}}
-    <div class="relative w-full overflow-hidden bg-slate-950 pt-20 lg:pt-0" @if($frontCover)
-    x-data="{ posterModalOpen: false }" @endif>
-        {{-- ── ATMOSPHERE LAYER ── --}}
-        <div class="absolute inset-0">
-            @if($frontCover)
-                <img src="{{ $frontCover }}" alt="" class="size-full object-cover opacity-65" loading="eager"
-                    aria-hidden="true">
-            @else
-                {{-- Enriched fallback gradient --}}
-                <div class="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900"
-                    aria-hidden="true"></div>
-
-                {{-- Islamic hexagonal tessellation --}}
-                <div class="absolute inset-0 opacity-15" aria-hidden="true">
-                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <pattern id="hero-hex" x="0" y="0" width="56" height="96" patternUnits="userSpaceOnUse">
-                                <polygon points="28,4 52,18 52,46 28,60 4,46 4,18" fill="none" stroke="white"
-                                    stroke-width="1.5" />
-                                <polygon points="28,48 52,62 52,90 28,104 4,90 4,62" fill="none" stroke="white"
-                                    stroke-width="1.5" />
-                            </pattern>
-                        </defs>
-                        <rect width="100%" height="100%" fill="url(#hero-hex)" />
-                    </svg>
-                </div>
-
-                {{-- Ambient glow orbs --}}
-                <div class="absolute -left-40 -top-40 size-[600px] rounded-full bg-indigo-500/40 blur-[120px]"
-                    aria-hidden="true"></div>
-                <div class="absolute -bottom-20 right-20 size-[500px] rounded-full bg-emerald-400/30 blur-[100px]"
-                    aria-hidden="true"></div>
-
-                {{-- Geometric glass accents to keep hero intentional even without media --}}
-                <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] lg:block" aria-hidden="true">
-                    <div
-                        class="absolute right-14 top-24 size-56 rotate-6 rounded-[2.25rem] border border-white/30 bg-white/10 backdrop-blur-sm">
-                    </div>
-                    <div
-                        class="absolute bottom-14 right-28 size-44 -rotate-6 rounded-[1.8rem] border border-white/20 bg-white/5">
-                    </div>
-                    <div
-                        class="absolute inset-y-14 left-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent">
-                    </div>
-                </div>
-            @endif
-
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/40"
-                aria-hidden="true"></div>
-            <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/50 to-transparent"
-                aria-hidden="true"></div>
-            <div class="absolute inset-0 opacity-[0.03]"
-                style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 200px;"></div>
+    <header
+        class="noise-overlay relative isolate overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950/70 to-slate-950">
+        {{-- Ambient orbs --}}
+        <div class="pointer-events-none absolute inset-0">
+            <div
+                class="animate-float-drift absolute -top-24 left-[5%] h-[28rem] w-[28rem] rounded-full bg-indigo-500/25 blur-[110px]">
+            </div>
+            <div
+                class="animate-float-drift-alt absolute -bottom-16 right-[8%] h-[22rem] w-[22rem] rounded-full bg-gold-400/15 blur-[90px]">
+            </div>
+            <div
+                class="animate-float-drift-slow absolute top-16 right-[40%] h-[18rem] w-[18rem] rounded-full bg-violet-400/15 blur-[80px]">
+            </div>
         </div>
+        <div
+            class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_55%_50%,rgba(99,102,241,0.12)_0%,transparent_60%)]">
+        </div>
+        <div class="absolute inset-0 opacity-[0.03]"
+            style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 200px;"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent"></div>
+        <div class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate-950/60 to-transparent"></div>
 
-        {{-- ── CONTENT ── --}}
-        <div class="container relative mx-auto px-5 sm:px-8 lg:px-12">
-            @if($frontCover)
-                <div class="relative z-10 grid items-end gap-8 pt-12 pb-10 lg:grid-cols-12 lg:gap-12 lg:pt-32 lg:pb-16">
-                    {{-- Left: Details --}}
-                    <div class="order-2 flex flex-col lg:order-1 lg:col-span-7">
-                        <span
-                            class="mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-indigo-300 backdrop-blur-md">
-                            {{ __('Siri') }}
-                        </span>
+        <div
+            class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-8 px-6 pb-12 pt-14 sm:flex-row sm:items-end sm:gap-10 lg:px-8 lg:pb-16 lg:pt-20">
 
-                        <h1
-                            class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl lg:leading-tight">
-                            {{ $series->title }}
-                        </h1>
-                        <div
-                            class="shimmer-line mt-4 h-0.5 w-20 rounded-full bg-gradient-to-r from-gold-400/80 via-gold-300/60 to-gold-600/30">
-                        </div>
-
-                        {{-- Action buttons --}}
-                        <div class="mt-8 flex flex-wrap items-center gap-3">
-                            <button wire:click="toggleFollow" wire:loading.attr="disabled"
-                                class="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-200 backdrop-blur-sm {{ $this->isFollowing ? 'border border-indigo-400/40 bg-indigo-500/20 text-indigo-300 hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-300' : 'border border-white/15 bg-white/10 text-white hover:border-indigo-400/40 hover:bg-indigo-500/20 hover:text-indigo-300' }}"
-                                x-data="{ hovering: false }" @mouseenter="hovering = true" @mouseleave="hovering = false">
-                                @if($this->isFollowing)
-                                    <template x-if="!hovering">
-                                        <span class="inline-flex items-center gap-1.5">
-                                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                                stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M4.5 12.75l6 6 9-13.5" />
-                                            </svg>
-                                            {{ __('Mengikuti') }}
-                                        </span>
-                                    </template>
-                                    <template x-if="hovering">
-                                        <span class="inline-flex items-center gap-1.5">
-                                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                                stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                            {{ __('Nyahikut') }}
-                                        </span>
-                                    </template>
-                                @else
-                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    {{ __('Ikuti Siri') }}
-                                @endif
-                            </button>
-
-                            @can('update', $series)
-                                <a href="{{ route('filament.admin.resources.series.edit', ['record' => $series]) }}"
-                                    target="_blank" rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-amber-400/40 hover:bg-amber-500/20 hover:text-amber-200 backdrop-blur-sm">
-                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.5 19.213l-4.5.9.9-4.5L16.862 3.487z" />
-                                    </svg>
-                                    {{ __('Edit Siri') }}
-                                </a>
-                            @endcan
-                        </div>
+            {{-- Book cover --}}
+            <div class="animate-scale-in relative shrink-0" style="animation-delay: 150ms; opacity: 0;">
+                <div
+                    class="animate-glow-breathe absolute -inset-3 rounded-2xl bg-gradient-to-br from-indigo-400/35 via-gold-400/15 to-indigo-600/30 blur-xl">
+                </div>
+                @if($frontCover)
+                    <div
+                        class="relative h-44 w-32 overflow-hidden rounded-2xl shadow-2xl shadow-indigo-950/60 ring-2 ring-white/15 sm:h-52 sm:w-36 lg:h-60 lg:w-44">
+                        <img src="{{ $frontCover }}" alt="{{ $reference->title }}" class="h-full w-full object-cover"
+                            width="176" height="240">
                     </div>
+                @else
+                    <div
+                        class="relative flex h-44 w-32 items-center justify-center rounded-2xl bg-indigo-900/60 shadow-2xl shadow-indigo-950/60 ring-2 ring-white/10 sm:h-52 sm:w-36 lg:h-60 lg:w-44">
+                        <svg class="size-16 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="1">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                @endif
+            </div>
 
-                    {{-- Right Poster --}}
-                    <div class="order-1 flex justify-center lg:order-2 lg:col-span-5 lg:justify-end animate-fade-in-up">
-                        <div class="relative w-full max-w-[260px] sm:max-w-[300px] lg:max-w-none">
-                            <div class="absolute -inset-3 rounded-3xl bg-white/5 blur-xl" aria-hidden="true"></div>
-                            <button type="button" @click="posterModalOpen = true"
-                                class="group relative block w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 transition-transform duration-300 hover:scale-[1.02] focus:outline-none">
-                                <img src="{{ $frontCover }}" alt="{{ $series->title }}"
-                                    class="w-full object-contain max-h-[480px] bg-slate-900" loading="lazy">
-                                <div
-                                    class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm ring-1 ring-white/10 transition-opacity duration-300 group-hover:opacity-0">
+            {{-- Title & meta --}}
+            <div class="animate-fade-in-up flex-1 text-center sm:text-left" style="animation-delay: 300ms; opacity: 0;">
+                @if($reference->type)
+                    <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-indigo-400/80">
+                        {{ ucfirst($reference->type) }}
+                    </p>
+                @endif
+                <h1 class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                    {{ $reference->title }}
+                </h1>
+                <div
+                    class="shimmer-line mx-auto mt-3 h-0.5 w-20 rounded-full bg-gradient-to-r from-gold-400/80 via-gold-300/60 to-gold-600/30 sm:mx-0">
+                </div>
+
+                <div
+                    class="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-300 sm:justify-start">
+                    @if($reference->author)
+                        <span class="inline-flex items-center gap-1.5">
+                            <svg class="size-4 text-indigo-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                            </svg>
+                            {{ $reference->author }}
+                        </span>
+                    @endif
+                    @if($reference->publisher)
+                        <span class="inline-flex items-center gap-1.5 text-slate-400">
+                            <svg class="size-4 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                            </svg>
+                            {{ $reference->publisher }}
+                        </span>
+                    @endif
+                    @if($reference->publication_year)
+                        <span class="inline-flex items-center gap-1.5 text-slate-400">
+                            <svg class="size-4 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                            </svg>
+                            {{ $reference->publication_year }}
+                        </span>
+                    @endif
+                </div>
+
+                {{-- Action buttons --}}
+                <div class="mt-5 flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
+                    {{-- Follow button --}}
+                    <button wire:click="toggleFollow" wire:loading.attr="disabled"
+                        class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 backdrop-blur-sm {{ $this->isFollowing ? 'border border-indigo-400/40 bg-indigo-500/20 text-indigo-300 hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-300' : 'border border-white/15 bg-white/10 text-white hover:border-indigo-400/40 hover:bg-indigo-500/20 hover:text-indigo-300' }}"
+                        x-data="{ hovering: false }" @mouseenter="hovering = true" @mouseleave="hovering = false">
+                        @if($this->isFollowing)
+                            <template x-if="!hovering">
+                                <span class="inline-flex items-center gap-1.5">
                                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                         stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                     </svg>
-                                    {{ __('Penuh') }}
-                                </div>
-                            </button>
-                        </div>
-
-                        {{-- Modal --}}
-                        <template x-teleport="body">
-                            <div x-show="posterModalOpen" x-cloak x-transition.opacity
-                                @keydown.escape.window="posterModalOpen = false"
-                                class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-4 backdrop-blur-xl sm:p-8">
-                                <button type="button" @click="posterModalOpen = false"
-                                    class="absolute right-4 top-4 z-10 inline-flex size-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20 hover:scale-110 sm:right-8 sm:top-8">
-                                    <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    {{ __('Mengikuti') }}
+                                </span>
+                            </template>
+                            <template x-if="hovering">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                         stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
-                                </button>
-                                <div @click.away="posterModalOpen = false" x-show="posterModalOpen"
-                                    class="relative max-h-full max-w-full">
-                                    <img src="{{ $series->getFirstMediaUrl('cover') ?: $frontCover }}"
-                                        alt="{{ $series->title }}"
-                                        class="max-h-[90vh] max-w-full w-auto rounded-2xl object-contain shadow-2xl ring-1 ring-white/20">
-                                </div>
-                            </div>
-                        </template>
-                    </div>
+                                    {{ __('Nyahikut') }}
+                                </span>
+                            </template>
+                        @else
+                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            {{ __('Ikuti') }}
+                        @endif
+                    </button>
+                    @can('update', $reference)
+                        <a href="{{ route('filament.admin.resources.references.edit', ['record' => $reference]) }}"
+                            target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:border-amber-400/40 hover:bg-amber-500/20 hover:text-amber-200 backdrop-blur-sm">
+                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.5 19.213l-4.5.9.9-4.5L16.862 3.487z" />
+                            </svg>
+                            {{ __('Edit Rujukan') }}
+                        </a>
+                    @endcan
                 </div>
-            @else
-                {{-- No Poster Layout --}}
-                <div class="relative z-10 flex flex-col justify-end pb-16 pt-12 lg:max-w-[70%] lg:pb-24 lg:pt-24">
-                    <span
-                        class="mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-indigo-300 backdrop-blur-md">
-                        {{ __('Siri') }}
-                    </span>
-                    <h1
-                        class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-6xl lg:leading-tight">
-                        {{ $series->title }}
-                    </h1>
-                    <div
-                        class="shimmer-line mt-6 h-0.5 w-20 rounded-full bg-gradient-to-r from-gold-400/80 via-gold-300/60 to-gold-600/30">
-                    </div>
 
-                    <div class="mt-8 flex flex-wrap items-center gap-3">
-                        <button wire:click="toggleFollow" wire:loading.attr="disabled"
-                            class="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-200 backdrop-blur-sm {{ $this->isFollowing ? 'border border-indigo-400/40 bg-indigo-500/20 text-indigo-300 hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-300' : 'border border-white/15 bg-white/10 text-white hover:border-indigo-400/40 hover:bg-indigo-500/20 hover:text-indigo-300' }}"
-                            x-data="{ hovering: false }" @mouseenter="hovering = true" @mouseleave="hovering = false">
-                            @if($this->isFollowing)
-                                <template x-if="!hovering">
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                        </svg>
-                                        {{ __('Mengikuti') }}
-                                    </span>
-                                </template>
-                                <template x-if="hovering">
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                        {{ __('Nyahikut') }}
-                                    </span>
-                                </template>
-                            @else
-                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
-                                {{ __('Ikuti Siri') }}
-                            @endif
-                        </button>
-                        @can('update', $series)
-                            <a href="{{ route('filament.admin.resources.series.edit', ['record' => $series]) }}" target="_blank"
-                                rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-amber-400/40 hover:bg-amber-500/20 hover:text-amber-200 backdrop-blur-sm">
-                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.5 19.213l-4.5.9.9-4.5L16.862 3.487z" />
-                                </svg>
-                                {{ __('Edit Siri') }}
-                            </a>
-                        @endcan
-                    </div>
-                </div>
-            @endif
+            </div>
         </div>
-    </div>
+
+        <div
+            class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent">
+        </div>
+        <div
+            class="absolute inset-x-0 -bottom-0.5 h-1 bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent blur-sm">
+        </div>
+    </header>
 
     {{-- ═══ MAIN CONTENT ═══ --}}
     <div class="relative">
@@ -432,7 +364,7 @@ new
                 <div class="space-y-8">
 
                     {{-- Description --}}
-                    @if($series->description)
+                    @if($reference->description)
                         <section
                             class="rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-lg shadow-slate-200/40 backdrop-blur-xl sm:p-8">
                             <div class="mb-4 flex items-center gap-3">
@@ -448,7 +380,7 @@ new
                                 </h2>
                             </div>
                             <div class="prose prose-slate max-w-none text-sm leading-relaxed text-slate-600">
-                                {!! nl2br(e($series->description)) !!}
+                                {!! nl2br(e($reference->description)) !!}
                             </div>
                         </section>
                     @endif
@@ -781,7 +713,90 @@ new
                         </div>
                     @endif
 
+                    {{-- External links --}}
+                    @if($hasSocialLinks)
+                        <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm"
+                            x-intersect.once="$el.classList.add('revealed')">
+                            <div class="border-b border-slate-100 px-5 py-4">
+                                <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                    <svg class="size-4 text-indigo-500" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                                    </svg>
+                                    {{ __('Pautan Luar') }}
+                                </h3>
+                            </div>
+                            <div class="space-y-1 p-3">
+                                @foreach($socialLinks as $social)
+                                    @php
+                                        $platform = strtolower((string) $social->platform);
+                                        $label = \App\Enums\SocialMediaPlatform::tryFrom($platform)?->getLabel() ?? ucfirst($platform);
+                                        $colorClass = match ($platform) {
+                                            'website' => 'text-emerald-600 hover:bg-emerald-50',
+                                            'youtube' => 'text-red-600 hover:bg-red-50',
+                                            'facebook' => 'text-blue-600 hover:bg-blue-50',
+                                            default => 'text-indigo-600 hover:bg-indigo-50',
+                                        };
+                                    @endphp
+                                    <a href="{{ $social->resolved_url }}" target="_blank" rel="noopener noreferrer"
+                                        class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors {{ $colorClass }}">
+                                        <img src="{{ $social->icon_url }}" alt="{{ $label }}" class="size-5 shrink-0"
+                                            loading="lazy">
+                                        <span
+                                            class="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 group-hover:text-current">{{ $label }}</span>
+                                        <svg class="size-3.5 shrink-0 text-slate-400 group-hover:text-current" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                                        </svg>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
+                    {{-- Metadata card --}}
+                    <div
+                        class="rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-lg shadow-slate-200/40 backdrop-blur-xl">
+                        <h3 class="mb-4 font-heading text-sm font-bold uppercase tracking-widest text-slate-500">
+                            {{ __('Details') }}
+                        </h3>
+                        <dl class="space-y-3 text-sm">
+                            @if($reference->author)
+                                <div>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        {{ __('Author') }}
+                                    </dt>
+                                    <dd class="mt-0.5 font-medium text-slate-800">{{ $reference->author }}</dd>
+                                </div>
+                            @endif
+                            @if($reference->publisher)
+                                <div>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        {{ __('Publisher') }}
+                                    </dt>
+                                    <dd class="mt-0.5 text-slate-700">{{ $reference->publisher }}</dd>
+                                </div>
+                            @endif
+                            @if($reference->publication_year)
+                                <div>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        {{ __('Year') }}
+                                    </dt>
+                                    <dd class="mt-0.5 text-slate-700">{{ $reference->publication_year }}</dd>
+                                </div>
+                            @endif
+                            @if($reference->type)
+                                <div>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        {{ __('Type') }}
+                                    </dt>
+                                    <dd class="mt-0.5 text-slate-700">{{ ucfirst($reference->type) }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                    </div>
 
                     {{-- Events count badge --}}
                     @php $totalEvents = $upcomingTotal + $pastTotal; @endphp
