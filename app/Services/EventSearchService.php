@@ -207,7 +207,7 @@ class EventSearchService
 
         $filterParts = [
             'is_active:=true',
-            'status:[approved, pending]',
+            'status:['.implode(', ', Event::PUBLIC_STATUSES).']',
             'visibility:public',
         ];
 
@@ -550,7 +550,7 @@ class EventSearchService
 
                     if (($prayerReference = $this->resolvePrayerReferenceFromFilter($prayerTime)) instanceof PrayerReference) {
                         $prayerQuery->orWhere('prayer_reference', $prayerReference->value);
-                        }
+                    }
                 });
         }
 

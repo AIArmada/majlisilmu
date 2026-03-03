@@ -23,7 +23,11 @@ class EventPolicy
     public function view(?User $user, Event $event): bool
     {
         // Public events are viewable by anyone
-        if ($event->is_active && $event->visibility === EventVisibility::Public && $event->status !== null && $event->status->equals(\App\States\EventStatus\Approved::class)) {
+        if (
+            $event->is_active
+            && $event->visibility === EventVisibility::Public
+            && in_array((string) $event->status, Event::PUBLIC_STATUSES, true)
+        ) {
             return true;
         }
 

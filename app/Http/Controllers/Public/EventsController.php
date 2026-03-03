@@ -30,7 +30,7 @@ class EventsController extends Controller
      */
     public function calendar(Event $event): Response
     {
-        if ((! in_array((string) $event->status, ['approved', 'pending'], true))
+        if ((! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true))
             || $event->visibility !== \App\Enums\EventVisibility::Public) {
             abort(404);
         }

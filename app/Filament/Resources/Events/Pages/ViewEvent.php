@@ -6,6 +6,7 @@ use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
+use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
@@ -30,6 +31,7 @@ class ViewEvent extends ViewRecord
         return [
             $this->getApproveAction(),
             $this->getRequestChangesAction(),
+            $this->getCancelAction(),
             $this->getRejectAction(),
             $this->getReconsiderAction(),
             $this->getRemoderateAction(),
@@ -140,6 +142,36 @@ class ViewEvent extends ViewRecord
             ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
     }
 
+    protected function getCancelAction(): Action
+    {
+        return Action::make('cancel')
+            ->label('Cancel Event')
+            ->icon(Heroicon::OutlinedXCircle)
+            ->color('danger')
+            ->modalHeading('Cancel Event')
+            ->modalDescription('This event will remain visible with a cancelled badge and notify users who saved, marked interest, or plan to attend.')
+            ->schema([
+                Textarea::make('note')
+                    ->label('Cancellation note (optional)')
+                    ->rows(3)
+                    ->maxLength(2000),
+            ])
+            ->action(function (array $data, ModerationService $service): void {
+                $service->cancel($this->eventRecord(), auth()->user(), $data['note'] ?? null);
+
+                Notification::make()
+                    ->title('Event cancelled')
+                    ->danger()
+                    ->send();
+
+                $this->refreshFormData(['status']);
+            })
+            ->visible(fn (): bool => $this->canModerate() && (
+                $this->eventRecord()->status instanceof Pending
+                || $this->eventRecord()->status instanceof Approved
+            ));
+    }
+
     protected function getReconsiderAction(): Action
     {
         return Action::make('reconsider')
@@ -170,30 +202,40 @@ class ViewEvent extends ViewRecord
 
     protected function getRemoderateAction(): Action
     {
+        $isCancelled = $this->eventRecord()->status instanceof Cancelled;
+
         return Action::make('remoderate')
-            ->label('Send for Re-moderation')
+            ->label($isCancelled ? 'Reopen for Review' : 'Send for Re-moderation')
             ->icon(Heroicon::OutlinedArrowPath)
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading('Re-moderate Event')
-            ->modalDescription('Send this approved event back to pending for re-review. It will be temporarily removed from search.')
+            ->modalHeading($isCancelled ? 'Reopen Cancelled Event' : 'Re-moderate Event')
+            ->modalDescription(
+                $isCancelled
+                    ? 'Move this cancelled event back to pending for moderation review.'
+                    : 'Send this approved event back to pending for re-review. It will be temporarily removed from search.'
+            )
             ->schema([
                 Textarea::make('note')
-                    ->label('Reason for re-moderation')
+                    ->label($isCancelled ? 'Reason for reopening' : 'Reason for re-moderation')
                     ->rows(3)
                     ->maxLength(2000),
             ])
             ->action(function (array $data, ModerationService $service): void {
+                $isCancelledNow = $this->eventRecord()->status instanceof Cancelled;
                 $service->remoderate($this->eventRecord(), auth()->user(), $data['note'] ?? null);
 
                 Notification::make()
-                    ->title('Event sent for re-moderation')
+                    ->title($isCancelledNow ? 'Cancelled event reopened for review' : 'Event sent for re-moderation')
                     ->warning()
                     ->send();
 
                 $this->refreshFormData(['status', 'published_at']);
             })
-            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Approved);
+            ->visible(fn (): bool => $this->canModerate() && (
+                $this->eventRecord()->status instanceof Approved
+                || $this->eventRecord()->status instanceof Cancelled
+            ));
     }
 
     protected function getRevertToDraftAction(): Action
@@ -223,6 +265,7 @@ class ViewEvent extends ViewRecord
             ->visible(fn (): bool => $this->canModerate() && (
                 $this->eventRecord()->status instanceof Rejected
                 || $this->eventRecord()->status instanceof NeedsChanges
+                || $this->eventRecord()->status instanceof Cancelled
             ));
     }
 

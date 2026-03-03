@@ -5,6 +5,7 @@ use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
 use App\Notifications\EventApprovedNotification;
+use App\Notifications\EventCancelledNotification;
 use App\Notifications\EventNeedsChangesNotification;
 use App\Notifications\EventRejectedNotification;
 use Illuminate\Support\Facades\Notification;
@@ -103,6 +104,53 @@ describe('Reject Action (ViewEvent)', function () {
             ->mountAction('reject')
             ->callMountedAction()
             ->assertHasActionErrors(['reason_code', 'note']);
+    });
+});
+
+describe('Cancel Action (ViewEvent)', function () {
+    it('allows moderator to cancel an approved event and notify affected users', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('super_admin');
+
+        $submitter = User::factory()->create();
+        $goingUser = User::factory()->create();
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'submitter_id' => $submitter->id,
+            'is_active' => true,
+        ]);
+
+        $event->goingBy()->attach($goingUser->id);
+
+        $this->actingAs($moderator);
+
+        Livewire::test(ViewEvent::class, ['record' => $event->id])
+            ->assertActionVisible('cancel')
+            ->callAction('cancel', ['note' => 'Venue closed due to emergency.'])
+            ->assertNotified();
+
+        $event->refresh();
+        expect((string) $event->status)->toBe('cancelled');
+        expect($event->is_active)->toBeTrue();
+
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+        expect($review->decision)->toBe('cancelled');
+
+        Notification::assertSentTo($submitter, EventCancelledNotification::class);
+        Notification::assertSentTo($goingUser, EventCancelledNotification::class);
+    });
+
+    it('hides cancel action for non-pending and non-approved events', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('super_admin');
+
+        $event = Event::factory()->create(['status' => 'rejected']);
+
+        $this->actingAs($moderator);
+
+        Livewire::test(ViewEvent::class, ['record' => $event->id])
+            ->assertActionHidden('cancel');
     });
 });
 

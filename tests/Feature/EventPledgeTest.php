@@ -180,6 +180,24 @@ test('can list all interested events for authenticated user', function () {
         ->assertJsonPath('meta.pagination.total', 3);
 });
 
+test('interested events index still includes cancelled events', function () {
+    Sanctum::actingAs($this->user);
+
+    $cancelledEvent = Event::factory()->create([
+        'status' => 'cancelled',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(7),
+    ]);
+
+    $this->user->interestedEvents()->attach($this->event->id);
+    $this->user->interestedEvents()->attach($cancelledEvent->id);
+
+    $response = $this->getJson(route('api.event-interests.index'));
+
+    $response->assertStatus(200)
+        ->assertJsonPath('meta.pagination.total', 2);
+});
+
 test('event show page displays interest button for authenticated users', function () {
     $this->actingAs($this->user);
 

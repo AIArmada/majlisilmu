@@ -71,6 +71,7 @@ class EventsTable
                         'pending' => 'warning',
                         'approved' => 'success',
                         'needs_changes' => 'info',
+                        'cancelled' => 'danger',
                         'rejected' => 'danger',
                         default => 'gray',
                     })
@@ -79,6 +80,7 @@ class EventsTable
                         'pending' => 'Pending Review',
                         'needs_changes' => 'Needs Changes',
                         'approved' => 'Approved',
+                        'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
                         default => (string) $state,
                     })
@@ -138,6 +140,7 @@ class EventsTable
                         'draft' => 'Draft',
                         'pending' => 'Pending',
                         'approved' => 'Approved',
+                        'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
                     ]),
                 SelectFilter::make('visibility')

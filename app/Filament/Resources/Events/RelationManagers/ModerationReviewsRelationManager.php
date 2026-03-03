@@ -27,6 +27,7 @@ class ModerationReviewsRelationManager extends RelationManager
                         'approved' => 'success',
                         'rejected' => 'danger',
                         'needs_changes' => 'warning',
+                        'cancelled' => 'danger',
                         'reconsidered' => 'info',
                         'remoderated' => 'info',
                         'reverted_to_draft' => 'gray',

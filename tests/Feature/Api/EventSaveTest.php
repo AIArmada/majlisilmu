@@ -105,3 +105,21 @@ test('saving an event recalculates stale saves_count from source rows', function
 
     expect($this->event->saves_count)->toBe(1);
 });
+
+test('saved events index still includes cancelled events', function () {
+    Sanctum::actingAs($this->user);
+
+    $cancelledEvent = Event::factory()->create([
+        'status' => 'cancelled',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(10),
+    ]);
+
+    $this->user->savedEvents()->attach($this->event->id);
+    $this->user->savedEvents()->attach($cancelledEvent->id);
+
+    $response = $this->getJson(route('api.event-saves.index'));
+
+    $response->assertOk()
+        ->assertJsonPath('meta.pagination.total', 2);
+});

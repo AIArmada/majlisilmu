@@ -36,6 +36,7 @@
     }
     $eventTimeStatus = $this->eventTimeStatus;
     $descriptionHtml = $this->descriptionHtml;
+    $isCancelledStatus = $event->status instanceof \App\States\EventStatus\Cancelled || (string) $event->status === 'cancelled';
 
     $shareData = [
         'title' => $event->title,
@@ -50,7 +51,7 @@
     $eventPosterOriginalUrl = $eventHasPoster ? $event->getFirstMediaUrl('poster') : null;
 
     // Hero atmospheric background:
-    // institution cover -> venue cover/main -> organizer/speaker media -> gradient fallback.
+    // institution cover -> venue cover/main -> organizer institution cover -> gradient fallback.
     // The event poster is NEVER used as background — it is a factual flyer and must be displayed clearly.
     $heroImage = $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
     if (!$heroImage) {
@@ -61,19 +62,6 @@
 
     if (!$heroImage && $event->organizer instanceof \App\Models\Institution) {
         $heroImage = $event->organizer->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
-    }
-
-    if (!$heroImage && $event->organizer instanceof \App\Models\Speaker) {
-        $heroImage = $event->organizer->getFirstMedia('main')?->getAvailableUrl(['banner'])
-            ?? $event->organizer->getFirstMedia('avatar')?->getAvailableUrl(['profile', 'thumb'])
-            ?? '';
-    }
-
-    if (!$heroImage) {
-        $firstSpeaker = $event->speakers->first();
-        $heroImage = $firstSpeaker?->getFirstMedia('main')?->getAvailableUrl(['banner'])
-            ?? $firstSpeaker?->getFirstMedia('avatar')?->getAvailableUrl(['profile', 'thumb'])
-            ?? '';
     }
 
     $eventFormat = $event->event_format;
@@ -360,6 +348,16 @@
                                                 class="relative inline-flex size-2 rounded-full bg-amber-500"></span></span>
                                         {{ __('Menunggu Kelulusan') }}
                                     </span>
+                                @elseif($event->status instanceof \App\States\EventStatus\Cancelled)
+                                    <span
+                                        class="inline-flex items-center gap-1.5 rounded-full border border-rose-400/40 bg-rose-500/15 px-3 py-1 text-xs font-semibold tracking-wide text-rose-200 backdrop-blur-md">
+                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                                        </svg>
+                                        {{ __('Dibatalkan') }}
+                                    </span>
                                 @endif
 
                                 @php
@@ -506,7 +504,12 @@
                                         @endif
                                     </div>
                                     <div>
-                                        <p class="text-sm font-bold text-white">{{ $heroLocationTitle }}</p>
+                                        @if($locationHref)
+                                            <a href="{{ $locationHref }}" wire:navigate
+                                                class="text-sm font-bold text-white hover:text-emerald-400 transition-colors">{{ $heroLocationTitle }}</a>
+                                        @else
+                                            <p class="text-sm font-bold text-white">{{ $heroLocationTitle }}</p>
+                                        @endif
                                         <p class="mt-0.5 text-xs font-medium text-white/60">{{ $heroLocationSubtitle }}</p>
                                     </div>
                                 </div>
@@ -594,6 +597,16 @@
                                             class="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75"></span><span
                                             class="relative inline-flex size-2 rounded-full bg-amber-500"></span></span>
                                     {{ __('Menunggu Kelulusan') }}
+                                </span>
+                            @elseif($event->status instanceof \App\States\EventStatus\Cancelled)
+                                <span
+                                    class="inline-flex items-center gap-1.5 rounded-full border border-rose-400/40 bg-rose-500/15 px-3 py-1 text-xs font-semibold tracking-wide text-rose-200 backdrop-blur-md">
+                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                    {{ __('Dibatalkan') }}
                                 </span>
                             @endif
 
@@ -741,7 +754,12 @@
                                     @endif
                                 </div>
                                 <div>
-                                    <p class="text-sm font-bold text-white">{{ $heroLocationTitle }}</p>
+                                    @if($locationHref)
+                                        <a href="{{ $locationHref }}" wire:navigate
+                                            class="text-sm font-bold text-white hover:text-emerald-400 transition-colors">{{ $heroLocationTitle }}</a>
+                                    @else
+                                        <p class="text-sm font-bold text-white">{{ $heroLocationTitle }}</p>
+                                    @endif
                                     <p class="mt-0.5 text-xs font-medium text-white/60">{{ $heroLocationSubtitle }}</p>
                                 </div>
                             </div>
@@ -761,119 +779,139 @@
         <div
             class="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/40 bg-white/80 p-4 shadow-2xl shadow-slate-200/50 backdrop-blur-xl sm:p-6">
             <div class="flex flex-wrap items-center gap-3">
-                @if(!$event->starts_at || !$event->starts_at->isPast())
-                            <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
-                                class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all
-                                                                                                                                                                                            {{ $isGoing
-                    ? 'bg-emerald-600 text-white shadow-emerald-200'
-                    : 'bg-slate-900 text-white hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/30' }}">
-                                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    @if($isGoing)
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                    @else
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    @endif
-                                </svg>
-                                {{ $isGoing ? __('Hadir') : __('Akan Hadir') }}
-                                @if($goingCount > 0)
-                                    <span class="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ $goingCount }}</span>
+                @if(!$isCancelledStatus)
+                    @if(!$event->starts_at || !$event->starts_at->isPast())
+                        <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
+                            class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all
+                                                                                                                                                                                                                    {{ $isGoing
+                        ? 'bg-emerald-600 text-white shadow-emerald-200'
+                        : 'bg-slate-900 text-white hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/30' }}">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                @if($isGoing)
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                @else
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 @endif
-                            </button>
-                @endif
-
-                <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
-                    {{ $isInterested
-    ? 'border-rose-200 bg-rose-50 text-rose-600'
-    : 'border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600' }}">
-                    <svg class="size-5 {{ $isInterested ? 'fill-rose-500' : '' }}" viewBox="0 0 24 24"
-                        fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                    {{ __('Minat') }}
-                    @if($interestsCount > 0)
-                        <span class="text-xs opacity-75">{{ $interestsCount }}</span>
+                            </svg>
+                            {{ $isGoing ? __('Hadir') : __('Akan Hadir') }}
+                            @if($goingCount > 0)
+                                <span class="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ $goingCount }}</span>
+                            @endif
+                        </button>
                     @endif
-                </button>
 
-                <button type="button" wire:click="toggleSave" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
-                    {{ $isSaved
-    ? 'border-blue-200 bg-blue-50 text-blue-600'
-    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600' }}">
-                    <svg class="size-5 {{ $isSaved ? 'fill-blue-500' : '' }}" viewBox="0 0 24 24"
-                        fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
-                    {{ $isSaved ? __('Disimpan') : __('Simpan') }}
-                </button>
-
-                <div class="relative" x-data="{ open: false }">
-                    <button type="button" @click="open = !open"
-                        class="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50">
-                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                        {{ $isInterested
+        ? 'border-rose-200 bg-rose-50 text-rose-600'
+        : 'border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600' }}">
+                        <svg class="size-5 {{ $isInterested ? 'fill-rose-500' : '' }}" viewBox="0 0 24 24"
+                            fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                        {{ __('Tambah ke Kalendar') }}
-                        <svg class="size-4 transition-transform duration-300" :class="{ 'rotate-180': open }"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        {{ __('Minat') }}
+                        @if($interestsCount > 0)
+                            <span class="text-xs opacity-75">{{ $interestsCount }}</span>
+                        @endif
                     </button>
 
-                    <div x-show="open" @click.away="open = false" x-transition:enter="transition ease-out duration-200"
-                        x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
-                        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                        x-transition:leave="transition ease-in duration-150"
-                        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                        x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
-                        class="absolute left-0 z-50 mt-3 w-72 max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 p-2 shadow-2xl backdrop-blur-xl">
-                        <a href="{{ $this->calendarLinks['google'] }}" target="_blank" rel="noopener"
-                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                            <svg class="size-5 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M19.5 22h-15A2.5 2.5 0 012 19.5v-15A2.5 2.5 0 014.5 2H9v2H4.5a.5.5 0 00-.5.5v15a.5.5 0 00.5.5h15a.5.5 0 00.5-.5V15h2v4.5a2.5 2.5 0 01-2.5 2.5z" />
-                                <path d="M8 10h2v2H8v-2zm0 4h2v2H8v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2z" />
-                            </svg>
-                            <span class="text-sm font-bold text-slate-700">Google Calendar</span>
-                        </a>
-                        <a href="{{ $this->calendarLinks['ics'] }}" download
-                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                            <svg class="size-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2">
+                    <button type="button" wire:click="toggleSave" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                        {{ $isSaved
+        ? 'border-blue-200 bg-blue-50 text-blue-600'
+        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600' }}">
+                        <svg class="size-5 {{ $isSaved ? 'fill-blue-500' : '' }}" viewBox="0 0 24 24"
+                            fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                        {{ $isSaved ? __('Disimpan') : __('Simpan') }}
+                    </button>
+                @else
+                    <span class="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        {{ __('Majlis Dibatalkan') }}
+                    </span>
+                @endif
+
+                @if(!$isCancelledStatus)
+                    <div class="relative" x-data="{ open: false }">
+                        <button type="button" @click="open = !open"
+                            class="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span class="text-sm font-bold text-slate-700">Apple / iCal (.ics)</span>
-                        </a>
-                        <a href="{{ $this->calendarLinks['outlook'] }}" target="_blank" rel="noopener"
-                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                            <svg class="size-5 text-[#0078D4]" viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                            {{ __('Tambah ke Kalendar') }}
+                            <svg class="size-4 transition-transform duration-300" :class="{ 'rotate-180': open }"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                             </svg>
-                            <span class="text-sm font-bold text-slate-700">Outlook.com</span>
-                        </a>
-                        <a href="{{ $this->calendarLinks['office365'] }}" target="_blank" rel="noopener"
-                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                            <svg class="size-5 text-[#D83B01]" viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M21 5H3a1 1 0 00-1 1v12a1 1 0 001 1h18a1 1 0 001-1V6a1 1 0 00-1-1zM3 6h18v2H3V6zm0 12V10h18v8H3z" />
-                            </svg>
-                            <span class="text-sm font-bold text-slate-700">Office 365</span>
-                        </a>
-                        <a href="{{ $this->calendarLinks['yahoo'] }}" target="_blank" rel="noopener"
-                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                            <svg class="size-5 text-[#6001D2]" viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                            </svg>
-                            <span class="text-sm font-bold text-slate-700">Yahoo Calendar</span>
-                        </a>
+                        </button>
+
+                        <div x-show="open" @click.away="open = false" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+                            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+                            class="absolute left-0 z-50 mt-3 w-72 max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 p-2 shadow-2xl backdrop-blur-xl">
+                            <a href="{{ $this->calendarLinks['google'] }}" target="_blank" rel="noopener"
+                                class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                                <svg class="size-5 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
+                                    <path
+                                        d="M19.5 22h-15A2.5 2.5 0 012 19.5v-15A2.5 2.5 0 014.5 2H9v2H4.5a.5.5 0 00-.5.5v15a.5.5 0 00.5.5h15a.5.5 0 00.5-.5V15h2v4.5a2.5 2.5 0 01-2.5 2.5z" />
+                                    <path d="M8 10h2v2H8v-2zm0 4h2v2H8v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2z" />
+                                </svg>
+                                <span class="text-sm font-bold text-slate-700">Google Calendar</span>
+                            </a>
+                            <a href="{{ $this->calendarLinks['ics'] }}" download
+                                class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                                <svg class="size-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span class="text-sm font-bold text-slate-700">Apple / iCal (.ics)</span>
+                            </a>
+                            <a href="{{ $this->calendarLinks['outlook'] }}" target="_blank" rel="noopener"
+                                class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                                <svg class="size-5 text-[#0078D4]" viewBox="0 0 24 24" fill="currentColor">
+                                    <path
+                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                </svg>
+                                <span class="text-sm font-bold text-slate-700">Outlook.com</span>
+                            </a>
+                            <a href="{{ $this->calendarLinks['office365'] }}" target="_blank" rel="noopener"
+                                class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                                <svg class="size-5 text-[#D83B01]" viewBox="0 0 24 24" fill="currentColor">
+                                    <path
+                                        d="M21 5H3a1 1 0 00-1 1v12a1 1 0 001 1h18a1 1 0 001-1V6a1 1 0 00-1-1zM3 6h18v2H3V6zm0 12V10h18v8H3z" />
+                                </svg>
+                                <span class="text-sm font-bold text-slate-700">Office 365</span>
+                            </a>
+                            <a href="{{ $this->calendarLinks['yahoo'] }}" target="_blank" rel="noopener"
+                                class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                                <svg class="size-5 text-[#6001D2]" viewBox="0 0 24 24" fill="currentColor">
+                                    <path
+                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                                </svg>
+                                <span class="text-sm font-bold text-slate-700">Yahoo Calendar</span>
+                            </a>
+                        </div>
                     </div>
-                </div>
+                @else
+                    <span class="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        {{ __('Kalendar tidak tersedia untuk majlis dibatalkan.') }}
+                    </span>
+                @endif
             </div>
 
             <div class="flex items-center gap-3">
@@ -905,6 +943,10 @@
     STATUS BANNERS
     ============================== --}}
     <div class="container mx-auto px-5 sm:px-8 lg:px-12">
+        @php
+            $hasModerationStatusBanner = $event->status instanceof \App\States\EventStatus\Pending || $isCancelledStatus;
+        @endphp
+
         @if($event->status instanceof \App\States\EventStatus\Pending)
             <div class="relative z-30 -mt-4 mb-4">
                 <div class="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
@@ -921,10 +963,26 @@
                     </div>
                 </div>
             </div>
+        @elseif($isCancelledStatus)
+            <div class="relative z-30 -mt-4 mb-4">
+                <div class="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm">
+                    <svg class="mt-0.5 size-5 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    <div>
+                        <p class="text-sm font-bold text-rose-800">{{ __('Majlis Dibatalkan') }}</p>
+                        <p class="mt-0.5 text-sm text-rose-700">
+                            {{ __('Majlis ini telah dibatalkan. Semak pengumuman penganjur untuk maklumat terkini.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
         @endif
 
         @if($eventTimeStatus === 'past')
-            <div class="relative z-30 {{ $event->status instanceof \App\States\EventStatus\Pending ? '' : '-mt-4' }} mb-4">
+            <div class="relative z-30 {{ $hasModerationStatusBanner ? '' : '-mt-4' }} mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-100 p-4">
                     <svg class="size-5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -936,7 +994,7 @@
                 </div>
             </div>
         @elseif($eventTimeStatus === 'happening_now')
-            <div class="relative z-30 {{ $event->status instanceof \App\States\EventStatus\Pending ? '' : '-mt-4' }} mb-4">
+            <div class="relative z-30 {{ $hasModerationStatusBanner ? '' : '-mt-4' }} mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                     <span class="relative flex size-3">
                         <span
@@ -956,18 +1014,18 @@
                 </div>
             </div>
         @elseif($eventTimeStatus === 'starting_soon' && $event->starts_at)
-            <div class="relative z-30 {{ $event->status instanceof \App\States\EventStatus\Pending ? '' : '-mt-4' }} mb-4">
+            <div class="relative z-30 {{ $hasModerationStatusBanner ? '' : '-mt-4' }} mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4" x-data="{
-                                                                            target: {{ $event->starts_at->timestamp * 1000 }},
-                                                                            display: '',
-                                                                            update() {
-                                                                                const diff = this.target - Date.now();
-                                                                                if (diff <= 0) { this.display = ''; return; }
-                                                                                const h = Math.floor(diff / 3600000);
-                                                                                const m = Math.floor((diff % 3600000) / 60000);
-                                                                                this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
-                                                                            }
-                                                                        }"
+                                                                                    target: {{ $event->starts_at->timestamp * 1000 }},
+                                                                                    display: '',
+                                                                                    update() {
+                                                                                        const diff = this.target - Date.now();
+                                                                                        if (diff <= 0) { this.display = ''; return; }
+                                                                                        const h = Math.floor(diff / 3600000);
+                                                                                        const m = Math.floor((diff % 3600000) / 60000);
+                                                                                        this.display = (h > 0 ? h + 'j ' : '') + m + 'm';
+                                                                                    }
+                                                                                }"
                     x-init="update(); setInterval(() => update(), 60000)">
                     <svg class="size-5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1747,10 +1805,15 @@
                     <div class="min-w-0 flex-1 pt-0.5">
                         <p class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ __('Location') }}</p>
                         <p class="mt-1.5 font-heading text-base font-bold text-slate-900">
-                            @if($event->venue && $event->institution)
+                            @if($event->venue)
                                 {{ $event->venue->name }}
+                            @elseif($event->institution)
+                                <a href="{{ route('institutions.show', $event->institution) }}" wire:navigate
+                                    class="text-emerald-600 hover:text-emerald-700 hover:underline">
+                                    {{ $event->institution->name }}
+                                </a>
                             @else
-                                {{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}
+                                {{ __('Online') }}
                             @endif
                         </p>
                         @if($event->space)
@@ -2421,12 +2484,13 @@ MOBILE BOTTOM ACTION BAR
 <div class="fixed inset-x-0 bottom-0 z-40 lg:hidden">
     <div class="border-t border-slate-200/60 bg-white/80 px-4 py-3 backdrop-blur-xl shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)]"
         style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
-        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2">
             @auth
+                @if(!$isCancelledStatus)
                     <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
-                                                                                                                                        {{ $isGoing
-                ? 'border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-inner'
-                : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' }}">
+                                                                                                                                                            {{ $isGoing
+                    ? 'border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-inner'
+                    : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' }}">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                             @if($isGoing)
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -2440,7 +2504,7 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                                                                                                                        {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
+                                                                                                                                                            {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
                         <svg class="size-5 {{ $isInterested ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -2450,13 +2514,22 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
                         class="rounded-xl border-2 p-3 transition-all
-                                                                                                                                        {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
+                                                                                                                                                            {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
                         <svg class="size-5 {{ $isSaved ? 'fill-current' : '' }}" viewBox="0 0 24 24"
                             fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                         </svg>
                     </button>
+                @else
+                    <div class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        {{ __('Majlis Dibatalkan') }}
+                    </div>
+                @endif
             @else
                 <a href="{{ route('login') }}"
                     class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700">
@@ -2468,69 +2541,75 @@ MOBILE BOTTOM ACTION BAR
                 </a>
             @endauth
 
-            <div class="relative" x-data="{ calendarOpen: false }">
-                <button type="button" @click="calendarOpen = !calendarOpen"
-                    class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-                    aria-label="{{ __('Tambah ke Kalendar') }}">
-                    <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                </button>
-
-                <div x-show="calendarOpen" @click.away="calendarOpen = false"
-                    x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0 translate-y-2 scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                    x-transition:leave="transition ease-in duration-150"
-                    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                    x-transition:leave-end="opacity-0 translate-y-2 scale-95"
-                    class="absolute bottom-full right-0 z-50 mb-2 w-72 max-w-[85vw] overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 p-2 shadow-2xl backdrop-blur-xl"
-                    x-cloak>
-                    <a href="{{ $this->calendarLinks['google'] }}" target="_blank" rel="noopener"
-                        class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                        <svg class="size-5 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
-                            <path
-                                d="M19.5 22h-15A2.5 2.5 0 012 19.5v-15A2.5 2.5 0 014.5 2H9v2H4.5a.5.5 0 00-.5.5v15a.5.5 0 00.5.5h15a.5.5 0 00.5-.5V15h2v4.5a2.5 2.5 0 01-2.5 2.5z" />
-                            <path d="M8 10h2v2H8v-2zm0 4h2v2H8v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2z" />
-                        </svg>
-                        <span class="text-sm font-bold text-slate-700">Google Calendar</span>
-                    </a>
-                    <a href="{{ $this->calendarLinks['ics'] }}" download
-                        class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                        <svg class="size-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
+            @if(!$isCancelledStatus)
+                <div class="relative" x-data="{ calendarOpen: false }">
+                    <button type="button" @click="calendarOpen = !calendarOpen"
+                        class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+                        aria-label="{{ __('Tambah ke Kalendar') }}">
+                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span class="text-sm font-bold text-slate-700">Apple / iCal (.ics)</span>
-                    </a>
-                    <a href="{{ $this->calendarLinks['outlook'] }}" target="_blank" rel="noopener"
-                        class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                        <svg class="size-5 text-[#0078D4]" viewBox="0 0 24 24" fill="currentColor">
-                            <path
-                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                        </svg>
-                        <span class="text-sm font-bold text-slate-700">Outlook.com</span>
-                    </a>
-                    <a href="{{ $this->calendarLinks['office365'] }}" target="_blank" rel="noopener"
-                        class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                        <svg class="size-5 text-[#D83B01]" viewBox="0 0 24 24" fill="currentColor">
-                            <path
-                                d="M21 5H3a1 1 0 00-1 1v12a1 1 0 001 1h18a1 1 0 001-1V6a1 1 0 00-1-1zM3 6h18v2H3V6zm0 12V10h18v8H3z" />
-                        </svg>
-                        <span class="text-sm font-bold text-slate-700">Office 365</span>
-                    </a>
-                    <a href="{{ $this->calendarLinks['yahoo'] }}" target="_blank" rel="noopener"
-                        class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
-                        <svg class="size-5 text-[#6001D2]" viewBox="0 0 24 24" fill="currentColor">
-                            <path
-                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                        </svg>
-                        <span class="text-sm font-bold text-slate-700">Yahoo Calendar</span>
-                    </a>
+                    </button>
+
+                    <div x-show="calendarOpen" @click.away="calendarOpen = false"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+                        class="absolute bottom-full right-0 z-50 mb-2 w-72 max-w-[85vw] overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 p-2 shadow-2xl backdrop-blur-xl"
+                        x-cloak>
+                        <a href="{{ $this->calendarLinks['google'] }}" target="_blank" rel="noopener"
+                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M19.5 22h-15A2.5 2.5 0 012 19.5v-15A2.5 2.5 0 014.5 2H9v2H4.5a.5.5 0 00-.5.5v15a.5.5 0 00.5.5h15a.5.5 0 00.5-.5V15h2v4.5a2.5 2.5 0 01-2.5 2.5z" />
+                                <path d="M8 10h2v2H8v-2zm0 4h2v2H8v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2z" />
+                            </svg>
+                            <span class="text-sm font-bold text-slate-700">Google Calendar</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['ics'] }}" download
+                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span class="text-sm font-bold text-slate-700">Apple / iCal (.ics)</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['outlook'] }}" target="_blank" rel="noopener"
+                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#0078D4]" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                            </svg>
+                            <span class="text-sm font-bold text-slate-700">Outlook.com</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['office365'] }}" target="_blank" rel="noopener"
+                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#D83B01]" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M21 5H3a1 1 0 00-1 1v12a1 1 0 001 1h18a1 1 0 001-1V6a1 1 0 00-1-1zM3 6h18v2H3V6zm0 12V10h18v8H3z" />
+                            </svg>
+                            <span class="text-sm font-bold text-slate-700">Office 365</span>
+                        </a>
+                        <a href="{{ $this->calendarLinks['yahoo'] }}" target="_blank" rel="noopener"
+                            class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
+                            <svg class="size-5 text-[#6001D2]" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                            </svg>
+                            <span class="text-sm font-bold text-slate-700">Yahoo Calendar</span>
+                        </a>
+                    </div>
                 </div>
-            </div>
+            @else
+                <span class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                    {{ __('Kalendar ditutup') }}
+                </span>
+            @endif
 
             <button type="button" @click="openShareModal()"
                 class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700">

@@ -5,6 +5,7 @@ use App\Models\Institution;
 use App\Models\ModerationReview;
 use App\Models\User;
 use App\Notifications\EventApprovedNotification;
+use App\Notifications\EventCancelledNotification;
 use App\Notifications\EventNeedsChangesNotification;
 use App\Notifications\EventRejectedNotification;
 use App\Notifications\EventSubmittedNotification;
@@ -229,6 +230,43 @@ describe('Event Rejection', function () {
         expect((string) $event->fresh()->status)->toBe('rejected');
 
         Notification::assertSentTo($submitter, EventRejectedNotification::class);
+    });
+});
+
+describe('Event Cancellation', function () {
+    it('cancels event and notifies affected users', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('moderator');
+
+        $submitter = User::factory()->create();
+        $goingUser = User::factory()->create();
+        $interestedUser = User::factory()->create();
+        $savedUser = User::factory()->create();
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'submitter_id' => $submitter->id,
+            'is_active' => true,
+        ]);
+
+        $event->goingBy()->attach($goingUser->id);
+        $event->interestedBy()->attach($interestedUser->id);
+        $event->savedBy()->attach($savedUser->id);
+
+        $this->service->cancel($event, $moderator, 'Venue emergency closure.');
+
+        $event->refresh();
+        expect((string) $event->status)->toBe('cancelled');
+        expect($event->is_active)->toBeTrue();
+
+        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
+        expect($review)->toBeInstanceOf(ModerationReview::class);
+        expect($review->decision)->toBe('cancelled');
+
+        Notification::assertSentTo($submitter, EventCancelledNotification::class);
+        Notification::assertSentTo($goingUser, EventCancelledNotification::class);
+        Notification::assertSentTo($interestedUser, EventCancelledNotification::class);
+        Notification::assertSentTo($savedUser, EventCancelledNotification::class);
     });
 });
 

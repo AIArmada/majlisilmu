@@ -1,3 +1,77 @@
+# Event Cancelled Status Todo
+
+- [x] Add `cancelled` as a first-class `EventStatus` with moderation transition support
+- [x] Keep cancelled events publicly visible in listing/search/API (without flipping `is_active` false)
+- [x] Surface explicit cancelled badges in public event cards/details and admin status badges
+- [x] Add a moderation action for admins to cancel approved/pending events
+- [x] Notify affected users (`going`, `interested`, `saved`) when an event is cancelled
+- [x] Add focused feature coverage for visibility and cancellation notifications
+- [x] Run focused Pest + PHPStan verification and document review
+
+## Review
+
+- Added `cancelled` status implementation:
+  - `app/States/EventStatus/Cancelled.php`
+  - `app/States/EventStatus/Transitions/CancelEvent.php`
+  - `app/Notifications/EventCancelledNotification.php`
+  - transition wiring in `app/States/EventStatus/EventStatus.php` (pending/approved -> cancelled, cancelled -> pending/draft)
+- Added moderation support:
+  - `ModerationService::cancel(...)`
+  - new `cancel` action in `app/Filament/Resources/Events/Pages/ViewEvent.php`
+  - new `cancel` row action + cancelled badge mapping in `app/Filament/Pages/ModerationQueue.php`
+- Updated visibility/indexing/listing behavior:
+  - `Event::PUBLIC_STATUSES` now includes `cancelled` and is used by `active()` and `shouldBeSearchable()`
+  - updated status filters in `EventSearchService`, API event listing/show, saved/interested list endpoints, and public calendar access
+  - updated event-show access logic to allow cancelled events while keeping engagement actions disabled for cancelled status
+- Updated UI status presentation:
+  - `/events` cards now show `Dibatalkan` badge
+  - event detail hero and status banners now show clear cancellation state
+  - admin table/infolist/form/reviews mappings include cancelled status color/label
+- Added/updated tests:
+  - `tests/Feature/ModerationServiceTest.php`
+  - `tests/Feature/EventModerationActionsTest.php`
+  - `tests/Feature/EventVisibilityAccessTest.php`
+  - `tests/Feature/Api/EventApiContractTest.php`
+  - `tests/Feature/EventSearchTest.php`
+  - `tests/Feature/Api/EventSaveTest.php`
+  - `tests/Feature/EventPledgeTest.php`
+  - `tests/Unit/EventTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ModerationServiceTest.php` => **16 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventModerationActionsTest.php` => **15 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventVisibilityAccessTest.php` => **13 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/EventApiContractTest.php` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/EventSaveTest.php` => **8 passed**
+  - `vendor/bin/pest --parallel --compact tests/Unit/EventTest.php` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="(shows approved, pending, and cancelled public events|shows pending events on detail page with warning banner|shows cancelled events on detail page with cancellation banner)"` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventPledgeTest.php --filter="(can list all interested events for authenticated user|interested events index still includes cancelled events)"` => **2 passed**
+  - `vendor/bin/phpstan analyse --ansi ...[changed files]` => **No errors**
+  - Note: broader suites still contain pre-existing unrelated failures (for example assertions expecting legacy UI strings in `EventPledgeTest`, `EventSearchTest`, and location text in `InstitutionShowPageTest`).
+
+# Speaker Missing Submission Todo
+
+- [x] Add a direct speaker-submission flow on `/penceramah` using shared `SpeakerFormSchema`
+- [x] Add clear CTA(s) on speaker index and empty-state so users can submit missing speakers
+- [x] Keep new submissions moderated (`pending`) with explicit UI notice
+- [x] Add feature test coverage for submission from speaker index
+- [x] Run focused verification
+
+## Review
+
+- Updated `resources/views/components/pages/speakers/⚡index.blade.php`:
+  - integrated Filament form handling (`HasForms`, `InteractsWithForms`, `WithFileUploads`) into the speaker index Volt page
+  - reused `SpeakerFormSchema::createOptionForm()` + `SpeakerFormSchema::createOptionUsing(...)` for submission parity with submit-event
+  - added “Tak jumpa penceramah?” CTA in hero and empty-state
+  - added inline submission panel with moderation message and submit/cancel actions
+  - invalidates `submit_speakers` cache key after successful submission
+  - sends success notification clarifying admin approval flow (`pending` status)
+- Updated `tests/Feature/SpeakerIndexTest.php`:
+  - added CTA visibility assertion and regression test that submits a missing speaker from `pages.speakers.index` and asserts persisted `pending` + `is_active=true`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SpeakerFormSchema.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
 # Event Advanced Filter Taxonomy Parity Todo
 
 - [x] Rename `Topic/Tajuk` advanced filter label to `Bidang Ilmu`

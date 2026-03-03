@@ -19,7 +19,7 @@ class EventController extends Controller
     /**
      * @var list<string>
      */
-    private const array PUBLIC_STATUSES = ['approved', 'pending'];
+    private const array PUBLIC_STATUSES = Event::PUBLIC_STATUSES;
 
     /**
      * List events with filtering, sorting, and includes.

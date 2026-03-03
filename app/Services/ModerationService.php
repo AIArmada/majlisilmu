@@ -55,6 +55,17 @@ class ModerationService
     }
 
     /**
+     * Cancel an event while keeping it visible to users.
+     */
+    public function cancel(
+        Event $event,
+        ?User $moderator = null,
+        ?string $note = null
+    ): void {
+        $event->status->transitionTo(\App\States\EventStatus\Cancelled::class, $moderator, $note);
+    }
+
+    /**
      * Reconsider a rejected event (move back to pending).
      */
     public function reconsider(

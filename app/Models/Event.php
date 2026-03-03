@@ -64,6 +64,20 @@ class Event extends Model implements AuditableContract, HasMedia
     /** @use HasFactory<\Database\Factories\EventFactory> */
     use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasLanguages, Auditable, HasFactory, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
+    /**
+     * Statuses visible on public listings and detail pages.
+     *
+     * @var list<string>
+     */
+    public const array PUBLIC_STATUSES = ['approved', 'pending', 'cancelled'];
+
+    /**
+     * Statuses that still allow engagement actions (save/interest/going).
+     *
+     * @var list<string>
+     */
+    public const array ENGAGEABLE_STATUSES = ['approved', 'pending'];
+
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -184,7 +198,7 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * Scope a query to only include active events (approved + pending public events).
+     * Scope a query to only include active public events.
      *
      * @param  Builder<self>  $query
      */
@@ -194,18 +208,18 @@ class Event extends Model implements AuditableContract, HasMedia
         $table = $query->getModel()->getTable();
 
         $query->where("{$table}.is_active", true)
-            ->whereIn("{$table}.status", ['approved', 'pending'])
+            ->whereIn("{$table}.status", self::PUBLIC_STATUSES)
             ->where("{$table}.visibility", EventVisibility::Public);
     }
 
     /**
      * Determine if the model should be searchable.
-     * Index approved and pending public events.
+     * Index active public events (including cancelled notices).
      */
     public function shouldBeSearchable(): bool
     {
         return $this->is_active
-            && in_array((string) $this->status, ['approved', 'pending'], true)
+            && in_array((string) $this->status, self::PUBLIC_STATUSES, true)
             && $this->visibility === EventVisibility::Public;
     }
 

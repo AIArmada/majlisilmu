@@ -5,6 +5,8 @@ namespace App\Livewire\Pages\Home;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -12,12 +14,24 @@ use Livewire\Component;
 #[Title('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')]
 class KimiHome extends Component
 {
+    /**
+     * @var array<string, int>
+     */
     public array $stats = [];
 
-    public $featuredEvents;
+    /**
+     * @var Collection<int, Event>
+     */
+    public Collection $featuredEvents;
 
-    public $upcomingEvents;
+    /**
+     * @var Collection<int, Event>
+     */
+    public Collection $upcomingEvents;
 
+    /**
+     * @var array<int, array{name: string, icon: string, color: string, search: string}>
+     */
     public array $categories = [];
 
     public function mount(): void
@@ -45,8 +59,7 @@ class KimiHome extends Component
         $this->featuredEvents = Cache::remember('kimi_featured_events', 300, function () {
             return Event::with(['institution', 'speakers', 'media'])
                 ->where('starts_at', '>=', now())
-                ->where('is_active', true)
-                ->whereIn('status', ['approved', 'pending'])
+                ->active()
                 ->orderBy('starts_at')
                 ->limit(6)
                 ->get();
@@ -58,8 +71,7 @@ class KimiHome extends Component
         $this->upcomingEvents = Cache::remember('kimi_upcoming_events', 300, function () {
             return Event::with(['institution', 'speakers'])
                 ->where('starts_at', '>=', now())
-                ->where('is_active', true)
-                ->whereIn('status', ['approved', 'pending'])
+                ->active()
                 ->orderBy('starts_at')
                 ->limit(4)
                 ->get();
@@ -78,7 +90,7 @@ class KimiHome extends Component
         ];
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.pages.home.kimi-home');
     }

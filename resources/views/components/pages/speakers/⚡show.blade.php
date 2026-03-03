@@ -292,6 +292,7 @@ new class extends Component {
                 ->trim(),
             'url' => route('events.show', $e),
             'pending' => $e->status instanceof \App\States\EventStatus\Pending,
+            'cancelled' => $e->status instanceof \App\States\EventStatus\Cancelled,
             'is_remote' => in_array($formatValue, ['online', 'hybrid'], true),
         ];
     })->values())->toArray();
@@ -546,14 +547,15 @@ new class extends Component {
                                     $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                     $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                     $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
+                                    $isCancelledEvent = $event->status instanceof \App\States\EventStatus\Cancelled;
                                 @endphp
                                 <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="upcoming-{{ $event->id }}"
                                    class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/80 hover:ring-emerald-100 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                     {{-- Date accent sidebar --}}
-                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800') }} p-2.5 text-white sm:w-24 sm:p-3">
-                                        <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                    <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isCancelledEvent ? 'from-rose-600 to-rose-800' : ($isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800')) }} p-2.5 text-white sm:w-24 sm:p-3">
+                                        <span class="text-[10px] font-bold uppercase tracking-widest {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80')) }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                         <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
-                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
+                                        <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80')) }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                     </div>
                                     {{-- Event details --}}
                                     <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -564,6 +566,11 @@ new class extends Component {
                                             @if($event->status instanceof \App\States\EventStatus\Pending)
                                                 <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
                                                     {{ __('Menunggu Kelulusan') }}
+                                                </span>
+                                            @endif
+                                            @if($event->status instanceof \App\States\EventStatus\Cancelled)
+                                                <span class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                                                    {{ __('Dibatalkan') }}
                                                 </span>
                                             @endif
                                             @if($isRemoteEvent)
@@ -661,18 +668,18 @@ new class extends Component {
                                         <template x-if="cell.day !== null">
                                             <div>
                                                 <span class="text-xs font-medium"
-                                                    :class="cell.events?.length > 0 ? (cell.events.some(ev => ev.pending) ? 'font-bold text-amber-700' : (cell.events.some(ev => ev.is_remote) ? 'font-bold text-sky-700' : 'font-bold text-emerald-700')) : 'text-slate-400'"
+                                                    :class="cell.events?.length > 0 ? (cell.events.some(ev => ev.cancelled) ? 'font-bold text-rose-700' : (cell.events.some(ev => ev.pending) ? 'font-bold text-amber-700' : (cell.events.some(ev => ev.is_remote) ? 'font-bold text-sky-700' : 'font-bold text-emerald-700'))) : 'text-slate-400'"
                                                     x-text="cell.day"></span>
                                                 <template x-if="cell.events?.length > 0">
                                                     <div class="mt-0.5 space-y-0.5">
                                                         <template x-for="ev in cell.events.slice(0, 2)" :key="ev.id">
                                                             <a :href="ev.url" class="block rounded px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words transition"
-                                                               :class="ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100')"
+                                                               :class="ev.cancelled ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : (ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'))"
                                                                x-text="ev.title"></a>
                                                         </template>
                                                         <template x-if="cell.events?.length > 2">
                                                             <span class="block text-[9px] font-semibold"
-                                                                  :class="cell.events.some(ev => ev.pending) ? 'text-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'text-sky-500' : 'text-emerald-500')"
+                                                                  :class="cell.events.some(ev => ev.cancelled) ? 'text-rose-500' : (cell.events.some(ev => ev.pending) ? 'text-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'text-sky-500' : 'text-emerald-500'))"
                                                                   x-text="'+' + (cell.events.length - 2) + ' ' + @js(__('lagi'))"></span>
                                                         </template>
                                                     </div>
@@ -680,7 +687,7 @@ new class extends Component {
                                                 <template x-if="cell.events?.length > 0">
                                                     <div class="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5 sm:hidden">
                                                         <template x-for="i in Math.min(cell.events.length, 3)" :key="i">
-                                                            <span class="h-1 w-1 rounded-full" :class="cell.events.some(ev => ev.pending) ? 'bg-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'bg-sky-500' : 'bg-emerald-500')"></span>
+                                                            <span class="h-1 w-1 rounded-full" :class="cell.events.some(ev => ev.cancelled) ? 'bg-rose-500' : (cell.events.some(ev => ev.pending) ? 'bg-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'bg-sky-500' : 'bg-emerald-500'))"></span>
                                                         </template>
                                                     </div>
                                                 </template>
@@ -704,14 +711,15 @@ new class extends Component {
                                 $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                 $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                 $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
+                                $isCancelledEvent = $event->status instanceof \App\States\EventStatus\Cancelled;
                             @endphp
                             <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
                                class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:ring-slate-200 hover:shadow-xl hover:shadow-slate-500/[0.06]">
                                 {{-- Date accent sidebar --}}
-                                <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700') }} p-2.5 text-white sm:w-24 sm:p-3">
-                                    <span class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                <div class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isCancelledEvent ? 'from-rose-600 to-rose-800' : ($isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700')) }} p-2.5 text-white sm:w-24 sm:p-3">
+                                    <span class="text-[10px] font-bold uppercase tracking-widest {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80')) }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                     <span class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
-                                    <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
+                                    <span class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80')) }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                 </div>
                                 {{-- Event details --}}
                                 <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -724,15 +732,22 @@ new class extends Component {
                                                 {{ __('Menunggu Kelulusan') }}
                                             </span>
                                         @endif
+                                        @if($event->status instanceof \App\States\EventStatus\Cancelled)
+                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                                                {{ __('Dibatalkan') }}
+                                            </span>
+                                        @endif
                                         @if($isRemoteEvent)
                                             <span class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
                                                 {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
                                             </span>
                                         @endif
-                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
-                                            {{ __('Selesai') }}
-                                        </span>
+                                        @if(!$isCancelledEvent)
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                {{ __('Selesai') }}
+                                            </span>
+                                        @endif
                                     </div>
                                     <h3 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
                                         {{ $event->title }}

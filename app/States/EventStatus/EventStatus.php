@@ -26,12 +26,17 @@ abstract class EventStatus extends State
             ->allowTransition(Pending::class, Approved::class, Transitions\ApproveEvent::class)
             ->allowTransition(Pending::class, NeedsChanges::class, Transitions\RequestChanges::class)
             ->allowTransition(Pending::class, Rejected::class, Transitions\RejectEvent::class)
+            ->allowTransition(Pending::class, Cancelled::class, Transitions\CancelEvent::class)
+            // Cancellation flow
+            ->allowTransition(Approved::class, Cancelled::class, Transitions\CancelEvent::class)
+            ->allowTransition(Cancelled::class, Pending::class, Transitions\RemoderateEvent::class)
             // Re-moderation (Approved back to Pending)
             ->allowTransition(Approved::class, Pending::class, Transitions\RemoderateEvent::class)
             // Reconsider rejected events (back to Pending for review)
             ->allowTransition(Rejected::class, Pending::class, Transitions\ReconsiderEvent::class)
             // Revert to draft (from any terminal state)
             ->allowTransition(Rejected::class, Draft::class, Transitions\RevertToDraft::class)
-            ->allowTransition(NeedsChanges::class, Draft::class, Transitions\RevertToDraft::class);
+            ->allowTransition(NeedsChanges::class, Draft::class, Transitions\RevertToDraft::class)
+            ->allowTransition(Cancelled::class, Draft::class, Transitions\RevertToDraft::class);
     }
 }
