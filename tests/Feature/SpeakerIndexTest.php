@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Speaker;
+use App\Models\User;
 use Livewire\Livewire;
 
 use function Pest\Laravel\get;
@@ -59,6 +60,12 @@ it('renders translated search placeholder on speaker index', function () {
         ->assertSee(__('Search speakers...'));
 });
 
+it('shows add-missing-speaker call to action on speaker index', function () {
+    get('/penceramah')
+        ->assertSuccessful()
+        ->assertSee('Tak jumpa penceramah? Tambah penceramah');
+});
+
 it('supports fuzzy search with minor typos', function () {
     Speaker::factory()->create([
         'name' => 'Samad Al-Bakri',
@@ -95,4 +102,31 @@ it('updates search results live when query changes', function () {
         ->set('search', 'Smad')
         ->assertSee('Samad')
         ->assertDontSee('Ahmad');
+});
+
+it('allows users to submit a missing speaker from speaker index with pending status', function () {
+    $speakerName = 'Ustaz Cadangan Baru';
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages.speakers.index')
+        ->call('openSpeakerSubmissionForm')
+        ->set('speakerSubmissionData.name', $speakerName)
+        ->set('speakerSubmissionData.gender', 'male')
+        ->call('submitSpeaker')
+        ->assertHasNoErrors();
+
+    $speaker = Speaker::query()
+        ->where('name', $speakerName)
+        ->first();
+
+    expect($speaker)->not->toBeNull()
+        ->and($speaker?->status)->toBe('pending')
+        ->and($speaker?->is_active)->toBeTrue();
+});
+
+it('redirects guests to login when opening add speaker form', function () {
+    Livewire::test('pages.speakers.index')
+        ->call('openSpeakerSubmissionForm')
+        ->assertRedirect(route('login'));
 });

@@ -5,6 +5,7 @@ use App\Models\District;
 use App\Models\Event;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -27,6 +28,39 @@ it('renders translated no-result copy on institution index', function () {
         ->assertSuccessful()
         ->assertSee(__('No institutions found'))
         ->assertSee(__('We couldn\'t find any institutions matching your search.'));
+});
+
+it('shows add-missing-institution call to action on institution index', function () {
+    get('/institusi')
+        ->assertSuccessful()
+        ->assertSee('Tak jumpa institusi? Tambah institusi');
+});
+
+it('redirects guests to login when opening add institution form', function () {
+    Livewire::test('pages.institutions.index')
+        ->call('openInstitutionSubmissionForm')
+        ->assertRedirect(route('login'));
+});
+
+it('allows users to submit a missing institution from institution index with pending status', function () {
+    $user = User::factory()->create();
+    $institutionName = 'Institusi Cadangan Baru';
+
+    Livewire::actingAs($user)
+        ->test('pages.institutions.index')
+        ->call('openInstitutionSubmissionForm')
+        ->set('institutionSubmissionData.name', $institutionName)
+        ->set('institutionSubmissionData.type', 'masjid')
+        ->set('institutionSubmissionData.google_maps_url', 'https://maps.google.com/?q=3.1390,101.6869')
+        ->call('submitInstitution')
+        ->assertHasNoErrors();
+
+    $institution = Institution::query()
+        ->where('name', $institutionName)
+        ->first();
+
+    expect($institution)->not->toBeNull()
+        ->and($institution?->status)->toBe('pending');
 });
 
 it('supports fuzzy search with minor institution name typos', function () {

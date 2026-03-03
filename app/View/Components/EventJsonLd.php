@@ -139,7 +139,7 @@ class EventJsonLd extends Component
      */
     protected function getEventStatus(): string
     {
-        if ((string) $this->event->status === 'rejected') {
+        if (in_array((string) $this->event->status, ['rejected', 'cancelled'], true)) {
             return 'https://schema.org/EventCancelled';
         }
 
@@ -166,7 +166,7 @@ class EventJsonLd extends Component
         $event = $this->event;
         $settings = $event->settings;
 
-        if ((string) $event->status === 'rejected') {
+        if (in_array((string) $event->status, ['rejected', 'cancelled'], true)) {
             return 'https://schema.org/Discontinued';
         }
 

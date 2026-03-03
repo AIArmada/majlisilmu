@@ -35,6 +35,26 @@ it('shows prayer-relative timing text on speaker page instead of absolute time',
         ->assertDontSee($event->starts_at?->format('h:i A'));
 });
 
+it('shows cancelled public events with cancelled badge on speaker page', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'cancelled',
+        'visibility' => 'public',
+        'starts_at' => now()->addDay()->setTime(17, 45),
+        'ends_at' => now()->addDay()->setTime(19, 15),
+    ]);
+
+    $speaker->events()->attach($event->id);
+
+    $this->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee($event->title)
+        ->assertSee('Dibatalkan');
+});
+
 it('renders event end time in event timezone on speaker page', function () {
     $speaker = Speaker::factory()->create([
         'status' => 'verified',

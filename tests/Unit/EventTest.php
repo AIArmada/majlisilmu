@@ -6,6 +6,7 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
 use App\States\EventStatus\Approved;
+use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,8 +14,8 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-it('active scope filters approved and pending public events', function () {
-    // Active events (approved + pending)
+it('active scope filters public visible statuses (approved, pending, cancelled)', function () {
+    // Active public-visible events
     $approvedEvent = Event::factory()->create([
         'status' => Approved::class,
         'visibility' => 'public',
@@ -23,6 +24,12 @@ it('active scope filters approved and pending public events', function () {
 
     $pendingEvent = Event::factory()->create([
         'status' => Pending::class,
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $cancelledEvent = Event::factory()->create([
+        'status' => Cancelled::class,
         'visibility' => 'public',
         'is_active' => true,
     ]);
@@ -48,9 +55,10 @@ it('active scope filters approved and pending public events', function () {
 
     $results = Event::active()->get();
 
-    expect($results)->toHaveCount(2)
+    expect($results)->toHaveCount(3)
         ->and($results->pluck('id')->toArray())->toContain($approvedEvent->id)
         ->and($results->pluck('id')->toArray())->toContain($pendingEvent->id)
+        ->and($results->pluck('id')->toArray())->toContain($cancelledEvent->id)
         ->and($results->pluck('id')->toArray())->not->toContain($draftEvent->id)
         ->and($results->pluck('id')->toArray())->not->toContain($privateEvent->id)
         ->and($results->pluck('id')->toArray())->not->toContain($deactivatedEvent->id);

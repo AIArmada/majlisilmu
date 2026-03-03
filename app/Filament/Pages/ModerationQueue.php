@@ -185,6 +185,7 @@ class ModerationQueue extends Page implements HasTable
                         'pending' => 'warning',
                         'needs_changes' => 'warning',
                         'approved' => 'success',
+                        'cancelled' => 'danger',
                         'rejected' => 'danger',
                         'draft' => 'gray',
                         default => 'gray',
@@ -263,6 +264,24 @@ class ModerationQueue extends Page implements HasTable
                         $service->reject($record, auth()->user(), $data['reason_code'], $data['note']);
                     })
                     ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
+
+                Action::make('cancel')
+                    ->label('Cancel')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Cancel Event')
+                    ->modalDescription('This event will remain visible with a cancelled badge and notify users who saved, marked interest, or plan to attend.')
+                    ->form([
+                        Textarea::make('note')
+                            ->label('Cancellation note (optional)')
+                            ->rows(3),
+                    ])
+                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                        $service->cancel($record, auth()->user(), $data['note'] ?? null);
+                    })
+                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending
+                        || $record->status instanceof \App\States\EventStatus\Approved),
 
                 Action::make('needs_changes')
                     ->label('Request Changes')

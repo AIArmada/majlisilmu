@@ -2,8 +2,10 @@
 
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -116,6 +118,29 @@ describe('Event Show Page Going Feature', function () {
 });
 
 describe('Event Show Page Location & Contact Info', function () {
+    it('does not use speaker images as hero background when location media is missing', function () {
+        $speaker = Speaker::factory()->create();
+        $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg', 800, 800))
+            ->toMediaCollection('avatar');
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'institution_id' => null,
+            'venue_id' => null,
+            'organizer_type' => Speaker::class,
+            'organizer_id' => $speaker->id,
+        ]);
+
+        $event->speakers()->attach($speaker->id);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertDontSee('class="size-full object-cover opacity-65"', false);
+    });
+
     it('displays full venue address on the event page', function () {
         $venue = Venue::factory()->create();
         $address = $venue->addressModel;

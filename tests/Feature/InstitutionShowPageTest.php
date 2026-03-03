@@ -239,6 +239,22 @@ it('shows pending public events', function () {
         ->assertSee('Menunggu Kelulusan');
 });
 
+it('shows cancelled public events with cancelled badge', function () {
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    Event::factory()->for($institution)->create([
+        'status' => 'cancelled',
+        'visibility' => EventVisibility::Public,
+        'starts_at' => now()->addDays(2),
+        'title' => 'Cancelled Event ABC',
+    ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('Cancelled Event ABC')
+        ->assertSee('Dibatalkan');
+});
+
 it('does not show events outside approved and pending statuses', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 

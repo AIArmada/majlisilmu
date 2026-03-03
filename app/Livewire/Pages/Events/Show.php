@@ -10,6 +10,7 @@ use App\Models\EventSession;
 use App\Models\User;
 use App\Services\CalendarService;
 use App\States\EventStatus\Approved;
+use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
 use Illuminate\Contracts\View\View;
@@ -40,7 +41,7 @@ class Show extends Component
 
     public function mount(Event $event): void
     {
-        $isViewable = $event->is_active && $this->isApprovedOrPending($event);
+        $isViewable = $event->is_active && $this->isPubliclyVisibleStatus($event);
         $isOwner = $this->isEventOwner($event);
 
         // Owners can always view their own events (drafts, pending, approved, etc)
@@ -53,10 +54,6 @@ class Show extends Component
         }
         // Unlisted events: anyone with link can view if active and approved/pending
         elseif ($isViewable && $event->visibility === EventVisibility::Unlisted) {
-            // Allow access
-        }
-        // Private events: only owner can view if active and approved/pending
-        elseif ($isViewable && $event->visibility === EventVisibility::Private && $isOwner) {
             // Allow access
         }
         // All other cases: 404
@@ -264,7 +261,7 @@ class Show extends Component
             return;
         }
 
-        if (! $this->isApprovedOrPending($this->event) || $this->event->visibility !== EventVisibility::Public) {
+        if (! $this->isEngagementStatus($this->event) || $this->event->visibility !== EventVisibility::Public) {
             abort(403);
         }
 
@@ -329,7 +326,20 @@ class Show extends Component
         return view('livewire.pages.events.show');
     }
 
-    protected function isApprovedOrPending(Event $event): bool
+    protected function isPubliclyVisibleStatus(Event $event): bool
+    {
+        $status = $event->status;
+
+        if ($status instanceof EventStatus) {
+            return $status->equals(Approved::class)
+                || $status->equals(Pending::class)
+                || $status->equals(Cancelled::class);
+        }
+
+        return in_array((string) $status, Event::PUBLIC_STATUSES, true);
+    }
+
+    protected function isEngagementStatus(Event $event): bool
     {
         $status = $event->status;
 
@@ -337,7 +347,7 @@ class Show extends Component
             return $status->equals(Approved::class) || $status->equals(Pending::class);
         }
 
-        return in_array((string) $status, ['approved', 'pending'], true);
+        return in_array((string) $status, Event::ENGAGEABLE_STATUSES, true);
     }
 
     /**

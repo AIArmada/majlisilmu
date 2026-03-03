@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
-it('lists only active public approved or pending events', function () {
+it('lists only active public visible statuses (approved, pending, cancelled)', function () {
     $approvedPublic = Event::factory()->create([
         'status' => 'approved',
         'visibility' => EventVisibility::Public,
@@ -21,6 +21,12 @@ it('lists only active public approved or pending events', function () {
 
     $pendingPublic = Event::factory()->create([
         'status' => 'pending',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $cancelledPublic = Event::factory()->create([
+        'status' => 'cancelled',
         'visibility' => EventVisibility::Public,
         'is_active' => true,
     ]);
@@ -52,6 +58,7 @@ it('lists only active public approved or pending events', function () {
     expect($eventIds)
         ->toContain($approvedPublic->id)
         ->toContain($pendingPublic->id)
+        ->toContain($cancelledPublic->id)
         ->not()->toContain($draftPublic->id)
         ->not()->toContain($approvedUnlisted->id)
         ->not()->toContain($inactiveApproved->id);

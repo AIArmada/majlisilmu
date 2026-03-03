@@ -37,6 +37,39 @@ describe('public events', function () {
             ->test(Show::class, ['event' => $event])
             ->assertSuccessful();
     });
+
+    it('allows anyone to view cancelled public events', function () {
+        $event = Event::factory()->create([
+            'visibility' => EventVisibility::Public,
+            'is_active' => true,
+            'status' => 'cancelled',
+        ]);
+
+        Livewire::test(Show::class, ['event' => $event])
+            ->assertSuccessful();
+    });
+
+    it('allows calendar export for public approved events', function () {
+        $event = Event::factory()->create([
+            'visibility' => EventVisibility::Public,
+            'is_active' => true,
+            'status' => 'approved',
+        ]);
+
+        $this->get(route('events.calendar', $event))
+            ->assertOk();
+    });
+
+    it('returns 404 for calendar export on cancelled public events', function () {
+        $event = Event::factory()->create([
+            'visibility' => EventVisibility::Public,
+            'is_active' => true,
+            'status' => 'cancelled',
+        ]);
+
+        $this->get(route('events.calendar', $event))
+            ->assertNotFound();
+    });
 });
 
 // Unlisted Event Tests
@@ -130,7 +163,7 @@ describe('private events', function () {
             ->assertStatus(404);
     });
 
-    it('returns 404 for private events when inactive even for owner', function () {
+    it('allows owners to view their private events even when inactive', function () {
         $event = Event::factory()->create([
             'user_id' => $this->owner->id,
             'visibility' => EventVisibility::Private,
@@ -140,7 +173,7 @@ describe('private events', function () {
 
         Livewire::actingAs($this->owner)
             ->test(Show::class, ['event' => $event])
-            ->assertStatus(404);
+            ->assertSuccessful();
     });
 });
 

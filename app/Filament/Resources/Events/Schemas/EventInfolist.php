@@ -271,6 +271,7 @@ class EventInfolist
                                                 'pending' => 'warning',
                                                 'approved' => 'success',
                                                 'needs_changes' => 'info',
+                                                'cancelled' => 'danger',
                                                 'rejected' => 'danger',
                                                 default => 'gray',
                                             }),

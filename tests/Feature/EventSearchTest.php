@@ -1101,7 +1101,7 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Bulugh Session');
     });
 
-    it('shows approved and pending public events', function () {
+    it('shows approved, pending, and cancelled public events', function () {
         Event::factory()->create([
             'title' => 'Approved Event',
             'status' => 'approved',
@@ -1113,6 +1113,13 @@ describe('Event Search Filters', function () {
         Event::factory()->create([
             'title' => 'Pending Event',
             'status' => 'pending',
+            'visibility' => 'public',
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->create([
+            'title' => 'Cancelled Event',
+            'status' => 'cancelled',
             'visibility' => 'public',
             'starts_at' => now()->addDays(2),
         ]);
@@ -1137,7 +1144,9 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Approved Event')
             ->assertSee('Pending Event')
+            ->assertSee('Cancelled Event')
             ->assertSee('Menunggu Kelulusan')
+            ->assertSee('Dibatalkan')
             ->assertDontSee('Draft Event')
             ->assertDontSee('Private Event');
     });
@@ -1610,6 +1619,23 @@ describe('Event Detail Page', function () {
         $response->assertOk()
             ->assertSee('Pending Detail Event')
             ->assertSee('Menunggu Kelulusan');
+    });
+
+    it('shows cancelled events on detail page with cancellation banner', function () {
+        $event = Event::factory()->create([
+            'title' => 'Cancelled Detail Event',
+            'status' => 'cancelled',
+            'visibility' => 'public',
+        ]);
+
+        $response = $this->get("/events/{$event->slug}");
+
+        $response->assertOk()
+            ->assertSee('Cancelled Detail Event')
+            ->assertSee('Majlis Dibatalkan')
+            ->assertSee('Kalendar tidak tersedia untuk majlis dibatalkan.')
+            ->assertDontSee('Tambah ke Kalendar')
+            ->assertSee('https://schema.org/EventCancelled');
     });
 
     it('shows 404 for draft events', function () {

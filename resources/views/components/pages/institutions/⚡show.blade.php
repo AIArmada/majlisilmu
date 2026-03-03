@@ -189,6 +189,7 @@ new class extends Component {
         'email' => "mailto:?subject={$encodedShareText}&body={$encodedShareBody}",
     ];
 
+    $showPendingStatusNotice = $institution->status === 'pending';
     // Location
     $address = $institution->addressModel;
     $formatAddressHierarchy = static function ($addressModel): string {
@@ -228,6 +229,7 @@ new class extends Component {
         $normalizedMapQuery = $mapQuery;
     }
 
+    $hasPhysicalAddress = $address && ($address->line1 || $address->city?->name || $address->state?->name);
     $googleMapsEmbedUrl = null;
     if (filled($address?->google_maps_url) && filled($googleMapsApiKey) && filled($normalizedMapQuery)) {
         $googleMapsEmbedUrl = 'https://www.google.com/maps/embed/v1/place?key=' . urlencode($googleMapsApiKey) . '&q=' . urlencode((string) $normalizedMapQuery);
@@ -293,6 +295,7 @@ new class extends Component {
                 ->trim(),
             'url' => route('events.show', $e),
             'pending' => $e->status instanceof \App\States\EventStatus\Pending,
+            'cancelled' => $e->status instanceof \App\States\EventStatus\Cancelled,
             'is_remote' => in_array($formatValue, ['online', 'hybrid'], true),
         ];
     })->values())->toArray();
@@ -638,9 +641,11 @@ new class extends Component {
                                     </svg>
                                 </div>
                                 <p class="text-base font-semibold text-slate-500">
-                                    {{ __('Tiada majlis dijadualkan buat masa ini') }}</p>
+                                    {{ __('Tiada majlis dijadualkan buat masa ini') }}
+                                </p>
                                 <p class="mt-1 text-sm text-slate-400">
-                                    {{ __('Semak semula nanti untuk kemas kini terbaru.') }}</p>
+                                    {{ __('Semak semula nanti untuk kemas kini terbaru.') }}
+                                </p>
                             </div>
                         @else
                             {{-- LIST VIEW --}}
@@ -654,19 +659,20 @@ new class extends Component {
                                             $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                             $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                             $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
+                                            $isCancelledEvent = $event->status instanceof \App\States\EventStatus\Cancelled;
                                         @endphp
                                         <a href="{{ route('events.show', $event) }}" wire:navigate
                                             wire:key="upcoming-{{ $event->id }}"
                                             class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/80 hover:ring-emerald-100 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
                                             {{-- Date accent sidebar --}}
                                             <div
-                                                class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800') }} p-2.5 text-white sm:w-24 sm:p-3">
+                                                class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isCancelledEvent ? 'from-rose-600 to-rose-800' : ($isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800')) }} p-2.5 text-white sm:w-24 sm:p-3">
                                                 <span
-                                                    class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                                    class="text-[10px] font-bold uppercase tracking-widest {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80')) }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                                 <span
                                                     class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
                                                 <span
-                                                    class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
+                                                    class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80')) }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                             </div>
                                             {{-- Event details --}}
                                             <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
@@ -679,6 +685,12 @@ new class extends Component {
                                                         <span
                                                             class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
                                                             {{ __('Menunggu Kelulusan') }}
+                                                        </span>
+                                                    @endif
+                                                    @if($event->status instanceof \App\States\EventStatus\Cancelled)
+                                                        <span
+                                                            class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                                                            {{ __('Dibatalkan') }}
                                                         </span>
                                                     @endif
                                                     @if($isRemoteEvent)
@@ -807,24 +819,24 @@ new class extends Component {
                                     {{-- Calendar grid --}}
                                     <div class="grid grid-cols-7">
                                         <template x-for="(cell, idx) in (() => {
-                                            const first = new Date(calendarYear, calendarMonth, 1);
-                                            const lastDay = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-                                            let startDay = first.getDay();
-                                            startDay = startDay === 0 ? 6 : startDay - 1;
-                                            const cells = [];
-                                            for (let i = 0; i < startDay; i++) cells.push({ day: null });
-                                            for (let d = 1; d <= lastDay; d++) {
-                                                const key = calendarYear + '-' + String(calendarMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-                                                cells.push({ day: d, key, events: calendarEvents[key] || [] });
-                                            }
-                                            return cells;
-                                        })()" :key="idx">
+                                                            const first = new Date(calendarYear, calendarMonth, 1);
+                                                            const lastDay = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+                                                            let startDay = first.getDay();
+                                                            startDay = startDay === 0 ? 6 : startDay - 1;
+                                                            const cells = [];
+                                                            for (let i = 0; i < startDay; i++) cells.push({ day: null });
+                                                            for (let d = 1; d <= lastDay; d++) {
+                                                                const key = calendarYear + '-' + String(calendarMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                                                                cells.push({ day: d, key, events: calendarEvents[key] || [] });
+                                                            }
+                                                            return cells;
+                                                        })()" :key="idx">
                                             <div class="relative min-h-[6rem] border-b border-r border-slate-100 p-1 sm:min-h-[7.5rem] sm:p-1.5"
                                                 :class="cell.day === null ? 'bg-slate-50/30' : ''">
                                                 <template x-if="cell.day !== null">
                                                     <div>
                                                         <span class="text-xs font-medium"
-                                                            :class="cell.events?.length > 0 ? (cell.events.some(ev => ev.pending) ? 'font-bold text-amber-700' : (cell.events.some(ev => ev.is_remote) ? 'font-bold text-sky-700' : 'font-bold text-emerald-700')) : 'text-slate-400'"
+                                                            :class="cell.events?.length > 0 ? (cell.events.some(ev => ev.cancelled) ? 'font-bold text-rose-700' : (cell.events.some(ev => ev.pending) ? 'font-bold text-amber-700' : (cell.events.some(ev => ev.is_remote) ? 'font-bold text-sky-700' : 'font-bold text-emerald-700'))) : 'text-slate-400'"
                                                             x-text="cell.day"></span>
                                                         <template x-if="cell.events?.length > 0">
                                                             <div class="mt-0.5 space-y-0.5">
@@ -832,12 +844,12 @@ new class extends Component {
                                                                     :key="ev.id">
                                                                     <a :href="ev.url"
                                                                         class="block rounded px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words transition"
-                                                                        :class="ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100')"
+                                                                        :class="ev.cancelled ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : (ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'))"
                                                                         x-text="ev.title"></a>
                                                                 </template>
                                                                 <template x-if="cell.events?.length > 2">
                                                                     <span class="block text-[9px] font-semibold"
-                                                                        :class="cell.events.some(ev => ev.pending) ? 'text-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'text-sky-500' : 'text-emerald-500')"
+                                                                        :class="cell.events.some(ev => ev.cancelled) ? 'text-rose-500' : (cell.events.some(ev => ev.pending) ? 'text-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'text-sky-500' : 'text-emerald-500'))"
                                                                         x-text="'+' + (cell.events.length - 2) + ' ' + @js(__('lagi'))"></span>
                                                                 </template>
                                                             </div>
@@ -848,7 +860,7 @@ new class extends Component {
                                                                 <template x-for="i in Math.min(cell.events.length, 3)"
                                                                     :key="i">
                                                                     <span class="h-1 w-1 rounded-full"
-                                                                        :class="cell.events.some(ev => ev.pending) ? 'bg-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'bg-sky-500' : 'bg-emerald-500')"></span>
+                                                                        :class="cell.events.some(ev => ev.cancelled) ? 'bg-rose-500' : (cell.events.some(ev => ev.pending) ? 'bg-amber-500' : (cell.events.some(ev => ev.is_remote) ? 'bg-sky-500' : 'bg-emerald-500'))"></span>
                                                                 </template>
                                                             </div>
                                                         </template>
@@ -874,17 +886,18 @@ new class extends Component {
                                         $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                         $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                         $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
+                                        $isCancelledEvent = $event->status instanceof \App\States\EventStatus\Cancelled;
                                     @endphp
                                     <a href="{{ route('events.show', $event) }}" wire:navigate wire:key="past-{{ $event->id }}"
                                         class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:ring-slate-200 hover:shadow-xl hover:shadow-slate-500/[0.06]">
                                         <div
-                                            class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700') }} p-2.5 text-white sm:w-24 sm:p-3">
+                                            class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isCancelledEvent ? 'from-rose-600 to-rose-800' : ($isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700')) }} p-2.5 text-white sm:w-24 sm:p-3">
                                             <span
-                                                class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
+                                                class="text-[10px] font-bold uppercase tracking-widest {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80')) }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                             <span
                                                 class="font-heading text-2xl font-black leading-none sm:text-4xl">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</span>
                                             <span
-                                                class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
+                                                class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80')) }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                         </div>
                                         <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
                                             <div class="flex items-center gap-2">
@@ -898,6 +911,12 @@ new class extends Component {
                                                         {{ __('Menunggu Kelulusan') }}
                                                     </span>
                                                 @endif
+                                                @if($event->status instanceof \App\States\EventStatus\Cancelled)
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                                                        {{ __('Dibatalkan') }}
+                                                    </span>
+                                                @endif
                                                 @if($isRemoteEvent)
                                                     <span
                                                         class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
@@ -905,10 +924,12 @@ new class extends Component {
                                                         {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
                                                     </span>
                                                 @endif
-                                                <span
-                                                    class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
-                                                    {{ __('Selesai') }}
-                                                </span>
+                                                @if(!$isCancelledEvent)
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                        {{ __('Selesai') }}
+                                                    </span>
+                                                @endif
                                             </div>
                                             <h3
                                                 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
@@ -1045,7 +1066,8 @@ new class extends Component {
                                     <div class="min-w-0 text-center">
                                         <h3
                                             class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-gold-700">
-                                            {{ $speaker->name }}</h3>
+                                            {{ $speaker->name }}
+                                        </h3>
                                         @if($speakerPosition)
                                             <p class="mt-0.5 truncate text-xs text-slate-500">{{ $speakerPosition }}</p>
                                         @endif
@@ -1177,7 +1199,7 @@ new class extends Component {
                 @endif
 
                 {{-- ─── CONTACT & ADDRESS ─── --}}
-                @if($contacts->isNotEmpty() || $address)
+                @if($contacts->isNotEmpty() || $hasPhysicalAddress)
                     <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm"
                         x-intersect.once="$el.classList.add('revealed')">
                         <div class="border-b border-slate-100 px-5 py-4">
@@ -1218,7 +1240,7 @@ new class extends Component {
                                 @endif
                             @endforeach
 
-                            @if($address && ($address->line1 || $address->city?->name || $address->state?->name))
+                            @if($hasPhysicalAddress)
                                 <div class="flex items-center gap-3 group">
                                     <div
                                         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
@@ -1387,7 +1409,23 @@ new class extends Component {
                     </div>
                 @endif
 
-                {{-- ─── JOIN MAJLISILMU CTA ─── --}}
+                @if($showPendingStatusNotice)
+                    <div class="scroll-reveal reveal-right rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm"
+                        x-intersect.once="$el.classList.add('revealed')">
+                        <p
+                            class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-800">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {{ __('Status Institusi: Menunggu Semakan') }}
+                        </p>
+                        <p class="mt-2 text-xs leading-relaxed text-amber-900/80">
+                            {{ __('Institusi ini masih dalam status semakan. Sila berhati-hati dengan sebarang info / pautan peribadi.') }}
+                            </p>
+                        </div>
+                @endif
+
                 <x-join-majlisilmu-cta />
 
             </div>
@@ -1427,7 +1465,8 @@ new class extends Component {
                         </div>
                         <div class="p-5">
                             <h4 class="font-heading text-lg font-bold leading-tight text-slate-900">
-                                {{ $institution->name }}</h4>
+                                {{ $institution->name }}
+                            </h4>
                             @if($locationString)
                                 <p class="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"

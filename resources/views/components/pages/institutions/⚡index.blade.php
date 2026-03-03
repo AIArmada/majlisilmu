@@ -1,24 +1,33 @@
 <?php
 
+use App\Forms\InstitutionFormSchema;
 use App\Models\Institution;
 use App\Models\District;
 use App\Models\State;
 use App\Models\Subdistrict;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Schemas\Schema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 new
 #[Title('Institutions - Majlis Ilmu')]
-class extends Component
+class extends Component implements HasForms
 {
+    use InteractsWithForms;
+    use WithFileUploads;
     use WithPagination;
 
     #[Url]
@@ -32,6 +41,69 @@ class extends Component
 
     #[Url]
     public ?string $subdistrict_id = null;
+
+    /**
+     * @var array<string, mixed>|null
+     */
+    public ?array $institutionSubmissionData = [];
+
+    public bool $showInstitutionSubmissionForm = false;
+
+    public function mount(): void
+    {
+        $this->form->fill();
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema
+            ->statePath('institutionSubmissionData')
+            ->schema(InstitutionFormSchema::createOptionForm());
+    }
+
+    public function openInstitutionSubmissionForm(): void
+    {
+        if (! auth()->check()) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $this->showInstitutionSubmissionForm = true;
+
+        $prefillName = $this->normalizedSearch();
+        $this->form->fill($prefillName !== null ? ['name' => $prefillName] : []);
+    }
+
+    public function cancelInstitutionSubmissionForm(): void
+    {
+        $this->showInstitutionSubmissionForm = false;
+        $this->form->fill();
+    }
+
+    public function submitInstitution(): void
+    {
+        if (! auth()->check()) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $data = $this->form->getState();
+
+        InstitutionFormSchema::createOptionUsing($data, $this->form);
+
+        Cache::forget('submit_institutions');
+
+        $this->showInstitutionSubmissionForm = false;
+        $this->form->fill();
+
+        FilamentNotification::make()
+            ->title(__('Institusi berjaya dihantar untuk semakan pentadbir.'))
+            ->body(__('Status institusi adalah pending sehingga diluluskan oleh admin.'))
+            ->success()
+            ->send();
+    }
 
     #[Computed]
     public function institutions(): LengthAwarePaginatorContract
@@ -331,6 +403,7 @@ class extends Component
 @php
     $institutions = $this->institutions;
     $search = $this->search;
+    $showInstitutionSubmissionForm = $this->showInstitutionSubmissionForm;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
@@ -445,34 +518,84 @@ class extends Component
                         </div>
                     </div>
 
-                    @if($hasScopedFilters)
-                        <div class="mt-3 flex justify-end">
+	                    @if($hasScopedFilters)
+	                        <div class="mt-3 flex justify-end">
+	                            <button
+	                                type="button"
+	                                wire:click="clearFilters"
+                                class="text-xs font-bold text-red-500 hover:underline"
+	                            >
+	                                {{ __('Clear Location Scope') }}
+	                            </button>
+	                        </div>
+	                    @endif
+
+                        <div class="mt-4">
                             <button
                                 type="button"
-                                wire:click="clearFilters"
-                                class="text-xs font-bold text-red-500 hover:underline"
+                                wire:click="openInstitutionSubmissionForm"
+                                class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
                             >
-                                {{ __('Clear Location Scope') }}
+                                {{ __('Tak jumpa institusi? Tambah institusi') }}
                             </button>
                         </div>
-                    @endif
-                 </div>
-            </div>
-        </div>
+	                 </div>
+	            </div>
+	        </div>
 
-        <div class="container mx-auto px-6 lg:px-12 mt-12">
-            @if($institutions->isEmpty())
-                <div class="text-center py-24 rounded-3xl bg-slate-50/50 border border-dashed border-slate-200">
-                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white text-slate-300 shadow-sm mb-6">
-                        <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+	        <div class="container mx-auto px-6 lg:px-12 mt-12">
+                @if($showInstitutionSubmissionForm)
+                    <div class="mb-10 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm md:p-8">
+                        <div class="mb-6">
+                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Tambah Institusi') }}</h2>
+                            <p class="mt-2 text-sm text-slate-600">
+                                {{ __('Institusi baharu akan ditandakan sebagai pending dan menunggu kelulusan admin sebelum dipaparkan secara umum.') }}
+                            </p>
+                        </div>
+
+                        <form wire:submit="submitInstitution" novalidate>
+                            {{ $this->form }}
+
+                            <div class="mt-6 flex flex-wrap items-center gap-3">
+                                <button
+                                    type="submit"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                                >
+                                    {{ __('Hantar Institusi') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="cancelInstitutionSubmissionForm"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    {{ __('Batal') }}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <h3 class="text-xl font-bold text-slate-900">{{ __('No institutions found') }}</h3>
-                    <p class="text-slate-500 mt-2 max-w-md mx-auto">{{ __('We couldn\'t find any institutions matching your search.') }}</p>
-                    <button type="button" wire:click="clearFilters" class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
-                        {{ __('Clear Filters') }} &rarr;
-                    </button>
-                </div>
-            @else
+                @endif
+
+	            @if($institutions->isEmpty())
+	                <div class="text-center py-24 rounded-3xl bg-slate-50/50 border border-dashed border-slate-200">
+	                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white text-slate-300 shadow-sm mb-6">
+                        <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+	                    </div>
+	                    <h3 class="text-xl font-bold text-slate-900">{{ __('No institutions found') }}</h3>
+	                    <p class="text-slate-500 mt-2 max-w-md mx-auto">{{ __('We couldn\'t find any institutions matching your search.') }}</p>
+                        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+                            <button type="button" wire:click="clearFilters" class="font-semibold text-emerald-600 hover:text-emerald-700">
+                                {{ __('Clear Filters') }} &rarr;
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="openInstitutionSubmissionForm"
+                                class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+                            >
+                                {{ __('Tambah Institusi') }}
+                            </button>
+                        </div>
+	                </div>
+	            @else
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($institutions as $institution)
                         @php
@@ -522,9 +645,10 @@ class extends Component
                     @endforeach
                 </div>
 
-                <div class="mt-16">
-                    {{ $institutions->withQueryString()->links() }}
-                </div>
-            @endif
-        </div>
-    </div>
+	                <div class="mt-16">
+	                    {{ $institutions->withQueryString()->links() }}
+	                </div>
+	            @endif
+	        </div>
+        <x-filament-actions::modals />
+	    </div>

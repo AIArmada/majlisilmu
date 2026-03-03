@@ -18,7 +18,7 @@ class EventSaveController extends Controller
         $savedEvents = $request->user()
             ->savedEvents()
             ->with(['institution:id,name,slug', 'venue:id,name', 'speakers:id,name,slug'])
-            ->where('status', 'approved')
+            ->whereIn('status', Event::PUBLIC_STATUSES)
             ->where('visibility', 'public')
             ->orderBy('starts_at')
             ->paginate($request->input('per_page', 20));
