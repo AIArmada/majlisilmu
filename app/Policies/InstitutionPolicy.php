@@ -2,9 +2,9 @@
 
 namespace App\Policies;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\Institution;
 use App\Models\User;
+use App\Support\Authz\MemberPermissionGate;
 
 class InstitutionPolicy
 {
@@ -35,7 +35,7 @@ class InstitutionPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'institution.view', $institution);
+        return app(MemberPermissionGate::class)->canInstitution($user, 'institution.view', $institution);
     }
 
     /**
@@ -57,7 +57,7 @@ class InstitutionPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'institution.update', $institution);
+        return app(MemberPermissionGate::class)->canInstitution($user, 'institution.update', $institution);
     }
 
     /**
@@ -70,7 +70,7 @@ class InstitutionPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'institution.delete', $institution);
+        return app(MemberPermissionGate::class)->canInstitution($user, 'institution.delete', $institution);
     }
 
     /**
@@ -82,7 +82,7 @@ class InstitutionPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'institution.manage-members', $institution);
+        return app(MemberPermissionGate::class)->canInstitution($user, 'institution.manage-members', $institution);
     }
 
     /**
@@ -94,6 +94,6 @@ class InstitutionPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'institution.manage-donation-channels', $institution);
+        return app(MemberPermissionGate::class)->canInstitution($user, 'institution.manage-donation-channels', $institution);
     }
 }

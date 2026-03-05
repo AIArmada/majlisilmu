@@ -6,6 +6,7 @@ use App\Enums\NotificationChannel;
 use App\Enums\NotificationFrequency;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,6 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
@@ -46,6 +46,7 @@ class User extends Authenticatable implements FilamentUser
             $user->reports()->update(['reporter_id' => null]);
             $user->handledReports()->update(['handled_by' => null]);
             $user->registrations()->each(fn ($reg) => $reg->delete());
+            $user->eventCheckins()->each(fn ($checkin) => $checkin->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
             $user->notificationEndpoints()->each(fn ($endpoint) => $endpoint->delete());
             $user->notificationPreferences()->each(fn ($preference) => $preference->delete());
@@ -150,6 +151,14 @@ class User extends Authenticatable implements FilamentUser
     public function registrations(): HasMany
     {
         return $this->hasMany(Registration::class);
+    }
+
+    /**
+     * @return HasMany<EventCheckin, $this>
+     */
+    public function eventCheckins(): HasMany
+    {
+        return $this->hasMany(EventCheckin::class);
     }
 
     /**
@@ -331,14 +340,31 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        $registrar = app(PermissionRegistrar::class);
-        $teams = $registrar->teams;
-        $registrar->teams = false;
-
-        try {
-            return $this->roles()->exists();
-        } finally {
-            $registrar->teams = $teams;
+        if ($panel->getId() === 'ahli') {
+            return true;
         }
+
+        if ($panel->getId() === 'admin') {
+            return $this->hasGlobalRoleAssignment();
+        }
+
+        return $this->roles()->exists();
+    }
+
+    private function hasGlobalRoleAssignment(): bool
+    {
+        $modelHasRolesTable = (string) (config('permission.table_names.model_has_roles') ?? 'model_has_roles');
+        $modelMorphKey = (string) (config('permission.column_names.model_morph_key') ?? 'model_id');
+        $teamForeignKey = (string) (config('permission.column_names.team_foreign_key') ?? 'team_id');
+
+        $query = DB::table($modelHasRolesTable)
+            ->where($modelMorphKey, $this->getKey())
+            ->where('model_type', $this->getMorphClass());
+
+        if (config('permission.teams')) {
+            $query->whereNull($teamForeignKey);
+        }
+
+        return $query->exists();
     }
 }

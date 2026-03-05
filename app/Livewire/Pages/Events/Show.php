@@ -6,13 +6,17 @@ use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Enums\SessionStatus;
 use App\Models\Event;
+use App\Models\EventCheckin;
 use App\Models\EventSession;
+use App\Models\Registration;
 use App\Models\User;
 use App\Services\CalendarService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
+use Carbon\CarbonInterface;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -34,6 +38,8 @@ class Show extends Component
     public bool $isInterested = false;
 
     public bool $isGoing = false;
+
+    public bool $isCheckedIn = false;
 
     public int $interestsCount = 0;
 
@@ -144,7 +150,7 @@ class Show extends Component
                 }
 
                 return $session->status === SessionStatus::Scheduled
-                    && $startsAt instanceof Carbon
+                    && $startsAt instanceof CarbonInterface
                     && $startsAt->greaterThanOrEqualTo($now);
             })
             ->sortBy('starts_at')
@@ -172,15 +178,15 @@ class Show extends Component
         $startsAt = $this->event->starts_at;
         $endsAt = $this->event->ends_at;
 
-        if (! $startsAt instanceof Carbon) {
+        if (! $startsAt instanceof CarbonInterface) {
             return 'upcoming';
         }
 
-        if ($endsAt instanceof Carbon && $now->greaterThan($endsAt)) {
+        if ($endsAt instanceof CarbonInterface && $now->greaterThan($endsAt)) {
             return 'past';
         }
 
-        if ($startsAt->isPast() && (! $endsAt instanceof Carbon || $now->lessThanOrEqualTo($endsAt))) {
+        if ($startsAt->isPast() && (! $endsAt instanceof CarbonInterface || $now->lessThanOrEqualTo($endsAt))) {
             return 'happening_now';
         }
 
@@ -251,6 +257,86 @@ class Show extends Component
         $this->toggleEngagement('goingEvents', 'isGoing', 'going_count', 'goingCount');
     }
 
+    public function checkIn(): void
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login');
+
+            return;
+        }
+
+        $state = $this->resolveCheckInState($user);
+
+        if (! $state['available']) {
+            if (filled($state['reason'])) {
+                FilamentNotification::make()
+                    ->title((string) $state['reason'])
+                    ->warning()
+                    ->send();
+            }
+
+            return;
+        }
+
+        $alreadyCheckedIn = EventCheckin::query()
+            ->where('event_id', $this->event->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($alreadyCheckedIn) {
+            $this->isCheckedIn = true;
+
+            FilamentNotification::make()
+                ->title(__('Anda sudah check-in untuk majlis ini.'))
+                ->success()
+                ->send();
+
+            return;
+        }
+
+        EventCheckin::query()->create([
+            'event_id' => $this->event->id,
+            'event_session_id' => $state['event_session_id'],
+            'registration_id' => $state['registration_id'],
+            'user_id' => $user->id,
+            'method' => $state['method'],
+            'checked_in_at' => now(),
+        ]);
+
+        $this->isCheckedIn = true;
+        unset($this->checkInState);
+
+        FilamentNotification::make()
+            ->title(__('Check-in berjaya direkodkan.'))
+            ->success()
+            ->send();
+    }
+
+    /**
+     * @return array{available: bool, reason: string|null}
+     */
+    #[Computed]
+    public function checkInState(): array
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return [
+                'available' => false,
+                'reason' => __('Log masuk untuk check-in.'),
+            ];
+        }
+
+        $state = $this->resolveCheckInState($user);
+
+        return [
+            'available' => $state['available'],
+            'reason' => $state['reason'],
+        ];
+    }
+
     protected function toggleEngagement(string $relation, string $stateProperty, string $countColumn, ?string $countProperty = null): void
     {
         $user = auth()->user();
@@ -297,6 +383,7 @@ class Show extends Component
             $this->isSaved = false;
             $this->isInterested = false;
             $this->isGoing = false;
+            $this->isCheckedIn = false;
 
             return;
         }
@@ -304,6 +391,10 @@ class Show extends Component
         $this->isSaved = $user->savedEvents()->where('event_id', $this->event->id)->exists();
         $this->isInterested = $user->interestedEvents()->where('event_id', $this->event->id)->exists();
         $this->isGoing = $user->goingEvents()->where('event_id', $this->event->id)->exists();
+        $this->isCheckedIn = EventCheckin::query()
+            ->where('event_id', $this->event->id)
+            ->where('user_id', $user->id)
+            ->exists();
     }
 
     /**
@@ -369,5 +460,100 @@ class Show extends Component
         return \App\Models\EventSubmission::where('event_id', $event->id)
             ->where('submitted_by', $user->id)
             ->exists();
+    }
+
+    /**
+     * @return array{
+     *   available: bool,
+     *   reason: string|null,
+     *   method: 'self_reported'|'registered_self_checkin',
+     *   registration_id: string|null,
+     *   event_session_id: string|null
+     * }
+     */
+    protected function resolveCheckInState(User $user): array
+    {
+        if (! $this->event->is_active || $this->event->visibility !== EventVisibility::Public || ! $this->isEngagementStatus($this->event)) {
+            return [
+                'available' => false,
+                'reason' => __('Majlis ini tidak tersedia untuk check-in.'),
+                'method' => 'self_reported',
+                'registration_id' => null,
+                'event_session_id' => null,
+            ];
+        }
+
+        $startsAt = $this->event->starts_at;
+        if (! $startsAt instanceof CarbonInterface) {
+            return [
+                'available' => false,
+                'reason' => __('Masa majlis belum ditetapkan untuk check-in.'),
+                'method' => 'self_reported',
+                'registration_id' => null,
+                'event_session_id' => null,
+            ];
+        }
+
+        $eventTimezone = $this->event->timezone ?: 'Asia/Kuala_Lumpur';
+        $windowStartsAt = $startsAt->copy()->setTimezone($eventTimezone)->subHours(2);
+        $windowEndsAt = $startsAt->copy()->setTimezone($eventTimezone)->addHours(8);
+        $now = now($eventTimezone);
+
+        if ($now->lt($windowStartsAt)) {
+            return [
+                'available' => false,
+                'reason' => __('Check-in dibuka 2 jam sebelum majlis bermula.'),
+                'method' => 'self_reported',
+                'registration_id' => null,
+                'event_session_id' => null,
+            ];
+        }
+
+        if ($now->gt($windowEndsAt)) {
+            return [
+                'available' => false,
+                'reason' => __('Tempoh check-in telah tamat.'),
+                'method' => 'self_reported',
+                'registration_id' => null,
+                'event_session_id' => null,
+            ];
+        }
+
+        $registrationRequired = (bool) data_get($this->event, 'settings.registration_required', false);
+        if (! $registrationRequired) {
+            return [
+                'available' => true,
+                'reason' => null,
+                'method' => 'self_reported',
+                'registration_id' => null,
+                'event_session_id' => null,
+            ];
+        }
+
+        /** @var Registration|null $registration */
+        $registration = Registration::query()
+            ->where('event_id', $this->event->id)
+            ->where('user_id', $user->id)
+            ->where('status', '!=', 'cancelled')
+            ->latest('created_at')
+            ->first();
+
+        if (! $registration instanceof Registration) {
+            return [
+                'available' => false,
+                'reason' => __('Majlis ini memerlukan pendaftaran sebelum check-in.'),
+                'method' => 'registered_self_checkin',
+                'registration_id' => null,
+                'event_session_id' => null,
+            ];
+        }
+
+        return [
+            'available' => true,
+            'reason' => null,
+            'method' => 'registered_self_checkin',
+            'registration_id' => $registration->id,
+            'event_session_id' => $registration->event_session_id,
+        ];
     }
 }

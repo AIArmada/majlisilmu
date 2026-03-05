@@ -2,9 +2,9 @@
 
 namespace App\Policies;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Authz\MemberPermissionGate;
 
 class SpeakerPolicy
 {
@@ -35,7 +35,7 @@ class SpeakerPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'speaker.view', $speaker);
+        return app(MemberPermissionGate::class)->canSpeaker($user, 'speaker.view', $speaker);
     }
 
     /**
@@ -57,7 +57,7 @@ class SpeakerPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'speaker.update', $speaker);
+        return app(MemberPermissionGate::class)->canSpeaker($user, 'speaker.update', $speaker);
     }
 
     /**
@@ -70,7 +70,7 @@ class SpeakerPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'speaker.delete', $speaker);
+        return app(MemberPermissionGate::class)->canSpeaker($user, 'speaker.delete', $speaker);
     }
 
     /**
@@ -82,6 +82,6 @@ class SpeakerPolicy
             return true;
         }
 
-        return Authz::userCanInScope($user, 'speaker.manage-members', $speaker);
+        return app(MemberPermissionGate::class)->canSpeaker($user, 'speaker.manage-members', $speaker);
     }
 }

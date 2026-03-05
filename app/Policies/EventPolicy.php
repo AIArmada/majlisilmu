@@ -2,10 +2,12 @@
 
 namespace App\Policies;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Enums\EventVisibility;
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Authz\MemberPermissionGate;
 
 class EventPolicy
 {
@@ -119,14 +121,22 @@ class EventPolicy
             return true;
         }
 
-        // Check organizer scope first
-        if ($event->organizer_id && $event->organizer) {
-            return Authz::userCanInScope($user, 'event.export-registrations', $event->organizer);
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        if ($memberPermissions->canEvent($user, 'event.export-registrations', $event)) {
+            return true;
         }
 
-        // Fallback to institution scope
-        if ($event->institution_id) {
-            return Authz::userCanInScope($user, 'event.export-registrations', $event->institution);
+        if ($event->organizer instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.export-registrations', $event->organizer);
+        }
+
+        if ($event->organizer instanceof Speaker) {
+            return $memberPermissions->canSpeaker($user, 'event.export-registrations', $event->organizer);
+        }
+
+        if ($event->institution instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.export-registrations', $event->institution);
         }
 
         return false;
@@ -141,19 +151,22 @@ class EventPolicy
             return true;
         }
 
-        // Check event-scoped permission via Authz
-        if (Authz::userCanInScope($user, 'event.manage-members', $event)) {
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        if ($memberPermissions->canEvent($user, 'event.manage-members', $event)) {
             return true;
         }
 
-        // Check organizer scope
-        if ($event->organizer_id && $event->organizer) {
-            return Authz::userCanInScope($user, 'event.manage-members', $event->organizer);
+        if ($event->organizer instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.manage-members', $event->organizer);
         }
 
-        // Fallback to institution scope
-        if ($event->institution_id) {
-            return Authz::userCanInScope($user, 'event.manage-members', $event->institution);
+        if ($event->organizer instanceof Speaker) {
+            return $memberPermissions->canSpeaker($user, 'event.manage-members', $event->organizer);
+        }
+
+        if ($event->institution instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.manage-members', $event->institution);
         }
 
         return false;

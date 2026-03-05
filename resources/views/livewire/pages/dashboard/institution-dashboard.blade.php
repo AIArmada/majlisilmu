@@ -51,12 +51,16 @@
                         </div>
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Events') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Events (All)') }}</p>
                                 <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['events_count'] }}</p>
+                                <p class="mt-1 text-[11px] text-slate-500">{{ __('Public active: :count', ['count' => $stats['public_events_count']]) }}</p>
+                                <p class="text-[11px] text-slate-500">{{ __('Internal / hidden: :count', ['count' => $stats['internal_events_count']]) }}</p>
                             </div>
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Registrations') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Registrations (All)') }}</p>
                                 <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['registrations_count'] }}</p>
+                                <p class="mt-1 text-[11px] text-slate-500">{{ __('Public active: :count', ['count' => $stats['public_registrations_count']]) }}</p>
+                                <p class="text-[11px] text-slate-500">{{ __('Internal / hidden: :count', ['count' => $stats['internal_registrations_count']]) }}</p>
                             </div>
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Members') }}</p>
@@ -68,6 +72,9 @@
 
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
                     <h3 class="mb-5 font-heading text-2xl font-bold text-slate-900">{{ __('Institution Events') }}</h3>
+                    <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                        {{ __('This dashboard shows all institution events, including draft, private, and inactive records. Public institution pages only show events that are public + active.') }}
+                    </div>
 
                     @if($events->isEmpty())
                         <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
@@ -82,11 +89,20 @@
                                         <th class="pb-3 pr-4">{{ __('Date') }}</th>
                                         <th class="pb-3 pr-4">{{ __('Venue') }}</th>
                                         <th class="pb-3 pr-4">{{ __('Status') }}</th>
+                                        <th class="pb-3 pr-4">{{ __('Visibility') }}</th>
+                                        <th class="pb-3 pr-4">{{ __('Public Page') }}</th>
                                         <th class="pb-3">{{ __('Registrations') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
                                     @foreach($events as $event)
+                                        @php
+                                            $statusValue = (string) $event->status;
+                                            $visibilityValue = $event->visibility?->value ?? (string) $event->visibility;
+                                            $isPublicListed = $event->is_active
+                                                && in_array($statusValue, \App\Models\Event::PUBLIC_STATUSES, true)
+                                                && $visibilityValue === \App\Enums\EventVisibility::Public->value;
+                                        @endphp
                                         <tr wire:key="institution-event-{{ $event->id }}">
                                             <td class="py-4 pr-4">
                                                 <a href="{{ route('events.show', $event) }}" wire:navigate
@@ -99,6 +115,16 @@
                                             <td class="py-4 pr-4">
                                                 <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                                                     {{ str((string) $event->status)->replace('_', ' ')->headline() }}
+                                                </span>
+                                            </td>
+                                            <td class="py-4 pr-4">
+                                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $visibilityValue === \App\Enums\EventVisibility::Public->value ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
+                                                    {{ $visibilityValue === \App\Enums\EventVisibility::Public->value ? __('Public') : __('Private') }}
+                                                </span>
+                                            </td>
+                                            <td class="py-4 pr-4">
+                                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $isPublicListed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700' }}">
+                                                    {{ $isPublicListed ? __('Visible on public page') : __('Internal only') }}
                                                 </span>
                                             </td>
                                             <td class="py-4 font-semibold text-slate-900">{{ $event->registrations_count }}</td>
@@ -124,6 +150,14 @@
                     @else
                         <div class="space-y-3">
                             @foreach($registrations as $registration)
+                                @php
+                                    $registrationEvent = $registration->event;
+                                    $registrationStatusValue = (string) ($registrationEvent?->status ?? '');
+                                    $registrationVisibilityValue = $registrationEvent?->visibility?->value ?? (string) ($registrationEvent?->visibility ?? '');
+                                    $registrationIsPublicListed = $registrationEvent?->is_active
+                                        && in_array($registrationStatusValue, \App\Models\Event::PUBLIC_STATUSES, true)
+                                        && $registrationVisibilityValue === \App\Enums\EventVisibility::Public->value;
+                                @endphp
                                 <article wire:key="institution-registration-{{ $registration->id }}"
                                     class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -135,6 +169,9 @@
                                                 </a>
                                                 <p class="mt-1 text-xs text-slate-500">
                                                     {{ $registration->event?->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($registration->event->starts_at, 'd M Y, h:i A') : __('TBC') }}
+                                                </p>
+                                                <p class="mt-1 text-xs text-slate-500">
+                                                    {{ __('Event scope: :scope', ['scope' => $registrationIsPublicListed ? __('Visible on public page') : __('Internal only')]) }}
                                                 </p>
                                             @endif
                                             <p class="mt-2 text-sm text-slate-700">

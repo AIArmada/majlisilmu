@@ -2,11 +2,11 @@
 
 namespace App\States\EventStatus\Transitions;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
 use App\Notifications\EventNeedsChangesNotification;
+use App\Support\Authz\MemberPermissionGate;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -82,9 +82,9 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
             $notifiables->push(User::find($event->submitter_id));
         }
 
-        if ($event->institution_id) {
-            $admins = Authz::withScope($event->institution, fn () => User::permission('event.update')->get());
-
+        if ($event->institution) {
+            $admins = app(MemberPermissionGate::class)
+                ->institutionMembersWithPermission($event->institution, 'event.update');
             $notifiables = $notifiables->merge($admins);
         }
 

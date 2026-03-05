@@ -126,6 +126,53 @@ it('shows institution profile, events, and registrations for members', function 
         ->assertDontSee('External Registrant');
 });
 
+it('clearly distinguishes public and internal institution data for members', function () {
+    $user = User::factory()->create();
+    $attendee = User::factory()->create();
+
+    $institution = Institution::factory()->create(['name' => 'Masjid Pemisahan Scope']);
+    $user->institutions()->attach($institution->id);
+
+    $publicEvent = Event::factory()->for($institution)->create([
+        'title' => 'Public Institution Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $internalEvent = Event::factory()->for($institution)->create([
+        'title' => 'Internal Institution Event',
+        'status' => 'draft',
+        'visibility' => 'private',
+        'is_active' => true,
+        'starts_at' => now()->addDays(4),
+    ]);
+
+    Registration::factory()->for($publicEvent)->for($attendee)->create([
+        'name' => 'Public Event Registrant',
+        'status' => 'registered',
+    ]);
+
+    Registration::factory()->for($internalEvent)->for($attendee)->create([
+        'name' => 'Internal Event Registrant',
+        'status' => 'registered',
+    ]);
+
+    $response = $this->actingAs($user)->get('/dashboard/institutions?institution='.$institution->id);
+
+    $response->assertOk()
+        ->assertSee('Masjid Pemisahan Scope')
+        ->assertSee('Public Institution Event')
+        ->assertSee('Internal Institution Event')
+        ->assertSee('Public Event Registrant')
+        ->assertSee('Internal Event Registrant')
+        ->assertSee('Public active: 1')
+        ->assertSee('Internal / hidden: 1')
+        ->assertSee('Visible on public page')
+        ->assertSee('Internal only');
+});
+
 it('forbids selecting institutions the user does not belong to', function () {
     $user = User::factory()->create();
 

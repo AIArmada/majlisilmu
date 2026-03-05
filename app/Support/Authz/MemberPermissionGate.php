@@ -1,0 +1,91 @@
+<?php
+
+namespace App\Support\Authz;
+
+use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\AuthzScope;
+use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Speaker;
+use App\Models\User;
+use Illuminate\Support\Collection;
+
+final class MemberPermissionGate
+{
+    public function __construct(
+        private readonly MemberRoleScopes $memberRoleScopes,
+    ) {}
+
+    public function canInstitution(User $user, string $permission, Institution $institution): bool
+    {
+        return $this->isInstitutionMember($user, $institution)
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->institution());
+    }
+
+    public function canSpeaker(User $user, string $permission, Speaker $speaker): bool
+    {
+        return $this->isSpeakerMember($user, $speaker)
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->speaker());
+    }
+
+    public function canEvent(User $user, string $permission, Event $event): bool
+    {
+        return $this->isEventMember($user, $event)
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->event());
+    }
+
+    public function hasAnyInstitutionPermission(User $user, string $permission): bool
+    {
+        return $user->institutions()->exists()
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->institution());
+    }
+
+    public function hasAnyEventPermission(User $user, string $permission): bool
+    {
+        return $user->memberEvents()->exists()
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->event());
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function institutionMembersWithPermission(Institution $institution, string $permission): Collection
+    {
+        /** @var Collection<int, User> $members */
+        $members = $institution->members()->get();
+
+        return $members
+            ->filter(fn (User $member): bool => $this->canInstitution($member, $permission, $institution))
+            ->values();
+    }
+
+    public function institutionScope(): AuthzScope
+    {
+        return $this->memberRoleScopes->institution();
+    }
+
+    public function speakerScope(): AuthzScope
+    {
+        return $this->memberRoleScopes->speaker();
+    }
+
+    public function eventScope(): AuthzScope
+    {
+        return $this->memberRoleScopes->event();
+    }
+
+    private function isInstitutionMember(User $user, Institution $institution): bool
+    {
+        return $institution->members()->whereKey($user->getKey())->exists();
+    }
+
+    private function isSpeakerMember(User $user, Speaker $speaker): bool
+    {
+        return $speaker->members()->whereKey($user->getKey())->exists();
+    }
+
+    private function isEventMember(User $user, Event $event): bool
+    {
+        return $event->members()->whereKey($user->getKey())->exists();
+    }
+}

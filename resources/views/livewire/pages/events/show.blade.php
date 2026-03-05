@@ -37,6 +37,12 @@
     $eventTimeStatus = $this->eventTimeStatus;
     $descriptionHtml = $this->descriptionHtml;
     $isCancelledStatus = $event->status instanceof \App\States\EventStatus\Cancelled || (string) $event->status === 'cancelled';
+    $checkInState = $this->checkInState;
+    $canCheckIn = $checkInState['available'];
+    $checkInReason = $checkInState['reason'];
+    $isCheckedIn = $this->isCheckedIn;
+    $isAuthenticated = auth()->check();
+    $checkInActionDisabled = $isAuthenticated && ! $canCheckIn && ! $isCheckedIn;
 
     $shareData = [
         'title' => $event->title,
@@ -800,6 +806,22 @@
                             @endif
                         </button>
                     @endif
+
+                    <button type="button" wire:click="checkIn" wire:loading.attr="disabled"
+                        @disabled($checkInActionDisabled)
+                        @if($checkInActionDisabled && filled($checkInReason)) title="{{ $checkInReason }}" @endif
+                        class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                        {{ $isCheckedIn
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : ($checkInActionDisabled
+                                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                : 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50') }}">
+                        <svg class="size-5 {{ $isCheckedIn ? 'text-emerald-600' : '' }}" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {{ $isCheckedIn ? __('Sudah Check-in') : __('Check-in') }}
+                    </button>
 
                     <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
                         {{ $isInterested
@@ -2500,6 +2522,21 @@ MOBILE BOTTOM ACTION BAR
                             @endif
                         </svg>
                         {{ $isGoing ? __('Hadir') : __('Akan Hadir') }}
+                    </button>
+
+                    <button type="button" wire:click="checkIn" wire:loading.attr="disabled"
+                        @disabled($checkInActionDisabled)
+                        @if($checkInActionDisabled && filled($checkInReason)) title="{{ $checkInReason }}" @endif
+                        class="rounded-xl border-2 p-3 transition-all
+                        {{ $isCheckedIn
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-600 shadow-inner'
+                            : ($checkInActionDisabled
+                                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300'
+                                : 'border-emerald-200 bg-white text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50') }}">
+                        <svg class="size-5 {{ $isCheckedIn ? 'text-emerald-600' : '' }}" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
                     </button>
 
                     <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"

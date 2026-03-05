@@ -6,6 +6,7 @@ use App\Enums\NotificationChannel;
 use App\Enums\NotificationFrequency;
 use App\Enums\NotificationPreferenceKey;
 use App\Models\Event;
+use App\Models\EventCheckin;
 use App\Models\Registration;
 use App\Models\SavedSearch;
 use App\Models\User;
@@ -57,6 +58,7 @@ class UserDashboard extends Component
                 'institutions_count' => 0,
                 'events_count' => 0,
                 'registrations_count' => 0,
+                'checkins_count' => 0,
                 'saved_events_count' => 0,
                 'saved_searches_count' => 0,
             ];
@@ -66,6 +68,7 @@ class UserDashboard extends Component
             'institutions_count' => $user->institutions()->count(),
             'events_count' => $this->myEventsQuery($user)->count(),
             'registrations_count' => $user->registrations()->count(),
+            'checkins_count' => EventCheckin::query()->where('user_id', $user->id)->count(),
             'saved_events_count' => $this->mySavedEventsQuery($user)->count(),
             'saved_searches_count' => $user->savedSearches()->count(),
         ];
@@ -112,6 +115,30 @@ class UserDashboard extends Component
             ])
             ->latest()
             ->paginate(perPage: 8, pageName: 'my_registrations_page');
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, EventCheckin>
+     */
+    #[Computed]
+    public function myCheckins(): LengthAwarePaginator
+    {
+        $user = auth()->user();
+
+        abort_unless($user instanceof User, 403);
+
+        return EventCheckin::query()
+            ->where('user_id', $user->id)
+            ->with([
+                'event' => fn ($query) => $query
+                    ->select('id', 'title', 'slug', 'starts_at', 'institution_id', 'venue_id')
+                    ->with([
+                        'institution:id,name',
+                        'venue:id,name',
+                    ]),
+            ])
+            ->orderByDesc('checked_in_at')
+            ->paginate(perPage: 8, pageName: 'my_checkins_page');
     }
 
     /**

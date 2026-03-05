@@ -1,11 +1,12 @@
 <?php
 
 use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Models\Event;
 use App\Models\EventUser;
 use App\Models\User;
+use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
@@ -35,15 +36,15 @@ beforeEach(function () {
 });
 
 /**
- * Helper: assign a scoped role with the given permission to a user on an event.
+ * Helper: assign a shared event-member scoped role to a user.
  */
-function assignEventScopedRole(User $user, Event $event, string $roleName, string $permissionName): void
+function assignEventScopedRole(User $user, string $roleName): void
 {
-    $permission = Permission::findOrCreate($permissionName, 'web');
+    app(ScopedMemberRoleSeeder::class)->ensureForEvent();
+    $scope = app(MemberRoleScopes::class)->event();
 
-    Authz::withScope($event, function () use ($user, $roleName, $permission): void {
+    Authz::withScope($scope, function () use ($user, $roleName): void {
         $role = Role::findOrCreate($roleName, 'web');
-        $role->givePermissionTo($permission);
         $user->assignRole($role);
     }, $user);
 }
@@ -51,12 +52,12 @@ function assignEventScopedRole(User $user, Event $event, string $roleName, strin
 /**
  * Helper: make a user an event member with a scoped role.
  */
-function makeEventMember(User $user, Event $event, ?string $roleName = null, ?string $permissionName = null): void
+function makeEventMember(User $user, Event $event, ?string $roleName = null): void
 {
     EventUser::factory()->for($event)->for($user)->create();
 
-    if ($roleName && $permissionName) {
-        assignEventScopedRole($user, $event, $roleName, $permissionName);
+    if ($roleName) {
+        assignEventScopedRole($user, $roleName);
     }
 }
 
@@ -104,10 +105,7 @@ describe('view', function () {
         ]);
         $user = User::factory()->create();
 
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->create();
+        makeEventMember($user, $event, 'viewer');
 
         expect($user->can('view', $event))->toBeTrue();
     });
@@ -188,7 +186,7 @@ describe('update', function () {
             'status' => Approved::class,
         ]);
 
-        makeEventMember($user, $event, 'organizer', 'event.update');
+        makeEventMember($user, $event, 'organizer');
 
         expect($user->can('update', $event))->toBeTrue();
     });
@@ -199,11 +197,7 @@ describe('update', function () {
             'status' => Approved::class,
         ]);
 
-        // Member without any scoped role
-        EventUser::factory()
-            ->for($event)
-            ->for($user)
-            ->create();
+        makeEventMember($user, $event, 'viewer');
 
         expect($user->can('update', $event))->toBeFalse();
     });
@@ -249,7 +243,7 @@ describe('delete', function () {
             'status' => Draft::class,
         ]);
 
-        makeEventMember($user, $event, 'organizer', 'event.delete');
+        makeEventMember($user, $event, 'organizer');
 
         expect($user->can('delete', $event))->toBeTrue();
     });
@@ -261,7 +255,7 @@ describe('delete', function () {
         ]);
 
         // Member with event.update but not event.delete
-        makeEventMember($user, $event, 'co-organizer', 'event.update');
+        makeEventMember($user, $event, 'editor');
 
         expect($user->can('delete', $event))->toBeFalse();
     });
@@ -272,7 +266,7 @@ describe('delete', function () {
             'status' => Approved::class,
         ]);
 
-        makeEventMember($user, $event, 'organizer', 'event.delete');
+        makeEventMember($user, $event, 'organizer');
 
         expect($user->can('delete', $event))->toBeFalse();
     });
@@ -322,7 +316,7 @@ describe('manageMembers', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        makeEventMember($user, $event, 'organizer', 'event.manage-members');
+        makeEventMember($user, $event, 'organizer');
 
         expect($user->can('manageMembers', $event))->toBeTrue();
     });
@@ -331,8 +325,8 @@ describe('manageMembers', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        // Member with different permission
-        makeEventMember($user, $event, 'co-organizer', 'event.update');
+        // Member with update-only role
+        makeEventMember($user, $event, 'editor');
 
         expect($user->can('manageMembers', $event))->toBeFalse();
     });
@@ -343,7 +337,7 @@ describe('userCanManage helper', function () {
         $user = User::factory()->create();
         $event = Event::factory()->create();
 
-        assignEventScopedRole($user, $event, 'organizer', 'event.update');
+        makeEventMember($user, $event, 'organizer');
 
         expect($event->userCanManage($user))->toBeTrue();
     });

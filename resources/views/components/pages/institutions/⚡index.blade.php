@@ -149,20 +149,28 @@ class extends Component implements HasForms
         $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
         $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
 
-        return $query->where(function (Builder $innerQuery) use ($search, $operator, $collapsedWildcardSearch, $searchTokens) {
-            $innerQuery->where('name', $operator, "%{$search}%")
+        return $query->where(function (Builder $innerQuery) use ($collapsedSearch, $operator, $collapsedWildcardSearch, $searchTokens) {
+            $innerQuery->where('name', $operator, "%{$collapsedSearch}%")
                 ->orWhere('name', $operator, $collapsedWildcardSearch)
-                ->orWhere('description', $operator, "%{$search}%")
+                ->orWhere('description', $operator, "%{$collapsedSearch}%")
                 ->orWhere('description', $operator, $collapsedWildcardSearch);
 
-            foreach ($searchTokens as $token) {
-                if (mb_strlen($token) < 2) {
-                    continue;
-                }
-
-                $innerQuery->orWhere('name', $operator, "%{$token}%")
-                    ->orWhere('description', $operator, "%{$token}%");
+            if (count($searchTokens) < 2) {
+                return;
             }
+
+            $innerQuery->orWhere(function (Builder $tokenQuery) use ($searchTokens, $operator): void {
+                foreach ($searchTokens as $token) {
+                    if (mb_strlen($token) < 2) {
+                        continue;
+                    }
+
+                    $tokenQuery->where(function (Builder $tokenMatchQuery) use ($token, $operator): void {
+                        $tokenMatchQuery->where('name', $operator, "%{$token}%")
+                            ->orWhere('description', $operator, "%{$token}%");
+                    });
+                }
+            });
         });
     }
 

@@ -258,6 +258,7 @@ Note: registration export endpoint exists (`GET /api/v1/events/{id}/registration
 - [x] Follow speaker/institution
 - [ ] Push notifications (web)
 - [ ] QR check-in at events
+- [ ] Distinguish check-in source in attendance records (`button` vs `qr_scan`)
 - [ ] Poster generator
 
 ---
