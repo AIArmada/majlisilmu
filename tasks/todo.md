@@ -1,3 +1,104 @@
+# Filament Subdomain Panels Todo
+
+- [x] Move admin panel from `/admin` path to `admin` subdomain routing (with fallback to `/admin` when no subdomain is configured)
+- [x] Enforce admin panel login to users with at least one global-scope role assignment only
+- [x] Add `ahli` panel on its own subdomain with authenticated-access for all users
+- [x] Add focused panel access tests and run verification
+
+## Review
+
+- Added panel-domain config:
+  - `config/filament-panels.php` with `FILAMENT_ADMIN_DOMAIN` and `FILAMENT_AHLI_DOMAIN`.
+  - `.env.example` now includes both keys.
+- Added shared domain resolver trait:
+  - `app/Providers/Filament/Concerns/ResolvesPanelDomain.php`
+  - Auto-derives subdomains from `APP_URL` host (e.g. `majlisilmu.test` -> `admin.majlisilmu.test`, `ahli.majlisilmu.test`) unless explicitly configured.
+  - Keeps testing safe by disabling domain binding when running unit tests.
+- Updated admin panel:
+  - `app/Providers/Filament/AdminPanelProvider.php`
+  - binds to `admin` subdomain and uses root path on that domain.
+  - falls back to `/admin` path if no domain is configured.
+- Added ahli panel:
+  - `app/Providers/Filament/AhliPanelProvider.php`
+  - registered in `bootstrap/providers.php`
+  - binds to `ahli` subdomain (fallback `/ahli`) with login enabled for authenticated users.
+- Updated panel access policy:
+  - `app/Models/User.php`
+  - `admin` panel now requires at least one global role assignment (`authz_scope_id = null`).
+  - `ahli` panel allows all authenticated users.
+- Added focused tests:
+  - `tests/Feature/FilamentPanelAccessTest.php`
+  - covers `ahli` open access, `admin` deny without global role, `admin` deny scoped-only role, and `admin` allow global role.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/FilamentPanelAccessTest.php` => **4 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Providers/Filament/AdminPanelProvider.php app/Providers/Filament/AhliPanelProvider.php app/Providers/Filament/Concerns/ResolvesPanelDomain.php app/Models/User.php tests/Feature/FilamentPanelAccessTest.php` => **No errors**
+  - `php artisan route:list` confirms panel routes on:
+    - `admin.majlisilmu.test`
+    - `ahli.majlisilmu.test`
+
+# Event Check-In Todo
+
+- [x] Add first-class event check-in data model (`event_checkins`) for both open and registration-required events
+- [x] Implement event detail check-in action with eligibility rules (status, time window, auth, registration requirement when needed)
+- [x] Add check-in UI affordance on event detail (desktop + mobile action bars)
+- [x] Show personal check-in history on user dashboard
+- [x] Add focused feature tests for open-event check-in and registration-required check-in
+- [x] Run focused Pest verification and document review
+
+## Review
+
+- Added check-in persistence:
+  - `database/migrations/2026_03_04_000100_create_event_checkins_table.php`
+  - `app/Models/EventCheckin.php`
+  - `database/factories/EventCheckinFactory.php`
+- Added relations + cleanup hooks:
+  - `Event::checkins()`, `Registration::checkins()`, `EventSession::checkins()`, `User::eventCheckins()`
+  - deletion cleanup in `Event`, `Registration`, and `User`; `EventSession` now nulls `event_session_id` in check-ins on delete
+- Implemented event detail check-in flow in `app/Livewire/Pages/Events/Show.php`:
+  - one-button check-in for both open and registration-required events
+  - open events use `method=self_reported`
+  - registration-required events enforce existing non-cancelled registration and use `method=registered_self_checkin`
+  - eligibility window: `2h before start` until `8h after start`
+  - duplicate prevention per `(event_id, user_id)`
+  - integrated with existing auth + notification UX
+- Added check-in actions on desktop/mobile bars in `resources/views/livewire/pages/events/show.blade.php`.
+- Added user-facing history in dashboard:
+  - `app/Livewire/Pages/Dashboard/UserDashboard.php`
+  - `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+- Added focused tests in `tests/Feature/EventCheckInTest.php`.
+- Fixed Carbon type handling in event page checks (`CarbonImmutable` compatibility) by switching strict checks to `CarbonInterface` in `Show.php`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter=EventCheckIn` => **5 passed**
+  - `vendor/bin/pest --parallel --compact --filter="EventShowPageTest|EventEngagementLivewireTest|NotificationPreferencesTest"` => **21 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Show.php` => **No errors**
+  - `vendor/bin/phpstan analyse --ansi` => reports **pre-existing unrelated project errors** outside this change set.
+
+# Institution Dashboard Scope Clarity Todo
+
+- [x] Align institution dashboard stats with all-record visibility while preserving explicit public-active counts
+- [x] Add clear UI scope labels for events and registrations (`Visible on public page` vs `Internal only`)
+- [x] Add regression coverage for mixed public/internal institution events on dashboard
+- [x] Run focused verification and document review
+
+## Review
+
+- Updated dashboard stats logic in `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`:
+  - `events_count` now represents all institution events for members/admins.
+  - added `public_events_count` and `internal_events_count`.
+  - registrations now include `public_registrations_count` and `internal_registrations_count`.
+- Updated dashboard UI in `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`:
+  - stats cards now show `All`, plus explicit split (`Public active` vs `Internal / hidden`).
+  - added a scope notice clarifying dashboard vs public-page visibility rules.
+  - event table now includes `Visibility` and `Public Page` columns with badges (`Visible on public page` / `Internal only`).
+  - registration cards now show event scope label with same visibility language.
+- Added regression in `tests/Feature/DashboardPagesTest.php`:
+  - `it('clearly distinguishes public and internal institution data for members', ...)`
+  - covers mixed public/internal events + registrations and scope labels.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **6 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+
 # Event Cancelled Status Todo
 
 - [x] Add `cancelled` as a first-class `EventStatus` with moderation transition support
@@ -176,6 +277,27 @@
 
 ---
 
+# Institution Multi-Word Search Precision Todo
+
+- [x] Add regression coverage for strict multi-word institution search (`masjid besi`) to avoid broad token-only matches
+- [x] Tighten public institution direct-search logic so multi-word queries require all tokens (while preserving fuzzy typo fallback when no direct result)
+- [x] Run focused verification and document review notes
+
+## Review
+
+- Updated `resources/views/components/pages/institutions/⚡index.blade.php`:
+  - direct search now uses normalized phrase/wildcard matching and, for multi-word input, requires all meaningful tokens to match (name/description) instead of broad token `OR` expansion.
+  - this prevents queries like `masjid besi` from returning institutions that only match `masjid` or only `besi`.
+- Added regression in `tests/Feature/InstitutionIndexTest.php`:
+  - `it('keeps multi-word search strict to phrase-relevant institutions', ...)`
+  - asserts `masjid+besi` returns `Masjid Besi Putrajaya` and excludes partial token-only matches.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **12 passed**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/InstitutionIndexTest.php` => **No files found to analyse** (project PHPStan config does not target this path directly)
+
+---
+
 # Event Majlis Search Live + Fuzzy Todo
 
 - [x] Expand `/majlis` DB search to include title, institution, venue, and speaker names
@@ -220,6 +342,59 @@
   - `Tests\\Feature\\InspirationTest` (expects `Test Did You Know` on event page)
   - `Tests\\Feature\\MediaConversionsTest` (`poster_orientation` portrait assertion mismatch)
 - Chrome MCP verification on `https://majlisilmu.test`, event detail page, and login page shows successful renders with no browser console errors.
+
+---
+
+# Shared Member Scope Roles Todo
+
+- [x] Introduce shared member-role scopes for `institution`, `speaker`, and `event`
+- [x] Enforce record membership before allowing scoped permissions
+- [x] Move member relation-manager role assignment/read to shared scopes (no per-record custom role creation)
+- [x] Seed scoped member role templates only into shared scopes
+- [x] Update event/institution/speaker/registration policy checks to use membership + shared scope permissions
+- [x] Update event status transition notifications to target institution members with permissions
+- [x] Add focused tests for shared-scope seeding and membership enforcement
+- [x] Run focused Pest and PHPStan verification
+
+## Review
+
+- Added shared member-scope registry:
+  - `app/Support/Authz/MemberRoleScopes.php`
+- Added membership-aware permission gate:
+  - `app/Support/Authz/MemberPermissionGate.php`
+- Updated scoped member seeding to shared scopes only:
+  - `app/Support/Authz/ScopedMemberRoleSeeder.php`
+  - `database/seeders/ScopedMemberRolesSeeder.php`
+- Enabled central authz role management again (for editing shared scoped role permissions from Filament):
+  - `app/Providers/Filament/AdminPanelProvider.php`
+  - `config/filament-authz.php`
+- Dev cleanup performed on local DB:
+  - removed `600` legacy per-record scoped roles
+  - kept `5` global roles + `12` shared scoped member roles (`3` scopes x `4` templates)
+- Refactored member role management UIs to shared scopes:
+  - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php`
+- Updated authorization flow:
+  - `app/Policies/InstitutionPolicy.php`
+  - `app/Policies/SpeakerPolicy.php`
+  - `app/Policies/EventPolicy.php`
+  - `app/Policies/RegistrationPolicy.php`
+  - `app/Models/Event.php`
+- Updated moderation transition recipients:
+  - `app/States/EventStatus/Transitions/ApproveEvent.php`
+  - `app/States/EventStatus/Transitions/RejectEvent.php`
+  - `app/States/EventStatus/Transitions/RequestChanges.php`
+  - `app/States/EventStatus/Transitions/CancelEvent.php`
+- Added/updated tests:
+  - `tests/Feature/ScopedMemberRoleSeederTest.php`
+  - `tests/Feature/MemberPermissionGateTest.php`
+  - `tests/Feature/EventPolicyTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScopedMemberRoleSeederTest.php` => **4 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/MemberPermissionGateTest.php` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventPolicyTest.php` => **30 passed**
+  - `vendor/bin/phpstan analyse --ansi [changed authz/policy/model/relation-manager files]` => **No errors**
 
 ---
 
@@ -1514,3 +1689,124 @@
   - Scripted key audit against `app/Livewire/Pages/Events/Index.php` and `resources/views/livewire/pages/events/index.blade.php` => **No missing keys** in `ms.json` and `ms_MY.json`
   - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (3 assertions)**
   - Chrome MCP on `https://majlisilmu.test/majlis` confirms advanced-filter headings and descriptions are now Malay (`Penapis Lanjutan`, `Masa & Tarikh`, `Penceramah & Kandungan`, `Tetapan Majlis`, etc.).
+
+---
+
+# Scoped Member Roles (Institution/Speaker/Event)
+
+- [x] Add a shared scoped member-role seeder service for Institution, Speaker, and Event scopes
+- [x] Auto-seed missing scoped roles from admin Filament member relation managers before rendering role options
+- [x] Enable Authz scopes UI support in config so scoped roles are visible/manageable in Authz roles UI
+- [x] Seed missing baseline permissions (`speaker.*`, `event.manage-members`)
+- [x] Add focused regression tests and run verification
+
+## Review
+
+- Added `App\Support\Authz\ScopedMemberRoleSeeder` with canonical templates:
+  - Institution: `owner`, `admin`, `editor`, `viewer`
+  - Speaker: `owner`, `admin`, `editor`, `viewer`
+  - Event: `organizer`, `co-organizer`, `editor`, `viewer`
+- Updated default-seed behavior to be non-destructive:
+  - Missing scoped roles are created automatically.
+  - Existing scoped role permissions are preserved (to allow per-entity customization).
+- Wired auto-seeding into role option loading for member management in:
+  - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php`
+- Added inline custom-role creation in all three member relation managers:
+  - Role name + permission selection can be created directly from the role picker modal.
+- Added batch backfill seeder:
+  - `database/seeders/ScopedMemberRolesSeeder.php`
+  - Can be run manually with `php artisan db:seed --class=ScopedMemberRolesSeeder`
+- Enabled scopes UI config:
+  - `config/filament-authz.php` => `authz_scopes.enabled = true`
+- Stopped central-app role listing to avoid massive duplicate scoped role lists in `/admin/authz/roles`:
+  - `app/Providers/Filament/AdminPanelProvider.php` now uses `FilamentAuthzPlugin::make()` without `->centralApp()`
+- Added missing permissions:
+  - `database/seeders/PermissionSeeder.php`
+- Added event scope label support:
+  - `app/Models/Event.php` => `getAuthzScopeLabel()`
+- Added tests:
+  - `tests/Feature/ScopedMemberRoleSeederTest.php`
+- Verification:
+  - `php -l` on all changed PHP files => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScopedMemberRoleSeederTest.php` => **4 passed (11 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventPolicyTest.php --filter="manageMembers"` => **3 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Authz/ScopedMemberRoleSeeder.php database/seeders/ScopedMemberRolesSeeder.php app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php app/Models/Event.php` => **No errors**
+
+# Authz Role Edit Translation Todo
+
+- [x] Audit RoleResource translation keys used by Filament Authz role edit form
+- [x] Expand local Malay vendor override with complete `filament-authz` key coverage
+- [x] Improve wording for role edit labels, sections, tabs, search placeholders, and permission prefixes
+- [x] Clear caches and verify no missing/extra translation keys versus package source
+
+## Review
+
+- Updated `resources/lang/vendor/filament-authz/ms/filament-authz.php` from partial override to full translation map.
+- Added all missing groups used by the role edit page:
+  - `form`, `filter`, `tabs`, `search`, `section`, `empty_state`, `notification`, `forbidden`, `resource_permission_prefixes`, `command`, `impersonate`.
+- Improved Malay wording for admin UI context (for example role details descriptions and permission action prefixes).
+- Verification:
+  - Key parity check against package source: **missing=0**, **extra=0**
+  - `php artisan optimize:clear` completed successfully.
+  - Live verification using admin account showed remaining hardcoded English (`Scope`, `Leave empty for a global role.`, `Clear resource search`), which required resource-level override.
+- Added localized app-level Authz Role resource override:
+  - `app/Filament/Resources/Authz/RoleResource.php`
+  - `app/Filament/Resources/Authz/RoleResource/Pages/{ListRoles,CreateRole,EditRole}.php`
+- Updated panel plugin registration to disable package Role resource and use app override:
+  - `app/Providers/Filament/AdminPanelProvider.php` (`->roleResource(false)`)
+- Added new translation keys for scope/search-clear labels:
+  - `resources/lang/vendor/filament-authz/ms/filament-authz.php`
+  - `resources/lang/vendor/filament-authz/en/filament-authz.php`
+- Verification (override changes):
+  - `php -l` on all modified/new files => **No syntax errors**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Authz/RoleResource.php app/Filament/Resources/Authz/RoleResource/Pages/ListRoles.php app/Filament/Resources/Authz/RoleResource/Pages/CreateRole.php app/Filament/Resources/Authz/RoleResource/Pages/EditRole.php app/Providers/Filament/AdminPanelProvider.php` => **No errors**
+  - Browser verification on `/admin/authz/roles/{id}/edit` now shows:
+    - `Skop`
+    - `Biarkan kosong untuk peranan global.`
+    - `Kosongkan carian sumber`
+
+# Authz Role Permission Assignment Expansion
+
+- [x] Investigate AiArmada/Authz role-permission sync mechanism and current UX limitations
+- [x] Add explicit role UI for assigning non-Filament permissions directly
+- [x] Ensure new field participates in existing sync pipeline (`permissions_*`)
+- [x] Fix scoped role name uniqueness validation so scoped roles can be saved reliably
+- [x] Verify on live admin role edit page with save/reload cycle
+
+## Review
+
+- Package behavior confirmed:
+  - `SyncsRolePermissions` only syncs form keys prefixed with `permissions_`.
+  - Default role UI mainly exposes discovered Filament Resource/Page/Widget permissions (plus configured custom list), which can hide app-specific permissions from role editors.
+- Expanded role edit UI in app override:
+  - `app/Filament/Resources/Authz/RoleResource.php`
+  - Added new `Kebenaran Tambahan` tab containing `permissions_direct` (prefixed correctly for sync trait).
+  - Tab lists **non-discovered** DB permissions (for selected guard), so no duplicate conflict with existing Resource/Page/Widget tabs.
+- Fixed save blocker for scoped roles:
+  - Replaced global `unique` check on role `name` with scoped unique query (`name + guard_name + scope`) while ignoring current record.
+  - This resolved false-positive `nama telah pun diambil` validation on scoped role edits.
+- Translation updates:
+  - `resources/lang/vendor/filament-authz/ms/filament-authz.php`
+  - `resources/lang/vendor/filament-authz/en/filament-authz.php`
+- Verification:
+  - `php -l` and targeted PHPStan on modified resource files => **No errors**
+  - Browser verification on:
+    - `https://majlisilmu.test/admin/authz/roles/019cb6ef-009d-73b9-8a90-8239af95ebbe/edit`
+  - Confirmed:
+    - New tab visible (`Kebenaran Tambahan`)
+    - Direct permission checkboxes rendered (e.g., `event.manage-members`, `speaker.manage-members`)
+    - Save + reload persists permission changes
+    - Test toggle was reverted to original state after validation (`speaker.manage-members` left unchecked).
+- Vendor migration completed:
+  - RoleResource enhancements moved into vendor package:
+    - `vendor/aiarmada/filament-authz/src/Resources/RoleResource.php`
+    - `vendor/aiarmada/filament-authz/src/Resources/RoleResource/Concerns/HasAuthzFormComponents.php`
+    - `vendor/aiarmada/filament-authz/resources/lang/en/filament-authz.php`
+    - `vendor/aiarmada/filament-authz/config/filament-authz.php`
+  - Local override resources removed:
+    - `app/Filament/Resources/Authz/RoleResource.php`
+    - `app/Filament/Resources/Authz/RoleResource/Pages/{ListRoles,CreateRole,EditRole}.php`
+  - Admin panel plugin registration reverted to vendor RoleResource:
+    - `app/Providers/Filament/AdminPanelProvider.php` now uses `FilamentAuthzPlugin::make()->centralApp()`

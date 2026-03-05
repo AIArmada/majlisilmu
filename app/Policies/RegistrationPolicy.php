@@ -2,9 +2,9 @@
 
 namespace App\Policies;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\Registration;
 use App\Models\User;
+use App\Support\Authz\MemberPermissionGate;
 
 class RegistrationPolicy
 {
@@ -18,7 +18,10 @@ class RegistrationPolicy
             return true;
         }
 
-        return Authz::userHasPermissionAcrossScopes($user, 'event.view-registrations');
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        return $memberPermissions->hasAnyInstitutionPermission($user, 'event.view-registrations')
+            || $memberPermissions->hasAnyEventPermission($user, 'event.view-registrations');
     }
 
     /**
@@ -36,10 +39,16 @@ class RegistrationPolicy
             return true;
         }
 
-        // Institution members can view registrations for their events
+        $memberPermissions = app(MemberPermissionGate::class);
+
         $event = $registration->event;
-        if ($event?->institution_id) {
-            return Authz::userCanInScope($user, 'event.view-registrations', $event->institution);
+        if ($event && $memberPermissions->canEvent($user, 'event.view-registrations', $event)) {
+            return true;
+        }
+
+        // Institution members can view registrations for their events
+        if ($event?->institution) {
+            return $memberPermissions->canInstitution($user, 'event.view-registrations', $event->institution);
         }
 
         return false;
@@ -60,10 +69,16 @@ class RegistrationPolicy
             return true;
         }
 
-        // Institution admins can update registrations
+        $memberPermissions = app(MemberPermissionGate::class);
+
         $event = $registration->event;
-        if ($event?->institution_id) {
-            return Authz::userCanInScope($user, 'event.export-registrations', $event->institution);
+        if ($event && $memberPermissions->canEvent($user, 'event.export-registrations', $event)) {
+            return true;
+        }
+
+        // Institution admins can update registrations
+        if ($event?->institution) {
+            return $memberPermissions->canInstitution($user, 'event.export-registrations', $event->institution);
         }
 
         return false;
@@ -79,6 +94,9 @@ class RegistrationPolicy
             return true;
         }
 
-        return Authz::userHasPermissionAcrossScopes($user, 'event.export-registrations');
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        return $memberPermissions->hasAnyInstitutionPermission($user, 'event.export-registrations')
+            || $memberPermissions->hasAnyEventPermission($user, 'event.export-registrations');
     }
 }

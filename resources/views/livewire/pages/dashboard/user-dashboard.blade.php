@@ -5,6 +5,7 @@
     $stats = $this->profileStats;
     $myEvents = $this->myEvents;
     $myRegistrations = $this->myRegistrations;
+    $myCheckins = $this->myCheckins;
     $mySavedEvents = $this->mySavedEvents;
     $mySavedSearches = $this->mySavedSearches;
     $digestFrequencyOptions = $this->digestFrequencyOptions;
@@ -25,7 +26,7 @@
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-6">
                         <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Institutions') }}</p>
                             <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['institutions_count'] }}</p>
@@ -37,6 +38,10 @@
                         <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Registrations') }}</p>
                             <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['registrations_count'] }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Check-ins') }}</p>
+                            <p class="mt-1 text-2xl font-bold text-slate-900">{{ $stats['checkins_count'] }}</p>
                         </div>
                         <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Saved Events') }}</p>
@@ -220,6 +225,61 @@
 
                     <div class="mt-6">
                         {{ $mySavedEvents->links() }}
+                    </div>
+                @endif
+            </section>
+
+            <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+                <div class="mb-5">
+                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('My Check-ins') }}</h2>
+                    <p class="mt-1 text-sm text-slate-500">{{ __('Attendance records you logged from event pages.') }}</p>
+                </div>
+
+                @if($myCheckins->isEmpty())
+                    <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
+                        <p class="text-base font-semibold text-slate-700">{{ __('No check-ins yet.') }}</p>
+                        <p class="mt-1 text-sm text-slate-500">{{ __('Use the check-in button on an event page to save your attendance.') }}</p>
+                    </div>
+                @else
+                    <div class="space-y-3">
+                        @foreach($myCheckins as $checkin)
+                            @php
+                                $event = $checkin->event;
+                                $methodLabel = match ($checkin->method) {
+                                    'registered_self_checkin' => __('Registered self check-in'),
+                                    'organizer_verified' => __('Organizer verified'),
+                                    default => __('Self reported'),
+                                };
+                            @endphp
+                            <article wire:key="dashboard-checkin-{{ $checkin->id }}"
+                                class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        @if($event)
+                                            <a href="{{ route('events.show', $event) }}" wire:navigate
+                                                class="font-semibold text-slate-900 hover:text-emerald-700">
+                                                {{ $event->title }}
+                                            </a>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                {{ $checkin->checked_in_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($checkin->checked_in_at, 'd M Y, h:i A') : __('Unknown check-in time') }}
+                                                @if($event->institution?->name)
+                                                    • {{ $event->institution->name }}
+                                                @endif
+                                            </p>
+                                        @else
+                                            <p class="font-semibold text-slate-700">{{ __('Event unavailable') }}</p>
+                                        @endif
+                                    </div>
+                                    <span class="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                                        {{ $methodLabel }}
+                                    </span>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-6">
+                        {{ $myCheckins->links() }}
                     </div>
                 @endif
             </section>

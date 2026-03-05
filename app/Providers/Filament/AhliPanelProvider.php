@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use AIArmada\FilamentAuthz\FilamentAuthzPlugin;
 use App\Providers\Filament\Concerns\ResolvesPanelDomain;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -12,8 +11,6 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -21,19 +18,18 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AdminPanelProvider extends PanelProvider
+class AhliPanelProvider extends PanelProvider
 {
     use ResolvesPanelDomain;
 
     public function panel(Panel $panel): Panel
     {
-        $adminDomain = $this->resolvePanelDomain('admin');
+        $ahliDomain = $this->resolvePanelDomain('ahli');
 
         return $panel
-            ->default()
-            ->id('admin')
-            ->domain($adminDomain)
-            ->path(filled($adminDomain) ? '' : 'admin')
+            ->id('ahli')
+            ->domain($ahliDomain)
+            ->path(filled($ahliDomain) ? '' : 'ahli')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandLogo(asset('images/milogo.webp'))
             ->brandLogoHeight('3rem')
@@ -44,18 +40,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->font('Outfit')
             ->maxContentWidth('full')
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
-            ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
-            ->widgets([
-                // AccountWidget::class,
-                // FilamentInfoWidget::class,
-            ])
-            ->plugins([
-                FilamentAuthzPlugin::make()->centralApp(),
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -74,3 +60,4 @@ class AdminPanelProvider extends PanelProvider
             ]);
     }
 }
+

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
+use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Registration;
@@ -85,8 +86,12 @@ class InstitutionDashboard extends Component
 
         return $this->availableInstitutionsQuery($user)
             ->withCount([
-                'events' => function (Builder $query) {
-                    $query->active();
+                'events',
+                'events as public_events_count' => function (Builder $query): void {
+                    $query
+                        ->where('events.is_active', true)
+                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                        ->where('events.visibility', EventVisibility::Public);
                 },
                 'members',
             ])
@@ -119,17 +124,40 @@ class InstitutionDashboard extends Component
         if (! $institution instanceof Institution) {
             return [
                 'events_count' => 0,
+                'public_events_count' => 0,
+                'internal_events_count' => 0,
                 'registrations_count' => 0,
+                'public_registrations_count' => 0,
+                'internal_registrations_count' => 0,
                 'members_count' => 0,
                 'venues_count' => 0,
             ];
         }
 
+        $totalRegistrations = Registration::query()
+            ->whereHas('event', fn (Builder $eventQuery) => $eventQuery->where('institution_id', $institution->id))
+            ->count();
+
+        $publicRegistrations = Registration::query()
+            ->whereHas('event', function (Builder $eventQuery) use ($institution): void {
+                $eventQuery
+                    ->where('institution_id', $institution->id)
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public);
+            })
+            ->count();
+
+        $totalEvents = (int) ($institution->events_count ?? 0);
+        $publicEvents = (int) ($institution->public_events_count ?? 0);
+
         return [
-            'events_count' => (int) ($institution->events_count ?? 0),
-            'registrations_count' => Registration::query()
-                ->whereHas('event', fn (Builder $eventQuery) => $eventQuery->where('institution_id', $institution->id))
-                ->count(),
+            'events_count' => $totalEvents,
+            'public_events_count' => $publicEvents,
+            'internal_events_count' => max($totalEvents - $publicEvents, 0),
+            'registrations_count' => $totalRegistrations,
+            'public_registrations_count' => $publicRegistrations,
+            'internal_registrations_count' => max($totalRegistrations - $publicRegistrations, 0),
             'members_count' => (int) ($institution->members_count ?? 0),
         ];
     }
@@ -174,7 +202,7 @@ class InstitutionDashboard extends Component
             ->whereHas('event', fn (Builder $eventQuery) => $eventQuery->where('institution_id', $institution->id))
             ->with([
                 'event' => fn ($query) => $query
-                    ->select('id', 'title', 'slug', 'starts_at'),
+                    ->select('id', 'title', 'slug', 'starts_at', 'status', 'visibility', 'is_active'),
             ])
             ->latest()
             ->paginate(perPage: 8, pageName: 'institution_registrations_page');

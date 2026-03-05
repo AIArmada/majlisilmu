@@ -80,6 +80,29 @@ it('supports fuzzy search with minor institution name typos', function () {
         ->assertDontSee('Pusat Pengajian An-Nur');
 });
 
+it('keeps multi-word search strict to phrase-relevant institutions', function () {
+    Institution::factory()->create([
+        'name' => 'Masjid Besi Putrajaya',
+        'status' => 'verified',
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Masjid Al Hidayah',
+        'status' => 'verified',
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Pusat Komuniti Besi',
+        'status' => 'verified',
+    ]);
+
+    get('/institusi?search=masjid+besi')
+        ->assertSuccessful()
+        ->assertSee('Masjid Besi Putrajaya')
+        ->assertDontSee('Masjid Al Hidayah')
+        ->assertDontSee('Pusat Komuniti Besi');
+});
+
 it('updates institution results live when search changes', function () {
     Institution::factory()->create([
         'name' => 'Masjid Al Hidayah',

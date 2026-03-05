@@ -2,11 +2,11 @@
 
 namespace App\States\EventStatus\Transitions;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
 use App\Notifications\EventApprovedNotification;
+use App\Support\Authz\MemberPermissionGate;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -67,9 +67,9 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
         }
 
         // Notify institution admins
-        if ($event->institution_id) {
-            $admins = Authz::withScope($event->institution, fn () => User::permission('event.update')->get());
-
+        if ($event->institution) {
+            $admins = app(MemberPermissionGate::class)
+                ->institutionMembersWithPermission($event->institution, 'event.update');
             $notifiables = $notifiables->merge($admins);
         }
 

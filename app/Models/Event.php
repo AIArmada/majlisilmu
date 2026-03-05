@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -15,6 +14,7 @@ use App\Enums\ScheduleState;
 use App\Enums\SessionStatus;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use App\Support\Authz\MemberPermissionGate;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -95,6 +95,9 @@ class Event extends Model implements AuditableContract, HasMedia
 
             $event->registrations()->each(function (Registration $registration): void {
                 $registration->delete();
+            });
+            $event->checkins()->each(function (EventCheckin $checkin): void {
+                $checkin->delete();
             });
             $event->submissions()->each(function (EventSubmission $submission): void {
                 $submission->delete();
@@ -512,6 +515,14 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * @return HasMany<EventCheckin, $this>
+     */
+    public function checkins(): HasMany
+    {
+        return $this->hasMany(EventCheckin::class);
+    }
+
+    /**
      * @return BelongsToMany<User, $this>
      */
     public function savedBy(): BelongsToMany
@@ -813,25 +824,33 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->morphTo();
     }
 
+    public function getAuthzScopeLabel(): string
+    {
+        return 'Event: '.$this->title;
+    }
+
     /**
      * Check if a user can manage this event.
      * Uses Authz scoped roles via event membership or organizer/institution scope.
      */
     public function userCanManage(User $user): bool
     {
-        // 1. Check event-scoped roles via Authz
-        if (Authz::userCanInScope($user, 'event.update', $this)) {
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        if ($memberPermissions->canEvent($user, 'event.update', $this)) {
             return true;
         }
 
-        // 2. Check organizer scope permissions (if organizer is set)
-        if ($this->organizer_id && $this->organizer) {
-            return Authz::userCanInScope($user, 'event.update', $this->organizer);
+        if ($this->organizer instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.update', $this->organizer);
         }
 
-        // 3. Fallback to institution scope
-        if ($this->institution_id && $this->institution) {
-            return Authz::userCanInScope($user, 'event.update', $this->institution);
+        if ($this->organizer instanceof Speaker) {
+            return $memberPermissions->canSpeaker($user, 'event.update', $this->organizer);
+        }
+
+        if ($this->institution instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.update', $this->institution);
         }
 
         return false;
@@ -843,19 +862,22 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function userCanDelete(User $user): bool
     {
-        // 1. Check event-scoped delete permission via Authz
-        if (Authz::userCanInScope($user, 'event.delete', $this)) {
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        if ($memberPermissions->canEvent($user, 'event.delete', $this)) {
             return true;
         }
 
-        // 2. Check organizer scope delete permission
-        if ($this->organizer_id && $this->organizer) {
-            return Authz::userCanInScope($user, 'event.delete', $this->organizer);
+        if ($this->organizer instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.delete', $this->organizer);
         }
 
-        // 3. Fallback to institution scope
-        if ($this->institution_id && $this->institution) {
-            return Authz::userCanInScope($user, 'event.delete', $this->institution);
+        if ($this->organizer instanceof Speaker) {
+            return $memberPermissions->canSpeaker($user, 'event.delete', $this->organizer);
+        }
+
+        if ($this->institution instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.delete', $this->institution);
         }
 
         return false;
@@ -866,19 +888,22 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function userCanView(User $user): bool
     {
-        // Event members can view
-        if ($this->members()->where('user_id', $user->id)->exists()) {
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        if ($memberPermissions->canEvent($user, 'event.view', $this)) {
             return true;
         }
 
-        // Check organizer scope
-        if ($this->organizer_id && $this->organizer) {
-            return Authz::userCanInScope($user, 'event.view', $this->organizer);
+        if ($this->organizer instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.view', $this->organizer);
         }
 
-        // Fallback to institution scope
-        if ($this->institution_id && $this->institution) {
-            return Authz::userCanInScope($user, 'event.view', $this->institution);
+        if ($this->organizer instanceof Speaker) {
+            return $memberPermissions->canSpeaker($user, 'event.view', $this->organizer);
+        }
+
+        if ($this->institution instanceof Institution) {
+            return $memberPermissions->canInstitution($user, 'event.view', $this->institution);
         }
 
         return false;

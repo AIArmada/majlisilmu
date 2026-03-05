@@ -26,10 +26,10 @@ return [
 
     'scoped_to_tenant' => true,
 
-    'central_app' => false,
+    'central_app' => true,
 
     'authz_scopes' => [
-        'enabled' => false,
+        'enabled' => true,
         'auto_create' => true,
     ],
 
@@ -101,6 +101,7 @@ return [
             'pages' => true,
             'widgets' => true,
             'custom_permissions' => true,
+            'direct_permissions' => true,
         ],
         'grid_columns' => 2,
         'checkbox_columns' => 3,

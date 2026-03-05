@@ -1,5 +1,7 @@
 # Lessons
 
+- For event date eligibility logic in Livewire, use `CarbonInterface` checks instead of concrete `Illuminate\Support\Carbon`; Eloquent may return `CarbonImmutable`, and strict class checks can silently disable actions like check-in.
+- For attendance UX, keep one clear `Check-in` action for both open and registration-required events; branch behavior in backend validation (`self_reported` vs `registered_self_checkin`) rather than splitting UI flows unless explicitly requested.
 - On Livewire pages with `wire:model.live` search, avoid wrapping reactive result regions in `@island` unless intentionally isolated; island skip mode can update URL/chips while leaving stale result grids unchanged.
 - For `/majlis` event search, do not limit DB fallback to title/description; include institution, venue, and speaker names in direct matching and add typo-tolerant fuzzy fallback so behavior stays consistent when Typesense is unavailable.
 - When removing Laravel packages, clear and regenerate the exact PHPUnit cache targets (`APP_PACKAGES_CACHE`, `APP_SERVICES_CACHE`) instead of only running `php artisan package:discover` with `APP_ENV=testing`.
@@ -57,3 +59,4 @@
 - For advanced search UIs, split dense mixed-purpose groups into intent-based sections (for example taxonomy/content vs event settings) so users can scan and adjust filters faster.
 - For filter-order requests, align both form-field order and active-chip rendering order so users see a consistent sequence across input and feedback areas.
 - When adding or regrouping `/majlis` advanced filters, immediately audit locale coverage (`ms.json` + `ms_MY.json`) for every new `__()` key to prevent mixed-language UI in production.
+- When authz architecture is explicitly greenfield/dev-only, do not add backward-compatibility fallback paths; implement the requested target model directly to avoid carrying redundant legacy logic.

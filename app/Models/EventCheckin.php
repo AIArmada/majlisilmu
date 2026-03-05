@@ -6,24 +6,15 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Registration extends Model
+class EventCheckin extends Model
 {
-    /** @use HasFactory<\Database\Factories\RegistrationFactory> */
+    /** @use HasFactory<\Database\Factories\EventCheckinFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;
 
     protected $keyType = 'string';
-
-    #[\Override]
-    protected static function booted(): void
-    {
-        static::deleting(function (Registration $registration): void {
-            $registration->checkins()->each(fn (EventCheckin $checkin) => $checkin->delete());
-        });
-    }
 
     /**
      * @var list<string>
@@ -31,13 +22,26 @@ class Registration extends Model
     protected $fillable = [
         'event_id',
         'event_session_id',
+        'registration_id',
         'user_id',
-        'name',
-        'email',
-        'phone',
-        'status',
-        'checkin_token',
+        'verified_by_user_id',
+        'method',
+        'checked_in_at',
+        'lat',
+        'lng',
+        'accuracy_m',
     ];
+
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'checked_in_at' => 'datetime',
+            'lat' => 'float',
+            'lng' => 'float',
+            'accuracy_m' => 'float',
+        ];
+    }
 
     /**
      * @return BelongsTo<Event, $this>
@@ -56,6 +60,14 @@ class Registration extends Model
     }
 
     /**
+     * @return BelongsTo<Registration, $this>
+     */
+    public function registration(): BelongsTo
+    {
+        return $this->belongsTo(Registration::class);
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
@@ -64,10 +76,10 @@ class Registration extends Model
     }
 
     /**
-     * @return HasMany<EventCheckin, $this>
+     * @return BelongsTo<User, $this>
      */
-    public function checkins(): HasMany
+    public function verifiedBy(): BelongsTo
     {
-        return $this->hasMany(EventCheckin::class);
+        return $this->belongsTo(User::class, 'verified_by_user_id');
     }
 }

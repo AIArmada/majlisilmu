@@ -3,11 +3,14 @@
 namespace App\Filament\Resources\Institutions\RelationManagers;
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\AuthzScope;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Support\Authz\MemberRoleScopes;
 use App\Models\Institution;
 use App\Models\User;
+use App\Support\Authz\ScopedMemberRoleSeeder;
 use Filament\Actions\Action;
-use Filament\Forms;
+use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -32,43 +35,33 @@ class MembersRelationManager extends RelationManager
                 TextColumn::make('roles')
                     ->label('Roles')
                     ->getStateUsing(function (User $record): string {
-                        $institution = $this->getInstitutionOwner();
-
-                        return Authz::withScope($institution, fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
+                        return Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
                     }),
             ])
             ->headerActions([
                 Action::make('addMember')
                     ->label('Add member')
                     ->form([
-                        Forms\Components\Select::make('user_id')
+                        Select::make('user_id')
                             ->label('User')
                             ->options(User::query()->orderBy('name')->pluck('name', 'id')->all())
                             ->searchable()
                             ->required(),
-                        Forms\Components\Select::make('role_ids')
-                            ->label('Roles')
-                            ->options(fn () => $this->getScopedRoleOptions())
-                            ->multiple()
-                            ->required(),
+                        $this->makeRoleSelect(),
                     ])
                     ->action(function (array $data): void {
                         $institution = $this->getInstitutionOwner();
                         $user = User::findOrFail($data['user_id']);
 
                         $institution->members()->syncWithoutDetaching([$user->id]);
-                        $this->syncMemberRoles($institution, $user, $data['role_ids'] ?? []);
+                        $this->syncMemberRoles($user, $data['role_ids'] ?? []);
                     }),
             ])
             ->actions([
                 Action::make('manageRoles')
                     ->label('Roles')
                     ->form([
-                        Forms\Components\Select::make('role_ids')
-                            ->label('Roles')
-                            ->options(fn () => $this->getScopedRoleOptions())
-                            ->multiple()
-                            ->required(),
+                        $this->makeRoleSelect(),
                     ])
                     ->mountUsing(function (Action $action, User $record): void {
                         $action->fillForm([
@@ -76,9 +69,7 @@ class MembersRelationManager extends RelationManager
                         ]);
                     })
                     ->action(function (array $data, User $record): void {
-                        $institution = $this->getInstitutionOwner();
-
-                        $this->syncMemberRoles($institution, $record, $data['role_ids'] ?? []);
+                        $this->syncMemberRoles($record, $data['role_ids'] ?? []);
                     }),
                 Action::make('removeMember')
                     ->label('Remove')
@@ -88,7 +79,7 @@ class MembersRelationManager extends RelationManager
                         $institution = $this->getInstitutionOwner();
 
                         $institution->members()->detach($record->id);
-                        $this->syncMemberRoles($institution, $record, []);
+                        $this->syncMemberRoles($record, []);
                     }),
             ]);
     }
@@ -98,10 +89,11 @@ class MembersRelationManager extends RelationManager
      */
     protected function getScopedRoleOptions(): array
     {
-        $institution = $this->getInstitutionOwner();
+        app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
         $teamsKey = app(PermissionRegistrar::class)->teamsKey;
+        $scope = $this->getRoleScope();
 
-        return Authz::withScope($institution, fn (): array => Role::query()
+        return Authz::withScope($scope, fn (): array => Role::query()
             ->where($teamsKey, getPermissionsTeamId())
             ->orderBy('name')
             ->pluck('name', 'id')
@@ -113,17 +105,15 @@ class MembersRelationManager extends RelationManager
      */
     protected function getMemberRoleIds(User $user): array
     {
-        $institution = $this->getInstitutionOwner();
-
-        return Authz::withScope($institution, fn (): array => $user->roles()->pluck('id')->all(), $user);
+        return Authz::withScope($this->getRoleScope(), fn (): array => $user->roles()->pluck('id')->all(), $user);
     }
 
     /**
      * @param  list<string>  $roleIds
      */
-    protected function syncMemberRoles(Institution $institution, User $user, array $roleIds): void
+    protected function syncMemberRoles(User $user, array $roleIds): void
     {
-        Authz::withScope($institution, function () use ($user, $roleIds): void {
+        Authz::withScope($this->getRoleScope(), function () use ($user, $roleIds): void {
             $user->syncRoles($roleIds);
         }, $user);
     }
@@ -134,5 +124,19 @@ class MembersRelationManager extends RelationManager
         $institution = $this->getOwnerRecord();
 
         return $institution;
+    }
+
+    private function makeRoleSelect(): Select
+    {
+        return Select::make('role_ids')
+            ->label('Roles')
+            ->options(fn () => $this->getScopedRoleOptions())
+            ->multiple()
+            ->required();
+    }
+
+    private function getRoleScope(): AuthzScope
+    {
+        return app(MemberRoleScopes::class)->institution();
     }
 }

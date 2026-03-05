@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use App\Enums\SessionStatus;
-use App\Enums\TimingMode;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\SessionStatus;
+use App\Enums\TimingMode;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventSession extends Model
 {
@@ -19,6 +20,16 @@ class EventSession extends Model
     public $incrementing = false;
 
     protected $keyType = 'string';
+
+    #[\Override]
+    protected static function booted(): void
+    {
+        static::deleting(function (EventSession $session): void {
+            EventCheckin::query()
+                ->where('event_session_id', $session->id)
+                ->update(['event_session_id' => null]);
+        });
+    }
 
     /**
      * @var list<string>
@@ -67,6 +78,14 @@ class EventSession extends Model
     public function recurrenceRule(): BelongsTo
     {
         return $this->belongsTo(EventRecurrenceRule::class, 'recurrence_rule_id');
+    }
+
+    /**
+     * @return HasMany<EventCheckin, $this>
+     */
+    public function checkins(): HasMany
+    {
+        return $this->hasMany(EventCheckin::class, 'event_session_id');
     }
 
     public function isActiveForPublic(): bool
