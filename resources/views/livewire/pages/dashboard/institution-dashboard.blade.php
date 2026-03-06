@@ -6,6 +6,10 @@
     $stats = $this->institutionStats;
     $events = $this->institutionEvents;
     $registrations = $this->institutionRegistrations;
+    $canEditInstitution = $selectedInstitution !== null && (auth()->user()?->can('update', $selectedInstitution) ?? false);
+    $ahliInstitutionEditUrl = $canEditInstitution
+        ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution], panel: 'ahli')
+        : null;
 @endphp
 
 <div class="bg-slate-50 min-h-screen py-12 pb-32">
@@ -48,6 +52,14 @@
                             <p class="mt-1 text-sm text-slate-500">
                                 {{ __('Type:') }} {{ $selectedInstitution->type?->value ? str($selectedInstitution->type->value)->headline() : __('Not specified') }}
                             </p>
+                            @if($ahliInstitutionEditUrl)
+                                <a
+                                    href="{{ $ahliInstitutionEditUrl }}"
+                                    class="mt-3 inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    {{ __('Edit Institution') }}
+                                </a>
+                            @endif
                         </div>
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -102,6 +114,10 @@
                                             $isPublicListed = $event->is_active
                                                 && in_array($statusValue, \App\Models\Event::PUBLIC_STATUSES, true)
                                                 && $visibilityValue === \App\Enums\EventVisibility::Public->value;
+                                            $canEditEvent = auth()->user()?->can('update', $event) ?? false;
+                                            $ahliEventEditUrl = $canEditEvent
+                                                ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $event], panel: 'ahli')
+                                                : null;
                                         @endphp
                                         <tr wire:key="institution-event-{{ $event->id }}">
                                             <td class="py-4 pr-4">
@@ -109,6 +125,16 @@
                                                     class="font-semibold text-slate-900 hover:text-emerald-700">
                                                     {{ $event->title }}
                                                 </a>
+                                                @if($ahliEventEditUrl)
+                                                    <div class="mt-1">
+                                                        <a
+                                                            href="{{ $ahliEventEditUrl }}"
+                                                            class="text-xs font-semibold text-emerald-700 hover:underline"
+                                                        >
+                                                            {{ __('Edit in Ahli Panel') }}
+                                                        </a>
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="py-4 pr-4">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}</td>
                                             <td class="py-4 pr-4">{{ $event->venue?->name ?? __('Online / TBD') }}</td>

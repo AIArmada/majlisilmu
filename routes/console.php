@@ -38,6 +38,13 @@ Schedule::command('app:prune-orphaned-entities')
     ->name('prune-orphaned-entities')
     ->withoutOverlapping();
 
+// Auto-reopen public submission when lock credibility requirements are no longer met.
+Schedule::command('app:sync-public-submission-locks')
+    ->hourly()
+    ->timezone('Asia/Kuala_Lumpur')
+    ->name('sync-public-submission-locks')
+    ->withoutOverlapping();
+
 // Media maintenance: remove orphaned/deprecated files and keep conversions healthy.
 Schedule::command('media-library:clean --delete-orphaned --force')
     ->dailyAt('02:30')

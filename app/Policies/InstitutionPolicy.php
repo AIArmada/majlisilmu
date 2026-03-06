@@ -31,7 +31,7 @@ class InstitutionPolicy
         }
 
         // Admins can view any institution
-        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'moderator'])) {
             return true;
         }
 
@@ -53,7 +53,7 @@ class InstitutionPolicy
     public function update(User $user, Institution $institution): bool
     {
         // Admins can update any institution
-        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'moderator'])) {
             return true;
         }
 

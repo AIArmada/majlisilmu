@@ -19,9 +19,11 @@ use App\Models\Reference;
 use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Venue;
 use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
+use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserTimezoneResolver;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -963,7 +965,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('organizer_institution_id')
                                         ->label(__('Institusi'))
-                                        ->options(fn() => Cache::remember('submit_institutions', 60, fn() => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
+                                        ->options(fn (): array => $this->availableInstitutionOptions())
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -975,12 +977,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('organizer_speaker_id')
                                         ->label(__('Penceramah'))
-                                        ->options(fn() => Cache::remember('submit_speakers', 60, fn() => Speaker::query()
-                                            ->whereIn('status', ['verified', 'pending'])
-                                            ->where('is_active', true)
-                                            ->get()
-                                            ->mapWithKeys(fn(Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
-                                            ->all()))
+                                        ->options(fn (): array => $this->availableSpeakerOptions())
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -1029,7 +1026,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                                     Select::make('location_institution_id')
                                         ->label(__('Institusi'))
-                                        ->options(fn() => Cache::remember('submit_institutions', 60, fn() => Institution::whereIn('status', ['verified', 'pending'])->where('is_active', true)->pluck('name', 'id')))
+                                        ->options(fn (): array => $this->availableInstitutionOptions())
                                         ->searchable()
                                         ->preload()
                                         ->visibleJs(<<<'JS'
@@ -1082,7 +1079,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->required()
                                         ->multiple()
                                         ->closeOnSelect()
-                                        ->relationship('speakers', 'name', fn(Builder $query) => $query->whereIn('status', ['verified', 'pending'])->where('is_active', true))
+                                        ->relationship('speakers', 'name', fn(Builder $query) => app(EntitySubmissionAccess::class)->constrainSpeakerQueryForSubmitter($query, $this->submitterUser()))
                                         ->searchable()
                                         ->preload()
                                         ->getOptionLabelUsing(fn(mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
@@ -1233,6 +1230,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         ) {
             $validated['children_allowed'] = true;
         }
+
+        $this->assertSubmissionEntitiesAreAccessible($validated);
 
         $startsAt = $this->resolveStartsAt($validated);
         $timezone = $this->resolveUserTimezone($validated['timezone'] ?? null);
@@ -1491,6 +1490,118 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ->filter()
             ->values()
             ->all();
+    }
+
+    protected function submitterUser(): ?User
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user : null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function availableInstitutionOptions(): array
+    {
+        $access = app(EntitySubmissionAccess::class);
+        $submitter = $this->submitterUser();
+
+        if (! $submitter instanceof User) {
+            return Cache::remember('submit_institutions', 60, fn (): array => $access->institutionQueryForSubmitter(null)
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->all());
+        }
+
+        return $access->institutionQueryForSubmitter($submitter)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function availableSpeakerOptions(): array
+    {
+        $access = app(EntitySubmissionAccess::class);
+        $submitter = $this->submitterUser();
+
+        if (! $submitter instanceof User) {
+            return Cache::remember('submit_speakers', 60, fn (): array => $access->speakerQueryForSubmitter(null)
+                ->orderBy('name')
+                ->get()
+                ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                ->all());
+        }
+
+        return $access->speakerQueryForSubmitter($submitter)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    protected function assertSubmissionEntitiesAreAccessible(array $validated): void
+    {
+        $access = app(EntitySubmissionAccess::class);
+        $submitter = $this->submitterUser();
+
+        $organizerType = $validated['organizer_type'] ?? ($this->data['organizer_type'] ?? null);
+        $organizerInstitutionId = (string) ($validated['organizer_institution_id'] ?? ($this->data['organizer_institution_id'] ?? ''));
+        $organizerSpeakerId = (string) ($validated['organizer_speaker_id'] ?? ($this->data['organizer_speaker_id'] ?? ''));
+        $locationInstitutionId = (string) ($validated['location_institution_id'] ?? ($this->data['location_institution_id'] ?? ''));
+
+        if ($organizerType === 'institution' && $organizerInstitutionId !== '') {
+            if (! $access->canUseInstitution($submitter, $organizerInstitutionId)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'data.organizer_institution_id' => __('Anda tidak dibenarkan memilih institusi ini untuk penghantaran majlis.'),
+                ]);
+            }
+        }
+
+        if ($organizerType === 'speaker' && $organizerSpeakerId !== '') {
+            if (! $access->canUseSpeaker($submitter, $organizerSpeakerId)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'data.organizer_speaker_id' => __('Anda tidak dibenarkan memilih penceramah ini untuk penghantaran majlis.'),
+                ]);
+            }
+        }
+
+        $eventFormat = $validated['event_format'] ?? EventFormat::Physical->value;
+        $requiresLocationChoice = $organizerType === 'speaker' || ! ($validated['location_same_as_institution'] ?? true);
+        $usesLocationInstitution = $eventFormat !== EventFormat::Online->value
+            && $requiresLocationChoice
+            && (($validated['location_type'] ?? 'institution') === 'institution');
+
+        if ($usesLocationInstitution && $locationInstitutionId !== '') {
+            if (! $access->canUseInstitution($submitter, $locationInstitutionId)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'data.location_institution_id' => __('Anda tidak dibenarkan memilih institusi lokasi ini.'),
+                ]);
+            }
+        }
+
+        $speakerIds = collect(array_merge(
+            (array) ($validated['speakers'] ?? []),
+            (array) ($this->data['speakers'] ?? []),
+        ))
+            ->map(fn (mixed $value): ?string => filled($value) ? (string) $value : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($speakerIds as $speakerId) {
+            if (! $access->canUseSpeaker($submitter, $speakerId)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'data.speakers' => __('Senarai penceramah mengandungi pilihan yang tidak dibenarkan untuk penghantaran ini.'),
+                ]);
+            }
+        }
     }
 
     protected function hasCommunityEventTypeSelection(mixed $eventTypes): bool

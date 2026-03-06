@@ -51,6 +51,10 @@ class Speaker extends Model implements AuditableContract, HasMedia
         'is_freelance',
         'job_title',
         'is_active',
+        'allow_public_event_submission',
+        'public_submission_locked_at',
+        'public_submission_locked_by',
+        'public_submission_lock_reason',
     ];
 
     #[\Override]
@@ -64,6 +68,8 @@ class Speaker extends Model implements AuditableContract, HasMedia
             'qualifications' => 'array',
             'is_freelance' => 'boolean',
             'is_active' => 'boolean',
+            'allow_public_event_submission' => 'boolean',
+            'public_submission_locked_at' => 'datetime',
         ];
     }
 

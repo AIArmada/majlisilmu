@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationFrequency;
+use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,14 @@ class User extends Authenticatable implements FilamentUser
     #[\Override]
     protected static function booted(): void
     {
+        static::updated(function (User $user): void {
+            if (! $user->wasChanged('phone_verified_at')) {
+                return;
+            }
+
+            app(PublicSubmissionLockService::class)->syncForUser($user);
+        });
+
         static::deleting(function (User $user) {
             $user->socialAccounts()->each(fn ($account) => $account->delete());
             $user->institutions()->detach();
