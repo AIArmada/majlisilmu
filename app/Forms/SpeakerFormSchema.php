@@ -12,6 +12,7 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Models\User;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -196,6 +197,12 @@ class SpeakerFormSchema
             'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
             'status' => 'pending',
         ]);
+
+        $creator = auth()->user();
+
+        if ($creator instanceof User) {
+            $speaker->members()->syncWithoutDetaching([$creator->getKey()]);
+        }
 
         // Save media uploads (avatar/cover) via Filament's relationship-saving mechanism
         $schema?->model($speaker)->saveRelationships();

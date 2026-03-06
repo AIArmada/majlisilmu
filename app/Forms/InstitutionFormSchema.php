@@ -4,6 +4,7 @@ namespace App\Forms;
 
 use App\Enums\InstitutionType;
 use App\Models\Institution;
+use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
@@ -75,6 +76,12 @@ class InstitutionFormSchema
             'type' => $data['type'],
             'status' => 'pending',
         ]);
+
+        $creator = auth()->user();
+
+        if ($creator instanceof User) {
+            $institution->members()->syncWithoutDetaching([$creator->getKey()]);
+        }
 
         // Save media uploads (cover, gallery) via Filament's relationship-saving mechanism
         $schema?->model($institution)->saveRelationships();

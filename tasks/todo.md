@@ -36,6 +36,41 @@
     - `admin.majlisilmu.test`
     - `ahli.majlisilmu.test`
 
+# Ahli Institution Editing Todo
+
+- [x] Add member-scoped institution/event edit resources under `ahli` panel
+- [x] Restrict ahli resource queries to institutions the current user is a member of
+- [x] Add frontend institution-dashboard links to ahli edit routes when policy permits
+- [x] Add focused feature coverage for ahli edit-route access and dashboard link visibility
+- [x] Run focused verification and document review
+
+## Review
+
+- Added member editing resources in ahli panel:
+  - `app/Filament/Ahli/Resources/Institutions/InstitutionResource.php`
+  - `app/Filament/Ahli/Resources/Institutions/Pages/EditInstitution.php`
+  - `app/Filament/Ahli/Resources/Events/EventResource.php`
+  - `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php`
+- Wired ahli panel to discover these resources:
+  - `app/Providers/Filament/AhliPanelProvider.php`
+- Access model for ahli resources:
+  - institution/event records are constrained to current user’s institution memberships in resource `getEloquentQuery()`.
+  - edit permissions still enforced by existing policies (`institution.update`, `event.update`).
+- Added frontend edit links from institution dashboard:
+  - `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+  - `Edit Institution` and `Edit in Ahli Panel` links render only when current user can update the respective record.
+- Added tests:
+  - `tests/Feature/AhliPanelInstitutionEditingTest.php`
+  - Covers allowed member edit access, denied non-member access, and conditional dashboard link visibility.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **6 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Ahli/Resources/Institutions/InstitutionResource.php app/Filament/Ahli/Resources/Events/EventResource.php app/Filament/Ahli/Resources/Events/Pages/EditEvent.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+  - `php artisan view:cache` => **Blade templates cached successfully**
+  - `php artisan route:list` confirms ahli edit endpoints:
+    - `ahli.majlisilmu.test/institutions/{record}/edit`
+    - `ahli.majlisilmu.test/events/{record}/edit`
+
 # Event Check-In Todo
 
 - [x] Add first-class event check-in data model (`event_checkins`) for both open and registration-required events
@@ -1810,3 +1845,108 @@
     - `app/Filament/Resources/Authz/RoleResource/Pages/{ListRoles,CreateRole,EditRole}.php`
   - Admin panel plugin registration reverted to vendor RoleResource:
     - `app/Providers/Filament/AdminPanelProvider.php` now uses `FilamentAuthzPlugin::make()->centralApp()`
+
+# Ahli Event Scope Todo
+
+- [x] Update ahli event resource query scope to include: own submitted, organizer institution membership, organizer speaker membership
+- [x] Add/adjust ahli event resource pages to make scoped events manageable from ahli panel
+- [x] Add focused feature tests for scope paths (submitter + organizer membership)
+- [x] Run focused verification and document review
+
+## Review
+
+- Updated `app/Filament/Ahli/Resources/Events/EventResource.php`:
+  - ahli resource now **extends** `App\Filament\Resources\Events\EventResource` so form/table/filter improvements in admin resource flow into ahli by default.
+  - keeps ahli-specific overrides only for:
+    - scoped query constraints
+    - page map (`index`, `edit`)
+    - disabled create action
+    - record actions tweak (edit + public view, no bulk toolbar actions)
+  - scoped query includes:
+    - `events.user_id = auth user`
+    - `events.submitter_id = auth user`
+    - `event_submissions.submitted_by = auth user`
+    - organizer institution events where user is institution member
+    - organizer speaker events where user is speaker member
+    - legacy fallback (`organizer_type` null + member institution via `institution_id`)
+  - added `index` page route so ahli users can manage scoped events from panel navigation.
+- Added `app/Filament/Ahli/Resources/Events/Pages/ListEvents.php`.
+- Updated feature tests in `tests/Feature/AhliPanelInstitutionEditingTest.php`:
+  - submitter can access own submitted event edit.
+  - speaker member can access speaker-organized event edit (with scoped direct permission).
+  - ahli events index lists only scoped events and excludes out-of-scope events.
+  - existing institution-scoped tests kept and aligned with organizer fields.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **6 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Ahli/Resources/Events/EventResource.php app/Filament/Ahli/Resources/Events/Pages/ListEvents.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+  - `php artisan route:list | rg \"ahli.*events|events/{record}/edit\"` confirms:
+    - `GET ahli.majlisilmu.test/events`
+    - `GET ahli.majlisilmu.test/events/{record}/edit`
+
+# Public Submission Lock Gating Todo
+
+- [x] Add explicit lock metadata and keep `allow_public_event_submission=true` as default state
+- [x] Add centralized eligibility checker returning `eligible + reasons` without mutating lock state
+- [x] Add explicit global-admin lock/unlock actions for Institution and Speaker admin pages
+- [x] Disable lock action until eligibility passes and show eligibility reasons
+- [x] Auto-reopen locked entities when credibility drifts (member/role/phone changes + scheduled sweep)
+- [x] Enforce submit-event entity access with resolver filtering and server-side validation
+- [x] Add focused feature coverage and run verification
+
+## Review
+
+- Added migration `database/migrations/2026_03_06_120000_add_public_submission_lock_columns_to_institutions_and_speakers.php`:
+  - `allow_public_event_submission` (default `true`)
+  - `public_submission_locked_at`
+  - `public_submission_locked_by`
+  - `public_submission_lock_reason`
+- Added centralized submission access + lock services:
+  - `app/Support/Submission/SubmissionLockEligibilityResult.php`
+  - `app/Support/Submission/PublicSubmissionLockService.php`
+  - `app/Support/Submission/EntitySubmissionAccess.php`
+- Added lock sweep command + scheduler:
+  - `app/Console/Commands/SyncPublicSubmissionLocks.php`
+  - `routes/console.php` (`app:sync-public-submission-locks`, hourly)
+- Updated Institution/Speaker admin edit pages to use explicit lock/unlock actions:
+  - `app/Filament/Resources/Institutions/Pages/EditInstitution.php`
+  - `app/Filament/Resources/Speakers/Pages/EditSpeaker.php`
+- Updated member role/member change triggers to auto-reopen when eligibility fails:
+  - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
+  - `app/Models/User.php` (phone verification drift hook)
+- Updated submit-event filtering + backend enforcement:
+  - `resources/views/components/pages/submit-event/create.blade.php`
+- Added focused tests:
+  - `tests/Feature/PublicSubmissionLockActionsTest.php`
+  - `tests/Feature/SubmitEventEntityAccessTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicSubmissionLockActionsTest.php` => **6 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **6 passed**
+  - `vendor/bin/pest --parallel --compact --filter="SubmitEventLocationTest|SubmitEventOrganizerAutoSelectTest|EditInstitutionSocialMediaTest|SpeakerAdminEditSocialMediaLabelTest"` => **9 passed**
+  - `vendor/bin/phpstan analyse --ansi [changed lock/access files]` => **No errors**
+  - `vendor/bin/phpstan analyse --ansi` => **17 pre-existing unrelated project errors remain**
+
+# Authz User Verification Fields Todo
+
+- [x] Replace package auto-registered Authz user resource with a local override
+- [x] Expose `email_verified_at` and `phone_verified_at` on the admin user form with proper datetime inputs
+- [x] Add focused regression coverage for the Authz user edit page
+- [x] Run focused verification
+
+## Review
+
+- Disabled package auto-registration for the Authz user resource in `config/filament-authz.php` and expanded configured field order to include:
+  - `email_verified_at`
+  - `phone_verified_at`
+- Added local override resource and pages:
+  - `app/Filament/Resources/Authz/UserResource.php`
+  - `app/Filament/Resources/Authz/UserResource/Pages/ListUsers.php`
+  - `app/Filament/Resources/Authz/UserResource/Pages/CreateUser.php`
+  - `app/Filament/Resources/Authz/UserResource/Pages/EditUser.php`
+- The edit form now exposes both verification timestamps as proper `DateTimePicker` fields on the Authz user page.
+- Added regression test:
+  - `tests/Feature/AuthzUserResourceTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Authz/UserResource.php app/Filament/Resources/Authz/UserResource/Pages/ListUsers.php app/Filament/Resources/Authz/UserResource/Pages/CreateUser.php app/Filament/Resources/Authz/UserResource/Pages/EditUser.php tests/Feature/AuthzUserResourceTest.php` => **No errors**

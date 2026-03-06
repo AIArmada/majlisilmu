@@ -110,7 +110,7 @@ return [
 
     'user_resource' => [
         'enabled' => true,
-        'auto_register' => true,
+        'auto_register' => false,
         'model' => null,
         'slug' => 'authz/users',
         'navigation' => [
@@ -119,7 +119,7 @@ return [
             'icon' => 'heroicon-o-user-group',
         ],
         'form' => [
-            'fields' => ['name', 'email', 'password'],
+            'fields' => ['name', 'email', 'email_verified_at', 'phone_verified_at', 'password'],
             'roles' => true,
             'permissions' => true,
         ],

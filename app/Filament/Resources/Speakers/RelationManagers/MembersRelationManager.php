@@ -9,6 +9,7 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -55,6 +56,7 @@ class MembersRelationManager extends RelationManager
 
                         $speaker->members()->syncWithoutDetaching([$user->id]);
                         $this->syncMemberRoles($user, $data['role_ids'] ?? []);
+                        app(PublicSubmissionLockService::class)->ensureSpeakerUnlockedIfIneligible($speaker->fresh());
                     }),
             ])
             ->actions([
@@ -70,6 +72,7 @@ class MembersRelationManager extends RelationManager
                     })
                     ->action(function (array $data, User $record): void {
                         $this->syncMemberRoles($record, $data['role_ids'] ?? []);
+                        app(PublicSubmissionLockService::class)->syncForUser($record);
                     }),
                 Action::make('removeMember')
                     ->label('Remove')
@@ -80,6 +83,7 @@ class MembersRelationManager extends RelationManager
 
                         $speaker->members()->detach($record->id);
                         $this->syncMemberRoles($record, []);
+                        app(PublicSubmissionLockService::class)->ensureSpeakerUnlockedIfIneligible($speaker->fresh());
                     }),
             ]);
     }

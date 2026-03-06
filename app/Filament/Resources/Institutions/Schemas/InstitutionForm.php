@@ -190,6 +190,11 @@ class InstitutionForm
                                 'rejected' => 'Rejected',
                             ])
                             ->required(),
+                        \Filament\Forms\Components\Toggle::make('allow_public_event_submission')
+                            ->label('Allow Public Event Submission')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Managed via lock/unlock header actions.'),
                         \Filament\Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),

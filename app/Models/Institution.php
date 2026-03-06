@@ -39,6 +39,10 @@ class Institution extends Model implements AuditableContract, HasMedia
 
         'status',
         'is_active',
+        'allow_public_event_submission',
+        'public_submission_locked_at',
+        'public_submission_locked_by',
+        'public_submission_lock_reason',
     ];
 
     #[\Override]
@@ -47,6 +51,8 @@ class Institution extends Model implements AuditableContract, HasMedia
         return [
             'type' => InstitutionType::class,
             'is_active' => 'boolean',
+            'allow_public_event_submission' => 'boolean',
+            'public_submission_locked_at' => 'datetime',
         ];
     }
 

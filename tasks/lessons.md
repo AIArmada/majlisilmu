@@ -60,3 +60,4 @@
 - For filter-order requests, align both form-field order and active-chip rendering order so users see a consistent sequence across input and feedback areas.
 - When adding or regrouping `/majlis` advanced filters, immediately audit locale coverage (`ms.json` + `ms_MY.json`) for every new `__()` key to prevent mixed-language UI in production.
 - When authz architecture is explicitly greenfield/dev-only, do not add backward-compatibility fallback paths; implement the requested target model directly to avoid carrying redundant legacy logic.
+- For responsibility handoff toggles like `allow_public_event_submission`, treat eligibility checks as control gating only; never auto-transition state on eligibility pass, and require an explicit global-admin lock action for `true -> false`.

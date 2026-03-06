@@ -40,6 +40,7 @@ class AhliPanelProvider extends PanelProvider
             ])
             ->font('Outfit')
             ->maxContentWidth('full')
+            ->discoverResources(in: app_path('Filament/Ahli/Resources'), for: 'App\Filament\Ahli\Resources')
             ->pages([
                 Dashboard::class,
             ])
@@ -60,4 +61,3 @@ class AhliPanelProvider extends PanelProvider
             ]);
     }
 }
-

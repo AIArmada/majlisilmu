@@ -31,7 +31,7 @@ class SpeakerPolicy
         }
 
         // Admins can view any speaker
-        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'moderator'])) {
             return true;
         }
 
@@ -53,7 +53,7 @@ class SpeakerPolicy
     public function update(User $user, Speaker $speaker): bool
     {
         // Admins can update any speaker
-        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'moderator'])) {
             return true;
         }
 

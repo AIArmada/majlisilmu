@@ -291,6 +291,11 @@ class SpeakerForm
                                 }
                             })
                             ->required(),
+                        \Filament\Forms\Components\Toggle::make('allow_public_event_submission')
+                            ->label(__('Allow Public Event Submission'))
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText(__('Managed via lock/unlock header actions.')),
                         \Filament\Forms\Components\Toggle::make('is_active')
                             ->label(__('Active'))
                             ->disabled(fn (Get $get): bool => $get('status') === 'rejected')
