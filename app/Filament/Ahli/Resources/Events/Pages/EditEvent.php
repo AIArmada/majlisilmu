@@ -9,8 +9,14 @@ use App\Models\Event;
 use App\Models\Tag;
 use App\Models\User;
 use App\Services\ModerationService;
+use App\States\EventStatus\Approved;
+use App\States\EventStatus\Pending;
+use App\States\EventStatus\Rejected;
+use App\States\EventStatus\NeedsChanges;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -29,7 +35,7 @@ class EditEvent extends EditRecord
         $event = $this->eventRecord();
         $event->loadMissing(['languages:id', 'tags:id,type']);
 
-        $data['languages'] = $event->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $data['languages'] = $event->languages->pluck('id')->map(fn(mixed $id): int => (int) $id)->all();
         $data['domain_tags'] = $this->getTagIdsByType(TagType::Domain);
         $data['discipline_tags'] = $this->getTagIdsByType(TagType::Discipline);
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
@@ -44,7 +50,7 @@ class EditEvent extends EditRecord
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
 
-        if (! $this->currentUser()?->hasApplicationAdminAccess()) {
+        if (!$this->currentUser()?->hasApplicationAdminAccess()) {
             unset($data['is_featured']);
         }
 
@@ -88,8 +94,8 @@ class EditEvent extends EditRecord
         $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
 
         $languageIds = collect($rawLanguageIds)
-            ->filter(fn (mixed $id): bool => filled($id))
-            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn(mixed $id): bool => filled($id))
+            ->map(fn(mixed $id): int => (int) $id)
             ->values()
             ->all();
 
@@ -101,8 +107,8 @@ class EditEvent extends EditRecord
         $issueTagIds = is_array($state['issue_tags'] ?? null) ? $state['issue_tags'] : [];
 
         $tagIds = collect(array_merge($domainTagIds, $disciplineTagIds, $sourceTagIds, $issueTagIds))
-            ->filter(fn (mixed $id): bool => filled($id))
-            ->map(fn (mixed $id): string => (string) $id)
+            ->filter(fn(mixed $id): bool => filled($id))
+            ->map(fn(mixed $id): string => (string) $id)
             ->unique()
             ->values()
             ->all();
@@ -120,7 +126,7 @@ class EditEvent extends EditRecord
         return $this->eventRecord()->tags
             ->where('type', $type->value)
             ->pluck('id')
-            ->map(fn (mixed $id): string => (string) $id)
+            ->map(fn(mixed $id): string => (string) $id)
             ->values()
             ->all();
     }
@@ -145,10 +151,15 @@ class EditEvent extends EditRecord
     {
         return [
             $this->getApproveAction(),
+            $this->getRejectAction(),
+            $this->getReconsiderAction(),
+            $this->getRemoderateAction(),
+            $this->getRevertToDraftAction(),
             Action::make('view_public')
                 ->label('View Public Page')
                 ->icon(Heroicon::OutlinedEye)
-                ->url(fn (): string => route('events.show', $this->eventRecord())),
+                ->url(fn(): string => route('events.show', $this->eventRecord())),
+            DeleteAction::make(),
         ];
     }
 
@@ -180,14 +191,167 @@ class EditEvent extends EditRecord
                     ->success()
                     ->send();
             })
-            ->visible(fn (): bool => $this->canApproveSubmittedEvent());
+            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Pending);
+    }
+
+    protected function getRejectAction(): Action
+    {
+        return Action::make('reject')
+            ->label('Reject')
+            ->icon(Heroicon::OutlinedXCircle)
+            ->color('danger')
+            ->modalHeading('Reject Event')
+            ->modalDescription('This event will be rejected. The submitter will be notified.')
+            ->schema([
+                Select::make('reason_code')
+                    ->label('Reason')
+                    ->options(self::getReasonCodeOptions())
+                    ->required(),
+                Textarea::make('note')
+                    ->label('Note to Submitter')
+                    ->required()
+                    ->rows(3)
+                    ->maxLength(2000),
+            ])
+            ->action(function (array $data, ModerationService $service): void {
+                abort_unless($this->canApproveSubmittedEvent(), 403);
+
+                $service->reject(
+                    $this->eventRecord(),
+                    $this->currentUser(),
+                    $data['reason_code'],
+                    $data['note']
+                );
+
+                Notification::make()
+                    ->title('Event rejected')
+                    ->danger()
+                    ->send();
+
+                $this->eventRecord()->refresh();
+                $this->refreshFormData(['status']);
+            })
+            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Pending);
+    }
+
+    protected function getReconsiderAction(): Action
+    {
+        return Action::make('reconsider')
+            ->label('Reconsider')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Reconsider Rejected Event')
+            ->modalDescription('Move this rejected event back to pending for re-review.')
+            ->schema([
+                Textarea::make('note')
+                    ->label('Reason for reconsideration')
+                    ->rows(3)
+                    ->maxLength(2000),
+            ])
+            ->action(function (array $data, ModerationService $service): void {
+                abort_unless($this->canApproveSubmittedEvent(), 403);
+
+                $service->reconsider($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+
+                Notification::make()
+                    ->title('Event moved back to pending review')
+                    ->success()
+                    ->send();
+
+                $this->eventRecord()->refresh();
+                $this->refreshFormData(['status']);
+            })
+            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Rejected);
+    }
+
+    protected function getRemoderateAction(): Action
+    {
+        return Action::make('remoderate')
+            ->label('Send for Re-moderation')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Re-moderate Event')
+            ->modalDescription('Send this approved event back to pending for re-review. It will be temporarily removed from search.')
+            ->schema([
+                Textarea::make('note')
+                    ->label('Reason for re-moderation')
+                    ->rows(3)
+                    ->maxLength(2000),
+            ])
+            ->action(function (array $data, ModerationService $service): void {
+                abort_unless($this->canApproveSubmittedEvent(), 403);
+
+                $service->remoderate($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+
+                Notification::make()
+                    ->title('Event sent for re-moderation')
+                    ->warning()
+                    ->send();
+
+                $this->eventRecord()->refresh();
+                $this->refreshFormData(['status']);
+            })
+            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Approved);
+    }
+
+    protected function getRevertToDraftAction(): Action
+    {
+        return Action::make('revert_to_draft')
+            ->label('Revert to Draft')
+            ->icon(Heroicon::OutlinedArrowUturnLeft)
+            ->color('gray')
+            ->requiresConfirmation()
+            ->modalHeading('Revert to Draft')
+            ->modalDescription('Move this event back to draft status.')
+            ->schema([
+                Textarea::make('note')
+                    ->label('Reason (optional)')
+                    ->rows(3)
+                    ->maxLength(2000),
+            ])
+            ->action(function (array $data, ModerationService $service): void {
+                abort_unless($this->canApproveSubmittedEvent(), 403);
+
+                $service->revertToDraft($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+
+                Notification::make()
+                    ->title('Event reverted to draft')
+                    ->send();
+
+                $this->eventRecord()->refresh();
+                $this->refreshFormData(['status']);
+            })
+            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && (
+                $this->eventRecord()->status instanceof Rejected
+                || $this->eventRecord()->status instanceof NeedsChanges
+            ));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected static function getReasonCodeOptions(): array
+    {
+        return [
+            'incomplete_info' => 'Incomplete Information',
+            'duplicate' => 'Duplicate Event',
+            'inappropriate' => 'Inappropriate Content',
+            'spam' => 'Spam',
+            'wrong_category' => 'Wrong Category',
+            'inaccurate_details' => 'Inaccurate Details',
+            'missing_speaker' => 'Missing Speaker Information',
+            'missing_venue' => 'Missing Venue Information',
+            'other' => 'Other',
+        ];
     }
 
     protected function eventRecord(): Event
     {
         $record = $this->getRecord();
 
-        if (! $record instanceof Event) {
+        if (!$record instanceof Event) {
             throw new \RuntimeException('Expected Filament record to be an Event instance.');
         }
 

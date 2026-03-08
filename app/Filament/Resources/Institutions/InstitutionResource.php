@@ -52,9 +52,9 @@ class InstitutionResource extends Resource
     public static function getRelations(): array
     {
         return [
-            MembersRelationManager::class,
-            DonationChannelsRelationManager::class,
             EventsRelationManager::class,
+            DonationChannelsRelationManager::class,
+            MembersRelationManager::class,
         ];
     }
 

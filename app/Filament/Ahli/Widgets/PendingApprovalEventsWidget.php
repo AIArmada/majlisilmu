@@ -41,24 +41,24 @@ class PendingApprovalEventsWidget extends TableWidget
                     ->sortable()
                     ->wrap(),
                 TextColumn::make('approval_scope')
-                    ->label('Scope')
-                    ->getStateUsing(fn (Event $record): string => $this->getApprovalScopeLabel($record))
+                    ->label('Institution / Speaker')
+                    ->getStateUsing(fn(Event $record): string => $this->getApprovalScopeLabel($record))
                     ->wrap(),
                 TextColumn::make('submission_submitter')
                     ->label('Submitter')
-                    ->getStateUsing(fn (Event $record): string => $this->getSubmissionSubmitterLabel($record))
+                    ->getStateUsing(fn(Event $record): string => $this->getSubmissionSubmitterLabel($record))
                     ->wrap(),
                 TextColumn::make('submission_recorded_at')
                     ->label('Submitted')
-                    ->getStateUsing(fn (Event $record): string => $this->getSubmissionRecordedAtLabel($record))
-                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('created_at', $direction)),
+                    ->getStateUsing(fn(Event $record): string => $this->getSubmissionRecordedAtLabel($record))
+                    ->sortable(query: fn(Builder $query, string $direction): Builder => $query->orderBy('created_at', $direction)),
             ])
             ->recordActions([
                 Action::make('review')
                     ->label('Review')
                     ->icon('heroicon-o-pencil-square')
-                    ->url(fn (Event $record): string => EventResource::getUrl('edit', ['record' => $record], panel: 'ahli'))
-                    ->visible(fn (Event $record): bool => auth()->user()?->can('approve', $record) ?? false),
+                    ->url(fn(Event $record): string => EventResource::getUrl('edit', ['record' => $record], panel: 'ahli'))
+                    ->visible(fn(Event $record): bool => auth()->user()?->can('approve', $record) ?? false),
             ])
             ->emptyStateHeading('No events need approval right now')
             ->emptyStateDescription('Pending public submissions for your institutions and speakers will appear here.');
@@ -82,7 +82,7 @@ class PendingApprovalEventsWidget extends TableWidget
             ->where('status', 'pending')
             ->whereHas('submissions');
 
-        if (! $user instanceof User) {
+        if (!$user instanceof User) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -118,15 +118,15 @@ class PendingApprovalEventsWidget extends TableWidget
     private function getApprovalScopeLabel(Event $record): string
     {
         if ($record->organizer instanceof Institution) {
-            return 'Institution: '.$record->organizer->name;
+            return 'Institution: ' . $record->organizer->name;
         }
 
         if ($record->organizer instanceof Speaker) {
-            return 'Speaker: '.$record->organizer->formatted_name;
+            return 'Speaker: ' . $record->organizer->formatted_name;
         }
 
         if ($record->institution instanceof Institution) {
-            return 'Institution: '.$record->institution->name;
+            return 'Institution: ' . $record->institution->name;
         }
 
         return '-';
@@ -136,26 +136,34 @@ class PendingApprovalEventsWidget extends TableWidget
     {
         $submission = $this->latestSubmission($record);
 
-        if (! $submission instanceof EventSubmission) {
+        if (!$submission instanceof EventSubmission) {
             return '-';
         }
 
         if ($submission->submitter instanceof User) {
+            $contact = filled($submission->submitter->phone)
+                ? $submission->submitter->phone
+                : $submission->submitter->email;
+
             $parts = array_filter([
                 $submission->submitter->name,
-                $submission->submitter->email,
+                $contact,
             ]);
 
             return $parts === [] ? '-' : implode(' | ', $parts);
         }
 
-        $email = $submission->contacts
-            ->firstWhere('category', 'email')
-            ?->value;
+        $phone = $submission->contacts
+            ->firstWhere('category', 'phone')
+                ?->value;
+
+        $contact = filled($phone)
+            ? $phone
+            : $submission->contacts->firstWhere('category', 'email')?->value;
 
         $parts = array_filter([
             $submission->submitter_name,
-            is_string($email) ? $email : null,
+            is_string($contact) ? $contact : null,
         ]);
 
         return $parts === [] ? '-' : implode(' | ', $parts);
@@ -165,21 +173,21 @@ class PendingApprovalEventsWidget extends TableWidget
     {
         $submission = $this->latestSubmission($record);
 
-        if (! $submission instanceof EventSubmission || ! $submission->created_at) {
+        if (!$submission instanceof EventSubmission || !$submission->created_at) {
             return '-';
         }
 
         $date = UserDateTimeFormatter::translatedFormat($submission->created_at, 'd M Y');
         $time = UserDateTimeFormatter::format($submission->created_at, 'h:i A');
 
-        return trim($date.', '.$time, ', ');
+        return trim($date . ', ' . $time, ', ');
     }
 
     private function latestSubmission(Event $record): ?EventSubmission
     {
         /** @var EventSubmission|null $submission */
         $submission = $record->submissions
-            ->sortByDesc(fn (EventSubmission $submission): int => $submission->created_at?->getTimestamp() ?? 0)
+            ->sortByDesc(fn(EventSubmission $submission): int => $submission->created_at?->getTimestamp() ?? 0)
             ->first();
 
         return $submission;

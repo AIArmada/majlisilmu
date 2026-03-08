@@ -40,7 +40,8 @@
         "spatie/laravel-model-states": "^2.13",
         "spatie/laravel-query-builder": "^6.4",
         "spatie/laravel-sluggable": "^3.7",
-        "typesense/typesense-php": "^5.2"
+        "typesense/typesense-php": "^5.2",
+        "ysfkaya/filament-phone-input": "^4.1"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.1",

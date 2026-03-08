@@ -119,7 +119,7 @@ return [
             'icon' => 'heroicon-o-user-group',
         ],
         'form' => [
-            'fields' => ['name', 'email', 'timezone', 'email_verified_at', 'phone_verified_at', 'password'],
+            'fields' => ['name', 'email', 'phone', 'timezone', 'email_verified_at', 'phone_verified_at', 'password'],
             'roles' => true,
             'permissions' => true,
         ],
