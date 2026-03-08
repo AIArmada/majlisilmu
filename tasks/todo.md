@@ -1,3 +1,347 @@
+# Local Conflict Cleanup Todo
+
+- [x] Inspect local task-tracking files for unresolved merge markers
+- [x] Merge the nested conflict blocks in `tasks/todo.md` and `tasks/lessons.md`
+- [x] Verify conflict markers are gone and record the final state
+
+## Review
+
+- Root cause:
+  - a previous local merge left nested conflict markers inside the task-tracking files even though the surrounding feature work had already been recorded
+  - the broken state was limited to documentation files, but it still left the workspace inconsistent and made future edits risky
+- Fix:
+  - merged the duplicated marker blocks at the top of `tasks/todo.md`
+  - preserved both timezone follow-up sections in the correct order
+  - cleaned `tasks/lessons.md` so the dashboard lessons remain intact and the timezone-input lesson appears only once
+- Verification:
+  - `rg -n "^(<<<<<<<|=======|>>>>>>>)" -S tasks/todo.md tasks/lessons.md` => no matches
+  - `git status --short tasks/todo.md tasks/lessons.md` => both files remain modified locally with the merged content
+
+# Account Settings Menu Todo
+
+- [x] Inspect existing dashboard navigation and user-profile update support
+- [x] Add a dedicated authenticated account settings page for profile fields and wire it into the user menu
+- [x] Add focused route/update coverage, verify translations, and rerun checks
+
+## Review
+
+- Root cause:
+  - the authenticated dashboard menu had planner tools and digest settings, but no first-party place for users to update their own core profile details
+  - Fortify in this app currently covers registration and password reset only; there was no existing profile-update action or page for name, email, phone, and timezone
+  - that left basic account maintenance effectively hidden from normal users even though the `users` model already supports those fields
+- Fix:
+  - added `app/Livewire/Pages/Dashboard/AccountSettings.php`
+    - dedicated authenticated Livewire page for profile editing
+    - keeps the app's existing contact rules: at least one of email or phone, both unique, timezone optional
+    - resets `email_verified_at` / `phone_verified_at` when those contact values change
+    - updates the session timezone when the user sets a preferred timezone and clears it when the preference is removed
+  - added `resources/views/livewire/pages/dashboard/account-settings.blade.php`
+    - account settings UI for name, email, phone, and timezone
+    - profile/help copy aligned with the dashboard cluster styling
+  - updated `routes/web.php`
+    - added `/papan-pemuka/tetapan-akaun` named route `dashboard.account-settings`
+    - added legacy alias `/dashboard/account-settings`
+  - updated `resources/views/layouts/app.blade.php`
+    - inserted `Account Settings` into the authenticated desktop and mobile user menus
+  - updated locale files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added the full phrase set required by the new account settings page and menu
+  - updated tests:
+    - `tests/Feature/DashboardPagesTest.php`
+      - auth coverage now includes `/dashboard/account-settings`
+      - dashboard rendering now asserts the new menu item exists
+    - added `tests/Feature/AccountSettingsPageTest.php`
+      - page render coverage
+      - Livewire save coverage for name/email/phone/timezone updates
+      - validation coverage for the email-or-phone requirement
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **3 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/DashboardPagesTest.php tests/Feature/AccountSettingsPageTest.php` => **No errors**
+  - `php -r '$files=["resources/lang/en.json","resources/lang/ms.json","resources/lang/ms_MY.json","resources/lang/zh.json","resources/lang/ta.json","resources/lang/jv.json"]; foreach($files as $file){json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);} echo "locale-json-ok\n";'` => **locale-json-ok**
+
+# Dashboard Menu Label Todo
+
+- [x] Isolate the authenticated menu labels from the shared Malay dashboard translation
+- [x] Keep Malay menu wording as `Dashboard` / `Dashboard Institusi` without changing page titles and other dashboard copy
+- [x] Add focused regression coverage and rerun verification
+
+## Review
+
+- Root cause:
+  - the authenticated menu reused the shared `Dashboard` translation key
+  - that key is intentionally translated as `Papan Pemuka` in Malay for page titles and dashboard copy
+  - because the menu used the same key directly, the navigation label inherited wording that the product does not want in the menu
+- Fix:
+  - updated `resources/views/layouts/app.blade.php`
+    - added menu-specific labels for Malay locales only
+    - kept the shared translation keys untouched for titles and non-menu dashboard UI
+    - desktop and mobile menus now render `Dashboard` and `Dashboard Institusi` for `ms` / `ms_MY`
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - extended the Malay dashboard test to verify the authenticated menu contains `Dashboard` / `Dashboard Institusi`
+    - added assertions proving the menu block no longer contains `Papan Pemuka`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+
+# Dashboard Pagination Scroll Lock Todo
+
+- [x] Reproduce the post-pagination scroll lock on the attendee dashboard
+- [x] Replace the stock Livewire paginator scroll handler with a non-smooth offset scroll that respects the sticky header
+- [x] Add focused regression coverage and rerun verification
+
+## Review
+
+- Root cause:
+  - the earlier pagination fix switched Livewire from scrolling to `body` to scrolling each section selector, which did keep the viewport near the relevant block
+  - however, Livewire's stock paginator template still performs that jump with raw `scrollIntoView()`
+  - because the app layout uses global `scroll-smooth` on `<html>`, that section jump becomes a smooth animation and can keep asserting the target position after the page changes, which makes manual upward scrolling feel stuck near the top of the hero
+- Fix:
+  - added `resources/views/vendor/livewire/tailwind.blade.php`
+  - added `resources/views/vendor/livewire/simple-tailwind.blade.php`
+  - replaced the stock `scrollIntoView()` handler with a custom inline scroll routine that:
+    - resolves the intended scroll target exactly as before
+    - temporarily disables smooth scrolling on `html` and `body`
+    - scrolls immediately with `window.scrollTo(...)`
+    - subtracts the sticky-header height for section targets so the section header is not pinned under the nav bar
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added a regression assertion proving the dashboard paginator markup now emits the new `window.scrollTo(...)` behavior and no longer renders `scrollIntoView()`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+  - manual browser verification on `/papan-pemuka`
+    - pagination still updates the correct page
+    - the target section now lands below the sticky header
+    - moving back to the top after pagination remains at `scrollY = 0` instead of being pulled back down
+
+# Dashboard Translation And Status Badge Cleanup Todo
+
+- [x] Audit dashboard cluster pages for untranslated labels and redundant approval badges
+- [x] Remove attendee-facing approved badges while keeping submission workflow status visible
+- [x] Add locale coverage for dashboard, digest preferences, and institution dashboard copy
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the attendee dashboard still rendered event-approval badges in planner cards even when the status was the default `approved`, which added noise outside the submission workflow
+  - many dashboard strings were wrapped in `__()` but had no matching locale entries, so the interface silently fell back to English in non-English locales
+  - both digest-preferences and institution-dashboard pages had the same translation-gap pattern, and institution status chips still used raw `headline()` formatting
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - added a shared translated-status helper for dashboard badges
+    - attendee-facing cards now suppress event-status badges when the status is only `approved`
+    - workflow status still appears for submitted events, including when they surface in the planner
+  - updated `app/Livewire/Pages/Dashboard/UserDashboard.php`
+    - calendar-entry status labels now resolve through translated status keys instead of raw `headline()` formatting
+    - removed the redundant static Livewire title attribute so the translated Blade title section remains authoritative
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - institution type/status/registration labels now use translated status text instead of English `headline()` output
+  - updated `app/Livewire/Pages/Dashboard/DigestPreferences.php` and `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`
+    - removed static English title attributes so the translated Blade titles drive the page title
+  - updated locale files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added the full dashboard-cluster phrase set plus status keys used by planner and institution surfaces
+- Regression coverage:
+  - updated `tests/Feature/DashboardPagesTest.php`
+  - now verifies:
+    - the existing English dashboard assertions explicitly run under `locale=en`
+    - Malay dashboard copy renders correctly
+    - translated approved workflow status appears in the submitted section without leaking into the regular `Going` section
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationPreferencesTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php app/Livewire/Pages/Dashboard/DigestPreferences.php app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+  - locale JSON validation completed for `en`, `ms`, `ms_MY`, `zh`, `ta`, and `jv`
+
+# Dashboard Status Parity And Pagination Todo
+
+- [x] Compare dashboard event badges against `/majlis` card semantics and remove non-submission `approved` noise
+- [x] Replace hard preview truncation with named pagination where planner sections can grow
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the featured planner card still had one inconsistent status-badge branch, so the dashboard was not fully aligned with `/majlis` event-card behavior
+  - the badge helper on that card was receiving the raw roles array instead of a boolean submission flag, which made the suppression rule brittle
+  - planner sections had been capped with preview-style limits before the pagination pass, so growing buckets risked hiding records instead of letting users page through them
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - aligned pending workflow copy with the public `/majlis` badge language via `Menunggu Kelulusan`
+    - fixed the featured-event badge branch so `approved` only appears for the user’s own submitted events
+    - kept the named paginators wired into agenda, planner buckets, submitted events, and check-in history
+  - updated `app/Livewire/Pages/Dashboard/UserDashboard.php`
+    - made calendar-entry workflow labels use the same pending-status translation path as the dashboard cards
+  - updated locale files:
+    - `resources/lang/en.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added `Menunggu Kelulusan` where it was still missing so the shared pending label remains translatable outside Malay locales
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added coverage proving named paginator pages show later agenda, going, submitted, and check-in records instead of silently truncating them
+- Verification:
+  - `php -r '$files=["resources/lang/en.json","resources/lang/ms.json","resources/lang/ms_MY.json","resources/lang/zh.json","resources/lang/ta.json","resources/lang/jv.json"]; foreach($files as $file){json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);} echo "locale-json-ok\n";'` => **locale-json-ok**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **11 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+
+# Dashboard Natural Malay Copy Todo
+
+- [x] Audit dashboard-cluster Malay copy for literal translation wording
+- [x] Rewrite the affected `ms` / `ms_MY` strings to sound natural in product UI
+- [x] Update focused assertions and rerun verification
+
+## Review
+
+- Root cause:
+  - the dashboard structure was already correct, but several Malay strings still read like direct English translations
+  - the awkwardness was most obvious in the planner intro, agenda headings, quick-link helper text, and digest-preferences copy
+  - this made the dashboard feel translated rather than written for Malay users
+- Fix:
+  - updated `resources/lang/ms.json`
+  - updated `resources/lang/ms_MY.json`
+  - rewrote the dashboard-cluster strings into more natural Bahasa Melayu, including:
+    - planner intro and hero-support copy
+    - agenda and calendar helper text
+    - attendance bucket descriptions
+    - submitted/check-in guidance copy
+    - digest-preferences labels and explanatory text
+    - institution-dashboard supporting copy that was still overly literal
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - changed the Malay assertion tied to the quick-link heading from the old literal phrasing to the new natural wording
+- Verification:
+  - `php -r '$files=["resources/lang/en.json","resources/lang/ms.json","resources/lang/ms_MY.json","resources/lang/zh.json","resources/lang/ta.json","resources/lang/jv.json"]; foreach($files as $file){json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);} echo "locale-json-ok\n";'` => **locale-json-ok**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **11 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+
+# Dashboard Copy, Membership Access, And Pagination Scroll Todo
+
+- [x] Remove unnecessary institution-focused attendee copy from the main dashboard hero
+- [x] Hide the institution dashboard from non-members and forbid direct access
+- [x] Fix dashboard pagination so section paging stays at the relevant block instead of jumping to the top
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - the attendee hero copy still mentioned institution operations even though most users are not institution members
+  - the top-level authenticated navigation still exposed `Institution Dashboard` to every signed-in user, and the institution dashboard page returned an empty state instead of rejecting non-members
+  - the paginator data itself worked, but Livewire's default pagination view was scrolling to `body`, so clicking a page number looked broken because the user was thrown back to the top of the dashboard
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - kept the hero focused on attendee planning and removed the unnecessary institution mention from the translated intro copy
+    - changed every dashboard paginator to use section-specific `scrollTo` selectors so pagination returns to the relevant block
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - added section ids for the institution tables and gave their paginators section-specific scroll targets as well
+  - updated `resources/views/layouts/app.blade.php`
+    - compute institution-dashboard access once from the authenticated user
+    - only render the desktop/mobile `Institution Dashboard` menu item for members
+  - updated `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`
+    - forbid access up front when the signed-in user has no institution memberships
+  - updated locale files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - shortened the main dashboard intro so it no longer references institution operations
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added coverage proving non-members do not see `Institution Dashboard` on `/dashboard`
+    - added coverage proving direct access to `/dashboard/institutions` is forbidden for non-members
+- Verification:
+  - `php -r '$files=["resources/lang/en.json","resources/lang/ms.json","resources/lang/ms_MY.json","resources/lang/zh.json","resources/lang/ta.json","resources/lang/jv.json"]; foreach($files as $file){json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);} echo "locale-json-ok\n";'` => **locale-json-ok**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+  - manual browser verification on `/dashboard`
+    - section pagination now updates data and keeps the viewport anchored to the relevant section instead of jumping to the top of the page
+
+# Dashboard Hierarchy Cleanup Todo
+
+- [x] Inspect the dashboard layout to identify repeated summary layers and duplicated agenda content
+- [x] Refactor the dashboard Blade so analytics and planner sections each have a distinct job
+- [x] Add focused regression coverage for the new hierarchy and run verification
+
+## Review
+
+- Root cause:
+  - the dashboard tried to support both analytics and planning, but multiple layers answered the same question
+  - the hero already summarized planner state, then a second stat row repeated category counts, and the detailed sections repeated them again
+  - `Next up` also reused the first item from `Upcoming Agenda`, so the same event appeared twice in the top planner area
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - removed the secondary stat-card strip entirely
+    - kept a single analytics layer in the hero and split the old combined `Going + Registered` tile into distinct metrics
+    - added a compact quick-jump row so the removed summary space now helps navigation instead of repeating counts
+    - changed the agenda panel to render items after the featured `Next up` event, with a dedicated empty state when only the featured event exists
+    - added section anchors so the quick-jump pills move users directly to calendar, agenda, and each activity bucket
+- Regression coverage:
+  - updated `tests/Feature/DashboardPagesTest.php`
+  - now verifies:
+    - the dashboard renders the new quick-jump row
+    - the old `Going + Registered` card is gone
+    - when there is only one upcoming planner event, the agenda shows the featured-event empty state instead of repeating the same item
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **9 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php /Users/Saiffil/Herd/majlisilmu/tests/Feature/DashboardPagesTest.php` => **No errors**
+
+# Timezone Input Key Safety Follow-up Todo
+
+- [x] Re-review prior timezone hardening changes for domain-field collision risk
+- [x] Switch viewer-timezone request-input detection to dedicated `user_timezone` key
+- [x] Align middleware regression tests with dedicated request key behavior
+- [x] Run available verification checks and document limitations
+
+## Review
+
+- Root issue addressed:
+  - Using generic request input key `timezone` for viewer timezone detection can collide with domain payload fields (for example event/session timezone fields), creating unintended viewer-timezone overrides.
+- Fix applied:
+  - `UserTimezoneResolver` now reads request input/query from `user_timezone` (dedicated viewer context signal) rather than generic `timezone`.
+  - Middleware behavior stays the same for persistence (`request_input` remains persistable), but now only for explicit viewer-timezone payloads.
+  - Middleware tests updated to exercise `user_timezone` request input precedence and persistence.
+- Verification:
+  - `php -l app/Support/Timezone/UserTimezoneResolver.php` => no syntax errors
+  - `php -l app/Http/Middleware/SetFilamentTimezone.php` => no syntax errors
+  - `php -l tests/Feature/SetFilamentTimezoneMiddlewareTest.php` => no syntax errors
+  - `node --check resources/js/filament/user-timezone.js` => valid syntax
+  - `vendor/bin/pest --parallel --compact tests/Feature/SetFilamentTimezoneMiddlewareTest.php` not runnable: dependencies cannot be fully installed in this container because private Filament package downloads return 403.
+
+# Timezone Detection Hardening Todo
+
+- [x] Review current timezone resolver/middleware/frontend detection flow and identify gaps
+- [x] Study filament-timezone-detector package code/docs for transferable patterns
+- [x] Implement safe, minimal timezone detection hardening in this codebase
+- [x] Add focused timezone middleware regression tests
+- [x] Run focused verification and document review notes
+
+## Review
+
+- What was reviewed from `filament-timezone-detector`:
+  - middleware pattern that accepts timezone from request input/query in addition to header and cookie
+  - frontend pattern that ensures Livewire/fetch requests include `X-Timezone` consistently
+- Applied improvements (without adding the package dependency):
+  - `UserTimezoneResolver` now considers request input/query `timezone` as a valid detection source (after header, before cookie/session)
+  - `SetFilamentTimezone` now treats `request_input` as a persistable user timezone source when authenticated user timezone is null/different
+  - Filament timezone script now stores timezone in `sessionStorage`, keeps cookie sync, and injects `X-Timezone` for Livewire v4 intercepted requests and global `fetch()` requests
+  - Added middleware regression tests for request-input priority and user-profile persistence from request input
+- Verification:
+  - `php -l app/Support/Timezone/UserTimezoneResolver.php` => no syntax errors
+  - `php -l app/Http/Middleware/SetFilamentTimezone.php` => no syntax errors
+  - `php -l tests/Feature/SetFilamentTimezoneMiddlewareTest.php` => no syntax errors
+  - `node --check resources/js/filament/user-timezone.js` => valid syntax
+  - `vendor/bin/pest --parallel --compact tests/Feature/SetFilamentTimezoneMiddlewareTest.php` could not run because dependencies are not installed (`vendor/bin/pest` missing)
+
 # Authz User Timezone Field Todo
 
 - [x] Inspect the Authz user resource form and confirm the underlying user model supports `timezone`
@@ -2632,3 +2976,47 @@
 - Verification:
   - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionMembersRelationLinkTest.php` => **1 passed**
   - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php tests/Feature/InstitutionMembersRelationLinkTest.php` => **No errors**
+
+# User Dashboard Planner + Digest Preferences Todo
+
+- [x] Add a dedicated authenticated digest preferences page and route aliases
+- [x] Move digest preference state/save logic out of `UserDashboard`
+- [x] Add `Digest Preferences` to the authenticated desktop and mobile user menus
+- [x] Redesign `/dashboard` into an attendee-first planner with overview, calendar, agenda, activity buckets, submitted events, and recent check-ins
+- [x] Remove saved-search and digest-preferences panels from `/dashboard`
+- [x] Update dashboard and notification preference tests for the new page, menu, and planner behavior
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Added a dedicated digest settings surface:
+  - `app/Livewire/Pages/Dashboard/DigestPreferences.php`
+  - `resources/views/livewire/pages/dashboard/digest-preferences.blade.php`
+  - named route `dashboard.digest-preferences` on `/papan-pemuka/pilihan-digest`
+  - legacy alias `/dashboard/digest-preferences`
+- Moved digest preference state hydration, validation, and persistence out of `UserDashboard` and preserved the existing saved-search digest preference semantics.
+- Updated authenticated navigation in `resources/views/layouts/app.blade.php`:
+  - reordered user menu items to `Dashboard`, `Saved Searches`, `Digest Preferences`, `Institution Dashboard`
+  - added the new menu entry in both desktop dropdown and mobile authenticated menu
+- Rebuilt `app/Livewire/Pages/Dashboard/UserDashboard.php` into an attendee-first planner:
+  - dedicated collections for saved, interested, going, registered, submitted, and recent check-ins
+  - merged calendar entries by event/date across overlapping roles
+  - upcoming agenda derived from the merged calendar entries
+  - institution operations removed from the main dashboard data model
+- Replaced `resources/views/livewire/pages/dashboard/user-dashboard.blade.php` with a planner layout:
+  - header/summary cards
+  - overview month calendar with role filters
+  - upcoming agenda
+  - compact Going / Registered / Interested / Saved buckets
+  - Submitted Events section
+  - Recent Check-ins history
+  - removed saved-search and digest-preference panels from the dashboard body
+- Updated focused regression coverage:
+  - `tests/Feature/DashboardPagesTest.php`
+  - `tests/Feature/NotificationPreferencesTest.php`
+- Verification:
+  - `php artisan route:list --path=digest-preferences` => **new digest-preferences route present**
+  - `php artisan route:list --path=dashboard` => **dashboard route set includes digest-preferences**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **8 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationPreferencesTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/DigestPreferences.php app/Livewire/Pages/Dashboard/UserDashboard.php tests/Feature/DashboardPagesTest.php tests/Feature/NotificationPreferencesTest.php` => **No errors**
