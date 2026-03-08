@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('events', function (Blueprint $table) {
@@ -47,6 +46,9 @@ return new class extends Migration
             $table->string('visibility')->default('public');
 
             $table->string('status')->nullable();
+
+            $table->string('schedule_kind')->default('single')->index();
+            $table->string('schedule_state')->default('active')->index();
 
             $table->string('live_url')->nullable();
             $table->string('event_url')->nullable();

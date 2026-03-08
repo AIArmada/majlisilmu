@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('institutions', function (Blueprint $table) {
@@ -19,6 +18,10 @@ return new class extends Migration
 
             $table->string('status')->nullable();
             $table->boolean('is_active')->default(true);
+
+            $table->boolean('allow_public_event_submission')->default(true)->index();
+            $table->timestamp('public_submission_locked_at')->nullable()->index();
+            $table->foreignUuid('public_submission_locked_by')->nullable()->index();
 
             $table->timestamps();
 

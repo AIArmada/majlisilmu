@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -15,7 +14,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuidMorphs('socialable'); // polymorphic relation
             $table->string('platform')->index(); // e.g. facebook, twitter, instagram
-            $table->string('url');
+            $table->string('url')->nullable();
             $table->string('username')->nullable(); // optional handle
             $table->timestamps();
         });
