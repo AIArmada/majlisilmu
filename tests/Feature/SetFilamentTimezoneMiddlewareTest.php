@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 /**
  * @return array{resolved_timezone: string, status_code: int}
  */
-function runTimezoneMiddleware(?string $header = null, ?string $cookie = null, ?string $session = null): array
+function runTimezoneMiddleware(?string $header = null, ?string $cookie = null, ?string $session = null, ?string $requestUserTimezoneInput = null): array
 {
     $request = Request::create('/');
     $sessionStore = app('session')->driver();
@@ -25,6 +25,10 @@ function runTimezoneMiddleware(?string $header = null, ?string $cookie = null, ?
 
     if ($cookie !== null) {
         $request->cookies->set('user_timezone', $cookie);
+    }
+
+    if ($requestUserTimezoneInput !== null) {
+        $request->request->set('user_timezone', $requestUserTimezoneInput);
     }
 
     $response = app(SetFilamentTimezone::class)->handle(
@@ -48,6 +52,24 @@ it('stores timezone from X-Timezone header', function () {
 it('prioritizes X-Timezone header over cookie and session', function () {
     $result = runTimezoneMiddleware(
         header: 'Asia/Bangkok',
+        cookie: 'Asia/Singapore',
+        session: 'Asia/Manila',
+    );
+
+    expect($result['resolved_timezone'])->toBe('Asia/Bangkok');
+});
+
+
+it('uses user_timezone request input when header is missing', function () {
+    $result = runTimezoneMiddleware(requestUserTimezoneInput: 'Asia/Tokyo', session: 'Asia/Manila');
+
+    expect($result['resolved_timezone'])->toBe('Asia/Tokyo');
+});
+
+it('prioritizes X-Timezone header over user_timezone request input', function () {
+    $result = runTimezoneMiddleware(
+        header: 'Asia/Bangkok',
+        requestUserTimezoneInput: 'Asia/Tokyo',
         cookie: 'Asia/Singapore',
         session: 'Asia/Manila',
     );
@@ -119,6 +141,19 @@ it('does not persist fallback timezone to authenticated user when request timezo
 
     expect($result['resolved_timezone'])->toBe('UTC');
     expect($user->fresh()?->timezone)->toBeNull();
+});
+
+
+it('persists user_timezone request input to authenticated user profile when null', function () {
+    $user = User::factory()->create([
+        'timezone' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    runTimezoneMiddleware(requestUserTimezoneInput: 'Asia/Tokyo');
+
+    expect($user->fresh()?->timezone)->toBe('Asia/Tokyo');
 });
 
 it('persists resolved timezone to authenticated user profile when null', function () {
