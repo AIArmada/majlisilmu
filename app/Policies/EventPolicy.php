@@ -36,7 +36,7 @@ class EventPolicy
         }
 
         // Private events require authorization
-        if (! $user instanceof \App\Models\User) {
+        if (!$user instanceof \App\Models\User) {
             return false;
         }
 
@@ -91,13 +91,18 @@ class EventPolicy
      */
     public function delete(User $user, Event $event): bool
     {
-        // Only admins can delete approved events
+        // Super admins can delete anything
         if ($user->hasRole('super_admin')) {
             return true;
         }
 
-        // Only draft events can be deleted by non-admins
-        if ($event->status === null || ! $event->status->equals(\App\States\EventStatus\Draft::class)) {
+        // Members of the organizing institution or speaker can delete events scoped to them
+        if ($event->userHasScopedEventPermission($user, 'event.delete', includeEventScope: false)) {
+            return true;
+        }
+
+        // For other users, only draft events can be deleted
+        if ($event->status === null || !$event->status->equals(\App\States\EventStatus\Draft::class)) {
             return false;
         }
 

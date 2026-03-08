@@ -7,27 +7,27 @@ namespace App\Filament\Resources\Authz;
 use AIArmada\FilamentAuthz\Resources\UserResource as BaseUserResource;
 use AIArmada\FilamentAuthz\Support\UserAuthzForm;
 use AIArmada\FilamentAuthz\Tables\Actions\ImpersonateTableAction;
+use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
 use App\Filament\Resources\Authz\UserResource\Pages\CreateUser;
 use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
-use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
 use App\Filament\Resources\Authz\UserResource\Pages\ViewUser;
 use Filament\Actions;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
+use Ysfkaya\FilamentPhoneInput\Tables\PhoneColumn;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use DateTimeZone;
 
 class UserResource extends BaseUserResource
 {
-    public static function canView(Model $record): bool
-    {
-        return static::checkAbility('view');
-    }
 
     public static function form(Schema $schema): Schema
     {
@@ -42,10 +42,37 @@ class UserResource extends BaseUserResource
     public static function table(Table $table): Table
     {
         return parent::table($table)
+            ->columns([
+                TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('email')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable(),
+                PhoneColumn::make('phone')
+                    ->displayFormat(PhoneInputNumberType::INTERNATIONAL)
+                    ->searchable()
+                    ->copyable()
+                    ->placeholder('-'),
+                TextColumn::make('roles.name')
+                    ->label('Roles')
+                    ->badge()
+                    ->color('primary')
+                    ->searchable(),
+                TextColumn::make('created_at')
+                    ->since()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('updated_at')
+                    ->since()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
             ->actions([
                 ImpersonateTableAction::make(),
                 Actions\ViewAction::make()
-                    ->url(fn (Model $record): string => static::getUrl('view', ['record' => $record])),
+                    ->url(fn(Model $record): string => static::getUrl('view', ['record' => $record])),
                 Actions\EditAction::make(),
             ]);
     }
@@ -61,7 +88,7 @@ class UserResource extends BaseUserResource
     }
 
     /**
-     * @return list<DateTimePicker|Select|TextInput>
+     * @return list<DateTimePicker|PhoneInput|Select|TextInput>
      */
     protected static function getConfiguredFormFields(): array
     {
@@ -80,6 +107,8 @@ class UserResource extends BaseUserResource
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
+                'phone' => PhoneInput::make('phone')
+                    ->initialCountry('MY'),
                 'timezone' => Select::make('timezone')
                     ->label('Timezone')
                     ->options(static::getTimezoneOptions())
@@ -97,18 +126,18 @@ class UserResource extends BaseUserResource
                 'password' => TextInput::make('password')
                     ->password()
                     ->dehydrateStateUsing(function (?string $state): ?string {
-                        if ($state === null || $state === '') {
-                            return null;
-                        }
+                            if ($state === null || $state === '') {
+                                return null;
+                            }
 
-                        return Hash::make($state);
-                    })
+                            return Hash::make($state);
+                        })
                     ->dehydrated(function (?string $state): bool {
-                        return filled($state);
-                    })
+                            return filled($state);
+                        })
                     ->required(function (string $operation): bool {
-                        return $operation === 'create';
-                    })
+                            return $operation === 'create';
+                        })
                     ->maxLength(255),
                 default => TextInput::make((string) $field)
                     ->maxLength(255),
@@ -124,7 +153,7 @@ class UserResource extends BaseUserResource
     protected static function getTimezoneOptions(): array
     {
         return collect(DateTimeZone::listIdentifiers())
-            ->mapWithKeys(fn (string $timezone): array => [$timezone => $timezone])
+            ->mapWithKeys(fn(string $timezone): array => [$timezone => $timezone])
             ->all();
     }
 }

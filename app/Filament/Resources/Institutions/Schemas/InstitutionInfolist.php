@@ -46,7 +46,7 @@ class InstitutionInfolist
                                                 TextEntry::make('status')
                                                     ->label('Status')
                                                     ->badge()
-                                                    ->color(fn (string $state): string => match ($state) {
+                                                    ->color(fn(string $state): string => match ($state) {
                                                         'pending' => 'warning',
                                                         'verified' => 'success',
                                                         'rejected' => 'danger',
@@ -116,12 +116,12 @@ class InstitutionInfolist
                                         TextEntry::make('address.google_maps_url')
                                             ->label('Pautan Google Maps')
                                             ->placeholder('-')
-                                            ->url(fn (?string $state): ?string => filled($state) ? $state : null)
+                                            ->url(fn(?string $state): ?string => filled($state) ? $state : null)
                                             ->openUrlInNewTab(),
                                         TextEntry::make('address.waze_url')
                                             ->label('Pautan Waze')
                                             ->placeholder('-')
-                                            ->url(fn (?string $state): ?string => filled($state) ? $state : null)
+                                            ->url(fn(?string $state): ?string => filled($state) ? $state : null)
                                             ->openUrlInNewTab(),
                                     ])
                                     ->columns(2),
@@ -176,7 +176,7 @@ class InstitutionInfolist
                                                     ->label('Username'),
                                                 TextEntry::make('resolved_url')
                                                     ->label('URL')
-                                                    ->url(fn (?string $state): ?string => filled($state) ? $state : null)
+                                                    ->url(fn(?string $state): ?string => filled($state) ? $state : null)
                                                     ->openUrlInNewTab(),
                                             ])
                                             ->columns(3)
@@ -191,14 +191,24 @@ class InstitutionInfolist
                                     ->schema([
                                         TextEntry::make('events_count')
                                             ->label('Jumlah Majlis')
+                                            ->state(fn($record) => $record->events()->count())
                                             ->numeric(),
                                         TextEntry::make('members_count')
                                             ->label('Jumlah Ahli')
+                                            ->state(fn($record) => $record->members()->count())
                                             ->numeric(),
                                         TextEntry::make('speakers_count')
                                             ->label('Jumlah Penceramah')
-                                            ->state(fn ($record) => $record->speakers()->count())
+                                            ->state(fn($record) => $record->speakers()->count())
                                             ->numeric(),
+                                        TextEntry::make('followers_count')
+                                            ->label('Jumlah Pengikut')
+                                            ->state(fn($record) => $record->followers()->count())
+                                            ->numeric(),
+                                    ])
+                                    ->columns(4),
+                                Section::make('Maklumat Rekod')
+                                    ->schema([
                                         TextEntry::make('created_at')
                                             ->label('Dicipta Pada')
                                             ->dateTime(),
@@ -206,7 +216,7 @@ class InstitutionInfolist
                                             ->label('Dikemas Kini Pada')
                                             ->dateTime(),
                                     ])
-                                    ->columns(3),
+                                    ->columns(2),
                             ]),
                     ])
                     ->persistTabInQueryString(),
