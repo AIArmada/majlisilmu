@@ -1,3 +1,649 @@
+# Authz User Timezone Field Todo
+
+- [x] Inspect the Authz user resource form and confirm the underlying user model supports `timezone`
+- [x] Expose `timezone` on the Authz user edit/create form
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the `users` table and `App\Models\User` already support a nullable `timezone` field
+  - the custom Authz user resource followed a configurable field list, and `timezone` was not included in that form configuration
+  - as a result, admin users could not view or edit timezone from `/admin/authz/users/{id}/edit`
+- Fix:
+  - updated `config/filament-authz.php`
+    - added `timezone` to the configured Authz user form field list
+  - updated `app/Filament/Resources/Authz/UserResource.php`
+    - added a dedicated `timezone` field renderer
+    - implemented it as a searchable `Select` over PHP timezone identifiers instead of a free-text input
+    - kept the field optional so users can still fall back to application defaults
+- Regression coverage:
+  - updated `tests/Feature/AuthzUserResourceTest.php`
+  - now verifies:
+    - the edit page renders `Timezone`
+    - timezone persists through the Authz user edit flow alongside verification timestamps and role syncing
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => **4 passed**
+  - `vendor/bin/phpstan analyse --ansi config/filament-authz.php app/Filament/Resources/Authz/UserResource.php tests/Feature/AuthzUserResourceTest.php` => **No errors**
+
+# Ahli Escalation Field Visibility Todo
+
+- [x] Hide `Tarikh Eskalasi` from ahli event edit surfaces
+- [x] Strip crafted ahli `escalated_at` payloads on save and add focused regression coverage
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - `Tarikh Eskalasi` lived in the shared event moderation form with no panel-specific visibility rule
+  - so it still rendered on ahli event edit pages even though it is moderation metadata, not something ahli users should manage
+  - the ahli save path also did not explicitly unset `escalated_at`, so a crafted Livewire payload could still attempt to persist it
+- Fix:
+  - updated `app/Filament/Resources/Events/Schemas/EventForm.php`
+    - `DateTimePicker::make('escalated_at')` is now only visible on the `admin` panel
+  - updated `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php`
+    - ahli saves now explicitly unset `escalated_at` before persistence
+  - this matches the same pattern already used for other admin-only moderation metadata on shared forms
+- Regression coverage:
+  - extended `tests/Feature/AhliEventFeaturedGuardTest.php`
+  - now verifies:
+    - ahli edit page hides `is_priority`
+    - ahli edit page hides `escalated_at`
+    - ahli edit page hides `is_featured`
+    - admin edit page still shows all three fields
+    - crafted ahli payloads cannot set either `is_featured` or `escalated_at`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliEventFeaturedGuardTest|FilamentPanelAccessTest'` => **11 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/Schemas/EventForm.php app/Filament/Ahli/Resources/Events/Pages/EditEvent.php tests/Feature/AhliEventFeaturedGuardTest.php` => **No errors**
+
+# Priority Review Visibility And Queue Order Todo
+
+- [x] Inspect where `Priority Review` is rendered and how moderation queue ordering currently works
+- [x] Hide `Priority Review` on ahli event surfaces while preserving intended admin moderation controls
+- [x] Make the moderation queue surface priority events first and cover the behavior with focused tests
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - `is_priority` was exposed directly in the shared event moderation form with no panel-aware visibility guard, so it still rendered on ahli event edit pages
+  - the admin moderation queue still defaulted to a generic submission-time sort, so urgent `is_priority` events were not explicitly surfaced first
+- Fix:
+  - updated `app/Filament/Resources/Events/Schemas/EventForm.php`
+    - `Priority Review` is now only visible when the current Filament panel is `admin`
+    - this hides it from ahli while keeping it available on admin moderation surfaces
+  - updated `app/Filament/Pages/ModerationQueue.php`
+    - added an explicit `Priority` column so reviewers can see why a row is elevated
+    - changed the default queue ordering to:
+      - priority events first
+      - then earlier `starts_at`
+      - then newer `created_at`
+    - removed the old plain `created_at desc` default sort from the table definition so urgency ordering now leads the queue
+- Regression coverage:
+  - updated `tests/Feature/AhliEventFeaturedGuardTest.php`
+    - ahli edit page hides `is_priority`
+    - admin edit page still shows `is_priority`
+  - updated `tests/Feature/ModerationQueueTest.php`
+    - queue exposes the new `Priority` column
+    - priority records appear before non-priority records in table order
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliEventFeaturedGuardTest|ModerationQueueTest|FilamentPanelAccessTest'` => **20 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/Schemas/EventForm.php app/Filament/Pages/ModerationQueue.php tests/Feature/AhliEventFeaturedGuardTest.php tests/Feature/ModerationQueueTest.php` => **No errors**
+
+# Ahli Featured Toggle Visibility Todo
+
+- [x] Inspect why the `Featured Event` toggle still renders on ahli event edit pages
+- [x] Hide the field at the schema/render level so only application admins can see it
+- [x] Add focused regression coverage for ahli vs admin visibility
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - the shared event form/table helpers only checked whether the current user had application-admin access
+  - they did not check which Filament panel was rendering the shared schema
+  - that meant a super admin using the ahli panel could still see `Featured Event`, even though the product rule is that this control belongs only on global-admin surfaces, not on ahli
+- Fix:
+  - tightened the shared featured-flag visibility guard in:
+    - `app/Filament/Resources/Events/Schemas/EventForm.php`
+    - `app/Filament/Resources/Events/Tables/EventsTable.php`
+  - the helper now requires both:
+    - `hasApplicationAdminAccess()`
+    - current panel id is `admin`
+  - result:
+    - admin panel: global admins still see `Featured Event`
+    - ahli panel: `Featured Event` stays hidden for everyone, including super admins
+  - the ahli save-path guard in `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php` remains in place as backend protection against crafted payloads
+- Regression coverage:
+  - extended `tests/Feature/AhliEventFeaturedGuardTest.php`
+  - now verifies:
+    - ahli members do not see the featured field/column
+    - even a super admin does not see the featured field/column on ahli surfaces
+    - admin panel super admins still do see the field/column
+    - crafted ahli payloads still cannot set `is_featured`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliEventFeaturedGuardTest|AhliPanelInstitutionEditingTest|FilamentPanelAccessTest'` => **19 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/Schemas/EventForm.php app/Filament/Resources/Events/Tables/EventsTable.php tests/Feature/AhliEventFeaturedGuardTest.php` => **No errors**
+
+# Ahli Event Edit 404 Todo
+
+- [x] Inspect the target event record and ahli resource scoping to find why the edit route returns 404
+- [x] Implement the minimal fix so eligible ahli members can open the event edit page
+- [x] Add focused regression coverage for the failing ahli event access path
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - the event `019ca2c8-b868-73b9-8242-c5189901bdba` is a draft event with `organizer_type = App\Models\Speaker`, but it is also linked to an institution via `institution_id`
+  - the ahli event resource query only admitted institution members for:
+    - institution-organized events, or
+    - legacy events where `organizer_type` was null
+  - that meant institution-linked speaker events were filtered out at the resource-query layer before the edit page could authorize them, which surfaced as a `404`
+  - the same “speaker check returns early, institution fallback never runs” pattern also existed in the event scoped-permission helpers, so even if the query were widened, institution members could still fail update/approve checks on speaker-organized institution events
+- Fix:
+  - widened ahli event scoping in `app/Filament/Ahli/Resources/Events/EventResource.php`
+    - institution members now see any event linked to their institution through `events.institution_id`, including speaker-organized records
+  - widened the ahli dashboard approval widget query in `app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php`
+    - pending speaker-organized submissions linked to a member institution now appear for institution members as well
+  - centralized scoped permission fallback in `app/Models/Event.php`
+    - added `userHasScopedEventPermission(...)`
+    - `userCanManage()`, `userCanDelete()`, `userCanView()`, and `userCanApprovePublicSubmission()` now evaluate:
+      - event scope
+      - organizer institution scope
+      - organizer speaker scope
+      - linked institution scope
+    - this prevents organizer speaker checks from blocking legitimate institution fallback
+  - updated `app/Policies/EventPolicy.php`
+    - `exportRegistrations()` and `manageMembers()` now reuse the same shared scoped-permission helper so their behavior stays aligned with edit/approve access
+- Regression coverage:
+  - extended `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - institution admins can open ahli edit pages for speaker-organized events linked to their institution
+    - ahli events index now includes institution-linked speaker events for institution members
+  - extended `tests/Feature/AhliEventApprovalTest.php`
+    - institution admins can approve pending speaker-organized public submissions linked to their institution
+  - extended `tests/Feature/AhliDashboardApprovalWidgetTest.php`
+    - institution members see pending speaker-organized submissions linked to their institution on the ahli dashboard widget
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliPanelInstitutionEditingTest|AhliEventApprovalTest|AhliDashboardApprovalWidgetTest'` => **16 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Event.php app/Policies/EventPolicy.php app/Filament/Ahli/Resources/Events/EventResource.php app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/AhliEventApprovalTest.php tests/Feature/AhliDashboardApprovalWidgetTest.php` => **No errors**
+
+# Public About Page Todo
+
+- [x] Add a dedicated public About page route and Livewire page using the existing site layout
+- [x] Write structured multilingual About content for every supported locale
+- [x] Design a polished public-facing page with strong narrative, clear action paths, and responsive layout
+- [x] Wire public navigation/footer links to the page
+- [x] Add focused coverage and run verification
+
+## Review
+
+- Root cause:
+  - the public site had no About page at all, even though the footer already implied one with a dead `About Us` placeholder link
+  - the provided writeup was long, narrative, and multi-section, so forcing it into JSON translation keys or a one-off static blade would have made future edits messy
+- Fix:
+  - added a dedicated public About page Livewire component:
+    - `app/Livewire/Pages/About/Show.php`
+    - `resources/views/livewire/pages/about/show.blade.php`
+  - added the primary public route and legacy alias in `routes/web.php`:
+    - `/tentang-kami` named `about`
+    - `/about` legacy alias
+  - initially wired the new About route into the header, mobile menu, and footer
+  - revised the navigation placement after product feedback so `About` now lives in the lower navigation/footer only, not the top menu
+- Content architecture:
+  - created structured locale files instead of bloating JSON dictionaries:
+    - `resources/lang/en/about.php`
+    - `resources/lang/ms/about.php`
+    - `resources/lang/ms_MY/about.php`
+    - `resources/lang/zh/about.php`
+    - `resources/lang/ta/about.php`
+    - `resources/lang/jv/about.php`
+  - revised the page copy around the stronger Malaysia-specific product thesis:
+    - Malaysia already has a vast masjid/surau network
+    - the real gap is discovery, not venue supply
+    - missed majlis are often a visibility problem, not a motivation problem
+    - Majlis Ilmu acts as the invitation layer that makes knowledge easier to find, trust, and attend
+  - after user review, rewrote each locale as native copy rather than direct translation
+  - after a second review round, rebuilt the Bahasa Melayu copy again with a more native cadence, less translated sentence structure, and more grounded Malaysia-first phrasing
+  - rewrote the other locale files in the same pass so each language reads like locally authored copy rather than a mirrored structure from English
+  - localized the Blade-only motivation section and image alt text so the live page no longer falls back to English midway through the scroll
+  - kept the page copy modular by section:
+    - hero and simple definition
+    - scale / proximity stats
+    - silent-loss and paradox story blocks
+    - root causes
+    - life-outcome losses
+    - before/after product shifts
+    - product proof
+    - magnet / distribution / trust impact
+    - closing CTA
+- Design direction implemented:
+  - bold dark hero with gradient and patterned atmosphere
+  - two-column introduction with a sharper definition panel
+  - stat cards to anchor the Malaysia-scale argument
+  - alternating story cards and impact sections instead of a generic mission wall
+  - strong closing CTA with direct product actions (`register`, `browse events`, `submit event`)
+  - verified clean stacking on mobile and strong hierarchy on desktop
+- Regression coverage:
+  - added `tests/Feature/AboutPageTest.php`
+  - verifies:
+    - primary and legacy About routes render
+    - the page headline localizes correctly across supported locales
+    - the public layout links to the About route
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AboutPageTest|PublicPagesTest|HomepageRendersContentTest'` => **15 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/About/Show.php routes/web.php tests/Feature/AboutPageTest.php` => **No errors**
+  - manual browser render check completed on `https://majlisilmu.test/tentang-kami` for both narrow and desktop layouts
+
+# Ahli Dashboard Approval Queue Todo
+
+- [x] Add a member-scoped approval queue to the ahli dashboard
+- [x] Limit the dashboard queue to pending public-submitted events from member institutions and speakers
+- [x] Add focused dashboard/widget coverage and run verification
+
+## Review
+
+- Root cause:
+  - the ahli dashboard was still the bare Filament dashboard page with no panel widgets, so members had no at-a-glance approval queue even after the ahli approval flow was implemented
+- Fix:
+  - added an explicit ahli dashboard widget in `app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php`
+  - updated `app/Filament/Pages/AhliDashboard.php` to render only that widget and use a single-column layout
+  - updated `app/Providers/Filament/AhliPanelProvider.php` to discover ahli-specific widgets
+- Dashboard queue scope:
+  - only `pending` events
+  - must have a real `EventSubmission` record (`whereHas('submissions')`)
+  - only events organized by institutions or speakers the current user is a member of
+  - includes legacy institution-linked events where `organizer_type` is null but `institution_id` belongs to a member institution
+  - excludes unrelated pending events, in-scope drafts, and pending events without a submission record
+- Widget behavior:
+  - heading: `Events Needing Approval`
+  - shows event title, approval scope, submitter, and submission timestamp
+  - includes a `Review` action that links to the ahli event edit page only when the current user can actually approve that event
+  - shows an empty state when there is no pending approval work
+- Regression coverage:
+  - added `tests/Feature/AhliDashboardApprovalWidgetTest.php`
+  - verifies the widget table only shows pending public-submitted events from member institutions/speakers
+  - verifies the ahli dashboard route renders the queue heading and scoped event title
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliDashboardApprovalWidgetTest|AhliDashboardTest|FilamentPanelAccessTest'` => **11 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/AhliDashboard.php app/Providers/Filament/AhliPanelProvider.php app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php tests/Feature/AhliDashboardApprovalWidgetTest.php tests/Feature/AhliDashboardTest.php tests/Feature/FilamentPanelAccessTest.php` => **No errors**
+
+# Ahli Access And Featured Guard Todo
+
+- [x] Restrict ahli panel access to actual institution, speaker, or event members
+- [x] Hide event featured controls from non-application-admin users on ahli event surfaces
+- [x] Enforce the featured guard in the ahli save path against crafted payloads
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - `App\Models\User::canAccessPanel()` still returned `true` for every authenticated user on the ahli panel, so non-members could enter that workspace
+  - the shared admin event schema/table exposed `is_featured` everywhere, including ahli event edit/list surfaces, and the ahli save path did not strip a crafted `is_featured` payload
+  - event-level members were included in the requested ahli access rule, but the ahli event query did not include `event_user` memberships yet
+- Fix:
+  - added explicit member-based ahli access in `app/Models/User.php`
+    - institution member
+    - speaker member
+    - event member
+  - preserved admin panel access through a dedicated `hasApplicationAdminAccess()` helper
+  - extended the ahli event workspace query in `app/Filament/Ahli/Resources/Events/EventResource.php` to include `memberEvents()`
+  - restricted featured controls to application admins only:
+    - `app/Filament/Resources/Events/Schemas/EventForm.php`
+    - `app/Filament/Resources/Events/Tables/EventsTable.php`
+  - hardened the ahli event save path in `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php` to unset `is_featured` for non-application-admin users even if they submit a crafted Livewire payload
+- Regression coverage:
+  - updated `tests/Feature/FilamentPanelAccessTest.php`
+    - non-members cannot access ahli
+    - institution/speaker/event members can
+  - updated `tests/Feature/AhliDashboardTest.php`
+    - ahli members can open the dashboard
+    - non-members are forbidden at HTTP level
+  - updated `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - non-member submitters are forbidden from ahli edit pages
+    - event members can open scoped event edit pages
+    - event-member events appear on the ahli events index
+  - added `tests/Feature/AhliEventFeaturedGuardTest.php`
+    - ahli edit page hides `is_featured`
+    - ahli list hides the `is_featured` column
+    - admin edit/list still expose it
+    - crafted ahli payloads cannot flip `is_featured`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='FilamentPanelAccessTest|AhliDashboardTest|AhliPanelInstitutionEditingTest|AhliEventFeaturedGuardTest'` => **19 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/User.php app/Filament/Ahli/Resources/Events/EventResource.php app/Filament/Ahli/Resources/Events/Pages/EditEvent.php app/Filament/Resources/Events/Schemas/EventForm.php app/Filament/Resources/Events/Tables/EventsTable.php tests/Feature/FilamentPanelAccessTest.php tests/Feature/AhliDashboardTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/AhliEventFeaturedGuardTest.php` => **No errors**
+
+# Ahli Navigation Parent Todo
+
+- [x] Remove the redundant `Ahli Workspace` navigation wrapper from the ahli panel
+- [x] Make `Events` the top-level ahli navigation item and align future institution navigation under it
+- [x] Add focused coverage for the built ahli navigation structure
+- [x] Run verification and document the outcome
+
+## Review
+
+- Root cause:
+  - the ahli panel sidebar was still using a resource-level `navigationGroup = 'Ahli Workspace'`, which produced a redundant wrapper label around the actual working navigation item
+  - the ahli event resource also inherits from the admin event resource, so removing the local wrapper alone would still leave it grouped under inherited `Content` unless that inheritance is explicitly overridden
+  - the ahli institution resource has no index page, so it does not register a sidebar item today; `navigationParentItem` is therefore future-facing metadata, not a currently rendered child menu
+- Fix:
+  - removed the visible ahli navigation wrapper by setting the ahli event resource navigation group to `null`
+  - made the ahli event resource the stable top-level nav anchor with an explicit `Events` label
+  - aligned the ahli institution resource metadata so if an index page is introduced later, it will register under `Events` instead of creating a new top-level wrapper
+- Updated files:
+  - `app/Filament/Ahli/Resources/Events/EventResource.php`
+  - `app/Filament/Ahli/Resources/Institutions/InstitutionResource.php`
+  - `tests/Feature/AhliNavigationTest.php`
+- Regression coverage:
+  - added `tests/Feature/AhliNavigationTest.php`
+  - verifies the ahli dashboard response no longer shows `Ahli Workspace`
+  - verifies the built Filament navigation no longer contains that wrapper and still exposes `Events` as the top-level ahli nav item
+  - locks the institution resource parent-item metadata to `Events`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliNavigationTest|AhliDashboardTest|FilamentPanelAccessTest'` => **6 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Ahli/Resources/Events/EventResource.php app/Filament/Ahli/Resources/Institutions/InstitutionResource.php tests/Feature/AhliNavigationTest.php` => **No errors**
+
+# Admin Dashboard Priorities Todo
+
+- [x] Refocus the admin dashboard so approval work is the primary call to action
+- [x] Add informational event summary stats for upcoming, passed, and featured events
+- [x] Add focused dashboard coverage and run verification
+
+## Review
+
+- Root cause:
+  - the admin dashboard was still using a generic stats widget (`Total Events`, `Active Speakers`, `Institutions`) that did not direct moderators/admins toward the actual approval queue
+  - the default lazy widget rendering also meant dashboard call-to-action content could be delayed behind placeholders on first load
+- Fix:
+  - repurposed `app/Filament/Widgets/StatsOverview.php` into a moderation-first widget with:
+    - `Events Needing Approval` -> moderation queue pending tab
+    - `Speakers Needing Approval` -> speakers index filtered to `status=pending`
+    - `Institutions Needing Approval` -> institutions index filtered to `status=pending`
+    - `References Needing Approval` -> references index filtered to `status=pending`
+    - `Venues Needing Approval` -> venues index filtered to `status=pending`
+  - added `app/Filament/Widgets/EventInventoryOverview.php` for informational counts:
+    - `Upcoming Events`
+    - `Past Events`
+    - `Featured Events`
+  - added an admin-only dashboard page override in `app/Filament/Pages/AdminDashboard.php`
+    - forces the page title and navigation label to `Dashboard`
+    - registered only in `app/Providers/Filament/AdminPanelProvider.php`
+    - leaves the rest of the app’s Bahasa Melayu dashboard terminology unchanged
+  - both widgets are now eager-rendered (`$isLazy = false`) and explicitly ordered with widget sort values so the approval widget always appears first on `/admin`
+- Count model:
+  - approval counts use raw pending records
+  - information counts use `Event::active()` so they reflect active public-facing events rather than drafts/rejected inventory
+- Regression coverage:
+  - added `tests/Feature/AdminDashboardTest.php`
+  - verifies dashboard ordering, deep-link destinations, and the exact datasets used for the approval/info widgets, including pending references and venues
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminDashboardTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminResourcesCoverageTest.php` => **2 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Widgets/StatsOverview.php app/Filament/Widgets/EventInventoryOverview.php tests/Feature/AdminDashboardTest.php` => **No errors**
+  - `vendor/bin/pest --parallel --compact --filter='AdminDashboardTest|AdminResourcesCoverageTest'` => **5 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/AdminDashboard.php app/Providers/Filament/AdminPanelProvider.php tests/Feature/AdminDashboardTest.php` => **No errors**
+
+# Moderation Queue Reference Status Todo
+
+- [x] Add reference-status visibility to the admin moderation queue event table
+- [x] Add focused coverage for pending/verified/missing reference states
+- [x] Run verification and document the outcome
+
+## Review
+
+- Root cause:
+  - `app/Filament/Pages/ModerationQueue.php` summarized related moderation state for institution, venue, and speakers, but omitted event references even though pending references are also auto-verified during event approval
+  - that left moderators without an at-a-glance signal that an event still carried pending references
+- Fix:
+  - added a `References Status` badge column to the moderation queue event table
+  - the column mirrors the existing speaker summary pattern:
+    - `None` when the event has no references
+    - `All verified` when every attached reference is already verified
+    - `N unverified` when one or more attached references are still pending or otherwise not verified
+  - eager-loaded `references` in the moderation queue query to avoid N+1 lookups
+  - added a tooltip listing the non-verified reference titles so moderators can see which references still need review
+- Regression coverage:
+  - extended `tests/Feature/ModerationQueueTest.php`
+  - covers pending reference visibility, all-verified references, and no-reference events
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ModerationQueueTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/ModerationQueue.php tests/Feature/ModerationQueueTest.php` => **No errors**
+
+# Moderation Queue Venue Column Todo
+
+- [x] Add a visible venue-name column to the admin moderation queue event table
+- [x] Extend queue coverage so the venue column and value are asserted
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - the moderation queue exposed `Institution` plus venue verification state, but not the actual venue name
+  - that made rows harder to review because some events are effectively anchored by their venue as much as their institution
+- Fix:
+  - added a dedicated `Venue` text column to `app/Filament/Pages/ModerationQueue.php`
+  - kept it adjacent to `Institution` so the event’s organizing entity and location entity are both visible at a glance
+  - added a tooltip with the full venue name and a `None` placeholder when an event has no linked venue
+- Regression coverage:
+  - extended `tests/Feature/ModerationQueueTest.php`
+  - now asserts the queue renders the `Venue` column and shows the event’s venue name
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ModerationQueueTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/ModerationQueue.php tests/Feature/ModerationQueueTest.php` => **No errors**
+
+# Moderation Queue Status Column Todo
+
+- [x] Remove the redundant event status column from the admin moderation queue table
+- [x] Add focused table-shape coverage so the status column stays absent
+- [x] Run focused verification and document the outcome
+
+## Review
+
+- Root cause:
+  - the moderation queue is a dedicated review surface, not a general event listing
+  - keeping the event `status` column there was redundant because the active queue context already defines the review state, especially on the default pending tab
+- Fix:
+  - removed the `status` text column from `app/Filament/Pages/ModerationQueue.php`
+  - retained the surrounding moderation-signal columns (`Institution Status`, `Venue Status`, `Speakers Status`, `References Status`) that still add distinct review value
+- Regression coverage:
+  - extended `tests/Feature/ModerationQueueTest.php`
+  - added a Livewire table assertion proving the moderation queue no longer exposes the `status` column while still exposing `venue.name`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ModerationQueueTest.php` => **8 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/ModerationQueue.php tests/Feature/ModerationQueueTest.php` => **No errors**
+
+# Authz User View Todo
+
+- [x] Add the missing user relationships needed for follow/member/activity visibility on the admin user view
+- [x] Create a read-only Authz user view page that surfaces activity, registrations, follows, submissions, memberships, and saved searches
+- [x] Make the admin authz users index open the view page when a row is clicked
+- [x] Add focused coverage and run verification
+
+## Review
+
+- Root cause:
+  - the Authz users resource was still edit-first, so row clicks went straight into a mutable form and there was no admin-readable profile page for user activity and relationships
+  - the underlying user model already contained most of the needed event/activity relations, but follow visibility was incomplete because institution/reference follow relations were missing on `User`
+- Fix:
+  - added `followingInstitutions()` and `followingReferences()` to `app/Models/User.php`
+  - added a dedicated read-only admin user page in `app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php`
+  - implemented a custom page view at `resources/views/filament/resources/authz/user-resource/pages/view-user.blade.php` that shows:
+    - interested, going, saved, and checked-in events
+    - event registrations
+    - followed institutions, speakers, and references
+    - submitted events
+    - institution, speaker, and event memberships
+    - saved searches
+  - updated `app/Filament/Resources/Authz/UserResource.php` so:
+    - the resource exposes a real `view` page
+    - authz `view` permission is honored
+    - the users index includes a `view` action URL, which makes row clicks resolve to the view page instead of edit
+- Implementation note:
+  - an initial schema/infolist attempt hit a Filament renderer recursion edge case, so the final solution uses a custom Blade page for reliability while keeping the resource/page routing standard
+- Regression coverage:
+  - extended `tests/Feature/AuthzUserResourceTest.php`
+  - covers:
+    - index `view` action URL on authz users
+    - end-to-end visibility of the requested user activity/follow/member/search datasets on the view page
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => **4 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/User.php app/Filament/Resources/Authz/UserResource.php app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php tests/Feature/AuthzUserResourceTest.php` => **No errors**
+
+# Ahli Dashboard Label Todo
+
+- [x] Add an ahli-panel dashboard page override with explicit `Dashboard` title/label
+- [x] Register that page in the ahli panel provider
+- [x] Add focused coverage and run verification
+
+## Review
+
+- Root cause:
+  - the admin panel already had an explicit dashboard override, but the ahli panel still registered Filament’s default dashboard page, so Malay locale users still saw `Papan Pemuka`
+- Fix:
+  - added `app/Filament/Pages/AhliDashboard.php`
+  - registered it in `app/Providers/Filament/AhliPanelProvider.php`
+  - the ahli panel home now explicitly uses `Dashboard` for both the page title and navigation label
+- Regression coverage:
+  - added `tests/Feature/AhliDashboardTest.php`
+  - verifies the ahli dashboard renders `Dashboard` and not `Papan pemuka`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='AhliDashboardTest|FilamentPanelAccessTest'` => **5 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/AhliDashboard.php app/Providers/Filament/AhliPanelProvider.php tests/Feature/AhliDashboardTest.php` => **No errors**
+
+# Event Submission Display Todo
+
+- [x] Remove the editable submissions relation manager from the admin event resource
+- [x] Replace editable submitter fields on the event moderation tab with read-only submission details
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the admin event page modeled `submissions` as a normal relation manager, which exposed add/edit/delete affordances for data that should only exist as a factual result of a real submission flow
+  - the moderation form also exposed `submitter_id` as an editable select, which let admins rewrite submission provenance manually
+- Fix:
+  - removed the submissions relation manager from `app/Filament/Resources/Events/EventResource.php`
+  - deleted the unused `app/Filament/Resources/Events/RelationManagers/EventSubmissionsRelationManager.php`
+  - replaced the editable `submitter_id` field in `app/Filament/Resources/Events/Schemas/EventForm.php` with a read-only `Submission` section on the moderation tab
+  - the new section shows:
+    - source (`Pengguna berdaftar` vs `Penghantaran awam`)
+    - submitted timestamp
+    - submitter identity
+    - submission notes
+  - the section only renders when a real `EventSubmission` record exists
+- Regression coverage:
+  - added `tests/Feature/EventSubmissionDisplayTest.php`
+  - asserts the relation manager list no longer contains the submissions relation
+  - asserts `submitter_id` is no longer a form field
+  - asserts the new submission components render the expected read-only state
+  - asserts the submission section stays hidden when no real submission record exists
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSubmissionDisplayTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/EventResource.php app/Filament/Resources/Events/Schemas/EventForm.php tests/Feature/EventSubmissionDisplayTest.php` => **No errors**
+
+# Event Registrations Relation Visibility Todo
+
+- [x] Inspect the event resource registrations relation manager and the canonical registration-required flag
+- [x] Hide the registrations relation manager for events that do not require registration
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - `RegistrationsRelationManager` was always registered and relied only on generic authorization, so the tab still appeared on admin event pages even when the event did not require registration
+- Fix:
+  - added `canViewForRecord(...)` to `app/Filament/Resources/Events/RelationManagers/RegistrationsRelationManager.php`
+  - the relation now loads the event settings and only renders when `settings.registration_required` is true
+  - this uses the same flag already used by the public event page and registration controller logic
+- Regression coverage:
+  - `tests/Feature/EventRegistrationsRelationVisibilityTest.php`
+  - asserts the edit page relation-manager list includes registrations when required and omits it when not required
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventRegistrationsRelationVisibilityTest.php` => **2 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/RelationManagers/RegistrationsRelationManager.php tests/Feature/EventRegistrationsRelationVisibilityTest.php` => **No errors**
+
+# Scoped Event Approval Todo
+
+- [x] Inspect the current ahli-panel event approval gate for public submissions tied to institutions/speakers
+- [x] Allow responsible institution/speaker members to approve qualifying public-submitted events
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the ahli event edit page exposed no approval action at all; only the admin moderation pages could approve pending events
+  - speaker members also lacked a path through `EventPolicy::update` for pending public submissions, so they could be blocked from the ahli edit page before any approval action could render
+- Approval model implemented:
+  - added a scoped `event.approve` permission to institution `owner`/`admin`/`editor` roles and speaker `owner`/`admin`/`editor` roles in `app/Support/Authz/ScopedMemberRoleSeeder.php`
+  - added `Event::userCanApprovePublicSubmission(User $user)` to enforce:
+    - event must be `pending`
+    - event must come from the public submission flow (`submissions()->exists()`)
+    - user must be a responsible institution/speaker member with the scoped `event.approve` permission
+  - added `EventPolicy::approve(...)` and allowed `EventPolicy::update(...)` to pass for this exact approval path, so qualified speaker approvers can reach the ahli edit page
+  - added an `Approve` header action to `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php`
+- Verification:
+  - new focused tests in `tests/Feature/AhliEventApprovalTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliEventApprovalTest.php` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **6 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Authz/ScopedMemberRoleSeeder.php app/Models/Event.php app/Policies/EventPolicy.php app/Filament/Ahli/Resources/Events/Pages/EditEvent.php tests/Feature/AhliEventApprovalTest.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+
+# Public Submission Toggle Live Refresh Todo
+
+- [x] Identify why the edit-page toggle stays disabled after eligible members are added in the relation manager
+- [x] Trigger a parent-page toggle refresh when institution/speaker member relations change
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the edit pages computed toggle availability from the current record, but member relation changes happened in a child Livewire relation manager
+  - after add/remove/role updates, the parent page never refreshed its record or toggle field, so the disabled state stayed stale until a full browser refresh
+- Fix:
+  - added a shared UI event constant in `app/Support/Submission/PublicSubmissionUiEvents.php`
+  - `EditInstitution` and `EditSpeaker` now listen for the refresh event and call `refresh()` on the record plus `refreshFormData(['allow_public_event_submission'])`
+  - institution/speaker member relation managers now dispatch that event to their parent page after add-member, manage-roles, and remove-member actions
+- Updated files:
+  - `app/Filament/Resources/Institutions/Pages/EditInstitution.php`
+  - `app/Filament/Resources/Speakers/Pages/EditSpeaker.php`
+  - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
+  - `app/Support/Submission/PublicSubmissionUiEvents.php`
+- Added regression coverage:
+  - `tests/Feature/PublicSubmissionLockActionsTest.php`
+  - new assertions prove the same mounted edit page flips from disabled to enabled after the refresh event, without remounting
+  - also verifies the institution member relation manager dispatches the targeted refresh event after adding an eligible member
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicSubmissionLockActionsTest.php` => **9 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/MemberRoleModalHydrationTest.php` => **3 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Submission/PublicSubmissionUiEvents.php app/Filament/Resources/Institutions/Pages/EditInstitution.php app/Filament/Resources/Speakers/Pages/EditSpeaker.php app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php tests/Feature/PublicSubmissionLockActionsTest.php tests/Feature/MemberRoleModalHydrationTest.php` => **No errors**
+
+# Member Role Modal Hydration Todo
+
+- [x] Reproduce the missing scoped-role preselection in institution and speaker member relation actions
+- [x] Fix relation manager role hydration so existing roles are preselected in the modal
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - `manageRoles` used `mountUsing(function (Action $action, ...) { $action->fillForm(...) })`.
+  - In Filament actions, `fillForm()` configures the mount callback; it does not fill the already-mounted schema from inside `mountUsing()`.
+  - That left the modal `role_ids` state empty even when the member already had scoped roles.
+- Fixed relation managers:
+  - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php`
+- Change made:
+  - replaced the custom `mountUsing(...)` callback with `fillForm(fn (User $record): array => [...])`
+  - existing scoped role IDs are now resolved before the action modal opens, so the multi-select preselects correctly
+- Added regression test:
+  - `tests/Feature/MemberRoleModalHydrationTest.php`
+  - covers institution, speaker, and event member role modals
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/MemberRoleModalHydrationTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionMembersRelationLinkTest.php` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php tests/Feature/MemberRoleModalHydrationTest.php tests/Feature/InstitutionMembersRelationLinkTest.php` => **No errors**
+
 # Filament Subdomain Panels Todo
 
 - [x] Move admin panel from `/admin` path to `admin` subdomain routing (with fallback to `/admin` when no subdomain is configured)
@@ -1899,7 +2545,10 @@
   - `allow_public_event_submission` (default `true`)
   - `public_submission_locked_at`
   - `public_submission_locked_by`
-  - `public_submission_lock_reason`
+- Removed unused lock-reason persistence:
+  - `public_submission_lock_reason` was deleted from models/service usage
+  - fresh installs no longer create the column
+  - existing databases drop it via `database/migrations/2026_03_06_130000_drop_public_submission_lock_reason_columns.php`
 - Added centralized submission access + lock services:
   - `app/Support/Submission/SubmissionLockEligibilityResult.php`
   - `app/Support/Submission/PublicSubmissionLockService.php`
@@ -1908,8 +2557,18 @@
   - `app/Console/Commands/SyncPublicSubmissionLocks.php`
   - `routes/console.php` (`app:sync-public-submission-locks`, hourly)
 - Updated Institution/Speaker admin edit pages to use explicit lock/unlock actions:
-  - `app/Filament/Resources/Institutions/Pages/EditInstitution.php`
-  - `app/Filament/Resources/Speakers/Pages/EditSpeaker.php`
+  - initial implementation used explicit header lock/unlock actions in:
+    - `app/Filament/Resources/Institutions/Pages/EditInstitution.php`
+    - `app/Filament/Resources/Speakers/Pages/EditSpeaker.php`
+- Simplified the admin UX to use the existing `allow_public_event_submission` toggle directly on the edit form:
+  - header lock/unlock actions were removed
+  - toggle changes now route through the same lock service in the edit page save hooks
+  - the toggle is now disabled while the record is still public and the lock-eligibility precondition has not passed
+  - save-time eligibility failures remain as backend protection
+  - helper text on the form now explains when `true -> false` is not yet allowed
+- Updated status form schemas:
+  - `app/Filament/Resources/Institutions/Schemas/InstitutionForm.php`
+  - `app/Filament/Resources/Speakers/Schemas/SpeakerForm.php`
 - Updated member role/member change triggers to auto-reopen when eligibility fails:
   - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
   - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
@@ -1948,5 +2607,28 @@
 - Added regression test:
   - `tests/Feature/AuthzUserResourceTest.php`
 - Verification:
-  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => **1 passed**
-  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Authz/UserResource.php app/Filament/Resources/Authz/UserResource/Pages/ListUsers.php app/Filament/Resources/Authz/UserResource/Pages/CreateUser.php app/Filament/Resources/Authz/UserResource/Pages/EditUser.php tests/Feature/AuthzUserResourceTest.php` => **No errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => **2 passed**
+  - Added page-level payload sanitization in:
+    - `app/Filament/Resources/Authz/UserResource/Pages/CreateUser.php`
+    - `app/Filament/Resources/Authz/UserResource/Pages/EditUser.php`
+  - This prevents `roles` / `permissions` from being mass-assigned onto `App\Models\User` while still allowing the form relationship hooks to sync them.
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Authz/UserResource.php app/Filament/Resources/Authz/UserResource/Pages/CreateUser.php app/Filament/Resources/Authz/UserResource/Pages/EditUser.php tests/Feature/AuthzUserResourceTest.php` => **No errors**
+
+# Member Relation User Links Todo
+
+- [x] Link institution member rows to the Authz user edit resource
+- [x] Keep speaker member rows aligned with the same user-resource link behavior
+- [x] Add focused regression coverage for the institution members relation
+- [x] Run focused verification
+
+## Review
+
+- Updated member relation manager name columns to point at the Authz user edit page:
+  - `app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php`
+  - `app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php`
+- The member name now resolves to `App\Filament\Resources\Authz\UserResource::getUrl('edit', ...)` when the current admin can edit that user resource.
+- Added regression test:
+  - `tests/Feature/InstitutionMembersRelationLinkTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionMembersRelationLinkTest.php` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php tests/Feature/InstitutionMembersRelationLinkTest.php` => **No errors**

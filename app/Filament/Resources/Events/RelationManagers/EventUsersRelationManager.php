@@ -78,10 +78,10 @@ class EventUsersRelationManager extends RelationManager
                     ->form([
                         $this->makeRoleSelect(),
                     ])
-                    ->mountUsing(function (Action $action, User $record): void {
-                        $action->fillForm([
+                    ->fillForm(function (User $record): array {
+                        return [
                             'role_ids' => $this->getMemberRoleIds($record),
-                        ]);
+                        ];
                     })
                     ->action(function (array $data, User $record): void {
                         $this->syncMemberRoles($record, $data['role_ids'] ?? []);

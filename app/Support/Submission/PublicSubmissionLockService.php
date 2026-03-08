@@ -40,7 +40,7 @@ final class PublicSubmissionLockService
         );
     }
 
-    public function lockInstitution(Institution $institution, User $actor, ?string $reason = null): void
+    public function lockInstitution(Institution $institution, User $actor): void
     {
         $this->ensureGlobalLockPermission($actor);
 
@@ -56,13 +56,12 @@ final class PublicSubmissionLockService
             'allow_public_event_submission' => false,
             'public_submission_locked_at' => Carbon::now(),
             'public_submission_locked_by' => $actor->getKey(),
-            'public_submission_lock_reason' => is_string($reason) && trim($reason) !== '' ? trim($reason) : null,
         ])->save();
 
         Cache::forget('submit_institutions');
     }
 
-    public function lockSpeaker(Speaker $speaker, User $actor, ?string $reason = null): void
+    public function lockSpeaker(Speaker $speaker, User $actor): void
     {
         $this->ensureGlobalLockPermission($actor);
 
@@ -78,7 +77,6 @@ final class PublicSubmissionLockService
             'allow_public_event_submission' => false,
             'public_submission_locked_at' => Carbon::now(),
             'public_submission_locked_by' => $actor->getKey(),
-            'public_submission_lock_reason' => is_string($reason) && trim($reason) !== '' ? trim($reason) : null,
         ])->save();
 
         Cache::forget('submit_speakers');

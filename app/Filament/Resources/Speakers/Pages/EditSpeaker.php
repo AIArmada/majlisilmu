@@ -6,12 +6,10 @@ use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Submission\PublicSubmissionLockService;
-use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 
 class EditSpeaker extends EditRecord
 {
@@ -21,98 +19,56 @@ class EditSpeaker extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            $this->getLockPublicSubmissionAction(),
-            $this->getUnlockPublicSubmissionAction(),
             DeleteAction::make(),
         ];
     }
 
-    protected function getLockPublicSubmissionAction(): Action
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
     {
-        return Action::make('lock_public_submission')
-            ->label('Lock Public Submission')
-            ->icon(Heroicon::OutlinedLockClosed)
-            ->color('warning')
-            ->requiresConfirmation()
-            ->schema([
-                Textarea::make('reason')
-                    ->label('Lock Reason (optional)')
-                    ->rows(3)
-                    ->maxLength(2000),
-            ])
-            ->tooltip(fn (): ?string => $this->lockActionTooltip())
-            ->disabled(fn (): bool => ! $this->lockEligibility()->eligible)
-            ->visible(fn (): bool => $this->canManagePublicSubmissionLock() && $this->speakerRecord()->allow_public_event_submission)
-            ->action(function (array $data, PublicSubmissionLockService $lockService): void {
-                $actor = $this->currentUser();
+        $actor = $this->currentUser();
 
-                if (! $actor instanceof User) {
-                    abort(403);
-                }
-
-                $lockService->lockSpeaker($this->speakerRecord(), $actor, $data['reason'] ?? null);
-
-                Notification::make()
-                    ->title('Public submission locked for this speaker.')
-                    ->success()
-                    ->send();
-
-                $this->refreshFormData([
-                    'allow_public_event_submission',
-                    'public_submission_locked_at',
-                    'public_submission_locked_by',
-                    'public_submission_lock_reason',
-                ]);
-            });
-    }
-
-    protected function getUnlockPublicSubmissionAction(): Action
-    {
-        return Action::make('unlock_public_submission')
-            ->label('Unlock Public Submission')
-            ->icon(Heroicon::OutlinedLockOpen)
-            ->color('success')
-            ->requiresConfirmation()
-            ->visible(fn (): bool => $this->canManagePublicSubmissionLock() && ! $this->speakerRecord()->allow_public_event_submission)
-            ->action(function (PublicSubmissionLockService $lockService): void {
-                $actor = $this->currentUser();
-
-                if (! $actor instanceof User) {
-                    abort(403);
-                }
-
-                $lockService->unlockSpeaker($this->speakerRecord(), $actor);
-
-                Notification::make()
-                    ->title('Public submission unlocked for this speaker.')
-                    ->success()
-                    ->send();
-
-                $this->refreshFormData([
-                    'allow_public_event_submission',
-                ]);
-            });
-    }
-
-    private function canManagePublicSubmissionLock(): bool
-    {
-        return $this->currentUser()?->hasAnyRole(['super_admin', 'admin', 'moderator']) ?? false;
-    }
-
-    private function lockActionTooltip(): ?string
-    {
-        $eligibility = $this->lockEligibility();
-
-        if ($eligibility->eligible) {
-            return null;
+        if (! $actor instanceof User) {
+            abort(403);
         }
 
-        return implode(' ', $eligibility->reasons);
+        $speaker = $this->speakerRecord();
+        $requestedPublicSubmission = (bool) ($data['allow_public_event_submission'] ?? $speaker->allow_public_event_submission);
+        $currentPublicSubmission = (bool) $speaker->allow_public_event_submission;
+
+        if ($requestedPublicSubmission === $currentPublicSubmission) {
+            return $data;
+        }
+
+        $lockService = app(PublicSubmissionLockService::class);
+
+        if ($requestedPublicSubmission) {
+            $lockService->unlockSpeaker($speaker, $actor);
+
+            return $data;
+        }
+
+        $eligibility = $lockService->speakerEligibility($speaker);
+
+        if (! $eligibility->eligible) {
+            throw ValidationException::withMessages([
+                'data.allow_public_event_submission' => $eligibility->reasons,
+            ]);
+        }
+
+        $lockService->lockSpeaker($speaker, $actor);
+
+        return $data;
     }
 
-    private function lockEligibility(): \App\Support\Submission\SubmissionLockEligibilityResult
+    #[On(\App\Support\Submission\PublicSubmissionUiEvents::REFRESH_TOGGLE)]
+    public function refreshPublicSubmissionToggleState(): void
     {
-        return app(PublicSubmissionLockService::class)->speakerEligibility($this->speakerRecord());
+        $this->speakerRecord()->refresh();
+        $this->refreshFormData(['allow_public_event_submission']);
     }
 
     private function speakerRecord(): Speaker

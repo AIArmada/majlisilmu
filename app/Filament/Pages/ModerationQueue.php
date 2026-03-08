@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -111,13 +112,26 @@ class ModerationQueue extends Page implements HasTable
         return $table
             ->query(fn (): Builder => $this->getTableQuery())
             ->columns([
+                IconColumn::make('is_priority')
+                    ->label('Priority')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-exclamation-triangle')
+                    ->falseIcon('heroicon-o-minus')
+                    ->trueColor('danger')
+                    ->falseColor('gray'),
                 TextColumn::make('title')
                     ->searchable()
                     ->limit(40)
                     ->tooltip(fn ($record) => $record->title),
                 TextColumn::make('institution.name')
                     ->label('Institution')
-                    ->limit(20),
+                    ->limit(20)
+                    ->tooltip(fn (Event $record): ?string => $record->institution?->name),
+                TextColumn::make('venue.name')
+                    ->label('Venue')
+                    ->limit(20)
+                    ->placeholder('None')
+                    ->tooltip(fn (Event $record): ?string => $record->venue?->name),
                 TextColumn::make('institution.status')
                     ->label('Institution Status')
                     ->badge()
@@ -168,6 +182,34 @@ class ModerationQueue extends Page implements HasTable
                         $state === 'None' => 'gray',
                         default => 'warning',
                     }),
+                TextColumn::make('references_status')
+                    ->label('References Status')
+                    ->badge()
+                    ->state(function (Event $record): string {
+                        $total = $record->references->count();
+
+                        if ($total === 0) {
+                            return 'None';
+                        }
+
+                        $unverified = $record->references->where('status', '!=', 'verified')->count();
+
+                        return $unverified === 0 ? 'All verified' : $unverified.' unverified';
+                    })
+                    ->tooltip(function (Event $record): ?string {
+                        $pendingReferences = $record->references
+                            ->where('status', '!=', 'verified')
+                            ->pluck('title')
+                            ->filter(fn (mixed $title): bool => filled($title))
+                            ->implode(', ');
+
+                        return filled($pendingReferences) ? $pendingReferences : null;
+                    })
+                    ->color(fn ($state): string => match (true) {
+                        $state === 'All verified' => 'success',
+                        $state === 'None' => 'gray',
+                        default => 'warning',
+                    }),
                 TextColumn::make('open_reports_count')
                     ->label('Open Reports')
                     ->badge()
@@ -179,17 +221,6 @@ class ModerationQueue extends Page implements HasTable
                     ->label('Event Date')
                     ->dateTime('M d, Y H:i')
                     ->sortable(),
-                TextColumn::make('status')
-                    ->badge()
-                    ->color(fn ($state): string => match ((string) $state) {
-                        'pending' => 'warning',
-                        'needs_changes' => 'warning',
-                        'approved' => 'success',
-                        'cancelled' => 'danger',
-                        'rejected' => 'danger',
-                        'draft' => 'gray',
-                        default => 'gray',
-                    }),
                 TextColumn::make('latestModerationReview.reason_code')
                     ->label('Latest Reason')
                     ->formatStateUsing(fn (?string $state): string => filled($state) ? Str::title(str_replace('_', ' ', $state)) : '-')
@@ -370,7 +401,6 @@ class ModerationQueue extends Page implements HasTable
                     ->url(fn (Event $record) => EventResource::getUrl('edit', ['record' => $record])),
             ])
             ->recordUrl(fn (Event $record): string => EventResource::getUrl('view', ['record' => $record]))
-            ->defaultSort('created_at', 'desc')
             ->poll('30s');
     }
 
@@ -380,18 +410,23 @@ class ModerationQueue extends Page implements HasTable
     protected function getTableQuery(): Builder
     {
         $query = Event::query()
-            ->with(['institution', 'venue', 'speakers', 'address.state', 'latestModerationReview'])
+            ->with(['institution', 'venue', 'speakers', 'references', 'address.state', 'latestModerationReview'])
             ->withCount([
                 'reports as open_reports_count' => fn (Builder $reportQuery) => $reportQuery->where('status', 'open'),
             ]);
 
-        return match ($this->activeTab) {
+        $query = match ($this->activeTab) {
             'pending' => $query->whereState('status', Pending::class),
             'needs_changes' => $query->whereState('status', NeedsChanges::class),
             'reports' => $query->whereHas('reports', fn (Builder $reportQuery) => $reportQuery->where('status', 'open')),
             'recently_rejected' => $query->whereState('status', Rejected::class)->where('updated_at', '>=', now()->subDays(7)),
             default => $query->whereState('status', Pending::class),
         };
+
+        return $query
+            ->orderByRaw('CASE WHEN events.is_priority THEN 0 ELSE 1 END')
+            ->orderBy('events.starts_at')
+            ->orderByDesc('events.created_at');
     }
 
     protected function normalizeActiveTab(string $tab): string

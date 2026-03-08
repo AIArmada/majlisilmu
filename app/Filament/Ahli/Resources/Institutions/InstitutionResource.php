@@ -13,7 +13,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use UnitEnum;
 
 class InstitutionResource extends Resource
 {
@@ -23,7 +22,11 @@ class InstitutionResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Ahli Workspace';
+    protected static ?string $navigationLabel = 'Institutions';
+
+    protected static ?string $navigationParentItem = 'Events';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'institutions';
 

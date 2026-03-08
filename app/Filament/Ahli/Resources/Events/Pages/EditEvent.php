@@ -7,8 +7,12 @@ use App\Enums\TagType;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Tag;
+use App\Models\User;
+use App\Services\ModerationService;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
@@ -40,7 +44,12 @@ class EditEvent extends EditRecord
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
 
+        if (! $this->currentUser()?->hasApplicationAdminAccess()) {
+            unset($data['is_featured']);
+        }
+
         unset(
+            $data['escalated_at'],
             $data['languages'],
             $data['domain_tags'],
             $data['discipline_tags'],
@@ -135,11 +144,43 @@ class EditEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->getApproveAction(),
             Action::make('view_public')
                 ->label('View Public Page')
                 ->icon(Heroicon::OutlinedEye)
                 ->url(fn (): string => route('events.show', $this->eventRecord())),
         ];
+    }
+
+    protected function getApproveAction(): Action
+    {
+        return Action::make('approve')
+            ->label('Approve')
+            ->icon(Heroicon::OutlinedCheckCircle)
+            ->color('success')
+            ->requiresConfirmation()
+            ->modalHeading('Approve Event')
+            ->modalDescription('Approve this public-submitted event for your institution or speaker.')
+            ->schema([
+                Textarea::make('note')
+                    ->label('Note (optional)')
+                    ->rows(3)
+                    ->maxLength(2000),
+            ])
+            ->action(function (array $data, ModerationService $service): void {
+                abort_unless($this->canApproveSubmittedEvent(), 403);
+
+                $service->approve($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+
+                $this->eventRecord()->refresh();
+                $this->refreshFormData(['status']);
+
+                Notification::make()
+                    ->title('Event approved')
+                    ->success()
+                    ->send();
+            })
+            ->visible(fn (): bool => $this->canApproveSubmittedEvent());
     }
 
     protected function eventRecord(): Event
@@ -152,5 +193,18 @@ class EditEvent extends EditRecord
 
         return $record;
     }
-}
 
+    protected function canApproveSubmittedEvent(): bool
+    {
+        $user = $this->currentUser();
+
+        return $user instanceof User && $user->can('approve', $this->eventRecord());
+    }
+
+    private function currentUser(): ?User
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user : null;
+    }
+}

@@ -2,6 +2,9 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
 use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,8 +17,35 @@ beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
 
-it('allows any authenticated user to access the ahli panel', function () {
+it('denies ahli panel access to users without any institution, speaker, or event membership', function () {
     $user = User::factory()->create();
+
+    expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeFalse();
+});
+
+it('allows ahli panel access to institution members', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeTrue();
+});
+
+it('allows ahli panel access to speaker members', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create();
+
+    $speaker->members()->syncWithoutDetaching([$user->id]);
+
+    expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeTrue();
+});
+
+it('allows ahli panel access to event members', function () {
+    $user = User::factory()->create();
+    $event = Event::factory()->create();
+
+    $user->memberEvents()->syncWithoutDetaching([$event->id => ['joined_at' => now()]]);
 
     expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeTrue();
 });
@@ -48,4 +78,3 @@ it('allows admin panel access when user has a global role assignment', function 
 
     expect($user->canAccessPanel(Panel::make()->id('admin')))->toBeTrue();
 });
-

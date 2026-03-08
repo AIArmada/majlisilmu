@@ -4,10 +4,7 @@ namespace App\Policies;
 
 use App\Enums\EventVisibility;
 use App\Models\Event;
-use App\Models\Institution;
-use App\Models\Speaker;
 use App\Models\User;
-use App\Support\Authz\MemberPermissionGate;
 
 class EventPolicy
 {
@@ -80,6 +77,11 @@ class EventPolicy
             return true;
         }
 
+        // Responsible institution/speaker approvers may access pending public submissions.
+        if ($event->userCanApprovePublicSubmission($user)) {
+            return true;
+        }
+
         // Use hybrid permission check (event members + organizer/institution scope)
         return $event->userCanManage($user);
     }
@@ -112,6 +114,14 @@ class EventPolicy
     }
 
     /**
+     * Determine whether the user can approve a pending public-submitted event.
+     */
+    public function approve(User $user, Event $event): bool
+    {
+        return $event->userCanApprovePublicSubmission($user);
+    }
+
+    /**
      * Determine whether the user can export registrations.
      */
     public function exportRegistrations(User $user, Event $event): bool
@@ -121,25 +131,7 @@ class EventPolicy
             return true;
         }
 
-        $memberPermissions = app(MemberPermissionGate::class);
-
-        if ($memberPermissions->canEvent($user, 'event.export-registrations', $event)) {
-            return true;
-        }
-
-        if ($event->organizer instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.export-registrations', $event->organizer);
-        }
-
-        if ($event->organizer instanceof Speaker) {
-            return $memberPermissions->canSpeaker($user, 'event.export-registrations', $event->organizer);
-        }
-
-        if ($event->institution instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.export-registrations', $event->institution);
-        }
-
-        return false;
+        return $event->userHasScopedEventPermission($user, 'event.export-registrations');
     }
 
     /**
@@ -151,24 +143,6 @@ class EventPolicy
             return true;
         }
 
-        $memberPermissions = app(MemberPermissionGate::class);
-
-        if ($memberPermissions->canEvent($user, 'event.manage-members', $event)) {
-            return true;
-        }
-
-        if ($event->organizer instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.manage-members', $event->organizer);
-        }
-
-        if ($event->organizer instanceof Speaker) {
-            return $memberPermissions->canSpeaker($user, 'event.manage-members', $event->organizer);
-        }
-
-        if ($event->institution instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.manage-members', $event->institution);
-        }
-
-        return false;
+        return $event->userHasScopedEventPermission($user, 'event.manage-members');
     }
 }

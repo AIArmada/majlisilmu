@@ -22,9 +22,6 @@ return new class extends Migration
                     $table->foreignUuid('public_submission_locked_by')->nullable()->index();
                 }
 
-                if (! Schema::hasColumn('institutions', 'public_submission_lock_reason')) {
-                    $table->text('public_submission_lock_reason')->nullable();
-                }
             });
         }
 
@@ -42,9 +39,6 @@ return new class extends Migration
                     $table->foreignUuid('public_submission_locked_by')->nullable()->index();
                 }
 
-                if (! Schema::hasColumn('speakers', 'public_submission_lock_reason')) {
-                    $table->text('public_submission_lock_reason')->nullable();
-                }
             });
         }
     }

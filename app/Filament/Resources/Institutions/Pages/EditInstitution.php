@@ -6,12 +6,10 @@ use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Submission\PublicSubmissionLockService;
-use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 
 class EditInstitution extends EditRecord
 {
@@ -21,98 +19,56 @@ class EditInstitution extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            $this->getLockPublicSubmissionAction(),
-            $this->getUnlockPublicSubmissionAction(),
             DeleteAction::make(),
         ];
     }
 
-    protected function getLockPublicSubmissionAction(): Action
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
     {
-        return Action::make('lock_public_submission')
-            ->label('Lock Public Submission')
-            ->icon(Heroicon::OutlinedLockClosed)
-            ->color('warning')
-            ->requiresConfirmation()
-            ->schema([
-                Textarea::make('reason')
-                    ->label('Lock Reason (optional)')
-                    ->rows(3)
-                    ->maxLength(2000),
-            ])
-            ->tooltip(fn (): ?string => $this->lockActionTooltip())
-            ->disabled(fn (): bool => ! $this->lockEligibility()->eligible)
-            ->visible(fn (): bool => $this->canManagePublicSubmissionLock() && $this->institutionRecord()->allow_public_event_submission)
-            ->action(function (array $data, PublicSubmissionLockService $lockService): void {
-                $actor = $this->currentUser();
+        $actor = $this->currentUser();
 
-                if (! $actor instanceof User) {
-                    abort(403);
-                }
-
-                $lockService->lockInstitution($this->institutionRecord(), $actor, $data['reason'] ?? null);
-
-                Notification::make()
-                    ->title('Public submission locked for this institution.')
-                    ->success()
-                    ->send();
-
-                $this->refreshFormData([
-                    'allow_public_event_submission',
-                    'public_submission_locked_at',
-                    'public_submission_locked_by',
-                    'public_submission_lock_reason',
-                ]);
-            });
-    }
-
-    protected function getUnlockPublicSubmissionAction(): Action
-    {
-        return Action::make('unlock_public_submission')
-            ->label('Unlock Public Submission')
-            ->icon(Heroicon::OutlinedLockOpen)
-            ->color('success')
-            ->requiresConfirmation()
-            ->visible(fn (): bool => $this->canManagePublicSubmissionLock() && ! $this->institutionRecord()->allow_public_event_submission)
-            ->action(function (PublicSubmissionLockService $lockService): void {
-                $actor = $this->currentUser();
-
-                if (! $actor instanceof User) {
-                    abort(403);
-                }
-
-                $lockService->unlockInstitution($this->institutionRecord(), $actor);
-
-                Notification::make()
-                    ->title('Public submission unlocked for this institution.')
-                    ->success()
-                    ->send();
-
-                $this->refreshFormData([
-                    'allow_public_event_submission',
-                ]);
-            });
-    }
-
-    private function canManagePublicSubmissionLock(): bool
-    {
-        return $this->currentUser()?->hasAnyRole(['super_admin', 'admin', 'moderator']) ?? false;
-    }
-
-    private function lockActionTooltip(): ?string
-    {
-        $eligibility = $this->lockEligibility();
-
-        if ($eligibility->eligible) {
-            return null;
+        if (! $actor instanceof User) {
+            abort(403);
         }
 
-        return implode(' ', $eligibility->reasons);
+        $institution = $this->institutionRecord();
+        $requestedPublicSubmission = (bool) ($data['allow_public_event_submission'] ?? $institution->allow_public_event_submission);
+        $currentPublicSubmission = (bool) $institution->allow_public_event_submission;
+
+        if ($requestedPublicSubmission === $currentPublicSubmission) {
+            return $data;
+        }
+
+        $lockService = app(PublicSubmissionLockService::class);
+
+        if ($requestedPublicSubmission) {
+            $lockService->unlockInstitution($institution, $actor);
+
+            return $data;
+        }
+
+        $eligibility = $lockService->institutionEligibility($institution);
+
+        if (! $eligibility->eligible) {
+            throw ValidationException::withMessages([
+                'data.allow_public_event_submission' => $eligibility->reasons,
+            ]);
+        }
+
+        $lockService->lockInstitution($institution, $actor);
+
+        return $data;
     }
 
-    private function lockEligibility(): \App\Support\Submission\SubmissionLockEligibilityResult
+    #[On(\App\Support\Submission\PublicSubmissionUiEvents::REFRESH_TOGGLE)]
+    public function refreshPublicSubmissionToggleState(): void
     {
-        return app(PublicSubmissionLockService::class)->institutionEligibility($this->institutionRecord());
+        $this->institutionRecord()->refresh();
+        $this->refreshFormData(['allow_public_event_submission']);
     }
 
     private function institutionRecord(): Institution

@@ -24,6 +24,7 @@ class ScopedMemberRoleSeeder
             'institution.manage-members',
             'institution.manage-donation-channels',
             'event.view',
+            'event.approve',
             'event.create',
             'event.update',
             'event.delete',
@@ -37,6 +38,7 @@ class ScopedMemberRoleSeeder
             'institution.manage-members',
             'institution.manage-donation-channels',
             'event.view',
+            'event.approve',
             'event.create',
             'event.update',
             'event.delete',
@@ -47,6 +49,7 @@ class ScopedMemberRoleSeeder
         'editor' => [
             'institution.view',
             'event.view',
+            'event.approve',
             'event.create',
             'event.update',
         ],
@@ -65,15 +68,18 @@ class ScopedMemberRoleSeeder
             'speaker.update',
             'speaker.delete',
             'speaker.manage-members',
+            'event.approve',
         ],
         'admin' => [
             'speaker.view',
             'speaker.update',
             'speaker.manage-members',
+            'event.approve',
         ],
         'editor' => [
             'speaker.view',
             'speaker.update',
+            'event.approve',
         ],
         'viewer' => [
             'speaker.view',

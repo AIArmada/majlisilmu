@@ -3,10 +3,12 @@
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
+use App\Livewire\Pages\About\Show as AboutPage;
 use Illuminate\Support\Facades\Route;
 
 Route::livewire('/', 'pages.⚡home')->name('home');
 Route::livewire('/glm', \App\Livewire\Pages\Home\GlmHome::class)->name('home.glm');
+Route::livewire('/tentang-kami', AboutPage::class)->name('about');
 Route::get('/bahasa/{locale}', LocaleController::class)->name('locale.switch');
 
 // Socialite OAuth Routes
@@ -75,6 +77,7 @@ Route::livewire('/events/{event:slug}', 'pages.events.show');
 Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar']);
 Route::livewire('/submit-event', 'pages.submit-event.create');
 Route::livewire('/submit-event/success', 'pages.submit-event.success');
+Route::livewire('/about', AboutPage::class);
 Route::post('/events/{event:slug}/register', [EventsController::class, 'register'])
     ->middleware('throttle:registration');
 Route::livewire('/institutions', 'pages.institutions.index')->middleware('throttle:search');

@@ -11,7 +11,9 @@ use App\Enums\EventVisibility;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Event;
+use App\Models\User;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -104,7 +106,8 @@ class EventsTable
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true),
                 \Filament\Tables\Columns\ToggleColumn::make('is_featured')
-                    ->label('Featured'),
+                    ->label('Featured')
+                    ->visible(fn (): bool => self::canManageFeaturedFlag()),
                 \Filament\Tables\Columns\ToggleColumn::make('is_active')
                     ->label('Active'),
                 IconColumn::make('is_muslim_only')
@@ -257,6 +260,15 @@ class EventsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    private static function canManageFeaturedFlag(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $user->hasApplicationAdminAccess()
+            && Filament::getCurrentPanel()?->getId() === 'admin';
     }
 
     protected static function formatEnumCollection(mixed $state, string $enumClass): string

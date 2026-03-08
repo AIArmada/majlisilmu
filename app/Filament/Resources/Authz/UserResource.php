@@ -6,17 +6,29 @@ namespace App\Filament\Resources\Authz;
 
 use AIArmada\FilamentAuthz\Resources\UserResource as BaseUserResource;
 use AIArmada\FilamentAuthz\Support\UserAuthzForm;
+use AIArmada\FilamentAuthz\Tables\Actions\ImpersonateTableAction;
 use App\Filament\Resources\Authz\UserResource\Pages\CreateUser;
 use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
 use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
+use App\Filament\Resources\Authz\UserResource\Pages\ViewUser;
+use Filament\Actions;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
+use DateTimeZone;
 
 class UserResource extends BaseUserResource
 {
+    public static function canView(Model $record): bool
+    {
+        return static::checkAbility('view');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
@@ -27,17 +39,29 @@ class UserResource extends BaseUserResource
         ]);
     }
 
+    public static function table(Table $table): Table
+    {
+        return parent::table($table)
+            ->actions([
+                ImpersonateTableAction::make(),
+                Actions\ViewAction::make()
+                    ->url(fn (Model $record): string => static::getUrl('view', ['record' => $record])),
+                Actions\EditAction::make(),
+            ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListUsers::route('/'),
             'create' => CreateUser::route('/create'),
+            'view' => ViewUser::route('/{record}'),
             'edit' => EditUser::route('/{record}/edit'),
         ];
     }
 
     /**
-     * @return list<DateTimePicker|TextInput>
+     * @return list<DateTimePicker|Select|TextInput>
      */
     protected static function getConfiguredFormFields(): array
     {
@@ -56,6 +80,12 @@ class UserResource extends BaseUserResource
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
+                'timezone' => Select::make('timezone')
+                    ->label('Timezone')
+                    ->options(static::getTimezoneOptions())
+                    ->searchable()
+                    ->native(false)
+                    ->helperText('Leave empty to use the application default timezone.'),
                 'email_verified_at' => DateTimePicker::make('email_verified_at')
                     ->label('Email Verified At')
                     ->native(false)
@@ -86,5 +116,15 @@ class UserResource extends BaseUserResource
         }
 
         return $components;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected static function getTimezoneOptions(): array
+    {
+        return collect(DateTimeZone::listIdentifiers())
+            ->mapWithKeys(fn (string $timezone): array => [$timezone => $timezone])
+            ->all();
     }
 }

@@ -42,7 +42,6 @@ class Institution extends Model implements AuditableContract, HasMedia
         'allow_public_event_submission',
         'public_submission_locked_at',
         'public_submission_locked_by',
-        'public_submission_lock_reason',
     ];
 
     #[\Override]

@@ -9,6 +9,9 @@ use App\Enums\Honorific;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Enums\SocialMediaPlatform;
+use App\Models\Speaker;
+use App\Models\User;
+use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -293,9 +296,8 @@ class SpeakerForm
                             ->required(),
                         \Filament\Forms\Components\Toggle::make('allow_public_event_submission')
                             ->label(__('Allow Public Event Submission'))
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->helperText(__('Managed via lock/unlock header actions.')),
+                            ->disabled(fn (?Speaker $record, string $operation): bool => ! self::canManagePublicSubmissionToggle($record, $operation))
+                            ->helperText(fn (?Speaker $record, string $operation): string => self::publicSubmissionHelperText($record, $operation)),
                         \Filament\Forms\Components\Toggle::make('is_active')
                             ->label(__('Active'))
                             ->disabled(fn (Get $get): bool => $get('status') === 'rejected')
@@ -303,5 +305,56 @@ class SpeakerForm
                     ])
                     ->columns(1),
             ]);
+    }
+
+    private static function canManagePublicSubmissionToggle(?Speaker $record, string $operation): bool
+    {
+        if ($operation !== 'edit' || ! $record instanceof Speaker) {
+            return false;
+        }
+
+        if (! self::hasPublicSubmissionToggleAccess()) {
+            return false;
+        }
+
+        if (! $record->allow_public_event_submission) {
+            return true;
+        }
+
+        return app(PublicSubmissionLockService::class)->speakerEligibility($record)->eligible;
+    }
+
+    private static function hasPublicSubmissionToggleAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->hasAnyRole(['super_admin', 'admin', 'moderator']);
+    }
+
+    private static function publicSubmissionHelperText(?Speaker $record, string $operation): string
+    {
+        if ($operation !== 'edit') {
+            return __('Public event submission defaults to enabled on create.');
+        }
+
+        if (! $record instanceof Speaker) {
+            return __('Use this toggle to control whether the public can submit events for this speaker.');
+        }
+
+        if (! self::hasPublicSubmissionToggleAccess()) {
+            return __('Only global admins can change this setting.');
+        }
+
+        if (! $record->allow_public_event_submission) {
+            return __('Enabled means anyone can submit. Disabled means only speaker members can submit.');
+        }
+
+        $eligibility = app(PublicSubmissionLockService::class)->speakerEligibility($record);
+
+        if ($eligibility->eligible) {
+            return __('Turn this off to shift submission responsibility entirely to speaker members.');
+        }
+
+        return __('Cannot turn this off yet: ').implode(' ', $eligibility->reasons);
     }
 }
