@@ -4,7 +4,7 @@ use App\Enums\NotificationChannel;
 use App\Enums\NotificationFrequency;
 use App\Enums\NotificationPreferenceKey;
 use App\Jobs\SendSavedSearchDigest;
-use App\Livewire\Pages\Dashboard\UserDashboard;
+use App\Livewire\Pages\Dashboard\DigestPreferences;
 use App\Models\NotificationEndpoint;
 use App\Models\NotificationPreference;
 use App\Models\SavedSearch;
@@ -132,11 +132,11 @@ it('checks digest frequency through user helper', function () {
         ))->toBeTrue();
 });
 
-it('allows users to update digest preferences from dashboard settings', function () {
+it('allows users to update digest preferences from the dedicated digest page', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
-        ->test(UserDashboard::class)
+        ->test(DigestPreferences::class)
         ->set('digestNotificationsEnabled', true)
         ->set('digestNotificationFrequency', NotificationFrequency::Weekly->value)
         ->set('digestNotificationChannels', [

@@ -24,7 +24,7 @@ class SetFilamentTimezone
         FilamentTimezone::set($timezone);
 
         $user = Auth::user();
-        $shouldPersistTimezone = in_array($resolution['source'], ['preferred', 'header', 'cookie'], true);
+        $shouldPersistTimezone = in_array($resolution['source'], ['preferred', 'header', 'request_input', 'cookie'], true);
 
         if ($user !== null && $shouldPersistTimezone && data_get($user, 'timezone') !== $timezone) {
             $user->forceFill(['timezone' => $timezone])->save();

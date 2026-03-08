@@ -18,18 +18,20 @@ class UserTimezoneResolver
     }
 
     /**
-     * @return array{timezone: string, source: 'preferred'|'authenticated_user'|'header'|'cookie'|'session'|'app_fallback'|'system_fallback'}
+     * @return array{timezone: string, source: 'preferred'|'authenticated_user'|'header'|'request_input'|'cookie'|'session'|'app_fallback'|'system_fallback'}
      */
     public static function resolveWithSource(?Request $request = null, ?string $preferredTimezone = null): array
     {
         $request ??= request();
         $sessionTimezone = $request->hasSession() ? $request->session()->get('user_timezone') : null;
         $authenticatedUserTimezone = Auth::check() ? data_get(Auth::user(), 'timezone') : null;
+        $requestInputTimezone = $request->input('user_timezone') ?? $request->query('user_timezone');
 
         $candidates = [
             'preferred' => $preferredTimezone,
             'authenticated_user' => $authenticatedUserTimezone,
             'header' => $request->header('X-Timezone'),
+            'request_input' => $requestInputTimezone,
             'cookie' => $request->cookie('user_timezone'),
             'session' => $sessionTimezone,
         ];

@@ -6,6 +6,15 @@
     $stats = $this->institutionStats;
     $events = $this->institutionEvents;
     $registrations = $this->institutionRegistrations;
+    $translateStatusLabel = static function (string $status): string {
+        $translated = __($status);
+
+        if ($translated !== $status) {
+            return $translated;
+        }
+
+        return str($status)->replace('_', ' ')->headline()->toString();
+    };
     $canEditInstitution = $selectedInstitution !== null && (auth()->user()?->can('update', $selectedInstitution) ?? false);
     $ahliInstitutionEditUrl = $canEditInstitution
         ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution], panel: 'ahli')
@@ -50,7 +59,7 @@
                         <div>
                             <h2 class="font-heading text-2xl font-bold text-slate-900">{{ $selectedInstitution->name }}</h2>
                             <p class="mt-1 text-sm text-slate-500">
-                                {{ __('Type:') }} {{ $selectedInstitution->type?->value ? str($selectedInstitution->type->value)->headline() : __('Not specified') }}
+                                {{ __('Type:') }} {{ $selectedInstitution->type?->value ? $translateStatusLabel($selectedInstitution->type->value) : __('Not specified') }}
                             </p>
                             @if($ahliInstitutionEditUrl)
                                 <a
@@ -83,7 +92,7 @@
                 </section>
 
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
-                    <h3 class="mb-5 font-heading text-2xl font-bold text-slate-900">{{ __('Institution Events') }}</h3>
+                    <h3 id="institution-events" class="mb-5 font-heading text-2xl font-bold text-slate-900">{{ __('Institution Events') }}</h3>
                     <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                         {{ __('This dashboard shows all institution events, including draft, private, and inactive records. Public institution pages only show events that are public + active.') }}
                     </div>
@@ -140,7 +149,7 @@
                                             <td class="py-4 pr-4">{{ $event->venue?->name ?? __('Online / TBD') }}</td>
                                             <td class="py-4 pr-4">
                                                 <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                                    {{ str((string) $event->status)->replace('_', ' ')->headline() }}
+                                                    {{ $translateStatusLabel((string) $event->status) }}
                                                 </span>
                                             </td>
                                             <td class="py-4 pr-4">
@@ -161,13 +170,13 @@
                         </div>
 
                         <div class="mt-6">
-                            {{ $events->links() }}
+                            {{ $events->links(data: ['scrollTo' => '#institution-events']) }}
                         </div>
                     @endif
                 </section>
 
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
-                    <h3 class="mb-5 font-heading text-2xl font-bold text-slate-900">{{ __('Event Registrations') }}</h3>
+                    <h3 id="institution-registrations" class="mb-5 font-heading text-2xl font-bold text-slate-900">{{ __('Event Registrations') }}</h3>
 
                     @if($registrations->isEmpty())
                         <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
@@ -208,7 +217,7 @@
                                             </p>
                                         </div>
                                         <span class="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                                            {{ str($registration->status)->replace('_', ' ')->headline() }}
+                                            {{ $translateStatusLabel((string) $registration->status) }}
                                         </span>
                                     </div>
                                 </article>
@@ -216,7 +225,7 @@
                         </div>
 
                         <div class="mt-6">
-                            {{ $registrations->links() }}
+                            {{ $registrations->links(data: ['scrollTo' => '#institution-registrations']) }}
                         </div>
                     @endif
                 </section>

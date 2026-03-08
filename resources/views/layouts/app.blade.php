@@ -55,6 +55,11 @@
             @php
                 $supportedLocales = config('app.supported_locales', []);
                 $currentLocale = app()->getLocale();
+                $authenticatedUser = auth()->user();
+                $hasInstitutionDashboardAccess = $authenticatedUser?->institutions()->exists() ?? false;
+                $usesDashboardMenuLabel = in_array($currentLocale, ['ms', 'ms_MY'], true);
+                $dashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard' : __('Dashboard');
+                $institutionDashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard Institusi' : __('Institution Dashboard');
             @endphp
 
             <!-- Premium Header -->
@@ -146,16 +151,26 @@
                                     </div>
                                     <a href="{{ route('dashboard') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Dashboard') }}
+                                        {{ $dashboardMenuLabel }}
                                     </a>
-                                    <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                    <a href="{{ route('dashboard.account-settings') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Institution Dashboard') }}
+                                        {{ __('Account Settings') }}
                                     </a>
                                     <a href="{{ route('saved-searches.index') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Saved Searches') }}
                                     </a>
+                                    <a href="{{ route('dashboard.digest-preferences') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('Digest Preferences') }}
+                                    </a>
+                                    @if($hasInstitutionDashboardAccess)
+                                        <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                            class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                            {{ $institutionDashboardMenuLabel }}
+                                        </a>
+                                    @endif
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit"
@@ -218,18 +233,28 @@
                                         <p class="text-xs text-slate-500 truncate">{{ auth()->user()->email }}</p>
                                     </div>
                                 </div>
+                                <a href="{{ route('dashboard') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ $dashboardMenuLabel }}
+                                </a>
+                                <a href="{{ route('dashboard.account-settings') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('Account Settings') }}
+                                </a>
                                 <a href="{{ route('saved-searches.index') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ __('Saved Searches') }}
                                 </a>
-                                <a href="{{ route('dashboard') }}" wire:navigate
+                                <a href="{{ route('dashboard.digest-preferences') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Dashboard') }}
+                                    {{ __('Digest Preferences') }}
                                 </a>
-                                <a href="{{ route('dashboard.institutions') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Institution Dashboard') }}
-                                </a>
+                                @if($hasInstitutionDashboardAccess)
+                                    <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                        class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                        {{ $institutionDashboardMenuLabel }}
+                                    </a>
+                                @endif
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <button type="submit"
