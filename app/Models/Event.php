@@ -835,25 +835,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function userCanManage(User $user): bool
     {
-        $memberPermissions = app(MemberPermissionGate::class);
-
-        if ($memberPermissions->canEvent($user, 'event.update', $this)) {
-            return true;
-        }
-
-        if ($this->organizer instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.update', $this->organizer);
-        }
-
-        if ($this->organizer instanceof Speaker) {
-            return $memberPermissions->canSpeaker($user, 'event.update', $this->organizer);
-        }
-
-        if ($this->institution instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.update', $this->institution);
-        }
-
-        return false;
+        return $this->userHasScopedEventPermission($user, 'event.update');
     }
 
     /**
@@ -862,25 +844,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function userCanDelete(User $user): bool
     {
-        $memberPermissions = app(MemberPermissionGate::class);
-
-        if ($memberPermissions->canEvent($user, 'event.delete', $this)) {
-            return true;
-        }
-
-        if ($this->organizer instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.delete', $this->organizer);
-        }
-
-        if ($this->organizer instanceof Speaker) {
-            return $memberPermissions->canSpeaker($user, 'event.delete', $this->organizer);
-        }
-
-        if ($this->institution instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.delete', $this->institution);
-        }
-
-        return false;
+        return $this->userHasScopedEventPermission($user, 'event.delete');
     }
 
     /**
@@ -888,22 +852,47 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function userCanView(User $user): bool
     {
-        $memberPermissions = app(MemberPermissionGate::class);
+        return $this->userHasScopedEventPermission($user, 'event.view');
+    }
 
-        if ($memberPermissions->canEvent($user, 'event.view', $this)) {
+    /**
+     * Check if a user can approve a pending public submission tied to their responsible scope.
+     */
+    public function userCanApprovePublicSubmission(User $user): bool
+    {
+        if (! $this->status instanceof \App\States\EventStatus\Pending) {
+            return false;
+        }
+
+        if (! $this->submissions()->exists()) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
             return true;
         }
 
-        if ($this->organizer instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.view', $this->organizer);
+        return $this->userHasScopedEventPermission($user, 'event.approve', includeEventScope: false);
+    }
+
+    public function userHasScopedEventPermission(User $user, string $permission, bool $includeEventScope = true): bool
+    {
+        $memberPermissions = app(MemberPermissionGate::class);
+
+        if ($includeEventScope && $memberPermissions->canEvent($user, $permission, $this)) {
+            return true;
         }
 
-        if ($this->organizer instanceof Speaker) {
-            return $memberPermissions->canSpeaker($user, 'event.view', $this->organizer);
+        if ($this->organizer instanceof Institution && $memberPermissions->canInstitution($user, $permission, $this->organizer)) {
+            return true;
         }
 
-        if ($this->institution instanceof Institution) {
-            return $memberPermissions->canInstitution($user, 'event.view', $this->institution);
+        if ($this->organizer instanceof Speaker && $memberPermissions->canSpeaker($user, $permission, $this->organizer)) {
+            return true;
+        }
+
+        if ($this->institution instanceof Institution && $memberPermissions->canInstitution($user, $permission, $this->institution)) {
+            return true;
         }
 
         return false;

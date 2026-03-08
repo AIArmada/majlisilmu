@@ -294,7 +294,7 @@
                         <div>
                             <h3 class="font-heading font-semibold text-slate-900 mb-4">{{ __('Community') }}</h3>
                             <ul class="space-y-3 text-slate-500">
-                                <li><a href="#"
+                                <li><a href="{{ route('about') }}" wire:navigate
                                         class="hover:text-emerald-600 transition-colors">{{ __('About Us') }}</a></li>
                                 <li><a href="{{ route('home') }}#submit" wire:navigate
                                         class="hover:text-emerald-600 transition-colors">{{ __('Submit Event') }}</a>

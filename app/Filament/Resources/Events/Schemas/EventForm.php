@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
+use App\Enums\ContactCategory;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -17,12 +18,17 @@ use App\Forms\InstitutionFormSchema;
 use App\Forms\SpeakerFormSchema;
 use App\Forms\VenueFormSchema;
 use App\Models\Event;
+use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
+use App\Models\User;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Filament\Facades\Filament;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
@@ -438,9 +444,11 @@ class EventForm
                                             ->dehydrated(false)
                                             ->helperText('Status boleh ditukar melalui butang moderasi di bahagian atas halaman.'),
                                         Toggle::make('is_priority')
-                                            ->label('Priority Review'),
+                                            ->label('Priority Review')
+                                            ->visible(fn (): bool => self::canManagePriorityFlag()),
                                         Toggle::make('is_featured')
-                                            ->label('Featured Event'),
+                                            ->label('Featured Event')
+                                            ->visible(fn (): bool => self::canManageFeaturedFlag()),
                                         Toggle::make('is_active')
                                             ->label('Active')
                                             ->helperText('Nyahaktifkan untuk menyembunyikan majlis daripada paparan awam tanpa menukar status.')
@@ -451,12 +459,28 @@ class EventForm
                                             ->dehydrated(false)
                                             ->helperText('Ditetapkan secara automatik apabila majlis diluluskan.'),
                                         DateTimePicker::make('escalated_at')
-                                            ->label('Tarikh Eskalasi'),
-                                        Select::make('submitter_id')
-                                            ->label('Penghantar')
-                                            ->relationship('submitter', 'email')
-                                            ->searchable()
-                                            ->preload(),
+                                            ->label('Tarikh Eskalasi')
+                                            ->visible(fn (): bool => self::canManageEscalationField()),
+                                        Section::make('Submission')
+                                            ->description('Rekod penghantaran asal dipaparkan di sini untuk rujukan sahaja dan tidak boleh diubah.')
+                                            ->schema([
+                                                Placeholder::make('submission_source')
+                                                    ->label('Sumber')
+                                                    ->content(fn (?Event $record): string => self::getSubmissionSourceLabel($record)),
+                                                Placeholder::make('submission_recorded_at')
+                                                    ->label('Dihantar Pada')
+                                                    ->content(fn (?Event $record): string => self::getSubmissionRecordedAtLabel($record)),
+                                                Placeholder::make('submission_submitter')
+                                                    ->label('Penghantar')
+                                                    ->columnSpanFull()
+                                                    ->content(fn (?Event $record): string => self::getSubmissionSubmitterLabel($record)),
+                                                Placeholder::make('submission_notes')
+                                                    ->label('Nota Penghantaran')
+                                                    ->columnSpanFull()
+                                                    ->content(fn (?Event $record): string => self::getSubmissionNotesLabel($record)),
+                                            ])
+                                            ->columns(2)
+                                            ->visible(fn (?Event $record): bool => self::latestSubmission($record) instanceof EventSubmission),
                                         Select::make('registration_mode')
                                             ->label('Mod Pendaftaran')
                                             ->options(
@@ -555,6 +579,100 @@ class EventForm
             ->toArray();
     }
 
+    protected static function latestSubmission(?Event $record): ?EventSubmission
+    {
+        if (! $record instanceof Event) {
+            return null;
+        }
+
+        $record->loadMissing([
+            'submissions.contacts',
+            'submissions.submitter',
+        ]);
+
+        /** @var EventSubmission|null $submission */
+        $submission = $record->submissions
+            ->sortByDesc(fn (EventSubmission $submission): int => $submission->created_at?->getTimestamp() ?? 0)
+            ->first();
+
+        return $submission;
+    }
+
+    protected static function getSubmissionSourceLabel(?Event $record): string
+    {
+        $submission = self::latestSubmission($record);
+
+        if (! $submission instanceof EventSubmission) {
+            return '-';
+        }
+
+        return $submission->submitter instanceof \App\Models\User
+            ? 'Pengguna berdaftar'
+            : 'Penghantaran awam';
+    }
+
+    protected static function getSubmissionRecordedAtLabel(?Event $record): string
+    {
+        $submission = self::latestSubmission($record);
+
+        if (! $submission instanceof EventSubmission || ! $submission->created_at) {
+            return '-';
+        }
+
+        $date = UserDateTimeFormatter::translatedFormat($submission->created_at, 'd M Y');
+        $time = UserDateTimeFormatter::format($submission->created_at, 'h:i A');
+
+        return trim($date.', '.$time, ', ');
+    }
+
+    protected static function getSubmissionSubmitterLabel(?Event $record): string
+    {
+        $submission = self::latestSubmission($record);
+
+        if (! $submission instanceof EventSubmission) {
+            return '-';
+        }
+
+        if ($submission->submitter instanceof \App\Models\User) {
+            $parts = array_filter([
+                $submission->submitter->name,
+                $submission->submitter->email,
+                $submission->submitter->phone,
+            ]);
+
+            return $parts === [] ? '-' : implode(' | ', $parts);
+        }
+
+        $parts = array_filter([
+            $submission->submitter_name,
+            self::getSubmissionContactValue($submission, ContactCategory::Email),
+            self::getSubmissionContactValue($submission, ContactCategory::Phone),
+        ]);
+
+        return $parts === [] ? '-' : implode(' | ', $parts);
+    }
+
+    protected static function getSubmissionNotesLabel(?Event $record): string
+    {
+        $submission = self::latestSubmission($record);
+
+        if (! $submission instanceof EventSubmission) {
+            return '-';
+        }
+
+        return filled($submission->notes) ? (string) $submission->notes : '-';
+    }
+
+    protected static function getSubmissionContactValue(EventSubmission $submission, ContactCategory $category): ?string
+    {
+        /** @var ?string $value */
+        $value = $submission->contacts
+            ->firstWhere('category', $category->value)
+            ?->value;
+
+        return filled($value) ? $value : null;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -574,5 +692,30 @@ class EventForm
                 ->toArray(),
             default => [],
         };
+    }
+
+    private static function canManageFeaturedFlag(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $user->hasApplicationAdminAccess()
+            && Filament::getCurrentPanel()?->getId() === 'admin';
+    }
+
+    private static function canManagePriorityFlag(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && Filament::getCurrentPanel()?->getId() === 'admin';
+    }
+
+    private static function canManageEscalationField(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && Filament::getCurrentPanel()?->getId() === 'admin';
     }
 }

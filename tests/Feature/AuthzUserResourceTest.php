@@ -2,10 +2,22 @@
 
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Filament\Resources\Authz\UserResource;
+use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
+use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
+use App\Filament\Resources\Authz\UserResource\Pages\ViewUser;
+use App\Models\Event;
+use App\Models\EventCheckin;
+use App\Models\EventSubmission;
+use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Registration;
+use App\Models\SavedSearch;
+use App\Models\Speaker;
 use App\Models\User;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
-it('shows email and phone verification timestamps on the authz user edit page', function () {
+it('shows timezone and verification timestamps on the authz user edit page', function () {
     setPermissionsTeamId(null);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
@@ -24,6 +36,172 @@ it('shows email and phone verification timestamps on the authz user edit page', 
     $this->actingAs($administrator)
         ->get(UserResource::getUrl('edit', ['record' => $targetUser], panel: 'admin'))
         ->assertSuccessful()
+        ->assertSee('Timezone')
         ->assertSee('Email Verified At')
         ->assertSee('Phone Verified At');
+});
+
+it('saves authz user edits without mass assigning roles', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $targetUser = User::factory()->create([
+        'name' => 'Original Name',
+        'email' => 'original@example.com',
+        'timezone' => null,
+        'email_verified_at' => null,
+        'phone_verified_at' => null,
+    ]);
+
+    $roleId = (string) Role::query()
+        ->where('name', 'super_admin')
+        ->whereNull(app(PermissionRegistrar::class)->teamsKey)
+        ->value('id');
+
+    Livewire::actingAs($administrator)
+        ->test(EditUser::class, ['record' => $targetUser->getKey()])
+        ->fillForm([
+            'name' => 'Updated Name',
+            'email' => 'updated@example.com',
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'email_verified_at' => now()->format('Y-m-d H:i:s'),
+            'phone_verified_at' => now()->format('Y-m-d H:i:s'),
+            'roles' => [$roleId],
+            'permissions' => [],
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $targetUser->refresh();
+
+    expect($targetUser->name)->toBe('Updated Name')
+        ->and($targetUser->email)->toBe('updated@example.com')
+        ->and($targetUser->timezone)->toBe('Asia/Kuala_Lumpur')
+        ->and($targetUser->email_verified_at)->not->toBeNull()
+        ->and($targetUser->phone_verified_at)->not->toBeNull()
+        ->and($targetUser->hasRole('super_admin'))->toBeTrue();
+});
+
+it('opens authz user records on the view page from the users index', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $targetUser = User::factory()->create([
+        'name' => 'Viewed User',
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(ListUsers::class)
+        ->assertCanSeeTableRecords([$targetUser])
+        ->assertTableActionExists(
+            'view',
+            fn ($action): bool => $action->getUrl() === UserResource::getUrl('view', ['record' => $targetUser], panel: 'admin'),
+            $targetUser,
+        );
+});
+
+it('shows authz user activity memberships follows submissions and saved searches on the view page', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $targetUser = User::factory()->create([
+        'name' => 'Activity User',
+        'email' => 'activity@example.com',
+        'phone' => '+60112223344',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'email_verified_at' => now(),
+        'phone_verified_at' => now(),
+    ]);
+
+    $savedEvent = Event::factory()->create(['title' => 'Saved Event']);
+    $interestedEvent = Event::factory()->create(['title' => 'Interested Event']);
+    $goingEvent = Event::factory()->create(['title' => 'Going Event']);
+    $registeredEvent = Event::factory()->create(['title' => 'Registered Event']);
+    $checkedInEvent = Event::factory()->create(['title' => 'Checked In Event']);
+    $submittedEvent = Event::factory()->create(['title' => 'Submitted Event']);
+    $memberEvent = Event::factory()->create(['title' => 'Member Event']);
+
+    $followedInstitution = Institution::factory()->create(['name' => 'Followed Institution']);
+    $memberInstitution = Institution::factory()->create(['name' => 'Member Institution']);
+    $followedSpeaker = Speaker::factory()->create(['name' => 'Followed Speaker']);
+    $memberSpeaker = Speaker::factory()->create(['name' => 'Member Speaker']);
+    $followedReference = Reference::factory()->create(['title' => 'Followed Reference']);
+
+    $targetUser->savedEvents()->attach($savedEvent->id);
+    $targetUser->interestedEvents()->attach($interestedEvent->id);
+    $targetUser->goingEvents()->attach($goingEvent->id);
+    $targetUser->memberEvents()->attach($memberEvent->id, ['joined_at' => now()]);
+    $memberInstitution->members()->syncWithoutDetaching([$targetUser->id]);
+    $memberSpeaker->members()->syncWithoutDetaching([$targetUser->id]);
+
+    $targetUser->follow($followedInstitution);
+    $targetUser->follow($followedSpeaker);
+    $targetUser->follow($followedReference);
+
+    Registration::factory()->create([
+        'user_id' => $targetUser->id,
+        'event_id' => $registeredEvent->id,
+        'status' => 'registered',
+    ]);
+
+    EventCheckin::factory()->create([
+        'user_id' => $targetUser->id,
+        'event_id' => $checkedInEvent->id,
+        'method' => 'registered_self_checkin',
+    ]);
+
+    EventSubmission::factory()->create([
+        'event_id' => $submittedEvent->id,
+        'submitted_by' => $targetUser->id,
+        'submitter_name' => $targetUser->name,
+        'notes' => 'Submitted from public form.',
+    ]);
+
+    SavedSearch::factory()->create([
+        'user_id' => $targetUser->id,
+        'name' => 'My Saved Search',
+        'query' => 'tafsir',
+        'filters' => ['time_scope' => 'upcoming', 'state' => 'selangor'],
+        'notify' => 'weekly',
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(ViewUser::class, ['record' => $targetUser->getKey()])
+        ->assertSee('Activity User')
+        ->assertSee('Saved Event')
+        ->assertSee('Interested Event')
+        ->assertSee('Going Event')
+        ->assertSee('Registered Event')
+        ->assertSee('Checked In Event')
+        ->assertSee('Followed Institution')
+        ->assertSee('Followed Speaker')
+        ->assertSee('Followed Reference')
+        ->assertSee('Submitted Event')
+        ->assertSee('Submitted from public form.')
+        ->assertSee('Member Institution')
+        ->assertSee('Member Speaker')
+        ->assertSee('Member Event')
+        ->assertSee('My Saved Search')
+        ->assertSee('tafsir');
 });

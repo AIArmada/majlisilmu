@@ -5,11 +5,13 @@ namespace App\Filament\Resources\Institutions\RelationManagers;
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\AuthzScope;
 use AIArmada\FilamentAuthz\Models\Role;
-use App\Support\Authz\MemberRoleScopes;
+use App\Filament\Resources\Authz\UserResource as AuthzUserResource;
 use App\Models\Institution;
 use App\Models\User;
+use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Submission\PublicSubmissionLockService;
+use App\Support\Submission\PublicSubmissionUiEvents;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -29,7 +31,10 @@ class MembersRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (User $record): ?string => AuthzUserResource::canEdit($record)
+                        ? AuthzUserResource::getUrl('edit', ['record' => $record], panel: 'admin')
+                        : null),
                 TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
@@ -57,6 +62,7 @@ class MembersRelationManager extends RelationManager
                         $institution->members()->syncWithoutDetaching([$user->id]);
                         $this->syncMemberRoles($user, $data['role_ids'] ?? []);
                         app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
+                        $this->notifyOwnerEditPage();
                     }),
             ])
             ->actions([
@@ -65,14 +71,15 @@ class MembersRelationManager extends RelationManager
                     ->form([
                         $this->makeRoleSelect(),
                     ])
-                    ->mountUsing(function (Action $action, User $record): void {
-                        $action->fillForm([
+                    ->fillForm(function (User $record): array {
+                        return [
                             'role_ids' => $this->getMemberRoleIds($record),
-                        ]);
+                        ];
                     })
                     ->action(function (array $data, User $record): void {
                         $this->syncMemberRoles($record, $data['role_ids'] ?? []);
                         app(PublicSubmissionLockService::class)->syncForUser($record);
+                        $this->notifyOwnerEditPage();
                     }),
                 Action::make('removeMember')
                     ->label('Remove')
@@ -84,6 +91,7 @@ class MembersRelationManager extends RelationManager
                         $institution->members()->detach($record->id);
                         $this->syncMemberRoles($record, []);
                         app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
+                        $this->notifyOwnerEditPage();
                     }),
             ]);
     }
@@ -142,5 +150,10 @@ class MembersRelationManager extends RelationManager
     private function getRoleScope(): AuthzScope
     {
         return app(MemberRoleScopes::class)->institution();
+    }
+
+    private function notifyOwnerEditPage(): void
+    {
+        $this->dispatch(PublicSubmissionUiEvents::REFRESH_TOGGLE)->to($this->getPageClass());
     }
 }

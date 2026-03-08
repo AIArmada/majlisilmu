@@ -7,7 +7,6 @@ use App\Enums\NotificationFrequency;
 use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -203,6 +203,24 @@ class User extends Authenticatable implements FilamentUser
             ->withTimestamps();
     }
 
+    /**
+     * @return MorphToMany<Institution, $this>
+     */
+    public function followingInstitutions(): MorphToMany
+    {
+        return $this->morphedByMany(Institution::class, 'followable', 'followings')
+            ->withTimestamps();
+    }
+
+    /**
+     * @return MorphToMany<Reference, $this>
+     */
+    public function followingReferences(): MorphToMany
+    {
+        return $this->morphedByMany(Reference::class, 'followable', 'followings')
+            ->withTimestamps();
+    }
+
     public function follow(Model $followable): void
     {
         \Illuminate\Support\Facades\DB::table('followings')->insertOrIgnore([
@@ -350,14 +368,26 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         if ($panel->getId() === 'ahli') {
-            return true;
+            return $this->hasAhliPanelAccess();
         }
 
         if ($panel->getId() === 'admin') {
-            return $this->hasGlobalRoleAssignment();
+            return $this->hasApplicationAdminAccess();
         }
 
         return $this->roles()->exists();
+    }
+
+    public function hasAhliPanelAccess(): bool
+    {
+        return $this->institutions()->exists()
+            || $this->speakers()->exists()
+            || $this->memberEvents()->exists();
+    }
+
+    public function hasApplicationAdminAccess(): bool
+    {
+        return $this->hasGlobalRoleAssignment();
     }
 
     private function hasGlobalRoleAssignment(): bool

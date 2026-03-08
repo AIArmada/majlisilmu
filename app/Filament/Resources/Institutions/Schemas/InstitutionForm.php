@@ -6,6 +6,9 @@ use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\InstitutionType;
 use App\Enums\SocialMediaPlatform;
+use App\Models\Institution;
+use App\Models\User;
+use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -192,9 +195,8 @@ class InstitutionForm
                             ->required(),
                         \Filament\Forms\Components\Toggle::make('allow_public_event_submission')
                             ->label('Allow Public Event Submission')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->helperText('Managed via lock/unlock header actions.'),
+                            ->disabled(fn (?Institution $record, string $operation): bool => ! self::canManagePublicSubmissionToggle($record, $operation))
+                            ->helperText(fn (?Institution $record, string $operation): string => self::publicSubmissionHelperText($record, $operation)),
                         \Filament\Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
@@ -237,5 +239,56 @@ class InstitutionForm
                             }),
                     ]),
             ]);
+    }
+
+    private static function canManagePublicSubmissionToggle(?Institution $record, string $operation): bool
+    {
+        if ($operation !== 'edit' || ! $record instanceof Institution) {
+            return false;
+        }
+
+        if (! self::hasPublicSubmissionToggleAccess()) {
+            return false;
+        }
+
+        if (! $record->allow_public_event_submission) {
+            return true;
+        }
+
+        return app(PublicSubmissionLockService::class)->institutionEligibility($record)->eligible;
+    }
+
+    private static function hasPublicSubmissionToggleAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->hasAnyRole(['super_admin', 'admin', 'moderator']);
+    }
+
+    private static function publicSubmissionHelperText(?Institution $record, string $operation): string
+    {
+        if ($operation !== 'edit') {
+            return 'Public event submission defaults to enabled on create.';
+        }
+
+        if (! $record instanceof Institution) {
+            return 'Use this toggle to control whether the public can submit events for this institution.';
+        }
+
+        if (! self::hasPublicSubmissionToggleAccess()) {
+            return 'Only global admins can change this setting.';
+        }
+
+        if (! $record->allow_public_event_submission) {
+            return 'Enabled means anyone can submit. Disabled means only institution members can submit.';
+        }
+
+        $eligibility = app(PublicSubmissionLockService::class)->institutionEligibility($record);
+
+        if ($eligibility->eligible) {
+            return 'Turn this off to shift submission responsibility entirely to institution members.';
+        }
+
+        return 'Cannot turn this off yet: '.implode(' ', $eligibility->reasons);
     }
 }

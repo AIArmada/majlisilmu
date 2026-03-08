@@ -18,7 +18,11 @@ use UnitEnum;
 
 class EventResource extends AdminEventResource
 {
-    protected static string|UnitEnum|null $navigationGroup = 'Ahli Workspace';
+    protected static string|UnitEnum|null $navigationGroup = null;
+
+    protected static ?string $navigationLabel = 'Events';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'events';
 
@@ -62,6 +66,10 @@ class EventResource extends AdminEventResource
                     EventSubmission::query()
                         ->where('submitted_by', $user->id)
                         ->select('event_id')
+                )
+                ->orWhereIn(
+                    'events.id',
+                    $user->memberEvents()->select('events.id')
                 );
 
             // Events organized by institutions where user is a member.
@@ -84,10 +92,9 @@ class EventResource extends AdminEventResource
                     );
             });
 
-            // Legacy events without organizer data, but linked to member institution.
-            $eventQuery->orWhere(function (Builder $legacyInstitutionQuery) use ($user): void {
-                $legacyInstitutionQuery
-                    ->whereNull('events.organizer_type')
+            // Any event linked to a member institution, including speaker-organized and legacy records.
+            $eventQuery->orWhere(function (Builder $institutionLinkedQuery) use ($user): void {
+                $institutionLinkedQuery
                     ->whereIn(
                         'events.institution_id',
                         $user->institutions()->select('institutions.id')

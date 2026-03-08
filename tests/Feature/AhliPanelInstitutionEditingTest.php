@@ -52,7 +52,36 @@ it('allows institution admins to open ahli edit pages for their institution and 
         ->assertOk();
 });
 
-it('allows submitters to open ahli edit page for their own submitted event', function () {
+it('allows institution admins to open ahli edit page for speaker-organized events linked to their institution', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $speaker = Speaker::factory()->create();
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Institution Scoped Speaker Event',
+        'status' => 'draft',
+        'visibility' => 'private',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get($eventEditUrl)
+        ->assertOk();
+});
+
+it('forbids non-member submitters from opening ahli edit page for their own submitted event', function () {
     $user = User::factory()->create();
     $foreignInstitution = Institution::factory()->create();
     $event = Event::factory()->for($foreignInstitution)->create([
@@ -66,7 +95,7 @@ it('allows submitters to open ahli edit page for their own submitted event', fun
 
     $this->actingAs($user)
         ->get($eventEditUrl)
-        ->assertOk();
+        ->assertForbidden();
 });
 
 it('allows speaker members to open ahli edit page for speaker-organized events', function () {
@@ -98,19 +127,52 @@ it('allows speaker members to open ahli edit page for speaker-organized events',
         ->assertOk();
 });
 
+it('allows event members to open ahli edit page for their scoped event membership', function () {
+    $user = User::factory()->create();
+    $event = Event::factory()->create([
+        'title' => 'Event Member Scoped Event',
+        'status' => 'draft',
+        'visibility' => 'private',
+    ]);
+
+    $event->members()->syncWithoutDetaching([$user->id => ['joined_at' => now()]]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForEvent();
+
+    $eventScope = app(MemberRoleScopes::class)->event();
+
+    Authz::withScope($eventScope, function () use ($user): void {
+        $user->syncRoles(['organizer']);
+    }, $user);
+
+    $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get($eventEditUrl)
+        ->assertOk();
+});
+
 it('lists only scoped events on ahli events index', function () {
     $user = User::factory()->create();
     $memberInstitution = Institution::factory()->create();
     $otherInstitution = Institution::factory()->create();
     $memberSpeaker = Speaker::factory()->create();
     $otherSpeaker = Speaker::factory()->create();
+    $memberEvent = Event::factory()->create([
+        'title' => 'Scoped Event Membership Event',
+        'status' => 'draft',
+        'visibility' => 'private',
+    ]);
 
     $user->institutions()->syncWithoutDetaching([$memberInstitution->id]);
     $user->speakers()->syncWithoutDetaching([$memberSpeaker->id]);
+    $user->memberEvents()->syncWithoutDetaching([$memberEvent->id => ['joined_at' => now()]]);
 
     $submittedTitle = 'Scoped Submitted Event';
     $institutionTitle = 'Scoped Institution Organizer Event';
     $speakerTitle = 'Scoped Speaker Organizer Event';
+    $institutionLinkedSpeakerTitle = 'Institution Linked Speaker Event';
+    $eventMemberTitle = 'Scoped Event Membership Event';
     $outsideTitle = 'Outside Scope Event';
 
     Event::factory()->create([
@@ -134,6 +196,14 @@ it('lists only scoped events on ahli events index', function () {
         'visibility' => 'private',
         'organizer_type' => Speaker::class,
         'organizer_id' => $memberSpeaker->id,
+    ]);
+
+    Event::factory()->for($memberInstitution)->create([
+        'title' => $institutionLinkedSpeakerTitle,
+        'status' => 'draft',
+        'visibility' => 'private',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $otherSpeaker->id,
     ]);
 
     Event::factory()->create([
@@ -160,6 +230,8 @@ it('lists only scoped events on ahli events index', function () {
         ->assertSee($submittedTitle)
         ->assertSee($institutionTitle)
         ->assertSee($speakerTitle)
+        ->assertSee($institutionLinkedSpeakerTitle)
+        ->assertSee($eventMemberTitle)
         ->assertDontSee($outsideTitle)
         ->assertDontSee('Outside Speaker Scope Event');
 });

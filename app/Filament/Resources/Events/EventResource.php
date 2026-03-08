@@ -6,7 +6,6 @@ use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
 use App\Filament\Resources\Events\Pages\ViewEvent;
-use App\Filament\Resources\Events\RelationManagers\EventSubmissionsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventRecurrenceRulesRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventSessionsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
@@ -59,7 +58,10 @@ class EventResource extends Resource
     #[\Override]
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        /** @var Builder<Event> $query */
+        $query = parent::getEloquentQuery();
+
+        return $query
             ->with([
                 'media',
                 'institution',
@@ -77,7 +79,6 @@ class EventResource extends Resource
             EventRecurrenceRulesRelationManager::class,
             MediaLinksRelationManager::class,
             EventUsersRelationManager::class,
-            EventSubmissionsRelationManager::class,
             ModerationReviewsRelationManager::class,
             RegistrationsRelationManager::class,
         ];

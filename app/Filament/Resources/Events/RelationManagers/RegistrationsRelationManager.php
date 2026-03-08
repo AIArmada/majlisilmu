@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Models\Event;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -14,12 +15,26 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Throwable;
 
 class RegistrationsRelationManager extends RelationManager
 {
     protected static string $relationship = 'registrations';
+
+    #[\Override]
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        if (! $ownerRecord instanceof Event) {
+            return false;
+        }
+
+        $ownerRecord->loadMissing('settings');
+
+        return parent::canViewForRecord($ownerRecord, $pageClass)
+            && (bool) $ownerRecord->settings?->registration_required;
+    }
 
     #[\Override]
     public function form(Schema $schema): Schema
