@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
@@ -19,6 +20,11 @@ Route::get('/oauth/{provider}/callback', [SocialiteController::class, 'callback'
     ->name('socialite.callback')
     ->whereIn('provider', ['google']);
 
+Route::get('/kongsi/payload', [DawahShareController::class, 'payload'])->name('dawah-share.payload');
+Route::get('/kongsi/{provider}', [DawahShareController::class, 'redirect'])
+    ->whereIn('provider', ['whatsapp', 'telegram', 'line', 'facebook', 'x', 'instagram', 'tiktok', 'email'])
+    ->name('dawah-share.redirect');
+
 // Authentication is handled by Fortify
 
 // Events (with search rate limiting)
@@ -36,6 +42,9 @@ Route::livewire('/hantar-majlis/berjaya', 'pages.submit-event.success')->name('s
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard', \App\Livewire\Pages\Dashboard\UserDashboard::class)->name('dashboard');
     Route::redirect('/papan-pemuka', '/dashboard', 301);
+    Route::livewire('/dashboard/dawah-impact', \App\Livewire\Pages\Dashboard\DawahImpactIndex::class)->name('dashboard.dawah-impact');
+    Route::livewire('/dashboard/dawah-impact/links', \App\Livewire\Pages\Dashboard\DawahImpactIndex::class)->name('dashboard.dawah-impact.links');
+    Route::livewire('/dashboard/dawah-impact/links/{link}', \App\Livewire\Pages\Dashboard\DawahImpactLinkShow::class)->name('dashboard.dawah-impact.links.show');
     Route::livewire('/dashboard/notifications', \App\Livewire\Pages\Dashboard\NotificationsIndex::class)->name('dashboard.notifications');
     Route::redirect('/papan-pemuka/notifikasi', '/dashboard/notifications', 301);
     Route::livewire('/tetapan-akaun', \App\Livewire\Pages\Dashboard\AccountSettings::class)->name('dashboard.account-settings');

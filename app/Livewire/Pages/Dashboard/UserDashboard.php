@@ -7,6 +7,7 @@ use App\Models\EventCheckin;
 use App\Models\EventSubmission;
 use App\Models\Registration;
 use App\Models\User;
+use App\Services\DawahShare\DawahShareAnalyticsService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -58,6 +59,21 @@ class UserDashboard extends Component
             'checkins_count' => EventCheckin::query()->where('user_id', $user->id)->count(),
             'institutions_count' => $user->institutions()->count(),
         ];
+    }
+
+    /**
+     * @return array{
+     *     visits: int,
+     *     unique_visitors: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     total_outcomes: int
+     * }
+     */
+    #[Computed]
+    public function dawahImpactSummary(): array
+    {
+        return app(DawahShareAnalyticsService::class)->summaryForUser($this->user());
     }
 
     /**

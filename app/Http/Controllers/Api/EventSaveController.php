@@ -3,13 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Event;
+use App\Services\DawahShare\DawahShareService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class EventSaveController extends Controller
 {
+    public function __construct(
+        private readonly DawahShareService $dawahShareService
+    ) {}
+
     /**
      * List all saved events for the authenticated user.
      */
@@ -109,6 +115,20 @@ class EventSaveController extends Controller
                 ],
             ], 409);
         }
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->dawahShareService->recordOutcome(
+            type: \App\Enums\DawahShareOutcomeType::EventSave,
+            outcomeKey: 'event_save:user:'.$user->id.':event:'.$event->id,
+            subject: $event,
+            actor: $user,
+            request: $request,
+            metadata: [
+                'event_id' => $event->id,
+            ],
+        );
 
         return response()->json([
             'data' => [

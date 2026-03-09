@@ -3,6 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Services\DawahShare\DawahShareService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -38,11 +39,15 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
+        $user = User::create([
             'name' => $input['name'],
             'email' => $input['email'] ?? null,
             'phone' => $input['phone'] ?? null,
             'password' => $input['password'],
         ]);
+
+        app(DawahShareService::class)->recordSignup($user, request());
+
+        return $user;
     }
 }

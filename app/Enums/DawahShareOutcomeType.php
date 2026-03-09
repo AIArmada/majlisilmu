@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Enums;
+
+enum DawahShareOutcomeType: string
+{
+    case Signup = 'signup';
+    case EventRegistration = 'event_registration';
+    case EventSave = 'event_save';
+    case EventInterest = 'event_interest';
+    case EventGoing = 'event_going';
+    case InstitutionFollow = 'institution_follow';
+    case SpeakerFollow = 'speaker_follow';
+    case SeriesFollow = 'series_follow';
+    case ReferenceFollow = 'reference_follow';
+    case SavedSearchCreated = 'saved_search_created';
+}

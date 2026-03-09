@@ -160,6 +160,10 @@
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ $dashboardMenuLabel }}
                                     </a>
+                                    <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('Dawah Impact') }}
+                                    </a>
                                     <a href="{{ route('dashboard.account-settings') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Account Settings') }}
@@ -248,6 +252,10 @@
                                 <a href="{{ route('dashboard') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ $dashboardMenuLabel }}
+                                </a>
+                                <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('Dawah Impact') }}
                                 </a>
                                 <a href="{{ route('dashboard.account-settings') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">

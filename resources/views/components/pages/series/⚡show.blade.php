@@ -50,6 +50,16 @@ new
         } else {
             $user->follow($this->series);
             $this->isFollowing = true;
+            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+                type: \App\Enums\DawahShareOutcomeType::SeriesFollow,
+                outcomeKey: 'series_follow:user:'.$user->id.':series:'.$this->series->id,
+                subject: $this->series,
+                actor: $user,
+                request: request(),
+                metadata: [
+                    'series_id' => $this->series->id,
+                ],
+            );
         }
     }
 
@@ -135,6 +145,22 @@ new
     $pastEvents = $this->pastEvents;
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
+    $seriesUrl = route('series.show', $series);
+    $seriesShareText = trim($series->title . ' - ' . config('app.name'));
+    $seriesShareData = [
+        'title' => $series->title,
+        'text' => Str::limit((string) $series->description, 140) ?: __('Lihat siri ini di :app', ['app' => config('app.name')]),
+        'url' => $seriesUrl,
+        'sourceUrl' => $seriesUrl,
+        'shareText' => $seriesShareText,
+        'fallbackTitle' => $series->title,
+        'payloadEndpoint' => route('dawah-share.payload'),
+    ];
+    $seriesShareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+        $seriesUrl,
+        $seriesShareText,
+        $series->title,
+    );
 
     $frontCover = $series->getFirstMediaUrl('cover', 'thumb');
     $backCover = null;
@@ -312,6 +338,17 @@ new
                                     {{ __('Edit Siri') }}
                                 </a>
                             @endcan
+                        </div>
+
+                        <div class="mt-6 max-w-2xl">
+                            <x-dawah-share-panel
+                                :heading="__('Share This Series')"
+                                :description="__('Share this series with others and keep every visit and response on one tracked link.')"
+                                :preview-title="$series->title"
+                                :preview-subtitle="Str::limit((string) $series->description, 110)"
+                                :share-data="$seriesShareData"
+                                :share-links="$seriesShareLinks"
+                            />
                         </div>
                     </div>
 

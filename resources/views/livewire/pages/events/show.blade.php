@@ -48,6 +48,10 @@
         'title' => $event->title,
         'text' => Str::limit($event->description_text, 100),
         'url' => route('events.show', $event),
+        'sourceUrl' => route('events.show', $event),
+        'shareText' => trim($event->title . ' - ' . config('app.name')),
+        'fallbackTitle' => $event->title,
+        'payloadEndpoint' => route('dawah-share.payload'),
     ];
     $copyMessage = __('Link copied to clipboard!');
     $copyPrompt = __('Copy this link:');
@@ -235,22 +239,53 @@
         shareData: @json($shareData),
         copyMessage: @json($copyMessage),
         copyPrompt: @json($copyPrompt),
-        nativeShare() {
+        attributedShareData: null,
+        async resolveShareData() {
+            if (this.attributedShareData) {
+                return this.attributedShareData;
+            }
+
+            const params = new URLSearchParams({
+                url: this.shareData.sourceUrl,
+                text: this.shareData.shareText,
+                title: this.shareData.fallbackTitle,
+            });
+            const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                return this.shareData;
+            }
+
+            const payload = await response.json();
+            this.attributedShareData = {
+                ...this.shareData,
+                url: payload.url,
+            };
+
+            return this.attributedShareData;
+        },
+        async nativeShare() {
+            const shareData = await this.resolveShareData();
             if (navigator.share) {
-                navigator.share(this.shareData);
+                navigator.share(shareData);
                 return;
             }
             this.copyLink();
         },
-        copyLink() {
+        async copyLink() {
+            const shareData = await this.resolveShareData();
             if (navigator.clipboard) {
-                navigator.clipboard.writeText(this.shareData.url).then(() => {
+                navigator.clipboard.writeText(shareData.url).then(() => {
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 2000);
                 });
                 return;
             }
-            window.prompt(this.copyPrompt, this.shareData.url);
+            window.prompt(this.copyPrompt, shareData.url);
         },
         openShareModal() {
             this.shareModalOpen = true;

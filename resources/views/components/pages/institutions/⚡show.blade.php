@@ -53,6 +53,16 @@ new class extends Component {
         } else {
             $user->follow($this->institution);
             $this->isFollowing = true;
+            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+                type: \App\Enums\DawahShareOutcomeType::InstitutionFollow,
+                outcomeKey: 'institution_follow:user:'.$user->id.':institution:'.$this->institution->id,
+                subject: $this->institution,
+                actor: $user,
+                request: request(),
+                metadata: [
+                    'institution_id' => $this->institution->id,
+                ],
+            );
         }
     }
 
@@ -170,23 +180,19 @@ new class extends Component {
     $languages = $institution->languages;
     $institutionUrl = route('institutions.show', $institution);
     $shareText = trim($institution->name . ' - ' . config('app.name'));
-    $encodedInstitutionUrl = urlencode($institutionUrl);
-    $encodedShareText = urlencode($shareText);
-    $encodedShareBody = urlencode($shareText . "\n" . $institutionUrl);
+    $shareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+        $institutionUrl,
+        $shareText,
+        $institution->name,
+    );
     $shareData = [
         'title' => $institution->name,
         'text' => __('Lihat profil institusi ini di :app', ['app' => config('app.name')]),
         'url' => $institutionUrl,
-    ];
-    $shareLinks = [
-        'whatsapp' => "https://wa.me/?text={$encodedShareText}%20{$encodedInstitutionUrl}",
-        'telegram' => "https://t.me/share/url?url={$encodedInstitutionUrl}&text={$encodedShareText}",
-        'line' => "https://social-plugins.line.me/lineit/share?url={$encodedInstitutionUrl}",
-        'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedInstitutionUrl}",
-        'x' => "https://x.com/intent/tweet?text={$encodedShareText}&url={$encodedInstitutionUrl}",
-        'instagram' => 'https://www.instagram.com/',
-        'tiktok' => 'https://www.tiktok.com/',
-        'email' => "mailto:?subject={$encodedShareText}&body={$encodedShareBody}",
+        'sourceUrl' => $institutionUrl,
+        'shareText' => $shareText,
+        'fallbackTitle' => $institution->name,
+        'payloadEndpoint' => route('dawah-share.payload'),
     ];
 
     $showPendingStatusNotice = $institution->status === 'pending';
@@ -202,7 +208,9 @@ new class extends Component {
             $stateName = null;
         }
 
-        return implode(', ', array_filter([$subdistrictName, $districtName, $stateName]));
+        return __('Negeri').': '.($stateName ?: '-')
+            .' • '.__('Daerah').': '.($districtName ?: '-')
+            .' • '.__('Bandar / Mukim / Zon').': '.($subdistrictName ?: '-');
     };
     $locationString = $formatAddressHierarchy($address);
     $googleMapsApiKey = (string) config('services.google.maps_api_key', '');
@@ -306,22 +314,53 @@ new class extends Component {
         copied: false,
         shareData: @json($shareData),
         copyPrompt: @json(__('Copy this link:')),
-        nativeShare() {
+        attributedShareData: null,
+        async resolveShareData() {
+            if (this.attributedShareData) {
+                return this.attributedShareData;
+            }
+
+            const params = new URLSearchParams({
+                url: this.shareData.sourceUrl,
+                text: this.shareData.shareText,
+                title: this.shareData.fallbackTitle,
+            });
+            const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                return this.shareData;
+            }
+
+            const payload = await response.json();
+            this.attributedShareData = {
+                ...this.shareData,
+                url: payload.url,
+            };
+
+            return this.attributedShareData;
+        },
+        async nativeShare() {
+            const shareData = await this.resolveShareData();
             if (navigator.share) {
-                navigator.share(this.shareData);
+                navigator.share(shareData);
                 return;
             }
             this.copyLink();
         },
-        copyLink() {
+        async copyLink() {
+            const shareData = await this.resolveShareData();
             if (navigator.clipboard) {
-                navigator.clipboard.writeText(this.shareData.url).then(() => {
+                navigator.clipboard.writeText(shareData.url).then(() => {
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 2000);
                 });
                 return;
             }
-            window.prompt(this.copyPrompt, this.shareData.url);
+            window.prompt(this.copyPrompt, shareData.url);
         },
         openShareModal() {
             this.shareModalOpen = true;
