@@ -2,15 +2,22 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
+use App\Filament\Ahli\Resources\Events\Pages\ViewEvent as AhliViewEvent;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource;
 use App\Models\Event;
+use App\Models\EventSubmission;
 use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Registration;
+use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Models\Venue;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -41,6 +48,7 @@ it('allows institution admins to open ahli edit pages for their institution and 
     }, $user);
 
     $institutionEditUrl = InstitutionResource::getUrl('edit', ['record' => $institution], panel: 'ahli');
+    $eventViewUrl = EventResource::getUrl('view', ['record' => $event], panel: 'ahli');
     $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
 
     $this->actingAs($user)
@@ -48,8 +56,83 @@ it('allows institution admins to open ahli edit pages for their institution and 
         ->assertOk();
 
     $this->actingAs($user)
+        ->get($eventViewUrl)
+        ->assertOk();
+
+    $this->actingAs($user)
         ->get($eventEditUrl)
         ->assertOk();
+});
+
+it('opens the ahli view public page action in a new tab', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Ahli View Public Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
+    $publicUrl = route('events.show', $event);
+
+    $this->actingAs($user)
+        ->get($eventEditUrl)
+        ->assertOk()
+        ->assertSee($publicUrl, false)
+        ->assertSee('target="_blank"', false);
+});
+
+it('renders submitter phone numbers as whatsapp links on the ahli event edit page', function () {
+    $member = User::factory()->create();
+    $submitter = User::factory()->create([
+        'phone' => '60112233445',
+    ]);
+    $institution = Institution::factory()->create();
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Ahli Submitter Contact Event',
+        'status' => 'pending',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'submitter_id' => $submitter->id,
+    ]);
+
+    EventSubmission::factory()
+        ->for($event)
+        ->for($submitter, 'submitter')
+        ->create([
+            'submitter_name' => $submitter->name,
+        ]);
+
+    $institution->members()->syncWithoutDetaching([$member->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($member): void {
+        $member->syncRoles(['admin']);
+    }, $member);
+
+    $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
+
+    $this->actingAs($member)
+        ->get($eventEditUrl)
+        ->assertOk()
+        ->assertSee('https://wa.me/60112233445');
 });
 
 it('allows institution admins to open ahli edit page for speaker-organized events linked to their institution', function () {
@@ -273,11 +356,21 @@ it('does not allow editing institutions outside user membership in ahli panel', 
 it('shows ahli edit links on institution dashboard only when user can update', function () {
     $adminUser = User::factory()->create();
     $viewerUser = User::factory()->create();
+    $registrant = User::factory()->create();
     $institution = Institution::factory()->create(['name' => 'Masjid Link Ahli']);
     $event = Event::factory()->for($institution)->create([
         'title' => 'Event Link Ahli',
         'status' => 'draft',
         'visibility' => 'private',
+    ]);
+    $event->settings()->updateOrCreate(
+        ['event_id' => $event->id],
+        ['registration_required' => true],
+    );
+    Registration::factory()->for($event)->for($registrant)->create([
+        'name' => 'Registrations Table User',
+        'email' => 'registrations-table@example.test',
+        'status' => 'registered',
     ]);
 
     $institution->members()->syncWithoutDetaching([$adminUser->id, $viewerUser->id]);
@@ -296,20 +389,103 @@ it('shows ahli edit links on institution dashboard only when user can update', f
 
     $institutionEditUrl = InstitutionResource::getUrl('edit', ['record' => $institution], panel: 'ahli');
     $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
+    $eventRegistrationsUrl = EventResource::getUrl('view', ['record' => $event, 'relation' => 'registrations'], panel: 'ahli');
 
     $this->actingAs($adminUser)
-        ->get('/dashboard/institutions?institution='.$institution->id)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
         ->assertOk()
-        ->assertSee('Edit Institution')
-        ->assertSee('Edit in Ahli Panel')
+        ->assertSee(__('Edit Institution'))
+        ->assertSee(__('Edit'))
+        ->assertDontSee(__('Edit in Ahli Panel'))
         ->assertSee($institutionEditUrl, false)
-        ->assertSee($eventEditUrl, false);
+        ->assertSee($eventEditUrl, false)
+        ->assertSee($eventRegistrationsUrl, false);
+
+    $this->actingAs($adminUser)
+        ->get($eventRegistrationsUrl)
+        ->assertOk();
+
+    Livewire::withQueryParams(['relation' => 'registrations'])
+        ->test(AhliViewEvent::class, ['record' => $event->id])
+        ->assertSet('activeRelationManager', 'registrations');
 
     $this->actingAs($viewerUser)
-        ->get('/dashboard/institutions?institution='.$institution->id)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
         ->assertOk()
-        ->assertDontSee('Edit Institution')
-        ->assertDontSee('Edit in Ahli Panel')
+        ->assertDontSee(__('Edit Institution'))
+        ->assertDontSee(__('Edit'))
+        ->assertDontSee(__('Edit in Ahli Panel'))
         ->assertDontSee($institutionEditUrl, false)
-        ->assertDontSee($eventEditUrl, false);
+        ->assertDontSee($eventEditUrl, false)
+        ->assertDontSee($eventRegistrationsUrl, false);
+});
+
+it('shows review instead of edit for pending institution events on the dashboard', function () {
+    $adminUser = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Review Label']);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Pending Review Label Event',
+        'status' => 'pending',
+        'visibility' => 'public',
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$adminUser->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($adminUser): void {
+        $adminUser->syncRoles(['admin']);
+    }, $adminUser);
+
+    $this->actingAs($adminUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertSee('Pending Review Label Event')
+        ->assertSee(__('Review'))
+        ->assertDontSee(__('Edit in Ahli Panel'));
+});
+
+it('renders the ahli event view page when related resources do not exist in the ahli panel', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $speaker = Speaker::factory()->create();
+    $series = Series::factory()->create();
+    $reference = Reference::factory()->create();
+    $venue = Venue::factory()->create();
+
+    $event = Event::factory()->for($institution)->for($venue)->create([
+        'title' => 'Ahli View Safe Related Links Event',
+        'status' => 'draft',
+        'visibility' => 'private',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+    ]);
+
+    $event->speakers()->attach($speaker->id);
+    $event->series()->attach($series->id);
+    $event->references()->attach($reference->id);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $eventViewUrl = EventResource::getUrl('view', ['record' => $event], panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get($eventViewUrl)
+        ->assertOk()
+        ->assertSee('Ahli View Safe Related Links Event')
+        ->assertSee($institution->name)
+        ->assertSee($speaker->name)
+        ->assertSee($venue->name)
+        ->assertSee($series->title)
+        ->assertSee($reference->title);
 });

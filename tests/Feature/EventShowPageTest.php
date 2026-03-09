@@ -2,6 +2,7 @@
 
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
@@ -118,6 +119,30 @@ describe('Event Show Page Going Feature', function () {
 });
 
 describe('Event Show Page Location & Contact Info', function () {
+    it('renders a single reference material card at full width', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $reference = Reference::factory()->create([
+            'title' => 'Matan Al-Arbain',
+            'author' => 'Imam al-Nawawi',
+        ]);
+
+        $event->references()->attach($reference->id);
+
+        $response = $this->get(route('events.show', $event));
+
+        $response->assertOk()
+            ->assertSee('Reference Materials')
+            ->assertSee('Matan Al-Arbain')
+            ->assertSee('class="grid gap-5"', false)
+            ->assertDontSee('class="grid gap-5 sm:grid-cols-2"', false);
+    });
+
     it('does not use speaker images as hero background when location media is missing', function () {
         $speaker = Speaker::factory()->create();
         $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg', 800, 800))

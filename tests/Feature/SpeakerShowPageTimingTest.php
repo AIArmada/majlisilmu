@@ -55,6 +55,26 @@ it('shows cancelled public events with cancelled badge on speaker page', functio
         ->assertSee('Dibatalkan');
 });
 
+it('uses stronger calendar event colors on speaker page', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+        'title' => 'Kuliah Kalender Penceramah',
+    ]);
+
+    $speaker->events()->attach($event->id);
+
+    $this->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee('border-emerald-300 bg-emerald-100 text-emerald-900 shadow-emerald-200/80 hover:bg-emerald-200', false)
+        ->assertDontSee('bg-emerald-50 text-emerald-700 hover:bg-emerald-100', false);
+});
+
 it('renders event end time in event timezone on speaker page', function () {
     $speaker = Speaker::factory()->create([
         'status' => 'verified',

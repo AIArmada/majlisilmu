@@ -1,5 +1,8 @@
 <?php
 
+use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\Role;
+use App\Livewire\Pages\Dashboard\InstitutionDashboard;
 use App\Livewire\Pages\Dashboard\UserDashboard;
 use App\Models\Event;
 use App\Models\EventCheckin;
@@ -8,17 +11,37 @@ use App\Models\Institution;
 use App\Models\Registration;
 use App\Models\SavedSearch;
 use App\Models\User;
+use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\ScopedMemberRoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function (): void {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+});
+
 it('requires authentication for user and institution dashboards', function () {
+    expect(route('dashboard'))->toEndWith('/dashboard');
+    expect(route('dashboard.account-settings'))->toEndWith('/tetapan-akaun');
+    expect(route('dashboard.institutions'))->toEndWith('/dashboard/institusi');
+
+    $this->get('/papan-pemuka')->assertRedirect(route('login'));
     $this->get('/dashboard')->assertRedirect(route('login'));
-    $this->get('/dashboard/account-settings')->assertRedirect(route('login'));
-    $this->get('/dashboard/digest-preferences')->assertRedirect(route('login'));
-    $this->get('/dashboard/institutions')->assertRedirect(route('login'));
+    $this->get('/dashboard/notifications')->assertRedirect(route('login'));
+    $this->get('/tetapan-akaun')->assertRedirect(route('login'));
+    $this->get('/dashboard/institusi')->assertRedirect(route('login'));
     $this->get('/dashboard/events/create-advanced')->assertRedirect(route('login'));
+});
+
+it('redirects the legacy papan pemuka URL to the canonical dashboard URL for authenticated users', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get('/papan-pemuka')
+        ->assertRedirect('/dashboard');
 });
 
 it('renders the attendee-first planner dashboard without saved search or digest panels', function () {
@@ -115,16 +138,18 @@ it('renders the attendee-first planner dashboard without saved search or digest 
         ->get('/dashboard');
 
     $response->assertOk()
-        ->assertSee('Attendee Planner')
+        ->assertSee('Dashboard')
+        ->assertDontSee('Attendee Planner')
         ->assertSee('Jump to section')
         ->assertSee('Overview Calendar')
         ->assertSee('Upcoming Agenda')
+        ->assertDontSee('What needs your attention next')
+        ->assertDontSee('Find more')
         ->assertSee('Account Settings')
         ->assertSee('Submitted Events')
         ->assertSee('Recent Check-ins')
         ->assertDontSee('Submitted + Check-ins')
         ->assertDontSee('Going + Registered')
-        ->assertSee('Digest Preferences')
         ->assertSee('Saved Searches')
         ->assertSee('Saved Dashboard Event')
         ->assertSee('Interested Dashboard Event')
@@ -139,6 +164,9 @@ it('renders the attendee-first planner dashboard without saved search or digest 
         ->assertDontSee('External Event');
 
     $response->assertDontSee('Other User Search');
+    $response->assertDontSee('x-show="cell.entries.length > 0"', false);
+    $response->assertDontSee("entry.role_badges.map(badge => badge.label).join(' • ')", false);
+    $response->assertDontSee('bg-emerald-50/80', false);
 });
 
 it('shows a featured next event without repeating it inside an otherwise empty agenda list', function () {
@@ -195,12 +223,14 @@ it('translates the attendee dashboard in Malay and only shows approved workflow 
         ->get('/dashboard');
 
     $response->assertOk()
-        ->assertSee('Perancang Kehadiran')
+        ->assertSee('Dashboard')
+        ->assertDontSee('Perancang Kehadiran')
         ->assertSee('Pergi ke bahagian')
         ->assertSee('Majlis Dihantar')
-        ->assertSee('Dashboard')
         ->assertSee('Dashboard Institusi')
         ->assertSee('Diluluskan')
+        ->assertDontSee('Yang perlu anda urus selepas ini')
+        ->assertDontSee('Lihat lagi')
         ->assertDontSee('Approved');
 
     $html = $response->getContent();
@@ -309,19 +339,34 @@ it('paginates agenda, planner buckets, submitted events, and check-in history wh
         ->not->toContain('scrollIntoView()');
 });
 
-it('shows the dedicated digest preferences page from the authenticated navigation cluster', function () {
+it('does not expose the removed legacy account settings urls', function () {
     $user = User::factory()->create();
 
-    $response = $this->withSession(['locale' => 'en'])
-        ->actingAs($user)
-        ->get(route('dashboard.digest-preferences'));
+    $this->actingAs($user)
+        ->get('/papan-pemuka/tetapan-akaun')
+        ->assertNotFound();
 
-    $response->assertOk()
-        ->assertSee('Digest Preferences')
-        ->assertSee('Saved search delivery settings')
-        ->assertSee('Saved Searches')
-        ->assertSee('Back to Dashboard')
-        ->assertSee('Save Preferences');
+    $this->actingAs($user)
+        ->get('/dashboard/account-settings')
+        ->assertNotFound();
+
+    $this->actingAs($user)
+        ->get('/papan-pemuka/pilihan-digest')
+        ->assertNotFound();
+
+    $this->actingAs($user)
+        ->get('/dashboard/digest-preferences')
+        ->assertNotFound();
+
+    $followedResponse = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.account-settings', ['tab' => 'notifications']));
+
+    $followedResponse->assertOk()
+        ->assertSee('Account Settings')
+        ->assertSee('Manage your account and notifications from one place.')
+        ->assertSee('Open inbox')
+        ->assertSee('Save Notification Settings');
 });
 
 it('hides institution dashboard access for users without institution membership', function () {
@@ -335,7 +380,7 @@ it('hides institution dashboard access for users without institution membership'
         ->assertDontSee('Institution Dashboard');
 
     $this->actingAs($user)
-        ->get('/dashboard/institutions')
+        ->get(route('dashboard.institutions'))
         ->assertForbidden();
 });
 
@@ -372,7 +417,7 @@ it('merges overlapping planner relationships into one calendar entry', function 
         ->and($instance->upcomingAgenda)->toHaveCount(1);
 });
 
-it('shows institution profile, events, and registrations for members', function () {
+it('shows institution profile and events for members without a separate registrations section', function () {
     $user = User::factory()->create();
     $attendee = User::factory()->create();
 
@@ -408,14 +453,148 @@ it('shows institution profile, events, and registrations for members', function 
 
     $response = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
-        ->get('/dashboard/institutions?institution='.$institution->id);
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
 
     $response->assertOk()
         ->assertSee('Masjid Al-Ikhlas')
+        ->assertSee('Event List')
+        ->assertSee('Search by event title or venue')
+        ->assertSee('Members & Roles')
         ->assertSee('Institution Dashboard Event')
-        ->assertSee('Ahmad Registrant')
+        ->assertDontSee('Event Registrations')
+        ->assertDontSee('Registrations (All)')
+        ->assertDontSee('Ahmad Registrant')
         ->assertDontSee('Outside Institution Event')
         ->assertDontSee('External Registrant');
+});
+
+it('highlights institution events that are waiting approval', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Menunggu Kelulusan']);
+
+    $user->institutions()->attach($institution->id);
+
+    Event::factory()->for($institution)->create([
+        'title' => 'Pending Institution Dashboard Event',
+        'status' => 'pending',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    $response = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+
+    $response->assertOk()
+        ->assertSee('Pending Institution Dashboard Event')
+        ->assertSee('Pending Approval')
+        ->assertSee('data-event-status="pending-attention"', false);
+});
+
+it('filters and sorts institution events on the dashboard', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Tapis Majlis']);
+    $otherInstitution = Institution::factory()->create();
+
+    $user->institutions()->attach($institution->id);
+
+    Event::factory()->for($institution)->create([
+        'title' => 'Zulu Public Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    Event::factory()->for($institution)->create([
+        'title' => 'Alpha Hidden Pending Event',
+        'status' => 'pending',
+        'visibility' => 'private',
+        'starts_at' => now()->addDays(1),
+    ]);
+
+    Event::factory()->for($institution)->create([
+        'title' => 'Beta Unlisted Event',
+        'status' => 'approved',
+        'visibility' => 'unlisted',
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    Event::factory()->for($otherInstitution)->create([
+        'title' => 'Outside Event',
+        'status' => 'pending',
+        'visibility' => 'private',
+        'starts_at' => now()->addDays(4),
+    ]);
+
+    $filteredResponse = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions', [
+            'institution' => $institution->id,
+            'event_search' => 'alpha',
+            'event_status' => 'pending',
+            'event_visibility' => 'private',
+            'event_sort' => 'title_asc',
+        ]));
+
+    $filteredResponse->assertOk()
+        ->assertSee('Alpha Hidden Pending Event')
+        ->assertDontSee('Zulu Public Event')
+        ->assertDontSee('Beta Unlisted Event')
+        ->assertDontSee('Outside Event');
+
+    $sortedResponse = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions', [
+            'institution' => $institution->id,
+            'event_sort' => 'title_asc',
+        ]));
+
+    $sortedResponse->assertOk()
+        ->assertSeeInOrder([
+            'Alpha Hidden Pending Event',
+            'Beta Unlisted Event',
+            'Zulu Public Event',
+        ]);
+});
+
+it('paginates institution events on the dashboard', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Paginate']);
+
+    $user->institutions()->attach($institution->id);
+
+    foreach (range(1, 9) as $index) {
+        Event::factory()->for($institution)->create([
+            'title' => sprintf('Paged Institution Event %02d', $index),
+            'status' => 'approved',
+            'visibility' => 'public',
+            'starts_at' => now()->addDays($index),
+        ]);
+    }
+
+    $pageOne = $this->actingAs($user)
+        ->get(route('dashboard.institutions', [
+            'institution' => $institution->id,
+            'event_sort' => 'title_asc',
+            'event_per_page' => 8,
+        ]));
+
+    $pageOne->assertOk()
+        ->assertSee('Paged Institution Event 01')
+        ->assertSee('Paged Institution Event 08')
+        ->assertDontSee('Paged Institution Event 09');
+
+    $pageTwo = $this->actingAs($user)
+        ->get(route('dashboard.institutions', [
+            'institution' => $institution->id,
+            'event_sort' => 'title_asc',
+            'event_per_page' => 8,
+            'institution_events_page' => 2,
+        ]));
+
+    $pageTwo->assertOk()
+        ->assertSee('Paged Institution Event 09')
+        ->assertDontSee('Paged Institution Event 01');
 });
 
 it('clearly distinguishes public and internal institution data for members', function () {
@@ -453,18 +632,83 @@ it('clearly distinguishes public and internal institution data for members', fun
 
     $response = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
-        ->get('/dashboard/institutions?institution='.$institution->id);
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
 
     $response->assertOk()
         ->assertSee('Masjid Pemisahan Scope')
         ->assertSee('Public Institution Event')
         ->assertSee('Internal Institution Event')
-        ->assertSee('Public Event Registrant')
-        ->assertSee('Internal Event Registrant')
+        ->assertDontSee('Public Event Registrant')
+        ->assertDontSee('Internal Event Registrant')
         ->assertSee('Public active: 1')
         ->assertSee('Internal / hidden: 1')
+        ->assertSee('Hidden')
+        ->assertDontSee('Private')
         ->assertSee('Visible on public page')
         ->assertSee('Internal only');
+});
+
+it('lets institution admins add members and manage scoped roles from the dashboard', function () {
+    $adminUser = User::factory()->create();
+    $memberUser = User::factory()->create([
+        'email' => 'new-member@example.test',
+    ]);
+    $institution = Institution::factory()->create(['name' => 'Masjid Ahli Dashboard']);
+
+    $institution->members()->syncWithoutDetaching([$adminUser->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+    $teamsKey = app(PermissionRegistrar::class)->teamsKey;
+
+    Authz::withScope($institutionScope, function () use ($adminUser): void {
+        $adminUser->syncRoles(['admin']);
+    }, $adminUser);
+
+    $roleIds = Authz::withScope($institutionScope, fn (): array => Role::query()
+        ->where($teamsKey, getPermissionsTeamId())
+        ->pluck('id', 'name')
+        ->all());
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($adminUser)
+        ->test(InstitutionDashboard::class)
+        ->set('newMemberEmail', $memberUser->email)
+        ->set('newMemberRoleIds', [$roleIds['viewer']])
+        ->call('addMember')
+        ->assertHasNoErrors()
+        ->assertSet('newMemberEmail', '')
+        ->assertSet('newMemberRoleIds', []);
+
+    expect($institution->fresh()->members()->whereKey($memberUser->id)->exists())->toBeTrue();
+
+    $memberRoleNames = Authz::withScope($institutionScope, fn (): array => $memberUser->fresh()->getRoleNames()->values()->all(), $memberUser);
+
+    expect($memberRoleNames)->toBe(['viewer']);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($adminUser)
+        ->test(InstitutionDashboard::class)
+        ->call('startEditingMemberRoles', $memberUser->id)
+        ->set('editingMemberRoleIds', [$roleIds['editor']])
+        ->call('saveMemberRoles')
+        ->assertHasNoErrors()
+        ->assertSet('editingMemberId', null)
+        ->assertSet('editingMemberRoleIds', []);
+
+    $updatedRoleNames = Authz::withScope($institutionScope, fn (): array => $memberUser->fresh()->getRoleNames()->values()->all(), $memberUser);
+
+    expect($updatedRoleNames)->toBe(['editor']);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($adminUser)
+        ->test(InstitutionDashboard::class)
+        ->call('removeMember', $memberUser->id)
+        ->assertHasNoErrors();
+
+    expect($institution->fresh()->members()->whereKey($memberUser->id)->exists())->toBeFalse()
+        ->and(Authz::withScope($institutionScope, fn (): array => $memberUser->fresh()->getRoleNames()->values()->all(), $memberUser))->toBe([]);
 });
 
 it('forbids selecting institutions the user does not belong to', function () {
@@ -476,8 +720,20 @@ it('forbids selecting institutions the user does not belong to', function () {
     $user->institutions()->attach($memberInstitution->id);
 
     $this->actingAs($user)
-        ->get('/dashboard/institutions?institution='.$nonMemberInstitution->id)
+        ->get(route('dashboard.institutions', ['institution' => $nonMemberInstitution->id]))
         ->assertForbidden();
+});
+
+it('does not expose removed institution dashboard legacy urls', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get('/papan-pemuka/institusi')
+        ->assertNotFound();
+
+    $this->actingAs($user)
+        ->get('/dashboard/institutions')
+        ->assertNotFound();
 });
 
 it('allows owner to access advanced schedule page and blocks others', function () {

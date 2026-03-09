@@ -2,25 +2,33 @@
 
 namespace App\Livewire\Pages\SavedSearches;
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
+use App\Enums\NotificationFrequency;
+use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\SavedSearch;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
-#[Title('Saved Searches')]
 class Index extends Component
 {
     public string $name = '';
@@ -81,6 +89,11 @@ class Index extends Component
      */
     private array $referenceTitles = [];
 
+    /**
+     * @var array<string, string|null>
+     */
+    private array $speakerNames = [];
+
     public bool $hasFilters = false;
 
     public function mount(): void
@@ -111,14 +124,14 @@ class Index extends Component
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:100'],
             'query' => ['nullable', 'string', 'max:255'],
-            'notify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
+            'notify' => ['required', Rule::in(array_keys($this->notifyOptions()))],
             'radius_km' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'lat' => ['nullable', 'required_with:radius_km', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'required_with:radius_km', 'numeric', 'between:-180,180'],
         ]);
 
         if ($user->savedSearches()->count() >= 10) {
-            $this->addError('name', __('Anda telah mencapai had maksimum 10 carian tersimpan.'));
+            $this->addError('name', __('You can only keep up to 10 saved searches.'));
 
             return;
         }
@@ -137,7 +150,7 @@ class Index extends Component
         $this->notify = 'daily';
         $this->filters = [];
 
-        session()->flash('status', __('Carian berjaya disimpan.'));
+        session()->flash('status', __('Saved search saved.'));
     }
 
     public function delete(string $savedSearchId): void
@@ -151,7 +164,7 @@ class Index extends Component
         $savedSearch = $user->savedSearches()->where('id', $savedSearchId)->firstOrFail();
         $savedSearch->delete();
 
-        session()->flash('status', __('Carian tersimpan telah dipadam.'));
+        session()->flash('status', __('Saved search deleted.'));
     }
 
     public function startEdit(string $savedSearchId): void
@@ -186,7 +199,7 @@ class Index extends Component
 
         $validated = $this->validate([
             'editName' => ['required', 'string', 'max:100'],
-            'editNotify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
+            'editNotify' => ['required', Rule::in(array_keys($this->notifyOptions()))],
         ]);
 
         $savedSearch = $user->savedSearches()->where('id', $savedSearchId)->firstOrFail();
@@ -197,7 +210,7 @@ class Index extends Component
 
         $this->cancelEdit();
 
-        session()->flash('status', __('Carian tersimpan telah dikemaskini.'));
+        session()->flash('status', __('Saved search updated.'));
     }
 
     /**
@@ -225,6 +238,24 @@ class Index extends Component
     public function render(): View
     {
         return view('livewire.pages.saved-searches.index');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function notifyOptions(): array
+    {
+        return [
+            NotificationFrequency::Off->value => __('Paused'),
+            NotificationFrequency::Instant->value => __('Instant'),
+            NotificationFrequency::Daily->value => __('Daily'),
+            NotificationFrequency::Weekly->value => __('Weekly'),
+        ];
+    }
+
+    public function notifyLabel(string $notify): string
+    {
+        return $this->notifyOptions()[$notify] ?? str($notify)->headline()->toString();
     }
 
     /**
@@ -296,6 +327,7 @@ class Index extends Component
             'event_format',
             'gender',
             'institution_id',
+            'venue_id',
             'starts_after',
             'starts_before',
             'time_scope',
@@ -384,7 +416,7 @@ class Index extends Component
     protected function suggestedName(): string
     {
         if (filled($this->query)) {
-            return __('Carian: :query', ['query' => Str::limit($this->query, 40)]);
+            return __('Search: :query', ['query' => Str::limit($this->query, 40)]);
         }
 
         if (! empty($this->filters['event_type'])) {
@@ -392,14 +424,17 @@ class Index extends Component
                 ? $this->filters['event_type'][0]
                 : $this->filters['event_type'];
 
-            return __('Jenis: :type', ['type' => Str::headline((string) $eventType)]);
+            $eventTypeLabel = EventType::tryFrom((string) $eventType)?->getLabel()
+                ?? Str::of((string) $eventType)->replace('_', ' ')->headline()->toString();
+
+            return __('Event type: :type', ['type' => $eventTypeLabel]);
         }
 
         if (! empty($this->filters['starts_after']) || ! empty($this->filters['starts_before'])) {
-            return __('Tarikh Majlis Akan Datang');
+            return __('Upcoming event dates');
         }
 
-        return __('Carian Majlis Saya');
+        return __('My event search');
     }
 
     private function capturedFilterLabel(string $filterKey): string
@@ -407,16 +442,33 @@ class Index extends Component
         return match ($filterKey) {
             'state_id' => __('State'),
             'district_id' => __('District'),
-            'subdistrict_id' => __('Bandar / Mukim / Zon'),
+            'subdistrict_id' => __('Subdistrict / Mukim / Zone'),
             'institution_id' => __('Institution'),
-            'venue_id' => __('Tempat'),
+            'venue_id' => __('Venue'),
+            'speaker_ids' => __('Speaker'),
             'domain_tag_ids' => __('Kategori'),
-            'topic_ids' => __('Bidang Ilmu'),
-            'source_tag_ids' => __('Sumber Rujukan Utama'),
-            'issue_tag_ids' => __('Tema / Isu'),
-            'reference_ids' => __('Rujukan Kitab/Buku'),
+            'topic_ids' => __('Discipline'),
+            'source_tag_ids' => __('Primary Sources'),
+            'issue_tag_ids' => __('Themes / Issues'),
+            'reference_ids' => __('References'),
+            'language', 'language_codes' => __('Languages'),
+            'event_type' => __('Event Type'),
+            'event_format' => __('Event Format'),
+            'gender' => __('Gender'),
+            'starts_after' => __('Starts After'),
+            'starts_before' => __('Starts Before'),
             'time_scope' => __('Time Scope'),
-            default => str($filterKey)->replace('_', ' ')->title()->toString(),
+            'prayer_time' => __('Prayer Time'),
+            'timing_mode' => __('Timing'),
+            'starts_time_from' => __('Starts From'),
+            'starts_time_until' => __('Starts Until'),
+            'children_allowed' => __('Children Allowed'),
+            'is_muslim_only' => __('Muslim Only'),
+            'has_event_url' => __('Event URL'),
+            'has_live_url' => __('Live URL'),
+            'has_end_time' => __('End Time'),
+            'age_group' => __('Age Group'),
+            default => $this->translatedFilterFallbackLabel($filterKey),
         };
     }
 
@@ -443,14 +495,25 @@ class Index extends Component
             'subdistrict_id' => $this->subdistrictName($value) ?? $value,
             'institution_id' => $this->institutionName($value) ?? $value,
             'venue_id' => $this->venueName($value) ?? $value,
+            'speaker_ids' => $this->speakerName($value) ?? $value,
             'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
             'reference_ids' => $this->referenceTitle($value) ?? $value,
+            'language', 'language_codes' => $this->languageLabel($value) ?? $value,
+            'event_type' => EventType::tryFrom($value)?->getLabel() ?? $value,
+            'event_format' => EventFormat::tryFrom($value)?->getLabel() ?? $value,
+            'gender' => EventGenderRestriction::tryFrom($value)?->getLabel() ?? $value,
+            'age_group' => EventAgeGroup::tryFrom($value)?->getLabel() ?? $value,
+            'starts_after', 'starts_before' => $this->dateLabel($value) ?? $value,
             'time_scope' => match ($value) {
                 'upcoming' => __('Upcoming'),
                 'past' => __('Past'),
                 'all' => __('All Time'),
                 default => $value,
             },
+            'prayer_time' => EventPrayerTime::tryFrom($value)?->getLabel() ?? $value,
+            'timing_mode' => TimingMode::tryFrom($value)?->label() ?? $value,
+            'starts_time_from', 'starts_time_until' => $this->timeLabel($value) ?? $value,
+            'children_allowed', 'is_muslim_only', 'has_event_url', 'has_live_url', 'has_end_time' => $this->booleanLabel($value) ?? $value,
             default => $value,
         };
     }
@@ -518,6 +581,15 @@ class Index extends Component
         return $this->venueNames[$id];
     }
 
+    private function speakerName(string $id): ?string
+    {
+        if (! array_key_exists($id, $this->speakerNames)) {
+            $this->speakerNames[$id] = Speaker::query()->whereKey($id)->value('name');
+        }
+
+        return $this->speakerNames[$id];
+    }
+
     private function tagName(string $id): ?string
     {
         if (! array_key_exists($id, $this->tagNames)) {
@@ -562,5 +634,75 @@ class Index extends Component
         }
 
         return $this->referenceTitles[$id];
+    }
+
+    private function languageLabel(string $code): ?string
+    {
+        $normalized = mb_strtolower(trim($code));
+        $locale = app()->getLocale();
+
+        $label = match ($normalized) {
+            'ms' => __('Malay'),
+            'ar' => __('Arabic'),
+            'en' => __('English'),
+            'id' => __('Indonesian'),
+            'zh' => __('Mandarin Chinese'),
+            'ta' => __('Tamil'),
+            'jv' => __('Javanese'),
+            default => null,
+        };
+
+        if (! is_string($label) || $label === '') {
+            return null;
+        }
+
+        if (in_array($locale, ['ms', 'ms_MY'], true)) {
+            return __('Bahasa').' '.$label;
+        }
+
+        return $label;
+    }
+
+    private function booleanLabel(string $value): ?string
+    {
+        return match (mb_strtolower(trim($value))) {
+            '1', 'true', 'yes', 'on' => __('Yes'),
+            '0', 'false', 'no', 'off' => __('No'),
+            default => null,
+        };
+    }
+
+    private function dateLabel(string $value): ?string
+    {
+        try {
+            return Carbon::parse($value, UserDateTimeFormatter::resolveTimezone())->translatedFormat('j M Y');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function timeLabel(string $value): ?string
+    {
+        foreach (['H:i:s', 'H:i'] as $format) {
+            try {
+                return Carbon::createFromFormat(
+                    $format,
+                    $value,
+                    UserDateTimeFormatter::resolveTimezone()
+                )->format('g:i A');
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    private function translatedFilterFallbackLabel(string $filterKey): string
+    {
+        $fallback = str($filterKey)->replace('_', ' ')->headline()->toString();
+        $translated = __($fallback);
+
+        return $translated !== $fallback ? $translated : $fallback;
     }
 }

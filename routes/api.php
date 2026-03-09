@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventInterestController;
 use App\Http\Controllers\Api\EventSaveController;
+use App\Http\Controllers\Api\NotificationDestinationController;
+use App\Http\Controllers\Api\NotificationMessageController;
+use App\Http\Controllers\Api\NotificationSettingsController;
 use App\Http\Controllers\Api\RegistrationExportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
@@ -50,4 +53,24 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Registration Exports (per documentation B9d)
     Route::get('/events/{event}/registrations/export', [RegistrationExportController::class, 'export'])
         ->name('api.registrations.export');
+
+    // Notification center
+    Route::get('/notifications', [NotificationMessageController::class, 'index'])
+        ->name('api.notifications.index');
+    Route::post('/notifications/{message}/read', [NotificationMessageController::class, 'read'])
+        ->name('api.notifications.read');
+    Route::post('/notifications/read-all', [NotificationMessageController::class, 'readAll'])
+        ->name('api.notifications.read-all');
+    Route::get('/notification-settings/catalog', [NotificationSettingsController::class, 'catalog'])
+        ->name('api.notification-settings.catalog');
+    Route::get('/notification-settings', [NotificationSettingsController::class, 'show'])
+        ->name('api.notification-settings.show');
+    Route::put('/notification-settings', [NotificationSettingsController::class, 'update'])
+        ->name('api.notification-settings.update');
+    Route::post('/notification-destinations/push', [NotificationDestinationController::class, 'storePush'])
+        ->name('api.notification-destinations.push.store');
+    Route::put('/notification-destinations/push/{installation}', [NotificationDestinationController::class, 'updatePush'])
+        ->name('api.notification-destinations.push.update');
+    Route::delete('/notification-destinations/push/{installation}', [NotificationDestinationController::class, 'destroyPush'])
+        ->name('api.notification-destinations.push.destroy');
 });

@@ -1,3 +1,608 @@
+# Comprehensive Notification System Todo
+
+- [x] Replace the digest-only notification persistence with the new settings, rules, destinations, messages, and deliveries schema
+- [x] Build the notification catalog, policy resolver, message builder, and delivery senders for in-app, email, push, and WhatsApp
+- [x] Integrate notification triggers for follows, saved-search matches, event updates/reminders, registrations, check-ins, and submission workflow
+- [x] Add the account-settings notification center, inbox page, navigation links, and authenticated notification APIs
+- [x] Update focused tests and verify the new notification flows end to end
+
+## Follow-up Review Fixes
+
+- [x] Remove stale email and WhatsApp destinations when a user changes account contact details
+- [x] Make `urgent_override` actually control quiet-hours bypass for urgent notifications
+- [x] Mark digest source notifications delivered only after the digest delivery itself succeeds
+- [x] Honor configured `fallback_channels` at runtime instead of ignoring them
+- [x] Add an atomic delivery-claim step so duplicate jobs do not send the same notification twice
+
+## Final Review Pass
+
+- [x] Restrict inbox visibility to notifications with a real delivered `in_app` delivery and hide digest-source bookkeeping rows
+- [x] Preserve explicit fallback-channel settings from the account settings web UI instead of rewriting them from preferred channel order
+- [x] Keep unverified replacement email destinations inactive until verification completes
+- [x] Fix digest query lookback to honor DST-aware daily and weekly windows instead of assuming a fixed UTC day/week length
+- [x] Re-run focused and broader notification verification after the final fixes
+
+## Final Review
+
+- Root cause:
+  - the earlier follow-up fixes corrected the main runtime mismatches, but one digest-path edge case still assumed a fixed UTC lookback and could miss the earliest portion of a local digest window across DST changes
+  - the inbox surface also needed to distinguish real in-app notifications from delivery-accounting rows, and the account settings web payload needed to preserve explicit fallback-channel choices end to end
+- Fix:
+  - updated `app/Models/NotificationMessage.php`
+    - added `visibleInInbox()` so inbox surfaces only include notifications with a delivered `in_app` delivery and exclude digest-source bookkeeping rows
+  - updated `app/Http/Controllers/Api/NotificationMessageController.php`
+  - updated `app/Livewire/Pages/Dashboard/NotificationsIndex.php`
+  - updated `resources/views/layouts/app.blade.php`
+    - switched inbox list, mark-read actions, and unread badge counts onto `visibleInInbox()`
+  - updated `app/Livewire/Pages/Dashboard/AccountSettings.php`
+  - updated `resources/views/livewire/pages/dashboard/account-settings.blade.php`
+    - preserved explicit fallback-channel selections in separate web-form state and exposed trigger-level inheritance/override controls directly in the settings UI
+  - updated `app/Services/Notifications/NotificationSettingsManager.php`
+    - kept replacement email destinations inactive until re-verification and continued deleting stale email/WhatsApp destinations on contact changes
+  - updated `app/Jobs/DispatchNotificationDigests.php`
+    - replaced the fixed `subDay()/subWeek()` query lookback with an earliest due-window scan across notification settings so DST fall-back windows are queried completely before per-user policy filtering
+  - updated focused tests:
+    - `tests/Feature/AccountSettingsPageTest.php`
+    - `tests/Feature/NotificationInboxPageTest.php`
+    - `tests/Feature/NotificationCenterApiTest.php`
+    - `tests/Feature/NotificationPreferencesTest.php`
+    - `tests/Feature/NotificationDeliveryFlowTest.php`
+    - added coverage for inbox filtering, fallback-channel persistence, inactive unverified email destinations, sibling-destination fallback suppression, and DST-aware digest windows
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(AccountSettingsPageTest|NotificationInboxPageTest|NotificationCenterApiTest|NotificationPreferencesTest|NotificationDeliveryFlowTest)'` => **26 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(AccountSettingsPageTest|DashboardPagesTest|NotificationPreferencesTest|NotificationInboxPageTest|NotificationDeliveryFlowTest|NotificationCenterApiTest|NotificationCenterTriggersTest|SubmitEventNotificationTest)'` => **47 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/NotificationMessage.php app/Services/Notifications/NotificationSettingsManager.php app/Services/Notifications/NotificationEngine.php app/Jobs/DispatchNotificationDigests.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Dashboard/NotificationsIndex.php app/Http/Controllers/Api/NotificationMessageController.php tests/Feature/AccountSettingsPageTest.php tests/Feature/NotificationInboxPageTest.php tests/Feature/NotificationCenterApiTest.php tests/Feature/NotificationPreferencesTest.php tests/Feature/NotificationDeliveryFlowTest.php` => **No errors**
+
+## Migration Follow-up
+
+- [x] Confirm the notification-center tables were simply missing from the local database
+- [x] Run the pending migration instead of adding runtime workarounds
+- [x] Verify the new tables exist and the dashboard-related tests still pass
+
+## Review
+
+- Root cause:
+  - the `notification_messages` and related notification-center tables had not been migrated into the local Postgres database yet
+  - the dashboard crash came from the new unread-count query in `resources/views/layouts/app.blade.php`, but the actual defect was schema state, not application logic
+- Fix:
+  - ran `php artisan migrate --force`
+  - applied migration `2026_03_08_120000_create_notification_center_tables`
+  - reverted the temporary missing-table guard code from this turn so the fix stays at the correct layer
+- Verification:
+  - `php artisan tinker --execute="echo (int) \\Illuminate\\Support\\Facades\\Schema::hasTable('notification_messages'); echo PHP_EOL; echo (int) \\Illuminate\\Support\\Facades\\Schema::hasTable('notification_deliveries'); echo PHP_EOL;"` => `1` / `1`
+  - `vendor/bin/pest --parallel --compact --filter='(DashboardPagesTest|NotificationPreferencesTest)'` => **17 passed**
+
+## Account Settings URL
+
+- [x] Make `/tetapan-akaun` the canonical account settings URL
+- [x] Remove the legacy `/papan-pemuka/tetapan-akaun`, `/dashboard/account-settings`, and digest-preferences aliases entirely
+- [x] Update focused route assertions and verify the dashboard/account settings suite
+
+## Review
+
+- Root cause:
+  - the account settings page was still canonically mounted under `/papan-pemuka/tetapan-akaun` even after the dashboard root itself had already been normalized to `/dashboard`
+  - the first pass kept the old account-settings and digest-preferences URLs around as redirects, but the user explicitly wanted those old paths removed, not preserved
+- Fix:
+  - updated `routes/web.php`
+    - made `route('dashboard.account-settings')` resolve to `/tetapan-akaun`
+    - removed `/papan-pemuka/tetapan-akaun`
+    - removed `/dashboard/account-settings`
+    - removed `/papan-pemuka/pilihan-digest`
+    - removed `/dashboard/digest-preferences`
+  - updated tests:
+    - `tests/Feature/AccountSettingsPageTest.php`
+    - `tests/Feature/DashboardPagesTest.php`
+    - added assertions for the canonical route helper path and for the removed legacy URLs returning `404`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='(AccountSettingsPageTest|DashboardPagesTest)'` => **19 passed**
+  - `php -l routes/web.php` => **No syntax errors**
+
+## Review
+
+- Root cause:
+  - the app still treated notifications as a narrow digest preference instead of a full cross-channel notification product
+  - there was no clean schema for user delivery behavior, no in-app inbox surface, and no single orchestration pipeline for follows, saved searches, tracked events, reminders, registrations, check-ins, and submission workflow updates
+- Fix:
+  - added a new notification-center domain from scratch:
+    - schema/models for `notification_settings`, `notification_rules`, `notification_destinations`, `notification_messages`, and `notification_deliveries`
+    - enums for families, triggers, cadence, channels, priority, rule scope, destination status, and delivery status
+    - `NotificationCatalog`, `NotificationSettingsManager`, `NotificationEngine`, and delivery senders for `email`, `in_app`, `push`, and `whatsapp`
+  - integrated trigger fanout through `EventNotificationService` and the existing event lifecycle surfaces:
+    - followed content publication
+    - saved-search matches
+    - tracked event approval/cancellation/material changes
+    - reminder windows (`24h`, `2h`, `check-in open`)
+    - registration and check-in confirmations
+    - submission workflow transitions
+  - added user-facing product surfaces:
+    - expanded `AccountSettings` into a real notification center with family controls, trigger overrides, delivery preferences, quiet hours, channel order, fallback strategy, digest timing, and destination status
+    - added `dashboard.notifications` inbox page with unread count, filters, mark-read actions, and deep links
+    - added authenticated API endpoints for inbox/messages, settings catalog/state, and push-device registration lifecycle
+    - added navigation entry and unread badge wiring
+  - fixed verification-discovered follow-ups:
+    - normalized casted enum/date values at API and job boundaries so the notification slice passes PHPStan
+    - changed `NotificationMessageMail` to Laravel markdown mail rendering so the notification email template resolves correctly
+    - added a custom `EventSeries` pivot model so UUID-backed `event_series` attach/sync flows work reliably
+    - froze time in notification trigger tests where the assertions depend on “future event” semantics
+  - updated focused notification coverage:
+    - `tests/Feature/AccountSettingsPageTest.php`
+    - `tests/Feature/DashboardPagesTest.php`
+    - `tests/Feature/NotificationPreferencesTest.php`
+    - `tests/Feature/NotificationInboxPageTest.php`
+    - `tests/Feature/NotificationDeliveryFlowTest.php`
+    - `tests/Feature/NotificationCenterApiTest.php`
+    - `tests/Feature/NotificationCenterTriggersTest.php`
+  - Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(AccountSettingsPageTest|DashboardPagesTest|NotificationPreferencesTest|NotificationInboxPageTest|NotificationDeliveryFlowTest|NotificationCenterApiTest|NotificationCenterTriggersTest|SubmitEventNotificationTest)'` => **35 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Dashboard/NotificationsIndex.php app/Http/Controllers/Api/NotificationDestinationController.php app/Http/Controllers/Api/NotificationMessageController.php app/Http/Controllers/Api/NotificationSettingsController.php app/Services/Notifications/NotificationSettingsManager.php app/Services/Notifications/NotificationEngine.php app/Services/Notifications/EventNotificationService.php app/Jobs/DispatchNotificationDigests.php app/Jobs/DispatchEventReminderNotifications.php app/Jobs/ProcessDeferredNotificationDeliveries.php app/Jobs/ProcessNotificationDelivery.php app/Models/NotificationSetting.php app/Models/NotificationRule.php app/Models/NotificationDestination.php app/Models/NotificationMessage.php app/Models/NotificationDelivery.php app/Support/Notifications/NotificationCatalog.php tests/Feature/AccountSettingsPageTest.php tests/Feature/NotificationInboxPageTest.php tests/Feature/NotificationPreferencesTest.php tests/Feature/NotificationDeliveryFlowTest.php tests/Feature/DashboardPagesTest.php` => **No errors**
+  - `vendor/bin/phpstan analyse --ansi app/Models/EventSeries.php app/Models/Event.php app/Models/Series.php app/Mail/NotificationMessageMail.php app/Http/Controllers/Api/NotificationDestinationController.php app/Http/Controllers/Api/NotificationMessageController.php app/Services/Notifications/NotificationSettingsManager.php app/Services/Notifications/NotificationEngine.php app/Services/Notifications/EventNotificationService.php app/Jobs/DispatchNotificationDigests.php app/Support/Notifications/NotificationCatalog.php tests/Feature/NotificationCenterTriggersTest.php tests/Feature/NotificationCenterApiTest.php tests/Feature/NotificationDeliveryFlowTest.php tests/Feature/NotificationInboxPageTest.php tests/Feature/NotificationPreferencesTest.php tests/Feature/AccountSettingsPageTest.php tests/Feature/DashboardPagesTest.php` => **No errors**
+
+## Follow-up Review
+
+- Root cause:
+  - the initial notification implementation persisted several delivery controls, but parts of the runtime engine still bypassed those settings or accounted for delivery too early
+  - contact-destination sync also assumed append-only behavior, which left outdated email and WhatsApp endpoints active after profile edits
+  - queue delivery processing did not claim a row atomically before sending, so concurrent retries could duplicate provider sends
+- Fix:
+  - updated `app/Services/Notifications/NotificationSettingsManager.php`
+    - remove stale email and WhatsApp destinations whenever the account contact value changes, so only the current verified address/number remains active per user/channel
+  - updated `app/Services/Notifications/NotificationEngine.php`
+    - gate quiet-hours bypass behind the saved `urgent_override` setting instead of only the dispatch payload flag
+    - use the configured `fallback_channels` list when building fallback attempts, with ordered-channel fallback only when no explicit list is configured
+    - add an atomic claim step before delivery processing so already-claimed rows are skipped safely
+    - create source-message delivered rows for digests only after the digest delivery succeeds
+    - trigger fallback after failed or skipped sends using the resolved policy instead of hard-coded channel slicing
+  - updated `app/Jobs/DispatchNotificationDigests.php`
+    - stop pre-marking source messages as delivered before the digest channel send completes
+    - only treat existing source deliveries with `Delivered` status as already accounted for during later digest runs
+  - updated focused tests:
+    - `tests/Feature/AccountSettingsPageTest.php`
+    - `tests/Feature/NotificationDeliveryFlowTest.php`
+    - added coverage for stale-destination cleanup, urgent quiet-hours deferral, configured fallback-channel usage, duplicate-send prevention, and post-success digest source accounting
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(AccountSettingsPageTest|DashboardPagesTest|NotificationPreferencesTest|NotificationInboxPageTest|NotificationDeliveryFlowTest|NotificationCenterApiTest|NotificationCenterTriggersTest|SubmitEventNotificationTest)'` => **39 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Services/Notifications/NotificationSettingsManager.php app/Services/Notifications/NotificationEngine.php app/Jobs/DispatchNotificationDigests.php tests/Feature/AccountSettingsPageTest.php tests/Feature/NotificationDeliveryFlowTest.php` => **No errors**
+
+## Second Follow-up Review
+
+- Root cause:
+  - `AccountSettings` reused the same Livewire component state for both profile edits and notification preferences, then wrote the full notification payload during `saveAccountSettings()`, which meant a profile save could silently persist unrelated unsaved notification changes
+  - inherited trigger cards in the notification tab were disabled visually, but their displayed cadence/channel values did not stay aligned with live family-level edits until a save/rehydrate cycle
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/AccountSettings.php`
+    - stopped profile saves from writing the full notification payload
+    - added inherited-trigger state syncing so trigger cards that use family defaults reflect live family cadence/channel changes immediately
+  - updated `app/Services/Notifications/NotificationSettingsManager.php`
+    - added `syncProfileSettings()` so profile edits only update notification timezone mirroring and system destinations, without persisting unrelated notification-preference state
+  - updated `tests/Feature/AccountSettingsPageTest.php`
+    - added coverage proving profile saves do not commit pending notification edits
+    - added coverage proving inherited trigger controls stay aligned with live family changes
+    - extended the existing profile-save test to assert notification timezone mirroring still updates correctly
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **6 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(AccountSettingsPageTest|DashboardPagesTest|NotificationPreferencesTest|NotificationInboxPageTest|NotificationDeliveryFlowTest|NotificationCenterApiTest|NotificationCenterTriggersTest|SubmitEventNotificationTest)'` => **47 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/AccountSettings.php app/Services/Notifications/NotificationSettingsManager.php tests/Feature/AccountSettingsPageTest.php` => **No errors**
+  - `php -l app/Livewire/Pages/Dashboard/AccountSettings.php` => **No syntax errors**
+  - `php -l app/Services/Notifications/NotificationSettingsManager.php` => **No syntax errors**
+  - `php -l tests/Feature/AccountSettingsPageTest.php` => **No syntax errors**
+
+# Event Reference Card Width Todo
+
+- [x] Inspect the event show page reference-materials layout and confirm why a single card renders half-width
+- [x] Make a single reference-material card span the full content width while preserving the two-column layout for multiple references
+- [x] Add focused event-show coverage and run verification
+
+## Review
+
+- Root cause:
+  - the reference-materials section on the public event page always used `sm:grid-cols-2`, so a single reference card stayed pinned to a half-width column and left the rest of the row empty
+- Fix:
+  - updated `resources/views/livewire/pages/events/show.blade.php`
+    - switched the reference grid to a conditional class list
+    - keep `sm:grid-cols-2` only when the event has more than one reference
+    - let the section fall back to a single-column full-width card when there is only one reference item
+  - updated `tests/Feature/EventShowPageTest.php`
+    - added a focused event-show assertion proving a single reference item renders without the two-column grid class
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **13 passed**
+  - `php -l tests/Feature/EventShowPageTest.php` => **No syntax errors**
+
+# Digest Preferences Consolidation Todo
+
+- [x] Audit the account settings page, digest preferences page, menu, and routes
+- [x] Move the digest preferences form and save flow into the account settings page
+- [x] Remove the standalone digest menu/page surface and keep the old digest URLs as redirects
+- [x] Update focused tests and verification
+
+## Review
+
+- Root cause:
+  - digest preferences had been split into a separate page and separate navigation entry even though it is just another piece of account-level user settings
+  - that created two adjacent settings surfaces, duplicated the account-area structure, and forced users to bounce between pages for related profile/preferences work
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/AccountSettings.php`
+    - merged the digest preference state, hydration, validation, and save action into the account settings Livewire component
+    - preserved the existing preference key, frequency rules, channel rules, and storage behavior
+  - updated `resources/views/livewire/pages/dashboard/account-settings.blade.php`
+    - added a second settings section for digest preferences directly under the account form
+    - kept the account header clean and avoided reintroducing the old button-based navigation clutter
+  - updated `routes/web.php`
+    - replaced the standalone digest page routes with authenticated redirects to account settings for both `/papan-pemuka/pilihan-digest` and `/dashboard/digest-preferences`
+  - updated `resources/views/layouts/app.blade.php`
+    - removed the separate `Digest Preferences` menu item from both desktop and mobile authenticated navigation
+  - removed the old standalone digest page implementation:
+    - deleted `app/Livewire/Pages/Dashboard/DigestPreferences.php`
+    - deleted `resources/views/livewire/pages/dashboard/digest-preferences.blade.php`
+  - updated tests:
+    - `tests/Feature/NotificationPreferencesTest.php`
+    - `tests/Feature/AccountSettingsPageTest.php`
+    - `tests/Feature/DashboardPagesTest.php`
+    - moved digest-preference interaction coverage onto `AccountSettings` and changed the old digest route expectation to a redirect
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **13 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationPreferencesTest.php` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php tests/Feature/DashboardPagesTest.php tests/Feature/NotificationPreferencesTest.php` => **No errors**
+  - `php -l app/Livewire/Pages/Dashboard/AccountSettings.php` => **No syntax errors**
+  - `php -l routes/web.php` => **No syntax errors**
+  - `php -l tests/Feature/AccountSettingsPageTest.php` => **No syntax errors**
+  - `php -l tests/Feature/DashboardPagesTest.php` => **No syntax errors**
+  - `php -l tests/Feature/NotificationPreferencesTest.php` => **No syntax errors**
+
+# Saved Searches Translation Todo
+
+- [x] Audit the saved-searches page for hard-coded or unnatural copy in the Livewire class and Blade view
+- [x] Make saved-search filter labels, values, and notification states fully translatable and human-readable
+- [x] Rewrite saved-searches page copy in a more natural product voice and add locale keys across supported languages
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Root cause:
+  - the saved-searches page only translated the obvious headings, while the Livewire class still carried hard-coded flash/error strings, raw notification labels, and partially humanized filter chips
+  - the Malay copy itself also read like direct translation in a few places, especially around the create form, empty state, and saved-search cards
+  - some chip labels and values, such as event format, languages, dates, and times, still fell back to raw keys or storage values instead of user-facing wording
+- Fix:
+  - updated `app/Livewire/Pages/SavedSearches/Index.php`
+    - centralized notification labels through `notifyOptions()` / `notifyLabel()`
+    - localized suggested-name generation, saved-search flash messages, and validation copy through translatable keys
+    - expanded captured-filter labels and values so speaker, venue, event format, languages, dates, times, booleans, and enum-backed fields all render as human-readable text
+    - added `venue_id` to captured saved-search filters and formatted Malay language labels naturally as `Bahasa Melayu`, `Bahasa Inggeris`, and so on
+  - updated `resources/views/livewire/pages/saved-searches/index.blade.php`
+    - rewrote the page intro, create section, empty state, and card actions in a more natural product voice
+    - switched the notify select and badge to the centralized localized labels instead of raw `title()` formatting
+  - updated locale JSON files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added the missing saved-search keys and the filter-label keys that the formatter now uses
+  - updated `tests/Feature/SavedSearchPageTest.php`
+    - aligned the create-form assertions with the new saved-search wording
+    - added a focused Malay regression that locks the natural copy, localized notify label, and human-readable filter values
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php` => **19 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/SavedSearches/Index.php tests/Feature/SavedSearchPageTest.php` => **No errors**
+  - `php -l app/Livewire/Pages/SavedSearches/Index.php` => **No syntax errors**
+  - `php -l resources/views/livewire/pages/saved-searches/index.blade.php` => **No syntax errors**
+  - `php -l tests/Feature/SavedSearchPageTest.php` => **No syntax errors**
+  - locale JSON validation passed for `en`, `ms`, `ms_MY`, `zh`, `ta`, and `jv`
+
+# Public Calendar Color Emphasis Todo
+
+- [x] Strengthen the speaker and institution public-page calendar card colors to match the dashboard direction
+- [x] Add focused public-page assertions so the old pale calendar card classes do not return
+- [x] Run focused verification for both page types
+
+## Review
+
+- Root cause:
+  - the speaker and institution public-page calendars used their own Alpine card classes instead of the dashboard's shared planner palette
+  - those cards still relied on pale `50`-level fills, so the event colors did not stand out enough in the month grid after the dashboard calendar had already been strengthened
+- Fix:
+  - updated `resources/views/components/pages/speakers/⚡show.blade.php`
+    - strengthened the month-calendar event card classes to use clearer `100`-level fills, firmer borders, and small matching shadows
+  - updated `resources/views/components/pages/institutions/⚡show.blade.php`
+    - applied the same stronger calendar-card treatment so both public page types stay visually aligned
+  - updated tests:
+    - `tests/Feature/SpeakerShowPageTimingTest.php`
+    - `tests/Feature/InstitutionShowPageTest.php`
+    - added focused assertions proving the new stronger class string renders and the old pale class string does not
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='uses stronger calendar event colors on speaker page'` => **1 passed**
+  - `vendor/bin/pest --parallel --compact --filter='uses stronger calendar event colors on institution page'` => **1 passed**
+  - `php -l resources/views/components/pages/speakers/⚡show.blade.php` => **No syntax errors**
+  - `php -l resources/views/components/pages/institutions/⚡show.blade.php` => **No syntax errors**
+  - note:
+    - broader `SpeakerShowPageTimingTest.php` and `InstitutionShowPageTest.php` runs still hit unrelated existing failures outside this color-change scope
+
+# Dashboard Calendar Color Emphasis Todo
+
+- [x] Strengthen the month-calendar card colors so each role stands out more clearly
+- [x] Add a focused regression assertion so the old washed-out calendar card class does not return
+- [x] Run the focused dashboard verification
+
+## Review
+
+- Root cause:
+  - after removing the role text from calendar cards, the remaining role distinction relied only on very soft background tints like `bg-emerald-50/80`
+  - those pale fills were not strong enough to help the different planner states stand out at a glance in the month grid
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/UserDashboard.php`
+    - strengthened the calendar panel classes for `going`, `registered`, `interested`, `saved`, `submitted`, and `checkin`
+    - increased the tint from soft `50/80` fills to clearer `100` fills
+    - tightened the border colors and added small matching shadows so the cards read more clearly in the grid
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added a regression assertion proving the old `bg-emerald-50/80` calendar style no longer renders
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **13 passed**
+  - `php -l app/Livewire/Pages/Dashboard/UserDashboard.php` => **No syntax errors**
+
+# Dashboard Calendar Card Simplification Todo
+
+- [x] Remove role/status text from the month-calendar event cards
+- [x] Add a focused regression assertion for the removed calendar-card label line
+- [x] Run the focused dashboard verification
+
+## Review
+
+- Root cause:
+  - the month-calendar cards still rendered a second line made from `entry.role_badges`, which added labels like `Disimpan`, `Daftar Masuk`, and `Berdaftar` inside very small calendar cells
+  - those labels were useful elsewhere in the planner, but inside the calendar they made the grid noisier without helping the user scan dates
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - removed the second-line role label text from month-calendar event cards
+    - kept the event title, card color, and overflow indicator intact
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added a focused assertion proving the old `entry.role_badges.map(...)` calendar label line no longer renders
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **13 passed**
+  - `php -l resources/views/livewire/pages/dashboard/user-dashboard.blade.php` => **No syntax errors**
+
+# Dashboard Canonical URL Todo
+
+- [x] Make `/dashboard` the canonical named dashboard route
+- [x] Keep `/papan-pemuka` as a backward-compatible redirect to the canonical dashboard URL
+- [x] Add focused routing coverage and rerun verification
+
+## Review
+
+- Root cause:
+  - the route helper and product wording had been aligned toward `Dashboard`, but the canonical named route still pointed to `/papan-pemuka`
+  - that left the application with two live dashboard URLs and kept `route('dashboard')` inconsistent with the URL the user explicitly wants
+- Fix:
+  - updated `routes/web.php`
+    - made `/dashboard` the named canonical route for `dashboard`
+    - turned `/papan-pemuka` into an authenticated legacy redirect to `/dashboard`
+    - kept the rest of the dashboard-area child routes unchanged
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added coverage proving `route('dashboard')` resolves to `/dashboard`
+    - added coverage proving authenticated requests to `/papan-pemuka` redirect to `/dashboard`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **13 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Auth/AuthenticationTest.php` => **6 passed**
+  - `php -l routes/web.php` => **No syntax errors**
+
+# Dashboard Page Label Alignment Todo
+
+- [x] Inspect the user dashboard page label and align it with the menu wording
+- [x] Update focused dashboard assertions so the old `Attendee Planner` / `Perancang Kehadiran` label does not reappear
+- [x] Run the focused dashboard verification
+
+## Review
+
+- Root cause:
+  - the actual route alias was already `dashboard`, but the dashboard page itself still surfaced a different hero eyebrow label, `Attendee Planner` / `Perancang Kehadiran`
+  - that made the main dashboard landing page inconsistent with the navigation wording the user had already standardized to `Dashboard`
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - introduced a local dashboard page label that keeps Malay on `Dashboard` instead of `Papan Pemuka`
+    - reused that label for both the page `<title>` and the hero eyebrow text
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added assertions proving the page now shows `Dashboard`
+    - added assertions proving the old `Attendee Planner` / `Perancang Kehadiran` wording is gone
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+  - `php -l resources/views/livewire/pages/dashboard/user-dashboard.blade.php` => **No syntax errors**
+
+# Dashboard Agenda Header Cleanup Todo
+
+- [x] Inspect the dashboard agenda header and remove the redundant title/button
+- [x] Update focused dashboard assertions so the removed copy and CTA do not reappear
+- [x] Run the focused dashboard verification
+
+## Review
+
+- Root cause:
+  - the `Upcoming Agenda` section still carried a second large heading and a `Find more` CTA even though the dashboard already has primary event-discovery navigation elsewhere
+  - that made the agenda block feel heavier than the content it introduced, and in Malay it surfaced the extra `Yang perlu anda urus selepas ini` copy the user explicitly does not want
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - removed the secondary `What needs your attention next` heading from the agenda section
+    - removed the `Find more` / `Lihat lagi` button from that same header
+    - kept the `Upcoming Agenda` section label and the agenda content itself intact
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added assertions proving both the English and Malay versions of the removed heading/button no longer render
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+  - `php -l resources/views/livewire/pages/dashboard/user-dashboard.blade.php` => **No syntax errors**
+
+# Account Settings Phone Input Todo
+
+- [x] Inspect the current account settings Livewire form and the existing `ysfkaya` phone-input pattern
+- [x] Switch the account settings page to render the Filament schema so the phone field uses `ysfkaya/filament-phone-input`
+- [x] Update focused coverage and rerun verification
+
+## Review
+
+- Root cause:
+  - the account settings Livewire component had already been partially refactored to define a Filament schema with `Ysfkaya\FilamentPhoneInput\Forms\PhoneInput`, but the Blade view still rendered the old raw HTML inputs
+  - because the page never rendered `{{ $this->form }}`, the dashboard account settings page could not actually use the same phone-input component already used elsewhere in the app
+  - the PHPUnit package caches did not include `ysfkaya/filament-phone-input`, so rendering the package field on a public Livewire page failed in tests even though the package existed in the normal runtime
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/AccountSettings.php`
+    - removed an unused import
+    - added a typed `accountSettingsForm()` helper so the schema can be used without dynamic-property PHPStan errors
+    - switched internal form usage from `$this->form` to the typed helper
+    - resolved timezone options through the method directly
+  - updated `resources/views/livewire/pages/dashboard/account-settings.blade.php`
+    - replaced the hand-written `name` / `email` / `phone` / `timezone` inputs with `{{ $this->form }}`
+    - kept the surrounding account-settings shell, status notice, verification notice, and save button intact
+  - updated `bootstrap/providers.php`
+    - explicitly registered `Ysfkaya\FilamentPhoneInput\FilamentPhoneInputServiceProvider::class` so the package view namespace is available on non-panel/public Livewire pages and under the PHPUnit testing bootstrap
+  - updated `tests/Feature/AccountSettingsPageTest.php`
+    - now asserts the rendered page contains the phone-input wrapper class
+    - moved the Livewire state updates and validation assertions to `formData.*`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **3 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php` => **No errors**
+
+# Account Settings Header Simplification Todo
+
+- [x] Inspect the remaining account settings hero copy and CTA button
+- [x] Remove the profile-intro copy and digest-preferences button from the account settings header
+- [x] Tighten focused coverage to the header fragment and rerun verification
+
+## Review
+
+- Root cause:
+  - after the earlier cleanup, the account settings header still carried extra explanatory copy and a digest-preferences button that the user does not want on that page
+  - those elements added noise without helping the core account-editing task
+  - the first regression assertion was too broad because `Digest Preferences` still appears elsewhere in the global navigation
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/account-settings.blade.php`
+    - removed the `Manage your profile details` heading
+    - removed the supporting paragraph about dashboard/registration/time display details
+    - removed the `Digest Preferences` button from the page header
+  - updated `tests/Feature/AccountSettingsPageTest.php`
+    - narrowed the assertion to the rendered account-settings header fragment instead of the whole response
+    - now verifies the removed copy and button are absent from that header block
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **3 passed**
+  - `php -l tests/Feature/AccountSettingsPageTest.php` => **No syntax errors**
+
+# Dashboard Calendar Day Count Cleanup Todo
+
+- [x] Confirm the top-right calendar-day pill is the per-day event count
+- [x] Remove the day-count badge from the attendee dashboard calendar
+- [x] Update focused coverage and verify the dashboard suite
+
+## Review
+
+- Root cause:
+  - each calendar day cell showed a small top-right count badge driven by `cell.entries.length`
+  - that duplicated information already implied by the event cards in the same cell and made the calendar feel busier than needed
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/user-dashboard.blade.php`
+    - removed the per-day event count badge from the calendar cell header
+    - kept the day number and the existing event cards / `+lagi` overflow indicator intact
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added a focused assertion proving the old `x-show="cell.entries.length > 0"` badge markup is no longer rendered
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **12 passed**
+  - `php -l tests/Feature/DashboardPagesTest.php` => **No syntax errors**
+
+# Account Settings Header Cleanup Todo
+
+- [x] Inspect the account settings hero actions
+- [x] Remove the redundant `Back to Dashboard` button from the account settings page
+- [x] Update focused coverage and verify the page still renders correctly
+
+## Review
+
+- Root cause:
+  - the account settings page header included both a useful cross-link to digest preferences and a redundant `Back to Dashboard` CTA
+  - that extra dashboard button added noise without providing a necessary account-management action
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/account-settings.blade.php`
+    - removed the `Back to Dashboard` button from the header action group
+  - updated `tests/Feature/AccountSettingsPageTest.php`
+    - the authenticated page-render test now asserts the account settings page does not show `Back to Dashboard`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **3 passed**
+  - `php -l tests/Feature/AccountSettingsPageTest.php` => **No syntax errors**
+
+# Ahli Draft Submit For Review Todo
+
+- [x] Inspect why submitted draft events have no path to pending from the Ahli edit page
+- [x] Add an Ahli `Submit for Review` action for submitted draft events using the existing moderation service
+- [x] Add focused Ahli coverage and run verification
+
+## Review
+
+- Root cause:
+  - the event state machine already allows `draft -> pending`, but the Ahli edit page only exposed actions for `pending`, `approved`, `rejected`, and `needs_changes`
+  - the Ahli page reused the `approve` policy helper, and that policy intentionally returns `false` unless the event is already `pending`
+  - as a result, submitted draft events could not be moved into review from the Ahli workspace even though the backend transition already existed
+- Fix:
+  - updated `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php`
+    - added a `Submit for Review` header action
+    - wired the action to `ModerationService::submitForModeration()`
+    - introduced a dedicated draft-review eligibility helper so submitted draft events use the same scoped `event.approve` permission path without depending on the pending-only `approve` policy
+  - updated `tests/Feature/AhliEventApprovalTest.php`
+    - added coverage proving institution admins can move a submitted draft event to `pending`
+    - added coverage proving the action stays hidden for ordinary draft events that do not come from the submission flow
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliEventApprovalTest.php` => **8 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Ahli/Resources/Events/Pages/EditEvent.php tests/Feature/AhliEventApprovalTest.php` => **No errors**
+
+# Ahli View Public New Tab Todo
+
+- [x] Inspect the Ahli event edit-page `View Public Page` header action
+- [x] Open the public event page in a new tab from the Ahli edit screen
+- [x] Add focused coverage and verify the action markup
+
+## Review
+
+- Root cause:
+  - the Ahli event edit page had a `View Public Page` header action with the correct public event URL, but it was missing Filament's new-tab flag
+  - that caused the action to replace the Ahli workspace tab instead of preserving the current moderation/edit context
+- Fix:
+  - updated `app/Filament/Ahli/Resources/Events/Pages/EditEvent.php`
+    - added `->openUrlInNewTab()` to the `view_public` header action
+  - updated `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - added a focused assertion proving the rendered Ahli edit page contains the public URL and `target="_blank"`
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='opens the ahli view public page action in a new tab'` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Ahli/Resources/Events/Pages/EditEvent.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+
+# Ahli Submitter WhatsApp Link Todo
+
+- [x] Inspect Ahli submitter-contact renderers and reuse the existing WhatsApp URL resolver
+- [x] Link submitter contact labels to WhatsApp when a phone number is available on Ahli review surfaces
+- [x] Add focused Ahli coverage and run targeted verification
+
+## Review
+
+- Root cause:
+  - Ahli review surfaces showed submitter phone numbers as inert text, which forced moderators to copy numbers manually before contacting the submitter
+  - the same submitter-label logic was duplicated across the Ahli dashboard widget, the shared event form submission panel, and the event infolist, making it easy for contact behavior to drift
+- Fix:
+  - added `app/Support/Events/SubmitterContactPresenter.php`
+    - centralizes submitter label assembly across registered-user and guest-submission flows
+    - resolves a canonical WhatsApp link by reusing `App\Support\SocialMedia\SocialMediaLinkResolver`
+    - supports both `phone` and `whatsapp` submission-contact categories when available
+  - updated `app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php`
+    - the `Submitter` column now opens WhatsApp in a new tab when the submitter has a phone number
+  - updated `app/Filament/Resources/Events/Schemas/EventForm.php`
+    - the read-only submission `Penghantar` placeholder on the event edit form now renders as a WhatsApp link when possible
+  - updated `app/Filament/Resources/Events/Schemas/EventInfolist.php`
+    - the shared submitter entry now uses the same presenter and WhatsApp-link behavior for consistency on record views
+  - updated tests:
+    - `tests/Feature/AhliDashboardApprovalWidgetTest.php`
+    - `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - added focused assertions proving Ahli dashboard/edit views render `https://wa.me/...` when the submitter has a phone number
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliDashboardApprovalWidgetTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact --filter='(links submitter phone numbers to whatsapp in the ahli approval widget|renders submitter phone numbers as whatsapp links on the ahli event edit page)'` => **2 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Events/SubmitterContactPresenter.php app/Filament/Resources/Events/Schemas/EventForm.php app/Filament/Resources/Events/Schemas/EventInfolist.php app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php tests/Feature/AhliDashboardApprovalWidgetTest.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+  - `php -l app/Support/Events/SubmitterContactPresenter.php && php -l app/Filament/Resources/Events/Schemas/EventForm.php && php -l app/Filament/Resources/Events/Schemas/EventInfolist.php && php -l app/Filament/Ahli/Widgets/PendingApprovalEventsWidget.php` => **No syntax errors**
+  - note:
+    - a broader filtered run that included the whole `AhliPanelInstitutionEditingTest` file still hit an existing unrelated failure at `tests/Feature/AhliPanelInstitutionEditingTest.php:344` expecting `Edit Institution`; that assertion is outside this WhatsApp change
+
 # Local Conflict Cleanup Todo
 
 - [x] Inspect local task-tracking files for unresolved merge markers
@@ -3017,6 +3622,212 @@
 - Verification:
   - `php artisan route:list --path=digest-preferences` => **new digest-preferences route present**
   - `php artisan route:list --path=dashboard` => **dashboard route set includes digest-preferences**
-  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **8 passed**
-  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationPreferencesTest.php` => **7 passed**
-  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/DigestPreferences.php app/Livewire/Pages/Dashboard/UserDashboard.php tests/Feature/DashboardPagesTest.php tests/Feature/NotificationPreferencesTest.php` => **No errors**
+- `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **8 passed**
+- `vendor/bin/pest --parallel --compact tests/Feature/NotificationPreferencesTest.php` => **7 passed**
+- `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/DigestPreferences.php app/Livewire/Pages/Dashboard/UserDashboard.php tests/Feature/DashboardPagesTest.php tests/Feature/NotificationPreferencesTest.php` => **No errors**
+
+## Account Settings Notifications Translation Cleanup
+
+- [x] Audit the `/tetapan-akaun?tab=notifications` surface for untranslated labels and leaked translation keys
+- [x] Fix the account settings notification template to use the correct notification locale keys
+- [x] Add missing push-channel translations across supported locale JSON files
+- [x] Add a focused Malay render test for the notifications tab
+- [x] Run focused verification
+
+## Review
+
+- Fixed repeated trigger-card copy in `resources/views/livewire/pages/dashboard/account-settings.blade.php` by switching the missing `notifications.settings.triggers.*` references to the existing `notifications.ui.triggers.*` keys.
+- Normalized the destination card labels to use the channel label map already prepared by the page, so the notifications tab uses the translated channel names consistently.
+- Added the missing `Push Notification` translation key to:
+  - `resources/lang/en.json`
+  - `resources/lang/ms.json`
+  - `resources/lang/ms_MY.json`
+  - `resources/lang/zh.json`
+  - `resources/lang/ta.json`
+  - `resources/lang/jv.json`
+- Added Malay regression coverage in `tests/Feature/AccountSettingsPageTest.php` to ensure the notifications tab renders translated copy and does not leak raw translation keys.
+- Verification:
+- `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **7 passed**
+- `php -l resources/views/livewire/pages/dashboard/account-settings.blade.php` => **No syntax errors**
+- `php -l tests/Feature/AccountSettingsPageTest.php` => **No syntax errors**
+
+## Institution Dashboard Route And Copy Cleanup
+
+- [x] Inspect the institution dashboard routes, labels, and registrations copy
+- [x] Make `/dashboard/institusi` the institution dashboard URL and remove the old paths
+- [x] Replace the generic events heading with `Senarai Majlis`
+- [x] Remove the standalone `Pendaftaran Majlis` dashboard section and turn registration counts into Ahli drill-down links
+- [x] Rename the private-visibility label from `Peribadi` to `Tersembunyi`
+- [x] Update focused tests and run verification
+
+## Review
+
+- Updated `routes/web.php` so the named institution dashboard route now resolves to `/dashboard/institusi`.
+- Removed the old institution dashboard paths:
+  - `/papan-pemuka/institusi`
+  - `/dashboard/institutions`
+- Updated `app/Filament/Ahli/Resources/Events/EventResource.php`:
+  - registered keyed Ahli relation managers so `?relation=registrations` can reliably target the registrations relation manager tab
+- Updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`:
+  - changed the institution events section heading to `Event List` / `Senarai Majlis`
+  - removed the separate `Event Registrations` / `Pendaftaran Majlis` block from the dashboard
+  - turned each event registration count into a deep link to the Ahli event registrations relation manager from the dashboard
+  - changed the private-visibility badge copy from `Private` / `Peribadi` to `Hidden` / `Tersembunyi`
+- Updated `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`:
+  - removed the now-unused institution-registrations dashboard query while preserving the institution summary registration counts
+- Updated locale strings in:
+  - `resources/lang/en.json`
+  - `resources/lang/ms.json`
+  - `resources/lang/ms_MY.json`
+  - `resources/lang/zh.json`
+  - `resources/lang/ta.json`
+  - `resources/lang/jv.json`
+- Updated focused coverage:
+  - `tests/Feature/DashboardPagesTest.php`
+    - now expects `route('dashboard.institutions')` to end with `/dashboard/institusi`
+    - verifies `/dashboard/institusi` requires auth
+    - verifies the removed legacy institution-dashboard URLs return `404`
+    - verifies the institution dashboard shows `Event List` / `Senarai Majlis`
+    - verifies the old registrations section is gone
+    - verifies `Hidden` / `Tersembunyi` replaces `Private` / `Peribadi`
+  - `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - switched the dashboard URL usage to the named route
+    - verifies institution admins see the Ahli registrations deep link from the dashboard
+    - verifies the Ahli event page honors `?relation=registrations` by selecting the registrations relation manager
+    - keeps the link hidden for viewers who cannot manage the event
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **14 passed**
+  - `vendor/bin/pest --parallel --compact --filter='shows ahli edit links on institution dashboard only when user can update' tests/Feature/AhliPanelInstitutionEditingTest.php` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php app/Filament/Ahli/Resources/Events/EventResource.php tests/Feature/DashboardPagesTest.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+
+# Ahli Event View Drill-down Todo
+
+- [x] Inspect the Ahli event resource page set and confirm whether a view page already exists
+- [x] Add an Ahli event view page that supports relation-tab deep links
+- [x] Repoint institution-dashboard registration counts to the Ahli view page registrations tab
+- [x] Update focused tests and run verification
+
+## Review
+
+- Root cause:
+  - the Ahli event resource only exposed `index` and `edit`, so the dashboard registrations count had to deep-link into the edit page even when the user only needed to inspect the registrations relation manager
+  - that made the registrations drill-down land on a heavier editing surface instead of a read-first page
+  - after adding the Ahli event view page, the shared `EventInfolist` still assumed every admin-related resource route also existed in the Ahli panel, which caused missing-route crashes for speakers, venues, references, and series
+- Fix:
+  - added `app/Filament/Ahli/Resources/Events/Pages/ViewEvent.php`
+    - introduced a dedicated Ahli event `view` page based on Filament `ViewRecord`
+    - kept it full-width and added header actions for `Edit` and `View Public Page`
+  - updated `app/Filament/Ahli/Resources/Events/EventResource.php`
+    - registered the new `'view' => ViewEvent::route('/{record}')` page
+    - restored a `ViewAction` in the Ahli events table so the new page is reachable from the panel itself
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - changed the registrations count link from the Ahli edit URL to the Ahli view URL with `?relation=registrations`
+    - based the registrations link on relation-manager visibility instead of generic edit access
+  - updated `app/Filament/Resources/Events/Schemas/EventInfolist.php`
+    - made related-record links panel-safe instead of assuming admin resource routes exist in Ahli
+    - kept institution links clickable in Ahli through the Ahli institution resource
+    - rendered speakers, venues, references, and series as plain text in Ahli when those resources are not registered there
+  - updated `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - verifies institution members can open the Ahli event view page
+    - verifies the dashboard registrations link now targets the Ahli view page
+    - verifies the Ahli view page selects the `registrations` relation manager when `?relation=registrations` is present
+    - verifies the Ahli event view page renders safely with linked speaker, series, reference, and venue data
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **14 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **11 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/Schemas/EventInfolist.php app/Filament/Ahli/Resources/Events/EventResource.php app/Filament/Ahli/Resources/Events/Pages/ViewEvent.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/DashboardPagesTest.php` => **No errors**
+
+# Institution Dashboard Pending Highlight
+
+- [x] Inspect the institution event list rendering on `/dashboard/institusi`
+- [x] Add stronger emphasis for approval-pending events in the institution event list
+- [x] Update focused dashboard coverage and verify
+
+## Review
+
+- Root cause:
+  - pending institution events were rendered with the same neutral table treatment as routine rows, so approval-waiting items did not stand out despite being the most urgent operational work on the page
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - added a pending-specific amber row treatment for institution events with `status = pending`
+    - added a clear `Menunggu Kelulusan` / `Pending Approval` pill under the event title
+    - strengthened the status badge styling for pending rows and tagged those rows with `data-event-status="pending-attention"` for regression coverage
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - added coverage proving pending institution events render the `Pending Approval` emphasis and the pending-attention row marker
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **15 passed**
+  - `php -l tests/Feature/DashboardPagesTest.php` => **No syntax errors**
+
+# Institution Dashboard Ahli Action Labels
+
+- [x] Replace the old `Edit in Ahli Panel` wording on institution event rows
+- [x] Make pending events use `Review` and non-pending events use `Edit`
+- [x] Update focused Ahli dashboard coverage and verify
+
+## Review
+
+- Root cause:
+  - the institution dashboard still used the generic `Edit in Ahli Panel` wording on every Ahli drill-down link, even though the user wanted a shorter label and a clearer approval-oriented action for pending events
+- Fix:
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - replaced the old event-row action label with a status-aware label
+    - pending events now show `Review`
+    - non-pending events now show `Edit`
+  - updated locale JSON files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added direct translation keys for `Edit` and `Review`
+  - updated `tests/Feature/AhliPanelInstitutionEditingTest.php`
+    - draft event rows now assert `Edit`
+    - pending event rows now assert `Review`
+    - old `Edit in Ahli Panel` wording is explicitly kept out
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **12 passed**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+
+# Institution Dashboard Event Controls And Members
+
+- [x] Remove the redundant institution summary cards for registrations and members
+- [x] Add filtering, sorting, and pagination controls to `Senarai Majlis`
+- [x] Add a members-and-roles management section on the institution dashboard
+- [x] Update focused dashboard tests, Ahli tests, and verification notes
+
+## Review
+
+- Root cause:
+  - the institution dashboard still carried old summary-card assumptions from when registrations and member counts were treated as top-level dashboard metrics, but the user wanted the page to behave like an operations workspace
+  - `Senarai Majlis` was still a static table without search, filtering, sorting, or page-size control, so it was not useful once an institution had more than a handful of events
+  - member management existed only inside the Filament relation manager, which forced users to leave the dashboard for a routine add-member / assign-role task
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`
+    - removed the dead registrations-page reset logic
+    - added event search, status, visibility, sort, and per-page state with URL-backed filters
+    - refactored the event query to support filter and sort combinations while keeping registration counts and pending highlighting intact
+    - added paginated institution-member data plus scoped role helpers using the same institution authz scope as the Filament relation manager
+    - added member actions for add, edit roles, cancel edit, save roles, and remove member
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - removed the top `Registrations (All)` and `Members` summary cards
+    - kept a single compact `Majlis` summary card
+    - added real `Senarai Majlis` controls for search, status, visibility, sort, and page size
+    - added a new `Members & Roles` section with add-member form, role editing, removal actions, and paginated member list
+  - updated locale JSON files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added translation coverage for the new event controls, member-management copy, and pending-approval label
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - now verifies the dashboard no longer renders the removed registrations summary card
+    - covers event filtering, sorting, and pagination
+    - covers member add / role update / remove flow on the Livewire dashboard itself
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **18 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **12 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+  - `php -r 'foreach ([\"resources/lang/en.json\",\"resources/lang/ms.json\",\"resources/lang/ms_MY.json\",\"resources/lang/zh.json\",\"resources/lang/ta.json\",\"resources/lang/jv.json\"] as $file) { json_decode(file_get_contents($file)); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.\": \".json_last_error_msg().PHP_EOL); exit(1); } } echo \"locale JSON validation passed\\n\";'` => **locale JSON validation passed**

@@ -1,7 +1,9 @@
 <?php
 
+use App\Jobs\DispatchEventReminderNotifications;
+use App\Jobs\DispatchNotificationDigests;
 use App\Jobs\EscalatePendingEvents;
-use App\Jobs\SendSavedSearchDigest;
+use App\Jobs\ProcessDeferredNotificationDeliveries;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -10,17 +12,29 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Saved Search Digests (per documentation B4c)
-Schedule::job(new SendSavedSearchDigest('daily'))
-    ->dailyAt('08:00')
-    ->timezone('Asia/Kuala_Lumpur')
-    ->name('saved-search-digest-daily')
+// Notification digests and time-based deliveries
+Schedule::job(new DispatchNotificationDigests('daily'))
+    ->everyFifteenMinutes()
+    ->timezone('UTC')
+    ->name('notification-digest-daily')
     ->withoutOverlapping();
 
-Schedule::job(new SendSavedSearchDigest('weekly'))
-    ->weeklyOn(1, '08:00') // Every Monday at 8am
-    ->timezone('Asia/Kuala_Lumpur')
-    ->name('saved-search-digest-weekly')
+Schedule::job(new DispatchNotificationDigests('weekly'))
+    ->everyFifteenMinutes()
+    ->timezone('UTC')
+    ->name('notification-digest-weekly')
+    ->withoutOverlapping();
+
+Schedule::job(new DispatchEventReminderNotifications)
+    ->everyFifteenMinutes()
+    ->timezone('UTC')
+    ->name('notification-reminders')
+    ->withoutOverlapping();
+
+Schedule::job(new ProcessDeferredNotificationDeliveries)
+    ->everyFifteenMinutes()
+    ->timezone('UTC')
+    ->name('notification-deferred-deliveries')
     ->withoutOverlapping();
 
 // SLA Escalation (per documentation B4a and B6b)

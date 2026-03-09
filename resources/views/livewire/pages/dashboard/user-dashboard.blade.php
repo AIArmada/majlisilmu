@@ -1,4 +1,7 @@
-@section('title', __('Dashboard') . ' - ' . config('app.name'))
+@php
+    $dashboardPageLabel = in_array(app()->getLocale(), ['ms', 'ms_MY'], true) ? 'Dashboard' : __('Dashboard');
+@endphp
+@section('title', $dashboardPageLabel . ' - ' . config('app.name'))
 
 @php
     $user = auth()->user();
@@ -129,7 +132,7 @@
 
                 <div class="relative z-10 grid gap-8 xl:grid-cols-[1.3fr,0.9fr] xl:items-start">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">{{ __('Attendee Planner') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">{{ $dashboardPageLabel }}</p>
                         <h1 class="mt-3 font-heading text-3xl font-bold tracking-tight text-white md:text-4xl">
                             {{ __('Assalamualaikum, :name', ['name' => $firstName]) }}
                         </h1>
@@ -349,9 +352,8 @@
                                         :class="cell.day === null ? 'bg-slate-50/40' : 'bg-white'">
                                         <template x-if="cell.day !== null">
                                             <div class="flex h-full flex-col">
-                                                <div class="flex items-center justify-between">
+                                                <div class="flex items-center">
                                                     <span class="text-xs font-bold text-slate-500" x-text="cell.day"></span>
-                                                    <span x-show="cell.entries.length > 0" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500" x-text="cell.entries.length"></span>
                                                 </div>
 
                                                 <div class="mt-1 flex-1 space-y-1">
@@ -360,7 +362,6 @@
                                                             class="block rounded-lg border px-2 py-1.5 text-[10px] leading-snug transition"
                                                             :class="entry.panel_class + (entry.url ? ' hover:shadow-sm' : ' pointer-events-none')">
                                                             <p class="line-clamp-2 font-semibold" x-text="entry.title"></p>
-                                                            <p class="mt-0.5 truncate opacity-75" x-text="entry.role_badges.map(badge => badge.label).join(' • ')"></p>
                                                         </a>
                                                     </template>
                                                     <template x-if="cell.entries.length > 2">
@@ -377,15 +378,10 @@
                 </section>
 
                 <section id="planner-agenda" class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-                    <div class="flex items-start justify-between gap-4">
+                    <div>
                         <div>
                             <p class="text-xs font-bold uppercase tracking-[0.18em] text-sky-600">{{ __('Upcoming Agenda') }}</p>
-                            <h2 class="mt-2 font-heading text-2xl font-bold text-slate-900">{{ __('What needs your attention next') }}</h2>
                         </div>
-                        <a href="{{ route('events.index') }}" wire:navigate
-                            class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700">
-                            {{ __('Find more') }}
-                        </a>
                     </div>
 
                     @if($paginatedAgenda->isEmpty())

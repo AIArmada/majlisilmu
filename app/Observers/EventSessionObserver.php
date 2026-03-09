@@ -34,6 +34,10 @@ class EventSessionObserver
             return;
         }
 
-        $this->projector->project($event->fresh());
+        $refreshedEvent = $event->fresh();
+
+        $this->projector->project($refreshedEvent);
+        app(\App\Services\Notifications\EventNotificationService::class)
+            ->notifySessionChange($refreshedEvent);
     }
 }

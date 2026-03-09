@@ -59,6 +59,11 @@ class User extends Authenticatable implements FilamentUser
             $user->savedSearches()->each(fn ($search) => $search->delete());
             $user->notificationEndpoints()->each(fn ($endpoint) => $endpoint->delete());
             $user->notificationPreferences()->each(fn ($preference) => $preference->delete());
+            $user->notificationSetting()?->delete();
+            $user->notificationRules()->each(fn ($rule) => $rule->delete());
+            $user->notificationDestinations()->each(fn ($destination) => $destination->delete());
+            $user->notificationMessages()->each(fn ($message) => $message->delete());
+            $user->notificationDeliveries()->each(fn ($delivery) => $delivery->delete());
 
             \Illuminate\Support\Facades\DB::table('followings')->where('user_id', $user->id)->delete();
         });
@@ -221,6 +226,15 @@ class User extends Authenticatable implements FilamentUser
             ->withTimestamps();
     }
 
+    /**
+     * @return MorphToMany<Series, $this>
+     */
+    public function followingSeries(): MorphToMany
+    {
+        return $this->morphedByMany(Series::class, 'followable', 'followings')
+            ->withTimestamps();
+    }
+
     public function follow(Model $followable): void
     {
         \Illuminate\Support\Facades\DB::table('followings')->insertOrIgnore([
@@ -299,6 +313,46 @@ class User extends Authenticatable implements FilamentUser
     public function notificationPreferences(): MorphMany
     {
         return $this->morphMany(NotificationPreference::class, 'owner');
+    }
+
+    /**
+     * @return HasOne<NotificationSetting, $this>
+     */
+    public function notificationSetting(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(NotificationSetting::class);
+    }
+
+    /**
+     * @return HasMany<NotificationRule, $this>
+     */
+    public function notificationRules(): HasMany
+    {
+        return $this->hasMany(NotificationRule::class);
+    }
+
+    /**
+     * @return HasMany<NotificationDestination, $this>
+     */
+    public function notificationDestinations(): HasMany
+    {
+        return $this->hasMany(NotificationDestination::class);
+    }
+
+    /**
+     * @return HasMany<NotificationMessage, $this>
+     */
+    public function notificationMessages(): HasMany
+    {
+        return $this->hasMany(NotificationMessage::class)->orderByDesc('occurred_at')->orderByDesc('created_at');
+    }
+
+    /**
+     * @return HasMany<NotificationDelivery, $this>
+     */
+    public function notificationDeliveries(): HasMany
+    {
+        return $this->hasMany(NotificationDelivery::class);
     }
 
     public function notificationPreferenceFor(string $notificationKey): ?NotificationPreference

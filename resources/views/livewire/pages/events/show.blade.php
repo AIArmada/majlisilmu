@@ -1514,7 +1514,10 @@
                 <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Reference Materials') }}</h2>
             </div>
 
-            <div class="grid gap-5 sm:grid-cols-2">
+            <div @class([
+                'grid gap-5',
+                'sm:grid-cols-2' => $event->references->count() > 1,
+            ])>
                 @foreach($event->references as $reference)
                     <a href="{{ route('references.show', $reference) }}" wire:navigate wire:key="ref-{{ $reference->id }}"
                         class="group flex gap-5 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-100">

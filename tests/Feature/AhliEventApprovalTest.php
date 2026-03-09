@@ -81,6 +81,38 @@ it('allows institution admins to approve pending public-submitted events from th
     Notification::assertSentTo($submitter, EventApprovedNotification::class);
 });
 
+it('allows institution admins to submit draft public-submitted events for review from the ahli edit page', function () {
+    $approver = User::factory()->create();
+    $submitter = User::factory()->create();
+    $institution = Institution::factory()->create();
+
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'draft',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'submitter_id' => $submitter->id,
+        'published_at' => null,
+    ]);
+
+    EventSubmission::factory()->for($event)->for($submitter, 'submitter')->create();
+
+    $institution->members()->syncWithoutDetaching([$approver->id]);
+    assignInstitutionRole($approver, 'admin');
+
+    $this->actingAs($approver);
+
+    Livewire::test(AhliEditEvent::class, ['record' => $event->id])
+        ->assertActionVisible('submit_for_review')
+        ->callAction('submit_for_review')
+        ->assertNotified();
+
+    $event->refresh();
+
+    expect((string) $event->status)->toBe('pending')
+        ->and($event->published_at)->toBeNull();
+});
+
 it('allows speaker admins to approve pending public-submitted speaker-organized events from the ahli edit page', function () {
     $approver = User::factory()->create();
     $submitter = User::factory()->create();
@@ -236,4 +268,25 @@ it('hides the ahli approve action for pending events that did not come from the 
 
     Livewire::test(AhliEditEvent::class, ['record' => $event->id])
         ->assertActionHidden('approve');
+});
+
+it('hides the ahli submit for review action for draft events that did not come from the public submission flow', function () {
+    $approver = User::factory()->create();
+    $institution = Institution::factory()->create();
+
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'draft',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'submitter_id' => null,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$approver->id]);
+    assignInstitutionRole($approver, 'admin');
+
+    $this->actingAs($approver);
+
+    Livewire::test(AhliEditEvent::class, ['record' => $event->id])
+        ->assertActionHidden('submit_for_review');
 });
