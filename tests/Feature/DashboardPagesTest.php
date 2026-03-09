@@ -648,7 +648,7 @@ it('clearly distinguishes public and internal institution data for members', fun
         ->assertSee('Internal only');
 });
 
-it('lets institution admins add members and manage scoped roles from the dashboard', function () {
+it('lets institution owners and admins add members and manage scoped roles from the dashboard', function () {
     $adminUser = User::factory()->create();
     $memberUser = User::factory()->create([
         'email' => 'new-member@example.test',
@@ -675,11 +675,11 @@ it('lets institution admins add members and manage scoped roles from the dashboa
         ->actingAs($adminUser)
         ->test(InstitutionDashboard::class)
         ->set('newMemberEmail', $memberUser->email)
-        ->set('newMemberRoleIds', [$roleIds['viewer']])
+        ->set('newMemberRoleId', $roleIds['viewer'])
         ->call('addMember')
         ->assertHasNoErrors()
         ->assertSet('newMemberEmail', '')
-        ->assertSet('newMemberRoleIds', []);
+        ->assertSet('newMemberRoleId', '');
 
     expect($institution->fresh()->members()->whereKey($memberUser->id)->exists())->toBeTrue();
 
@@ -691,11 +691,11 @@ it('lets institution admins add members and manage scoped roles from the dashboa
         ->actingAs($adminUser)
         ->test(InstitutionDashboard::class)
         ->call('startEditingMemberRoles', $memberUser->id)
-        ->set('editingMemberRoleIds', [$roleIds['editor']])
+        ->set('editingMemberRoleId', $roleIds['editor'])
         ->call('saveMemberRoles')
         ->assertHasNoErrors()
         ->assertSet('editingMemberId', null)
-        ->assertSet('editingMemberRoleIds', []);
+        ->assertSet('editingMemberRoleId', '');
 
     $updatedRoleNames = Authz::withScope($institutionScope, fn (): array => $memberUser->fresh()->getRoleNames()->values()->all(), $memberUser);
 
@@ -709,6 +709,66 @@ it('lets institution admins add members and manage scoped roles from the dashboa
 
     expect($institution->fresh()->members()->whereKey($memberUser->id)->exists())->toBeFalse()
         ->and(Authz::withScope($institutionScope, fn (): array => $memberUser->fresh()->getRoleNames()->values()->all(), $memberUser))->toBe([]);
+});
+
+it('only lets institution owners and admins manage members and never removes owners', function () {
+    $ownerUser = User::factory()->create();
+    $adminUser = User::factory()->create();
+    $viewerUser = User::factory()->create();
+    $newMember = User::factory()->create([
+        'email' => 'candidate-member@example.test',
+    ]);
+    $institution = Institution::factory()->create(['name' => 'Masjid Role Rules']);
+
+    $institution->members()->syncWithoutDetaching([
+        $ownerUser->id,
+        $adminUser->id,
+        $viewerUser->id,
+    ]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+    $teamsKey = app(PermissionRegistrar::class)->teamsKey;
+
+    Authz::withScope($institutionScope, function () use ($ownerUser, $adminUser, $viewerUser): void {
+        $ownerUser->syncRoles(['owner']);
+        $adminUser->syncRoles(['admin']);
+        $viewerUser->syncRoles(['viewer']);
+    }, $ownerUser);
+
+    $roleIds = Authz::withScope($institutionScope, fn (): array => Role::query()
+        ->where($teamsKey, getPermissionsTeamId())
+        ->pluck('id', 'name')
+        ->all());
+
+    $response = $this->withSession(['locale' => 'en'])
+        ->actingAs($viewerUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+
+    $response->assertOk()
+        ->assertSee('Only institution owners and admins can add, remove, or update member roles from this dashboard.')
+        ->assertDontSee('Add Member')
+        ->assertDontSee('Remove')
+        ->assertDontSee('Owner cannot be removed');
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($viewerUser)
+        ->test(InstitutionDashboard::class)
+        ->set('newMemberEmail', $newMember->email)
+        ->set('newMemberRoleId', $roleIds['viewer'])
+        ->call('addMember');
+
+    expect($institution->fresh()->members()->whereKey($newMember->id)->exists())->toBeFalse();
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($adminUser)
+        ->test(InstitutionDashboard::class)
+        ->call('removeMember', $ownerUser->id)
+        ->assertSee('Institution owners cannot be removed from this dashboard.');
+
+    expect($institution->fresh()->members()->whereKey($ownerUser->id)->exists())->toBeTrue()
+        ->and(Authz::withScope($institutionScope, fn (): array => $ownerUser->fresh()->getRoleNames()->values()->all(), $ownerUser))->toBe(['owner']);
 });
 
 it('forbids selecting institutions the user does not belong to', function () {

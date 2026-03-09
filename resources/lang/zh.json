@@ -592,7 +592,8 @@
     "your@email.com": "your@email.com",
     "Agenda": "议程",
     "As you save or register for more events, the rest of your month will continue to fill in here.": "随着您保存或报名更多活动，本月其余安排会继续显示在这里。",
-    "Ask an institution admin to add you as a member to unlock this dashboard.": "请联系机构管理员将您加入成员后再使用此仪表板。",
+    "Ask an institution admin to add you as a member to unlock this dashboard.": "请联系机构负责人或管理员将您加入成员后再使用此仪表板。",
+    "Ask an institution owner or admin to add you as a member to unlock this dashboard.": "请联系机构负责人或管理员将您加入成员后再使用此仪表板。",
     "Assalamualaikum, :name": "Assalamualaikum, :name",
     "Attendance history you have already recorded.": "您已记录的出席历史。",
     "Attendance history": "出席历史",
@@ -807,7 +808,10 @@
     "Keep institution access up to date and assign the right Ahli roles for each member.": "保持机构成员权限最新，并为每位成员分配合适的 Ahli 角色。",
     "Existing user email": "现有用户邮箱",
     "Add Member": "添加成员",
-    "Only institution admins can add members or change roles from this dashboard.": "只有机构管理员可以在此仪表板中添加成员或更改角色。",
+    "Only institution admins can add members or change roles from this dashboard.": "只有机构负责人和管理员可以在此仪表板中添加、移除或更新成员角色。",
+    "Only institution owners and admins can add, remove, or update member roles from this dashboard.": "只有机构负责人和管理员可以在此仪表板中添加、移除或更新成员角色。",
+    "Institution owners cannot be removed from this dashboard.": "机构负责人不能在此仪表板中被移除。",
+    "Owner cannot be removed": "负责人不能被移除",
     "No institution members found yet.": "目前还没有机构成员。",
     "No roles assigned": "尚未分配角色",
     "Save Roles": "保存角色",
@@ -817,5 +821,6 @@
     "Member roles updated.": "成员角色已更新。",
     "Member removed successfully.": "成员移除成功。",
     "We could not find a user with that email address.": "找不到使用该邮箱地址的用户。",
-    "Pending Approval": "待审批"
+    "Pending Approval": "待审批",
+    "Select a role": "选择角色"
 }

@@ -3,7 +3,6 @@
 use App\Jobs\DispatchEventReminderNotifications;
 use App\Jobs\DispatchNotificationDigests;
 use App\Jobs\EscalatePendingEvents;
-use App\Jobs\ProcessDeferredNotificationDeliveries;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -29,12 +28,6 @@ Schedule::job(new DispatchEventReminderNotifications)
     ->everyFifteenMinutes()
     ->timezone('UTC')
     ->name('notification-reminders')
-    ->withoutOverlapping();
-
-Schedule::job(new ProcessDeferredNotificationDeliveries)
-    ->everyFifteenMinutes()
-    ->timezone('UTC')
-    ->name('notification-deferred-deliveries')
     ->withoutOverlapping();
 
 // SLA Escalation (per documentation B4a and B6b)

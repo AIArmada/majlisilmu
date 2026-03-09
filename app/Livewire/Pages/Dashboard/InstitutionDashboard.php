@@ -50,17 +50,11 @@ class InstitutionDashboard extends Component
 
     public string $newMemberEmail = '';
 
-    /**
-     * @var list<string>
-     */
-    public array $newMemberRoleIds = [];
+    public string $newMemberRoleId = '';
 
     public ?string $editingMemberId = null;
 
-    /**
-     * @var list<string>
-     */
-    public array $editingMemberRoleIds = [];
+    public string $editingMemberRoleId = '';
 
     public function mount(): void
     {
@@ -166,12 +160,12 @@ class InstitutionDashboard extends Component
         }
 
         $institution->members()->syncWithoutDetaching([$member->id]);
-        $this->syncMemberRoles($member, $validated['newMemberRoleIds']);
+        $this->syncMemberRoles($member, $validated['newMemberRoleId']);
 
         app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
 
         $this->newMemberEmail = '';
-        $this->newMemberRoleIds = [];
+        $this->newMemberRoleId = '';
         $this->resetPage('institution_members_page');
 
         session()->flash('institution_dashboard_message', __('Member added successfully.'));
@@ -186,7 +180,7 @@ class InstitutionDashboard extends Component
         $member = $this->findInstitutionMember($memberId);
 
         $this->editingMemberId = $member->id;
-        $this->editingMemberRoleIds = $this->getMemberRoleIds($member);
+        $this->editingMemberRoleId = $this->getMemberRoleIds($member)[0] ?? '';
     }
 
     public function cancelEditingMemberRoles(): void
@@ -208,7 +202,7 @@ class InstitutionDashboard extends Component
 
         $validated = $this->validate($this->memberRoleRules());
 
-        $this->syncMemberRoles($member, $validated['editingMemberRoleIds']);
+        $this->syncMemberRoles($member, $validated['editingMemberRoleId']);
         app(PublicSubmissionLockService::class)->syncForUser($member);
 
         $this->resetMemberEditor();
@@ -224,8 +218,14 @@ class InstitutionDashboard extends Component
 
         $member = $this->findInstitutionMember($memberId);
 
+        if ($this->memberIsOwner($member)) {
+            session()->flash('institution_dashboard_error', __('Institution owners cannot be removed from this dashboard.'));
+
+            return;
+        }
+
         $institution->members()->detach($member->id);
-        $this->syncMemberRoles($member, []);
+        $this->syncMemberRoles($member, null);
         app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
 
         if ($this->editingMemberId === $member->id) {
@@ -453,9 +453,11 @@ class InstitutionDashboard extends Component
     public function canManageMembers(): bool
     {
         $institution = $this->selectedInstitution();
+        $user = auth()->user();
 
         return $institution instanceof Institution
-            && (auth()->user()?->can('manageMembers', $institution) ?? false);
+            && $user instanceof User
+            && $this->userHasInstitutionManagementRole($user);
     }
 
     /**
@@ -504,25 +506,23 @@ class InstitutionDashboard extends Component
     }
 
     /**
-     * @return array<string, list<string>|string>
+     * @return array<string, array<int, string>|string>
      */
     protected function memberCreationRules(): array
     {
         return [
             'newMemberEmail' => ['required', 'email'],
-            'newMemberRoleIds' => ['required', 'array', 'min:1'],
-            'newMemberRoleIds.*' => ['string'],
+            'newMemberRoleId' => ['required', 'string'],
         ];
     }
 
     /**
-     * @return array<string, list<string>|string>
+     * @return array<string, array<int, string>|string>
      */
     protected function memberRoleRules(): array
     {
         return [
-            'editingMemberRoleIds' => ['required', 'array', 'min:1'],
-            'editingMemberRoleIds.*' => ['string'],
+            'editingMemberRoleId' => ['required', 'string'],
         ];
     }
 
@@ -550,12 +550,14 @@ class InstitutionDashboard extends Component
     protected function resetMemberEditor(): void
     {
         $this->editingMemberId = null;
-        $this->editingMemberRoleIds = [];
+        $this->editingMemberRoleId = '';
     }
 
     protected function ensureCanManageMembers(Institution $institution): void
     {
-        abort_unless(auth()->user()?->can('manageMembers', $institution) ?? false, 403);
+        $user = auth()->user();
+
+        abort_unless($user instanceof User && $this->userHasInstitutionManagementRole($user), 403);
     }
 
     /**
@@ -592,12 +594,31 @@ class InstitutionDashboard extends Component
         return Authz::withScope($this->getRoleScope(), fn (): array => $user->getRoleNames()->values()->all(), $user);
     }
 
-    /**
-     * @param  list<string>  $roleIds
-     */
-    protected function syncMemberRoles(User $user, array $roleIds): void
+    protected function userHasInstitutionManagementRole(User $user): bool
     {
-        $validRoleIds = array_values(array_intersect($roleIds, array_keys($this->institutionRoleOptions())));
+        return Authz::withScope(
+            $this->getRoleScope(),
+            fn (): bool => $user->hasAnyRole(['owner', 'admin']),
+            $user,
+        );
+    }
+
+    protected function memberIsOwner(User $user): bool
+    {
+        return Authz::withScope(
+            $this->getRoleScope(),
+            fn (): bool => $user->hasRole('owner'),
+            $user,
+        );
+    }
+
+    /**
+     */
+    protected function syncMemberRoles(User $user, ?string $roleId): void
+    {
+        $validRoleIds = $roleId !== null && $roleId !== '' && array_key_exists($roleId, $this->institutionRoleOptions())
+            ? [$roleId]
+            : [];
 
         Authz::withScope($this->getRoleScope(), function () use ($user, $validRoleIds): void {
             $user->syncRoles($validRoleIds);

@@ -1,5 +1,165 @@
 # Comprehensive Notification System Todo
 
+## Notification Review Follow-up
+
+- [x] Refactor notification dispatch so only the primary external channel is queued up front and fallback happens only when needed
+- [x] Move queued notification title/body rendering onto the notification object so send-time locale and timezone come from the actual notifiable
+- [x] Add focused regression coverage for primary-channel sequencing and send-time rendering
+- [x] Re-run focused notification tests and PHPStan after the refactor
+
+## Review
+
+- Root cause:
+  - the notification engine still treated every enabled channel as an immediate send target, so preferred-channel order behaved like fan-out and fallback could duplicate downstream deliveries
+  - notification-center rows still stored fully rendered title/body strings as the delivery source, so delayed notifications were locked to the locale/timezone that existed when the row was created instead of the recipient context at actual send time
+- Fix:
+  - added `app/Services/Notifications/NotificationMessageRenderer.php`
+    - centralizes notification translation rendering and event-timing token formatting
+    - renders against the actual notifiable so locale/timezone resolution happens at send time
+  - updated `app/Support/Notifications/NotificationDispatchData.php`
+    - added an optional `render` blueprint so notifications can persist raw message definitions alongside preview text
+  - updated `app/Services/Notifications/EventNotificationService.php`
+    - replaced direct translated title/body construction with a `buildDispatchData()` helper that stores render definitions and keeps localized preview strings for pending rows
+    - replaced preformatted timing strings with raw event-timing tokens
+  - updated `app/Jobs/DispatchNotificationDigests.php`
+    - digest notifications now persist render definitions too, while keeping compatibility with direct test invocation of `handle()`
+  - updated `app/Notifications/NotificationCenterMessage.php`
+    - `toMail()`, `toDatabase()`, `toPush()`, and `toWhatsapp()` now render title/body from the persisted blueprint using the current notifiable instead of the stored preview strings
+  - updated `app/Services/Notifications/NotificationEngine.php`
+    - split `in_app` from external channels
+    - queue `in_app` independently when enabled
+    - queue only the primary external channel up front and keep the remaining external channels as a fallback chain instead of immediate sends
+  - updated `tests/Feature/NotificationDeliveryFlowTest.php`
+    - added regression coverage proving queued notifications re-render from the recipient’s current locale/timezone at send time
+    - asserted that the configured fallback sequence queues only the primary external channel initially
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationDeliveryFlowTest.php` => **13 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(SubmitEventNotificationTest|ModerationServiceTest|EventModerationActionsTest|AhliEventApprovalTest|EventEscalationTest|AccountSettingsPageTest|NotificationInboxPageTest|NotificationCenterApiTest|NotificationPreferencesTest|NotificationDeliveryFlowTest|NotificationCenterTriggersTest)'` => **80 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Services/Notifications/NotificationMessageRenderer.php app/Services/Notifications/EventNotificationService.php app/Services/Notifications/NotificationEngine.php app/Notifications/NotificationCenterMessage.php app/Jobs/DispatchNotificationDigests.php app/Support/Notifications/NotificationDispatchData.php tests/Feature/NotificationDeliveryFlowTest.php` => **No errors**
+
+## Institution Dashboard Member Access
+
+- [x] Restrict dashboard member-management actions to scoped institution owner/admin roles
+- [x] Prevent owner members from being removed from the institution dashboard
+- [x] Update dashboard copy/tests and verify the institution dashboard suite
+
+## Review
+
+- Root cause:
+  - the institution dashboard reused the broader `manageMembers` permission path, which was good enough for ordinary role checks but did not express the product rule that this dashboard should be managed only by scoped institution `owner` / `admin`
+  - the member table also allowed owner rows to be detached with the same remove action as everyone else
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`
+    - added a scoped owner/admin membership gate for this dashboard instead of relying on the broader policy shortcut
+    - blocked owner-member removal and surfaced a dashboard error flash when attempted
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - changed the access/help copy from `admin` to `owner or admin`
+    - added a visible error banner for blocked owner-removal attempts
+    - replaced the owner row’s remove action with an `Owner cannot be removed` note
+  - updated locale JSON files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - existing member-management coverage still proves admins can add/edit/remove ordinary members
+    - added regression coverage showing viewers do not get member-management controls and owners remain attached after a removal attempt
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **19 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
+  - `php -r 'foreach ([\"resources/lang/en.json\",\"resources/lang/ms.json\",\"resources/lang/ms_MY.json\",\"resources/lang/zh.json\",\"resources/lang/ta.json\",\"resources/lang/jv.json\"] as $file) { json_decode(file_get_contents($file)); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.\": \".json_last_error_msg().PHP_EOL); exit(1); } } echo \"locale JSON validation passed\\n\";'` => **locale JSON validation passed**
+
+## Laravel Notification Best-Practice Follow-up
+
+- [x] Render notification title/body/timing per recipient locale and timezone before persistence
+- [x] Make push and WhatsApp channels fail loudly when provider config or usable destinations are missing
+- [x] Route push and WhatsApp delivery accounting through Laravel `NotificationSent` / `NotificationFailed` listeners instead of in-channel logging
+- [x] Add focused regression coverage for recipient localization and custom-channel listener accounting
+- [x] Re-run focused notification tests and PHPStan after the refactor
+
+## Laravel Notification Best-Practice Follow-up Review
+
+- Root cause:
+  - the notification center had moved closer to Laravel Notifications, but event and digest message text was still being composed in dispatcher context before Laravel could apply each notifiable's locale
+  - custom push and WhatsApp channels still treated provider misconfiguration as an early return instead of a real failure, which bypassed Laravel's `NotificationFailed` lifecycle and the app's fallback flow
+  - post-send accounting for custom channels still happened inside the channel classes, while mail and database relied on Laravel's notification events, leaving two different delivery-accounting paths
+- Fix:
+  - updated `app/Services/Notifications/EventNotificationService.php`
+    - added a per-user dispatch helper that switches to the recipient locale while building `NotificationDispatchData`
+    - removed all shared-recipient formatting shortcuts like `$users->first()` and now format event timing for each actual recipient
+  - updated `app/Jobs/DispatchNotificationDigests.php`
+    - build digest title/body in the recipient locale instead of job locale
+  - updated `app/Models/User.php`
+    - added `preferredTimezone()` so notification rendering can consistently use the notification-setting timezone instead of request/auth fallback
+  - updated `app/Notifications/NotificationCenterMessage.php`
+    - mail `occurred_at` lines are now rendered from the notifiable's own locale and timezone instead of `UserDateTimeFormatter`, which is request-context based
+  - added `app/Notifications/Channels/Exceptions/ChannelDeliveryException.php`
+    - custom channels now throw structured failures with per-destination result data when provider config is missing or no usable destination can actually receive the message
+  - updated `app/Notifications/Channels/PushChannel.php`
+  - updated `app/Notifications/Channels/WhatsappChannel.php`
+    - removed in-channel delivery logging
+    - return structured result payloads on success for Laravel `NotificationSent`
+    - throw `ChannelDeliveryException` on full-channel failure so Laravel emits `NotificationFailed`
+  - updated `app/Listeners/Notifications/RecordNotificationSent.php`
+    - custom push and WhatsApp delivery results now flow through the same `NotificationSent` listener path as mail/database
+  - updated `app/Listeners/Notifications/HandleNotificationFailed.php`
+    - consume structured custom-channel failures from `NotificationFailed` and queue fallbacks from that listener path
+  - updated `app/Services/Notifications/NotificationDeliveryLogger.php`
+    - added channel-result logging so listeners can record per-destination success/failure rows without channel-specific side effects
+  - updated `app/Services/Notifications/NotificationEngine.php`
+    - treat push/WhatsApp as unavailable up front when provider config is absent, so fallback can happen before queueing when the app already knows the provider is not ready
+  - updated `tests/Feature/NotificationDeliveryFlowTest.php`
+    - added regressions for mixed-recipient locale/timezone rendering, localized digest generation, timezone-correct mail rendering, push result accounting via `NotificationSent`, and WhatsApp config failure logging via `NotificationFailed`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationDeliveryFlowTest.php` => **12 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationCenterTriggersTest.php` => **4 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(SubmitEventNotificationTest|ModerationServiceTest|EventModerationActionsTest|AhliEventApprovalTest|EventEscalationTest|AccountSettingsPageTest|NotificationInboxPageTest|NotificationCenterApiTest|NotificationPreferencesTest|NotificationDeliveryFlowTest|NotificationCenterTriggersTest)'` => **79 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Services/Notifications/EventNotificationService.php app/Jobs/DispatchNotificationDigests.php app/Notifications/NotificationCenterMessage.php app/Notifications/Channels/PushChannel.php app/Notifications/Channels/WhatsappChannel.php app/Notifications/Channels/Exceptions/ChannelDeliveryException.php app/Listeners/Notifications/RecordNotificationSent.php app/Listeners/Notifications/HandleNotificationFailed.php app/Services/Notifications/NotificationDeliveryLogger.php app/Services/Notifications/NotificationEngine.php app/Models/User.php tests/Feature/NotificationDeliveryFlowTest.php tests/Feature/NotificationCenterTriggersTest.php` => **No errors**
+
+## Laravel Notification Refactor
+
+- [x] Replace the custom notification delivery engine with Laravel-native notifications and queued custom channels
+- [x] Move the inbox surface and unread counts onto Laravel's `notifications` table
+- [x] Simplify notification settings to Laravel-aligned cadence/channel controls while keeping quiet hours, digest schedule, locale, timezone, and destinations
+- [x] Refactor all notification trigger entry points to dispatch native notifications after commit
+- [x] Update focused notification tests and verify the refactor with Pest and PHPStan
+
+- [x] Replace the custom notification runtime with Laravel Notification classes, native database notifications, and custom push / WhatsApp channels
+- [x] Keep notification settings and destinations, but route delivery selection, locale, and queueing through Laravel notification best practices
+- [x] Refactor the inbox page, unread badges, and notification APIs to read from the native `notifications` table instead of `notification_messages`
+- [x] Remove or retire custom runtime pieces that bypass Laravel notifications (`NotificationEngine`, direct sender classes, custom inbox storage assumptions)
+- [x] Update focused notification tests and verify the refactor end to end
+
+## Laravel Notification Refactor Review
+
+- Root cause:
+  - the notification center had drifted into two overlapping systems: a newer Laravel-backed inbox path and a leftover legacy preference/endpoint layer with older moderation notifications still using hard-coded copy and URLs
+  - that left dead schema/runtime code in `User`, inconsistent notification authoring patterns, and queued moderation alerts that were not explicitly aligned with Laravel's `afterCommit` guidance
+- Fix:
+  - removed the retired legacy notification-preference/endpoint runtime:
+    - deleted `NotificationEndpoint`, `NotificationPreference`, their factories, and `NotificationPreferenceKey`
+    - removed the old relations/helpers from `app/Models/User.php`
+    - added `database/migrations/2026_03_09_210000_drop_legacy_notification_tables.php` to drop `notification_endpoints` and `notification_preferences`
+  - finished the Laravel-native notification alignment:
+    - kept `NotificationCenterMessage` as the single queued notification payload for the notification center
+    - kept custom `PushChannel` and `WhatsappChannel` as Laravel notification channels
+    - kept the outbox model as `PendingNotification`, but routed dispatch through `Notification::send(...)` and native `database` notifications for the inbox
+  - modernized the remaining moderator/admin notifications:
+    - updated `app/Notifications/EventSubmittedNotification.php`
+    - updated `app/Notifications/EventEscalationNotification.php`
+    - both now queue `afterCommit()`, use translated copy from `resources/lang/*/notifications.php`, and use panel route helpers instead of hard-coded `/admin/...` URLs
+  - tightened the notification type layer for PHPStan and runtime safety:
+    - added missing relation generics and locale-routing cleanup in `app/Models/User.php`
+    - normalized pending payload typing in `app/Notifications/NotificationCenterMessage.php`
+    - normalized digest-source delivery logging in `app/Services/Notifications/NotificationDeliveryLogger.php`
+    - removed a redundant user filter in `app/Services/Notifications/NotificationEngine.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(SubmitEventNotificationTest|ModerationServiceTest|EventModerationActionsTest|AhliEventApprovalTest|EventEscalationTest|AccountSettingsPageTest|NotificationInboxPageTest|NotificationCenterApiTest|NotificationPreferencesTest|NotificationDeliveryFlowTest|NotificationCenterTriggersTest)'` => **74 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/User.php app/Notifications/EventSubmittedNotification.php app/Notifications/EventEscalationNotification.php app/Services/Notifications/NotificationEngine.php app/Services/Notifications/NotificationSettingsManager.php app/Services/Notifications/NotificationDeliveryLogger.php app/Notifications/NotificationCenterMessage.php app/Notifications/Channels/PushChannel.php app/Notifications/Channels/WhatsappChannel.php app/Jobs/DispatchNotificationDigests.php app/Jobs/EscalatePendingEvents.php tests/Feature/SubmitEventNotificationTest.php tests/Feature/ModerationServiceTest.php tests/Feature/EventModerationActionsTest.php tests/Feature/AhliEventApprovalTest.php tests/Feature/EventEscalationTest.php tests/Feature/AccountSettingsPageTest.php tests/Feature/NotificationInboxPageTest.php tests/Feature/NotificationCenterApiTest.php tests/Feature/NotificationPreferencesTest.php tests/Feature/NotificationDeliveryFlowTest.php tests/Feature/NotificationCenterTriggersTest.php` => **No errors**
+  - `php artisan migrate --force` => applied `2026_03_09_210000_drop_legacy_notification_tables`
+
 - [x] Replace the digest-only notification persistence with the new settings, rules, destinations, messages, and deliveries schema
 - [x] Build the notification catalog, policy resolver, message builder, and delivery senders for in-app, email, push, and WhatsApp
 - [x] Integrate notification triggers for follows, saved-search matches, event updates/reminders, registrations, check-ins, and submission workflow
@@ -3830,4 +3990,39 @@
   - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **18 passed**
   - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => **12 passed**
   - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php tests/Feature/AhliPanelInstitutionEditingTest.php` => **No errors**
+  - `php -r 'foreach ([\"resources/lang/en.json\",\"resources/lang/ms.json\",\"resources/lang/ms_MY.json\",\"resources/lang/zh.json\",\"resources/lang/ta.json\",\"resources/lang/jv.json\"] as $file) { json_decode(file_get_contents($file)); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.\": \".json_last_error_msg().PHP_EOL); exit(1); } } echo \"locale JSON validation passed\\n\";'` => **locale JSON validation passed**
+
+# Institution Dashboard Single Role Select
+
+- [x] Change institution member role inputs from multi-select to single-select
+- [x] Update Livewire validation and role-sync payloads to accept one role ID
+- [x] Update focused dashboard tests and verification notes
+
+## Review
+
+- Root cause:
+  - the new institution members section reused the earlier multi-role relation-manager shape too literally, so the dashboard rendered role selection as a multi-select even though the user wanted a single role per member from this surface
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/InstitutionDashboard.php`
+    - changed member-role state from array properties to single role ID strings
+    - updated add/save validation rules to require a single selected role
+    - updated role syncing to accept one scoped role ID at a time
+    - kept removal behavior clearing all scoped roles
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php`
+    - replaced the add-member and edit-role multi-select boxes with single `<select>` fields
+    - added an explicit `Select a role` placeholder option
+    - updated error bindings to the new single-field validation keys
+  - updated locale JSON files:
+    - `resources/lang/en.json`
+    - `resources/lang/ms.json`
+    - `resources/lang/ms_MY.json`
+    - `resources/lang/zh.json`
+    - `resources/lang/ta.json`
+    - `resources/lang/jv.json`
+    - added the `Select a role` translation
+  - updated `tests/Feature/DashboardPagesTest.php`
+    - member-management assertions now use the single role ID state shape for add and edit flows
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **18 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
   - `php -r 'foreach ([\"resources/lang/en.json\",\"resources/lang/ms.json\",\"resources/lang/ms_MY.json\",\"resources/lang/zh.json\",\"resources/lang/ta.json\",\"resources/lang/jv.json\"] as $file) { json_decode(file_get_contents($file)); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.\": \".json_last_error_msg().PHP_EOL); exit(1); } } echo \"locale JSON validation passed\\n\";'` => **locale JSON validation passed**

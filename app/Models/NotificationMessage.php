@@ -3,74 +3,34 @@
 namespace App\Models;
 
 use App\Enums\NotificationFamily;
-use App\Enums\NotificationChannel;
-use App\Enums\NotificationDeliveryStatus;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
+use Database\Factories\NotificationMessageFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\DatabaseNotification;
 
-class NotificationMessage extends Model
+#[UseFactory(NotificationMessageFactory::class)]
+class NotificationMessage extends DatabaseNotification
 {
-    /** @use HasFactory<\Database\Factories\NotificationMessageFactory> */
-    use HasFactory, HasUuids;
-
-    public $incrementing = false;
-
-    protected $keyType = 'string';
-
-    /**
-     * @var list<string>
-     */
-    protected $fillable = [
-        'user_id',
-        'fingerprint',
-        'family',
-        'trigger',
-        'title',
-        'body',
-        'action_url',
-        'entity_type',
-        'entity_id',
-        'priority',
-        'occurred_at',
-        'read_at',
-        'channels_attempted',
-        'meta',
-    ];
+    /** @use HasFactory<NotificationMessageFactory> */
+    use HasFactory;
 
     #[\Override]
     protected function casts(): array
     {
-        return [
+        return array_merge(parent::casts(), [
+            'data' => 'array',
             'family' => NotificationFamily::class,
             'trigger' => NotificationTrigger::class,
             'priority' => NotificationPriority::class,
             'occurred_at' => 'datetime',
             'read_at' => 'datetime',
-            'channels_attempted' => 'array',
-            'meta' => 'array',
-        ];
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * @return HasMany<NotificationDelivery, $this>
-     */
-    public function deliveries(): HasMany
-    {
-        return $this->hasMany(NotificationDelivery::class, 'notification_message_id');
+            'inbox_visible' => 'boolean',
+            'is_digest' => 'boolean',
+        ]);
     }
 
     /**
@@ -79,30 +39,78 @@ class NotificationMessage extends Model
      */
     public function scopeVisibleInInbox(Builder $query): Builder
     {
-        return $query
-            ->where(function (Builder $messageQuery): void {
-                $messageQuery
-                    ->where('meta->inbox_visible', true)
-                    ->orWhereNull('meta->inbox_visible');
-            })
-            ->whereHas('deliveries', function (Builder $deliveryQuery): void {
-                $deliveryQuery
-                    ->where('channel', NotificationChannel::InApp->value)
-                    ->where('status', NotificationDeliveryStatus::Delivered->value)
-                    ->where(function (Builder $metaQuery): void {
-                        $metaQuery
-                            ->whereNull('meta->digest')
-                            ->orWhere('meta->digest', false);
-                    });
-            });
+        return $query->where('inbox_visible', true);
     }
 
-    public function markAsRead(): void
+    protected function title(): Attribute
     {
-        if ($this->read_at !== null) {
-            return;
+        return Attribute::get(fn (): string => (string) data_get($this->data, 'title', ''));
+    }
+
+    protected function body(): Attribute
+    {
+        return Attribute::get(fn (): string => (string) data_get($this->data, 'body', ''));
+    }
+
+    protected function actionUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->stringOrNull((string) ($this->attributes['action_url'] ?? data_get($this->data, 'action_url'))));
+    }
+
+    protected function channelsAttempted(): Attribute
+    {
+        return Attribute::get(function (): array {
+            $channels = data_get($this->data, 'channels_attempted', []);
+
+            if (! is_array($channels)) {
+                return [];
+            }
+
+            return collect($channels)
+                ->map(static fn (mixed $channel): string => (string) $channel)
+                ->filter(static fn (string $channel): bool => $channel !== '')
+                ->unique()
+                ->values()
+                ->all();
+        });
+    }
+
+    protected function meta(): Attribute
+    {
+        return Attribute::get(fn (): array => is_array(data_get($this->data, 'meta')) ? data_get($this->data, 'meta') : []);
+    }
+
+    protected function entityType(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->stringOrNull((string) ($this->attributes['entity_type'] ?? data_get($this->data, 'entity_type'))));
+    }
+
+    protected function entityId(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->stringOrNull((string) ($this->attributes['entity_id'] ?? data_get($this->data, 'entity_id'))));
+    }
+
+    protected function userId(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->stringOrNull($this->notifiable_id));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function payload(): array
+    {
+        return is_array($this->data) ? $this->data : [];
+    }
+
+    protected function stringOrNull(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
         }
 
-        $this->forceFill(['read_at' => now()])->save();
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 }

@@ -660,7 +660,8 @@
     "Go to page :page": "Go to page :page",
     "Agenda": "Agenda",
     "As you save or register for more events, the rest of your month will continue to fill in here.": "As you save or register for more events, the rest of your month will continue to fill in here.",
-    "Ask an institution admin to add you as a member to unlock this dashboard.": "Ask an institution admin to add you as a member to unlock this dashboard.",
+    "Ask an institution admin to add you as a member to unlock this dashboard.": "Ask an institution owner or admin to add you as a member to unlock this dashboard.",
+    "Ask an institution owner or admin to add you as a member to unlock this dashboard.": "Ask an institution owner or admin to add you as a member to unlock this dashboard.",
     "Assalamualaikum, :name": "Assalamualaikum, :name",
     "Attendance history you have already recorded.": "Attendance history you have already recorded.",
     "Attendance history": "Attendance history",
@@ -874,7 +875,10 @@
     "Keep institution access up to date and assign the right Ahli roles for each member.": "Keep institution access up to date and assign the right Ahli roles for each member.",
     "Existing user email": "Existing user email",
     "Add Member": "Add Member",
-    "Only institution admins can add members or change roles from this dashboard.": "Only institution admins can add members or change roles from this dashboard.",
+    "Only institution admins can add members or change roles from this dashboard.": "Only institution owners and admins can add, remove, or update member roles from this dashboard.",
+    "Only institution owners and admins can add, remove, or update member roles from this dashboard.": "Only institution owners and admins can add, remove, or update member roles from this dashboard.",
+    "Institution owners cannot be removed from this dashboard.": "Institution owners cannot be removed from this dashboard.",
+    "Owner cannot be removed": "Owner cannot be removed",
     "No institution members found yet.": "No institution members found yet.",
     "No roles assigned": "No roles assigned",
     "Save Roles": "Save Roles",
@@ -884,5 +888,6 @@
     "Member roles updated.": "Member roles updated.",
     "Member removed successfully.": "Member removed successfully.",
     "We could not find a user with that email address.": "We could not find a user with that email address.",
-    "Pending Approval": "Pending Approval"
+    "Pending Approval": "Pending Approval",
+    "Select a role": "Select a role"
 }

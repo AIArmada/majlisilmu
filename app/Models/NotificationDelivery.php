@@ -58,11 +58,11 @@ class NotificationDelivery extends Model
     }
 
     /**
-     * @return BelongsTo<NotificationMessage, $this>
+     * @return BelongsTo<PendingNotification, $this>
      */
     public function message(): BelongsTo
     {
-        return $this->belongsTo(NotificationMessage::class, 'notification_message_id');
+        return $this->belongsTo(PendingNotification::class, 'notification_message_id');
     }
 
     /**

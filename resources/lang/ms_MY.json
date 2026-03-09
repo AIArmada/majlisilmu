@@ -813,7 +813,8 @@
     "Menunggu Kelulusan": "Menunggu Kelulusan",
     "Agenda": "Agenda",
     "As you save or register for more events, the rest of your month will continue to fill in here.": "Bila anda simpan atau daftar untuk lebih banyak majlis, bahagian ini akan terisi sendiri.",
-    "Ask an institution admin to add you as a member to unlock this dashboard.": "Minta pentadbir institusi menambah anda sebagai ahli untuk membuka papan pemuka ini.",
+    "Ask an institution admin to add you as a member to unlock this dashboard.": "Minta pemilik atau pentadbir institusi menambah anda sebagai ahli untuk membuka dashboard ini.",
+    "Ask an institution owner or admin to add you as a member to unlock this dashboard.": "Minta pemilik atau pentadbir institusi menambah anda sebagai ahli untuk membuka dashboard ini.",
     "Assalamualaikum, :name": "Assalamualaikum, :name",
     "Attendance history you have already recorded.": "Rekod kehadiran yang telah anda catatkan.",
     "Attendance history": "Sejarah kehadiran",
@@ -1019,7 +1020,10 @@
     "Keep institution access up to date and assign the right Ahli roles for each member.": "Pastikan akses institusi sentiasa terkini dan tetapkan peranan Ahli yang sesuai untuk setiap ahli.",
     "Existing user email": "E-mel pengguna sedia ada",
     "Add Member": "Tambah Ahli",
-    "Only institution admins can add members or change roles from this dashboard.": "Hanya pentadbir institusi boleh menambah ahli atau menukar peranan melalui dashboard ini.",
+    "Only institution admins can add members or change roles from this dashboard.": "Hanya pemilik dan pentadbir institusi boleh menambah, membuang, atau mengemas kini peranan ahli melalui dashboard ini.",
+    "Only institution owners and admins can add, remove, or update member roles from this dashboard.": "Hanya pemilik dan pentadbir institusi boleh menambah, membuang, atau mengemas kini peranan ahli melalui dashboard ini.",
+    "Institution owners cannot be removed from this dashboard.": "Pemilik institusi tidak boleh dibuang melalui dashboard ini.",
+    "Owner cannot be removed": "Pemilik tidak boleh dibuang",
     "No institution members found yet.": "Belum ada ahli institusi lagi.",
     "No roles assigned": "Belum ada peranan",
     "Save Roles": "Simpan Peranan",
@@ -1029,5 +1033,6 @@
     "Member roles updated.": "Peranan ahli berjaya dikemas kini.",
     "Member removed successfully.": "Ahli berjaya dikeluarkan.",
     "We could not find a user with that email address.": "Kami tidak menemui pengguna dengan alamat e-mel tersebut.",
-    "Pending Approval": "Menunggu Kelulusan"
+    "Pending Approval": "Menunggu Kelulusan",
+    "Select a role": "Pilih peranan"
 }

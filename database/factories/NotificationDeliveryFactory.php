@@ -8,7 +8,7 @@ use App\Enums\NotificationFamily;
 use App\Enums\NotificationTrigger;
 use App\Models\NotificationDelivery;
 use App\Models\NotificationDestination;
-use App\Models\NotificationMessage;
+use App\Models\PendingNotification;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -22,7 +22,7 @@ class NotificationDeliveryFactory extends Factory
     public function definition(): array
     {
         return [
-            'notification_message_id' => NotificationMessage::factory(),
+            'notification_message_id' => PendingNotification::factory(),
             'user_id' => User::factory(),
             'family' => NotificationFamily::EventUpdates->value,
             'trigger' => NotificationTrigger::EventScheduleChanged->value,
