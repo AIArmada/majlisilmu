@@ -22,6 +22,7 @@ class EventNotificationService
         protected NotificationEngine $engine,
         protected EventSearchService $eventSearchService,
         protected MemberPermissionGate $memberPermissionGate,
+        protected NotificationMessageRenderer $messageRenderer,
     ) {}
 
     public function notifySubmissionReceived(Event $event): void
@@ -32,10 +33,12 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($recipients, new NotificationDispatchData(
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::SubmissionReceived,
-            title: __('notifications.messages.submission_received.title', ['title' => $event->title]),
-            body: __('notifications.messages.submission_received.body'),
+            titleKey: 'notifications.messages.submission_received.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: 'notifications.messages.submission_received.body',
             actionUrl: route('dashboard.notifications'),
             entityType: Event::class,
             entityId: $event->id,
@@ -56,12 +59,13 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($recipients, new NotificationDispatchData(
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::SubmissionApproved,
-            title: __('notifications.messages.submission_approved.title', ['title' => $event->title]),
-            body: __('notifications.messages.submission_approved.body', [
-                'timing' => $this->formatEventTiming($event, $recipients->first()),
-            ]),
+            titleKey: 'notifications.messages.submission_approved.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: 'notifications.messages.submission_approved.body',
+            bodyParams: ['timing' => $this->messageRenderer->eventTimingToken($event)],
             actionUrl: route('events.show', $event),
             entityType: Event::class,
             entityId: $event->id,
@@ -78,12 +82,19 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($recipients, new NotificationDispatchData(
+        $bodyKey = filled($note)
+            ? 'notifications.messages.submission_rejected.body_with_note'
+            : 'notifications.messages.submission_rejected.body';
+
+        $bodyParams = filled($note) ? ['note' => $note] : [];
+
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::SubmissionRejected,
-            title: __('notifications.messages.submission_rejected.title', ['title' => $event->title]),
-            body: filled($note)
-                ? __('notifications.messages.submission_rejected.body_with_note', ['note' => $note])
-                : __('notifications.messages.submission_rejected.body'),
+            titleKey: 'notifications.messages.submission_rejected.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: $bodyKey,
+            bodyParams: $bodyParams,
             actionUrl: route('dashboard.notifications'),
             entityType: Event::class,
             entityId: $event->id,
@@ -101,12 +112,19 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($recipients, new NotificationDispatchData(
+        $bodyKey = filled($note)
+            ? 'notifications.messages.submission_needs_changes.body_with_note'
+            : 'notifications.messages.submission_needs_changes.body';
+
+        $bodyParams = filled($note) ? ['note' => $note] : [];
+
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::SubmissionNeedsChanges,
-            title: __('notifications.messages.submission_needs_changes.title', ['title' => $event->title]),
-            body: filled($note)
-                ? __('notifications.messages.submission_needs_changes.body_with_note', ['note' => $note])
-                : __('notifications.messages.submission_needs_changes.body'),
+            titleKey: 'notifications.messages.submission_needs_changes.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: $bodyKey,
+            bodyParams: $bodyParams,
             actionUrl: route('dashboard.notifications'),
             entityType: Event::class,
             entityId: $event->id,
@@ -124,12 +142,19 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($recipients, new NotificationDispatchData(
+        $bodyKey = filled($note)
+            ? 'notifications.messages.submission_cancelled.body_with_note'
+            : 'notifications.messages.submission_cancelled.body';
+
+        $bodyParams = filled($note) ? ['note' => $note] : [];
+
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::SubmissionCancelled,
-            title: __('notifications.messages.submission_cancelled.title', ['title' => $event->title]),
-            body: filled($note)
-                ? __('notifications.messages.submission_cancelled.body_with_note', ['note' => $note])
-                : __('notifications.messages.submission_cancelled.body'),
+            titleKey: 'notifications.messages.submission_cancelled.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: $bodyKey,
+            bodyParams: $bodyParams,
             actionUrl: route('dashboard.notifications'),
             entityType: Event::class,
             entityId: $event->id,
@@ -147,12 +172,19 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($recipients, new NotificationDispatchData(
+        $bodyKey = filled($note)
+            ? 'notifications.messages.submission_remoderated.body_with_note'
+            : 'notifications.messages.submission_remoderated.body';
+
+        $bodyParams = filled($note) ? ['note' => $note] : [];
+
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::SubmissionRemoderated,
-            title: __('notifications.messages.submission_remoderated.title', ['title' => $event->title]),
-            body: filled($note)
-                ? __('notifications.messages.submission_remoderated.body_with_note', ['note' => $note])
-                : __('notifications.messages.submission_remoderated.body'),
+            titleKey: 'notifications.messages.submission_remoderated.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: $bodyKey,
+            bodyParams: $bodyParams,
             actionUrl: route('dashboard.notifications'),
             entityType: Event::class,
             entityId: $event->id,
@@ -181,12 +213,23 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($trackedUsers, new NotificationDispatchData(
+        $bodyKey = filled($note)
+            ? 'notifications.messages.event_cancelled.body_with_note'
+            : 'notifications.messages.event_cancelled.body';
+
+        $bodyParams = ['timing' => $this->messageRenderer->eventTimingToken($event)];
+
+        if (filled($note)) {
+            $bodyParams['note'] = $note;
+        }
+
+        $this->dispatchForUsers($trackedUsers, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::EventCancelled,
-            title: __('notifications.messages.event_cancelled.title', ['title' => $event->title]),
-            body: filled($note)
-                ? __('notifications.messages.event_cancelled.body_with_note', ['timing' => $this->formatEventTiming($event, $trackedUsers->first()), 'note' => $note])
-                : __('notifications.messages.event_cancelled.body', ['timing' => $this->formatEventTiming($event, $trackedUsers->first())]),
+            titleKey: 'notifications.messages.event_cancelled.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: $bodyKey,
+            bodyParams: $bodyParams,
             actionUrl: route('events.show', $event),
             entityType: Event::class,
             entityId: $event->id,
@@ -219,10 +262,15 @@ class EventNotificationService
             ->values();
 
         if ($trackedExcludingRegistered->isNotEmpty()) {
-            $this->engine->dispatch($trackedExcludingRegistered, new NotificationDispatchData(
+            [$bodyKey, $bodyParams] = $this->materialChangeBodyDefinition($event, $trigger);
+
+            $this->dispatchForUsers($trackedExcludingRegistered, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+                user: $user,
                 trigger: $trigger,
-                title: __('notifications.messages.event_update.title', ['title' => $event->title]),
-                body: $this->materialChangeBody($event, $trigger, $trackedExcludingRegistered->first()),
+                titleKey: 'notifications.messages.event_update.title',
+                titleParams: ['title' => $event->title],
+                bodyKey: $bodyKey,
+                bodyParams: $bodyParams,
                 actionUrl: route('events.show', $event),
                 entityType: Event::class,
                 entityId: $event->id,
@@ -233,12 +281,13 @@ class EventNotificationService
         }
 
         if ($registeredUsers->isNotEmpty()) {
-            $this->engine->dispatch($registeredUsers, new NotificationDispatchData(
+            $this->dispatchForUsers($registeredUsers, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+                user: $user,
                 trigger: NotificationTrigger::RegistrationEventChanged,
-                title: __('notifications.messages.registration_event_changed.title', ['title' => $event->title]),
-                body: __('notifications.messages.registration_event_changed.body', [
-                    'timing' => $this->formatEventTiming($event, $registeredUsers->first()),
-                ]),
+                titleKey: 'notifications.messages.registration_event_changed.title',
+                titleParams: ['title' => $event->title],
+                bodyKey: 'notifications.messages.registration_event_changed.body',
+                bodyParams: ['timing' => $this->messageRenderer->eventTimingToken($event)],
                 actionUrl: route('events.show', $event),
                 entityType: Event::class,
                 entityId: $event->id,
@@ -263,12 +312,13 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch([$user], new NotificationDispatchData(
+        $this->dispatchForUsers([$user], fn (User $recipient): NotificationDispatchData => $this->buildDispatchData(
+            user: $recipient,
             trigger: NotificationTrigger::RegistrationConfirmed,
-            title: __('notifications.messages.registration_confirmed.title', ['title' => $event->title]),
-            body: __('notifications.messages.registration_confirmed.body', [
-                'timing' => $this->formatEventTiming($event, $user),
-            ]),
+            titleKey: 'notifications.messages.registration_confirmed.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: 'notifications.messages.registration_confirmed.body',
+            bodyParams: ['timing' => $this->messageRenderer->eventTimingToken($event)],
             actionUrl: route('events.show', $event),
             entityType: Event::class,
             entityId: $event->id,
@@ -286,10 +336,12 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch([$user], new NotificationDispatchData(
+        $this->dispatchForUsers([$user], fn (User $recipient): NotificationDispatchData => $this->buildDispatchData(
+            user: $recipient,
             trigger: NotificationTrigger::CheckinConfirmed,
-            title: __('notifications.messages.checkin_confirmed.title', ['title' => $event->title]),
-            body: __('notifications.messages.checkin_confirmed.body'),
+            titleKey: 'notifications.messages.checkin_confirmed.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: 'notifications.messages.checkin_confirmed.body',
             actionUrl: route('events.show', $event),
             entityType: Event::class,
             entityId: $event->id,
@@ -323,7 +375,7 @@ class EventNotificationService
         }
 
         if ($event->institution) {
-            $institutionAdmins = app(MemberPermissionGate::class)
+            $institutionAdmins = $this->memberPermissionGate
                 ->institutionMembersWithPermission($event->institution, 'event.update');
             $recipients = $recipients->merge($institutionAdmins);
         }
@@ -380,12 +432,13 @@ class EventNotificationService
             return;
         }
 
-        $this->engine->dispatch($trackedUsers, new NotificationDispatchData(
+        $this->dispatchForUsers($trackedUsers, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
             trigger: NotificationTrigger::EventApproved,
-            title: __('notifications.messages.event_approved.title', ['title' => $event->title]),
-            body: __('notifications.messages.event_approved.body', [
-                'timing' => $this->formatEventTiming($event, $trackedUsers->first()),
-            ]),
+            titleKey: 'notifications.messages.event_approved.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: 'notifications.messages.event_approved.body',
+            bodyParams: ['timing' => $this->messageRenderer->eventTimingToken($event)],
             actionUrl: route('events.show', $event),
             entityType: Event::class,
             entityId: $event->id,
@@ -461,12 +514,15 @@ class EventNotificationService
             $searches = $matchData['searches'];
             $searchNames = collect($searches)->pluck('name')->values()->all();
 
-            $this->engine->dispatch([$user], new NotificationDispatchData(
+            $this->dispatchForUsers([$user], fn (User $recipient): NotificationDispatchData => $this->buildDispatchData(
+                user: $recipient,
                 trigger: NotificationTrigger::SavedSearchMatch,
-                title: __('notifications.messages.saved_search_match.title', ['title' => $event->title]),
-                body: __('notifications.messages.saved_search_match.body', [
+                titleKey: 'notifications.messages.saved_search_match.title',
+                titleParams: ['title' => $event->title],
+                bodyKey: 'notifications.messages.saved_search_match.body',
+                bodyParams: [
                     'searches' => implode(', ', array_slice($searchNames, 0, 3)),
-                ]),
+                ],
                 actionUrl: route('events.show', $event),
                 entityType: Event::class,
                 entityId: $event->id,
@@ -518,13 +574,16 @@ class EventNotificationService
             $user = $match['user'];
             $labels = array_values($match['labels'] ?? []);
 
-            $this->engine->dispatch([$user], new NotificationDispatchData(
+            $this->dispatchForUsers([$user], fn (User $recipient): NotificationDispatchData => $this->buildDispatchData(
+                user: $recipient,
                 trigger: $trigger,
-                title: __('notifications.messages.followed_content.title', ['title' => $event->title]),
-                body: __('notifications.messages.followed_content.body', [
+                titleKey: 'notifications.messages.followed_content.title',
+                titleParams: ['title' => $event->title],
+                bodyKey: 'notifications.messages.followed_content.body',
+                bodyParams: [
                     'matches' => implode(', ', array_slice($labels, 0, 3)),
-                    'timing' => $this->formatEventTiming($event, $user),
-                ]),
+                    'timing' => $this->messageRenderer->eventTimingToken($event),
+                ],
                 actionUrl: route('events.show', $event),
                 entityType: Event::class,
                 entityId: $event->id,
@@ -604,18 +663,24 @@ class EventNotificationService
         return null;
     }
 
-    protected function materialChangeBody(Event $event, NotificationTrigger $trigger, User $user): string
+    /**
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    protected function materialChangeBodyDefinition(Event $event, NotificationTrigger $trigger): array
     {
         return match ($trigger) {
-            NotificationTrigger::EventVenueChanged => __('notifications.messages.event_venue_changed.body', [
-                'timing' => $this->formatEventTiming($event, $user),
-            ]),
-            NotificationTrigger::EventSessionChanged => __('notifications.messages.event_session_changed.body', [
-                'timing' => $this->formatEventTiming($event, $user),
-            ]),
-            default => __('notifications.messages.event_schedule_changed.body', [
-                'timing' => $this->formatEventTiming($event, $user),
-            ]),
+            NotificationTrigger::EventVenueChanged => [
+                'notifications.messages.event_venue_changed.body',
+                ['timing' => $this->messageRenderer->eventTimingToken($event)],
+            ],
+            NotificationTrigger::EventSessionChanged => [
+                'notifications.messages.event_session_changed.body',
+                ['timing' => $this->messageRenderer->eventTimingToken($event)],
+            ],
+            default => [
+                'notifications.messages.event_schedule_changed.body',
+                ['timing' => $this->messageRenderer->eventTimingToken($event)],
+            ],
         };
     }
 
@@ -650,18 +715,25 @@ class EventNotificationService
                 continue;
             }
 
-            $this->engine->dispatch($users, new NotificationDispatchData(
+            $titleKey = match ($trigger) {
+                NotificationTrigger::Reminder24Hours => 'notifications.messages.reminder_24_hours.title',
+                NotificationTrigger::Reminder2Hours => 'notifications.messages.reminder_2_hours.title',
+                default => 'notifications.messages.checkin_open.title',
+            };
+
+            $bodyKey = match ($trigger) {
+                NotificationTrigger::Reminder24Hours => 'notifications.messages.reminder_24_hours.body',
+                NotificationTrigger::Reminder2Hours => 'notifications.messages.reminder_2_hours.body',
+                default => 'notifications.messages.checkin_open.body',
+            };
+
+            $this->dispatchForUsers($users, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+                user: $user,
                 trigger: $trigger,
-                title: match ($trigger) {
-                    NotificationTrigger::Reminder24Hours => __('notifications.messages.reminder_24_hours.title', ['title' => $event->title]),
-                    NotificationTrigger::Reminder2Hours => __('notifications.messages.reminder_2_hours.title', ['title' => $event->title]),
-                    default => __('notifications.messages.checkin_open.title', ['title' => $event->title]),
-                },
-                body: match ($trigger) {
-                    NotificationTrigger::Reminder24Hours => __('notifications.messages.reminder_24_hours.body', ['timing' => $this->formatEventTiming($event, $users->first())]),
-                    NotificationTrigger::Reminder2Hours => __('notifications.messages.reminder_2_hours.body', ['timing' => $this->formatEventTiming($event, $users->first())]),
-                    default => __('notifications.messages.checkin_open.body', ['timing' => $this->formatEventTiming($event, $users->first())]),
-                },
+                titleKey: $titleKey,
+                titleParams: ['title' => $event->title],
+                bodyKey: $bodyKey,
+                bodyParams: ['timing' => $this->messageRenderer->eventTimingToken($event)],
                 actionUrl: route('events.show', $event),
                 entityType: Event::class,
                 entityId: $event->id,
@@ -691,6 +763,90 @@ class EventNotificationService
         return $users;
     }
 
+    /**
+     * @param  iterable<int, User>  $users
+     * @param  callable(User): NotificationDispatchData  $builder
+     */
+    protected function dispatchForUsers(iterable $users, callable $builder): void
+    {
+        collect($users)
+            ->unique('id')
+            ->values()
+            ->each(function (User $user) use ($builder): void {
+                $data = $this->withUserLocale($user, fn (): NotificationDispatchData => $builder($user));
+
+                $this->engine->dispatchToUser($user, $data);
+            });
+    }
+
+    /**
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    protected function withUserLocale(User $user, callable $callback): mixed
+    {
+        $originalLocale = app()->getLocale();
+        app()->setLocale($user->preferredLocale());
+
+        try {
+            return $callback();
+        } finally {
+            app()->setLocale($originalLocale);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $titleParams
+     * @param  array<string, mixed>  $bodyParams
+     * @param  array<string, mixed>  $meta
+     */
+    protected function buildDispatchData(
+        User $user,
+        NotificationTrigger $trigger,
+        string $titleKey,
+        array $titleParams = [],
+        string $bodyKey = 'notifications.messages.submission_received.body',
+        array $bodyParams = [],
+        ?string $actionUrl = null,
+        ?string $entityType = null,
+        ?string $entityId = null,
+        NotificationPriority $priority = NotificationPriority::Medium,
+        ?NotificationCadence $forcedCadence = null,
+        ?string $fingerprint = null,
+        array $meta = [],
+        ?CarbonImmutable $occurredAt = null,
+        bool $bypassQuietHours = false,
+    ): NotificationDispatchData {
+        $render = [
+            'title' => [
+                'key' => $titleKey,
+                'params' => $titleParams,
+            ],
+            'body' => [
+                'key' => $bodyKey,
+                'params' => $bodyParams,
+            ],
+        ];
+
+        return new NotificationDispatchData(
+            trigger: $trigger,
+            title: $this->messageRenderer->renderDefinition($render['title'], $user),
+            body: $this->messageRenderer->renderDefinition($render['body'], $user),
+            actionUrl: $actionUrl,
+            entityType: $entityType,
+            entityId: $entityId,
+            priority: $priority,
+            forcedCadence: $forcedCadence,
+            fingerprint: $fingerprint,
+            meta: $meta,
+            occurredAt: $occurredAt,
+            bypassQuietHours: $bypassQuietHours,
+            render: $render,
+        );
+    }
+
     protected function isPublicFutureEvent(Event $event): bool
     {
         return $event->is_active
@@ -698,21 +854,6 @@ class EventNotificationService
             && $event->visibility === \App\Enums\EventVisibility::Public
             && $event->starts_at !== null
             && $event->starts_at->isFuture();
-    }
-
-    protected function formatEventTiming(Event $event, ?User $user): string
-    {
-        $startsAt = $event->starts_at;
-
-        if ($startsAt === null) {
-            return __('notifications.messages.timing.to_be_confirmed');
-        }
-
-        $timezone = $user?->timezone ?: ($event->timezone ?: config('app.timezone'));
-        $locale = app()->getLocale();
-        $localizedStart = CarbonImmutable::instance($startsAt)->setTimezone($timezone)->locale($locale);
-
-        return $localizedStart->translatedFormat('D, j M Y').' • '.$localizedStart->format('h:i A');
     }
 
     protected function startsWithinHours(Event $event, int $hours): bool

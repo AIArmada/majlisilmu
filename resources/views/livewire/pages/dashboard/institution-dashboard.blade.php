@@ -66,12 +66,18 @@
             @if(!$selectedInstitution)
                 <section class="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
                     <p class="text-lg font-semibold text-slate-700">{{ __('You do not have institution access yet.') }}</p>
-                    <p class="mt-2 text-sm text-slate-500">{{ __('Ask an institution admin to add you as a member to unlock this dashboard.') }}</p>
+                    <p class="mt-2 text-sm text-slate-500">{{ __('Ask an institution owner or admin to add you as a member to unlock this dashboard.') }}</p>
                 </section>
             @else
                 @if(session()->has('institution_dashboard_message'))
                     <section class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
                         {{ session('institution_dashboard_message') }}
+                    </section>
+                @endif
+
+                @if(session()->has('institution_dashboard_error'))
+                    <section class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+                        {{ session('institution_dashboard_error') }}
                     </section>
                 @endif
 
@@ -344,18 +350,15 @@
                                     </label>
                                     <select
                                         id="institution-member-roles"
-                                        wire:model="newMemberRoleIds"
-                                        multiple
-                                        class="min-h-32 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+                                        wire:model="newMemberRoleId"
+                                        class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
                                     >
+                                        <option value="">{{ __('Select a role') }}</option>
                                         @foreach($institutionRoleOptions as $roleId => $roleName)
                                             <option value="{{ $roleId }}">{{ $translateRoleLabel($roleName) }}</option>
                                         @endforeach
                                     </select>
-                                    @error('newMemberRoleIds')
-                                        <p class="mt-2 text-xs font-medium text-rose-600">{{ $message }}</p>
-                                    @enderror
-                                    @error('newMemberRoleIds.*')
+                                    @error('newMemberRoleId')
                                         <p class="mt-2 text-xs font-medium text-rose-600">{{ $message }}</p>
                                     @enderror
                                 </div>
@@ -370,7 +373,7 @@
                         </form>
                     @else
                         <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                            {{ __('Only institution admins can add members or change roles from this dashboard.') }}
+                            {{ __('Only institution owners and admins can add, remove, or update member roles from this dashboard.') }}
                         </div>
                     @endif
 
@@ -396,6 +399,7 @@
                                         @php
                                             $roleNames = $memberRoleMap[$member->id] ?? [];
                                             $isEditingMember = $canManageMembers && $this->editingMemberId === $member->id;
+                                            $isProtectedOwner = in_array('owner', $roleNames, true);
                                         @endphp
                                         <tr wire:key="institution-member-{{ $member->id }}">
                                             <td class="py-4 pr-4">
@@ -406,18 +410,15 @@
                                                 @if($isEditingMember)
                                                     <div class="max-w-sm">
                                                         <select
-                                                            wire:model="editingMemberRoleIds"
-                                                            multiple
-                                                            class="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+                                                            wire:model="editingMemberRoleId"
+                                                            class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
                                                         >
+                                                            <option value="">{{ __('Select a role') }}</option>
                                                             @foreach($institutionRoleOptions as $roleId => $roleName)
                                                                 <option value="{{ $roleId }}">{{ $translateRoleLabel($roleName) }}</option>
                                                             @endforeach
                                                         </select>
-                                                        @error('editingMemberRoleIds')
-                                                            <p class="mt-2 text-xs font-medium text-rose-600">{{ $message }}</p>
-                                                        @enderror
-                                                        @error('editingMemberRoleIds.*')
+                                                        @error('editingMemberRoleId')
                                                             <p class="mt-2 text-xs font-medium text-rose-600">{{ $message }}</p>
                                                         @enderror
                                                     </div>
@@ -459,14 +460,20 @@
                                                             >
                                                                 {{ __('Edit Roles') }}
                                                             </button>
-                                                            <button
-                                                                type="button"
-                                                                wire:click="removeMember('{{ $member->id }}')"
-                                                                wire:confirm="{{ __('Remove this member from the institution?') }}"
-                                                                class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                                                            >
-                                                                {{ __('Remove') }}
-                                                            </button>
+                                                            @if(!$isProtectedOwner)
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="removeMember('{{ $member->id }}')"
+                                                                    wire:confirm="{{ __('Remove this member from the institution?') }}"
+                                                                    class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                                                                >
+                                                                    {{ __('Remove') }}
+                                                                </button>
+                                                            @else
+                                                                <span class="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                                                                    {{ __('Owner cannot be removed') }}
+                                                                </span>
+                                                            @endif
                                                         @endif
                                                     </div>
                                                 </td>

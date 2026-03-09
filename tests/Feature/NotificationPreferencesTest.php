@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\NotificationMessage;
-use App\Models\NotificationDelivery;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -140,38 +139,44 @@ it('lists notifications and marks them as read through the api', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
-    $unread = NotificationMessage::factory()->for($user)->create([
-        'title' => 'Unread notification',
+    $unread = NotificationMessage::factory()->for($user, 'notifiable')->create([
         'read_at' => null,
-        'meta' => ['inbox_visible' => true],
+        'data' => [
+            'title' => 'Unread notification',
+            'body' => 'Unread body',
+            'channels_attempted' => ['in_app'],
+            'meta' => ['inbox_visible' => true],
+        ],
+        'inbox_visible' => true,
     ]);
-    $read = NotificationMessage::factory()->for($user)->create([
-        'title' => 'Read notification',
+    $read = NotificationMessage::factory()->for($user, 'notifiable')->create([
         'read_at' => now(),
-        'meta' => ['inbox_visible' => true],
+        'data' => [
+            'title' => 'Read notification',
+            'body' => 'Read body',
+            'channels_attempted' => ['in_app'],
+            'meta' => ['inbox_visible' => true],
+        ],
+        'inbox_visible' => true,
     ]);
-    NotificationMessage::factory()->for($user)->create([
-        'title' => 'Hidden email-only notification',
+    NotificationMessage::factory()->for($user, 'notifiable')->create([
         'read_at' => null,
-        'meta' => ['inbox_visible' => false],
+        'data' => [
+            'title' => 'Hidden email-only notification',
+            'body' => 'Hidden body',
+            'channels_attempted' => ['email'],
+            'meta' => ['inbox_visible' => false],
+        ],
+        'inbox_visible' => false,
     ]);
-    NotificationMessage::factory()->for($otherUser)->create([
-        'title' => 'Other user notification',
+    NotificationMessage::factory()->for($otherUser, 'notifiable')->create([
+        'data' => [
+            'title' => 'Other user notification',
+            'body' => 'Other body',
+            'channels_attempted' => ['in_app'],
+            'meta' => ['inbox_visible' => true],
+        ],
     ]);
-
-    foreach ([$unread, $read] as $message) {
-        NotificationDelivery::factory()->create([
-            'notification_message_id' => $message->id,
-            'user_id' => $user->id,
-            'channel' => 'in_app',
-            'destination_id' => null,
-            'provider' => null,
-            'provider_message_id' => null,
-            'status' => 'delivered',
-            'payload' => [],
-            'meta' => [],
-        ]);
-    }
 
     Sanctum::actingAs($user);
 

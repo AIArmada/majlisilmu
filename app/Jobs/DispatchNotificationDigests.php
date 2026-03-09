@@ -8,10 +8,11 @@ use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
 use App\Models\NotificationDelivery;
-use App\Models\NotificationMessage;
+use App\Models\PendingNotification;
 use App\Models\NotificationSetting;
 use App\Models\User;
 use App\Services\Notifications\NotificationEngine;
+use App\Services\Notifications\NotificationMessageRenderer;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationDispatchData;
 use Carbon\CarbonImmutable;
@@ -27,8 +28,13 @@ class DispatchNotificationDigests implements ShouldQueue
         public string $cadence = 'daily',
     ) {}
 
-    public function handle(NotificationEngine $engine, NotificationSettingsManager $settingsManager): void
+    public function handle(
+        NotificationEngine $engine,
+        NotificationSettingsManager $settingsManager,
+        ?NotificationMessageRenderer $messageRenderer = null,
+    ): void
     {
+        $messageRenderer ??= app(NotificationMessageRenderer::class);
         $cadence = NotificationCadence::tryFrom($this->cadence) ?? NotificationCadence::Daily;
         $now = CarbonImmutable::now('UTC');
         $queryStart = $this->candidateQueryStart($cadence, $now);
@@ -37,26 +43,26 @@ class DispatchNotificationDigests implements ShouldQueue
             return;
         }
 
-        /** @var Collection<int, NotificationMessage> $messages */
-        $messages = NotificationMessage::query()
+        /** @var Collection<int, PendingNotification> $messages */
+        $messages = PendingNotification::query()
             ->with('user')
+            ->forCadence($cadence)
             ->where('occurred_at', '>=', $queryStart)
             ->where('occurred_at', '<=', $now)
             ->get()
-            ->filter(fn (NotificationMessage $message): bool => (string) data_get($message->meta, 'delivery_cadence') === $cadence->value)
             ->values();
 
-        $grouped = $messages->groupBy(fn (NotificationMessage $message): string => implode('|', [
+        $grouped = $messages->groupBy(fn (PendingNotification $message): string => implode('|', [
             $message->user_id,
             $this->messageFamily($message)->value,
             $this->messageTrigger($message)->value,
         ]));
 
         foreach ($grouped as $group) {
-            /** @var Collection<int, NotificationMessage> $group */
+            /** @var Collection<int, PendingNotification> $group */
             $sample = $group->first();
 
-            if (! $sample instanceof NotificationMessage || ! $sample->user instanceof User) {
+            if (! $sample instanceof PendingNotification || ! $sample->user instanceof User) {
                 continue;
             }
 
@@ -71,7 +77,7 @@ class DispatchNotificationDigests implements ShouldQueue
                 continue;
             }
 
-            $undelivered = $group->filter(function (NotificationMessage $message) use ($policy, $window): bool {
+            $undelivered = $group->filter(function (PendingNotification $message) use ($policy, $window): bool {
                 $occurredAt = $message->getRawOriginal('occurred_at');
 
                 if (! is_string($occurredAt) || $occurredAt === '') {
@@ -96,33 +102,56 @@ class DispatchNotificationDigests implements ShouldQueue
             }
 
             $count = $undelivered->count();
-            $title = __('notifications.messages.digest.title', [
-                'count' => $count,
-                'label' => $sample->title,
-            ]);
-            $body = __('notifications.messages.digest.body', [
-                'count' => $count,
-            ]);
             $digestFingerprint = 'digest:'.$cadence->value.':'.$sampleTrigger->value.':'.$sample->user_id.':'.$window['end']->format('YmdHi');
 
-            $digestMessage = $engine->dispatchToUser($user, new NotificationDispatchData(
-                trigger: $sampleTrigger,
-                title: $title,
-                body: $body,
-                actionUrl: route('dashboard.notifications'),
-                entityType: $sample->entity_type,
-                entityId: $sample->entity_id,
-                priority: $samplePriority,
-                forcedCadence: NotificationCadence::Instant,
-                fingerprint: $digestFingerprint,
-                meta: [
-                    'digest' => true,
-                    'source_message_ids' => $undelivered->pluck('id')->all(),
-                ],
-                occurredAt: $window['end'],
-            ));
+            $digestMessage = $this->withUserLocale($user, function () use (
+                $count,
+                $digestFingerprint,
+                $engine,
+                $messageRenderer,
+                $sample,
+                $samplePriority,
+                $sampleTrigger,
+                $undelivered,
+                $user,
+                $window,
+            ): ?PendingNotification {
+                $render = [
+                    'title' => [
+                        'key' => 'notifications.messages.digest.title',
+                        'params' => [
+                            'count' => $count,
+                            'label' => $sample->title,
+                        ],
+                    ],
+                    'body' => [
+                        'key' => 'notifications.messages.digest.body',
+                        'params' => [
+                            'count' => $count,
+                        ],
+                    ],
+                ];
 
-            if (! $digestMessage instanceof NotificationMessage) {
+                return $engine->dispatchToUser($user, new NotificationDispatchData(
+                    trigger: $sampleTrigger,
+                    title: $messageRenderer->renderDefinition($render['title'], $user),
+                    body: $messageRenderer->renderDefinition($render['body'], $user),
+                    actionUrl: route('dashboard.notifications'),
+                    entityType: $sample->entity_type,
+                    entityId: $sample->entity_id,
+                    priority: $samplePriority,
+                    forcedCadence: NotificationCadence::Instant,
+                    fingerprint: $digestFingerprint,
+                    meta: [
+                        'digest' => true,
+                        'source_message_ids' => $undelivered->pluck('id')->all(),
+                    ],
+                    occurredAt: $window['end'],
+                    render: $render,
+                ));
+            });
+
+            if (! $digestMessage instanceof PendingNotification) {
                 continue;
             }
         }
@@ -215,7 +244,7 @@ class DispatchNotificationDigests implements ShouldQueue
         ];
     }
 
-    protected function messageFamily(NotificationMessage $message): NotificationFamily
+    protected function messageFamily(PendingNotification $message): NotificationFamily
     {
         $family = $message->family;
 
@@ -224,7 +253,7 @@ class DispatchNotificationDigests implements ShouldQueue
             : NotificationFamily::from((string) $family);
     }
 
-    protected function messageTrigger(NotificationMessage $message): NotificationTrigger
+    protected function messageTrigger(PendingNotification $message): NotificationTrigger
     {
         $trigger = $message->trigger;
 
@@ -233,12 +262,30 @@ class DispatchNotificationDigests implements ShouldQueue
             : NotificationTrigger::from((string) $trigger);
     }
 
-    protected function messagePriority(NotificationMessage $message): NotificationPriority
+    protected function messagePriority(PendingNotification $message): NotificationPriority
     {
         $priority = $message->priority;
 
         return $priority instanceof NotificationPriority
             ? $priority
             : NotificationPriority::from((string) $priority);
+    }
+
+    /**
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    protected function withUserLocale(User $user, callable $callback): mixed
+    {
+        $originalLocale = app()->getLocale();
+        app()->setLocale($user->preferredLocale());
+
+        try {
+            return $callback();
+        } finally {
+            app()->setLocale($originalLocale);
+        }
     }
 }

@@ -43,4 +43,15 @@ enum NotificationChannel: string
             self::Whatsapp,
         ];
     }
+
+    public function laravelChannel(): string
+    {
+        return match ($this) {
+            self::Email => 'mail',
+            self::InApp => 'database',
+            self::Push => \App\Notifications\Channels\PushChannel::class,
+            self::Whatsapp => \App\Notifications\Channels\WhatsappChannel::class,
+            default => throw new \LogicException("Channel [{$this->value}] is not supported by the Laravel notification runtime."),
+        };
+    }
 }

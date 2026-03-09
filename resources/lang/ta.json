@@ -592,7 +592,8 @@
     "your@email.com": "your@email.com",
     "Agenda": "நிகழ்ச்சி அட்டவணை",
     "As you save or register for more events, the rest of your month will continue to fill in here.": "நீங்கள் மேலும் நிகழ்வுகளை சேமிக்கவோ பதிவு செய்யவோ செய்தால், இந்த மாதத்தின் மீதமுள்ள திட்டம் இங்கே தொடர்ந்து நிரம்பும்.",
-    "Ask an institution admin to add you as a member to unlock this dashboard.": "இந்த டாஷ்போர்டை திறக்க, ஒரு நிறுவன நிர்வாகியிடம் உங்களை உறுப்பினராக சேர்க்கச் சொல்லுங்கள்.",
+    "Ask an institution admin to add you as a member to unlock this dashboard.": "இந்த டாஷ்போர்டைத் திறக்க, ஒரு நிறுவன உரிமையாளர் அல்லது நிர்வாகியிடம் உங்களை உறுப்பினராகச் சேர்க்கச் சொல்லுங்கள்.",
+    "Ask an institution owner or admin to add you as a member to unlock this dashboard.": "இந்த டாஷ்போர்டைத் திறக்க, ஒரு நிறுவன உரிமையாளர் அல்லது நிர்வாகியிடம் உங்களை உறுப்பினராகச் சேர்க்கச் சொல்லுங்கள்.",
     "Assalamualaikum, :name": "அஸ்ஸலாமு அலைக்கும், :name",
     "Attendance history you have already recorded.": "நீங்கள் ஏற்கனவே பதிவு செய்த பங்கேற்பு வரலாறு.",
     "Attendance history": "பங்கேற்பு வரலாறு",
@@ -807,7 +808,10 @@
     "Keep institution access up to date and assign the right Ahli roles for each member.": "நிறுவன அணுகலை புதுப்பித்தபடி வைத்திருந்து, ஒவ்வொரு உறுப்பினருக்கும் பொருத்தமான Ahli பொறுப்புகளை ஒதுக்குங்கள்.",
     "Existing user email": "ஏற்கனவே உள்ள பயனர் மின்னஞ்சல்",
     "Add Member": "உறுப்பினரைச் சேர்க்க",
-    "Only institution admins can add members or change roles from this dashboard.": "இந்த டாஷ்போர்டிலிருந்து உறுப்பினர்களைச் சேர்க்கவும் பொறுப்புகளை மாற்றவும் நிறுவன நிர்வாகிகளுக்கே அனுமதி.",
+    "Only institution admins can add members or change roles from this dashboard.": "இந்த டாஷ்போர்டிலிருந்து உறுப்பினர்களைச் சேர்க்க, அகற்ற, அல்லது அவர்களின் பொறுப்புகளை மாற்ற நிறுவன உரிமையாளர்களுக்கும் நிர்வாகிகளுக்கும் மட்டுமே அனுமதி.",
+    "Only institution owners and admins can add, remove, or update member roles from this dashboard.": "இந்த டாஷ்போர்டிலிருந்து உறுப்பினர்களைச் சேர்க்க, அகற்ற, அல்லது அவர்களின் பொறுப்புகளை மாற்ற நிறுவன உரிமையாளர்களுக்கும் நிர்வாகிகளுக்கும் மட்டுமே அனுமதி.",
+    "Institution owners cannot be removed from this dashboard.": "இந்த டாஷ்போர்டிலிருந்து நிறுவன உரிமையாளர்களை அகற்ற முடியாது.",
+    "Owner cannot be removed": "உரிமையாளரை அகற்ற முடியாது",
     "No institution members found yet.": "இன்னும் நிறுவன உறுப்பினர்கள் இல்லை.",
     "No roles assigned": "எந்தப் பொறுப்பும் வழங்கப்படவில்லை",
     "Save Roles": "பொறுப்புகளைச் சேமிக்க",
@@ -817,5 +821,6 @@
     "Member roles updated.": "உறுப்பினர் பொறுப்புகள் புதுப்பிக்கப்பட்டன.",
     "Member removed successfully.": "உறுப்பினர் வெற்றிகரமாக நீக்கப்பட்டார்.",
     "We could not find a user with that email address.": "அந்த மின்னஞ்சல் முகவரியுடன் பயனரை கண்டுபிடிக்க முடியவில்லை.",
-    "Pending Approval": "அனுமதி நிலுவையில்"
+    "Pending Approval": "அனுமதி நிலுவையில்",
+    "Select a role": "ஒரு பொறுப்பைத் தேர்ந்தெடுக்கவும்"
 }

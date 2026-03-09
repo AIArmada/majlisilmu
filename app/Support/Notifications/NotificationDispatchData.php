@@ -11,6 +11,10 @@ readonly class NotificationDispatchData
 {
     /**
      * @param  array<string, mixed>  $meta
+     * @param  array{
+     *     title?: array{key?: string, params?: array<string, mixed>},
+     *     body?: array{key?: string, params?: array<string, mixed>}
+     * }|null  $render
      */
     public function __construct(
         public NotificationTrigger $trigger,
@@ -25,5 +29,6 @@ readonly class NotificationDispatchData
         public array $meta = [],
         public ?CarbonInterface $occurredAt = null,
         public bool $bypassQuietHours = false,
+        public ?array $render = null,
     ) {}
 }

@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\NotificationChannel;
-use App\Enums\NotificationFrequency;
 use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -12,15 +11,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasLocalePreference
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable;
@@ -57,11 +59,10 @@ class User extends Authenticatable implements FilamentUser
             $user->registrations()->each(fn ($reg) => $reg->delete());
             $user->eventCheckins()->each(fn ($checkin) => $checkin->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
-            $user->notificationEndpoints()->each(fn ($endpoint) => $endpoint->delete());
-            $user->notificationPreferences()->each(fn ($preference) => $preference->delete());
-            $user->notificationSetting()?->delete();
+            $user->notificationSetting()->delete();
             $user->notificationRules()->each(fn ($rule) => $rule->delete());
             $user->notificationDestinations()->each(fn ($destination) => $destination->delete());
+            $user->pendingNotifications()->each(fn ($notification) => $notification->delete());
             $user->notificationMessages()->each(fn ($message) => $message->delete());
             $user->notificationDeliveries()->each(fn ($delivery) => $delivery->delete());
 
@@ -300,25 +301,19 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * @return MorphMany<NotificationEndpoint, $this>
+     * @return MorphMany<NotificationMessage, $this>
      */
-    public function notificationEndpoints(): MorphMany
+    public function notifications(): MorphMany
     {
-        return $this->morphMany(NotificationEndpoint::class, 'owner');
-    }
-
-    /**
-     * @return MorphMany<NotificationPreference, $this>
-     */
-    public function notificationPreferences(): MorphMany
-    {
-        return $this->morphMany(NotificationPreference::class, 'owner');
+        return $this->morphMany(NotificationMessage::class, 'notifiable')
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('created_at');
     }
 
     /**
      * @return HasOne<NotificationSetting, $this>
      */
-    public function notificationSetting(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function notificationSetting(): HasOne
     {
         return $this->hasOne(NotificationSetting::class);
     }
@@ -340,11 +335,19 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * @return HasMany<NotificationMessage, $this>
+     * @return HasMany<PendingNotification, $this>
      */
-    public function notificationMessages(): HasMany
+    public function pendingNotifications(): HasMany
     {
-        return $this->hasMany(NotificationMessage::class)->orderByDesc('occurred_at')->orderByDesc('created_at');
+        return $this->hasMany(PendingNotification::class)->orderByDesc('occurred_at')->orderByDesc('created_at');
+    }
+
+    /**
+     * @return MorphMany<NotificationMessage, $this>
+     */
+    public function notificationMessages(): MorphMany
+    {
+        return $this->notifications();
     }
 
     /**
@@ -355,68 +358,66 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(NotificationDelivery::class);
     }
 
-    public function notificationPreferenceFor(string $notificationKey): ?NotificationPreference
+    public function preferredLocale(): string
     {
-        $loadedPreference = $this->relationLoaded('notificationPreferences')
-            ? $this->notificationPreferences->firstWhere('notification_key', $notificationKey)
-            : null;
+        $locale = $this->notificationSetting()->value('locale');
 
-        if ($loadedPreference instanceof NotificationPreference) {
-            return $loadedPreference;
+        return is_string($locale) && $locale !== ''
+            ? $locale
+            : config('app.locale');
+    }
+
+    public function preferredTimezone(): string
+    {
+        $timezone = $this->notificationSetting()->value('timezone');
+
+        if (is_string($timezone) && $timezone !== '') {
+            return $timezone;
         }
 
-        $preference = $this->notificationPreferences()
-            ->where('notification_key', $notificationKey)
-            ->first();
-
-        return $preference instanceof NotificationPreference ? $preference : null;
+        return is_string($this->timezone) && $this->timezone !== ''
+            ? $this->timezone
+            : (string) config('app.timezone', 'UTC');
     }
 
     /**
-     * @param  list<string>  $defaultChannels
-     * @return list<string>
+     * @return array<int, string>|string|null
      */
-    public function notificationChannelsFor(
-        string $notificationKey,
-        array $defaultChannels = [NotificationChannel::Email->value]
-    ): array {
-        $preference = $this->notificationPreferenceFor($notificationKey);
-
-        if (! $preference instanceof NotificationPreference) {
-            return $defaultChannels;
+    public function routeNotificationForMail(Notification $notification): array|string|null
+    {
+        if (! $notification instanceof \App\Notifications\NotificationCenterMessage) {
+            return $this->email;
         }
 
-        if (! $preference->enabled || $preference->frequency === NotificationFrequency::Off) {
-            return [];
-        }
-
-        $channels = is_array($preference->channels) && $preference->channels !== []
-            ? $preference->channels
-            : $defaultChannels;
-
-        return array_values(array_unique(array_filter(
-            array_map(fn (mixed $channel): string => (string) $channel, $channels),
-            fn (string $channel): bool => $channel !== ''
-        )));
+        return $this->notificationDestinations()
+            ->where('channel', NotificationChannel::Email->value)
+            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
+            ->orderByDesc('is_primary')
+            ->value('address');
     }
 
-    public function shouldReceiveNotificationFor(string $notificationKey, ?string $frequency = null): bool
+    /**
+     * @return \Illuminate\Support\Collection<int, NotificationDestination>
+     */
+    public function routeNotificationForPush(Notification $notification): \Illuminate\Support\Collection
     {
-        $preference = $this->notificationPreferenceFor($notificationKey);
+        return $this->notificationDestinations()
+            ->where('channel', NotificationChannel::Push->value)
+            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
+            ->orderByDesc('is_primary')
+            ->get();
+    }
 
-        if (! $preference instanceof \App\Models\NotificationPreference) {
-            return true;
-        }
-
-        if (! $preference->enabled || $preference->frequency === NotificationFrequency::Off) {
-            return false;
-        }
-
-        if ($frequency !== null && in_array($preference->frequency, [NotificationFrequency::Daily, NotificationFrequency::Weekly], true)) {
-            return $preference->frequency->value === $frequency;
-        }
-
-        return true;
+    /**
+     * @return \Illuminate\Support\Collection<int, NotificationDestination>
+     */
+    public function routeNotificationForWhatsapp(Notification $notification): \Illuminate\Support\Collection
+    {
+        return $this->notificationDestinations()
+            ->where('channel', NotificationChannel::Whatsapp->value)
+            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
+            ->orderByDesc('is_primary')
+            ->get();
     }
 
     public function canAccessPanel(Panel $panel): bool

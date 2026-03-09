@@ -4,10 +4,6 @@ use App\Filament\Resources\Events\Pages\ViewEvent;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
-use App\Notifications\EventApprovedNotification;
-use App\Notifications\EventCancelledNotification;
-use App\Notifications\EventNeedsChangesNotification;
-use App\Notifications\EventRejectedNotification;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
@@ -44,7 +40,10 @@ describe('Approve Action (ViewEvent)', function () {
         expect($review->decision)->toBe('approved');
         expect($review->moderator_id)->toBe($moderator->id);
 
-        Notification::assertSentTo($submitter, EventApprovedNotification::class);
+        $this->assertDatabaseHas('notification_messages', [
+            'user_id' => $submitter->id,
+            'trigger' => 'submission_approved',
+        ]);
     });
 
     it('hides approve action for non-pending events', function () {
@@ -89,7 +88,10 @@ describe('Reject Action (ViewEvent)', function () {
         expect($review->decision)->toBe('rejected');
         expect($review->reason_code)->toBe('spam');
 
-        Notification::assertSentTo($submitter, EventRejectedNotification::class);
+        $this->assertDatabaseHas('notification_messages', [
+            'user_id' => $submitter->id,
+            'trigger' => 'submission_rejected',
+        ]);
     });
 
     it('requires reason code and note to reject', function () {
@@ -137,8 +139,14 @@ describe('Cancel Action (ViewEvent)', function () {
         $review = ModerationReview::where('event_id', $event->id)->latest()->first();
         expect($review->decision)->toBe('cancelled');
 
-        Notification::assertSentTo($submitter, EventCancelledNotification::class);
-        Notification::assertSentTo($goingUser, EventCancelledNotification::class);
+        $this->assertDatabaseHas('notification_messages', [
+            'user_id' => $submitter->id,
+            'trigger' => 'submission_cancelled',
+        ]);
+        $this->assertDatabaseHas('notification_messages', [
+            'user_id' => $goingUser->id,
+            'trigger' => 'event_cancelled',
+        ]);
     });
 
     it('hides cancel action for non-pending and non-approved events', function () {
@@ -183,7 +191,10 @@ describe('Request Changes Action (ViewEvent)', function () {
         expect($review->decision)->toBe('needs_changes');
         expect($review->reason_code)->toBe('incomplete_info');
 
-        Notification::assertSentTo($submitter, EventNeedsChangesNotification::class);
+        $this->assertDatabaseHas('notification_messages', [
+            'user_id' => $submitter->id,
+            'trigger' => 'submission_needs_changes',
+        ]);
     });
 });
 

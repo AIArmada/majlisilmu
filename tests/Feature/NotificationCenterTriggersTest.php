@@ -4,6 +4,7 @@ use App\Enums\NotificationTrigger;
 use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\Institution;
+use App\Models\PendingNotification;
 use App\Models\Reference;
 use App\Models\Registration;
 use App\Models\Series;
@@ -144,7 +145,7 @@ it('sends 2-hour and check-in reminders exactly once to going and registered use
         $service->dispatchDueReminderNotifications($now);
         $service->dispatchDueReminderNotifications($now);
 
-        expect(\App\Models\NotificationMessage::query()
+        expect(PendingNotification::query()
             ->whereIn('user_id', [$goingUser->id, $registeredUser->id])
             ->whereIn('trigger', [
                 NotificationTrigger::Reminder2Hours->value,

@@ -58,8 +58,8 @@
                 $authenticatedUser = auth()->user();
                 $hasInstitutionDashboardAccess = $authenticatedUser?->institutions()->exists() ?? false;
                 $notificationUnreadCount = $authenticatedUser
-                    ? \App\Models\NotificationMessage::query()
-                        ->where('user_id', $authenticatedUser->id)
+                    ? $authenticatedUser
+                        ->notificationMessages()
                         ->visibleInInbox()
                         ->whereNull('read_at')
                         ->count()

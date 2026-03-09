@@ -15,7 +15,49 @@ return [
         'push_updated' => 'Push device updated.',
     ],
     'mail' => [
+        'greeting' => 'Hello :name,',
+        'generic_recipient' => 'there',
+        'occurred_at' => 'Occurred at: :datetime',
         'footer' => 'You are receiving this because your notification settings allow this update.',
+    ],
+    'moderation' => [
+        'greeting' => 'Assalamualaikum,',
+        'not_scheduled' => 'Not scheduled yet',
+        'actions' => [
+            'review_event' => 'Review event',
+        ],
+        'fields' => [
+            'institution' => 'Institution: :name',
+            'event_datetime' => 'Event time: :datetime',
+        ],
+        'submitted' => [
+            'subject' => 'New event submitted: :title',
+            'intro' => 'A new event has been submitted and needs moderation.',
+            'public_submission' => 'Public submission',
+            'footer' => 'Please review this submission as soon as possible.',
+        ],
+        'escalation' => [
+            'subjects' => [
+                '48_hours' => 'Event pending review over 48 hours: :title',
+                '72_hours' => 'Urgent escalation for pending event: :title',
+                'urgent' => 'Time-sensitive pending event: :title',
+                'priority' => 'Priority pending event: :title',
+            ],
+            'greetings' => [
+                '48_hours' => 'Moderation SLA alert,',
+                '72_hours' => 'Urgent escalation,',
+                'urgent' => 'Time-sensitive event alert,',
+                'priority' => 'Priority event alert,',
+            ],
+            'messages' => [
+                '48_hours' => 'This event has been pending moderation for more than 48 hours.',
+                '72_hours' => 'This event has been pending moderation for more than 72 hours and needs immediate attention.',
+                'urgent' => 'This event is still pending moderation and starts within the next 24 hours.',
+                'priority' => 'This event is still pending moderation and starts within the next 6 hours.',
+            ],
+            'urgent_footer' => 'Please review this event soon so the status is resolved before it starts.',
+            'priority_footer' => 'This event needs immediate action because it is very close to starting.',
+        ],
     ],
     'destinations' => [
         'unknown_device' => 'Unknown device',

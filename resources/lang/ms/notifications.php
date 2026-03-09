@@ -15,7 +15,49 @@ return [
         'push_updated' => 'Maklumat peranti push telah dikemas kini.',
     ],
     'mail' => [
+        'greeting' => 'Salam sejahtera :name,',
+        'generic_recipient' => 'anda',
+        'occurred_at' => 'Berlaku pada: :datetime',
         'footer' => 'Anda menerima mesej ini kerana tetapan notifikasi anda membenarkan kemas kini ini.',
+    ],
+    'moderation' => [
+        'greeting' => 'Assalamualaikum,',
+        'not_scheduled' => 'Belum dijadualkan',
+        'actions' => [
+            'review_event' => 'Semak majlis',
+        ],
+        'fields' => [
+            'institution' => 'Institusi: :name',
+            'event_datetime' => 'Waktu majlis: :datetime',
+        ],
+        'submitted' => [
+            'subject' => 'Majlis baharu dihantar: :title',
+            'intro' => 'Ada majlis baharu yang telah dihantar dan perlu disemak.',
+            'public_submission' => 'Hantaran awam',
+            'footer' => 'Mohon semak hantaran ini secepat mungkin.',
+        ],
+        'escalation' => [
+            'subjects' => [
+                '48_hours' => 'Majlis menunggu semakan lebih 48 jam: :title',
+                '72_hours' => 'Eskalasi segera untuk majlis tertangguh: :title',
+                'urgent' => 'Majlis sensitif masa sedang menunggu semakan: :title',
+                'priority' => 'Majlis keutamaan tinggi sedang menunggu semakan: :title',
+            ],
+            'greetings' => [
+                '48_hours' => 'Makluman SLA moderasi,',
+                '72_hours' => 'Eskalasi segera,',
+                'urgent' => 'Makluman majlis sensitif masa,',
+                'priority' => 'Makluman majlis keutamaan tinggi,',
+            ],
+            'messages' => [
+                '48_hours' => 'Majlis ini telah menunggu semakan moderator melebihi 48 jam.',
+                '72_hours' => 'Majlis ini telah menunggu semakan moderator melebihi 72 jam dan perlukan tindakan segera.',
+                'urgent' => 'Majlis ini masih menunggu semakan dan akan bermula dalam masa 24 jam.',
+                'priority' => 'Majlis ini masih menunggu semakan dan akan bermula dalam masa 6 jam.',
+            ],
+            'urgent_footer' => 'Mohon semak majlis ini segera supaya statusnya dapat diputuskan sebelum ia bermula.',
+            'priority_footer' => 'Majlis ini perlukan tindakan serta-merta kerana waktu mulanya sudah sangat hampir.',
+        ],
     ],
     'destinations' => [
         'unknown_device' => 'Peranti tidak dikenali',

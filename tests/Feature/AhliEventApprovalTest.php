@@ -8,7 +8,6 @@ use App\Models\Institution;
 use App\Models\ModerationReview;
 use App\Models\Speaker;
 use App\Models\User;
-use App\Notifications\EventApprovedNotification;
 use App\Support\Authz\MemberRoleScopes;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
@@ -78,7 +77,10 @@ it('allows institution admins to approve pending public-submitted events from th
         ->and($review?->decision)->toBe('approved')
         ->and($review?->moderator_id)->toBe($approver->id);
 
-    Notification::assertSentTo($submitter, EventApprovedNotification::class);
+    $this->assertDatabaseHas('notification_messages', [
+        'user_id' => $submitter->id,
+        'trigger' => 'submission_approved',
+    ]);
 });
 
 it('allows institution admins to submit draft public-submitted events for review from the ahli edit page', function () {
@@ -150,7 +152,10 @@ it('allows speaker admins to approve pending public-submitted speaker-organized 
         ->and($review?->decision)->toBe('approved')
         ->and($review?->moderator_id)->toBe($approver->id);
 
-    Notification::assertSentTo($submitter, EventApprovedNotification::class);
+    $this->assertDatabaseHas('notification_messages', [
+        'user_id' => $submitter->id,
+        'trigger' => 'submission_approved',
+    ]);
 });
 
 it('allows speaker editors to approve pending public-submitted speaker-organized events from the ahli edit page', function () {

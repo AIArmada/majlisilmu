@@ -2,7 +2,6 @@
 
 use App\Enums\NotificationFamily;
 use App\Enums\NotificationTrigger;
-use App\Models\NotificationDelivery;
 use App\Models\NotificationDestination;
 use App\Models\NotificationMessage;
 use App\Models\User;
@@ -80,34 +79,29 @@ it('lists notifications and marks them as read through the api', function () {
     $user = User::factory()->create();
     Sanctum::actingAs($user);
 
-    $message = NotificationMessage::factory()->create([
-        'user_id' => $user->id,
+    $message = NotificationMessage::factory()->for($user, 'notifiable')->create([
         'family' => NotificationFamily::EventUpdates->value,
         'trigger' => NotificationTrigger::EventCancelled->value,
         'read_at' => null,
-        'title' => 'Cancelled event',
-        'meta' => ['inbox_visible' => true],
+        'data' => [
+            'title' => 'Cancelled event',
+            'body' => 'Cancelled body',
+            'channels_attempted' => ['in_app'],
+            'meta' => ['inbox_visible' => true],
+        ],
+        'inbox_visible' => true,
     ]);
-    NotificationMessage::factory()->create([
-        'user_id' => $user->id,
+    NotificationMessage::factory()->for($user, 'notifiable')->create([
         'family' => NotificationFamily::EventUpdates->value,
         'trigger' => NotificationTrigger::EventCancelled->value,
         'read_at' => null,
-        'title' => 'Hidden email-only event',
-        'meta' => ['inbox_visible' => false],
-    ]);
-    NotificationDelivery::factory()->create([
-        'notification_message_id' => $message->id,
-        'user_id' => $user->id,
-        'family' => NotificationFamily::EventUpdates->value,
-        'trigger' => NotificationTrigger::EventCancelled->value,
-        'channel' => 'in_app',
-        'destination_id' => null,
-        'provider' => null,
-        'provider_message_id' => null,
-        'status' => 'delivered',
-        'payload' => [],
-        'meta' => [],
+        'data' => [
+            'title' => 'Hidden email-only event',
+            'body' => 'Hidden body',
+            'channels_attempted' => ['email'],
+            'meta' => ['inbox_visible' => false],
+        ],
+        'inbox_visible' => false,
     ]);
 
     $this->getJson('/api/v1/notifications?family=event_updates&status=unread')
