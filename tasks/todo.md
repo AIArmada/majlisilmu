@@ -1,3 +1,32 @@
+# Affiliates Package Review
+
+- [x] Inspect `/Users/Saiffil/Herd/commerce/packages/affiliates` models, migrations, docs, and services tied to links, touchpoints, attributions, conversions, and daily stats
+- [x] Determine whether link destinations and conversion records are generic enough for MajlisIlmu share targets (`event`, `institution`, `speaker`, `saved search`) or still commerce-specific
+- [x] Write a concise evidence-based summary with file references and package-extension recommendations
+
+## Review
+
+- Conclusion:
+  - The package can capture affiliate/referral visits on arbitrary web URLs through `?aff=` style query parameters and store landing/referrer/UTM context in `affiliate_attributions`.
+  - It does not currently provide first-class resource-aware tracking for arbitrary shared content. `affiliate_links` are URL-only, are not wired into runtime click tracking, and there is no `link_id` / `resource_type` / `resource_id` carried into attributions, touchpoints, conversions, or daily stats.
+  - Conversion recording is still cart/order-centric. Automatic tracking paths are voucher-to-cart attachment and order-event conversion recording. There is no built-in referred-user signup/account-creation conversion flow.
+  - For MajlisIlmu-style dawah metrics, the package would need extensions for resource identity, non-monetary outcome types, per-link tracking, and resource-level aggregation.
+
+# Public Attribution Audit
+
+- [x] Inventory public/shareable surfaces for events, institutions, speakers, saved searches, and other public pages
+- [x] Trace signup, account creation, and event registration flows to determine attribution boundaries
+- [x] Find existing share UI, analytics, or referral-like tracking and note implementation hook points
+- [x] Write review notes confirming whether signup is separate from event registration
+
+## Review
+
+- Public/shareable surfaces currently include the event listing/detail/calendar flows, institution listing/detail, speaker listing/detail, series detail, reference detail, the public submit-event flow, public API event list/show endpoints, and sitemap/about/home pages.
+- Explicit share UI exists on event, institution, and speaker detail pages. Series and reference pages are public and followable but do not currently expose a comparable share modal.
+- Saved searches are authenticated-only. The event index forwards current query/filter state into the saved-searches page, which then persists those filters per user.
+- Signup/account creation is separate from event registration. Account creation is handled through Fortify and Google Socialite. Event registration is a separate public POST on the event page and can create guest registrations without creating a user account.
+- I did not find existing UTM/referral/campaign capture or first-class analytics beacons in app code. The closest existing tracking is operational `request_id` metadata on some APIs plus audit logging for registration exports.
+
 # Comprehensive Notification System Todo
 
 ## Notification Review Follow-up
@@ -4026,3 +4055,15 @@
   - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **18 passed**
   - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
   - `php -r 'foreach ([\"resources/lang/en.json\",\"resources/lang/ms.json\",\"resources/lang/ms_MY.json\",\"resources/lang/zh.json\",\"resources/lang/ta.json\",\"resources/lang/jv.json\"] as $file) { json_decode(file_get_contents($file)); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.\": \".json_last_error_msg().PHP_EOL); exit(1); } } echo \"locale JSON validation passed\\n\";'` => **locale JSON validation passed**
+
+# Dawah Share Impact
+
+- [ ] Add the `dawah_share_links`, `dawah_share_attributions`, `dawah_share_visits`, and `dawah_share_outcomes` tables and corresponding Eloquent models
+- [ ] Build canonical share URL generation, subject classification, attribution cookies, and visit tracking middleware
+- [ ] Record attributed signups, event registrations, saves, interests, going actions, follows, and saved-search creation
+- [ ] Add dashboard impact summary, dedicated impact pages, and tracked share UI across supported public surfaces
+- [ ] Add focused feature coverage plus PHPStan verification for the new share-impact flows
+
+## Review
+
+- In progress.

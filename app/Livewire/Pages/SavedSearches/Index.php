@@ -18,6 +18,7 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
+use App\Services\DawahShare\DawahShareService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -136,7 +137,7 @@ class Index extends Component
             return;
         }
 
-        $user->savedSearches()->create([
+        $savedSearch = $user->savedSearches()->create([
             'name' => $validated['name'],
             'query' => $validated['query'] ?? null,
             'filters' => $this->filters === [] ? null : $this->filters,
@@ -145,6 +146,17 @@ class Index extends Component
             'lng' => isset($validated['lng']) ? (float) $validated['lng'] : null,
             'notify' => $validated['notify'],
         ]);
+
+        app(DawahShareService::class)->recordOutcome(
+            type: \App\Enums\DawahShareOutcomeType::SavedSearchCreated,
+            outcomeKey: 'saved_search_created:saved_search:'.$savedSearch->id,
+            subject: null,
+            actor: $user,
+            request: request(),
+            metadata: [
+                'saved_search_id' => $savedSearch->id,
+            ],
+        );
 
         $this->reset(['name', 'query', 'radius_km', 'lat', 'lng']);
         $this->notify = 'daily';

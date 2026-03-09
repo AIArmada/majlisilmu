@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\NotificationChannel;
 use App\Support\Submission\PublicSubmissionLockService;
+use App\Models\DawahShareLink;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -59,6 +60,12 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             $user->registrations()->each(fn ($reg) => $reg->delete());
             $user->eventCheckins()->each(fn ($checkin) => $checkin->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
+            $user->dawahShareLinks()->each(function (DawahShareLink $link): void {
+                $link->outcomes()->delete();
+                $link->visits()->delete();
+                $link->attributions()->delete();
+                $link->delete();
+            });
             $user->notificationSetting()->delete();
             $user->notificationRules()->each(fn ($rule) => $rule->delete());
             $user->notificationDestinations()->each(fn ($destination) => $destination->delete());
@@ -190,6 +197,14 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     public function savedSearches(): HasMany
     {
         return $this->hasMany(SavedSearch::class);
+    }
+
+    /**
+     * @return HasMany<DawahShareLink, $this>
+     */
+    public function dawahShareLinks(): HasMany
+    {
+        return $this->hasMany(DawahShareLink::class);
     }
 
     /**

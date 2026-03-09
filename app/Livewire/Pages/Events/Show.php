@@ -11,6 +11,7 @@ use App\Models\EventSession;
 use App\Models\Registration;
 use App\Models\User;
 use App\Services\CalendarService;
+use App\Services\DawahShare\DawahShareService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
@@ -224,22 +225,14 @@ class Show extends Component
     #[Computed]
     public function shareLinks(): array
     {
-        $eventUrl = route('events.show', $this->event);
-        $shareText = trim($this->event->title.' - '.config('app.name'));
-        $encodedUrl = urlencode($eventUrl);
-        $encodedText = urlencode($shareText);
-        $encodedBody = urlencode($shareText."\n".$eventUrl);
+        /** @var array<string, string> $platformLinks */
+        $platformLinks = app(DawahShareService::class)->redirectLinks(
+            route('events.show', $this->event),
+            trim($this->event->title.' - '.config('app.name')),
+            $this->event->title,
+        );
 
-        return [
-            'whatsapp' => "https://wa.me/?text={$encodedText}%20{$encodedUrl}",
-            'telegram' => "https://t.me/share/url?url={$encodedUrl}&text={$encodedText}",
-            'line' => "https://social-plugins.line.me/lineit/share?url={$encodedUrl}",
-            'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedUrl}",
-            'x' => "https://x.com/intent/tweet?text={$encodedText}&url={$encodedUrl}",
-            'instagram' => 'https://www.instagram.com/',
-            'tiktok' => 'https://www.tiktok.com/',
-            'email' => "mailto:?subject={$encodedText}&body={$encodedBody}",
-        ];
+        return $platformLinks;
     }
 
     public function toggleSave(): void
@@ -372,7 +365,33 @@ class Show extends Component
             }
 
             $this->{$stateProperty} = true;
+            $this->recordEngagementOutcome($relation, $user);
         }
+    }
+
+    protected function recordEngagementOutcome(string $relation, User $user): void
+    {
+        $type = match ($relation) {
+            'savedEvents' => \App\Enums\DawahShareOutcomeType::EventSave,
+            'interestedEvents' => \App\Enums\DawahShareOutcomeType::EventInterest,
+            'goingEvents' => \App\Enums\DawahShareOutcomeType::EventGoing,
+            default => null,
+        };
+
+        if (! $type instanceof \App\Enums\DawahShareOutcomeType) {
+            return;
+        }
+
+        app(DawahShareService::class)->recordOutcome(
+            type: $type,
+            outcomeKey: $type->value.':user:'.$user->id.':event:'.$this->event->id,
+            subject: $this->event,
+            actor: $user,
+            request: request(),
+            metadata: [
+                'event_id' => $this->event->id,
+            ],
+        );
     }
 
     protected function syncEngagementStates(): void

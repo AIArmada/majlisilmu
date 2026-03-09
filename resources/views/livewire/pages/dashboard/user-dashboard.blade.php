@@ -21,6 +21,7 @@
     $paginatedSavedEvents = $this->paginatedSavedEvents;
     $paginatedSubmittedEvents = $this->paginatedSubmittedEvents;
     $paginatedRecentCheckins = $this->paginatedRecentCheckins;
+    $dawahImpactSummary = $this->dawahImpactSummary;
     $calendarFilters = $this->calendarFilters;
     $calendarFilterList = collect($calendarFilters)->map(
         fn (array $filter, string $key): array => ['key' => $key] + $filter,
@@ -149,6 +150,10 @@
                                 class="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-emerald-300 hover:bg-emerald-500/20">
                                 {{ __('Submit Event') }}
                             </a>
+                            <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
+                                class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-300 hover:text-emerald-200">
+                                {{ __('Dawah Impact') }}
+                            </a>
                             @if($summary['institutions_count'] > 0)
                                 <a href="{{ route('dashboard.institutions') }}" wire:navigate
                                     class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-300 hover:text-sky-200">
@@ -234,6 +239,44 @@
                                 </a>
                             </div>
                         @endif
+                    </div>
+                </div>
+            </section>
+
+            <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Dawah Impact') }}</p>
+                        <h2 class="mt-1 font-heading text-2xl font-bold text-slate-900">{{ __('What happened after your sharing') }}</h2>
+                        <p class="mt-2 text-sm text-slate-500">{{ __('These numbers stay private to you and summarise the visits and beneficial responses that followed your shared links.') }}</p>
+                    </div>
+
+                    <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
+                        class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                        {{ __('Open impact dashboard') }}
+                    </a>
+                </div>
+
+                <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Visits') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['visits']) }}</p>
+                        <p class="mt-2 text-xs text-slate-500">{{ __('Attributed visits from your shared pages.') }}</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Unique Visitors') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['unique_visitors']) }}</p>
+                        <p class="mt-2 text-xs text-slate-500">{{ __('People reached at least once.') }}</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Signups') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['signups']) }}</p>
+                        <p class="mt-2 text-xs text-slate-500">{{ __('New accounts created after a share touch.') }}</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Registrations') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['event_registrations']) }}</p>
+                        <p class="mt-2 text-xs text-slate-500">{{ __('Event registrations credited to your sharing.') }}</p>
                     </div>
                 </div>
             </section>

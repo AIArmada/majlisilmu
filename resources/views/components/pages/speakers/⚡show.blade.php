@@ -63,6 +63,16 @@ new class extends Component {
         } else {
             $user->follow($this->speaker);
             $this->isFollowing = true;
+            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+                type: \App\Enums\DawahShareOutcomeType::SpeakerFollow,
+                outcomeKey: 'speaker_follow:user:'.$user->id.':speaker:'.$this->speaker->id,
+                subject: $this->speaker,
+                actor: $user,
+                request: request(),
+                metadata: [
+                    'speaker_id' => $this->speaker->id,
+                ],
+            );
         }
     }
 
@@ -165,23 +175,19 @@ new class extends Component {
     $bioExcerpt = $isBioFilled ? Str::limit(strip_tags($bioHtml), 180) : null;
     $speakerUrl = route('speakers.show', $speaker);
     $shareText = trim($speaker->formatted_name . ' - ' . config('app.name'));
-    $encodedSpeakerUrl = urlencode($speakerUrl);
-    $encodedShareText = urlencode($shareText);
-    $encodedShareBody = urlencode($shareText . "\n" . $speakerUrl);
+    $shareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+        $speakerUrl,
+        $shareText,
+        $speaker->formatted_name,
+    );
     $shareData = [
         'title' => $speaker->formatted_name,
         'text' => $bioExcerpt ?: __('Lihat profil penceramah ini di :app', ['app' => config('app.name')]),
         'url' => $speakerUrl,
-    ];
-    $shareLinks = [
-        'whatsapp' => "https://wa.me/?text={$encodedShareText}%20{$encodedSpeakerUrl}",
-        'telegram' => "https://t.me/share/url?url={$encodedSpeakerUrl}&text={$encodedShareText}",
-        'line' => "https://social-plugins.line.me/lineit/share?url={$encodedSpeakerUrl}",
-        'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedSpeakerUrl}",
-        'x' => "https://x.com/intent/tweet?text={$encodedShareText}&url={$encodedSpeakerUrl}",
-        'instagram' => 'https://www.instagram.com/',
-        'tiktok' => 'https://www.tiktok.com/',
-        'email' => "mailto:?subject={$encodedShareText}&body={$encodedShareBody}",
+        'sourceUrl' => $speakerUrl,
+        'shareText' => $shareText,
+        'fallbackTitle' => $speaker->formatted_name,
+        'payloadEndpoint' => route('dawah-share.payload'),
     ];
 
     // Social media
@@ -305,22 +311,53 @@ new class extends Component {
         shareData: @json($shareData),
         copyMessage: @json(__('Pautan disalin ke papan klip!')),
         copyPrompt: @json(__('Copy this link:')),
-        nativeShare() {
+        attributedShareData: null,
+        async resolveShareData() {
+            if (this.attributedShareData) {
+                return this.attributedShareData;
+            }
+
+            const params = new URLSearchParams({
+                url: this.shareData.sourceUrl,
+                text: this.shareData.shareText,
+                title: this.shareData.fallbackTitle,
+            });
+            const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                return this.shareData;
+            }
+
+            const payload = await response.json();
+            this.attributedShareData = {
+                ...this.shareData,
+                url: payload.url,
+            };
+
+            return this.attributedShareData;
+        },
+        async nativeShare() {
+            const shareData = await this.resolveShareData();
             if (navigator.share) {
-                navigator.share(this.shareData);
+                navigator.share(shareData);
                 return;
             }
             this.copyLink();
         },
-        copyLink() {
+        async copyLink() {
+            const shareData = await this.resolveShareData();
             if (navigator.clipboard) {
-                navigator.clipboard.writeText(this.shareData.url).then(() => {
+                navigator.clipboard.writeText(shareData.url).then(() => {
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 2000);
                 });
                 return;
             }
-            window.prompt(this.copyPrompt, this.shareData.url);
+            window.prompt(this.copyPrompt, shareData.url);
         },
         openShareModal() {
             this.shareModalOpen = true;
