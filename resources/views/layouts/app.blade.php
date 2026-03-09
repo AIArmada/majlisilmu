@@ -57,6 +57,13 @@
                 $currentLocale = app()->getLocale();
                 $authenticatedUser = auth()->user();
                 $hasInstitutionDashboardAccess = $authenticatedUser?->institutions()->exists() ?? false;
+                $notificationUnreadCount = $authenticatedUser
+                    ? \App\Models\NotificationMessage::query()
+                        ->where('user_id', $authenticatedUser->id)
+                        ->visibleInInbox()
+                        ->whereNull('read_at')
+                        ->count()
+                    : 0;
                 $usesDashboardMenuLabel = in_array($currentLocale, ['ms', 'ms_MY'], true);
                 $dashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard' : __('Dashboard');
                 $institutionDashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard Institusi' : __('Institution Dashboard');
@@ -157,13 +164,18 @@
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Account Settings') }}
                                     </a>
+                                    <a href="{{ route('dashboard.notifications') }}" wire:navigate
+                                        class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        <span>{{ __('notifications.pages.inbox.nav_label') }}</span>
+                                        @if($notificationUnreadCount > 0)
+                                            <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                                                {{ $notificationUnreadCount }}
+                                            </span>
+                                        @endif
+                                    </a>
                                     <a href="{{ route('saved-searches.index') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Saved Searches') }}
-                                    </a>
-                                    <a href="{{ route('dashboard.digest-preferences') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Digest Preferences') }}
                                     </a>
                                     @if($hasInstitutionDashboardAccess)
                                         <a href="{{ route('dashboard.institutions') }}" wire:navigate
@@ -241,13 +253,18 @@
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ __('Account Settings') }}
                                 </a>
+                                <a href="{{ route('dashboard.notifications') }}" wire:navigate
+                                    class="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    <span>{{ __('notifications.pages.inbox.nav_label') }}</span>
+                                    @if($notificationUnreadCount > 0)
+                                        <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                                            {{ $notificationUnreadCount }}
+                                        </span>
+                                    @endif
+                                </a>
                                 <a href="{{ route('saved-searches.index') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ __('Saved Searches') }}
-                                </a>
-                                <a href="{{ route('dashboard.digest-preferences') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Digest Preferences') }}
                                 </a>
                                 @if($hasInstitutionDashboardAccess)
                                     <a href="{{ route('dashboard.institutions') }}" wire:navigate

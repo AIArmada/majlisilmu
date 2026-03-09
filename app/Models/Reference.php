@@ -16,7 +16,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Reference extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\ReferenceFactory> */
-    use HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use \App\Models\Concerns\HasFollowers, HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     #[\Override]
     protected static function booted(): void

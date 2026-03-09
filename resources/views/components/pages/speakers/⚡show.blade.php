@@ -673,8 +673,8 @@ new class extends Component {
                                                 <template x-if="cell.events?.length > 0">
                                                     <div class="mt-0.5 space-y-0.5">
                                                         <template x-for="ev in cell.events.slice(0, 2)" :key="ev.id">
-                                                            <a :href="ev.url" class="block rounded px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words transition"
-                                                               :class="ev.cancelled ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : (ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'))"
+                                                            <a :href="ev.url" class="block rounded-md border px-1.5 py-1 text-[10px] font-semibold leading-snug whitespace-normal break-words shadow-sm transition"
+                                                               :class="ev.cancelled ? 'border-rose-300 bg-rose-100 text-rose-900 shadow-rose-200/80 hover:bg-rose-200' : (ev.pending ? 'border-amber-300 bg-amber-100 text-amber-900 shadow-amber-200/80 hover:bg-amber-200' : (ev.is_remote ? 'border-sky-300 bg-sky-100 text-sky-900 shadow-sky-200/80 hover:bg-sky-200' : 'border-emerald-300 bg-emerald-100 text-emerald-900 shadow-emerald-200/80 hover:bg-emerald-200'))"
                                                                x-text="ev.title"></a>
                                                         </template>
                                                         <template x-if="cell.events?.length > 2">

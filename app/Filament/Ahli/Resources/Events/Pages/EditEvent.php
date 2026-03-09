@@ -10,6 +10,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
+use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
 use App\States\EventStatus\NeedsChanges;
@@ -150,6 +151,7 @@ class EditEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->getSubmitForReviewAction(),
             $this->getApproveAction(),
             $this->getRejectAction(),
             $this->getReconsiderAction(),
@@ -158,9 +160,35 @@ class EditEvent extends EditRecord
             Action::make('view_public')
                 ->label('View Public Page')
                 ->icon(Heroicon::OutlinedEye)
-                ->url(fn(): string => route('events.show', $this->eventRecord())),
+                ->url(fn(): string => route('events.show', $this->eventRecord()))
+                ->openUrlInNewTab(),
             DeleteAction::make(),
         ];
+    }
+
+    protected function getSubmitForReviewAction(): Action
+    {
+        return Action::make('submit_for_review')
+            ->label('Submit for Review')
+            ->icon('heroicon-o-paper-airplane')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Submit Event for Review')
+            ->modalDescription('Move this submitted draft event to pending so it can be reviewed.')
+            ->action(function (ModerationService $service): void {
+                abort_unless($this->canSubmitSubmittedDraftForReview(), 403);
+
+                $service->submitForModeration($this->eventRecord());
+
+                $this->eventRecord()->refresh();
+                $this->refreshFormData(['status']);
+
+                Notification::make()
+                    ->title('Event submitted for review')
+                    ->success()
+                    ->send();
+            })
+            ->visible(fn (): bool => $this->canSubmitSubmittedDraftForReview());
     }
 
     protected function getApproveAction(): Action
@@ -363,6 +391,26 @@ class EditEvent extends EditRecord
         $user = $this->currentUser();
 
         return $user instanceof User && $user->can('approve', $this->eventRecord());
+    }
+
+    protected function canSubmitSubmittedDraftForReview(): bool
+    {
+        $user = $this->currentUser();
+        $event = $this->eventRecord();
+
+        if (! $user instanceof User || ! $event->status instanceof Draft) {
+            return false;
+        }
+
+        if (! $event->submissions()->exists()) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+            return true;
+        }
+
+        return $event->userHasScopedEventPermission($user, 'event.approve', includeEventScope: false);
     }
 
     private function currentUser(): ?User

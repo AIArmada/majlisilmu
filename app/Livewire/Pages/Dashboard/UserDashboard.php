@@ -772,24 +772,24 @@ class UserDashboard extends Component
     protected function entryPanelClass(string $status, string $primaryRole, bool $isCheckin): string
     {
         if ($isCheckin) {
-            return 'border-slate-200 bg-slate-50 text-slate-900';
+            return 'border-slate-300 bg-slate-100 text-slate-900 shadow-sm shadow-slate-200/80';
         }
 
         if (in_array($status, ['cancelled', 'rejected'], true)) {
-            return 'border-rose-200 bg-rose-50 text-rose-900';
+            return 'border-rose-300 bg-rose-100 text-rose-950 shadow-sm shadow-rose-200/80';
         }
 
         if (in_array($status, ['pending', 'needs_changes'], true)) {
-            return 'border-amber-200 bg-amber-50 text-amber-900';
+            return 'border-amber-300 bg-amber-100 text-amber-950 shadow-sm shadow-amber-200/80';
         }
 
         return match ($primaryRole) {
-            'going' => 'border-emerald-200 bg-emerald-50/80 text-emerald-950',
-            'registered' => 'border-sky-200 bg-sky-50/80 text-sky-950',
-            'interested' => 'border-rose-200 bg-rose-50/80 text-rose-950',
-            'saved' => 'border-amber-200 bg-amber-50/80 text-amber-950',
-            'submitted' => 'border-violet-200 bg-violet-50/80 text-violet-950',
-            default => 'border-slate-200 bg-slate-50 text-slate-900',
+            'going' => 'border-emerald-300 bg-emerald-100 text-emerald-950 shadow-sm shadow-emerald-200/80',
+            'registered' => 'border-sky-300 bg-sky-100 text-sky-950 shadow-sm shadow-sky-200/80',
+            'interested' => 'border-rose-300 bg-rose-100 text-rose-950 shadow-sm shadow-rose-200/80',
+            'saved' => 'border-amber-300 bg-amber-100 text-amber-950 shadow-sm shadow-amber-200/80',
+            'submitted' => 'border-violet-300 bg-violet-100 text-violet-950 shadow-sm shadow-violet-200/80',
+            default => 'border-slate-300 bg-slate-100 text-slate-900 shadow-sm shadow-slate-200/80',
         };
     }
 

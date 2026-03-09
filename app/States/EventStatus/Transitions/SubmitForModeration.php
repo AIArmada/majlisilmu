@@ -24,6 +24,8 @@ class SubmitForModeration extends Transition implements HasColor, HasIcon, HasLa
         $this->event->status = \App\States\EventStatus\Pending::class;
         $this->event->save();
 
+        app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionReceived($this->event);
+
         // Notify moderators
         try {
             $moderators = User::role(['moderator', 'super_admin'])->get();

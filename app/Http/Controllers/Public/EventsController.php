@@ -10,6 +10,7 @@ use App\Models\EventSession;
 use App\Models\EventSettings;
 use App\Models\Registration;
 use App\Services\CalendarService;
+use App\Services\Notifications\EventNotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -22,7 +23,8 @@ use Illuminate\Validation\ValidationException;
 class EventsController extends Controller
 {
     public function __construct(
-        protected CalendarService $calendarService
+        protected CalendarService $calendarService,
+        protected EventNotificationService $eventNotificationService,
     ) {}
 
     /**
@@ -197,6 +199,18 @@ class EventsController extends Controller
             }
 
             throw $exception;
+        }
+
+        if (auth()->check()) {
+            $registration = Registration::query()
+                ->where('event_id', $event->id)
+                ->where('user_id', auth()->id())
+                ->latest('created_at')
+                ->first();
+
+            if ($registration instanceof Registration) {
+                $this->eventNotificationService->notifyRegistrationConfirmed($registration);
+            }
         }
 
         return back()->with('success', 'You have been registered for this event!');

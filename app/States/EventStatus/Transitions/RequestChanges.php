@@ -5,8 +5,6 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
-use App\Notifications\EventNeedsChangesNotification;
-use App\Support\Authz\MemberPermissionGate;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -55,7 +53,7 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
             $this->event->save();
 
             // Notify submitter and institution admins
-            $this->notifyNeedsChanges($this->event, $review);
+            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionNeedsChanges($this->event, $review->note);
 
             Log::info('Event needs changes', [
                 'event_id' => $this->event->id,
@@ -72,25 +70,6 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
         if (! $this->canTransition()) {
             throw new LogicException('Moderator and reason code are required to request event changes.');
         }
-    }
-
-    protected function notifyNeedsChanges(Event $event, ModerationReview $review): void
-    {
-        $notifiables = collect();
-
-        if ($event->submitter_id) {
-            $notifiables->push(User::find($event->submitter_id));
-        }
-
-        if ($event->institution) {
-            $admins = app(MemberPermissionGate::class)
-                ->institutionMembersWithPermission($event->institution, 'event.update');
-            $notifiables = $notifiables->merge($admins);
-        }
-
-        $notifiables->filter()->unique('id')->each(function ($user) use ($event, $review) {
-            $user->notify(new EventNeedsChangesNotification($event, $review));
-        });
     }
 
     public function getLabel(): string

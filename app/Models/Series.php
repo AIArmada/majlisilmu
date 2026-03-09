@@ -14,7 +14,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Series extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\SeriesFactory> */
-    use \App\Models\Concerns\HasLanguages, HasFactory, HasUuids, InteractsWithMedia;
+    use \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -40,12 +40,13 @@ class Series extends Model implements HasMedia
     }
 
     /**
-     * @return BelongsToMany<Event, $this>
+     * @return BelongsToMany<Event, $this, EventSeries, 'pivot'>
      */
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_series')
-            ->withPivot('order_column')
+            ->using(EventSeries::class)
+            ->withPivot('id', 'order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');
     }

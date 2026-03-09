@@ -296,7 +296,7 @@ class Show extends Component
             return;
         }
 
-        EventCheckin::query()->create([
+        $checkin = EventCheckin::query()->create([
             'event_id' => $this->event->id,
             'event_session_id' => $state['event_session_id'],
             'registration_id' => $state['registration_id'],
@@ -304,6 +304,9 @@ class Show extends Component
             'method' => $state['method'],
             'checked_in_at' => now(),
         ]);
+
+        app(\App\Services\Notifications\EventNotificationService::class)
+            ->notifyCheckinConfirmed($checkin);
 
         $this->isCheckedIn = true;
         unset($this->checkInState);

@@ -6,7 +6,7 @@
             <div class="text-center">
                 <h1 class="font-heading text-4xl font-bold text-slate-900">{{ __('Saved Searches') }}</h1>
                 <p class="text-slate-500 mt-3 text-lg">
-                    {{ __('Save your most-used filters and run them with one click.') }}
+                    {{ __('Keep the filters you use often so you can open the same search again without setting everything from scratch.') }}
                 </p>
             </div>
 
@@ -20,12 +20,17 @@
             {{-- Create section: only show when arriving from /majlis with actual filters --}}
             @if ($hasFilters)
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                    <h2 class="font-heading text-xl font-bold text-slate-900 mb-4">{{ __('Create Saved Search') }}</h2>
+                    <div class="mb-4 space-y-2">
+                        <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Save this search') }}</h2>
+                        <p class="text-sm text-slate-500">
+                            {{ __('Give this search a name so you can find it again quickly.') }}
+                        </p>
+                    </div>
 
                     <form wire:submit="save" class="space-y-4">
                         <div class="space-y-2">
                             <label for="saved-search-name"
-                                class="text-sm font-semibold text-slate-700">{{ __('Name') }}</label>
+                                class="text-sm font-semibold text-slate-700">{{ __('Search name') }}</label>
                             <input id="saved-search-name" type="text" wire:model.blur="name"
                                 placeholder="{{ __('e.g. Kuliah Maghrib KL') }}"
                                 class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
@@ -36,13 +41,12 @@
 
                         <div class="max-w-sm space-y-2">
                             <label for="saved-search-notify"
-                                class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
+                                class="text-sm font-semibold text-slate-700">{{ __('Update frequency') }}</label>
                             <select id="saved-search-notify" wire:model="notify"
                                 class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                                <option value="off">{{ __('Off') }}</option>
-                                <option value="instant">{{ __('Instant') }}</option>
-                                <option value="daily">{{ __('Daily') }}</option>
-                                <option value="weekly">{{ __('Weekly') }}</option>
+                                @foreach($this->notifyOptions() as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
                             </select>
                             @error('notify')
                                 <p class="text-sm text-danger-600">{{ $message }}</p>
@@ -57,13 +61,13 @@
                         @if($hasCriteria)
                             <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
-                                    {{ __('Captured Criteria') }}
+                                    {{ __('What will be saved') }}
                                 </p>
                                 <div class="flex flex-wrap gap-2">
                                     @if($query)
                                         <span
                                             class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                                            {{ __('Keyword') }}: {{ $query }}
+                                            {{ __('Search term:') }} {{ $query }}
                                         </span>
                                     @endif
                                     @foreach($capturedFilters as $capturedFilter)
@@ -79,7 +83,7 @@
                         <div class="flex justify-end">
                             <button type="submit"
                                 class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                                {{ __('Save Search') }}
+                                {{ __('Save this search') }}
                             </button>
                         </div>
                     </form>
@@ -88,21 +92,21 @@
 
             <section class="space-y-4">
                 <div class="flex items-center justify-between gap-4">
-                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Your Saved Searches') }}</h2>
+                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Searches you saved') }}</h2>
                     <a href="{{ route('events.index') }}" wire:navigate
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shrink-0">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        {{ __('New Saved Search') }}
+                        {{ __('Create another saved search') }}
                     </a>
                 </div>
 
                 @if($this->savedSearches->isEmpty())
                     <div class="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
-                        <p class="text-slate-600 font-medium">{{ __('No saved searches yet.') }}</p>
+                        <p class="text-slate-600 font-medium">{{ __('You do not have any saved searches yet.') }}</p>
                         <p class="text-slate-500 text-sm mt-1">
-                            {{ __('Go to the events page, apply filters, and save them from there.') }}
+                            {{ __('Go to the events page, choose the filters you want, then save that search from there.') }}
                         </p>
                         <a href="{{ route('events.index') }}" wire:navigate
                             class="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
@@ -121,18 +125,18 @@
                                         <div>
                                             <h3 class="font-heading text-lg font-bold text-slate-900">{{ $savedSearch->name }}</h3>
                                             <p class="text-xs text-slate-500 mt-1">
-                                                {{ __('Updated') }} {{ $savedSearch->updated_at?->diffForHumans() }}
+                                                {{ __('Updated :time', ['time' => $savedSearch->updated_at?->diffForHumans()]) }}
                                             </p>
                                         </div>
                                         <span
                                             class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 shrink-0">
-                                            {{ str($savedSearch->notify)->title() }}
+                                            {{ $this->notifyLabel($savedSearch->notify) }}
                                         </span>
                                     </div>
 
                                     @if($savedSearch->query)
                                         <p class="mt-3 text-sm text-slate-600">
-                                            <span class="font-semibold text-slate-800">{{ __('Keyword:') }}</span>
+                                            <span class="font-semibold text-slate-800">{{ __('Search term:') }}</span>
                                             {{ $savedSearch->query }}
                                         </p>
                                     @endif
@@ -151,7 +155,7 @@
                                     <div class="mt-4 flex items-center gap-3">
                                         <a href="{{ route('events.index', $this->toEventQueryParams($savedSearch)) }}" wire:navigate
                                             class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
-                                            {{ __('Run Search') }}
+                                            {{ __('Open Search') }}
                                         </a>
                                         <button type="button" wire:click="startEdit('{{ $savedSearch->id }}')"
                                             class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors gap-1.5">
@@ -173,7 +177,7 @@
                                     <div class="space-y-4">
                                         <div class="flex items-center justify-between">
                                             <span
-                                                class="text-xs font-bold uppercase tracking-wide text-emerald-600">{{ __('Editing') }}</span>
+                                                class="text-xs font-bold uppercase tracking-wide text-emerald-600">{{ __('Editing search') }}</span>
                                             <button type="button" wire:click="cancelEdit"
                                                 class="text-slate-400 hover:text-slate-700 transition-colors">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -185,7 +189,7 @@
 
                                         <div class="space-y-2">
                                             <label for="edit-name-{{ $savedSearch->id }}"
-                                                class="text-sm font-semibold text-slate-700">{{ __('Name') }}</label>
+                                                class="text-sm font-semibold text-slate-700">{{ __('Search name') }}</label>
                                             <input id="edit-name-{{ $savedSearch->id }}" type="text" wire:model.blur="editName"
                                                 class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
                                             @error('editName')
@@ -195,13 +199,12 @@
 
                                         <div class="space-y-2">
                                             <label for="edit-notify-{{ $savedSearch->id }}"
-                                                class="text-sm font-semibold text-slate-700">{{ __('Notify') }}</label>
+                                                class="text-sm font-semibold text-slate-700">{{ __('Update frequency') }}</label>
                                             <select id="edit-notify-{{ $savedSearch->id }}" wire:model="editNotify"
                                                 class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
-                                                <option value="off">{{ __('Off') }}</option>
-                                                <option value="instant">{{ __('Instant') }}</option>
-                                                <option value="daily">{{ __('Daily') }}</option>
-                                                <option value="weekly">{{ __('Weekly') }}</option>
+                                                @foreach($this->notifyOptions() as $value => $label)
+                                                    <option value="{{ $value }}">{{ $label }}</option>
+                                                @endforeach
                                             </select>
                                             @error('editNotify')
                                                 <p class="text-sm text-danger-600">{{ $message }}</p>
