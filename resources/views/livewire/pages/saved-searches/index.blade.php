@@ -10,13 +10,6 @@
                 </p>
             </div>
 
-            @if (session('status'))
-                <div
-                    class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
-                    {{ session('status') }}
-                </div>
-            @endif
-
             {{-- Create section: only show when arriving from /majlis with actual filters --}}
             @if ($hasFilters)
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
@@ -102,6 +95,11 @@
                     </a>
                 </div>
 
+                <div wire:loading.delay.short wire:target="save,startEdit,cancelEdit,update,delete">
+                    <x-ui.skeleton.panel-list />
+                </div>
+
+                <div wire:loading.remove wire:target="save,startEdit,cancelEdit,update,delete">
                 @if($this->savedSearches->isEmpty())
                     <div class="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
                         <p class="text-slate-600 font-medium">{{ __('You do not have any saved searches yet.') }}</p>
@@ -124,7 +122,7 @@
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
                                             <h3 class="font-heading text-lg font-bold text-slate-900">{{ $savedSearch->name }}</h3>
-                                            <p class="text-xs text-slate-500 mt-1">
+                                            <p class="mt-1 text-xs text-slate-500">
                                                 {{ __('Updated :time', ['time' => $savedSearch->updated_at?->diffForHumans()]) }}
                                             </p>
                                         </div>
@@ -227,6 +225,7 @@
                         @endforeach
                     </div>
                 @endif
+                </div>
             </section>
         </div>
     </div>

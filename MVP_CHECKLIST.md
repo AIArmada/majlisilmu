@@ -1,6 +1,6 @@
 # Majlisilmu MVP Feature Checklist
 
-**Last Updated:** 2026-02-28  
+**Last Updated:** 2026-03-10  
 **Document Purpose:** Track current MVP implementation status against the live codebase (routes, Livewire/Volt pages, Filament resources, services, jobs, tests).
 
 ---
@@ -88,14 +88,14 @@ Note: `event-submission` limiter exists, but is intentionally not attached to `s
 - [x] Institution dashboard home
 - [ ] Create/edit events for institution (institution-scoped workflow)
 - [x] View institution events list
-- [ ] Manage institution profile (self-service dashboard flow)
-- [ ] Manage donation accounts (self-service dashboard flow)
+- [x] Manage institution profile (self-service dashboard flow)
+- [x] Manage donation accounts (self-service dashboard flow)
 - [x] View event registrations
 - [ ] Export attendee list from institution dashboard UI
 
 ### Member Management
-- [ ] Add/remove institution members from institution dashboard
-- [ ] Role assignment (admin, editor, viewer) from institution dashboard
+- [x] Add/remove institution members from institution dashboard
+- [x] Role assignment (admin, editor, viewer) from institution dashboard
 - [ ] Member invitation flow
 
 Note: registration export endpoint exists (`GET /api/v1/events/{id}/registrations/export`), but institution dashboard self-service export UX is still missing.
@@ -246,9 +246,9 @@ Note: registration export endpoint exists (`GET /api/v1/events/{id}/registration
 ### General
 - [x] Responsive mobile design
 - [x] Dark mode support
-- [ ] Comprehensive loading skeleton coverage
-- [ ] System-wide toast notifications
-- [ ] Custom error pages (404, 500)
+- [x] Comprehensive loading skeleton coverage
+- [x] System-wide toast notifications
+- [x] Custom error pages (404, 500)
 
 ---
 

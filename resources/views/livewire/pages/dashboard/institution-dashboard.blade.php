@@ -69,18 +69,6 @@
                     <p class="mt-2 text-sm text-slate-500">{{ __('Ask an institution owner or admin to add you as a member to unlock this dashboard.') }}</p>
                 </section>
             @else
-                @if(session()->has('institution_dashboard_message'))
-                    <section class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                        {{ session('institution_dashboard_message') }}
-                    </section>
-                @endif
-
-                @if(session()->has('institution_dashboard_error'))
-                    <section class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
-                        {{ session('institution_dashboard_error') }}
-                    </section>
-                @endif
-
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
                     <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                         <div>
@@ -202,6 +190,11 @@
                         </div>
                     </div>
 
+                    <div wire:loading.delay.short wire:target="institutionId,eventSearch,eventStatus,eventVisibility,eventSort,eventPerPage">
+                        <x-ui.skeleton.table :rows="6" :columns="7" class="mt-5" />
+                    </div>
+
+                    <div wire:loading.remove wire:target="institutionId,eventSearch,eventStatus,eventVisibility,eventSort,eventPerPage">
                     @if($events->isEmpty())
                         <div class="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
                             <p class="text-base font-semibold text-slate-700">{{ __('No events match the current filters.') }}</p>
@@ -311,6 +304,7 @@
                             {{ $events->links(data: ['scrollTo' => '#institution-events']) }}
                         </div>
                     @endif
+                    </div>
                 </section>
 
                 <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">

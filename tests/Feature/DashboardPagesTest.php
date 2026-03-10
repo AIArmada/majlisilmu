@@ -765,7 +765,7 @@ it('only lets institution owners and admins manage members and never removes own
         ->actingAs($adminUser)
         ->test(InstitutionDashboard::class)
         ->call('removeMember', $ownerUser->id)
-        ->assertSee('Institution owners cannot be removed from this dashboard.');
+        ->assertDispatched('app-toast');
 
     expect($institution->fresh()->members()->whereKey($ownerUser->id)->exists())->toBeTrue()
         ->and(Authz::withScope($institutionScope, fn (): array => $ownerUser->fresh()->getRoleNames()->values()->all(), $ownerUser))->toBe(['owner']);

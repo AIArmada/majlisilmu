@@ -340,6 +340,8 @@
                 @yield('content')
             </main>
 
+            @include('components.ui.toast-stack')
+
             <!-- Modern Footer -->
             <footer class="mt-20 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
                 <div class="container mx-auto px-6 py-12 lg:px-12">

@@ -9,6 +9,7 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\NotificationFrequency;
 use App\Enums\TimingMode;
+use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\Reference;
@@ -32,6 +33,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use InteractsWithToasts;
+
     public string $name = '';
 
     public ?string $query = null;
@@ -162,7 +165,7 @@ class Index extends Component
         $this->notify = 'daily';
         $this->filters = [];
 
-        session()->flash('status', __('Saved search saved.'));
+        $this->successToast(__('Saved search saved.'));
     }
 
     public function delete(string $savedSearchId): void
@@ -176,7 +179,7 @@ class Index extends Component
         $savedSearch = $user->savedSearches()->where('id', $savedSearchId)->firstOrFail();
         $savedSearch->delete();
 
-        session()->flash('status', __('Saved search deleted.'));
+        $this->successToast(__('Saved search deleted.'));
     }
 
     public function startEdit(string $savedSearchId): void
@@ -222,7 +225,7 @@ class Index extends Component
 
         $this->cancelEdit();
 
-        session()->flash('status', __('Saved search updated.'));
+        $this->successToast(__('Saved search updated.'));
     }
 
     /**

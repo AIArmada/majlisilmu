@@ -674,24 +674,17 @@
         </form>
 
         <!-- Results Grid -->
-        <div class="mt-16 relative"
-            wire:loading.class="opacity-60"
-            wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
-            <div wire:loading.flex
-                wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort"
-                class="pointer-events-none absolute inset-0 z-30 items-center justify-center rounded-3xl bg-white/50 backdrop-blur-[1px]">
-                <div class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow">
-                    <svg class="h-4 w-4 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
-                        <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 00-10-10"></path>
-                    </svg>
-                    {{ __('Refreshing events...') }}
-                </div>
-            </div>
+        <div class="mt-16 relative">
             @php
                 $events = $this->events;
             @endphp
 
+            <div wire:loading.delay.short
+                wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
+                <x-ui.skeleton.event-card-grid />
+            </div>
+
+            <div wire:loading.remove wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
             @if($events->isEmpty())
                 <div class="flex flex-col items-center justify-center py-24 text-center">
                     <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
@@ -855,6 +848,7 @@
                     {{ $events->withQueryString()->links() }}
                 </div>
             @endif
+            </div>
         </div>
     </div>
 </div>

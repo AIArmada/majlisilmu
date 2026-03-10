@@ -189,6 +189,8 @@
                         @yield('content')
                     </div>
 
+                    @include('components.ui.toast-stack')
+
                 </div>
 
                 {{-- Footer / Bottom Decor --}}

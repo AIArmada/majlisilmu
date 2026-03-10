@@ -301,6 +301,7 @@ new
     $speakers = $this->speakers;
     $search = $this->search;
     $showSpeakerSubmissionForm = $this->showSpeakerSubmissionForm;
+    $speakerLoadingTarget = 'search,clearSearch';
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -386,6 +387,11 @@ new
             </div>
         @endif
 
+        <div wire:loading.delay.short wire:target="{{ $speakerLoadingTarget }}">
+            <x-ui.skeleton.speaker-card-grid />
+        </div>
+
+        <div wire:loading.remove wire:target="{{ $speakerLoadingTarget }}">
         @if($speakers->isEmpty())
             <div class="text-center py-24 rounded-3xl bg-slate-50/50 border border-dashed border-slate-200">
                 <div
@@ -450,6 +456,7 @@ new
                 {{ $speakers->links() }}
             </div>
         @endif
+        </div>
     </div>
 
     <x-filament-actions::modals />
