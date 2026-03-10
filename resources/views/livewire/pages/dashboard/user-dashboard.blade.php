@@ -1,7 +1,4 @@
-@php
-    $dashboardPageLabel = in_array(app()->getLocale(), ['ms', 'ms_MY'], true) ? 'Dashboard' : __('Dashboard');
-@endphp
-@section('title', $dashboardPageLabel . ' - ' . config('app.name'))
+@section('title', __('Dashboard') . ' - ' . config('app.name'))
 
 @php
     $user = auth()->user();
@@ -21,7 +18,6 @@
     $paginatedSavedEvents = $this->paginatedSavedEvents;
     $paginatedSubmittedEvents = $this->paginatedSubmittedEvents;
     $paginatedRecentCheckins = $this->paginatedRecentCheckins;
-    $dawahImpactSummary = $this->dawahImpactSummary;
     $calendarFilters = $this->calendarFilters;
     $calendarFilterList = collect($calendarFilters)->map(
         fn (array $filter, string $key): array => ['key' => $key] + $filter,
@@ -133,7 +129,7 @@
 
                 <div class="relative z-10 grid gap-8 xl:grid-cols-[1.3fr,0.9fr] xl:items-start">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">{{ $dashboardPageLabel }}</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">{{ __('Attendee Planner') }}</p>
                         <h1 class="mt-3 font-heading text-3xl font-bold tracking-tight text-white md:text-4xl">
                             {{ __('Assalamualaikum, :name', ['name' => $firstName]) }}
                         </h1>
@@ -149,10 +145,6 @@
                             <a href="{{ route('submit-event.create') }}" wire:navigate
                                 class="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-emerald-300 hover:bg-emerald-500/20">
                                 {{ __('Submit Event') }}
-                            </a>
-                            <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                                class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-300 hover:text-emerald-200">
-                                {{ __('Dawah Impact') }}
                             </a>
                             @if($summary['institutions_count'] > 0)
                                 <a href="{{ route('dashboard.institutions') }}" wire:navigate
@@ -239,44 +231,6 @@
                                 </a>
                             </div>
                         @endif
-                    </div>
-                </div>
-            </section>
-
-            <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Dawah Impact') }}</p>
-                        <h2 class="mt-1 font-heading text-2xl font-bold text-slate-900">{{ __('What happened after your sharing') }}</h2>
-                        <p class="mt-2 text-sm text-slate-500">{{ __('These numbers stay private to you and summarise the visits and beneficial responses that followed your shared links.') }}</p>
-                    </div>
-
-                    <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
-                        {{ __('Open impact dashboard') }}
-                    </a>
-                </div>
-
-                <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Visits') }}</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['visits']) }}</p>
-                        <p class="mt-2 text-xs text-slate-500">{{ __('Attributed visits from your shared pages.') }}</p>
-                    </div>
-                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Unique Visitors') }}</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['unique_visitors']) }}</p>
-                        <p class="mt-2 text-xs text-slate-500">{{ __('People reached at least once.') }}</p>
-                    </div>
-                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Signups') }}</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['signups']) }}</p>
-                        <p class="mt-2 text-xs text-slate-500">{{ __('New accounts created after a share touch.') }}</p>
-                    </div>
-                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Registrations') }}</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['event_registrations']) }}</p>
-                        <p class="mt-2 text-xs text-slate-500">{{ __('Event registrations credited to your sharing.') }}</p>
                     </div>
                 </div>
             </section>
@@ -395,8 +349,9 @@
                                         :class="cell.day === null ? 'bg-slate-50/40' : 'bg-white'">
                                         <template x-if="cell.day !== null">
                                             <div class="flex h-full flex-col">
-                                                <div class="flex items-center">
+                                                <div class="flex items-center justify-between">
                                                     <span class="text-xs font-bold text-slate-500" x-text="cell.day"></span>
+                                                    <span x-show="cell.entries.length > 0" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500" x-text="cell.entries.length"></span>
                                                 </div>
 
                                                 <div class="mt-1 flex-1 space-y-1">
@@ -405,6 +360,7 @@
                                                             class="block rounded-lg border px-2 py-1.5 text-[10px] leading-snug transition"
                                                             :class="entry.panel_class + (entry.url ? ' hover:shadow-sm' : ' pointer-events-none')">
                                                             <p class="line-clamp-2 font-semibold" x-text="entry.title"></p>
+                                                            <p class="mt-0.5 truncate opacity-75" x-text="entry.role_badges.map(badge => badge.label).join(' • ')"></p>
                                                         </a>
                                                     </template>
                                                     <template x-if="cell.entries.length > 2">
@@ -421,10 +377,15 @@
                 </section>
 
                 <section id="planner-agenda" class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-                    <div>
+                    <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-[0.18em] text-sky-600">{{ __('Upcoming Agenda') }}</p>
+                            <h2 class="mt-2 font-heading text-2xl font-bold text-slate-900">{{ __('What needs your attention next') }}</h2>
                         </div>
+                        <a href="{{ route('events.index') }}" wire:navigate
+                            class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700">
+                            {{ __('Find more') }}
+                        </a>
                     </div>
 
                     @if($paginatedAgenda->isEmpty())

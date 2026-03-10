@@ -95,24 +95,6 @@ it('displays upcoming events for the institution', function () {
         ->assertSee('Kuliah Subuh Lalu');
 });
 
-it('uses stronger calendar event colors on institution page', function () {
-    $institution = Institution::factory()->create(['status' => 'verified']);
-
-    Event::factory()
-        ->for($institution)
-        ->create([
-            'status' => 'approved',
-            'visibility' => EventVisibility::Public,
-            'starts_at' => now()->addDays(3),
-            'title' => 'Kuliah Kalender Institusi',
-        ]);
-
-    $this->get(route('institutions.show', $institution))
-        ->assertSuccessful()
-        ->assertSee('border-emerald-300 bg-emerald-100 text-emerald-900 shadow-emerald-200/80 hover:bg-emerald-200', false)
-        ->assertDontSee('bg-emerald-50 text-emerald-700 hover:bg-emerald-100', false);
-});
-
 it('displays affiliated speakers', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 

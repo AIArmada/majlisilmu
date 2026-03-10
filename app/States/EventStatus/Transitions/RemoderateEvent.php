@@ -38,8 +38,6 @@ class RemoderateEvent extends Transition implements HasColor, HasIcon, HasLabel
             $this->event->status = \App\States\EventStatus\Pending::class;
             $this->event->save();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionRemoderated($this->event, $this->note);
-
             // Remove from search temporarily
             $this->event->unsearchable();
 

@@ -34,8 +34,6 @@ class ReconsiderEvent extends Transition implements HasColor, HasIcon, HasLabel
             $this->event->status = \App\States\EventStatus\Pending::class;
             $this->event->save();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionRemoderated($this->event, $this->note);
-
             Log::info('Rejected event reconsidered', [
                 'event_id' => $this->event->id,
                 'moderator_id' => $this->moderator?->id,

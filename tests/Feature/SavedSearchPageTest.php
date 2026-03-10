@@ -215,7 +215,7 @@ it('hides the create saved search form when no filters are present', function ()
     $this->actingAs($user)
         ->get(route('saved-searches.index'))
         ->assertOk()
-        ->assertDontSee('Simpan carian ini');
+        ->assertDontSee('Create Saved Search');
 });
 
 it('shows the create saved search form when filters are present in the url', function () {
@@ -224,7 +224,7 @@ it('shows the create saved search form when filters are present in the url', fun
     $this->actingAs($user)
         ->get(route('saved-searches.index', ['time_scope' => 'upcoming']))
         ->assertOk()
-        ->assertSee('Simpan carian ini');
+        ->assertSee('Create Saved Search');
 });
 
 it('shows the create saved search form when location coordinates are present in the url', function () {
@@ -237,7 +237,7 @@ it('shows the create saved search form when location coordinates are present in 
             'radius_km' => '20',
         ]))
         ->assertOk()
-        ->assertSee('Simpan carian ini');
+        ->assertSee('Create Saved Search');
 });
 
 it('hides the create saved search form when only a keyword is present without filters', function () {
@@ -246,7 +246,7 @@ it('hides the create saved search form when only a keyword is present without fi
     $this->actingAs($user)
         ->get(route('saved-searches.index', ['search' => 'tafsir']))
         ->assertOk()
-        ->assertDontSee('Simpan carian ini');
+        ->assertDontSee('Create Saved Search');
 });
 
 it('allows authenticated users to edit a saved search name and notification', function () {
@@ -312,36 +312,4 @@ it('cancels editing and clears edit state', function () {
         ->assertSet('editingId', null)
         ->assertSet('editName', '')
         ->assertSet('editNotify', 'daily');
-});
-
-it('renders saved searches page copy and notify labels naturally in malay', function () {
-    $user = User::factory()->create();
-
-    SavedSearch::factory()->create([
-        'user_id' => $user->id,
-        'name' => 'Kuliah Maghrib Shah Alam',
-        'query' => 'maghrib',
-        'notify' => 'daily',
-        'filters' => [
-            'event_format' => ['online'],
-            'language_codes' => ['ms', 'en'],
-            'starts_after' => '2026-03-12',
-            'starts_time_from' => '20:15',
-        ],
-    ]);
-
-    $this->actingAs($user)
-        ->withSession(['locale' => 'ms'])
-        ->get(route('saved-searches.index'))
-        ->assertOk()
-        ->assertSee('Carian yang anda simpan')
-        ->assertSee('Simpan penapis yang anda selalu guna supaya anda boleh buka semula carian yang sama tanpa tetapkan semuanya dari awal.')
-        ->assertSee('Dikemas kini')
-        ->assertSee('Harian')
-        ->assertSee('Format Majlis: Dalam talian')
-        ->assertSee('Bahasa: Bahasa Melayu, Bahasa Inggeris')
-        ->assertSee('Tarikh Dari: 12 Mac 2026')
-        ->assertSee('Masa Dari: 8:15 PM')
-        ->assertDontSee('Daily')
-        ->assertDontSee('Languages');
 });

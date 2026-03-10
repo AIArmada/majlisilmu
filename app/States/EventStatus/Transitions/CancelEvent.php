@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Notifications\EventCancelledNotification;
+use App\Support\Authz\MemberPermissionGate;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -49,8 +51,7 @@ class CancelEvent extends Transition implements HasColor, HasIcon, HasLabel
             // Cancelled events remain searchable so users can still discover status updates.
             $this->event->searchable();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionCancelled($this->event, $this->note);
-            app(\App\Services\Notifications\EventNotificationService::class)->notifyTrackedEventCancelled($this->event, $this->note);
+            $this->notifyCancellation($this->event);
 
             Log::info('Event cancelled', [
                 'event_id' => $this->event->id,
@@ -66,6 +67,33 @@ class CancelEvent extends Transition implements HasColor, HasIcon, HasLabel
         if (! $this->canTransition()) {
             throw new LogicException('Moderator is required to cancel an event.');
         }
+    }
+
+    protected function notifyCancellation(Event $event): void
+    {
+        $notifiables = collect();
+
+        if ($event->submitter_id) {
+            $notifiables->push(User::find($event->submitter_id));
+        }
+
+        if ($event->institution) {
+            $institutionAdmins = app(MemberPermissionGate::class)
+                ->institutionMembersWithPermission($event->institution, 'event.update');
+            $notifiables = $notifiables->merge($institutionAdmins);
+        }
+
+        $notifiables = $notifiables
+            ->merge($event->goingBy()->get())
+            ->merge($event->interestedBy()->get())
+            ->merge($event->savedBy()->get());
+
+        $notifiables
+            ->filter(fn (mixed $user): bool => $user instanceof User)
+            ->unique('id')
+            ->each(function (User $user) use ($event): void {
+                $user->notify(new EventCancelledNotification($event, $this->note));
+            });
     }
 
     public function getLabel(): string

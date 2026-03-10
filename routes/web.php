@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
@@ -20,11 +19,6 @@ Route::get('/oauth/{provider}/callback', [SocialiteController::class, 'callback'
     ->name('socialite.callback')
     ->whereIn('provider', ['google']);
 
-Route::get('/kongsi/payload', [DawahShareController::class, 'payload'])->name('dawah-share.payload');
-Route::get('/kongsi/{provider}', [DawahShareController::class, 'redirect'])
-    ->whereIn('provider', ['whatsapp', 'telegram', 'line', 'facebook', 'x', 'instagram', 'tiktok', 'email'])
-    ->name('dawah-share.redirect');
-
 // Authentication is handled by Fortify
 
 // Events (with search rate limiting)
@@ -40,15 +34,10 @@ Route::livewire('/hantar-majlis', 'pages.submit-event.create')
 Route::livewire('/hantar-majlis/berjaya', 'pages.submit-event.success')->name('submit-event.success');
 
 Route::middleware('auth')->group(function () {
-    Route::livewire('/dashboard', \App\Livewire\Pages\Dashboard\UserDashboard::class)->name('dashboard');
-    Route::redirect('/papan-pemuka', '/dashboard', 301);
-    Route::livewire('/dashboard/dawah-impact', \App\Livewire\Pages\Dashboard\DawahImpactIndex::class)->name('dashboard.dawah-impact');
-    Route::livewire('/dashboard/dawah-impact/links', \App\Livewire\Pages\Dashboard\DawahImpactIndex::class)->name('dashboard.dawah-impact.links');
-    Route::livewire('/dashboard/dawah-impact/links/{link}', \App\Livewire\Pages\Dashboard\DawahImpactLinkShow::class)->name('dashboard.dawah-impact.links.show');
-    Route::livewire('/dashboard/notifications', \App\Livewire\Pages\Dashboard\NotificationsIndex::class)->name('dashboard.notifications');
-    Route::redirect('/papan-pemuka/notifikasi', '/dashboard/notifications', 301);
-    Route::livewire('/tetapan-akaun', \App\Livewire\Pages\Dashboard\AccountSettings::class)->name('dashboard.account-settings');
-    Route::livewire('/dashboard/institusi', \App\Livewire\Pages\Dashboard\InstitutionDashboard::class)->name('dashboard.institutions');
+    Route::livewire('/papan-pemuka', \App\Livewire\Pages\Dashboard\UserDashboard::class)->name('dashboard');
+    Route::livewire('/papan-pemuka/tetapan-akaun', \App\Livewire\Pages\Dashboard\AccountSettings::class)->name('dashboard.account-settings');
+    Route::livewire('/papan-pemuka/pilihan-digest', \App\Livewire\Pages\Dashboard\DigestPreferences::class)->name('dashboard.digest-preferences');
+    Route::livewire('/papan-pemuka/institusi', \App\Livewire\Pages\Dashboard\InstitutionDashboard::class)->name('dashboard.institutions');
     Route::livewire('/papan-pemuka/majlis/cipta-lanjutan', \App\Livewire\Pages\Dashboard\Events\CreateAdvanced::class)->name('dashboard.events.create-advanced');
     Route::livewire('/papan-pemuka/majlis/{event}/jadual', \App\Livewire\Pages\Dashboard\Events\Schedule::class)->name('dashboard.events.schedule');
     Route::livewire('/carian-tersimpan', \App\Livewire\Pages\SavedSearches\Index::class)->name('saved-searches.index');
@@ -104,6 +93,10 @@ Route::redirect('/sitemap-institutions.xml', '/peta-laman-institusi.xml', 301);
 Route::redirect('/sitemap-speakers.xml', '/peta-laman-penceramah.xml', 301);
 
 Route::middleware('auth')->group(function () {
+    Route::livewire('/dashboard', \App\Livewire\Pages\Dashboard\UserDashboard::class);
+    Route::livewire('/dashboard/account-settings', \App\Livewire\Pages\Dashboard\AccountSettings::class);
+    Route::livewire('/dashboard/digest-preferences', \App\Livewire\Pages\Dashboard\DigestPreferences::class);
+    Route::livewire('/dashboard/institutions', \App\Livewire\Pages\Dashboard\InstitutionDashboard::class);
     Route::livewire('/dashboard/events/create-advanced', \App\Livewire\Pages\Dashboard\Events\CreateAdvanced::class);
     Route::livewire('/dashboard/events/{event}/schedule', \App\Livewire\Pages\Dashboard\Events\Schedule::class);
     Route::livewire('/saved-searches', \App\Livewire\Pages\SavedSearches\Index::class);

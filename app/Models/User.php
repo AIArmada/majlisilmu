@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Enums\NotificationChannel;
+use App\Enums\NotificationFrequency;
 use App\Support\Submission\PublicSubmissionLockService;
-use App\Models\DawahShareLink;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -12,18 +12,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser, HasLocalePreference
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable;
@@ -60,18 +57,8 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             $user->registrations()->each(fn ($reg) => $reg->delete());
             $user->eventCheckins()->each(fn ($checkin) => $checkin->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
-            $user->dawahShareLinks()->each(function (DawahShareLink $link): void {
-                $link->outcomes()->delete();
-                $link->visits()->delete();
-                $link->attributions()->delete();
-                $link->delete();
-            });
-            $user->notificationSetting()->delete();
-            $user->notificationRules()->each(fn ($rule) => $rule->delete());
-            $user->notificationDestinations()->each(fn ($destination) => $destination->delete());
-            $user->pendingNotifications()->each(fn ($notification) => $notification->delete());
-            $user->notificationMessages()->each(fn ($message) => $message->delete());
-            $user->notificationDeliveries()->each(fn ($delivery) => $delivery->delete());
+            $user->notificationEndpoints()->each(fn ($endpoint) => $endpoint->delete());
+            $user->notificationPreferences()->each(fn ($preference) => $preference->delete());
 
             \Illuminate\Support\Facades\DB::table('followings')->where('user_id', $user->id)->delete();
         });
@@ -200,14 +187,6 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     }
 
     /**
-     * @return HasMany<DawahShareLink, $this>
-     */
-    public function dawahShareLinks(): HasMany
-    {
-        return $this->hasMany(DawahShareLink::class);
-    }
-
-    /**
      * @return BelongsToMany<Event, $this>
      */
     public function savedEvents(): BelongsToMany
@@ -239,15 +218,6 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     public function followingReferences(): MorphToMany
     {
         return $this->morphedByMany(Reference::class, 'followable', 'followings')
-            ->withTimestamps();
-    }
-
-    /**
-     * @return MorphToMany<Series, $this>
-     */
-    public function followingSeries(): MorphToMany
-    {
-        return $this->morphedByMany(Series::class, 'followable', 'followings')
             ->withTimestamps();
     }
 
@@ -316,123 +286,83 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     }
 
     /**
-     * @return MorphMany<NotificationMessage, $this>
+     * @return MorphMany<NotificationEndpoint, $this>
      */
-    public function notifications(): MorphMany
+    public function notificationEndpoints(): MorphMany
     {
-        return $this->morphMany(NotificationMessage::class, 'notifiable')
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('created_at');
+        return $this->morphMany(NotificationEndpoint::class, 'owner');
     }
 
     /**
-     * @return HasOne<NotificationSetting, $this>
+     * @return MorphMany<NotificationPreference, $this>
      */
-    public function notificationSetting(): HasOne
+    public function notificationPreferences(): MorphMany
     {
-        return $this->hasOne(NotificationSetting::class);
+        return $this->morphMany(NotificationPreference::class, 'owner');
     }
 
-    /**
-     * @return HasMany<NotificationRule, $this>
-     */
-    public function notificationRules(): HasMany
+    public function notificationPreferenceFor(string $notificationKey): ?NotificationPreference
     {
-        return $this->hasMany(NotificationRule::class);
-    }
+        $loadedPreference = $this->relationLoaded('notificationPreferences')
+            ? $this->notificationPreferences->firstWhere('notification_key', $notificationKey)
+            : null;
 
-    /**
-     * @return HasMany<NotificationDestination, $this>
-     */
-    public function notificationDestinations(): HasMany
-    {
-        return $this->hasMany(NotificationDestination::class);
-    }
-
-    /**
-     * @return HasMany<PendingNotification, $this>
-     */
-    public function pendingNotifications(): HasMany
-    {
-        return $this->hasMany(PendingNotification::class)->orderByDesc('occurred_at')->orderByDesc('created_at');
-    }
-
-    /**
-     * @return MorphMany<NotificationMessage, $this>
-     */
-    public function notificationMessages(): MorphMany
-    {
-        return $this->notifications();
-    }
-
-    /**
-     * @return HasMany<NotificationDelivery, $this>
-     */
-    public function notificationDeliveries(): HasMany
-    {
-        return $this->hasMany(NotificationDelivery::class);
-    }
-
-    public function preferredLocale(): string
-    {
-        $locale = $this->notificationSetting()->value('locale');
-
-        return is_string($locale) && $locale !== ''
-            ? $locale
-            : config('app.locale');
-    }
-
-    public function preferredTimezone(): string
-    {
-        $timezone = $this->notificationSetting()->value('timezone');
-
-        if (is_string($timezone) && $timezone !== '') {
-            return $timezone;
+        if ($loadedPreference instanceof NotificationPreference) {
+            return $loadedPreference;
         }
 
-        return is_string($this->timezone) && $this->timezone !== ''
-            ? $this->timezone
-            : (string) config('app.timezone', 'UTC');
+        $preference = $this->notificationPreferences()
+            ->where('notification_key', $notificationKey)
+            ->first();
+
+        return $preference instanceof NotificationPreference ? $preference : null;
     }
 
     /**
-     * @return array<int, string>|string|null
+     * @param  list<string>  $defaultChannels
+     * @return list<string>
      */
-    public function routeNotificationForMail(Notification $notification): array|string|null
-    {
-        if (! $notification instanceof \App\Notifications\NotificationCenterMessage) {
-            return $this->email;
+    public function notificationChannelsFor(
+        string $notificationKey,
+        array $defaultChannels = [NotificationChannel::Email->value]
+    ): array {
+        $preference = $this->notificationPreferenceFor($notificationKey);
+
+        if (! $preference instanceof NotificationPreference) {
+            return $defaultChannels;
         }
 
-        return $this->notificationDestinations()
-            ->where('channel', NotificationChannel::Email->value)
-            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
-            ->orderByDesc('is_primary')
-            ->value('address');
+        if (! $preference->enabled || $preference->frequency === NotificationFrequency::Off) {
+            return [];
+        }
+
+        $channels = is_array($preference->channels) && $preference->channels !== []
+            ? $preference->channels
+            : $defaultChannels;
+
+        return array_values(array_unique(array_filter(
+            array_map(fn (mixed $channel): string => (string) $channel, $channels),
+            fn (string $channel): bool => $channel !== ''
+        )));
     }
 
-    /**
-     * @return \Illuminate\Support\Collection<int, NotificationDestination>
-     */
-    public function routeNotificationForPush(Notification $notification): \Illuminate\Support\Collection
+    public function shouldReceiveNotificationFor(string $notificationKey, ?string $frequency = null): bool
     {
-        return $this->notificationDestinations()
-            ->where('channel', NotificationChannel::Push->value)
-            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
-            ->orderByDesc('is_primary')
-            ->get();
-    }
+        $preference = $this->notificationPreferenceFor($notificationKey);
 
-    /**
-     * @return \Illuminate\Support\Collection<int, NotificationDestination>
-     */
-    public function routeNotificationForWhatsapp(Notification $notification): \Illuminate\Support\Collection
-    {
-        return $this->notificationDestinations()
-            ->where('channel', NotificationChannel::Whatsapp->value)
-            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
-            ->orderByDesc('is_primary')
-            ->get();
+        if (! $preference instanceof \App\Models\NotificationPreference) {
+            return true;
+        }
+
+        if (! $preference->enabled || $preference->frequency === NotificationFrequency::Off) {
+            return false;
+        }
+
+        if ($frequency !== null && in_array($preference->frequency, [NotificationFrequency::Daily, NotificationFrequency::Weekly], true)) {
+            return $preference->frequency->value === $frequency;
+        }
+
+        return true;
     }
 
     public function canAccessPanel(Panel $panel): bool

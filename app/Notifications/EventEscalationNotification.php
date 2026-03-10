@@ -2,9 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
-use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -17,9 +15,7 @@ class EventEscalationNotification extends Notification implements ShouldQueue
     public function __construct(
         public Event $event,
         public string $escalationType,
-    ) {
-        $this->afterCommit();
-    }
+    ) {}
 
     /**
      * @return array<int, string>
@@ -29,35 +25,35 @@ class EventEscalationNotification extends Notification implements ShouldQueue
         return ['mail', 'database'];
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public function viaQueues(): array
-    {
-        return [
-            'mail' => 'notifications-mail',
-            'database' => 'notifications-inbox',
-        ];
-    }
-
     public function toMail(object $notifiable): MailMessage
     {
-        $message = (new MailMessage)
-            ->subject($this->subject())
-            ->greeting($this->greeting())
-            ->line($this->mainMessage())
-            ->line(__('notifications.moderation.fields.event_datetime', ['datetime' => $this->localizedStartsAt($notifiable)]));
+        $subject = match ($this->escalationType) {
+            '48_hours' => "⚠️ Event Pending Review > 48 Hours: {$this->event->title}",
+            '72_hours' => "🚨 URGENT: Event Pending > 72 Hours: {$this->event->title}",
+            'urgent' => "⏰ Time-Sensitive: Event Starting Soon: {$this->event->title}",
+            'priority' => "🔴 PRIORITY: Event Starting Soon: {$this->event->title}",
+            default => "Event Escalation: {$this->event->title}",
+        };
 
-        if (filled($this->event->institution?->name)) {
-            $message->line(__('notifications.moderation.fields.institution', ['name' => $this->event->institution->name]));
+        $message = (new MailMessage)
+            ->subject($subject)
+            ->greeting($this->getGreeting())
+            ->line($this->getMainMessage());
+
+        if ($this->event->starts_at) {
+            $message->line("Event starts: {$this->event->starts_at->format('l, F j, Y \\a\\t h:i A')}");
         }
 
-        $message->action(__('notifications.moderation.actions.review_event'), $this->reviewUrl());
+        if ($this->event->institution) {
+            $message->line("Institution: {$this->event->institution->name}");
+        }
+
+        $message->action('Review Event', url("/admin/events/{$this->event->id}"));
 
         if ($this->escalationType === 'priority') {
-            $message->line(__('notifications.moderation.escalation.priority_footer'));
+            $message->line('⚠️ This event requires immediate attention as it starts very soon.');
         } elseif ($this->escalationType === 'urgent') {
-            $message->line(__('notifications.moderation.escalation.urgent_footer'));
+            $message->line('⏰ Please review this event soon - it starts within 24 hours.');
         }
 
         return $message;
@@ -73,59 +69,28 @@ class EventEscalationNotification extends Notification implements ShouldQueue
             'event_title' => $this->event->title,
             'escalation_type' => $this->escalationType,
             'starts_at' => $this->event->starts_at?->toIso8601String(),
-            'action_url' => $this->reviewUrl(),
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function toDatabase(object $notifiable): array
+    private function getGreeting(): string
     {
-        return $this->toArray($notifiable);
+        return match ($this->escalationType) {
+            '48_hours' => 'Moderation SLA Alert',
+            '72_hours' => 'URGENT: Super Admin Escalation',
+            'urgent' => 'Time-Sensitive Event Alert',
+            'priority' => 'Priority Event Alert',
+            default => 'Event Escalation',
+        };
     }
 
-    public function databaseType(object $notifiable): string
+    private function getMainMessage(): string
     {
-        return 'event_escalation';
-    }
-
-    protected function subject(): string
-    {
-        return __('notifications.moderation.escalation.subjects.'.$this->escalationType, [
-            'title' => $this->event->title,
-        ]);
-    }
-
-    protected function greeting(): string
-    {
-        return __('notifications.moderation.escalation.greetings.'.$this->escalationType);
-    }
-
-    protected function mainMessage(): string
-    {
-        return __('notifications.moderation.escalation.messages.'.$this->escalationType);
-    }
-
-    protected function reviewUrl(): string
-    {
-        return EventResource::getUrl('edit', ['record' => $this->event], panel: 'admin');
-    }
-
-    protected function localizedStartsAt(object $notifiable): string
-    {
-        if (! $this->event->starts_at instanceof CarbonInterface) {
-            return __('notifications.moderation.not_scheduled');
-        }
-
-        $timezone = isset($notifiable->timezone) && is_string($notifiable->timezone) && $notifiable->timezone !== ''
-            ? $notifiable->timezone
-            : config('app.timezone');
-        $locale = method_exists($notifiable, 'preferredLocale')
-            ? (string) $notifiable->preferredLocale()
-            : app()->getLocale();
-        $startsAt = $this->event->starts_at->copy()->timezone($timezone)->locale($locale);
-
-        return $startsAt->translatedFormat('l, j F Y').', '.$startsAt->format('h:i A');
+        return match ($this->escalationType) {
+            '48_hours' => 'The following event has been pending moderation for more than 48 hours:',
+            '72_hours' => 'The following event has been pending moderation for more than 72 hours and requires immediate attention:',
+            'urgent' => 'The following event is still pending moderation and starts within 24 hours:',
+            'priority' => 'The following event is still pending moderation but starts within 6 hours:',
+            default => 'An event requires your attention:',
+        };
     }
 }

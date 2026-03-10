@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Notifications\EventRejectedNotification;
+use App\Support\Authz\MemberPermissionGate;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -56,7 +58,7 @@ class RejectEvent extends Transition implements HasColor, HasIcon, HasLabel
             $this->event->unsearchable();
 
             // Notify submitter
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionRejected($this->event, $review->note);
+            $this->notifyRejection($this->event, $review);
 
             Log::info('Event rejected', [
                 'event_id' => $this->event->id,
@@ -73,6 +75,25 @@ class RejectEvent extends Transition implements HasColor, HasIcon, HasLabel
         if (! $this->canTransition()) {
             throw new LogicException('Moderator and reason code are required to reject an event.');
         }
+    }
+
+    protected function notifyRejection(Event $event, ModerationReview $review): void
+    {
+        $notifiables = collect();
+
+        if ($event->submitter_id) {
+            $notifiables->push(User::find($event->submitter_id));
+        }
+
+        if ($event->institution) {
+            $admins = app(MemberPermissionGate::class)
+                ->institutionMembersWithPermission($event->institution, 'event.update');
+            $notifiables = $notifiables->merge($admins);
+        }
+
+        $notifiables->filter()->unique('id')->each(function ($user) use ($event, $review) {
+            $user->notify(new EventRejectedNotification($event, $review));
+        });
     }
 
     public function getLabel(): string
