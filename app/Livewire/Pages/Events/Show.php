@@ -298,6 +298,20 @@ class Show extends Component
             'checked_in_at' => now(),
         ]);
 
+        app(DawahShareService::class)->recordOutcome(
+            type: \App\Enums\DawahShareOutcomeType::EventCheckin,
+            outcomeKey: 'event_checkin:checkin:'.$checkin->id,
+            subject: $this->event,
+            actor: $user,
+            request: request(),
+            metadata: [
+                'checkin_id' => $checkin->id,
+                'event_session_id' => $checkin->event_session_id,
+                'registration_id' => $checkin->registration_id,
+                'method' => $checkin->method,
+            ],
+        );
+
         app(\App\Services\Notifications\EventNotificationService::class)
             ->notifyCheckinConfirmed($checkin);
 

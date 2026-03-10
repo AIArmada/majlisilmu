@@ -3,6 +3,7 @@
 @php
     $link = $this->link;
     $summary = $this->summary;
+    $providerBreakdown = $this->providerBreakdown;
     $shareLinks = $this->shareLinks;
     $dailyPerformance = $this->dailyPerformance;
     $outcomeBreakdown = $this->outcomeBreakdown;
@@ -139,7 +140,11 @@
                     </div>
                 </div>
 
-                <div class="grid gap-4 px-6 py-6 md:grid-cols-2 xl:grid-cols-5 md:px-8">
+                <div class="grid gap-4 px-6 py-6 md:grid-cols-2 xl:grid-cols-8 md:px-8">
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Outbound Shares') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($summary['outbound_shares']) }}</p>
+                    </div>
                     <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Visits') }}</p>
                         <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($summary['visits']) }}</p>
@@ -159,6 +164,14 @@
                     <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Registrations') }}</p>
                         <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($summary['event_registrations']) }}</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Event Check-ins') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($summary['event_checkins']) }}</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Event Submissions') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($summary['event_submissions']) }}</p>
                     </div>
                 </div>
             </section>
@@ -180,7 +193,7 @@
                                         <div>
                                             <p class="text-sm font-semibold text-slate-900">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat(\Illuminate\Support\Carbon::parse($day['date']), 'l, j M Y') }}</p>
                                         </div>
-                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
                                             <div class="rounded-2xl bg-white px-3 py-2">
                                                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Visits') }}</p>
                                                 <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($day['visits']) }}</p>
@@ -196,6 +209,14 @@
                                             <div class="rounded-2xl bg-white px-3 py-2">
                                                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Registrations') }}</p>
                                                 <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($day['event_registrations']) }}</p>
+                                            </div>
+                                            <div class="rounded-2xl bg-white px-3 py-2">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Check-ins') }}</p>
+                                                <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($day['event_checkins']) }}</p>
+                                            </div>
+                                            <div class="rounded-2xl bg-white px-3 py-2">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Submissions') }}</p>
+                                                <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($day['event_submissions']) }}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -214,7 +235,12 @@
                                     <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                                         <div>
                                             <p class="text-sm font-semibold text-slate-900 break-all">{{ $visit->visited_url }}</p>
-                                            <p class="mt-1 text-xs text-slate-500">{{ __('Visitor key') }}: {{ $visit->visitor_key }}</p>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                {{ __('Visitor key') }}: {{ $visit->visitor_key }}
+                                                @if(filled(data_get($visit->metadata, 'share_provider')))
+                                                    <span class="ml-2">{{ __('Channel') }}: {{ str((string) data_get($visit->metadata, 'share_provider'))->headline()->toString() }}</span>
+                                                @endif
+                                            </p>
                                         </div>
                                         <div class="text-right">
                                             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{{ $visitKindLabel((string) $visit->visit_kind) }}</p>
@@ -232,6 +258,38 @@
                 </div>
 
                 <div class="space-y-8">
+                    @if($providerBreakdown->isNotEmpty())
+                        <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Share Channels') }}</p>
+                            <h2 class="mt-1 font-heading text-2xl font-bold text-slate-900">{{ __('Which channels moved this link') }}</h2>
+
+                            <div class="mt-5 space-y-3">
+                                @foreach($providerBreakdown as $provider)
+                                    <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <p class="text-sm font-semibold text-slate-900">{{ $provider['label'] }}</p>
+                                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ number_format($provider['outbound_shares']) }} {{ __('outbound') }}</p>
+                                        </div>
+                                        <div class="mt-3 grid grid-cols-3 gap-3">
+                                            <div class="rounded-2xl bg-white px-3 py-2">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Visits') }}</p>
+                                                <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($provider['visits']) }}</p>
+                                            </div>
+                                            <div class="rounded-2xl bg-white px-3 py-2">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Visitors') }}</p>
+                                                <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($provider['unique_visitors']) }}</p>
+                                            </div>
+                                            <div class="rounded-2xl bg-white px-3 py-2">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Responses') }}</p>
+                                                <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($provider['outcomes']) }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endif
+
                     <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
                         <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Link Window') }}</p>
                         <h2 class="mt-1 font-heading text-2xl font-bold text-slate-900">{{ __('Activity timing') }}</h2>

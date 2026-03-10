@@ -26,17 +26,40 @@ class DawahImpactLinkShow extends Component
 
     /**
      * @return array{
+     *     outbound_shares: int,
      *     visits: int,
      *     unique_visitors: int,
      *     outcomes: int,
      *     signups: int,
-     *     event_registrations: int
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
      * }
      */
     #[Computed]
     public function summary(): array
     {
         return $this->analytics()->summaryForLink($this->link);
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     provider: string,
+     *     label: string,
+     *     outbound_shares: int,
+     *     visits: int,
+     *     unique_visitors: int,
+     *     outcomes: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
+     * }>
+     */
+    #[Computed]
+    public function providerBreakdown(): Collection
+    {
+        return $this->analytics()->providerBreakdownForLink($this->link);
     }
 
     /**
@@ -58,7 +81,9 @@ class DawahImpactLinkShow extends Component
      *     visits: int,
      *     outcomes: int,
      *     signups: int,
-     *     event_registrations: int
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
      * }>
      */
     #[Computed]

@@ -6,6 +6,8 @@ enum DawahShareOutcomeType: string
 {
     case Signup = 'signup';
     case EventRegistration = 'event_registration';
+    case EventCheckin = 'event_checkin';
+    case EventSubmission = 'event_submission';
     case EventSave = 'event_save';
     case EventInterest = 'event_interest';
     case EventGoing = 'event_going';

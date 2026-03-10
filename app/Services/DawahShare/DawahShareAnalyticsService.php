@@ -4,6 +4,7 @@ namespace App\Services\DawahShare;
 
 use App\Models\DawahShareLink;
 use App\Models\DawahShareOutcome;
+use App\Models\DawahShareShareEvent;
 use App\Models\DawahShareVisit;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -16,10 +17,13 @@ class DawahShareAnalyticsService
 {
     /**
      * @return array{
+     *     outbound_shares: int,
      *     visits: int,
      *     unique_visitors: int,
      *     signups: int,
      *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int,
      *     total_outcomes: int
      * }
      */
@@ -31,33 +35,82 @@ class DawahShareAnalyticsService
 
         if ($linkIds->isEmpty()) {
             return [
+                'outbound_shares' => 0,
                 'visits' => 0,
                 'unique_visitors' => 0,
                 'signups' => 0,
                 'event_registrations' => 0,
+                'event_checkins' => 0,
+                'event_submissions' => 0,
                 'total_outcomes' => 0,
             ];
         }
 
         return [
+            'outbound_shares' => DawahShareShareEvent::query()->whereIn('link_id', $linkIds)->where('event_type', 'outbound_click')->count(),
             'visits' => DawahShareVisit::query()->whereIn('link_id', $linkIds)->count(),
             'unique_visitors' => DawahShareVisit::query()->whereIn('link_id', $linkIds)->distinct('visitor_key')->count('visitor_key'),
             'signups' => DawahShareOutcome::query()->whereIn('link_id', $linkIds)->where('outcome_type', 'signup')->count(),
             'event_registrations' => DawahShareOutcome::query()->whereIn('link_id', $linkIds)->where('outcome_type', 'event_registration')->count(),
+            'event_checkins' => DawahShareOutcome::query()->whereIn('link_id', $linkIds)->where('outcome_type', 'event_checkin')->count(),
+            'event_submissions' => DawahShareOutcome::query()->whereIn('link_id', $linkIds)->where('outcome_type', 'event_submission')->count(),
             'total_outcomes' => DawahShareOutcome::query()->whereIn('link_id', $linkIds)->count(),
         ];
     }
 
     /**
+     * @return Collection<int, array{
+     *     provider: string,
+     *     label: string,
+     *     outbound_shares: int,
+     *     visits: int,
+     *     unique_visitors: int,
+     *     outcomes: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
+     * }>
+     */
+    public function providerBreakdownForUser(User $user): Collection
+    {
+        $linkIds = DawahShareLink::query()
+            ->where('user_id', $user->id)
+            ->pluck('id');
+
+        if ($linkIds->isEmpty()) {
+            return collect();
+        }
+
+        return $this->providerBreakdown(
+            DawahShareShareEvent::query()->whereIn('link_id', $linkIds),
+            DawahShareVisit::query()->whereIn('link_id', $linkIds),
+            DawahShareOutcome::query()->whereIn('link_id', $linkIds),
+        );
+    }
+
+    /**
      * @return Collection<int, DawahShareLink>
      */
-    public function linksForUser(User $user, string $sort = 'recent', ?string $subjectType = null, string $status = 'all'): Collection
-    {
+    public function linksForUser(
+        User $user,
+        string $sort = 'recent',
+        ?string $subjectType = null,
+        string $status = 'all',
+        string $outcomeType = 'all'
+    ): Collection {
         /** @var Collection<int, DawahShareLink> $links */
         $links = $this->baseLinksQuery($user)
             ->when(
                 filled($subjectType) && $subjectType !== 'all',
                 fn (Builder $query): Builder => $query->where('subject_type', $subjectType),
+            )
+            ->when(
+                filled($outcomeType) && $outcomeType !== 'all',
+                fn (Builder $query): Builder => $query->whereHas(
+                    'outcomes',
+                    fn (Builder $builder): Builder => $builder->where('outcome_type', $outcomeType)
+                ),
             )
             ->get()
             ->filter(function (DawahShareLink $link) use ($status): bool {
@@ -76,6 +129,8 @@ class DawahShareAnalyticsService
             'visits' => $links->sortByDesc(fn (DawahShareLink $link): int => (int) ($link->visits_count ?? 0)),
             'signups' => $links->sortByDesc(fn (DawahShareLink $link): int => (int) ($link->signups_count ?? 0)),
             'registrations' => $links->sortByDesc(fn (DawahShareLink $link): int => (int) ($link->event_registrations_count ?? 0)),
+            'checkins' => $links->sortByDesc(fn (DawahShareLink $link): int => (int) ($link->event_checkins_count ?? 0)),
+            'submissions' => $links->sortByDesc(fn (DawahShareLink $link): int => (int) ($link->event_submissions_count ?? 0)),
             default => $links->sortByDesc(fn (DawahShareLink $link): int => $this->latestActivityAt($link)?->getTimestamp() ?? 0),
         };
 
@@ -93,6 +148,8 @@ class DawahShareAnalyticsService
      *     visits: int,
      *     signups: int,
      *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int,
      *     total_outcomes: int
      * }>
      */
@@ -108,6 +165,8 @@ class DawahShareAnalyticsService
                     'visits' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->visits_count ?? 0)),
                     'signups' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->signups_count ?? 0)),
                     'event_registrations' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_registrations_count ?? 0)),
+                    'event_checkins' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_checkins_count ?? 0)),
+                    'event_submissions' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_submissions_count ?? 0)),
                     'total_outcomes' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->outcomes_count ?? 0)),
                 ];
             })
@@ -121,7 +180,9 @@ class DawahShareAnalyticsService
      *     visits: int,
      *     outcomes: int,
      *     signups: int,
-     *     event_registrations: int
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
      * }>
      */
     public function dailyPerformanceForLink(DawahShareLink $link, int $days = 14): Collection
@@ -137,13 +198,15 @@ class DawahShareAnalyticsService
             ->map(fn (mixed $count): int => (int) $count)
             ->all();
 
-        /** @var array<string, array{outcomes: int, signups: int, event_registrations: int}> $outcomes */
+        /** @var array<string, array{outcomes: int, signups: int, event_registrations: int, event_checkins: int, event_submissions: int}> $outcomes */
         $outcomes = $link->outcomes()
             ->where('occurred_at', '>=', $fromDate)
             ->selectRaw(
                 'date(occurred_at) as day, count(*) as outcomes, '.
                 "sum(case when outcome_type = 'signup' then 1 else 0 end) as signups, ".
-                "sum(case when outcome_type = 'event_registration' then 1 else 0 end) as event_registrations"
+                "sum(case when outcome_type = 'event_registration' then 1 else 0 end) as event_registrations, ".
+                "sum(case when outcome_type = 'event_checkin' then 1 else 0 end) as event_checkins, ".
+                "sum(case when outcome_type = 'event_submission' then 1 else 0 end) as event_submissions"
             )
             ->groupBy('day')
             ->get()
@@ -152,6 +215,8 @@ class DawahShareAnalyticsService
                     'outcomes' => (int) $outcome->getAttribute('outcomes'),
                     'signups' => (int) $outcome->getAttribute('signups'),
                     'event_registrations' => (int) $outcome->getAttribute('event_registrations'),
+                    'event_checkins' => (int) $outcome->getAttribute('event_checkins'),
+                    'event_submissions' => (int) $outcome->getAttribute('event_submissions'),
                 ],
             ])
             ->all();
@@ -163,6 +228,8 @@ class DawahShareAnalyticsService
                     'outcomes' => 0,
                     'signups' => 0,
                     'event_registrations' => 0,
+                    'event_checkins' => 0,
+                    'event_submissions' => 0,
                 ];
 
                 return [
@@ -171,6 +238,8 @@ class DawahShareAnalyticsService
                     'outcomes' => $dailyOutcomes['outcomes'],
                     'signups' => $dailyOutcomes['signups'],
                     'event_registrations' => $dailyOutcomes['event_registrations'],
+                    'event_checkins' => $dailyOutcomes['event_checkins'],
+                    'event_submissions' => $dailyOutcomes['event_submissions'],
                 ];
             });
     }
@@ -231,6 +300,8 @@ class DawahShareAnalyticsService
                 'outcomes',
                 'outcomes as signups_count' => fn (Builder $builder) => $builder->where('outcome_type', 'signup'),
                 'outcomes as event_registrations_count' => fn (Builder $builder) => $builder->where('outcome_type', 'event_registration'),
+                'outcomes as event_checkins_count' => fn (Builder $builder) => $builder->where('outcome_type', 'event_checkin'),
+                'outcomes as event_submissions_count' => fn (Builder $builder) => $builder->where('outcome_type', 'event_submission'),
             ])
             ->withMax('visits as latest_visit_at', 'occurred_at')
             ->withMax('outcomes as latest_outcome_at', 'occurred_at');
@@ -281,6 +352,8 @@ class DawahShareAnalyticsService
         return match ($outcomeType) {
             'signup' => __('Signups'),
             'event_registration' => __('Event registrations'),
+            'event_checkin' => __('Event check-ins'),
+            'event_submission' => __('Event submissions'),
             'event_save' => __('Event saves'),
             'event_interest' => __('Interested responses'),
             'event_going' => __('Going responses'),
@@ -308,22 +381,51 @@ class DawahShareAnalyticsService
 
     /**
      * @return array{
+     *     outbound_shares: int,
      *     visits: int,
      *     unique_visitors: int,
      *     outcomes: int,
      *     signups: int,
-     *     event_registrations: int
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
      * }
      */
     public function summaryForLink(DawahShareLink $link): array
     {
         return [
+            'outbound_shares' => $link->shareEvents()->where('event_type', 'outbound_click')->count(),
             'visits' => $link->visits()->count(),
             'unique_visitors' => $link->visits()->distinct('visitor_key')->count('visitor_key'),
             'outcomes' => $link->outcomes()->count(),
             'signups' => $link->outcomes()->where('outcome_type', 'signup')->count(),
             'event_registrations' => $link->outcomes()->where('outcome_type', 'event_registration')->count(),
+            'event_checkins' => $link->outcomes()->where('outcome_type', 'event_checkin')->count(),
+            'event_submissions' => $link->outcomes()->where('outcome_type', 'event_submission')->count(),
         ];
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     provider: string,
+     *     label: string,
+     *     outbound_shares: int,
+     *     visits: int,
+     *     unique_visitors: int,
+     *     outcomes: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
+     * }>
+     */
+    public function providerBreakdownForLink(DawahShareLink $link): Collection
+    {
+        return $this->providerBreakdown(
+            $link->shareEvents()->getQuery(),
+            $link->visits()->getQuery(),
+            $link->outcomes()->getQuery(),
+        );
     }
 
     /**
@@ -346,5 +448,97 @@ class DawahShareAnalyticsService
             ->latest('occurred_at')
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * @param  Builder<DawahShareShareEvent>  $shareEvents
+     * @param  Builder<DawahShareVisit>  $visits
+     * @param  Builder<DawahShareOutcome>  $outcomes
+     * @return Collection<int, array{
+     *     provider: string,
+     *     label: string,
+     *     outbound_shares: int,
+     *     visits: int,
+     *     unique_visitors: int,
+     *     outcomes: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
+     * }>
+     */
+    protected function providerBreakdown(Builder $shareEvents, Builder $visits, Builder $outcomes): Collection
+    {
+        $providers = app(DawahShareService::class)->supportedProviders();
+
+        return collect($providers)
+            ->map(function (string $provider) use ($shareEvents, $visits, $outcomes): array {
+                return [
+                    'provider' => $provider,
+                    'label' => $this->shareProviderLabel($provider),
+                    'outbound_shares' => (clone $shareEvents)
+                        ->where('event_type', 'outbound_click')
+                        ->where('provider', $provider)
+                        ->count(),
+                    'visits' => (clone $visits)
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->count(),
+                    'unique_visitors' => (clone $visits)
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->distinct('visitor_key')
+                        ->count('visitor_key'),
+                    'outcomes' => (clone $outcomes)
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->count(),
+                    'signups' => (clone $outcomes)
+                        ->where('outcome_type', 'signup')
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->count(),
+                    'event_registrations' => (clone $outcomes)
+                        ->where('outcome_type', 'event_registration')
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->count(),
+                    'event_checkins' => (clone $outcomes)
+                        ->where('outcome_type', 'event_checkin')
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->count(),
+                    'event_submissions' => (clone $outcomes)
+                        ->where('outcome_type', 'event_submission')
+                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                        ->count(),
+                ];
+            })
+            ->filter(fn (array $provider): bool => collect([
+                $provider['outbound_shares'],
+                $provider['visits'],
+                $provider['outcomes'],
+            ])->some(fn (int $count): bool => $count > 0))
+            ->sort(function (array $left, array $right): int {
+                return [
+                    $right['outcomes'],
+                    $right['visits'],
+                    $right['outbound_shares'],
+                ] <=> [
+                    $left['outcomes'],
+                    $left['visits'],
+                    $left['outbound_shares'],
+                ];
+            })
+            ->values();
+    }
+
+    protected function shareProviderLabel(string $provider): string
+    {
+        return match ($provider) {
+            'whatsapp' => __('WhatsApp'),
+            'telegram' => __('Telegram'),
+            'line' => __('LINE'),
+            'facebook' => __('Facebook'),
+            'x' => __('X'),
+            'instagram' => __('Instagram'),
+            'tiktok' => __('TikTok'),
+            'email' => __('Email'),
+            default => str($provider)->headline()->toString(),
+        };
     }
 }

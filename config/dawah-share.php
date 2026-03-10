@@ -3,6 +3,8 @@
 return [
     'query_parameter' => 'mi_share',
 
+    'provider_query_parameter' => 'mi_channel',
+
     'ttl_days' => 30,
 
     'cookie' => [
