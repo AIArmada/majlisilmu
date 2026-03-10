@@ -5,35 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    @php
-        $defaultMetaDescription = __('Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.');
-        $pageTitle = trim($__env->yieldContent('title', config('app.name')));
-        $pageDescription = trim($__env->yieldContent('meta_description', $defaultMetaDescription));
-        $defaultOgImage = asset('images/default-mosque-hero.png');
-        $pageUrl = trim($__env->yieldContent('og_url', url()->current()));
-        $pageOgImage = trim($__env->yieldContent('og_image', $defaultOgImage));
-        $pageOgImageAlt = trim($__env->yieldContent('og_image_alt', $pageTitle !== '' ? $pageTitle : config('app.name')));
-        $pageOgImageWidth = trim($__env->yieldContent('og_image_width', '1024'));
-        $pageOgImageHeight = trim($__env->yieldContent('og_image_height', '1024'));
-    @endphp
-    <title>{{ $pageTitle }}</title>
-    <meta name="description" content="{{ $pageDescription }}">
-    <meta name="robots" content="@yield('meta_robots', 'index, follow')">
-    <meta property="og:title" content="{{ $pageTitle }}">
-    <meta property="og:description" content="{{ $pageDescription }}">
-    <meta property="og:site_name" content="{{ config('app.name') }}">
-    <meta property="og:type" content="@yield('meta_og_type', 'website')">
-    <meta property="og:url" content="{{ $pageUrl }}">
-    <meta property="og:image" content="{{ $pageOgImage }}">
-    <meta property="og:image:secure_url" content="{{ $pageOgImage }}">
-    <meta property="og:image:width" content="{{ $pageOgImageWidth }}">
-    <meta property="og:image:height" content="{{ $pageOgImageHeight }}">
-    <meta property="og:image:alt" content="{{ $pageOgImageAlt }}">
-    <meta name="twitter:card" content="@yield('twitter_card', 'summary_large_image')">
-    <meta name="twitter:title" content="{{ $pageTitle }}">
-    <meta name="twitter:description" content="{{ $pageDescription }}">
-    <meta name="twitter:image" content="{{ $pageOgImage }}">
-    <meta name="twitter:image:alt" content="{{ $pageOgImageAlt }}">
+    <title>@yield('title', config('app.name'))</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32x32.png') }}">
@@ -85,13 +57,6 @@
                 $currentLocale = app()->getLocale();
                 $authenticatedUser = auth()->user();
                 $hasInstitutionDashboardAccess = $authenticatedUser?->institutions()->exists() ?? false;
-                $notificationUnreadCount = $authenticatedUser
-                    ? $authenticatedUser
-                        ->notificationMessages()
-                        ->visibleInInbox()
-                        ->whereNull('read_at')
-                        ->count()
-                    : 0;
                 $usesDashboardMenuLabel = in_array($currentLocale, ['ms', 'ms_MY'], true);
                 $dashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard' : __('Dashboard');
                 $institutionDashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard Institusi' : __('Institution Dashboard');
@@ -188,26 +153,17 @@
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ $dashboardMenuLabel }}
                                     </a>
-                                    <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Dawah Impact') }}
-                                    </a>
                                     <a href="{{ route('dashboard.account-settings') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Account Settings') }}
                                     </a>
-                                    <a href="{{ route('dashboard.notifications') }}" wire:navigate
-                                        class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        <span>{{ __('notifications.pages.inbox.nav_label') }}</span>
-                                        @if($notificationUnreadCount > 0)
-                                            <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                                                {{ $notificationUnreadCount }}
-                                            </span>
-                                        @endif
-                                    </a>
                                     <a href="{{ route('saved-searches.index') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Saved Searches') }}
+                                    </a>
+                                    <a href="{{ route('dashboard.digest-preferences') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('Digest Preferences') }}
                                     </a>
                                     @if($hasInstitutionDashboardAccess)
                                         <a href="{{ route('dashboard.institutions') }}" wire:navigate
@@ -281,26 +237,17 @@
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ $dashboardMenuLabel }}
                                 </a>
-                                <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Dawah Impact') }}
-                                </a>
                                 <a href="{{ route('dashboard.account-settings') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ __('Account Settings') }}
                                 </a>
-                                <a href="{{ route('dashboard.notifications') }}" wire:navigate
-                                    class="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    <span>{{ __('notifications.pages.inbox.nav_label') }}</span>
-                                    @if($notificationUnreadCount > 0)
-                                        <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                                            {{ $notificationUnreadCount }}
-                                        </span>
-                                    @endif
-                                </a>
                                 <a href="{{ route('saved-searches.index') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ __('Saved Searches') }}
+                                </a>
+                                <a href="{{ route('dashboard.digest-preferences') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('Digest Preferences') }}
                                 </a>
                                 @if($hasInstitutionDashboardAccess)
                                     <a href="{{ route('dashboard.institutions') }}" wire:navigate

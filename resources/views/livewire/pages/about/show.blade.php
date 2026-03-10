@@ -1,12 +1,12 @@
 @section('title', (string) data_get($content, 'meta.title', __('About')) . ' - ' . config('app.name'))
-@section('meta_description', (string) data_get($content, 'meta.description'))
-@section('og_url', route('about'))
-@section('og_image', asset('images/default-mosque-hero.png'))
-@section('og_image_alt', data_get($content, 'meta.title', __('About')))
-@section('og_image_width', '1024')
-@section('og_image_height', '1024')
 
 @push('head')
+    <meta name="description" content="{{ data_get($content, 'meta.description') }}">
+    <meta property="og:title" content="{{ data_get($content, 'meta.title', __('About')) }} - {{ config('app.name') }}">
+    <meta property="og:description" content="{{ data_get($content, 'meta.description') }}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ route('about') }}">
+    <meta name="twitter:card" content="summary_large_image">
 @endpush
 
 @php

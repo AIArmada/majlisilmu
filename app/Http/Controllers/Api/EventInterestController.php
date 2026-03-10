@@ -4,18 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class EventInterestController extends Controller
 {
-    public function __construct(
-        private readonly DawahShareService $dawahShareService
-    ) {}
-
     /**
      * List all interested events for the authenticated user.
      */
@@ -125,20 +119,6 @@ class EventInterestController extends Controller
                 ],
             ], 409);
         }
-
-        /** @var User $user */
-        $user = $request->user();
-
-        $this->dawahShareService->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::EventInterest,
-            outcomeKey: 'event_interest:user:'.$user->id.':event:'.$event->id,
-            subject: $event,
-            actor: $user,
-            request: $request,
-            metadata: [
-                'event_id' => $event->id,
-            ],
-        );
 
         return response()->json([
             'data' => [

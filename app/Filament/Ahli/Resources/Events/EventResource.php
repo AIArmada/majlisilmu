@@ -4,14 +4,7 @@ namespace App\Filament\Ahli\Resources\Events;
 
 use App\Filament\Ahli\Resources\Events\Pages\EditEvent;
 use App\Filament\Ahli\Resources\Events\Pages\ListEvents;
-use App\Filament\Ahli\Resources\Events\Pages\ViewEvent;
 use App\Filament\Resources\Events\EventResource as AdminEventResource;
-use App\Filament\Resources\Events\RelationManagers\EventRecurrenceRulesRelationManager;
-use App\Filament\Resources\Events\RelationManagers\EventSessionsRelationManager;
-use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
-use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
-use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
-use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -19,7 +12,6 @@ use App\Models\Speaker;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
@@ -39,7 +31,6 @@ class EventResource extends AdminEventResource
     {
         return parent::table($table)
             ->recordActions([
-                ViewAction::make(),
                 EditAction::make(),
                 Action::make('view_public')
                     ->label('View Public')
@@ -119,24 +110,10 @@ class EventResource extends AdminEventResource
     }
 
     #[\Override]
-    public static function getRelations(): array
-    {
-        return [
-            'sessions' => EventSessionsRelationManager::class,
-            'recurrence_rules' => EventRecurrenceRulesRelationManager::class,
-            'media_links' => MediaLinksRelationManager::class,
-            'event_users' => EventUsersRelationManager::class,
-            'moderation_reviews' => ModerationReviewsRelationManager::class,
-            'registrations' => RegistrationsRelationManager::class,
-        ];
-    }
-
-    #[\Override]
     public static function getPages(): array
     {
         return [
             'index' => ListEvents::route('/'),
-            'view' => ViewEvent::route('/{record}'),
             'edit' => EditEvent::route('/{record}/edit'),
         ];
     }

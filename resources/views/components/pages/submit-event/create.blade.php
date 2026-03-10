@@ -1448,18 +1448,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::EventSubmission,
-            outcomeKey: 'event_submission:submission:'.$submission->id,
-            subject: $event,
-            actor: auth()->user(),
-            request: request(),
-            metadata: [
-                'submission_id' => $submission->id,
-                'submitted_by' => $submission->submitted_by,
-            ],
-        );
-
         if (!auth()->check()) {
             $this->storeSubmitterContacts($submission, $validated);
         }

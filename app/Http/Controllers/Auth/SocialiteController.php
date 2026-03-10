@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -42,10 +41,8 @@ class SocialiteController extends Controller
             ]);
 
             $user = $account->user;
-            $createdFromShare = false;
         } else {
             $user = User::query()->where('email', $socialUser->getEmail())->first();
-            $createdFromShare = false;
 
             if (! $user) {
                 $user = User::query()->create([
@@ -53,7 +50,6 @@ class SocialiteController extends Controller
                     'email' => $socialUser->getEmail(),
                     'email_verified_at' => now(),
                 ]);
-                $createdFromShare = true;
             }
 
             SocialAccount::query()->updateOrCreate([
@@ -66,10 +62,6 @@ class SocialiteController extends Controller
         }
 
         Auth::login($user, remember: true);
-
-        if ($createdFromShare) {
-            app(DawahShareService::class)->recordSignup($user, request());
-        }
 
         return redirect()->intended(route('home'));
     }

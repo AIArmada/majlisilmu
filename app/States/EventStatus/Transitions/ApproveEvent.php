@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Notifications\EventApprovedNotification;
+use App\Support\Authz\MemberPermissionGate;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -43,8 +45,8 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
             // Make searchable (Scout)
             $this->event->searchable();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionApproved($this->event);
-            app(\App\Services\Notifications\EventNotificationService::class)->notifyPublication($this->event);
+            // Notify submitter and institution admins
+            $this->notifyApproval($this->event);
 
             Log::info('Event approved', [
                 'event_id' => $this->event->id,
@@ -52,6 +54,27 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
             ]);
 
             return $this->event;
+        });
+    }
+
+    protected function notifyApproval(Event $event): void
+    {
+        $notifiables = collect();
+
+        // Notify submitter if user exists
+        if ($event->submitter_id) {
+            $notifiables->push(User::find($event->submitter_id));
+        }
+
+        // Notify institution admins
+        if ($event->institution) {
+            $admins = app(MemberPermissionGate::class)
+                ->institutionMembersWithPermission($event->institution, 'event.update');
+            $notifiables = $notifiables->merge($admins);
+        }
+
+        $notifiables->filter()->unique('id')->each(function ($user) use ($event) {
+            $user->notify(new EventApprovedNotification($event));
         });
     }
 

@@ -1,15 +1,15 @@
-@section('title', $event->title . ' - ' . config('app.name'))
-@section('meta_description', Str::limit($event->description_text !== '' ? $event->description_text : __('Lihat masa, lokasi, penceramah, dan maklumat pendaftaran untuk majlis ilmu ini di :app.', ['app' => config('app.name')]), 160))
-@section('meta_og_type', 'event')
-@section('meta_robots', $this->metaRobots)
-@section('og_url', route('events.show', $event))
-@section('og_image', $event->card_image_url)
-@section('og_image_alt', __('Poster untuk :title', ['title' => $event->title]))
-
 @push('head')
     <x-event-json-ld :event="$this->event" />
-    <link rel="canonical" href="{{ route('events.show', $event) }}">
+    <meta property="og:title" content="{{ $event->title }}">
+    <meta property="og:description" content="{{ Str::limit($event->description_text, 160) }}">
+    <meta property="og:type" content="event">
+    <meta property="og:url" content="{{ route('events.show', $event) }}">
+    <meta property="og:image" content="{{ $event->card_image_url }}">
     <meta property="article:published_time" content="{{ $event->starts_at?->toIso8601String() }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $event->title }}">
+    <meta name="twitter:description" content="{{ Str::limit($event->description_text, 160) }}">
+    <meta name="twitter:image" content="{{ $event->card_image_url }}">
 @endpush
 
 @php
@@ -48,10 +48,6 @@
         'title' => $event->title,
         'text' => Str::limit($event->description_text, 100),
         'url' => route('events.show', $event),
-        'sourceUrl' => route('events.show', $event),
-        'shareText' => trim($event->title . ' - ' . config('app.name')),
-        'fallbackTitle' => $event->title,
-        'payloadEndpoint' => route('dawah-share.payload'),
     ];
     $copyMessage = __('Link copied to clipboard!');
     $copyPrompt = __('Copy this link:');
@@ -239,53 +235,22 @@
         shareData: @json($shareData),
         copyMessage: @json($copyMessage),
         copyPrompt: @json($copyPrompt),
-        attributedShareData: null,
-        async resolveShareData() {
-            if (this.attributedShareData) {
-                return this.attributedShareData;
-            }
-
-            const params = new URLSearchParams({
-                url: this.shareData.sourceUrl,
-                text: this.shareData.shareText,
-                title: this.shareData.fallbackTitle,
-            });
-            const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
-                headers: {
-                    Accept: "application/json",
-                },
-            });
-
-            if (!response.ok) {
-                return this.shareData;
-            }
-
-            const payload = await response.json();
-            this.attributedShareData = {
-                ...this.shareData,
-                url: payload.url,
-            };
-
-            return this.attributedShareData;
-        },
-        async nativeShare() {
-            const shareData = await this.resolveShareData();
+        nativeShare() {
             if (navigator.share) {
-                navigator.share(shareData);
+                navigator.share(this.shareData);
                 return;
             }
             this.copyLink();
         },
-        async copyLink() {
-            const shareData = await this.resolveShareData();
+        copyLink() {
             if (navigator.clipboard) {
-                navigator.clipboard.writeText(shareData.url).then(() => {
+                navigator.clipboard.writeText(this.shareData.url).then(() => {
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 2000);
                 });
                 return;
             }
-            window.prompt(this.copyPrompt, shareData.url);
+            window.prompt(this.copyPrompt, this.shareData.url);
         },
         openShareModal() {
             this.shareModalOpen = true;
@@ -1549,10 +1514,7 @@
                 <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Reference Materials') }}</h2>
             </div>
 
-            <div @class([
-                'grid gap-5',
-                'sm:grid-cols-2' => $event->references->count() > 1,
-            ])>
+            <div class="grid gap-5 sm:grid-cols-2">
                 @foreach($event->references as $reference)
                     <a href="{{ route('references.show', $reference) }}" wire:navigate wire:key="ref-{{ $reference->id }}"
                         class="group flex gap-5 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-100">

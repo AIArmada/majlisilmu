@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
+use App\Enums\ContactCategory;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -22,7 +23,6 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
-use App\Support\Events\SubmitterContactPresenter;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Filament\Facades\Filament;
 use Filament\Actions\Action;
@@ -42,7 +42,6 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Nnjeim\World\Models\Language;
 
@@ -474,7 +473,7 @@ class EventForm
                                                 Placeholder::make('submission_submitter')
                                                     ->label('Penghantar')
                                                     ->columnSpanFull()
-                                                    ->content(fn (?Event $record): HtmlString|string => self::getSubmissionSubmitterContent($record)),
+                                                    ->content(fn (?Event $record): string => self::getSubmissionSubmitterLabel($record)),
                                                 Placeholder::make('submission_notes')
                                                     ->label('Nota Penghantaran')
                                                     ->columnSpanFull()
@@ -628,32 +627,29 @@ class EventForm
 
     protected static function getSubmissionSubmitterLabel(?Event $record): string
     {
-        if (! $record instanceof Event) {
+        $submission = self::latestSubmission($record);
+
+        if (! $submission instanceof EventSubmission) {
             return '-';
         }
 
-        return SubmitterContactPresenter::labelForEvent($record);
-    }
+        if ($submission->submitter instanceof \App\Models\User) {
+            $parts = array_filter([
+                $submission->submitter->name,
+                $submission->submitter->email,
+                $submission->submitter->phone,
+            ]);
 
-    protected static function getSubmissionSubmitterContent(?Event $record): HtmlString|string
-    {
-        $label = self::getSubmissionSubmitterLabel($record);
-
-        if ($label === '-' || ! $record instanceof Event) {
-            return $label;
+            return $parts === [] ? '-' : implode(' | ', $parts);
         }
 
-        $url = SubmitterContactPresenter::whatsappUrlForEvent($record);
+        $parts = array_filter([
+            $submission->submitter_name,
+            self::getSubmissionContactValue($submission, ContactCategory::Email),
+            self::getSubmissionContactValue($submission, ContactCategory::Phone),
+        ]);
 
-        if ($url === null) {
-            return $label;
-        }
-
-        return new HtmlString(sprintf(
-            '<a href="%s" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline">%s</a>',
-            e($url),
-            e($label),
-        ));
+        return $parts === [] ? '-' : implode(' | ', $parts);
     }
 
     protected static function getSubmissionNotesLabel(?Event $record): string
@@ -665,6 +661,16 @@ class EventForm
         }
 
         return filled($submission->notes) ? (string) $submission->notes : '-';
+    }
+
+    protected static function getSubmissionContactValue(EventSubmission $submission, ContactCategory $category): ?string
+    {
+        /** @var ?string $value */
+        $value = $submission->contacts
+            ->firstWhere('category', $category->value)
+            ?->value;
+
+        return filled($value) ? $value : null;
     }
 
     /**

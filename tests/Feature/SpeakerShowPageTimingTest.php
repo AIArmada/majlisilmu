@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\EventFormat;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
@@ -56,26 +55,6 @@ it('shows cancelled public events with cancelled badge on speaker page', functio
         ->assertSee('Dibatalkan');
 });
 
-it('uses stronger calendar event colors on speaker page', function () {
-    $speaker = Speaker::factory()->create([
-        'status' => 'verified',
-    ]);
-
-    $event = Event::factory()->create([
-        'status' => 'approved',
-        'visibility' => 'public',
-        'starts_at' => now()->addDays(3),
-        'title' => 'Kuliah Kalender Penceramah',
-    ]);
-
-    $speaker->events()->attach($event->id);
-
-    $this->get(route('speakers.show', $speaker))
-        ->assertSuccessful()
-        ->assertSee('border-emerald-300 bg-emerald-100 text-emerald-900 shadow-emerald-200/80 hover:bg-emerald-200', false)
-        ->assertDontSee('bg-emerald-50 text-emerald-700 hover:bg-emerald-100', false);
-});
-
 it('renders event end time in event timezone on speaker page', function () {
     $speaker = Speaker::factory()->create([
         'status' => 'verified',
@@ -117,7 +96,6 @@ it('shows dedicated venue name for event location on speaker page when available
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
-        'event_format' => EventFormat::Physical,
         'institution_id' => $institution->id,
         'venue_id' => $venue->id,
         'starts_at' => now()->addDay()->setTime(17, 45),
@@ -146,7 +124,6 @@ it('falls back to institution name for event location on speaker page when venue
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
-        'event_format' => EventFormat::Physical,
         'institution_id' => $institution->id,
         'venue_id' => null,
         'starts_at' => now()->addDay()->setTime(17, 45),
@@ -198,7 +175,6 @@ it('hides state when district is kuala lumpur putrajaya or labuan', function () 
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
-        'event_format' => EventFormat::Physical,
         'institution_id' => $institution->id,
         'venue_id' => $venue->id,
         'starts_at' => now()->addDay()->setTime(17, 45),

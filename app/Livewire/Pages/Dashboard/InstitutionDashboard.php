@@ -2,29 +2,22 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\AuthzScope;
-use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\EventVisibility;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Registration;
 use App\Models\User;
-use App\Support\Authz\MemberRoleScopes;
-use App\Support\Authz\ScopedMemberRoleSeeder;
-use App\Support\Submission\PublicSubmissionLockService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Spatie\Permission\PermissionRegistrar;
 
 #[Layout('layouts.app')]
 class InstitutionDashboard extends Component
@@ -34,29 +27,6 @@ class InstitutionDashboard extends Component
 
     #[Url(as: 'institution')]
     public ?string $institutionId = null;
-
-    #[Url(as: 'event_search', except: '')]
-    public string $eventSearch = '';
-
-    #[Url(as: 'event_status', except: 'all')]
-    public string $eventStatus = 'all';
-
-    #[Url(as: 'event_visibility', except: 'all')]
-    public string $eventVisibility = 'all';
-
-    #[Url(as: 'event_sort', except: 'starts_desc')]
-    public string $eventSort = 'starts_desc';
-
-    #[Url(as: 'event_per_page', except: 8)]
-    public int $eventPerPage = 8;
-
-    public string $newMemberEmail = '';
-
-    public string $newMemberRoleId = '';
-
-    public ?string $editingMemberId = null;
-
-    public string $editingMemberRoleId = '';
 
     public function mount(): void
     {
@@ -79,11 +49,6 @@ class InstitutionDashboard extends Component
         if ($this->institutionId !== null && ! $this->availableInstitutionsQuery($user)->whereKey($this->institutionId)->exists()) {
             abort(403);
         }
-
-        $this->eventPerPage = $this->normalizeEventPerPage($this->eventPerPage);
-        $this->eventStatus = $this->normalizeEventStatus($this->eventStatus);
-        $this->eventVisibility = $this->normalizeEventVisibility($this->eventVisibility);
-        $this->eventSort = $this->normalizeEventSort($this->eventSort);
     }
 
     public function updatedInstitutionId(?string $institutionId): void
@@ -98,8 +63,7 @@ class InstitutionDashboard extends Component
 
         if ($this->institutionId === null) {
             $this->resetPage('institution_events_page');
-            $this->resetPage('institution_members_page');
-            $this->resetMemberEditor();
+            $this->resetPage('institution_registrations_page');
 
             return;
         }
@@ -260,6 +224,7 @@ class InstitutionDashboard extends Component
                         ->whereIn('events.status', Event::PUBLIC_STATUSES)
                         ->where('events.visibility', EventVisibility::Public);
                 },
+                'members',
             ])
             ->orderBy('name')
             ->get();
@@ -280,7 +245,7 @@ class InstitutionDashboard extends Component
     }
 
     /**
-     * @return array{events_count:int,public_events_count:int,internal_events_count:int}
+     * @return array<string, int>
      */
     #[Computed]
     public function institutionStats(): array
@@ -292,8 +257,27 @@ class InstitutionDashboard extends Component
                 'events_count' => 0,
                 'public_events_count' => 0,
                 'internal_events_count' => 0,
+                'registrations_count' => 0,
+                'public_registrations_count' => 0,
+                'internal_registrations_count' => 0,
+                'members_count' => 0,
+                'venues_count' => 0,
             ];
         }
+
+        $totalRegistrations = Registration::query()
+            ->whereHas('event', fn (Builder $eventQuery) => $eventQuery->where('institution_id', $institution->id))
+            ->count();
+
+        $publicRegistrations = Registration::query()
+            ->whereHas('event', function (Builder $eventQuery) use ($institution): void {
+                $eventQuery
+                    ->where('institution_id', $institution->id)
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public);
+            })
+            ->count();
 
         $totalEvents = (int) ($institution->events_count ?? 0);
         $publicEvents = (int) ($institution->public_events_count ?? 0);
@@ -302,6 +286,10 @@ class InstitutionDashboard extends Component
             'events_count' => $totalEvents,
             'public_events_count' => $publicEvents,
             'internal_events_count' => max($totalEvents - $publicEvents, 0),
+            'registrations_count' => $totalRegistrations,
+            'public_registrations_count' => $publicRegistrations,
+            'internal_registrations_count' => max($totalRegistrations - $publicRegistrations, 0),
+            'members_count' => (int) ($institution->members_count ?? 0),
         ];
     }
 
@@ -316,150 +304,39 @@ class InstitutionDashboard extends Component
         if (! $institution instanceof Institution) {
             return Event::query()
                 ->whereRaw('1 = 0')
-                ->paginate(perPage: $this->eventPerPage, pageName: 'institution_events_page');
+                ->paginate(perPage: 8, pageName: 'institution_events_page');
         }
 
-        $query = Event::query()
+        return Event::query()
             ->where('institution_id', $institution->id)
             ->with(['venue:id,name'])
-            ->withCount('registrations');
-
-        if ($this->eventSearch !== '') {
-            $search = '%'.mb_strtolower(trim($this->eventSearch)).'%';
-
-            $query->where(function (Builder $builder) use ($search): void {
-                $builder
-                    ->whereRaw('LOWER(title) LIKE ?', [$search])
-                    ->orWhereHas('venue', fn (Builder $venueQuery) => $venueQuery->whereRaw('LOWER(name) LIKE ?', [$search]));
-            });
-        }
-
-        if ($this->eventStatus !== 'all') {
-            $query->where('status', $this->eventStatus);
-        }
-
-        if ($this->eventVisibility !== 'all') {
-            $query->where('visibility', $this->eventVisibility);
-        }
-
-        $this->applyEventSort($query);
-
-        return $query->paginate(perPage: $this->eventPerPage, pageName: 'institution_events_page');
+            ->withCount('registrations')
+            ->orderBy('starts_at', 'desc')
+            ->paginate(perPage: 8, pageName: 'institution_events_page');
     }
 
     /**
-     * @return LengthAwarePaginator<int, User>
+     * @return LengthAwarePaginator<int, Registration>
      */
     #[Computed]
-    public function institutionMembers(): LengthAwarePaginator
+    public function institutionRegistrations(): LengthAwarePaginator
     {
         $institution = $this->selectedInstitution();
 
         if (! $institution instanceof Institution) {
-            return User::query()
+            return Registration::query()
                 ->whereRaw('1 = 0')
-                ->paginate(perPage: 8, pageName: 'institution_members_page');
+                ->paginate(perPage: 8, pageName: 'institution_registrations_page');
         }
 
-        return User::query()
-            ->whereIn('id', $institution->members()->select('users.id'))
-            ->orderBy('name')
-            ->paginate(perPage: 8, pageName: 'institution_members_page');
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    #[Computed]
-    public function institutionMemberRoleMap(): array
-    {
-        $roleMap = [];
-
-        foreach ($this->institutionMembers()->items() as $member) {
-            if (! $member instanceof User) {
-                continue;
-            }
-
-            $roleMap[$member->id] = $this->getMemberRoleNames($member);
-        }
-
-        return $roleMap;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    #[Computed]
-    public function eventStatusOptions(): array
-    {
-        return [
-            'all' => __('All statuses'),
-            'pending' => __('Pending'),
-            'draft' => __('Draft'),
-            'approved' => __('Approved'),
-            'needs_changes' => __('Needs Changes'),
-            'rejected' => __('Rejected'),
-            'cancelled' => __('Cancelled'),
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    #[Computed]
-    public function eventVisibilityOptions(): array
-    {
-        return [
-            'all' => __('All visibility'),
-            EventVisibility::Public->value => __('Public'),
-            EventVisibility::Unlisted->value => __('Unlisted'),
-            EventVisibility::Private->value => __('Hidden'),
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    #[Computed]
-    public function eventSortOptions(): array
-    {
-        return [
-            'starts_desc' => __('Newest first'),
-            'starts_asc' => __('Oldest first'),
-            'title_asc' => __('Title A-Z'),
-            'title_desc' => __('Title Z-A'),
-            'registrations_desc' => __('Most registrations'),
-            'pending_first' => __('Pending first'),
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    #[Computed]
-    public function institutionRoleOptions(): array
-    {
-        app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
-
-        $teamsKey = app(PermissionRegistrar::class)->teamsKey;
-        $scope = $this->getRoleScope();
-
-        return Authz::withScope($scope, fn (): array => Role::query()
-            ->where($teamsKey, getPermissionsTeamId())
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all());
-    }
-
-    #[Computed]
-    public function canManageMembers(): bool
-    {
-        $institution = $this->selectedInstitution();
-        $user = auth()->user();
-
-        return $institution instanceof Institution
-            && $user instanceof User
-            && $this->userHasInstitutionManagementRole($user);
+        return Registration::query()
+            ->whereHas('event', fn (Builder $eventQuery) => $eventQuery->where('institution_id', $institution->id))
+            ->with([
+                'event' => fn ($query) => $query
+                    ->select('id', 'title', 'slug', 'starts_at', 'status', 'visibility', 'is_active'),
+            ])
+            ->latest()
+            ->paginate(perPage: 8, pageName: 'institution_registrations_page');
     }
 
     /**

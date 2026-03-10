@@ -48,18 +48,6 @@ class EventObserver
     public function updated(Event $event): void
     {
         $this->publicListingsCache->bustMajlisListing();
-
-        $changedFields = collect(array_keys($event->getChanges()))
-            ->reject(static fn (string $field): bool => in_array($field, ['updated_at', 'saves_count', 'interests_count', 'going_count', 'registrations_count', 'published_at'], true))
-            ->values()
-            ->all();
-
-        if ($changedFields === []) {
-            return;
-        }
-
-        app(\App\Services\Notifications\EventNotificationService::class)
-            ->notifyMaterialEventChange($event->fresh(), $changedFields);
     }
 
     public function deleted(Event $event): void

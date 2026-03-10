@@ -4,30 +4,21 @@ namespace App\Filament\Resources\Events\Schemas;
 
 use App\Enums\TagType;
 use App\Enums\TimingMode;
-use App\Filament\Ahli\Resources\Institutions\InstitutionResource as AhliInstitutionResource;
-use App\Filament\Resources\Institutions\InstitutionResource as AdminInstitutionResource;
-use App\Filament\Resources\References\ReferenceResource as AdminReferenceResource;
-use App\Filament\Resources\Series\SeriesResource as AdminSeriesResource;
-use App\Filament\Resources\Speakers\SpeakerResource as AdminSpeakerResource;
-use App\Filament\Resources\Venues\VenueResource as AdminVenueResource;
 use App\Models\Event;
+use App\Models\EventSubmission;
 use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
-use App\Support\Events\SubmitterContactPresenter;
 use BackedEnum;
-use Filament\Facades\Filament;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Panel;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Route;
 
 class EventInfolist
 {
@@ -169,7 +160,9 @@ class EventInfolist
                                             ->schema([
                                                 TextEntry::make('title')
                                                     ->hiddenLabel()
-                                                    ->url(fn (?Reference $record): ?string => self::resourceEditUrl($record?->id, AdminReferenceResource::class)),
+                                                    ->url(fn (?Reference $record): ?string => $record?->id
+                                                        ? \App\Filament\Resources\References\ReferenceResource::getUrl('edit', ['record' => $record->id])
+                                                        : null),
                                             ])
                                             ->contained(false)
                                             ->placeholder('-')
@@ -193,13 +186,11 @@ class EventInfolist
                                                 if (! $record->organizer) {
                                                     return null;
                                                 }
-
                                                 if ($record->organizer_type === \App\Models\Institution::class) {
-                                                    return self::resourceEditUrl($record->organizer_id, AdminInstitutionResource::class, AhliInstitutionResource::class);
+                                                    return \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->organizer_id]);
                                                 }
-
                                                 if ($record->organizer_type === \App\Models\Speaker::class) {
-                                                    return self::resourceEditUrl($record->organizer_id, AdminSpeakerResource::class);
+                                                    return \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->organizer_id]);
                                                 }
 
                                                 return null;
@@ -209,7 +200,9 @@ class EventInfolist
                                             ->schema([
                                                 TextEntry::make('title')
                                                     ->hiddenLabel()
-                                                    ->url(fn (?Series $record): ?string => self::resourceEditUrl($record?->id, AdminSeriesResource::class)),
+                                                    ->url(fn (?Series $record): ?string => $record?->id
+                                                        ? \App\Filament\Resources\Series\SeriesResource::getUrl('edit', ['record' => $record->id])
+                                                        : null),
                                             ])
                                             ->contained(false)
                                             ->placeholder('-')
@@ -221,11 +214,11 @@ class EventInfolist
                                         TextEntry::make('institution.name')
                                             ->label('Institusi')
                                             ->placeholder('-')
-                                            ->url(fn (Event $record): ?string => self::resourceEditUrl($record->institution_id, AdminInstitutionResource::class, AhliInstitutionResource::class)),
+                                            ->url(fn (Event $record): ?string => $record->institution_id ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution_id]) : null),
                                         TextEntry::make('venue.name')
                                             ->label('Lokasi')
                                             ->placeholder('-')
-                                            ->url(fn (Event $record): ?string => self::resourceEditUrl($record->venue_id, AdminVenueResource::class)),
+                                            ->url(fn (Event $record): ?string => $record->venue_id ? \App\Filament\Resources\Venues\VenueResource::getUrl('edit', ['record' => $record->venue_id]) : null),
                                         TextEntry::make('space.name')
                                             ->label('Ruang')
                                             ->placeholder('-'),
@@ -242,7 +235,9 @@ class EventInfolist
                                             ->schema([
                                                 TextEntry::make('name')
                                                     ->hiddenLabel()
-                                                    ->url(fn (?Speaker $record): ?string => self::resourceEditUrl($record?->id, AdminSpeakerResource::class)),
+                                                    ->url(fn (?Speaker $record): ?string => $record?->id
+                                                        ? \App\Filament\Resources\Speakers\SpeakerResource::getUrl('edit', ['record' => $record->id])
+                                                        : null),
                                             ])
                                             ->contained(false)
                                             ->placeholder('-'),
@@ -304,9 +299,36 @@ class EventInfolist
                                             ->placeholder('-'),
                                         TextEntry::make('submitter_info')
                                             ->label('Penghantar')
-                                            ->state(fn (Event $record): string => SubmitterContactPresenter::labelForEvent($record))
-                                            ->url(fn (Event $record): ?string => SubmitterContactPresenter::whatsappUrlForEvent($record))
-                                            ->openUrlInNewTab()
+                                            ->state(function (Event $record): string {
+                                                // Check if submitted by authenticated user
+                                                if ($record->submitter) {
+                                                    $parts = [$record->submitter->name, $record->submitter->email];
+                                                    if ($record->submitter->phone) {
+                                                        $parts[] = $record->submitter->phone;
+                                                    }
+
+                                                    return implode(' | ', $parts);
+                                                }
+
+                                                // Get guest submission info from latest submission
+                                                $submission = $record->submissions()->latest()->first();
+                                                if ($submission instanceof EventSubmission) {
+                                                    $parts = [];
+                                                    if ($submission->submitter_name) {
+                                                        $parts[] = $submission->submitter_name;
+                                                    }
+                                                    if ($submission->email) {
+                                                        $parts[] = $submission->email;
+                                                    }
+                                                    if ($submission->phone) {
+                                                        $parts[] = $submission->phone;
+                                                    }
+
+                                                    return $parts === [] ? '-' : implode(' | ', $parts);
+                                                }
+
+                                                return '-';
+                                            })
                                             ->columnSpanFull(),
                                         TextEntry::make('created_at')
                                             ->label('Dicipta Pada')
@@ -440,51 +462,5 @@ class EventInfolist
         }
 
         return is_scalar($state) ? (string) $state : '';
-    }
-
-    protected static function resourceEditUrl(
-        int | string | null $record,
-        string $adminResourceClass,
-        ?string $ahliResourceClass = null,
-    ): ?string {
-        if (! filled($record)) {
-            return null;
-        }
-
-        $panel = Filament::getCurrentPanel();
-
-        if ($panel?->getId() === 'ahli') {
-            if ($ahliResourceClass === null) {
-                return null;
-            }
-
-            return self::resourceUrlForPanel($ahliResourceClass, 'edit', $record, $panel);
-        }
-
-        return self::resourceUrlForPanel(
-            $adminResourceClass,
-            'edit',
-            $record,
-            $panel ?? Filament::getCurrentOrDefaultPanel(),
-        );
-    }
-
-    protected static function resourceUrlForPanel(
-        string $resourceClass,
-        string $action,
-        int | string $record,
-        ?Panel $panel,
-    ): ?string {
-        if ($panel === null) {
-            return null;
-        }
-
-        $routeName = $resourceClass::getRouteBaseName($panel).'.'.$action;
-
-        if (! Route::has($routeName)) {
-            return null;
-        }
-
-        return $resourceClass::getUrl($action, ['record' => $record], panel: $panel->getId());
     }
 }

@@ -386,13 +386,12 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return BelongsToMany<Series, $this, EventSeries, 'pivot'>
+     * @return BelongsToMany<Series, $this>
      */
     public function series(): BelongsToMany
     {
         return $this->belongsToMany(Series::class, 'event_series')
-            ->using(EventSeries::class)
-            ->withPivot('id', 'order_column')
+            ->withPivot('order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');
     }

@@ -4,6 +4,10 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Notifications\EventApprovedNotification;
+use App\Notifications\EventCancelledNotification;
+use App\Notifications\EventNeedsChangesNotification;
+use App\Notifications\EventRejectedNotification;
 use App\Notifications\EventSubmittedNotification;
 use App\Services\ModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -87,10 +91,7 @@ describe('Event Approval', function () {
 
         $this->service->approve($event);
 
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $submitter->id,
-            'trigger' => 'submission_approved',
-        ]);
+        Notification::assertSentTo($submitter, EventApprovedNotification::class);
     });
 
     it('auto-verifies pending related records on approval', function () {
@@ -200,10 +201,7 @@ describe('Event Needs Changes', function () {
         expect($review->reason_code)->toBe('incomplete_info');
         expect((string) $event->fresh()->status)->toBe('needs_changes');
 
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $submitter->id,
-            'trigger' => 'submission_needs_changes',
-        ]);
+        Notification::assertSentTo($submitter, EventNeedsChangesNotification::class);
     });
 });
 
@@ -231,10 +229,7 @@ describe('Event Rejection', function () {
         expect($review->decision)->toBe('rejected');
         expect((string) $event->fresh()->status)->toBe('rejected');
 
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $submitter->id,
-            'trigger' => 'submission_rejected',
-        ]);
+        Notification::assertSentTo($submitter, EventRejectedNotification::class);
     });
 });
 
@@ -268,22 +263,10 @@ describe('Event Cancellation', function () {
         expect($review)->toBeInstanceOf(ModerationReview::class);
         expect($review->decision)->toBe('cancelled');
 
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $submitter->id,
-            'trigger' => 'submission_cancelled',
-        ]);
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $goingUser->id,
-            'trigger' => 'event_cancelled',
-        ]);
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $interestedUser->id,
-            'trigger' => 'event_cancelled',
-        ]);
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $savedUser->id,
-            'trigger' => 'event_cancelled',
-        ]);
+        Notification::assertSentTo($submitter, EventCancelledNotification::class);
+        Notification::assertSentTo($goingUser, EventCancelledNotification::class);
+        Notification::assertSentTo($interestedUser, EventCancelledNotification::class);
+        Notification::assertSentTo($savedUser, EventCancelledNotification::class);
     });
 });
 

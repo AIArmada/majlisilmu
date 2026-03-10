@@ -3,8 +3,6 @@
 namespace App\Providers;
 
 use App\Ai\Listeners\RecordAiUsage;
-use App\Listeners\Notifications\HandleNotificationFailed;
-use App\Listeners\Notifications\RecordNotificationSent;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventRecurrenceRule;
@@ -33,9 +31,6 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Notifications\Events\NotificationFailed;
-use Illuminate\Notifications\Events\NotificationSent;
-use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Events\AgentPrompted;
 use Laravel\Ai\Events\AgentStreamed;
@@ -57,8 +52,6 @@ class AppServiceProvider extends ServiceProvider
     protected static bool $eventScheduleObserversRegistered = false;
 
     protected static bool $publicListingObserversRegistered = false;
-
-    protected static bool $notificationListenersRegistered = false;
 
     /**
      * Register any application services.
@@ -109,21 +102,15 @@ class AppServiceProvider extends ServiceProvider
         }
 
         if (! app()->bound('ai.usage.listeners.registered')) {
-            EventFacade::listen(AgentPrompted::class, [RecordAiUsage::class, 'handle']);
-            EventFacade::listen(AgentStreamed::class, [RecordAiUsage::class, 'handle']);
-            EventFacade::listen(ImageGenerated::class, [RecordAiUsage::class, 'handle']);
-            EventFacade::listen(TranscriptionGenerated::class, [RecordAiUsage::class, 'handle']);
-            EventFacade::listen(EmbeddingsGenerated::class, [RecordAiUsage::class, 'handle']);
-            EventFacade::listen(Reranked::class, [RecordAiUsage::class, 'handle']);
-            EventFacade::listen(AudioGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(AgentPrompted::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(AgentStreamed::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(ImageGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(TranscriptionGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(EmbeddingsGenerated::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(Reranked::class, [RecordAiUsage::class, 'handle']);
+            \Illuminate\Support\Facades\Event::listen(AudioGenerated::class, [RecordAiUsage::class, 'handle']);
 
             app()->instance('ai.usage.listeners.registered', true);
-        }
-
-        if (! self::$notificationListenersRegistered) {
-            EventFacade::listen(NotificationSent::class, RecordNotificationSent::class);
-            EventFacade::listen(NotificationFailed::class, HandleNotificationFailed::class);
-            self::$notificationListenersRegistered = true;
         }
 
         if (! self::$languageSwitchConfigured) {
