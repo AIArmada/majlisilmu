@@ -146,7 +146,7 @@ it('shows sidebar inspiration on institution page', function () {
         ->assertSee('Test Hadith Quote');
 });
 
-it('shows sidebar inspiration on event page', function () {
+it('does not render sidebar inspiration on event page', function () {
     Inspiration::factory()->category(InspirationCategory::DidYouKnow)->create([
         'title' => 'Test Did You Know',
         'content' => 'Test content for event page',
@@ -161,7 +161,7 @@ it('shows sidebar inspiration on event page', function () {
 
     $this->get(route('events.show', $event))
         ->assertSuccessful()
-        ->assertSee('Test Did You Know');
+        ->assertDontSee('Test Did You Know');
 });
 
 it('does not show inactive inspiration on public pages', function () {

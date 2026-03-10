@@ -480,31 +480,24 @@ class DawahShareAnalyticsService
                         ->where('event_type', 'outbound_click')
                         ->where('provider', $provider)
                         ->count(),
-                    'visits' => (clone $visits)
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                    'visits' => $this->filterByShareProvider(clone $visits, $provider)
                         ->count(),
-                    'unique_visitors' => (clone $visits)
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                    'unique_visitors' => $this->filterByShareProvider(clone $visits, $provider)
                         ->distinct('visitor_key')
                         ->count('visitor_key'),
-                    'outcomes' => (clone $outcomes)
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
+                    'outcomes' => $this->filterByShareProvider(clone $outcomes, $provider)
                         ->count(),
-                    'signups' => (clone $outcomes)
+                    'signups' => $this->filterByShareProvider(clone $outcomes, $provider)
                         ->where('outcome_type', 'signup')
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
                         ->count(),
-                    'event_registrations' => (clone $outcomes)
+                    'event_registrations' => $this->filterByShareProvider(clone $outcomes, $provider)
                         ->where('outcome_type', 'event_registration')
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
                         ->count(),
-                    'event_checkins' => (clone $outcomes)
+                    'event_checkins' => $this->filterByShareProvider(clone $outcomes, $provider)
                         ->where('outcome_type', 'event_checkin')
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
                         ->count(),
-                    'event_submissions' => (clone $outcomes)
+                    'event_submissions' => $this->filterByShareProvider(clone $outcomes, $provider)
                         ->where('outcome_type', 'event_submission')
-                        ->whereHas('attribution', fn (Builder $builder): Builder => $builder->where('metadata->share_provider', $provider))
                         ->count(),
                 ];
             })
@@ -525,6 +518,22 @@ class DawahShareAnalyticsService
                 ];
             })
             ->values();
+    }
+
+    protected function filterByShareProvider(Builder $query, string $provider): Builder
+    {
+        $connection = $query->getModel()->getConnection();
+        $driver = $connection->getDriverName();
+
+        return $query->whereHas('attribution', function (Builder $builder) use ($driver, $provider): void {
+            if ($driver === 'sqlite') {
+                $builder->whereRaw("json_extract(metadata, '$.share_provider') = ?", [$provider]);
+
+                return;
+            }
+
+            $builder->where('metadata->share_provider', $provider);
+        });
     }
 
     protected function shareProviderLabel(string $provider): string

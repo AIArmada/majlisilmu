@@ -216,7 +216,8 @@ test('event show page displays login link for guest users', function () {
     $response = $this->get(route('events.show', $this->event));
 
     $response->assertStatus(200)
-        ->assertSee(__('Log Masuk untuk Hadir'));
+        ->assertSee(__('Log Masuk'))
+        ->assertSee(route('login'), false);
 });
 
 test('event show page does not show interest button for past events', function () {

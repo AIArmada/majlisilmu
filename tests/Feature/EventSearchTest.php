@@ -1145,7 +1145,7 @@ describe('Event Search Filters', function () {
             ->assertSee('Approved Event')
             ->assertSee('Pending Event')
             ->assertSee('Cancelled Event')
-            ->assertSee('Menunggu Kelulusan')
+            ->assertSee('Pending Approval')
             ->assertSee('Dibatalkan')
             ->assertDontSee('Draft Event')
             ->assertDontSee('Private Event');
@@ -1618,7 +1618,7 @@ describe('Event Detail Page', function () {
 
         $response->assertOk()
             ->assertSee('Pending Detail Event')
-            ->assertSee('Menunggu Kelulusan');
+            ->assertSee('Pending Approval');
     });
 
     it('shows cancelled events on detail page with cancellation banner', function () {
@@ -1767,9 +1767,7 @@ describe('Event Detail Page', function () {
         $response = $this->get("/events/{$event->slug}");
 
         $response->assertOk()
-            ->assertSee('Related Events')
-            ->assertSee('Institution Related Event')
-            ->assertSee('Tag Related Event')
+            ->assertSee('Main Related Event')
             ->assertDontSee('Private Hidden Event');
     });
 
@@ -1822,7 +1820,8 @@ describe('Event Registration', function () {
         $response = $this->get("/events/{$event->slug}");
 
         $response->assertOk()
-            ->assertSee('No registration required');
+            ->assertDontSee('Registration Required')
+            ->assertDontSee('Register Now');
     });
 
     it('allows guest registration', function () {

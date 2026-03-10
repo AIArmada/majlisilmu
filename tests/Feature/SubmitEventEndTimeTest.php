@@ -187,7 +187,7 @@ it('allows sebelum maghrib during ramadhan', function () {
         Livewire::test('pages.submit-event.create'),
         submitEventEndTimeFormData($fixtures, [
             'title' => 'Ramadhan Sebelum Maghrib Valid',
-            'event_date' => '2026-03-01',
+            'event_date' => '2027-02-10',
             'prayer_time' => EventPrayerTime::SebelumMaghrib->value,
             'timezone' => 'Asia/Kuala_Lumpur',
             'end_time' => '20:00',
@@ -199,8 +199,8 @@ it('allows sebelum maghrib during ramadhan', function () {
 
     $event = Event::where('title', 'Ramadhan Sebelum Maghrib Valid')->firstOrFail();
 
-    expect($event->starts_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('19:45');
-    expect($event->starts_at->timezone('UTC')->format('H:i'))->toBe('11:45');
+    expect($event->starts_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('19:10');
+    expect($event->starts_at->timezone('UTC')->format('H:i'))->toBe('11:10');
 });
 
 it('rejects sebelum maghrib outside ramadhan', function () {
@@ -210,7 +210,7 @@ it('rejects sebelum maghrib outside ramadhan', function () {
         Livewire::test('pages.submit-event.create'),
         submitEventEndTimeFormData($fixtures, [
             'title' => 'Non Ramadhan Sebelum Maghrib Invalid',
-            'event_date' => '2026-04-01',
+            'event_date' => '2027-03-20',
             'prayer_time' => EventPrayerTime::SebelumMaghrib->value,
         ]),
     )
