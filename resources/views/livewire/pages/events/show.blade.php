@@ -1,15 +1,15 @@
+@section('title', $event->title . ' - ' . config('app.name'))
+@section('meta_description', Str::limit($event->description_text !== '' ? $event->description_text : __('Lihat masa, lokasi, penceramah, dan maklumat pendaftaran untuk majlis ilmu ini di :app.', ['app' => config('app.name')]), 160))
+@section('meta_og_type', 'event')
+@section('meta_robots', $this->metaRobots)
+@section('og_url', route('events.show', $event))
+@section('og_image', $event->card_image_url)
+@section('og_image_alt', __('Poster untuk :title', ['title' => $event->title]))
+
 @push('head')
     <x-event-json-ld :event="$this->event" />
-    <meta property="og:title" content="{{ $event->title }}">
-    <meta property="og:description" content="{{ Str::limit($event->description_text, 160) }}">
-    <meta property="og:type" content="event">
-    <meta property="og:url" content="{{ route('events.show', $event) }}">
-    <meta property="og:image" content="{{ $event->card_image_url }}">
+    <link rel="canonical" href="{{ route('events.show', $event) }}">
     <meta property="article:published_time" content="{{ $event->starts_at?->toIso8601String() }}">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{{ $event->title }}">
-    <meta name="twitter:description" content="{{ Str::limit($event->description_text, 160) }}">
-    <meta name="twitter:image" content="{{ $event->card_image_url }}">
 @endpush
 
 @php

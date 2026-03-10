@@ -183,10 +183,10 @@ Note: registration export endpoint exists (`GET /api/v1/events/{id}/registration
 - [x] Events sitemap (`/sitemap-events.xml`)
 - [x] Institutions sitemap (`/sitemap-institutions.xml`)
 - [x] Speakers sitemap (`/sitemap-speakers.xml`)
-- [ ] Canonical URLs on event pages (explicit canonical tag)
-- [ ] noindex handling for draft/pending/private pages (meta robots strategy)
+- [x] Canonical URLs on event pages (explicit canonical tag)
+- [x] noindex handling for draft/pending/private pages (meta robots strategy)
 - [x] robots.txt configuration
-- [ ] Meta title/description optimization pass (comprehensive)
+- [x] Meta title/description optimization pass (comprehensive)
 
 ---
 

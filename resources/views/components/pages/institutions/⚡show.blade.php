@@ -140,6 +140,13 @@ new class extends Component {
 
 ?>
 
+@section('title', $this->institution->name . ' - ' . config('app.name'))
+@section('meta_description', \Illuminate\Support\Str::limit(trim(strip_tags((string) $this->institution->description)) ?: __('Lihat profil, lokasi, saluran sumbangan, dan majlis akan datang oleh :name di :app.', ['name' => $this->institution->name, 'app' => config('app.name')]), 160))
+@section('meta_robots', $this->institution->status === 'verified' ? 'index, follow' : 'noindex, nofollow')
+@section('og_url', route('institutions.show', $this->institution))
+@section('og_image', $this->institution->getFirstMediaUrl('cover', 'banner') ?: ($this->institution->getFirstMediaUrl('logo', 'thumb') ?: asset('images/placeholders/institution.png')))
+@section('og_image_alt', __('Profil institusi :name', ['name' => $this->institution->name]))
+
 <style>
     @media (max-width: 1023px) {
         .institution-main-column {
