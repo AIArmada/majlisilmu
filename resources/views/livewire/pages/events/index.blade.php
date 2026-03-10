@@ -1,13 +1,12 @@
-@section('title', __('Upcoming Events') . ' - ' . config('app.name'))
+@section('title', __('Kuliah & Majlis Ilmu Akan Datang di Malaysia') . ' - ' . config('app.name'))
+@section('meta_description', __('Terokai kuliah, ceramah, kelas, dan majlis ilmu akan datang di seluruh Malaysia. Tapis mengikut lokasi, tarikh, penceramah, dan topik.'))
+@section('og_url', route('events.index'))
+@section('og_image', asset('images/default-mosque-hero.png'))
+@section('og_image_alt', __('Kuliah dan majlis ilmu akan datang di Malaysia'))
+@section('og_image_width', '1024')
+@section('og_image_height', '1024')
 
 @push('head')
-    <!-- OpenGraph / Twitter Cards -->
-    <meta property="og:title" content="{{ __('Upcoming Events') }} - {{ config('app.name') }}">
-    <meta property="og:description"
-        content="{{ __('Discover Islamic lectures, classes, and gatherings happening near you.') }}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ route('events.index') }}">
-    <meta name="twitter:card" content="summary">
 @endpush
 
 @once

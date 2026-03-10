@@ -130,6 +130,12 @@ class Show extends Component
         return $images;
     }
 
+    #[Computed]
+    public function metaRobots(): string
+    {
+        return $this->isSearchIndexable($this->event) ? 'index, follow' : 'noindex, nofollow';
+    }
+
     /**
      * @return Collection<int, EventSession>
      */
@@ -475,6 +481,21 @@ class Show extends Component
         }
 
         return in_array((string) $status, Event::ENGAGEABLE_STATUSES, true);
+    }
+
+    protected function isSearchIndexable(Event $event): bool
+    {
+        if (! $event->is_active || $event->visibility !== EventVisibility::Public) {
+            return false;
+        }
+
+        $status = $event->status;
+
+        if ($status instanceof EventStatus) {
+            return $status->equals(Approved::class) || $status->equals(Cancelled::class);
+        }
+
+        return in_array((string) $status, ['approved', 'cancelled'], true);
     }
 
     /**

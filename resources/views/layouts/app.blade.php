@@ -5,7 +5,35 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', config('app.name'))</title>
+    @php
+        $defaultMetaDescription = __('Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.');
+        $pageTitle = trim($__env->yieldContent('title', config('app.name')));
+        $pageDescription = trim($__env->yieldContent('meta_description', $defaultMetaDescription));
+        $defaultOgImage = asset('images/default-mosque-hero.png');
+        $pageUrl = trim($__env->yieldContent('og_url', url()->current()));
+        $pageOgImage = trim($__env->yieldContent('og_image', $defaultOgImage));
+        $pageOgImageAlt = trim($__env->yieldContent('og_image_alt', $pageTitle !== '' ? $pageTitle : config('app.name')));
+        $pageOgImageWidth = trim($__env->yieldContent('og_image_width', '1024'));
+        $pageOgImageHeight = trim($__env->yieldContent('og_image_height', '1024'));
+    @endphp
+    <title>{{ $pageTitle }}</title>
+    <meta name="description" content="{{ $pageDescription }}">
+    <meta name="robots" content="@yield('meta_robots', 'index, follow')">
+    <meta property="og:title" content="{{ $pageTitle }}">
+    <meta property="og:description" content="{{ $pageDescription }}">
+    <meta property="og:site_name" content="{{ config('app.name') }}">
+    <meta property="og:type" content="@yield('meta_og_type', 'website')">
+    <meta property="og:url" content="{{ $pageUrl }}">
+    <meta property="og:image" content="{{ $pageOgImage }}">
+    <meta property="og:image:secure_url" content="{{ $pageOgImage }}">
+    <meta property="og:image:width" content="{{ $pageOgImageWidth }}">
+    <meta property="og:image:height" content="{{ $pageOgImageHeight }}">
+    <meta property="og:image:alt" content="{{ $pageOgImageAlt }}">
+    <meta name="twitter:card" content="@yield('twitter_card', 'summary_large_image')">
+    <meta name="twitter:title" content="{{ $pageTitle }}">
+    <meta name="twitter:description" content="{{ $pageDescription }}">
+    <meta name="twitter:image" content="{{ $pageOgImage }}">
+    <meta name="twitter:image:alt" content="{{ $pageOgImageAlt }}">
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32x32.png') }}">

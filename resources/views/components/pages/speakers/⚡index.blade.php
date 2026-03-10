@@ -289,6 +289,14 @@ new
     };
 ?>
 
+@section('title', __('Direktori Penceramah Islam') . ' - ' . config('app.name'))
+@section('meta_description', __('Cari profil penceramah, ustaz, dan pendakwah serta semak majlis ilmu mereka yang akan datang di seluruh Malaysia.'))
+@section('og_url', route('speakers.index'))
+@section('og_image', asset('images/placeholders/speaker.png'))
+@section('og_image_alt', __('Direktori penceramah Islam'))
+@section('og_image_width', '1024')
+@section('og_image_height', '1024')
+
 @php
     $speakers = $this->speakers;
     $search = $this->search;

@@ -139,6 +139,13 @@ new
 };
 ?>
 
+@section('title', $this->reference->title . ' - ' . config('app.name'))
+@section('meta_description', Str::limit(trim(strip_tags((string) $this->reference->description)) ?: __('Lihat rujukan ini, termasuk penerangan dan majlis berkaitan di :app.', ['app' => config('app.name')]), 160))
+@section('meta_robots', ($this->reference->is_active && $this->reference->status === 'verified') ? 'index, follow' : 'noindex, nofollow')
+@section('og_url', route('references.show', $this->reference))
+@section('og_image', $this->reference->getFirstMediaUrl('front_cover', 'thumb') ?: asset('images/default-mosque-hero.png'))
+@section('og_image_alt', __('Rujukan :title', ['title' => $this->reference->title]))
+
 @php
     $reference = $this->reference;
     $upcomingEvents = $this->upcomingEvents;
