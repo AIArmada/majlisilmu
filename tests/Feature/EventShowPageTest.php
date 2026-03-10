@@ -2,6 +2,7 @@
 
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
@@ -10,6 +11,78 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 describe('Event Show Page Going Feature', function () {
+    it('renders the canonical event url in the head metadata', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $canonicalUrl = route('events.show', $event);
+
+        $this->get($canonicalUrl)
+            ->assertOk()
+            ->assertSee('<link rel="canonical" href="'.$canonicalUrl.'">', false);
+    });
+
+    it('renders indexable robots metadata for approved public events', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="index, follow">', false);
+    });
+
+    it('renders noindex robots metadata for pending public events', function () {
+        $event = Event::factory()->create([
+            'status' => 'pending',
+            'visibility' => 'public',
+            'published_at' => null,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex, nofollow">', false);
+    });
+
+    it('renders noindex robots metadata for unlisted events', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'unlisted',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex, nofollow">', false);
+    });
+
+    it('renders Open Graph preview image metadata for events', function () {
+        $event = Event::factory()->create([
+            'title' => 'Kuliah Hadis Mingguan',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $eventImage = $event->card_image_url;
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('<meta property="og:image" content="'.$eventImage.'">', false)
+            ->assertSee('<meta property="og:image:alt" content="Poster untuk Kuliah Hadis Mingguan">', false)
+            ->assertSee('<meta name="twitter:image" content="'.$eventImage.'">', false);
+    });
+
     it('shows the going button for future events', function () {
         $event = Event::factory()->create([
             'status' => 'approved',
@@ -118,6 +191,30 @@ describe('Event Show Page Going Feature', function () {
 });
 
 describe('Event Show Page Location & Contact Info', function () {
+    it('renders a single reference material card at full width', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $reference = Reference::factory()->create([
+            'title' => 'Matan Al-Arbain',
+            'author' => 'Imam al-Nawawi',
+        ]);
+
+        $event->references()->attach($reference->id);
+
+        $response = $this->get(route('events.show', $event));
+
+        $response->assertOk()
+            ->assertSee('Reference Materials')
+            ->assertSee('Matan Al-Arbain')
+            ->assertSee('class="grid gap-5"', false)
+            ->assertDontSee('class="grid gap-5 sm:grid-cols-2"', false);
+    });
+
     it('does not use speaker images as hero background when location media is missing', function () {
         $speaker = Speaker::factory()->create();
         $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg', 800, 800))

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
+use App\Models\User;
+use App\Services\DawahShare\DawahShareService;
 use App\Services\EventSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +15,8 @@ use Illuminate\Validation\Rule;
 class SavedSearchController extends Controller
 {
     public function __construct(
-        protected EventSearchService $searchService
+        protected EventSearchService $searchService,
+        protected DawahShareService $dawahShareService
     ) {}
 
     /**
@@ -85,6 +88,20 @@ class SavedSearchController extends Controller
             'lng' => $validated['lng'] ?? null,
             'notify' => $validated['notify'],
         ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->dawahShareService->recordOutcome(
+            type: \App\Enums\DawahShareOutcomeType::SavedSearchCreated,
+            outcomeKey: 'saved_search_created:saved_search:'.$savedSearch->id,
+            subject: null,
+            actor: $user,
+            request: $request,
+            metadata: [
+                'saved_search_id' => $savedSearch->id,
+            ],
+        );
 
         return response()->json([
             'message' => 'Saved search created.',

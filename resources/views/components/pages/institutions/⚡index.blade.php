@@ -408,6 +408,14 @@ class extends Component implements HasForms
 };
 ?>
 
+@section('title', __('Direktori Institusi Islam di Malaysia') . ' - ' . config('app.name'))
+@section('meta_description', __('Terokai masjid, surau, pusat pengajian, dan institusi penganjur majlis ilmu di seluruh Malaysia. Cari mengikut nama dan lokasi.'))
+@section('og_url', route('institutions.index'))
+@section('og_image', asset('images/placeholders/institution.png'))
+@section('og_image_alt', __('Direktori institusi Islam di Malaysia'))
+@section('og_image_width', '1024')
+@section('og_image_height', '1024')
+
 @php
     $institutions = $this->institutions;
     $search = $this->search;

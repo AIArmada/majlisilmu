@@ -7,9 +7,15 @@ new #[Title('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')]
     };
 ?>
 
+@section('title', __('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia'))
+@section('meta_description', __('Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.'))
+@section('og_url', route('home.glm'))
+@section('og_image', asset('images/default-mosque-hero.png'))
+@section('og_image_alt', __('Majlis Ilmu'))
+@section('og_image_width', '1024')
+@section('og_image_height', '1024')
+
 @push('head')
-    <meta name="description"
-        content="{{ __('Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.') }}">
 @endpush
 
 <div class="min-h-screen bg-gradient-to-b from-slate-50 to-white">

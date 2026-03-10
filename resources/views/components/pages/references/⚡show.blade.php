@@ -50,6 +50,16 @@ new
         } else {
             $user->follow($this->reference);
             $this->isFollowing = true;
+            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+                type: \App\Enums\DawahShareOutcomeType::ReferenceFollow,
+                outcomeKey: 'reference_follow:user:'.$user->id.':reference:'.$this->reference->id,
+                subject: $this->reference,
+                actor: $user,
+                request: request(),
+                metadata: [
+                    'reference_id' => $this->reference->id,
+                ],
+            );
         }
     }
 
@@ -129,12 +139,35 @@ new
 };
 ?>
 
+@section('title', $this->reference->title . ' - ' . config('app.name'))
+@section('meta_description', Str::limit(trim(strip_tags((string) $this->reference->description)) ?: __('Lihat rujukan ini, termasuk penerangan dan majlis berkaitan di :app.', ['app' => config('app.name')]), 160))
+@section('meta_robots', ($this->reference->is_active && $this->reference->status === 'verified') ? 'index, follow' : 'noindex, nofollow')
+@section('og_url', route('references.show', $this->reference))
+@section('og_image', $this->reference->getFirstMediaUrl('front_cover', 'thumb') ?: asset('images/default-mosque-hero.png'))
+@section('og_image_alt', __('Rujukan :title', ['title' => $this->reference->title]))
+
 @php
     $reference = $this->reference;
     $upcomingEvents = $this->upcomingEvents;
     $pastEvents = $this->pastEvents;
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
+    $referenceUrl = route('references.show', $reference);
+    $referenceShareText = trim($reference->title . ' - ' . config('app.name'));
+    $referenceShareData = [
+        'title' => $reference->title,
+        'text' => Str::limit((string) $reference->description, 140) ?: __('Lihat rujukan ini di :app', ['app' => config('app.name')]),
+        'url' => $referenceUrl,
+        'sourceUrl' => $referenceUrl,
+        'shareText' => $referenceShareText,
+        'fallbackTitle' => $reference->title,
+        'payloadEndpoint' => route('dawah-share.payload'),
+    ];
+    $referenceShareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+        $referenceUrl,
+        $referenceShareText,
+        $reference->title,
+    );
 
     $frontCover = $reference->getFirstMediaUrl('front_cover', 'thumb');
     $backCover = $reference->getFirstMediaUrl('back_cover', 'thumb');
@@ -338,6 +371,17 @@ new
                             {{ __('Edit Rujukan') }}
                         </a>
                     @endcan
+                </div>
+
+                <div class="mt-6 max-w-2xl">
+                    <x-dawah-share-panel
+                        :heading="__('Share This Reference')"
+                        :description="__('Share this reference with others and keep every visit and response on one tracked link.')"
+                        :preview-title="$reference->title"
+                        :preview-subtitle="Str::limit((string) $reference->description, 110)"
+                        :share-data="$referenceShareData"
+                        :share-links="$referenceShareLinks"
+                    />
                 </div>
 
             </div>

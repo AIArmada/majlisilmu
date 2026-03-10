@@ -1,13 +1,12 @@
-@section('title', __('Upcoming Events') . ' - ' . config('app.name'))
+@section('title', __('Kuliah & Majlis Ilmu Akan Datang di Malaysia') . ' - ' . config('app.name'))
+@section('meta_description', __('Terokai kuliah, ceramah, kelas, dan majlis ilmu akan datang di seluruh Malaysia. Tapis mengikut lokasi, tarikh, penceramah, dan topik.'))
+@section('og_url', route('events.index'))
+@section('og_image', asset('images/default-mosque-hero.png'))
+@section('og_image_alt', __('Kuliah dan majlis ilmu akan datang di Malaysia'))
+@section('og_image_width', '1024')
+@section('og_image_height', '1024')
 
 @push('head')
-    <!-- OpenGraph / Twitter Cards -->
-    <meta property="og:title" content="{{ __('Upcoming Events') }} - {{ config('app.name') }}">
-    <meta property="og:description"
-        content="{{ __('Discover Islamic lectures, classes, and gatherings happening near you.') }}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ route('events.index') }}">
-    <meta name="twitter:card" content="summary">
 @endpush
 
 @once
@@ -219,6 +218,19 @@
     ])->filter()->count();
 
     $hasActiveFilters = $activeFilterCount > 0;
+    $searchShareUrl = $hasActiveFilters ? route('events.index', $savedSearchQuery) : null;
+    $searchShareText = __('Explore these Majlis Ilmu search results on :app', ['app' => config('app.name')]);
+    $searchShareData = $searchShareUrl !== null
+        ? [
+            'title' => __('Search Results'),
+            'text' => __('Share these filtered results with others.'),
+            'url' => $searchShareUrl,
+            'sourceUrl' => $searchShareUrl,
+            'shareText' => $searchShareText,
+            'fallbackTitle' => __('Search Results'),
+            'payloadEndpoint' => route('dawah-share.payload'),
+        ]
+        : null;
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -257,6 +269,9 @@
     <div class="container mx-auto px-6 lg:px-12 -mt-8 relative z-10">
         <form wire:submit.prevent x-data="{
                     locating: false,
+                    copiedShareLink: false,
+                    shareData: @js($searchShareData),
+                    attributedShareData: null,
                     locate() {
                         if (this.locating) return;
                         if (! navigator.geolocation) {
@@ -270,6 +285,71 @@
                         }, () => {
                             this.locating = false;
                             alert('{{ __("Unable to get your location. Please enable location services.") }}');
+                        });
+                    },
+                    async resolveShareData() {
+                        if (! this.shareData) {
+                            return null;
+                        }
+
+                        if (this.attributedShareData) {
+                            return this.attributedShareData;
+                        }
+
+                        const params = new URLSearchParams({
+                            url: this.shareData.sourceUrl,
+                            text: this.shareData.shareText,
+                            title: this.shareData.fallbackTitle,
+                        });
+                        const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
+                            headers: {
+                                Accept: 'application/json',
+                            },
+                        });
+
+                        if (!response.ok) {
+                            return this.shareData;
+                        }
+
+                        const payload = await response.json();
+                        this.attributedShareData = {
+                            ...this.shareData,
+                            url: payload.url,
+                        };
+
+                        return this.attributedShareData;
+                    },
+                    async shareResults() {
+                        const shareData = await this.resolveShareData();
+                        if (!shareData) {
+                            return;
+                        }
+
+                        if (navigator.share) {
+                            navigator.share(shareData);
+
+                            return;
+                        }
+
+                        this.copyShareLink();
+                    },
+                    async copyShareLink() {
+                        const shareData = await this.resolveShareData();
+                        if (!shareData) {
+                            return;
+                        }
+
+                        if (! navigator.clipboard) {
+                            window.prompt('{{ __("Copy this link:") }}', shareData.url);
+
+                            return;
+                        }
+
+                        navigator.clipboard.writeText(shareData.url).then(() => {
+                            this.copiedShareLink = true;
+                            setTimeout(() => this.copiedShareLink = false, 2200);
+                        }, () => {
+                            window.prompt('{{ __("Copy this link:") }}', shareData.url);
                         });
                     },
                 }" class="relative bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-6 md:p-8">
@@ -560,15 +640,35 @@
                         </span>
                     @endif
 
-                    <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
-                        class="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                        {{ __('Save This Search') }}
-                    </a>
+                    <div class="ml-auto flex flex-wrap items-center gap-3">
+                        <button type="button" @click="shareResults()"
+                            class="text-xs font-bold text-slate-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Share These Results') }}
+                        </button>
+                        <button type="button" @click="copyShareLink()"
+                            class="text-xs font-bold text-slate-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Copy Share Link') }}
+                        </button>
+                        <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
+                            class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            {{ __('Save This Search') }}
+                        </a>
+                    </div>
 
                     <button type="button" wire:click="clearAllFilters"
                         class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
                         {{ __('Clear All Filters') }}
                     </button>
+                </div>
+
+                <div x-show="copiedShareLink" x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 -translate-y-2"
+                    x-transition:enter-end="opacity-100 translate-y-0"
+                    class="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {{ __('Link copied to clipboard!') }}
                 </div>
             @endif
         </form>

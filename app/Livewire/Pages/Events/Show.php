@@ -11,6 +11,7 @@ use App\Models\EventSession;
 use App\Models\Registration;
 use App\Models\User;
 use App\Services\CalendarService;
+use App\Services\DawahShare\DawahShareService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
@@ -129,6 +130,12 @@ class Show extends Component
         return $images;
     }
 
+    #[Computed]
+    public function metaRobots(): string
+    {
+        return $this->isSearchIndexable($this->event) ? 'index, follow' : 'noindex, nofollow';
+    }
+
     /**
      * @return Collection<int, EventSession>
      */
@@ -224,22 +231,14 @@ class Show extends Component
     #[Computed]
     public function shareLinks(): array
     {
-        $eventUrl = route('events.show', $this->event);
-        $shareText = trim($this->event->title.' - '.config('app.name'));
-        $encodedUrl = urlencode($eventUrl);
-        $encodedText = urlencode($shareText);
-        $encodedBody = urlencode($shareText."\n".$eventUrl);
+        /** @var array<string, string> $platformLinks */
+        $platformLinks = app(DawahShareService::class)->redirectLinks(
+            route('events.show', $this->event),
+            trim($this->event->title.' - '.config('app.name')),
+            $this->event->title,
+        );
 
-        return [
-            'whatsapp' => "https://wa.me/?text={$encodedText}%20{$encodedUrl}",
-            'telegram' => "https://t.me/share/url?url={$encodedUrl}&text={$encodedText}",
-            'line' => "https://social-plugins.line.me/lineit/share?url={$encodedUrl}",
-            'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedUrl}",
-            'x' => "https://x.com/intent/tweet?text={$encodedText}&url={$encodedUrl}",
-            'instagram' => 'https://www.instagram.com/',
-            'tiktok' => 'https://www.tiktok.com/',
-            'email' => "mailto:?subject={$encodedText}&body={$encodedBody}",
-        ];
+        return $platformLinks;
     }
 
     public function toggleSave(): void
@@ -296,7 +295,7 @@ class Show extends Component
             return;
         }
 
-        EventCheckin::query()->create([
+        $checkin = EventCheckin::query()->create([
             'event_id' => $this->event->id,
             'event_session_id' => $state['event_session_id'],
             'registration_id' => $state['registration_id'],
@@ -304,6 +303,23 @@ class Show extends Component
             'method' => $state['method'],
             'checked_in_at' => now(),
         ]);
+
+        app(DawahShareService::class)->recordOutcome(
+            type: \App\Enums\DawahShareOutcomeType::EventCheckin,
+            outcomeKey: 'event_checkin:checkin:'.$checkin->id,
+            subject: $this->event,
+            actor: $user,
+            request: request(),
+            metadata: [
+                'checkin_id' => $checkin->id,
+                'event_session_id' => $checkin->event_session_id,
+                'registration_id' => $checkin->registration_id,
+                'method' => $checkin->method,
+            ],
+        );
+
+        app(\App\Services\Notifications\EventNotificationService::class)
+            ->notifyCheckinConfirmed($checkin);
 
         $this->isCheckedIn = true;
         unset($this->checkInState);
@@ -369,7 +385,33 @@ class Show extends Component
             }
 
             $this->{$stateProperty} = true;
+            $this->recordEngagementOutcome($relation, $user);
         }
+    }
+
+    protected function recordEngagementOutcome(string $relation, User $user): void
+    {
+        $type = match ($relation) {
+            'savedEvents' => \App\Enums\DawahShareOutcomeType::EventSave,
+            'interestedEvents' => \App\Enums\DawahShareOutcomeType::EventInterest,
+            'goingEvents' => \App\Enums\DawahShareOutcomeType::EventGoing,
+            default => null,
+        };
+
+        if (! $type instanceof \App\Enums\DawahShareOutcomeType) {
+            return;
+        }
+
+        app(DawahShareService::class)->recordOutcome(
+            type: $type,
+            outcomeKey: $type->value.':user:'.$user->id.':event:'.$this->event->id,
+            subject: $this->event,
+            actor: $user,
+            request: request(),
+            metadata: [
+                'event_id' => $this->event->id,
+            ],
+        );
     }
 
     protected function syncEngagementStates(): void
@@ -439,6 +481,21 @@ class Show extends Component
         }
 
         return in_array((string) $status, Event::ENGAGEABLE_STATUSES, true);
+    }
+
+    protected function isSearchIndexable(Event $event): bool
+    {
+        if (! $event->is_active || $event->visibility !== EventVisibility::Public) {
+            return false;
+        }
+
+        $status = $event->status;
+
+        if ($status instanceof EventStatus) {
+            return $status->equals(Approved::class) || $status->equals(Cancelled::class);
+        }
+
+        return in_array((string) $status, ['approved', 'cancelled'], true);
     }
 
     /**

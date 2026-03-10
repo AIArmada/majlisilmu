@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b846b6a7631b827159664103453fe12e",
+    "content-hash": "42ffb2ee5185ff93d82f363d1955dddd",
     "packages": [
         {
             "name": "aiarmada/commerce-support",
-            "version": "dev-main",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/commerce-support.git",
+                "reference": "b73766e50e09cba51e3ca9890e71a0db17c9ba28"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/commerce-support",
-                "reference": "b7f1aa9c149c2b515a4445befd81c8a1728045f5"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/commerce-support/zipball/b73766e50e09cba51e3ca9890e71a0db17c9ba28",
+                "reference": "b73766e50e09cba51e3ca9890e71a0db17c9ba28",
+                "shasum": ""
             },
             "require": {
                 "akaunting/laravel-money": "^6.0",
@@ -62,18 +68,21 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "time": "2026-03-08T09:35:00+00:00"
         },
         {
             "name": "aiarmada/filament-authz",
-            "version": "dev-main",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/filament-authz.git",
+                "reference": "7be5bf22d89c1d84457cbf3ef8dc1d2ae0e2b062"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/filament-authz",
-                "reference": "a9b928263ffb441016e7239089be54e5630b1fef"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/filament-authz/zipball/7be5bf22d89c1d84457cbf3ef8dc1d2ae0e2b062",
+                "reference": "7be5bf22d89c1d84457cbf3ef8dc1d2ae0e2b062",
+                "shasum": ""
             },
             "require": {
                 "aiarmada/commerce-support": "self.version",
@@ -107,10 +116,7 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "time": "2026-03-08T09:35:02+00:00"
         },
         {
             "name": "akaunting/laravel-money",
@@ -9631,16 +9637,16 @@
         },
         {
             "name": "spatie/laravel-query-builder",
-            "version": "6.4.3",
+            "version": "6.4.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-query-builder.git",
-                "reference": "317cf7e7146daec502241dd1cd1d8fd4bb6d5cff"
+                "reference": "ab9c4c369fc913d6c020a0f6776f3c82f3e523fb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-query-builder/zipball/317cf7e7146daec502241dd1cd1d8fd4bb6d5cff",
-                "reference": "317cf7e7146daec502241dd1cd1d8fd4bb6d5cff",
+                "url": "https://api.github.com/repos/spatie/laravel-query-builder/zipball/ab9c4c369fc913d6c020a0f6776f3c82f3e523fb",
+                "reference": "ab9c4c369fc913d6c020a0f6776f3c82f3e523fb",
                 "shasum": ""
             },
             "require": {
@@ -9701,7 +9707,7 @@
                     "type": "custom"
                 }
             ],
-            "time": "2026-02-21T21:10:32+00:00"
+            "time": "2026-03-08T13:45:05+00:00"
         },
         {
             "name": "spatie/laravel-settings",
@@ -17124,7 +17130,6 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "aiarmada/filament-authz": 20,
         "bezhansalleh/filament-language-switch": 20
     },
     "prefer-stable": true,

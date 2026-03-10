@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Space;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class SpaceSeeder extends Seeder
 {
@@ -12,10 +13,6 @@ class SpaceSeeder extends Seeder
      */
     public function run(): void
     {
-        if (Space::exists()) {
-            return;
-        }
-
         // Create common spaces that can be offered to all institutions
         // Submitters will select which spaces are relevant when creating events
         $commonSpaces = [
@@ -42,9 +39,12 @@ class SpaceSeeder extends Seeder
         ];
 
         foreach ($commonSpaces as $spaceData) {
-            Space::factory()->create([
+            Space::query()->updateOrCreate([
                 'name' => $spaceData['name'],
+            ], [
+                'slug' => Str::slug($spaceData['name']),
                 'capacity' => $spaceData['capacity'],
+                'is_active' => true,
             ]);
         }
     }

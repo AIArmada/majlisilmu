@@ -63,6 +63,16 @@ new class extends Component {
         } else {
             $user->follow($this->speaker);
             $this->isFollowing = true;
+            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+                type: \App\Enums\DawahShareOutcomeType::SpeakerFollow,
+                outcomeKey: 'speaker_follow:user:'.$user->id.':speaker:'.$this->speaker->id,
+                subject: $this->speaker,
+                actor: $user,
+                request: request(),
+                metadata: [
+                    'speaker_id' => $this->speaker->id,
+                ],
+            );
         }
     }
 
@@ -145,6 +155,13 @@ new class extends Component {
 };
 ?>
 
+@section('title', $this->speaker->formatted_name . ' - ' . config('app.name'))
+@section('meta_description', \Illuminate\Support\Str::limit((is_array($this->speaker->bio) ? Filament\Forms\Components\RichEditor\RichContentRenderer::make($this->speaker->bio)->toText() : trim(strip_tags((string) $this->speaker->bio))) ?: __('Lihat profil, biodata, dan jadual majlis oleh :name di :app.', ['name' => $this->speaker->formatted_name, 'app' => config('app.name')]), 160))
+@section('meta_robots', ($this->speaker->is_active && $this->speaker->status === 'verified') ? 'index, follow' : 'noindex, nofollow')
+@section('og_url', route('speakers.show', $this->speaker))
+@section('og_image', $this->speaker->getFirstMediaUrl('cover', 'banner') ?: ($this->speaker->getFirstMediaUrl('avatar', 'profile') ?: $this->speaker->default_avatar_url))
+@section('og_image_alt', __('Profil penceramah :name', ['name' => $this->speaker->formatted_name]))
+
 @php
     $speaker = $this->speaker;
     $upcomingEvents = $this->upcomingEvents;
@@ -165,23 +182,19 @@ new class extends Component {
     $bioExcerpt = $isBioFilled ? Str::limit(strip_tags($bioHtml), 180) : null;
     $speakerUrl = route('speakers.show', $speaker);
     $shareText = trim($speaker->formatted_name . ' - ' . config('app.name'));
-    $encodedSpeakerUrl = urlencode($speakerUrl);
-    $encodedShareText = urlencode($shareText);
-    $encodedShareBody = urlencode($shareText . "\n" . $speakerUrl);
+    $shareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+        $speakerUrl,
+        $shareText,
+        $speaker->formatted_name,
+    );
     $shareData = [
         'title' => $speaker->formatted_name,
         'text' => $bioExcerpt ?: __('Lihat profil penceramah ini di :app', ['app' => config('app.name')]),
         'url' => $speakerUrl,
-    ];
-    $shareLinks = [
-        'whatsapp' => "https://wa.me/?text={$encodedShareText}%20{$encodedSpeakerUrl}",
-        'telegram' => "https://t.me/share/url?url={$encodedSpeakerUrl}&text={$encodedShareText}",
-        'line' => "https://social-plugins.line.me/lineit/share?url={$encodedSpeakerUrl}",
-        'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedSpeakerUrl}",
-        'x' => "https://x.com/intent/tweet?text={$encodedShareText}&url={$encodedSpeakerUrl}",
-        'instagram' => 'https://www.instagram.com/',
-        'tiktok' => 'https://www.tiktok.com/',
-        'email' => "mailto:?subject={$encodedShareText}&body={$encodedShareBody}",
+        'sourceUrl' => $speakerUrl,
+        'shareText' => $shareText,
+        'fallbackTitle' => $speaker->formatted_name,
+        'payloadEndpoint' => route('dawah-share.payload'),
     ];
 
     // Social media
@@ -305,22 +318,53 @@ new class extends Component {
         shareData: @json($shareData),
         copyMessage: @json(__('Pautan disalin ke papan klip!')),
         copyPrompt: @json(__('Copy this link:')),
-        nativeShare() {
+        attributedShareData: null,
+        async resolveShareData() {
+            if (this.attributedShareData) {
+                return this.attributedShareData;
+            }
+
+            const params = new URLSearchParams({
+                url: this.shareData.sourceUrl,
+                text: this.shareData.shareText,
+                title: this.shareData.fallbackTitle,
+            });
+            const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                return this.shareData;
+            }
+
+            const payload = await response.json();
+            this.attributedShareData = {
+                ...this.shareData,
+                url: payload.url,
+            };
+
+            return this.attributedShareData;
+        },
+        async nativeShare() {
+            const shareData = await this.resolveShareData();
             if (navigator.share) {
-                navigator.share(this.shareData);
+                navigator.share(shareData);
                 return;
             }
             this.copyLink();
         },
-        copyLink() {
+        async copyLink() {
+            const shareData = await this.resolveShareData();
             if (navigator.clipboard) {
-                navigator.clipboard.writeText(this.shareData.url).then(() => {
+                navigator.clipboard.writeText(shareData.url).then(() => {
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 2000);
                 });
                 return;
             }
-            window.prompt(this.copyPrompt, this.shareData.url);
+            window.prompt(this.copyPrompt, shareData.url);
         },
         openShareModal() {
             this.shareModalOpen = true;
@@ -673,8 +717,8 @@ new class extends Component {
                                                 <template x-if="cell.events?.length > 0">
                                                     <div class="mt-0.5 space-y-0.5">
                                                         <template x-for="ev in cell.events.slice(0, 2)" :key="ev.id">
-                                                            <a :href="ev.url" class="block rounded px-1 py-0.5 text-[10px] font-medium leading-snug whitespace-normal break-words transition"
-                                                               :class="ev.cancelled ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : (ev.pending ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : (ev.is_remote ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'))"
+                                                            <a :href="ev.url" class="block rounded-md border px-1.5 py-1 text-[10px] font-semibold leading-snug whitespace-normal break-words shadow-sm transition"
+                                                               :class="ev.cancelled ? 'border-rose-300 bg-rose-100 text-rose-900 shadow-rose-200/80 hover:bg-rose-200' : (ev.pending ? 'border-amber-300 bg-amber-100 text-amber-900 shadow-amber-200/80 hover:bg-amber-200' : (ev.is_remote ? 'border-sky-300 bg-sky-100 text-sky-900 shadow-sky-200/80 hover:bg-sky-200' : 'border-emerald-300 bg-emerald-100 text-emerald-900 shadow-emerald-200/80 hover:bg-emerald-200'))"
                                                                x-text="ev.title"></a>
                                                         </template>
                                                         <template x-if="cell.events?.length > 2">

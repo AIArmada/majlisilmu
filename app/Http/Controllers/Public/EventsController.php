@@ -9,7 +9,10 @@ use App\Models\Event;
 use App\Models\EventSession;
 use App\Models\EventSettings;
 use App\Models\Registration;
+use App\Models\User;
 use App\Services\CalendarService;
+use App\Services\DawahShare\DawahShareService;
+use App\Services\Notifications\EventNotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -22,7 +25,9 @@ use Illuminate\Validation\ValidationException;
 class EventsController extends Controller
 {
     public function __construct(
-        protected CalendarService $calendarService
+        protected CalendarService $calendarService,
+        protected DawahShareService $dawahShareService,
+        protected EventNotificationService $eventNotificationService,
     ) {}
 
     /**
@@ -86,8 +91,10 @@ class EventsController extends Controller
             return back()->withErrors(['event_session_id' => 'Please choose a session to register.']);
         }
 
+        $createdRegistrationId = null;
+
         try {
-            DB::transaction(function () use ($event, $validated): void {
+            DB::transaction(function () use ($event, $validated, &$createdRegistrationId): void {
                 /** @var Event $lockedEvent */
                 $lockedEvent = Event::query()
                     ->whereKey($event->id)
@@ -174,7 +181,7 @@ class EventsController extends Controller
                     throw ValidationException::withMessages(['registration' => 'You are already registered for this event.']);
                 }
 
-                Registration::create([
+                $registration = Registration::create([
                     'event_id' => $lockedEvent->id,
                     'event_session_id' => $mode === RegistrationMode::Session ? ($validated['event_session_id'] ?? null) : null,
                     'user_id' => auth()->id(),
@@ -183,6 +190,8 @@ class EventsController extends Controller
                     'phone' => $validated['phone'] ?? null,
                     'status' => 'registered',
                 ]);
+
+                $createdRegistrationId = $registration->id;
 
                 $lockedEvent->update([
                     'registrations_count' => Registration::query()
@@ -197,6 +206,53 @@ class EventsController extends Controller
             }
 
             throw $exception;
+        }
+
+        if (auth()->check()) {
+            $registration = filled($createdRegistrationId)
+                ? Registration::query()->find($createdRegistrationId)
+                : null;
+
+            if ($registration instanceof Registration) {
+                /** @var User|null $actor */
+                $actor = auth()->user();
+
+                $this->dawahShareService->recordOutcome(
+                    type: \App\Enums\DawahShareOutcomeType::EventRegistration,
+                    outcomeKey: 'event_registration:registration:'.$registration->id,
+                    subject: $event,
+                    actor: $actor,
+                    request: $request,
+                    metadata: [
+                        'registration_id' => $registration->id,
+                        'event_session_id' => $registration->event_session_id,
+                        'guest' => false,
+                    ],
+                );
+
+                $this->eventNotificationService->notifyRegistrationConfirmed($registration);
+            }
+
+            return back()->with('success', 'You have been registered for this event!');
+        }
+
+        $guestRegistration = filled($createdRegistrationId)
+            ? Registration::query()->find($createdRegistrationId)
+            : null;
+
+        if ($guestRegistration instanceof Registration) {
+            $this->dawahShareService->recordOutcome(
+                type: \App\Enums\DawahShareOutcomeType::EventRegistration,
+                outcomeKey: 'event_registration:registration:'.$guestRegistration->id,
+                subject: $event,
+                actor: null,
+                request: $request,
+                metadata: [
+                    'registration_id' => $guestRegistration->id,
+                    'event_session_id' => $guestRegistration->event_session_id,
+                    'guest' => true,
+                ],
+            );
         }
 
         return back()->with('success', 'You have been registered for this event!');

@@ -14,4 +14,44 @@ enum NotificationChannel: string
     case InstagramDm = 'instagram_dm';
     case Push = 'push';
     case InApp = 'in_app';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Email => __('Email'),
+            self::Whatsapp => __('WhatsApp'),
+            self::Push => __('Push Notification'),
+            self::InApp => __('In-app'),
+            self::Sms => __('SMS'),
+            self::Telegram => __('Telegram'),
+            self::Line => __('LINE'),
+            self::Wechat => __('WeChat'),
+            self::Messenger => __('Messenger'),
+            self::InstagramDm => __('Instagram DM'),
+        };
+    }
+
+    /**
+     * @return list<self>
+     */
+    public static function userSelectable(): array
+    {
+        return [
+            self::Email,
+            self::InApp,
+            self::Push,
+            self::Whatsapp,
+        ];
+    }
+
+    public function laravelChannel(): string
+    {
+        return match ($this) {
+            self::Email => 'mail',
+            self::InApp => 'database',
+            self::Push => \App\Notifications\Channels\PushChannel::class,
+            self::Whatsapp => \App\Notifications\Channels\WhatsappChannel::class,
+            default => throw new \LogicException("Channel [{$this->value}] is not supported by the Laravel notification runtime."),
+        };
+    }
 }
