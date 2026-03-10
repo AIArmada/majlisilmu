@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
+use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationCatalog;
@@ -25,6 +26,7 @@ use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 class AccountSettings extends Component implements HasForms
 {
     use InteractsWithForms;
+    use InteractsWithToasts;
 
     protected bool $syncingInheritedTriggerState = false;
 
@@ -221,7 +223,7 @@ class AccountSettings extends Component implements HasForms
         $freshUser = $user->fresh() ?? $user;
         $this->settingsManager()->syncProfileSettings($freshUser);
 
-        session()->flash('account_settings_status', __('Account settings updated.'));
+        $this->successToast(__('Account settings updated.'));
         $this->hydrateNotificationCenter($freshUser);
     }
 
@@ -232,7 +234,7 @@ class AccountSettings extends Component implements HasForms
         $this->settingsManager()->save($user, $this->notificationPayload());
         $this->hydrateNotificationCenter($user->fresh());
 
-        session()->flash('notification_preferences_status', __('notifications.flash.updated'));
+        $this->successToast(__('notifications.flash.updated'));
         $this->tab = 'notifications';
     }
 

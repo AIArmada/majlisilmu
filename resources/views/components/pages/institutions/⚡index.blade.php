@@ -560,6 +560,10 @@ class extends Component implements HasForms
 	        </div>
 
 	        <div class="container mx-auto px-6 lg:px-12 mt-12">
+                @php
+                    $institutionLoadingTarget = 'search,state_id,district_id,subdistrict_id,clearSearch,clearFilters';
+                @endphp
+
                 @if($showInstitutionSubmissionForm)
                     <div class="mb-10 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm md:p-8">
                         <div class="mb-6">
@@ -591,6 +595,11 @@ class extends Component implements HasForms
                     </div>
                 @endif
 
+                <div wire:loading.delay.short wire:target="{{ $institutionLoadingTarget }}">
+                    <x-ui.skeleton.institution-card-grid />
+                </div>
+
+	            <div wire:loading.remove wire:target="{{ $institutionLoadingTarget }}">
 	            @if($institutions->isEmpty())
 	                <div class="text-center py-24 rounded-3xl bg-slate-50/50 border border-dashed border-slate-200">
 	                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white text-slate-300 shadow-sm mb-6">
@@ -665,6 +674,7 @@ class extends Component implements HasForms
 	                    {{ $institutions->withQueryString()->links() }}
 	                </div>
 	            @endif
+                </div>
 	        </div>
         <x-filament-actions::modals />
 	    </div>

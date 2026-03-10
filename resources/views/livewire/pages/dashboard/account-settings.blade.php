@@ -46,12 +46,6 @@
 
                 @if ($tab === 'profile')
                     <div class="px-6 py-8 md:px-8">
-                        @if (session('account_settings_status'))
-                            <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700">
-                                {{ session('account_settings_status') }}
-                            </div>
-                        @endif
-
                         <form wire:submit="saveAccountSettings" class="space-y-8">
                             {{ $this->form }}
 
@@ -69,12 +63,6 @@
                     </div>
                 @else
                     <div class="space-y-8 px-6 py-8 md:px-8">
-                        @if (session('notification_preferences_status'))
-                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700">
-                                {{ session('notification_preferences_status') }}
-                            </div>
-                        @endif
-
                         <div class="grid gap-4 md:grid-cols-3">
                             <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{{ $channelOptions['email'] ?? __('Email') }}</p>

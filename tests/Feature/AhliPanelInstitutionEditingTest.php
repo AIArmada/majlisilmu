@@ -2,9 +2,11 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
-use App\Filament\Ahli\Resources\Events\Pages\ViewEvent as AhliViewEvent;
 use App\Filament\Ahli\Resources\Events\EventResource;
+use App\Filament\Ahli\Resources\Events\Pages\ViewEvent as AhliViewEvent;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource;
+use App\Filament\Ahli\Resources\Institutions\Pages\EditInstitution as AhliEditInstitution;
+use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -418,6 +420,28 @@ it('shows ahli edit links on institution dashboard only when user can update', f
         ->assertDontSee($institutionEditUrl, false)
         ->assertDontSee($eventEditUrl, false)
         ->assertDontSee($eventRegistrationsUrl, false);
+});
+
+it('shows the donation channels relation manager on the ahli institution edit page for institution admins', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $component = Livewire::actingAs($user)
+        ->test(AhliEditInstitution::class, ['record' => $institution->id]);
+
+    $relationManagers = $component->instance()->getRelationManagers();
+
+    expect($relationManagers)->toContain(DonationChannelsRelationManager::class);
 });
 
 it('shows review instead of edit for pending institution events on the dashboard', function () {

@@ -6,6 +6,7 @@ use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\AuthzScope;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\EventVisibility;
+use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\User;
@@ -28,6 +29,7 @@ use Spatie\Permission\PermissionRegistrar;
 #[Layout('layouts.app')]
 class InstitutionDashboard extends Component
 {
+    use InteractsWithToasts;
     use WithPagination;
 
     #[Url(as: 'institution')]
@@ -168,7 +170,7 @@ class InstitutionDashboard extends Component
         $this->newMemberRoleId = '';
         $this->resetPage('institution_members_page');
 
-        session()->flash('institution_dashboard_message', __('Member added successfully.'));
+        $this->successToast(__('Member added successfully.'));
     }
 
     public function startEditingMemberRoles(string $memberId): void
@@ -207,7 +209,7 @@ class InstitutionDashboard extends Component
 
         $this->resetMemberEditor();
 
-        session()->flash('institution_dashboard_message', __('Member roles updated.'));
+        $this->successToast(__('Member roles updated.'));
     }
 
     public function removeMember(string $memberId): void
@@ -219,7 +221,7 @@ class InstitutionDashboard extends Component
         $member = $this->findInstitutionMember($memberId);
 
         if ($this->memberIsOwner($member)) {
-            session()->flash('institution_dashboard_error', __('Institution owners cannot be removed from this dashboard.'));
+            $this->errorToast(__('Institution owners cannot be removed from this dashboard.'));
 
             return;
         }
@@ -234,7 +236,7 @@ class InstitutionDashboard extends Component
 
         $this->resetPage('institution_members_page');
 
-        session()->flash('institution_dashboard_message', __('Member removed successfully.'));
+        $this->successToast(__('Member removed successfully.'));
     }
 
     /**
@@ -612,8 +614,6 @@ class InstitutionDashboard extends Component
         );
     }
 
-    /**
-     */
     protected function syncMemberRoles(User $user, ?string $roleId): void
     {
         $validRoleIds = $roleId !== null && $roleId !== '' && array_key_exists($roleId, $this->institutionRoleOptions())
