@@ -3,6 +3,7 @@
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource;
 use App\Filament\Pages\AhliDashboard;
+use App\Models\Institution;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationManager;
@@ -12,6 +13,9 @@ uses(RefreshDatabase::class);
 
 it('removes the ahli workspace wrapper and makes events the ahli navigation anchor', function () {
     $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+
+    $user->institutions()->attach($institution);
 
     $this->actingAs($user)
         ->get(AhliDashboard::getUrl(panel: 'ahli'))
@@ -31,7 +35,14 @@ it('removes the ahli workspace wrapper and makes events the ahli navigation anch
     expect($groupLabels)->not->toContain('Ahli Workspace');
 
     $topLevelItems = collect($navigation)
-        ->flatMap(fn ($group) => $group->getItems())
+        ->flatMap(function ($group) {
+            if (method_exists($group, 'getItems')) {
+                return $group->getItems();
+            }
+
+            return [$group];
+        })
+        ->filter(fn ($item) => method_exists($item, 'getLabel'))
         ->values();
 
     $eventsItem = $topLevelItems->first(

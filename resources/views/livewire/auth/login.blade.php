@@ -1,10 +1,17 @@
-<x-layouts.auth>
+@extends('layouts.auth')
+
+@section('title', __('Log in') . ' - ' . config('app.name'))
+
+@section('content')
     <div class="space-y-6">
-        {{-- Google Login --}}
+        <div class="text-center space-y-2">
+            <h1 class="font-heading text-2xl font-bold tracking-tight text-emerald-950/90">{{ __('Welcome Back') }}</h1>
+            <p class="text-slate-500 text-sm font-medium">{{ __('Please sign in to continue') }}</p>
+        </div>
+
         <div>
             <a href="{{ route('socialite.redirect', 'google') }}"
                 class="group relative flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.98] transition-all duration-200 shadow-sm">
-                {{-- Colored Google Icon --}}
                 <svg class="h-5 w-5 shrink-0 transition-opacity opacity-80 group-hover:opacity-100" viewBox="0 0 24 24">
                     <path
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -23,7 +30,6 @@
             </a>
         </div>
 
-        {{-- Divider --}}
         <div class="relative flex items-center py-2">
             <div class="flex-grow border-t border-slate-200"></div>
             <span class="mx-4 flex-shrink-0 text-xs font-bold uppercase tracking-widest text-slate-400">
@@ -32,11 +38,9 @@
             <div class="flex-grow border-t border-slate-200"></div>
         </div>
 
-        {{-- Form --}}
         <form method="POST" action="{{ route('login') }}" class="space-y-5">
             @csrf
 
-            {{-- Email --}}
             <div class="space-y-1.5">
                 <label for="email" class="block text-sm font-semibold text-slate-700">{{ __('Email address') }}</label>
                 <div class="relative">
@@ -50,13 +54,11 @@
                 @enderror
             </div>
 
-            {{-- Password --}}
             <div class="space-y-1.5">
                 <div class="flex items-center justify-between">
-                    <label for="password"
-                        class="block text-sm font-semibold text-slate-700">{{ __('Password') }}</label>
+                    <label for="password" class="block text-sm font-semibold text-slate-700">{{ __('Password') }}</label>
                     @if (Route::has('password.request'))
-                        <a href="{{ route('password.request') }}" wire:navigate
+                        <a href="{{ route('password.request') }}"
                             class="text-xs font-semibold text-emerald-600 hover:text-amber-600 hover:underline transition-colors decoration-2 underline-offset-4">
                             {{ __('Forgot password?') }}
                         </a>
@@ -72,7 +74,6 @@
                 @enderror
             </div>
 
-            {{-- Remember Me --}}
             <div class="flex items-center">
                 <input id="remember_me" type="checkbox" name="remember"
                     class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 transition duration-150 ease-in-out" />
@@ -81,12 +82,9 @@
                 </label>
             </div>
 
-            {{-- Submit --}}
             <button type="submit"
                 class="group relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl text-sm font-bold text-white uppercase tracking-wider shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:scale-[0.98]"
                 style="background: linear-gradient(135deg, oklch(0.40 0.12 165), oklch(0.30 0.10 165));">
-
-                {{-- Shimmer effect --}}
                 <div
                     class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover:animate-[shimmer_1.5s_infinite]">
                 </div>
@@ -102,12 +100,11 @@
             </button>
         </form>
 
-        {{-- Register Link --}}
         @if (Route::has('register'))
             <div class="text-center pt-2">
                 <p class="text-sm text-slate-500">
                     {{ __('Don\'t have an account?') }}
-                    <a href="{{ route('register') }}" wire:navigate
+                    <a href="{{ route('register') }}"
                         class="ml-1 font-bold text-emerald-700 hover:text-amber-600 hover:underline transition-colors decoration-2 underline-offset-4">
                         {{ __('Create one') }}
                     </a>
@@ -115,4 +112,4 @@
             </div>
         @endif
     </div>
-</x-layouts.auth>
+@endsection

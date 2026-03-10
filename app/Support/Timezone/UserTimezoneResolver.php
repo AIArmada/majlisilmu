@@ -25,7 +25,7 @@ class UserTimezoneResolver
         $request ??= request();
         $sessionTimezone = $request->hasSession() ? $request->session()->get('user_timezone') : null;
         $authenticatedUserTimezone = Auth::check() ? data_get(Auth::user(), 'timezone') : null;
-        $requestInputTimezone = $request->input('user_timezone') ?? $request->query('user_timezone');
+        $requestInputTimezone = $request->request->get('user_timezone') ?? $request->query('user_timezone');
 
         $candidates = [
             'preferred' => $preferredTimezone,
@@ -49,11 +49,20 @@ class UserTimezoneResolver
             }
         }
 
-        $fallback = (string) config('app.default_user_timezone', config('app.timezone', 'UTC'));
+        $fallback = (string) config('app.timezone', config('app.default_user_timezone', 'UTC'));
 
         if (self::isValid($fallback)) {
             return [
                 'timezone' => $fallback,
+                'source' => 'app_fallback',
+            ];
+        }
+
+        $defaultUserTimezone = (string) config('app.default_user_timezone', 'UTC');
+
+        if (self::isValid($defaultUserTimezone)) {
+            return [
+                'timezone' => $defaultUserTimezone,
                 'source' => 'app_fallback',
             ];
         }

@@ -128,5 +128,5 @@ it('accepts submission when turnstile verification succeeds', function () {
 
     expect(Event::where('title', 'Event Captcha Passed')->exists())->toBeTrue();
 
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
 });

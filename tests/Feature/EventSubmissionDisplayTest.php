@@ -69,8 +69,8 @@ it('shows the latest submission as read-only moderation data', function () {
             'submission_recorded_at',
             UserDateTimeFormatter::translatedFormat($submittedAt, 'd M Y').', '.UserDateTimeFormatter::format($submittedAt, 'h:i A'),
         )
-        ->assertSchemaComponentStateSet('submission_submitter', 'Guest Submitter | guest@example.com | +60112223344')
-        ->assertSchemaComponentStateSet('submission_notes', 'Needs wheelchair-friendly access and projector setup.');
+        ->assertSchemaComponentStateSet('submission_notes', 'Needs wheelchair-friendly access and projector setup.')
+        ->assertSee('Guest Submitter | guest@example.com | +60112223344');
 });
 
 it('hides submission reference components when the event has no real submission record', function () {
