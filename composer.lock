@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e28bc72d70b0efc171be46e3348e8ee2",
+    "content-hash": "42ffb2ee5185ff93d82f363d1955dddd",
     "packages": [
         {
             "name": "aiarmada/commerce-support",
-            "version": "1.0.0",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/commerce-support.git",
+                "reference": "b73766e50e09cba51e3ca9890e71a0db17c9ba28"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/commerce-support",
-                "reference": "67bddb7c403b531f9f3a0fd471b5fb3ff30bfd80"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/commerce-support/zipball/b73766e50e09cba51e3ca9890e71a0db17c9ba28",
+                "reference": "b73766e50e09cba51e3ca9890e71a0db17c9ba28",
+                "shasum": ""
             },
             "require": {
                 "akaunting/laravel-money": "^6.0",
@@ -62,18 +68,21 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "time": "2026-03-08T09:35:00+00:00"
         },
         {
             "name": "aiarmada/filament-authz",
-            "version": "1.0.0",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/filament-authz.git",
+                "reference": "7be5bf22d89c1d84457cbf3ef8dc1d2ae0e2b062"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/filament-authz",
-                "reference": "a37cfa244beeca70a27439e2eef470abae61cbb0"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/filament-authz/zipball/7be5bf22d89c1d84457cbf3ef8dc1d2ae0e2b062",
+                "reference": "7be5bf22d89c1d84457cbf3ef8dc1d2ae0e2b062",
+                "shasum": ""
             },
             "require": {
                 "aiarmada/commerce-support": "self.version",
@@ -107,10 +116,7 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "time": "2026-03-08T09:35:02+00:00"
         },
         {
             "name": "akaunting/laravel-money",
