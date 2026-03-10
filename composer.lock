@@ -4,15 +4,15 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b846b6a7631b827159664103453fe12e",
+    "content-hash": "e28bc72d70b0efc171be46e3348e8ee2",
     "packages": [
         {
             "name": "aiarmada/commerce-support",
-            "version": "dev-main",
+            "version": "1.0.0",
             "dist": {
                 "type": "path",
                 "url": "../commerce/packages/commerce-support",
-                "reference": "b7f1aa9c149c2b515a4445befd81c8a1728045f5"
+                "reference": "67bddb7c403b531f9f3a0fd471b5fb3ff30bfd80"
             },
             "require": {
                 "akaunting/laravel-money": "^6.0",
@@ -69,11 +69,11 @@
         },
         {
             "name": "aiarmada/filament-authz",
-            "version": "dev-main",
+            "version": "1.0.0",
             "dist": {
                 "type": "path",
                 "url": "../commerce/packages/filament-authz",
-                "reference": "a9b928263ffb441016e7239089be54e5630b1fef"
+                "reference": "a37cfa244beeca70a27439e2eef470abae61cbb0"
             },
             "require": {
                 "aiarmada/commerce-support": "self.version",
@@ -17124,7 +17124,6 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "aiarmada/filament-authz": 20,
         "bezhansalleh/filament-language-switch": 20
     },
     "prefer-stable": true,

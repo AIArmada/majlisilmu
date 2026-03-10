@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
+use App\Enums\DawahShareOutcomeType;
 use App\Enums\DawahShareSubjectType;
 use App\Models\User;
 use App\Services\DawahShare\DawahShareAnalyticsService;
@@ -29,11 +30,15 @@ class DawahImpactIndex extends Component
     #[Url(as: 'status')]
     public string $status = 'all';
 
+    #[Url(as: 'outcome')]
+    public string $outcomeType = 'all';
+
     public function mount(): void
     {
         $this->subjectType = $this->normalizeSubjectType($this->subjectType);
         $this->sort = $this->normalizeSort($this->sort);
         $this->status = $this->normalizeStatus($this->status);
+        $this->outcomeType = $this->normalizeOutcomeType($this->outcomeType);
     }
 
     public function updatedSubjectType(string $subjectType): void
@@ -51,6 +56,12 @@ class DawahImpactIndex extends Component
     public function updatedStatus(string $status): void
     {
         $this->status = $this->normalizeStatus($status);
+        $this->resetPage('links_page');
+    }
+
+    public function updatedOutcomeType(string $outcomeType): void
+    {
+        $this->outcomeType = $this->normalizeOutcomeType($outcomeType);
         $this->resetPage('links_page');
     }
 
@@ -88,7 +99,37 @@ class DawahImpactIndex extends Component
             'visits' => __('Most Visits'),
             'signups' => __('Most Signups'),
             'registrations' => __('Most Registrations'),
+            'checkins' => __('Most Event Check-ins'),
+            'submissions' => __('Most Event Submissions'),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function outcomeTypeOptions(): array
+    {
+        $options = ['all' => __('All Responses')];
+
+        foreach (DawahShareOutcomeType::cases() as $type) {
+            $options[$type->value] = match ($type) {
+                DawahShareOutcomeType::Signup => __('Signups'),
+                DawahShareOutcomeType::EventRegistration => __('Event registrations'),
+                DawahShareOutcomeType::EventCheckin => __('Event check-ins'),
+                DawahShareOutcomeType::EventSubmission => __('Event submissions'),
+                DawahShareOutcomeType::EventSave => __('Event saves'),
+                DawahShareOutcomeType::EventInterest => __('Interested responses'),
+                DawahShareOutcomeType::EventGoing => __('Going responses'),
+                DawahShareOutcomeType::InstitutionFollow => __('Institution follows'),
+                DawahShareOutcomeType::SpeakerFollow => __('Speaker follows'),
+                DawahShareOutcomeType::SeriesFollow => __('Series follows'),
+                DawahShareOutcomeType::ReferenceFollow => __('Reference follows'),
+                DawahShareOutcomeType::SavedSearchCreated => __('Saved searches created'),
+            };
+        }
+
+        return $options;
     }
 
     /**
@@ -106,10 +147,13 @@ class DawahImpactIndex extends Component
 
     /**
      * @return array{
+     *     outbound_shares: int,
      *     visits: int,
      *     unique_visitors: int,
      *     signups: int,
      *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int,
      *     total_outcomes: int
      * }
      */
@@ -121,12 +165,34 @@ class DawahImpactIndex extends Component
 
     /**
      * @return Collection<int, array{
+     *     provider: string,
+     *     label: string,
+     *     outbound_shares: int,
+     *     visits: int,
+     *     unique_visitors: int,
+     *     outcomes: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int
+     * }>
+     */
+    #[Computed]
+    public function providerBreakdown(): Collection
+    {
+        return $this->analytics()->providerBreakdownForUser($this->currentUser());
+    }
+
+    /**
+     * @return Collection<int, array{
      *     subject_type: string,
      *     label: string,
      *     links: int,
      *     visits: int,
      *     signups: int,
      *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int,
      *     total_outcomes: int
      * }>
      */
@@ -168,6 +234,7 @@ class DawahImpactIndex extends Component
             $this->sort,
             $this->subjectType,
             $this->status,
+            $this->outcomeType,
         );
 
         $perPage = 12;
@@ -213,7 +280,7 @@ class DawahImpactIndex extends Component
 
     protected function normalizeSort(string $sort): string
     {
-        return in_array($sort, ['recent', 'visits', 'signups', 'registrations'], true)
+        return in_array($sort, ['recent', 'visits', 'signups', 'registrations', 'checkins', 'submissions'], true)
             ? $sort
             : 'recent';
     }
@@ -222,6 +289,18 @@ class DawahImpactIndex extends Component
     {
         return in_array($status, ['all', 'active', 'inactive'], true)
             ? $status
+            : 'all';
+    }
+
+    protected function normalizeOutcomeType(string $outcomeType): string
+    {
+        if ($outcomeType === 'all') {
+            return $outcomeType;
+        }
+
+        return collect(DawahShareOutcomeType::cases())
+            ->contains(fn (DawahShareOutcomeType $type): bool => $type->value === $outcomeType)
+            ? $outcomeType
             : 'all';
     }
 

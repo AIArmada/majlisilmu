@@ -10,7 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
-        "aiarmada/filament-authz": "dev-main",
+        "aiarmada/filament-authz": "1.0.0",
         "bezhansalleh/filament-language-switch": "dev-main",
         "cocosmos/filament-quick-add-select": "^1.1",
         "filament/filament": "^5.0",

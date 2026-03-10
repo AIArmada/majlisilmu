@@ -1,3 +1,24 @@
+# Dawah Share Outcome Expansion
+
+- [x] Add missing outcome types for event check-ins and event submissions
+- [x] Wire attribution recording into check-in, submit-event, and follow actions for all supported followable models
+- [x] Extend Dawah Share impact tests to cover the new outcomes and public follow surfaces
+- [x] Run focused Pest, PHPStan, and Pint verification for the expanded attribution feature
+
+## Review
+
+- Added `event_checkin` and `event_submission` as first-class Dawah Share outcome types.
+- Recorded new outcomes in the event check-in Livewire action and the public submit-event flow.
+- Verified follow attribution coverage across institution, speaker, series, and reference public pages.
+- Expanded the Dawah Impact dashboard index and per-link detail pages so check-ins and submissions are shown as first-class summary metrics, not only inside total outcomes and breakdown lists.
+- Confirmed the public form route `hantar-majlis` maps to `submit-event.create`, so submissions through that page are attributed through the same tracked flow.
+- Verification:
+  - `runTests`: `tests/Feature/DawahShareImpactTest.php`, `tests/Feature/EventCheckInTest.php` => 12 passed
+- `runTests`: `tests/Feature/DawahShareImpactTest.php`, `tests/Feature/EventCheckInTest.php`, `tests/Feature/PublicPagesTest.php`, `tests/Feature/SubmitEventNotesTest.php`, `tests/Feature/SpeakerFollowTest.php`, `tests/Feature/InstitutionShowPageTest.php` => 47 passed
+  - `vendor/bin/phpstan analyse --ansi app/Enums/DawahShareOutcomeType.php app/Services/DawahShare/DawahShareAnalyticsService.php app/Livewire/Pages/Events/Show.php tests/Feature/DawahShareImpactTest.php` => no errors
+- `vendor/bin/phpstan analyse --ansi app/Services/DawahShare/DawahShareAnalyticsService.php app/Livewire/Pages/Dashboard/DawahImpactIndex.php app/Livewire/Pages/Dashboard/DawahImpactLinkShow.php tests/Feature/DawahShareImpactTest.php` => no errors
+  - `vendor/bin/pint --dirty --format agent` => pass
+
 # Affiliates Package Review
 
 - [x] Inspect `/Users/Saiffil/Herd/commerce/packages/affiliates` models, migrations, docs, and services tied to links, touchpoints, attributions, conversions, and daily stats
@@ -4058,12 +4079,21 @@
 
 # Dawah Share Impact
 
-- [ ] Add the `dawah_share_links`, `dawah_share_attributions`, `dawah_share_visits`, and `dawah_share_outcomes` tables and corresponding Eloquent models
-- [ ] Build canonical share URL generation, subject classification, attribution cookies, and visit tracking middleware
-- [ ] Record attributed signups, event registrations, saves, interests, going actions, follows, and saved-search creation
-- [ ] Add dashboard impact summary, dedicated impact pages, and tracked share UI across supported public surfaces
-- [ ] Add focused feature coverage plus PHPStan verification for the new share-impact flows
+- [x] Add the `dawah_share_links`, `dawah_share_attributions`, `dawah_share_visits`, and `dawah_share_outcomes` tables and corresponding Eloquent models
+- [x] Build canonical share URL generation, subject classification, attribution cookies, and visit tracking middleware
+- [x] Record attributed signups, event registrations, saves, interests, going actions, follows, and saved-search creation
+- [x] Add dashboard impact summary, dedicated impact pages, and tracked share UI across supported public surfaces
+- [x] Add focused feature coverage plus PHPStan verification for the new share-impact flows
 
 ## Review
 
-- In progress.
+- Root cause:
+  - the last `wip` commit had already landed most of the dawah-share runtime, but verification stopped early enough that important downstream attribution paths and public share-surface coverage were still under-tested
+  - one impacted speaker-page assertion was also flaky because the event factory can randomly create online events, which made a location fallback test nondeterministic after the share changes touched that page
+- Fix:
+  - kept the dawah-share runtime intact and completed the verification layer by extending `tests/Feature/DawahShareImpactTest.php` to cover attributed event saves, event interests, saved-search creation, and tracked share UI across the supported public surfaces
+  - stabilized `tests/Feature/SpeakerShowPageTimingTest.php` by forcing the location-specific speaker-page cases to use physical events
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php tests/Feature/SpeakerShowPageTimingTest.php` => **15 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php tests/Feature/EventShowPageTest.php tests/Feature/SpeakerShowPageTimingTest.php tests/Feature/InstitutionShowPageTest.php tests/Feature/DashboardPagesTest.php` => **68 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Services/DawahShare app/Http/Controllers/DawahShareController.php app/Http/Middleware/TrackDawahShareAttribution.php app/Livewire/Pages/Dashboard/DawahImpactIndex.php app/Livewire/Pages/Dashboard/DawahImpactLinkShow.php app/Livewire/Pages/Events/Show.php app/Livewire/Pages/SavedSearches/Index.php tests/Feature/DawahShareImpactTest.php tests/Feature/SpeakerShowPageTimingTest.php` => **No errors**

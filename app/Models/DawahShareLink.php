@@ -76,4 +76,12 @@ class DawahShareLink extends Model
     {
         return $this->hasMany(DawahShareOutcome::class, 'link_id');
     }
+
+    /**
+     * @return HasMany<DawahShareShareEvent, $this>
+     */
+    public function shareEvents(): HasMany
+    {
+        return $this->hasMany(DawahShareShareEvent::class, 'link_id');
+    }
 }

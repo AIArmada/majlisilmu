@@ -8,6 +8,7 @@ use App\Enums\DawahShareVisitKind;
 use App\Models\DawahShareAttribution;
 use App\Models\DawahShareLink;
 use App\Models\DawahShareOutcome;
+use App\Models\DawahShareShareEvent;
 use App\Models\DawahShareVisit;
 use App\Models\Event;
 use App\Models\Institution;
@@ -18,7 +19,6 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -26,13 +26,29 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class DawahShareService
 {
     /**
+     * @return list<string>
+     */
+    public function supportedProviders(): array
+    {
+        return ['whatsapp', 'telegram', 'line', 'facebook', 'x', 'instagram', 'tiktok', 'email'];
+    }
+
+    /**
      * @return array{url: string, platform_links: array<string, string>}
      */
     public function sharePayload(?User $user, string $url, string $shareText, ?string $fallbackTitle = null): array
     {
-        $shareUrl = $user instanceof User
-            ? $this->attributedUrl($user, $url, $fallbackTitle)
-            : $this->normalizeAbsoluteInternalUrl($url);
+        if ($user instanceof User) {
+            $link = $this->createOrReuseLink($user, $url, $fallbackTitle);
+            $shareUrl = $this->sharedUrlForLink($link);
+
+            return [
+                'url' => $shareUrl,
+                'platform_links' => $this->platformLinks($shareUrl, $shareText),
+            ];
+        }
+
+        $shareUrl = $this->normalizeAbsoluteInternalUrl($url);
 
         return [
             'url' => $shareUrl,
@@ -55,22 +71,38 @@ class DawahShareService
             $query['title'] = $fallbackTitle;
         }
 
-        return collect(['whatsapp', 'telegram', 'line', 'facebook', 'x', 'instagram', 'tiktok', 'email'])
+        return collect($this->supportedProviders())
             ->mapWithKeys(fn (string $provider): array => [
                 $provider => route('dawah-share.redirect', ['provider' => $provider] + $query),
             ])
             ->all();
     }
 
+    public function redirectUrl(
+        string $provider,
+        ?User $user,
+        string $url,
+        string $shareText,
+        ?string $fallbackTitle = null,
+        ?Request $request = null
+    ): string {
+        $provider = $this->normalizeProvider($provider) ?? throw new \InvalidArgumentException('Unsupported share provider.');
+
+        if (! $user instanceof User) {
+            return $this->platformLink($provider, $this->normalizeAbsoluteInternalUrl($url), $shareText);
+        }
+
+        $link = $this->createOrReuseLink($user, $url, $fallbackTitle);
+        $this->recordOutboundShare($link, $user, $provider, $request);
+
+        return $this->platformLink($provider, $this->sharedUrlForLink($link, $provider), $shareText);
+    }
+
     public function attributedUrl(User $user, string $url, ?string $fallbackTitle = null): string
     {
         $link = $this->createOrReuseLink($user, $url, $fallbackTitle);
-        $parameter = (string) config('dawah-share.query_parameter', 'mi_share');
-        $signedToken = $this->signedToken($link->share_token);
 
-        return $this->appendQueryParameters($link->destination_url, [
-            $parameter => $signedToken,
-        ]);
+        return $this->sharedUrlForLink($link);
     }
 
     public function createOrReuseLink(User $user, string $url, ?string $fallbackTitle = null): DawahShareLink
@@ -117,20 +149,11 @@ class DawahShareService
      */
     public function platformLinks(string $url, string $shareText): array
     {
-        $encodedUrl = urlencode($url);
-        $encodedText = urlencode($shareText);
-        $encodedBody = urlencode($shareText."\n".$url);
-
-        return [
-            'whatsapp' => "https://wa.me/?text={$encodedText}%20{$encodedUrl}",
-            'telegram' => "https://t.me/share/url?url={$encodedUrl}&text={$encodedText}",
-            'line' => "https://social-plugins.line.me/lineit/share?url={$encodedUrl}",
-            'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedUrl}",
-            'x' => "https://x.com/intent/tweet?text={$encodedText}&url={$encodedUrl}",
-            'instagram' => 'https://www.instagram.com/',
-            'tiktok' => 'https://www.tiktok.com/',
-            'email' => "mailto:?subject={$encodedText}&body={$encodedBody}",
-        ];
+        return collect($this->supportedProviders())
+            ->mapWithKeys(fn (string $provider): array => [
+                $provider => $this->platformLink($provider, $this->appendShareProvider($url, $provider), $shareText),
+            ])
+            ->all();
     }
 
     public function captureRequest(Request $request): ?string
@@ -152,6 +175,7 @@ class DawahShareService
         $parameter = (string) config('dawah-share.query_parameter', 'mi_share');
         $signedToken = $request->query($parameter);
         $visitorKey = $cookieState['visitor_key'] ?? (string) Str::ulid();
+        $shareProvider = $this->shareProviderFromRequest($request);
 
         if (is_string($signedToken) && $signedToken !== '') {
             $link = $this->resolveLinkFromSignedToken($signedToken);
@@ -167,7 +191,11 @@ class DawahShareService
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->userAgent(),
                     'metadata' => [
-                        'query' => Arr::except($request->query(), [$parameter]),
+                        'query' => Arr::except($request->query(), [
+                            $parameter,
+                            (string) config('dawah-share.provider_query_parameter', 'mi_channel'),
+                        ]),
+                        'share_provider' => $shareProvider,
                     ],
                     'first_seen_at' => now(),
                     'last_seen_at' => now(),
@@ -516,7 +544,11 @@ class DawahShareService
             'visit_kind' => $kind->value,
             'metadata' => [
                 'referrer_url' => $request->headers->get('referer'),
-                'query' => Arr::except($request->query(), [(string) config('dawah-share.query_parameter', 'mi_share')]),
+                'query' => Arr::except($request->query(), [
+                    (string) config('dawah-share.query_parameter', 'mi_share'),
+                    (string) config('dawah-share.provider_query_parameter', 'mi_channel'),
+                ]),
+                'share_provider' => data_get($attribution->metadata, 'share_provider'),
             ],
             'occurred_at' => now(),
         ]);
@@ -531,6 +563,7 @@ class DawahShareService
         $query = $this->normalizeQueryFromUrl($url);
 
         unset($query[(string) config('dawah-share.query_parameter', 'mi_share')]);
+        unset($query[(string) config('dawah-share.provider_query_parameter', 'mi_channel')]);
 
         return $this->buildAbsoluteUrl($path, $query);
     }
@@ -584,6 +617,87 @@ class DawahShareService
         ksort($query);
 
         return $query;
+    }
+
+    public function recordOutboundShare(
+        DawahShareLink $link,
+        User $user,
+        string $provider,
+        ?Request $request = null
+    ): DawahShareShareEvent {
+        /** @var DawahShareShareEvent $event */
+        $event = DawahShareShareEvent::query()->create([
+            'link_id' => $link->id,
+            'user_id' => $user->id,
+            'provider' => $provider,
+            'event_type' => 'outbound_click',
+            'metadata' => [
+                'referrer_url' => $request?->headers->get('referer'),
+                'user_agent' => $request?->userAgent(),
+                'ip_address' => $request?->ip(),
+            ],
+            'occurred_at' => now(),
+        ]);
+
+        return $event;
+    }
+
+    private function sharedUrlForLink(DawahShareLink $link, ?string $provider = null): string
+    {
+        $parameter = (string) config('dawah-share.query_parameter', 'mi_share');
+        $signedToken = $this->signedToken($link->share_token);
+
+        return $this->appendShareProvider($this->appendQueryParameters($link->destination_url, [
+            $parameter => $signedToken,
+        ]), $provider);
+    }
+
+    private function platformLink(string $provider, string $url, string $shareText): string
+    {
+        $encodedUrl = urlencode($url);
+        $encodedText = urlencode($shareText);
+        $encodedBody = urlencode($shareText."\n".$url);
+
+        return match ($provider) {
+            'whatsapp' => "https://wa.me/?text={$encodedText}%20{$encodedUrl}",
+            'telegram' => "https://t.me/share/url?url={$encodedUrl}&text={$encodedText}",
+            'line' => "https://social-plugins.line.me/lineit/share?url={$encodedUrl}",
+            'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedUrl}",
+            'x' => "https://x.com/intent/tweet?text={$encodedText}&url={$encodedUrl}",
+            'instagram' => 'https://www.instagram.com/',
+            'tiktok' => 'https://www.tiktok.com/',
+            'email' => "mailto:?subject={$encodedText}&body={$encodedBody}",
+            default => $url,
+        };
+    }
+
+    private function appendShareProvider(string $url, ?string $provider): string
+    {
+        $provider = $this->normalizeProvider($provider);
+
+        if (! is_string($provider)) {
+            return $url;
+        }
+
+        return $this->appendQueryParameters($url, [
+            (string) config('dawah-share.provider_query_parameter', 'mi_channel') => $provider,
+        ]);
+    }
+
+    private function shareProviderFromRequest(Request $request): ?string
+    {
+        $provider = $request->query((string) config('dawah-share.provider_query_parameter', 'mi_channel'));
+
+        return is_string($provider) ? $this->normalizeProvider($provider) : null;
+    }
+
+    private function normalizeProvider(?string $provider): ?string
+    {
+        if (! is_string($provider) || $provider === '') {
+            return null;
+        }
+
+        return in_array($provider, $this->supportedProviders(), true) ? $provider : null;
     }
 
     /**

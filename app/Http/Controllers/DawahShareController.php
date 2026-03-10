@@ -21,11 +21,21 @@ class DawahShareController extends Controller
     public function redirect(string $provider, Request $request, DawahShareService $dawahShareService): RedirectResponse
     {
         $data = $this->validatedData($request);
-        $payload = $this->buildPayload($request, $dawahShareService, $data);
 
-        $redirectUrl = $payload['platform_links'][$provider] ?? $payload['url'];
-
-        return redirect()->away($redirectUrl);
+        try {
+            return redirect()->away($dawahShareService->redirectUrl(
+                provider: $provider,
+                user: $this->authenticatedUser($request),
+                url: $data['url'],
+                shareText: $data['text'],
+                fallbackTitle: $data['title'] ?? null,
+                request: $request,
+            ));
+        } catch (\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'url' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
