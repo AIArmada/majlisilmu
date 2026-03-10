@@ -8,6 +8,7 @@ use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Events\SubmitterContactPresenter;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
@@ -46,7 +47,9 @@ class PendingApprovalEventsWidget extends TableWidget
                     ->wrap(),
                 TextColumn::make('submission_submitter')
                     ->label('Submitter')
-                    ->getStateUsing(fn(Event $record): string => $this->getSubmissionSubmitterLabel($record))
+                    ->getStateUsing(fn (Event $record): string => SubmitterContactPresenter::labelForEvent($record))
+                    ->url(fn (Event $record): ?string => SubmitterContactPresenter::whatsappUrlForEvent($record))
+                    ->openUrlInNewTab()
                     ->wrap(),
                 TextColumn::make('submission_recorded_at')
                     ->label('Submitted')
@@ -130,43 +133,6 @@ class PendingApprovalEventsWidget extends TableWidget
         }
 
         return '-';
-    }
-
-    private function getSubmissionSubmitterLabel(Event $record): string
-    {
-        $submission = $this->latestSubmission($record);
-
-        if (!$submission instanceof EventSubmission) {
-            return '-';
-        }
-
-        if ($submission->submitter instanceof User) {
-            $contact = filled($submission->submitter->phone)
-                ? $submission->submitter->phone
-                : $submission->submitter->email;
-
-            $parts = array_filter([
-                $submission->submitter->name,
-                $contact,
-            ]);
-
-            return $parts === [] ? '-' : implode(' | ', $parts);
-        }
-
-        $phone = $submission->contacts
-            ->firstWhere('category', 'phone')
-                ?->value;
-
-        $contact = filled($phone)
-            ? $phone
-            : $submission->contacts->firstWhere('category', 'email')?->value;
-
-        $parts = array_filter([
-            $submission->submitter_name,
-            is_string($contact) ? $contact : null,
-        ]);
-
-        return $parts === [] ? '-' : implode(' | ', $parts);
     }
 
     private function getSubmissionRecordedAtLabel(Event $record): string
