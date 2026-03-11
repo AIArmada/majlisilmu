@@ -6,6 +6,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerReference;
@@ -13,11 +14,11 @@ use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\User;
 use BackedEnum;
-use Filament\Facades\Filament;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
@@ -43,6 +44,12 @@ class EventsTable
                     ->size(56),
                 TextColumn::make('title')
                     ->searchable()
+                    ->sortable()
+                    ->description(fn (Event $record): ?string => $record->parentEvent?->title),
+                TextColumn::make('event_structure')
+                    ->label('Structure')
+                    ->badge()
+                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state, EventStructure::class))
                     ->sortable(),
                 TextColumn::make('institution.name')
                     ->sortable()
@@ -151,6 +158,13 @@ class EventsTable
                         'public' => 'Public',
                         'unlisted' => 'Unlisted',
                         'private' => 'Private',
+                    ]),
+                SelectFilter::make('event_structure')
+                    ->label('Structure')
+                    ->options([
+                        EventStructure::Standalone->value => EventStructure::Standalone->label(),
+                        EventStructure::ParentProgram->value => EventStructure::ParentProgram->label(),
+                        EventStructure::ChildEvent->value => EventStructure::ChildEvent->label(),
                     ]),
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),

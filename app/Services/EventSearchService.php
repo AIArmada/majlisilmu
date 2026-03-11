@@ -210,6 +210,7 @@ class EventSearchService
             'is_active:=true',
             'status:['.implode(', ', Event::PUBLIC_STATUSES).']',
             'visibility:public',
+            'event_structure:!=parent_program',
         ];
 
         $startsAfterTimestamp = $this->startsAfterTimestamp($filters, $timeScope);

@@ -1,3 +1,19 @@
+# Advanced Events Hierarchy Foundation
+
+- [x] Add event hierarchy primitives to `events` (`event_structure`, `parent_event_id`)
+- [x] Add `EventStructure` enum and event parent/child helpers on the model
+- [x] Add factory states and unit tests for standalone / parent / child semantics
+- [x] Build the dedicated advanced-events builder on top of the new hierarchy foundation
+- [x] Add Ahli entrypoint, hierarchy-aware moderation propagation, and dedicated public parent-program page
+
+## Review
+
+- Added a member-only advanced builder that creates one draft parent program and draft child events under it.
+- Parent programs are hidden from normal discovery/search while child events remain the public attendance unit.
+- Ahli event list now exposes a direct `Create Advanced Program` action.
+- Ahli moderation actions on parent programs now propagate to child events.
+- Added focused feature coverage for builder access/persistence, public parent page rendering, and hierarchy-aware Ahli approval.
+
 # Dawah Share Outcome Expansion
 
 - [x] Add missing outcome types for event check-ins and event submissions

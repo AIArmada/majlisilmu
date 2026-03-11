@@ -295,3 +295,45 @@ it('hides the ahli submit for review action for draft events that did not come f
     Livewire::test(AhliEditEvent::class, ['record' => $event->id])
         ->assertActionHidden('submit_for_review');
 });
+
+it('propagates approve actions from a parent program to its child events', function () {
+    $approver = User::factory()->create();
+    $submitter = User::factory()->create();
+    $institution = Institution::factory()->create();
+
+    $parentEvent = Event::factory()->parentProgram()->for($institution)->create([
+        'status' => 'pending',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'submitter_id' => $submitter->id,
+        'published_at' => null,
+    ]);
+
+    Event::factory()->childEvent($parentEvent)->for($institution)->create([
+        'status' => 'pending',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'submitter_id' => $submitter->id,
+        'published_at' => null,
+    ]);
+
+    EventSubmission::factory()->for($parentEvent)->for($submitter, 'submitter')->create();
+
+    $institution->members()->syncWithoutDetaching([$approver->id]);
+    assignInstitutionRole($approver, 'admin');
+
+    $this->actingAs($approver);
+
+    Livewire::test(AhliEditEvent::class, ['record' => $parentEvent->id])
+        ->assertActionVisible('approve')
+        ->callAction('approve', ['note' => 'Approved parent program'])
+        ->assertNotified();
+
+    $parentEvent->refresh();
+    $childStatuses = $parentEvent->childEvents()->get()->map(fn (Event $childEvent): string => (string) $childEvent->status)->all();
+
+    expect((string) $parentEvent->status)->toBe('approved')
+        ->and($childStatuses)->toBe(['approved']);
+});

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\EventFormat;
+use App\Enums\EventStructure;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -131,10 +132,12 @@ class EventFactory extends Factory
         }
 
         return [
+            'parent_event_id' => null,
             'institution_id' => $institutionId,
             'venue_id' => $venueId,
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),
+            'event_structure' => EventStructure::Standalone,
             'description' => fake()->optional()->paragraphs(2, true),
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
@@ -254,6 +257,22 @@ class EventFactory extends Factory
                 'Adab Menuntut Ilmu',
                 'Zikir Pagi',
             ]),
+        ]);
+    }
+
+    public function parentProgram(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'parent_event_id' => null,
+            'event_structure' => EventStructure::ParentProgram,
+        ]);
+    }
+
+    public function childEvent(?\App\Models\Event $parentEvent = null): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'parent_event_id' => $parentEvent !== null ? $parentEvent->id : \App\Models\Event::factory()->parentProgram(),
+            'event_structure' => EventStructure::ChildEvent,
         ]);
     }
 }

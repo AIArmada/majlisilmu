@@ -6,6 +6,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventParticipantRole;
+use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
@@ -50,6 +51,7 @@ use Spatie\Tags\HasTags;
  * @property \App\States\EventStatus\EventStatus|string $status
  * @property \App\Enums\EventVisibility|string|null $visibility
  * @property \App\Enums\EventFormat|string|null $event_format
+ * @property \App\Enums\EventStructure|string $event_structure
  * @property \App\Enums\EventGenderRestriction|string|null $gender
  * @property \Illuminate\Support\Collection<int, \App\Enums\EventAgeGroup>|array<int, string>|null $age_group
  * @property \Illuminate\Support\Collection<int, \App\Enums\EventType>|array<int, string>|null $event_type
@@ -88,6 +90,10 @@ class Event extends Model implements AuditableContract, HasMedia
     protected static function booted(): void
     {
         static::deleting(function (Event $event) {
+            $event->childEvents()->each(function (Event $childEvent): void {
+                $childEvent->delete();
+            });
+
             $event->members()->detach();
             $event->participants()->delete();
             $event->references()->detach();
@@ -131,11 +137,13 @@ class Event extends Model implements AuditableContract, HasMedia
         'submitter_id',
         'venue_id',
         'space_id',
+        'parent_event_id',
         'organizer_type',
         'organizer_id',
 
         'title',
         'slug',
+        'event_structure',
         'description',
         'starts_at',
         'ends_at',
@@ -179,6 +187,7 @@ class Event extends Model implements AuditableContract, HasMedia
             'ends_at' => 'datetime',
             'schedule_kind' => ScheduleKind::class,
             'schedule_state' => ScheduleState::class,
+            'event_structure' => EventStructure::class,
             'timing_mode' => TimingMode::class,
             'prayer_reference' => PrayerReference::class,
             'prayer_offset' => PrayerOffset::class,
@@ -214,7 +223,21 @@ class Event extends Model implements AuditableContract, HasMedia
 
         $query->where("{$table}.is_active", true)
             ->whereIn("{$table}.status", self::PUBLIC_STATUSES)
-            ->where("{$table}.visibility", EventVisibility::Public);
+            ->where("{$table}.visibility", EventVisibility::Public)
+            ->where("{$table}.event_structure", '!=', EventStructure::ParentProgram->value);
+    }
+
+    /**
+     * Scope a query to only include standalone events and child events.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function discoverable(Builder $query): void
+    {
+        $table = $query->getModel()->getTable();
+
+        $query->where("{$table}.event_structure", '!=', EventStructure::ParentProgram->value);
     }
 
     /**
@@ -225,6 +248,7 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         return $this->is_active
             && in_array((string) $this->status, self::PUBLIC_STATUSES, true)
+            && $this->eventStructure()->isDiscoverable()
             && $this->visibility === EventVisibility::Public;
     }
 
@@ -336,6 +360,8 @@ class Event extends Model implements AuditableContract, HasMedia
             'title' => $this->title,
             'description' => $this->description_text,
             'slug' => $this->slug,
+            'event_structure' => $this->eventStructure()->value,
+            'parent_event_id' => $this->parent_event_id,
             'speaker_names' => $this->speakerParticipants
                 ->map(fn (EventParticipant $participant): string => $participant->speaker !== null ? $participant->speaker->name : (string) ($participant->name ?? ''))
                 ->filter(fn (string $name): bool => $name !== '')
@@ -407,6 +433,14 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * @return BelongsTo<Event, $this>
+     */
+    public function parentEvent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_event_id');
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
@@ -447,6 +481,14 @@ class Event extends Model implements AuditableContract, HasMedia
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);
+    }
+
+    /**
+     * @return HasMany<Event, $this>
+     */
+    public function childEvents(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_event_id')->orderBy('starts_at')->orderBy('created_at');
     }
 
     /**
@@ -509,6 +551,37 @@ class Event extends Model implements AuditableContract, HasMedia
     public function nonSpeakerParticipants(): HasMany
     {
         return $this->participants()->where('role', '!=', EventParticipantRole::Speaker->value);
+    }
+
+    public function eventStructure(): EventStructure
+    {
+        $eventStructure = $this->event_structure;
+
+        if ($eventStructure instanceof EventStructure) {
+            return $eventStructure;
+        }
+
+        return EventStructure::tryFrom((string) $eventStructure) ?? EventStructure::Standalone;
+    }
+
+    public function isStandaloneEvent(): bool
+    {
+        return $this->eventStructure() === EventStructure::Standalone;
+    }
+
+    public function isParentProgram(): bool
+    {
+        return $this->eventStructure() === EventStructure::ParentProgram;
+    }
+
+    public function isChildEvent(): bool
+    {
+        return $this->eventStructure() === EventStructure::ChildEvent;
+    }
+
+    public function isSchedulable(): bool
+    {
+        return $this->eventStructure()->isSchedulable();
     }
 
     public function nextActiveSession(?CarbonInterface $moment = null): ?EventSession

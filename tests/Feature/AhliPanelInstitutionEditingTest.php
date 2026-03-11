@@ -317,8 +317,27 @@ it('lists only scoped events on ahli events index', function () {
         ->assertSee($speakerTitle)
         ->assertSee($institutionLinkedSpeakerTitle)
         ->assertSee($eventMemberTitle)
+        ->assertSee('Create Advanced Program')
         ->assertDontSee($outsideTitle)
         ->assertDontSee('Outside Speaker Scope Event');
+});
+
+it('hides the advanced create action for ahli users who only have event membership scope', function () {
+    $user = User::factory()->create();
+    $memberEvent = Event::factory()->create([
+        'title' => 'Scoped Event Membership Event Only',
+        'status' => 'draft',
+        'visibility' => 'private',
+    ]);
+
+    $user->memberEvents()->syncWithoutDetaching([$memberEvent->id => ['joined_at' => now()]]);
+
+    $eventsIndexUrl = EventResource::getUrl('index', panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get($eventsIndexUrl)
+        ->assertOk()
+        ->assertDontSee('Create Advanced Program');
 });
 
 it('does not allow editing institutions outside user membership in ahli panel', function () {

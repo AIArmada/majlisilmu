@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Events;
 
 use App\Enums\EventParticipantRole;
+use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Enums\SessionStatus;
@@ -93,6 +94,13 @@ class Show extends Component
             'series',
             'references.media',
             'languages',
+            'childEvents.media',
+            'childEvents.institution.media',
+            'childEvents.institution.address.state',
+            'childEvents.institution.address.district',
+            'childEvents.venue.media',
+            'childEvents.venue.address.state',
+            'childEvents.venue.address.district',
         ]);
 
         $event->loadMorph('organizer', [
@@ -137,6 +145,24 @@ class Show extends Component
     public function metaRobots(): string
     {
         return $this->isSearchIndexable($this->event) ? 'index, follow' : 'noindex, nofollow';
+    }
+
+    /**
+     * @return Collection<int, Event>
+     */
+    #[Computed]
+    public function publicChildEvents(): Collection
+    {
+        if (! $this->event->isParentProgram()) {
+            return collect();
+        }
+
+        return $this->event->childEvents
+            ->filter(fn (Event $childEvent): bool => $childEvent->is_active
+                && in_array((string) $childEvent->status, Event::PUBLIC_STATUSES, true)
+                && $childEvent->visibility === EventVisibility::Public)
+            ->sortBy('starts_at')
+            ->values();
     }
 
     /**
@@ -476,6 +502,10 @@ class Show extends Component
 
     public function render(): View
     {
+        if ($this->event->isParentProgram()) {
+            return view('livewire.pages.events.show-parent-program');
+        }
+
         return view('livewire.pages.events.show');
     }
 
@@ -505,7 +535,7 @@ class Show extends Component
 
     protected function isSearchIndexable(Event $event): bool
     {
-        if (! $event->is_active || $event->visibility !== EventVisibility::Public) {
+        if (! $event->is_active || $event->visibility !== EventVisibility::Public || $event->eventStructure() === EventStructure::ParentProgram) {
             return false;
         }
 
