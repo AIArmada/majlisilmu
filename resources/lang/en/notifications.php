@@ -161,10 +161,6 @@ return [
             'label' => 'Event venue changed',
             'description' => 'Alert me when a tracked event moves venue or space.',
         ],
-        'event_session_changed' => [
-            'label' => 'Event sessions changed',
-            'description' => 'Alert me when the event schedule changes because of session updates.',
-        ],
         'reminder_24_hours' => [
             'label' => '24-hour reminder',
             'description' => 'Send a reminder about going or registered events a day before they start.',
@@ -240,9 +236,6 @@ return [
         ],
         'event_venue_changed' => [
             'body' => 'The venue or space changed. :timing.',
-        ],
-        'event_session_changed' => [
-            'body' => 'The session lineup changed. :timing.',
         ],
         'registration_confirmed' => [
             'title' => 'Registration confirmed for :title',

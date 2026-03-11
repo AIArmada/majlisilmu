@@ -2,13 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\SessionStatus;
 use App\Models\Event;
-use App\Models\EventSession;
 use App\Models\Institution;
 use App\Models\Venue;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 
 class CalendarService
 {
@@ -223,26 +220,21 @@ class CalendarService
      */
     protected function nextCalendarWindow(Event $event): array
     {
-        $sessions = $this->activeSessions($event);
+        $windows = $this->eventWindows($event);
         $timezone = $event->timezone ?: config('app.timezone', 'UTC');
         $now = now($timezone);
 
-        /** @var EventSession|null $nextSession */
-        $nextSession = $sessions->first(
-            fn (EventSession $session): bool => ($this->asCarbon($session->starts_at)?->copy()->setTimezone($timezone)->greaterThanOrEqualTo($now)) ?? false
-        );
+        $nextWindow = collect($windows)
+            ->first(fn (array $window): bool => $window['start']->copy()->setTimezone($timezone)->greaterThanOrEqualTo($now));
 
-        if (! $nextSession instanceof EventSession) {
-            /** @var EventSession|null $nextSession */
-            $nextSession = $sessions->last();
+        if (! is_array($nextWindow)) {
+            $nextWindow = $windows[count($windows) - 1] ?? null;
         }
 
-        $nextSessionStart = $nextSession instanceof EventSession ? $this->asCarbon($nextSession->starts_at) : null;
-
-        if ($nextSessionStart instanceof Carbon) {
+        if (is_array($nextWindow)) {
             return [
-                $nextSessionStart->copy(),
-                $this->defaultEndAt($nextSessionStart, $nextSession?->ends_at),
+                $nextWindow['start']->copy(),
+                $nextWindow['end']->copy(),
             ];
         }
 
@@ -259,64 +251,51 @@ class CalendarService
     }
 
     /**
-     * @return Collection<int, EventSession>
+     * @return array<int, array{uid: string, start: Carbon, end: Carbon}>
      */
-    protected function activeSessions(Event $event): Collection
+    protected function sessionWindowsForIcs(Event $event): array
     {
-        if ($event->relationLoaded('sessions')) {
-            /** @var Collection<int, EventSession> $sessions */
-            $sessions = $event->sessions;
-        } else {
-            /** @var Collection<int, EventSession> $sessions */
-            $sessions = $event->sessions()
-                ->where('status', SessionStatus::Scheduled->value)
-                ->orderBy('starts_at')
-                ->get();
-        }
-
-        return $sessions
-            ->filter(function (EventSession $session): bool {
-                $status = $session->status;
-
-                return ($status === SessionStatus::Scheduled || $status === SessionStatus::Scheduled->value)
-                    && $this->asCarbon($session->starts_at) instanceof Carbon;
-            })
-            ->sortBy('starts_at')
-            ->values();
+        return $this->eventWindows($event);
     }
 
     /**
      * @return array<int, array{uid: string, start: Carbon, end: Carbon}>
      */
-    protected function sessionWindowsForIcs(Event $event): array
+    protected function eventWindows(Event $event): array
     {
         $windows = [];
 
-        foreach ($this->activeSessions($event) as $session) {
-            $sessionStartAt = $this->asCarbon($session->starts_at);
+        if ($event->isParentProgram()) {
+            $childEvents = $event->relationLoaded('childEvents')
+                ? $event->childEvents
+                : $event->childEvents()->orderBy('starts_at')->get();
 
-            if (! $sessionStartAt instanceof Carbon) {
-                continue;
+            foreach ($childEvents as $childEvent) {
+                $startAt = $this->asCarbon($childEvent->starts_at);
+
+                if (! $startAt instanceof Carbon) {
+                    continue;
+                }
+
+                $windows[] = [
+                    'uid' => (string) $childEvent->id,
+                    'start' => $startAt->copy(),
+                    'end' => $this->defaultEndAt($startAt, $childEvent->ends_at) ?? $startAt->copy()->addHours(2),
+                ];
             }
 
-            $windows[] = [
-                'uid' => (string) $session->id,
-                'start' => $sessionStartAt->copy(),
-                'end' => $this->defaultEndAt($sessionStartAt, $session->ends_at) ?? $sessionStartAt->copy()->addHours(2),
-            ];
+            if ($windows !== []) {
+                return $windows;
+            }
         }
 
-        if ($windows !== []) {
-            return $windows;
-        }
+        $startAt = $this->asCarbon($event->starts_at);
 
-        [$startAt, $endAt] = $this->nextCalendarWindow($event);
-
-        if ($startAt instanceof Carbon && $endAt instanceof Carbon) {
+        if ($startAt instanceof Carbon) {
             $windows[] = [
                 'uid' => 'event',
                 'start' => $startAt,
-                'end' => $endAt,
+                'end' => $this->defaultEndAt($startAt, $event->ends_at) ?? $startAt->copy()->addHours(2),
             ];
         }
 

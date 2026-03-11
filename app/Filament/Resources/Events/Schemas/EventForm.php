@@ -10,8 +10,6 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
-use App\Enums\ScheduleKind;
-use App\Enums\ScheduleState;
 use App\Enums\TagType;
 use App\Forms\Components\Select;
 use App\Forms\InstitutionFormSchema;
@@ -142,24 +140,6 @@ class EventForm
                                                     ->mapWithKeys(fn (EventFormat $case): array => [$case->value => $case->label()])
                                                     ->toArray(),
                                             )
-                                            ->required(),
-                                        Select::make('schedule_kind')
-                                            ->label('Jenis Jadual')
-                                            ->options(
-                                                collect(ScheduleKind::cases())
-                                                    ->mapWithKeys(fn (ScheduleKind $case): array => [$case->value => $case->label()])
-                                                    ->toArray(),
-                                            )
-                                            ->default(ScheduleKind::Single->value)
-                                            ->required(),
-                                        Select::make('schedule_state')
-                                            ->label('Status Jadual')
-                                            ->options(
-                                                collect(ScheduleState::cases())
-                                                    ->mapWithKeys(fn (ScheduleState $case): array => [$case->value => $case->label()])
-                                                    ->toArray(),
-                                            )
-                                            ->default(ScheduleState::Active->value)
                                             ->required(),
                                         Select::make('visibility')
                                             ->label('Keterlihatan')

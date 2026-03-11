@@ -10,7 +10,6 @@ use App\Enums\RegistrationMode;
 use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
 use App\Models\Event;
-use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
@@ -34,41 +33,92 @@ class CreateAdvanced extends Component
      */
     public array $form = [];
 
+    public int $activeStep = 1;
+
     public function mount(): void
     {
         abort_unless(auth()->check(), 403);
         abort_unless($this->hasBuilderAccess(), 403);
 
-        $defaultOrganizerType = $this->memberInstitutions()->isNotEmpty() ? 'institution' : 'speaker';
+        $requestedInstitutionId = request()->query('institution');
+        $memberInstitutions = $this->memberInstitutions();
+        $preferredInstitutionId = is_string($requestedInstitutionId) && $requestedInstitutionId !== '' && $memberInstitutions->pluck('id')->contains($requestedInstitutionId)
+            ? $requestedInstitutionId
+            : null;
+
+        $defaultOrganizerType = $memberInstitutions->isNotEmpty() ? 'institution' : 'speaker';
         $defaultOrganizerId = $defaultOrganizerType === 'institution'
-            ? $this->memberInstitutions()->first()?->id
+            ? $preferredInstitutionId ?: $memberInstitutions->first()?->id
             : $this->memberSpeakers()->first()?->id;
 
         $this->form = [
             'title' => '',
             'description' => '',
             'timezone' => 'Asia/Kuala_Lumpur',
+            'program_starts_at' => now('Asia/Kuala_Lumpur')->addDays(2)->setTime(20, 0)->format('Y-m-d\TH:i'),
+            'program_ends_at' => now('Asia/Kuala_Lumpur')->addDays(30)->setTime(22, 0)->format('Y-m-d\TH:i'),
             'organizer_type' => $defaultOrganizerType,
             'organizer_id' => $defaultOrganizerId,
-            'location_institution_id' => $defaultOrganizerType === 'institution' ? $defaultOrganizerId : $this->memberInstitutions()->first()?->id,
+            'location_institution_id' => $defaultOrganizerType === 'institution' ? $defaultOrganizerId : ($preferredInstitutionId ?: $memberInstitutions->first()?->id),
             'default_event_type' => EventType::KuliahCeramah->value,
             'default_event_format' => EventFormat::Physical->value,
             'visibility' => EventVisibility::Public->value,
             'registration_required' => true,
             'registration_mode' => RegistrationMode::Event->value,
-            'children' => [$this->defaultChildFormState()],
         ];
     }
 
-    public function addChild(): void
+    public function goToStep(int $step): void
     {
-        $this->form['children'][] = $this->defaultChildFormState(count($this->form['children']) + 1);
+        $this->activeStep = max(1, min(3, $step));
     }
 
-    public function removeChild(int $index): void
+    public function nextStep(): void
     {
-        unset($this->form['children'][$index]);
-        $this->form['children'] = array_values($this->form['children']);
+        $this->goToStep($this->activeStep + 1);
+    }
+
+    public function previousStep(): void
+    {
+        $this->goToStep($this->activeStep - 1);
+    }
+
+    public function applyTemplate(string $template): void
+    {
+        $timezone = (string) ($this->form['timezone'] ?? 'Asia/Kuala_Lumpur');
+        $startsAt = now($timezone)->addDays(2)->setTime(20, 0);
+
+        $templateState = match ($template) {
+            'weekly_series' => [
+                'title' => $this->form['title'] ?: __('Weekly Knowledge Series'),
+                'description' => $this->form['description'] ?: __('A repeating program with one featured child event every week.'),
+                'program_starts_at' => $startsAt->copy()->format('Y-m-d\TH:i'),
+                'program_ends_at' => $startsAt->copy()->addWeeks(4)->format('Y-m-d\TH:i'),
+            ],
+            'weekend_intensive' => [
+                'title' => $this->form['title'] ?: __('Weekend Intensive Program'),
+                'description' => $this->form['description'] ?: __('A compact multi-session program across one focused weekend.'),
+                'program_starts_at' => $startsAt->copy()->next('Friday')->setTime(20, 30)->format('Y-m-d\TH:i'),
+                'program_ends_at' => $startsAt->copy()->next('Sunday')->setTime(12, 30)->format('Y-m-d\TH:i'),
+            ],
+            'ramadan_program' => [
+                'title' => $this->form['title'] ?: __('Ramadan Companion Program'),
+                'description' => $this->form['description'] ?: __('An umbrella program with nightly child events and lighter weekend highlights.'),
+                'program_starts_at' => $startsAt->copy()->setTime(21, 15)->format('Y-m-d\TH:i'),
+                'program_ends_at' => $startsAt->copy()->addDays(10)->setTime(22, 30)->format('Y-m-d\TH:i'),
+            ],
+            default => null,
+        };
+
+        if (! is_array($templateState)) {
+            return;
+        }
+
+        $this->form['title'] = (string) $templateState['title'];
+        $this->form['description'] = (string) $templateState['description'];
+        $this->form['program_starts_at'] = (string) $templateState['program_starts_at'];
+        $this->form['program_ends_at'] = (string) $templateState['program_ends_at'];
+        $this->activeStep = 2;
     }
 
     public function updatedFormOrganizerType(string $value): void
@@ -99,27 +149,21 @@ class CreateAdvanced extends Component
         $timezone = (string) $validated['form']['timezone'];
         $organizerType = (string) $validated['form']['organizer_type'];
         $organizerId = (string) $validated['form']['organizer_id'];
+        $programStartsAt = Carbon::parse((string) $validated['form']['program_starts_at'], $timezone)->utc();
+        $programEndsAt = Carbon::parse((string) $validated['form']['program_ends_at'], $timezone)->utc();
 
         $this->ensureOrganizerIsMemberOwned($user, $organizerType, $organizerId);
 
         $locationInstitutionId = $this->resolveLocationInstitutionId($user, $organizerType, $organizerId, $validated['form']['location_institution_id'] ?? null);
 
-        /** @var list<array<string, mixed>> $childForms */
-        $childForms = is_array($validated['form']['children']) ? $validated['form']['children'] : [];
+        if ($programEndsAt->lessThanOrEqualTo($programStartsAt)) {
+            $this->addError('form.program_ends_at', __('The program end must be after the program start.'));
 
-        $childPayloads = collect($childForms)
-            ->map(fn (array $child): array => $this->normalizeChildPayload($child, $timezone, $validated['form']))
-            ->values();
-
-        $parentStartsAt = $childPayloads->min('starts_at');
-        $parentEndsAt = $childPayloads->max('ends_at');
-
-        if (! $parentStartsAt instanceof Carbon || ! $parentEndsAt instanceof Carbon) {
-            throw new \RuntimeException('Advanced event children must include valid schedule values.');
+            return null;
         }
 
         try {
-            $parentEvent = DB::transaction(function () use ($user, $validated, $timezone, $organizerType, $organizerId, $locationInstitutionId, $childPayloads, $parentStartsAt, $parentEndsAt): Event {
+            $parentEvent = DB::transaction(function () use ($user, $validated, $timezone, $organizerType, $organizerId, $locationInstitutionId, $programStartsAt, $programEndsAt): Event {
                 $parentEvent = Event::query()->create([
                     'user_id' => $user->id,
                     'submitter_id' => $user->id,
@@ -128,8 +172,8 @@ class CreateAdvanced extends Component
                     'title' => (string) $validated['form']['title'],
                     'slug' => Str::slug((string) $validated['form']['title']).'-'.Str::lower(Str::random(7)),
                     'description' => (string) ($validated['form']['description'] ?? ''),
-                    'starts_at' => $parentStartsAt,
-                    'ends_at' => $parentEndsAt,
+                    'starts_at' => $programStartsAt,
+                    'ends_at' => $programEndsAt,
                     'timezone' => $timezone,
                     'institution_id' => $locationInstitutionId,
                     'organizer_type' => $this->organizerMorphClass($organizerType),
@@ -137,48 +181,16 @@ class CreateAdvanced extends Component
                     'event_type' => [(string) $validated['form']['default_event_type']],
                     'event_format' => (string) $validated['form']['default_event_format'],
                     'visibility' => (string) $validated['form']['visibility'],
-                    'schedule_kind' => ScheduleKind::CustomChain->value,
+                    'schedule_kind' => ScheduleKind::Single->value,
                     'schedule_state' => ScheduleState::Active->value,
                     'status' => 'draft',
                     'is_active' => true,
                 ]);
 
-                EventSubmission::query()->create([
-                    'event_id' => $parentEvent->id,
-                    'submitted_by' => $user->id,
-                    'submitter_name' => $user->name,
-                    'notes' => null,
+                $parentEvent->settings()->create([
+                    'registration_required' => (bool) $validated['form']['registration_required'],
+                    'registration_mode' => (string) $validated['form']['registration_mode'],
                 ]);
-
-                foreach ($childPayloads as $childPayload) {
-                    $childEvent = Event::query()->create([
-                        'user_id' => $user->id,
-                        'submitter_id' => $user->id,
-                        'parent_event_id' => $parentEvent->id,
-                        'event_structure' => EventStructure::ChildEvent->value,
-                        'title' => $childPayload['title'],
-                        'slug' => Str::slug($childPayload['title']).'-'.Str::lower(Str::random(7)),
-                        'description' => $childPayload['description'],
-                        'starts_at' => $childPayload['starts_at'],
-                        'ends_at' => $childPayload['ends_at'],
-                        'timezone' => $timezone,
-                        'institution_id' => $locationInstitutionId,
-                        'organizer_type' => $this->organizerMorphClass($organizerType),
-                        'organizer_id' => $organizerId,
-                        'event_type' => [$childPayload['event_type']],
-                        'event_format' => $childPayload['event_format'],
-                        'visibility' => (string) $validated['form']['visibility'],
-                        'schedule_kind' => ScheduleKind::Single->value,
-                        'schedule_state' => ScheduleState::Active->value,
-                        'status' => 'draft',
-                        'is_active' => true,
-                    ]);
-
-                    $childEvent->settings()->create([
-                        'registration_required' => (bool) $validated['form']['registration_required'],
-                        'registration_mode' => (string) $validated['form']['registration_mode'],
-                    ]);
-                }
 
                 return $parentEvent;
             });
@@ -190,7 +202,7 @@ class CreateAdvanced extends Component
             return null;
         }
 
-        return redirect()->to(\App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $parentEvent], panel: 'ahli'));
+        return redirect()->route('submit-event.create', ['parent' => $parentEvent->id]);
     }
 
     /**
@@ -202,6 +214,8 @@ class CreateAdvanced extends Component
             'form.title' => ['required', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
             'form.timezone' => ['required', 'string', 'max:64'],
+            'form.program_starts_at' => ['required', 'date'],
+            'form.program_ends_at' => ['required', 'date'],
             'form.organizer_type' => ['required', Rule::in(['institution', 'speaker'])],
             'form.organizer_id' => ['required', 'string'],
             'form.location_institution_id' => ['nullable', 'string'],
@@ -210,30 +224,6 @@ class CreateAdvanced extends Component
             'form.visibility' => ['required', Rule::in(array_column(EventVisibility::cases(), 'value'))],
             'form.registration_required' => ['required', 'boolean'],
             'form.registration_mode' => ['required', Rule::in(array_column(RegistrationMode::cases(), 'value'))],
-            'form.children' => ['required', 'array', 'min:1'],
-            'form.children.*.title' => ['required', 'string', 'max:255'],
-            'form.children.*.description' => ['nullable', 'string'],
-            'form.children.*.starts_at' => ['required', 'date'],
-            'form.children.*.ends_at' => ['nullable', 'date'],
-            'form.children.*.event_format' => ['nullable', Rule::in(array_column(EventFormat::cases(), 'value'))],
-            'form.children.*.event_type' => ['nullable', Rule::in(array_column(EventType::cases(), 'value'))],
-        ];
-    }
-
-    /**
-     * @return array{title: string, description: string, starts_at: string, ends_at: string, event_format: null, event_type: null}
-     */
-    protected function defaultChildFormState(int $position = 1): array
-    {
-        $startsAt = now()->addDays($position)->setTime(20, 0);
-
-        return [
-            'title' => '',
-            'description' => '',
-            'starts_at' => $startsAt->format('Y-m-d\TH:i'),
-            'ends_at' => $startsAt->copy()->addHours(2)->format('Y-m-d\TH:i'),
-            'event_format' => null,
-            'event_type' => null,
         ];
     }
 
@@ -321,37 +311,33 @@ class CreateAdvanced extends Component
         return $locationInstitutionId;
     }
 
-    /**
-     * @param  array<string, mixed>  $child
-     * @param  array<string, mixed>  $parentForm
-     * @return array{title: string, description: string, starts_at: Carbon, ends_at: Carbon, event_type: string, event_format: string}
-     */
-    protected function normalizeChildPayload(array $child, string $timezone, array $parentForm): array
-    {
-        $startsAt = Carbon::parse((string) $child['starts_at'], $timezone)->utc();
-        $endsAt = filled($child['ends_at'] ?? null)
-            ? Carbon::parse((string) $child['ends_at'], $timezone)->utc()
-            : $startsAt->copy()->addHours(2);
-
-        if ($endsAt->lessThanOrEqualTo($startsAt)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'form.children' => __('Each child event must end after it starts.'),
-            ]);
-        }
-
-        return [
-            'title' => trim((string) $child['title']),
-            'description' => trim((string) ($child['description'] ?? '')),
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-            'event_type' => (string) ($child['event_type'] ?: $parentForm['default_event_type']),
-            'event_format' => (string) ($child['event_format'] ?: $parentForm['default_event_format']),
-        ];
-    }
-
     protected function organizerMorphClass(string $organizerType): string
     {
         return $organizerType === 'institution' ? Institution::class : Speaker::class;
+    }
+
+    /**
+     * @return array<int, array{number: int, title: string, description: string}>
+     */
+    protected function stepOptions(): array
+    {
+        return [
+            1 => ['number' => 1, 'title' => __('Program Identity'), 'description' => __('Name the umbrella program and ownership')],
+            2 => ['number' => 2, 'title' => __('Program Defaults'), 'description' => __('Set timeframe, visibility, and registration defaults')],
+            3 => ['number' => 3, 'title' => __('Review & Continue'), 'description' => __('Create the parent first, then add child events individually')],
+        ];
+    }
+
+    /**
+     * @return array<int, array{key: string, title: string, description: string, eyebrow: string}>
+     */
+    protected function templateOptions(): array
+    {
+        return [
+            ['key' => 'weekly_series', 'title' => __('Weekly Series'), 'description' => __('Use one parent program for a weekly chain of child event submissions.'), 'eyebrow' => __('Series')],
+            ['key' => 'weekend_intensive', 'title' => __('Weekend Intensive'), 'description' => __('Create one parent, then submit each session separately under it.'), 'eyebrow' => __('Focused')],
+            ['key' => 'ramadan_program', 'title' => __('Ramadan Program'), 'description' => __('Set up the parent first, then add nightly child events one by one.'), 'eyebrow' => __('Seasonal')],
+        ];
     }
 
     public function render(): View
@@ -362,6 +348,8 @@ class CreateAdvanced extends Component
             'eventTypeOptions' => collect(EventType::cases())->mapWithKeys(fn (EventType $type): array => [$type->value => $type->getLabel()])->all(),
             'eventFormatOptions' => collect(EventFormat::cases())->mapWithKeys(fn (EventFormat $format): array => [$format->value => $format->label()])->all(),
             'visibilityOptions' => collect(EventVisibility::cases())->mapWithKeys(fn (EventVisibility $visibility): array => [$visibility->value => $visibility->getLabel()])->all(),
+            'stepOptions' => $this->stepOptions(),
+            'templateOptions' => $this->templateOptions(),
         ]);
     }
 }

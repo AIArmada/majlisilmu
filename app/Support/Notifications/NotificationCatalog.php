@@ -83,7 +83,6 @@ class NotificationCatalog
                     NotificationTrigger::EventCancelled->value,
                     NotificationTrigger::EventScheduleChanged->value,
                     NotificationTrigger::EventVenueChanged->value,
-                    NotificationTrigger::EventSessionChanged->value,
                 ],
             ],
             NotificationFamily::EventReminders->value => [
@@ -248,15 +247,6 @@ class NotificationCatalog
                 'event_venue_changed',
                 NotificationCadence::Instant,
                 [NotificationChannel::Email->value, NotificationChannel::InApp->value, NotificationChannel::Push->value, NotificationChannel::Whatsapp->value],
-                [NotificationChannel::InApp->value, NotificationChannel::Email->value],
-                NotificationPriority::High,
-            ),
-            NotificationTrigger::EventSessionChanged->value => self::buildTriggerDefinition(
-                NotificationTrigger::EventSessionChanged,
-                NotificationFamily::EventUpdates,
-                'event_session_changed',
-                NotificationCadence::Instant,
-                [NotificationChannel::Email->value, NotificationChannel::InApp->value, NotificationChannel::Push->value],
                 [NotificationChannel::InApp->value, NotificationChannel::Email->value],
                 NotificationPriority::High,
             ),

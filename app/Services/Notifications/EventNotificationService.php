@@ -658,10 +658,6 @@ class EventNotificationService
             return NotificationTrigger::EventVenueChanged;
         }
 
-        if (in_array('event_session', $changedFields, true)) {
-            return NotificationTrigger::EventSessionChanged;
-        }
-
         if (array_intersect($changedFields, ['starts_at', 'ends_at', 'timezone', 'title'])) {
             return NotificationTrigger::EventScheduleChanged;
         }
@@ -677,10 +673,6 @@ class EventNotificationService
         return match ($trigger) {
             NotificationTrigger::EventVenueChanged => [
                 'notifications.messages.event_venue_changed.body',
-                ['timing' => $this->messageRenderer->eventTimingToken($event)],
-            ],
-            NotificationTrigger::EventSessionChanged => [
-                'notifications.messages.event_session_changed.body',
                 ['timing' => $this->messageRenderer->eventTimingToken($event)],
             ],
             default => [

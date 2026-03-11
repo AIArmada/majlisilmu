@@ -6,8 +6,7 @@ use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
 use App\Filament\Resources\Events\Pages\ViewEvent;
-use App\Filament\Resources\Events\RelationManagers\EventRecurrenceRulesRelationManager;
-use App\Filament\Resources\Events\RelationManagers\EventSessionsRelationManager;
+use App\Filament\Resources\Events\RelationManagers\ChildEventsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
@@ -76,8 +75,7 @@ class EventResource extends Resource
     public static function getRelations(): array
     {
         return [
-            EventSessionsRelationManager::class,
-            EventRecurrenceRulesRelationManager::class,
+            ChildEventsRelationManager::class,
             MediaLinksRelationManager::class,
             EventUsersRelationManager::class,
             ModerationReviewsRelationManager::class,

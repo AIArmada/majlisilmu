@@ -14,10 +14,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
-use Throwable;
 
 class RegistrationsRelationManager extends RelationManager
 {
@@ -43,39 +40,6 @@ class RegistrationsRelationManager extends RelationManager
             ->components([
                 Select::make('user_id')
                     ->relationship('user', 'email')
-                    ->searchable()
-                    ->preload(),
-                Select::make('event_session_id')
-                    ->relationship(
-                        name: 'session',
-                        titleAttribute: 'id',
-                        modifyQueryUsing: function (Builder $query): Builder {
-                            $ownerKey = $this->getOwnerRecord()->getKey();
-
-                            if (! is_string($ownerKey) || $ownerKey === '') {
-                                return $query->whereRaw('1 = 0');
-                            }
-
-                            return $query->where('event_id', $ownerKey);
-                        },
-                    )
-                    ->getOptionLabelFromRecordUsing(function (\App\Models\EventSession $record): string {
-                        $startsAt = $record->starts_at;
-
-                        if ($startsAt instanceof Carbon) {
-                            return $startsAt->translatedFormat('d M Y, h:i A');
-                        }
-
-                        if (is_string($startsAt) && $startsAt !== '') {
-                            try {
-                                return Carbon::parse($startsAt)->translatedFormat('d M Y, h:i A');
-                            } catch (Throwable) {
-                                return (string) $record->getKey();
-                            }
-                        }
-
-                        return (string) $record->getKey();
-                    })
                     ->searchable()
                     ->preload(),
                 TextInput::make('name')
@@ -112,10 +76,6 @@ class RegistrationsRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->badge()
                     ->sortable(),
-                TextColumn::make('session.starts_at')
-                    ->label('Session')
-                    ->dateTime()
-                    ->placeholder('-'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

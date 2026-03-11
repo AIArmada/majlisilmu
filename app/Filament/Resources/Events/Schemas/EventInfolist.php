@@ -60,14 +60,6 @@ class EventInfolist
                                             ->label('Mode Waktu')
                                             ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
                                             ->badge(),
-                                        TextEntry::make('schedule_kind')
-                                            ->label('Jenis Jadual')
-                                            ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
-                                            ->badge(),
-                                        TextEntry::make('schedule_state')
-                                            ->label('Status Jadual')
-                                            ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))
-                                            ->badge(),
                                         TextEntry::make('prayer_reference')
                                             ->label('Waktu Solat')
                                             ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state))

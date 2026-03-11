@@ -7,8 +7,6 @@ use App\Listeners\Notifications\HandleNotificationFailed;
 use App\Listeners\Notifications\RecordNotificationSent;
 use App\Models\DonationChannel;
 use App\Models\Event;
-use App\Models\EventRecurrenceRule;
-use App\Models\EventSession;
 use App\Models\EventSubmission;
 use App\Models\Inspiration;
 use App\Models\Institution;
@@ -20,8 +18,6 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Observers\EventObserver;
-use App\Observers\EventRecurrenceRuleObserver;
-use App\Observers\EventSessionObserver;
 use App\Observers\InstitutionObserver;
 use App\Observers\SpeakerObserver;
 use App\Observers\TagObserver;
@@ -54,8 +50,6 @@ class AppServiceProvider extends ServiceProvider
 
     protected static bool $mediaUploadConfigured = false;
 
-    protected static bool $eventScheduleObserversRegistered = false;
-
     protected static bool $publicListingObserversRegistered = false;
 
     protected static bool $notificationListenersRegistered = false;
@@ -85,15 +79,6 @@ class AppServiceProvider extends ServiceProvider
 
             if (! app()->runningUnitTests()) {
                 self::$eventObserverRegistered = true;
-            }
-        }
-
-        if (app()->runningUnitTests() || ! self::$eventScheduleObserversRegistered) {
-            EventSession::observe(EventSessionObserver::class);
-            EventRecurrenceRule::observe(EventRecurrenceRuleObserver::class);
-
-            if (! app()->runningUnitTests()) {
-                self::$eventScheduleObserversRegistered = true;
             }
         }
 

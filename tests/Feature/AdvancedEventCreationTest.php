@@ -3,7 +3,6 @@
 use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Livewire\Pages\Dashboard\Events\CreateAdvanced;
 use App\Models\Event;
-use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +18,7 @@ it('forbids the advanced builder for authenticated users without member entities
         ->assertForbidden();
 });
 
-it('creates a parent program draft with child event drafts for institution members', function () {
+it('creates a parent program draft then redirects into child-event submission', function () {
     $user = User::factory()->create(['name' => 'Aisyah Member']);
     $institution = Institution::factory()->create();
 
@@ -34,28 +33,12 @@ it('creates a parent program draft with child event drafts for institution membe
         ->test(CreateAdvanced::class)
         ->set('form.title', 'Ramadan Knowledge Series')
         ->set('form.description', 'A month-long umbrella program.')
+        ->set('form.program_starts_at', now()->addDays(2)->setTime(20, 0)->format('Y-m-d\TH:i'))
+        ->set('form.program_ends_at', now()->addDays(30)->setTime(22, 0)->format('Y-m-d\TH:i'))
         ->set('form.organizer_type', 'institution')
         ->set('form.organizer_id', $institution->id)
         ->set('form.default_event_type', 'kuliah_ceramah')
         ->set('form.default_event_format', 'physical')
-        ->set('form.children', [
-            [
-                'title' => 'Night One Tafsir',
-                'description' => 'Opening tafsir session.',
-                'starts_at' => now()->addDays(2)->setTime(20, 0)->format('Y-m-d\TH:i'),
-                'ends_at' => now()->addDays(2)->setTime(22, 0)->format('Y-m-d\TH:i'),
-                'event_type' => null,
-                'event_format' => null,
-            ],
-            [
-                'title' => 'Night Two Q&A',
-                'description' => 'Question and answer follow-up.',
-                'starts_at' => now()->addDays(3)->setTime(20, 30)->format('Y-m-d\TH:i'),
-                'ends_at' => now()->addDays(3)->setTime(22, 0)->format('Y-m-d\TH:i'),
-                'event_type' => 'forum',
-                'event_format' => 'hybrid',
-            ],
-        ])
         ->call('submit')
         ->assertHasNoErrors();
 
@@ -66,18 +49,60 @@ it('creates a parent program draft with child event drafts for institution membe
     expect($parentEvent)->not->toBeNull()
         ->and($parentEvent?->isParentProgram())->toBeTrue()
         ->and((string) $parentEvent?->status)->toBe('draft')
-        ->and($parentEvent?->childEvents()->count())->toBe(2);
+        ->and($parentEvent?->childEvents()->count())->toBe(0)
+        ->and($parentEvent?->settings?->registration_required)->toBeTrue();
 
-    expect(EventSubmission::query()->where('event_id', $parentEvent?->id)->exists())->toBeTrue();
+    $redirectComponent = Livewire::actingAs($user)
+        ->test(CreateAdvanced::class)
+        ->set('form.title', 'Another Parent Program')
+        ->set('form.program_starts_at', now()->addDays(5)->setTime(20, 0)->format('Y-m-d\TH:i'))
+        ->set('form.program_ends_at', now()->addDays(10)->setTime(22, 0)->format('Y-m-d\TH:i'))
+        ->set('form.organizer_type', 'institution')
+        ->set('form.organizer_id', $institution->id)
+        ->call('submit')
+        ->assertHasNoErrors();
 
-    $childTitles = $parentEvent?->childEvents()->orderBy('starts_at')->pluck('title')->all();
+    $redirectParent = Event::query()->where('title', 'Another Parent Program')->firstOrFail();
 
-    expect($childTitles)->toBe(['Night One Tafsir', 'Night Two Q&A']);
+    $redirectComponent->assertRedirect(route('submit-event.create', ['parent' => $redirectParent->id]));
+});
 
-    $secondChild = $parentEvent?->childEvents()->where('title', 'Night Two Q&A')->first();
+it('offers parent templates and a normalized child-submission workflow', function () {
+    $user = User::factory()->create(['name' => 'Planner Member']);
+    $institution = Institution::factory()->create(['name' => 'Masjid Perancang']);
 
-    expect($secondChild)->not->toBeNull()
-        ->and($secondChild?->isChildEvent())->toBeTrue()
-        ->and($secondChild?->settings?->registration_required)->toBeTrue()
-        ->and($secondChild?->event_format?->value)->toBe('hybrid');
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard.events.create-advanced'))
+        ->assertSuccessful()
+        ->assertSee('Create the parent first')
+        ->assertSee('Weekly Series')
+        ->assertSee('Standard submit-event UI');
+
+    $component = Livewire::actingAs($user)
+        ->test(CreateAdvanced::class)
+        ->call('applyTemplate', 'weekly_series');
+
+    expect($component->get('activeStep'))->toBe(2)
+        ->and($component->get('form')['title'])->toBe('Weekly Knowledge Series')
+        ->and(filled($component->get('form')['program_starts_at']))->toBeTrue()
+        ->and(filled($component->get('form')['program_ends_at']))->toBeTrue();
+});
+
+it('prefills the institution when launched from the institution dashboard shortcut', function () {
+    $user = User::factory()->create(['name' => 'Institution Shortcut Member']);
+    $institution = Institution::factory()->create(['name' => 'Masjid Pintasan']);
+    $otherInstitution = Institution::factory()->create(['name' => 'Masjid Lain']);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+    $otherInstitution->members()->syncWithoutDetaching([$user->id]);
+
+    $component = Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($user)
+        ->test(CreateAdvanced::class);
+
+    expect($component->get('form')['organizer_type'])->toBe('institution')
+        ->and($component->get('form')['organizer_id'])->toBe($institution->id)
+        ->and($component->get('form')['location_institution_id'])->toBe($institution->id);
 });

@@ -13,12 +13,10 @@ use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
-use App\Enums\SessionStatus;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Support\Authz\MemberPermissionGate;
 use App\Support\Timezone\UserDateTimeFormatter;
-use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -109,12 +107,6 @@ class Event extends Model implements AuditableContract, HasMedia
             });
             $event->submissions()->each(function (EventSubmission $submission): void {
                 $submission->delete();
-            });
-            $event->sessions()->each(function (EventSession $session): void {
-                $session->delete();
-            });
-            $event->recurrenceRules()->each(function (EventRecurrenceRule $rule): void {
-                $rule->delete();
             });
             $event->moderationReviews()->each(function (ModerationReview $review): void {
                 $review->delete();
@@ -514,22 +506,6 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return HasMany<EventSession, $this>
-     */
-    public function sessions(): HasMany
-    {
-        return $this->hasMany(EventSession::class)->orderBy('starts_at');
-    }
-
-    /**
-     * @return HasMany<EventRecurrenceRule, $this>
-     */
-    public function recurrenceRules(): HasMany
-    {
-        return $this->hasMany(EventRecurrenceRule::class)->orderByDesc('created_at');
-    }
-
-    /**
      * @return HasMany<EventParticipant, $this>
      */
     public function participants(): HasMany
@@ -582,34 +558,6 @@ class Event extends Model implements AuditableContract, HasMedia
     public function isSchedulable(): bool
     {
         return $this->eventStructure()->isSchedulable();
-    }
-
-    public function nextActiveSession(?CarbonInterface $moment = null): ?EventSession
-    {
-        $moment ??= now($this->timezone ?: 'Asia/Kuala_Lumpur');
-
-        /** @var EventSession|null $session */
-        $session = $this->sessions()
-            ->where('status', SessionStatus::Scheduled->value)
-            ->where('starts_at', '>=', $moment)
-            ->orderBy('starts_at')
-            ->first();
-
-        return $session;
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, EventSession>
-     */
-    public function activeSessions(): \Illuminate\Database\Eloquent\Collection
-    {
-        /** @var \Illuminate\Database\Eloquent\Collection<int, EventSession> $sessions */
-        $sessions = $this->sessions()
-            ->where('status', SessionStatus::Scheduled->value)
-            ->orderBy('starts_at')
-            ->get();
-
-        return $sessions;
     }
 
     /**

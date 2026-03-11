@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Event;
-use App\Models\EventSession;
 use App\Models\EventSettings;
 use App\Models\Registration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,13 +42,13 @@ it('enforces capacity using live registration rows when counter is stale', funct
     expect(Registration::query()->where('event_id', $event->id)->count())->toBe(1);
 });
 
-it('requires session selection when registration mode is per-session', function () {
+it('enforces uniqueness per event when registration is event-wide', function () {
     $event = Event::factory()
         ->has(EventSettings::factory()->state([
             'registration_required' => true,
             'registration_opens_at' => now()->subDay(),
             'registration_closes_at' => now()->addDay(),
-            'registration_mode' => 'session',
+            'registration_mode' => 'event',
         ]), 'settings')
         ->create([
             'status' => 'approved',
@@ -57,14 +56,7 @@ it('requires session selection when registration mode is per-session', function 
             'published_at' => now(),
         ]);
 
-    EventSession::factory()->create([
-        'event_id' => $event->id,
-        'starts_at' => now()->addDays(2)->setTime(20, 0),
-        'ends_at' => now()->addDays(2)->setTime(22, 0),
-        'status' => 'scheduled',
-    ]);
-
-    $response = $this
+    $first = $this
         ->withSession(['_token' => 'test-token'])
         ->post(route('events.register', $event), [
             '_token' => 'test-token',
@@ -72,16 +64,26 @@ it('requires session selection when registration mode is per-session', function 
             'email' => 'session-required@example.com',
         ]);
 
-    $response->assertSessionHasErrors(['event_session_id']);
+    $first->assertSessionHasNoErrors();
+
+    $duplicate = $this
+        ->withSession(['_token' => 'test-token'])
+        ->post(route('events.register', $event), [
+            '_token' => 'test-token',
+            'name' => 'Registrant Again',
+            'email' => 'session-required@example.com',
+        ]);
+
+    $duplicate->assertSessionHasErrors(['registration']);
 });
 
-it('enforces uniqueness per session in per-session registration mode', function () {
+it('allows distinct registrants for the same event', function () {
     $event = Event::factory()
         ->has(EventSettings::factory()->state([
             'registration_required' => true,
             'registration_opens_at' => now()->subDay(),
             'registration_closes_at' => now()->addDay(),
-            'registration_mode' => 'session',
+            'registration_mode' => 'event',
             'capacity' => 10,
         ]), 'settings')
         ->create([
@@ -90,52 +92,25 @@ it('enforces uniqueness per session in per-session registration mode', function 
             'published_at' => now(),
         ]);
 
-    $sessionA = EventSession::factory()->create([
-        'event_id' => $event->id,
-        'starts_at' => now()->addDays(2)->setTime(20, 0),
-        'ends_at' => now()->addDays(2)->setTime(22, 0),
-        'status' => 'scheduled',
-    ]);
-
-    $sessionB = EventSession::factory()->create([
-        'event_id' => $event->id,
-        'starts_at' => now()->addDays(3)->setTime(20, 0),
-        'ends_at' => now()->addDays(3)->setTime(22, 0),
-        'status' => 'scheduled',
-    ]);
-
     $first = $this
         ->withSession(['_token' => 'test-token'])
         ->post(route('events.register', $event), [
             '_token' => 'test-token',
             'name' => 'Registrant',
             'email' => 'same@example.com',
-            'event_session_id' => $sessionA->id,
         ]);
 
     $first->assertSessionHasNoErrors();
 
-    $duplicateInSameSession = $this
+    $second = $this
         ->withSession(['_token' => 'test-token'])
         ->post(route('events.register', $event), [
             '_token' => 'test-token',
-            'name' => 'Registrant Again',
-            'email' => 'same@example.com',
-            'event_session_id' => $sessionA->id,
+            'name' => 'Registrant Other',
+            'email' => 'other@example.com',
         ]);
 
-    $duplicateInSameSession->assertSessionHasErrors(['registration']);
-
-    $sameContactDifferentSession = $this
-        ->withSession(['_token' => 'test-token'])
-        ->post(route('events.register', $event), [
-            '_token' => 'test-token',
-            'name' => 'Registrant Other Session',
-            'email' => 'same@example.com',
-            'event_session_id' => $sessionB->id,
-        ]);
-
-    $sameContactDifferentSession->assertSessionHasNoErrors();
+    $second->assertSessionHasNoErrors();
 
     expect(
         Registration::query()

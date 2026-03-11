@@ -31,6 +31,9 @@
     $ahliInstitutionEditUrl = $canEditInstitution
         ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution], panel: 'ahli')
         : null;
+    $advancedCreateUrl = $selectedInstitution !== null
+        ? route('dashboard.events.create-advanced', ['institution' => $selectedInstitution->id])
+        : null;
 @endphp
 
 <div class="min-h-screen bg-slate-50 py-12 pb-32">
@@ -104,9 +107,21 @@
                             </p>
                         </div>
 
-                        <p class="text-sm font-medium text-slate-500">
-                            {{ __('Showing :count of :total events', ['count' => $events->count(), 'total' => $events->total()]) }}
-                        </p>
+                        <div class="flex flex-col items-start gap-3 md:items-end">
+                            @if($advancedCreateUrl)
+                                <a
+                                    href="{{ $advancedCreateUrl }}"
+                                    wire:navigate
+                                    class="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    {{ __('Create Advanced Program') }}
+                                </a>
+                            @endif
+
+                            <p class="text-sm font-medium text-slate-500">
+                                {{ __('Showing :count of :total events', ['count' => $events->count(), 'total' => $events->total()]) }}
+                            </p>
+                        </div>
                     </div>
 
                     <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
@@ -190,8 +205,22 @@
                         </div>
                     </div>
 
-                    <div wire:loading.delay.short wire:target="institutionId,eventSearch,eventStatus,eventVisibility,eventSort,eventPerPage">
-                        <x-ui.skeleton.table :rows="6" :columns="7" class="mt-5" />
+                    <div wire:loading.delay.short wire:target="institutionId,eventSearch,eventStatus,eventVisibility,eventSort,eventPerPage" class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <div class="grid grid-cols-7 gap-3 border-b border-slate-100 px-4 py-3">
+                            @for($column = 0; $column < 7; $column++)
+                                <div class="h-4 animate-pulse rounded bg-slate-200"></div>
+                            @endfor
+                        </div>
+
+                        <div class="space-y-3 px-4 py-4">
+                            @for($row = 0; $row < 6; $row++)
+                                <div class="grid grid-cols-7 gap-3">
+                                    @for($column = 0; $column < 7; $column++)
+                                        <div class="h-8 animate-pulse rounded-xl bg-slate-100"></div>
+                                    @endfor
+                                </div>
+                            @endfor
+                        </div>
                     </div>
 
                     <div wire:loading.remove wire:target="institutionId,eventSearch,eventStatus,eventVisibility,eventSort,eventPerPage">
@@ -232,6 +261,9 @@
                                             $ahliEventEditUrl = $canEditEvent
                                                 ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $event], panel: 'ahli')
                                                 : null;
+                                            $createChildEventUrl = $event->isParentProgram()
+                                                ? route('submit-event.create', ['parent' => $event->id])
+                                                : null;
                                             $ahliEventRegistrationsUrl = $canViewEventRegistrations
                                                 ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $event, 'relation' => 'registrations'], panel: 'ahli')
                                                 : null;
@@ -260,6 +292,13 @@
                                                     <div class="mt-1">
                                                         <a href="{{ $ahliEventEditUrl }}" class="text-xs font-semibold text-emerald-700 hover:underline">
                                                             {{ $isAwaitingApproval ? __('Review') : __('Edit') }}
+                                                        </a>
+                                                    </div>
+                                                @endif
+                                                @if($createChildEventUrl)
+                                                    <div class="mt-1">
+                                                        <a href="{{ $createChildEventUrl }}" wire:navigate class="text-xs font-semibold text-indigo-700 hover:underline">
+                                                            {{ __('Add Child Event') }}
                                                         </a>
                                                     </div>
                                                 @endif
