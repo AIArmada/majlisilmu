@@ -313,7 +313,8 @@ test('event saves and interests are attributed through authenticated api actions
 
     Sanctum::actingAs($visitor);
 
-    $this->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue())
+    $this->withCredentials()
+        ->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue())
         ->postJson(route($routeName), [
             'event_id' => $event->id,
         ])
@@ -433,8 +434,10 @@ test('event submissions are attributed after a shared landing', function () {
     ]);
 });
 
-test('follow actions are attributed across supported public followable pages', function (string $component, string $routeName, string $parameter, mixed $record, string $outcomeType, string $subjectKey) {
+test('follow actions are attributed across supported public followable pages', function (string $component, string $routeName, string $parameter, callable $recordFactory, string $outcomeType, string $subjectKey) {
     $visitor = User::factory()->create();
+    $record = $recordFactory();
+
     $cookie = dawahShareLandingCookie($this, $this->sharer, route($routeName, $record), data_get($record, 'title', data_get($record, 'name', 'Shared Page')));
 
     Livewire::withCookie(config('dawah-share.cookie.name'), $cookie)
@@ -452,28 +455,20 @@ test('follow actions are attributed across supported public followable pages', f
         'outcome_key' => $outcomeType.':user:'.$visitor->id.':'.$subjectKey.':'.$record->id,
     ]);
 })->with(function (): array {
-    $institution = Institution::factory()->create([
-        'status' => 'verified',
-    ]);
-
-    $speaker = Speaker::factory()->create([
-        'status' => 'verified',
-        'is_active' => true,
-    ]);
-
-    $series = Series::factory()->create([
-        'visibility' => 'public',
-    ]);
-
-    $reference = Reference::factory()->create([
-        'is_active' => true,
-    ]);
-
     return [
-        'institution follow' => ['pages.institutions.show', 'institutions.show', 'institution', $institution, 'institution_follow', 'institution'],
-        'speaker follow' => ['pages.speakers.show', 'speakers.show', 'speaker', $speaker, 'speaker_follow', 'speaker'],
-        'series follow' => ['pages.series.show', 'series.show', 'series', $series, 'series_follow', 'series'],
-        'reference follow' => ['pages.references.show', 'references.show', 'reference', $reference, 'reference_follow', 'reference'],
+        'institution follow' => ['pages.institutions.show', 'institutions.show', 'institution', fn () => Institution::factory()->create([
+            'status' => 'verified',
+        ]), 'institution_follow', 'institution'],
+        'speaker follow' => ['pages.speakers.show', 'speakers.show', 'speaker', fn () => Speaker::factory()->create([
+            'status' => 'verified',
+            'is_active' => true,
+        ]), 'speaker_follow', 'speaker'],
+        'series follow' => ['pages.series.show', 'series.show', 'series', fn () => Series::factory()->create([
+            'visibility' => 'public',
+        ]), 'series_follow', 'series'],
+        'reference follow' => ['pages.references.show', 'references.show', 'reference', fn () => Reference::factory()->create([
+            'is_active' => true,
+        ]), 'reference_follow', 'reference'],
     ];
 });
 
@@ -570,7 +565,8 @@ test('impact dashboard exposes provider channel performance', function () {
 
     Sanctum::actingAs($visitor);
 
-    $this->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue())
+    $this->withCredentials()
+        ->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue())
         ->postJson(route('api.event-saves.store'), [
             'event_id' => $event->id,
         ])
@@ -588,7 +584,7 @@ test('impact dashboard exposes provider channel performance', function () {
         ->and($providerBreakdown->first()['provider'])->toBe('whatsapp')
         ->and($providerBreakdown->first()['outbound_shares'])->toBe(1)
         ->and($providerBreakdown->first()['visits'])->toBe(1)
-        ->and($providerBreakdown->first()['outcomes'])->toBe(0);
+        ->and($providerBreakdown->first()['outcomes'])->toBe(1);
 
     $this->actingAs($this->sharer)
         ->get(route('dashboard.dawah-impact'))

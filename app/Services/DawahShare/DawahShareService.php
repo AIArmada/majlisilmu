@@ -16,6 +16,7 @@ use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
+use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -483,20 +484,38 @@ class DawahShareService
             return [];
         }
 
-        $decoded = base64_decode($encoded, true);
+        $payload = $this->decodeCookieStatePayload($encoded);
 
-        if (! is_string($decoded) || $decoded === '') {
-            return [];
-        }
-
-        try {
-            $payload = json_decode($decoded, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return [];
+        if (is_array($payload) && ! $this->isDecodedCookieStatePayload($payload)) {
+            $payload = null;
         }
 
         if (! is_array($payload)) {
-            return [];
+            try {
+                $decrypted = app('encrypter')->decrypt($encoded, false);
+            } catch (\Throwable) {
+                $decrypted = null;
+            }
+
+            if (! is_string($decrypted) || $decrypted === '') {
+                return [];
+            }
+
+            $decrypted = CookieValuePrefix::validate(
+                $cookieName,
+                $decrypted,
+                app('encrypter')->getAllKeys(),
+            );
+
+            if (! is_string($decrypted) || $decrypted === '') {
+                return [];
+            }
+
+            $payload = $this->decodeCookieStatePayload($decrypted);
+
+            if (! is_array($payload) || ! $this->isDecodedCookieStatePayload($payload)) {
+                return [];
+            }
         }
 
         return [
@@ -504,6 +523,37 @@ class DawahShareService
             'attribution_cookie' => is_string($payload['attribution_cookie'] ?? null) ? $payload['attribution_cookie'] : null,
             'encoded' => $encoded,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeCookieStatePayload(string $encoded): ?array
+    {
+        $decoded = base64_decode($encoded, true);
+
+        if (! is_string($decoded) || $decoded === '') {
+            return null;
+        }
+
+        try {
+            $payload = json_decode($decoded, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function isDecodedCookieStatePayload(array $payload): bool
+    {
+        return is_string($payload['visitor_key'] ?? null)
+            && $payload['visitor_key'] !== ''
+            && is_string($payload['attribution_cookie'] ?? null)
+            && $payload['attribution_cookie'] !== '';
     }
 
     private function recentDuplicateVisitExists(DawahShareAttribution $attribution, string $cleanUrl): bool
