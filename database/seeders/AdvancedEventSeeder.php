@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
@@ -19,6 +20,7 @@ use App\Models\EventRecurrenceRule;
 use App\Models\EventSession;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Services\EventParticipantSyncService;
 use App\Services\EventScheduleGeneratorService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -62,6 +64,9 @@ class AdvancedEventSeeder extends Seeder
     // ──────────────────────────────────────────────────────────────
     // 1. RECURRING — Weekly (every Friday night, 3 months forward)
     // ──────────────────────────────────────────────────────────────
+    /**
+     * @param  list<string>  $speakerIds
+     */
     private function seedRecurringWeekly(
         ?Institution $institution,
         array $speakerIds,
@@ -102,6 +107,9 @@ class AdvancedEventSeeder extends Seeder
     // ──────────────────────────────────────────────────────────────
     // 2. RECURRING — Prayer-relative (after Maghrib, every Sunday)
     // ──────────────────────────────────────────────────────────────
+    /**
+     * @param  list<string>  $speakerIds
+     */
     private function seedRecurringPrayerRelative(
         ?Institution $institution,
         array $speakerIds,
@@ -148,6 +156,9 @@ class AdvancedEventSeeder extends Seeder
     // ──────────────────────────────────────────────────────────────
     // 3. RECURRING — Monthly (last Saturday of each month)
     // ──────────────────────────────────────────────────────────────
+    /**
+     * @param  list<string>  $speakerIds
+     */
     private function seedRecurringMonthly(
         ?Institution $institution,
         array $speakerIds,
@@ -190,6 +201,9 @@ class AdvancedEventSeeder extends Seeder
     // ──────────────────────────────────────────────────────────────
     // 4. MULTI-DAY — 3-day daurah (consecutive days)
     // ──────────────────────────────────────────────────────────────
+    /**
+     * @param  list<string>  $speakerIds
+     */
     private function seedMultiDay(
         ?Institution $institution,
         array $speakerIds,
@@ -236,6 +250,9 @@ class AdvancedEventSeeder extends Seeder
     // 5. CUSTOM CHAIN — Irregular ad-hoc sessions (e.g. a seminar
     //    spread across non-consecutive weekends)
     // ──────────────────────────────────────────────────────────────
+    /**
+     * @param  list<string>  $speakerIds
+     */
     private function seedCustomChain(
         ?Institution $institution,
         array $speakerIds,
@@ -281,6 +298,8 @@ class AdvancedEventSeeder extends Seeder
 
     /**
      * Create the base Event row that all schedule types build on top of.
+     *
+     * @param  list<string>  $speakerIds
      */
     private function makeBaseEvent(
         string $title,
@@ -330,11 +349,17 @@ class AdvancedEventSeeder extends Seeder
 
         if (! empty($speakerIds)) {
             $selected = array_slice($speakerIds, 0, random_int(1, min(3, count($speakerIds))));
-            $attach = [];
-            foreach ($selected as $i => $speakerId) {
-                $attach[$speakerId] = ['order_column' => $i + 1];
+            $otherParticipants = [];
+
+            if (count($selected) > 1) {
+                $otherParticipants[] = [
+                    'role' => EventParticipantRole::Moderator->value,
+                    'speaker_id' => $selected[0],
+                    'is_public' => true,
+                ];
             }
-            $event->speakers()->syncWithoutDetaching($attach);
+
+            app(EventParticipantSyncService::class)->sync($event, $selected, $otherParticipants);
         }
 
         return $event;

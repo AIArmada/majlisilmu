@@ -5,6 +5,7 @@ namespace App\Livewire\Pages\SavedSearches;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\NotificationFrequency;
@@ -343,6 +344,11 @@ class Index extends Component
             'gender',
             'institution_id',
             'venue_id',
+            'participant_roles',
+            'moderator_ids',
+            'imam_ids',
+            'khatib_ids',
+            'bilal_ids',
             'starts_after',
             'starts_before',
             'time_scope',
@@ -407,6 +413,20 @@ class Index extends Component
             $filters['speaker_ids'] = $speakerIds;
         }
 
+        $participantRoles = array_values(array_filter((array) request()->input('participant_roles', [])));
+
+        if ($participantRoles !== []) {
+            $filters['participant_roles'] = $participantRoles;
+        }
+
+        foreach (['moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $filterKey) {
+            $roleSpecificIds = array_values(array_filter((array) request()->input($filterKey, [])));
+
+            if ($roleSpecificIds !== []) {
+                $filters[$filterKey] = $roleSpecificIds;
+            }
+        }
+
         $eventType = array_values(array_filter((array) request()->input('event_type', [])));
 
         if ($eventType !== []) {
@@ -461,6 +481,11 @@ class Index extends Component
             'institution_id' => __('Institution'),
             'venue_id' => __('Venue'),
             'speaker_ids' => __('Speaker'),
+            'participant_roles' => __('Participant Roles'),
+            'moderator_ids' => __('Moderator'),
+            'imam_ids' => __('Imam'),
+            'khatib_ids' => __('Khatib'),
+            'bilal_ids' => __('Bilal'),
             'domain_tag_ids' => __('Kategori'),
             'topic_ids' => __('Discipline'),
             'source_tag_ids' => __('Primary Sources'),
@@ -511,6 +536,8 @@ class Index extends Component
             'institution_id' => $this->institutionName($value) ?? $value,
             'venue_id' => $this->venueName($value) ?? $value,
             'speaker_ids' => $this->speakerName($value) ?? $value,
+            'participant_roles' => EventParticipantRole::tryFrom($value)?->getLabel() ?? $value,
+            'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids' => $this->speakerName($value) ?? $value,
             'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
             'reference_ids' => $this->referenceTitle($value) ?? $value,
             'language', 'language_codes' => $this->languageLabel($value) ?? $value,

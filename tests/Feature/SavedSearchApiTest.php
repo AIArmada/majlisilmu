@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\EventParticipantRole;
 use App\Models\SavedSearch;
+use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -33,15 +35,23 @@ describe('Saved Search API Endpoints', function () {
 
         describe('POST /api/v1/saved-searches', function () {
             it('creates a saved search', function () {
+                $imamSpeaker = Speaker::factory()->create();
+
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Kuliah Maghrib',
                     'query' => 'maghrib',
-                    'filters' => ['language' => 'malay'],
+                    'filters' => [
+                        'language' => 'malay',
+                        'participant_roles' => [EventParticipantRole::Imam->value],
+                        'imam_ids' => [$imamSpeaker->id],
+                    ],
                     'notify' => 'daily',
                 ]);
 
                 $response->assertCreated()
-                    ->assertJsonPath('data.name', 'Kuliah Maghrib');
+                    ->assertJsonPath('data.name', 'Kuliah Maghrib')
+                    ->assertJsonPath('data.filters.participant_roles.0', EventParticipantRole::Imam->value)
+                    ->assertJsonPath('data.filters.imam_ids.0', $imamSpeaker->id);
 
                 $this->assertDatabaseHas('saved_searches', [
                     'user_id' => $this->user->id,
@@ -64,6 +74,19 @@ describe('Saved Search API Endpoints', function () {
 
                 $response->assertUnprocessable()
                     ->assertJsonValidationErrors(['notify']);
+            });
+
+            it('validates participant role options', function () {
+                $response = $this->postJson('/api/v1/saved-searches', [
+                    'name' => 'Role Search',
+                    'filters' => [
+                        'participant_roles' => ['invalid-role'],
+                    ],
+                    'notify' => 'daily',
+                ]);
+
+                $response->assertUnprocessable()
+                    ->assertJsonValidationErrors(['filters.participant_roles.0']);
             });
 
             it('enforces max 10 saved searches per user', function () {

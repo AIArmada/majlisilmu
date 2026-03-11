@@ -36,7 +36,8 @@ it('renders the custom 404 page', function () {
     $this->get('/definitely-missing-page')
         ->assertNotFound()
         ->assertSee('This page wandered off the map.')
-        ->assertSee('Browse Events');
+        ->assertSee('Lihat Majlis')
+        ->assertSee('Back to Home');
 });
 
 it('renders the custom 500 page when debug mode is disabled', function () {

@@ -20,6 +20,7 @@
     $lng = $venueAddress?->lng ?? $institutionAddress?->lng;
     $galleryImages = $this->galleryImages;
     $upcomingSessions = $this->upcomingSessions;
+    $roleParticipants = $this->roleParticipants;
     $nextSession = $upcomingSessions->first();
     $registrationMode = $this->registrationMode();
     $shareLinks = $this->shareLinks;
@@ -1259,6 +1260,52 @@
                             @endforeach
                         </div>
                     @endif
+                </section>
+            @endif
+
+            @if($roleParticipants->isNotEmpty())
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="mb-5 flex items-center gap-3">
+                        <div class="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75V12zm0 5.25h.008v.008H3.75v-.008z" />
+                            </svg>
+                        </div>
+                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Peranan Lain') }}</h2>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        @foreach($roleParticipants as $role => $participants)
+                            @php
+                                $roleLabel = \App\Enums\EventParticipantRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
+                            @endphp
+                            <div class="rounded-3xl border border-amber-200/70 bg-amber-50/60 p-5 shadow-sm">
+                                <h3 class="font-heading text-lg font-bold text-slate-900">{{ $roleLabel }}</h3>
+                                <div class="mt-3 space-y-3">
+                                    @foreach($participants as $participant)
+                                        @php
+                                            $linkedSpeaker = $participant->speaker;
+                                            $displayName = $participant->display_name;
+                                        @endphp
+                                        <div wire:key="participant-{{ $participant->id }}" class="rounded-2xl bg-white/80 p-3 ring-1 ring-amber-100">
+                                            @if($linkedSpeaker)
+                                                <a href="{{ route('speakers.show', $linkedSpeaker) }}" wire:navigate class="font-semibold text-slate-900 hover:text-emerald-700">
+                                                    {{ $displayName }}
+                                                </a>
+                                            @else
+                                                <p class="font-semibold text-slate-900">{{ $displayName }}</p>
+                                            @endif
+
+                                            @if(filled($participant->notes))
+                                                <p class="mt-1 text-sm text-slate-600">{{ $participant->notes }}</p>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 </section>
             @endif
 

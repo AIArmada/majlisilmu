@@ -7,7 +7,9 @@ use App\Filament\Resources\Events\Pages\EditEvent as AdminEditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents as AdminListEvents;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
+use App\Services\EventParticipantSyncService;
 use App\Support\Authz\MemberRoleScopes;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -31,11 +33,14 @@ function createAhliInstitutionAdmin(): array
 {
     $user = User::factory()->create();
     $institution = Institution::factory()->create();
+    $speaker = Speaker::factory()->create();
     $event = Event::factory()->for($institution)->create([
         'organizer_type' => Institution::class,
         'organizer_id' => $institution->id,
         'is_featured' => false,
     ]);
+
+    app(EventParticipantSyncService::class)->sync($event, [$speaker->id], []);
 
     $institution->members()->syncWithoutDetaching([$user->id]);
 
@@ -95,6 +100,26 @@ it('shows the featured field and column to application admins', function () {
     Livewire::actingAs($administrator)
         ->test(AdminListEvents::class)
         ->assertTableColumnExists('is_featured');
+});
+
+it('allows application admins to save events without mass assigning speakers', function () {
+    $administrator = User::factory()->create();
+    assignGlobalRoleForFeaturedGuard($administrator, 'super_admin');
+
+    $speaker = Speaker::factory()->create();
+    $event = Event::factory()->create([
+        'is_featured' => false,
+    ]);
+
+    app(EventParticipantSyncService::class)->sync($event, [$speaker->id], []);
+
+    Livewire::actingAs($administrator)
+        ->test(AdminEditEvent::class, ['record' => $event->id])
+        ->set('data.speakers', [$speaker->id])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()->speakers->pluck('id')->all())->toBe([$speaker->id]);
 });
 
 it('ignores crafted ahli payloads that try to set featured on save', function () {

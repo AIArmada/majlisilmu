@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
@@ -57,6 +58,7 @@ use Spatie\Tags\HasTags;
  * @property-read Address|null $addressModel
  * @property-read Institution|null $institution
  * @property-read Venue|null $venue
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EventParticipant> $participants
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Speaker> $speakers
  */
 class Event extends Model implements AuditableContract, HasMedia
@@ -87,7 +89,7 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         static::deleting(function (Event $event) {
             $event->members()->detach();
-            $event->speakers()->detach();
+            $event->participants()->delete();
             $event->references()->detach();
             $event->savedBy()->detach();
             $event->interestedBy()->detach();
@@ -234,7 +236,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'tags', 'references']);
+        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'participants.speaker', 'tags', 'references']);
         $venueAddress = $this->venue?->addressModel;
         $institutionAddress = $this->institution?->addressModel;
         $institution = $this->institution;
@@ -273,6 +275,55 @@ class Event extends Model implements AuditableContract, HasMedia
             ->values()
             ->all();
 
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventParticipant> $participants */
+        $participants = $this->participants;
+
+        $participantRoles = $participants
+            ->map(function (EventParticipant $participant): string {
+                $role = $participant->role;
+
+                return $role instanceof EventParticipantRole ? $role->value : '';
+            })
+            ->reject(static fn (string $role): bool => $role === '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $participantSpeakerIds = $participants
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $moderatorIds = $participants
+            ->where('role', EventParticipantRole::Moderator)
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->values()
+            ->all();
+
+        $imamIds = $participants
+            ->where('role', EventParticipantRole::Imam)
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->values()
+            ->all();
+
+        $khatibIds = $participants
+            ->where('role', EventParticipantRole::Khatib)
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->values()
+            ->all();
+
+        $bilalIds = $participants
+            ->where('role', EventParticipantRole::Bilal)
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->values()
+            ->all();
+
         $issueTagIds = $tags
             ->filter(fn (Tag $tag): bool => $tag->type === TagType::Issue->value)
             ->whereIn('status', ['verified', 'pending'])
@@ -285,7 +336,10 @@ class Event extends Model implements AuditableContract, HasMedia
             'title' => $this->title,
             'description' => $this->description_text,
             'slug' => $this->slug,
-            'speaker_names' => $this->speakers->pluck('name')->implode(', '),
+            'speaker_names' => $this->speakerParticipants
+                ->map(fn (EventParticipant $participant): string => $participant->speaker !== null ? $participant->speaker->name : (string) ($participant->name ?? ''))
+                ->filter(fn (string $name): bool => $name !== '')
+                ->implode(', '),
             'institution_name' => $institution instanceof Institution ? $institution->name : '',
             'venue_name' => $venue instanceof Venue ? $venue->name : '',
             'state_id' => $venueAddress instanceof Address
@@ -318,7 +372,17 @@ class Event extends Model implements AuditableContract, HasMedia
             'source_tag_ids' => $sourceTagIds,
             'issue_tag_ids' => $issueTagIds,
             'reference_ids' => $this->references->pluck('id')->values()->all(),
-            'speaker_ids' => $this->speakers->pluck('id')->toArray(),
+            'speaker_ids' => $this->speakerParticipants
+                ->pluck('speaker_id')
+                ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+                ->values()
+                ->all(),
+            'participant_roles' => $participantRoles,
+            'participant_speaker_ids' => $participantSpeakerIds,
+            'moderator_ids' => $moderatorIds,
+            'imam_ids' => $imamIds,
+            'khatib_ids' => $khatibIds,
+            'bilal_ids' => $bilalIds,
             'starts_at' => $this->starts_at instanceof \Illuminate\Support\Carbon ? $this->starts_at->timestamp : 0,
             'ends_at' => $this->ends_at instanceof \Illuminate\Support\Carbon ? $this->ends_at->timestamp : null,
             'saves_count' => $this->saves_count ?? 0,
@@ -423,6 +487,30 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->hasMany(EventRecurrenceRule::class)->orderByDesc('created_at');
     }
 
+    /**
+     * @return HasMany<EventParticipant, $this>
+     */
+    public function participants(): HasMany
+    {
+        return $this->hasMany(EventParticipant::class)->orderBy('order_column')->orderBy('created_at');
+    }
+
+    /**
+     * @return HasMany<EventParticipant, $this>
+     */
+    public function speakerParticipants(): HasMany
+    {
+        return $this->participants()->where('role', EventParticipantRole::Speaker->value);
+    }
+
+    /**
+     * @return HasMany<EventParticipant, $this>
+     */
+    public function nonSpeakerParticipants(): HasMany
+    {
+        return $this->participants()->where('role', '!=', EventParticipantRole::Speaker->value);
+    }
+
     public function nextActiveSession(?CarbonInterface $moment = null): ?EventSession
     {
         $moment ??= now($this->timezone ?: 'Asia/Kuala_Lumpur');
@@ -452,12 +540,15 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return BelongsToMany<Speaker, $this>
+     * @return BelongsToMany<Speaker, $this, EventParticipantPivot, 'pivot'>
      */
     public function speakers(): BelongsToMany
     {
-        return $this->belongsToMany(Speaker::class, 'event_speaker')
-            ->withPivot('order_column')
+        return $this->belongsToMany(Speaker::class, 'event_participants', 'event_id', 'speaker_id')
+            ->using(EventParticipantPivot::class)
+            ->wherePivot('role', EventParticipantRole::Speaker->value)
+            ->withPivotValue('role', EventParticipantRole::Speaker->value)
+            ->withPivot(['id', 'role', 'name', 'order_column', 'is_public', 'notes'])
             ->withTimestamps()
             ->orderByPivot('order_column');
     }
@@ -688,12 +779,14 @@ class Event extends Model implements AuditableContract, HasMedia
         $width = (int) ($posterMedia->width ?? 0);
         $height = (int) ($posterMedia->height ?? 0);
 
-        if (($width <= 0 || $height <= 0) && is_string($posterMedia->getPath()) && $posterMedia->getPath() !== '') {
-            $dimensions = @getimagesize($posterMedia->getPath());
+        $posterPath = $posterMedia->getPath();
+
+        if (($width <= 0 || $height <= 0) && $posterPath !== '') {
+            $dimensions = @getimagesize($posterPath);
 
             if (is_array($dimensions)) {
-                $width = (int) ($dimensions[0] ?? 0);
-                $height = (int) ($dimensions[1] ?? 0);
+                $width = (int) $dimensions[0];
+                $height = (int) $dimensions[1];
             }
         }
 

@@ -9,7 +9,6 @@ use App\Enums\NotificationTrigger;
 use App\Jobs\DispatchNotificationDigests;
 use App\Models\Event;
 use App\Models\Institution;
-use App\Models\NotificationDelivery;
 use App\Models\NotificationDestination;
 use App\Models\PendingNotification;
 use App\Models\Registration;
@@ -72,12 +71,13 @@ it('localizes followed-content notifications per recipient locale and timezone',
 
     $speaker = Speaker::factory()->create(['name' => 'Ustaz Aiman']);
     $institution = Institution::factory()->create();
+    $startsAt = CarbonImmutable::now('UTC')->addDays(10)->setTime(12, 0);
     $event = Event::factory()->for($institution)->create([
         'title' => 'Majlis Tafsir Malam Jumaat',
         'status' => 'approved',
         'visibility' => 'public',
         'is_active' => true,
-        'starts_at' => CarbonImmutable::parse('2026-03-10 12:00:00', 'UTC'),
+        'starts_at' => $startsAt,
     ]);
 
     $event->speakers()->attach($speaker->id);
@@ -125,12 +125,13 @@ it('renders queued notification content using the recipient locale and timezone 
 
     $speaker = Speaker::factory()->create(['name' => 'Ustaz Aiman']);
     $institution = Institution::factory()->create();
+    $startsAt = CarbonImmutable::now('UTC')->addDays(10)->setTime(12, 0);
     $event = Event::factory()->for($institution)->create([
         'title' => 'Majlis Tafsir Malam Jumaat',
         'status' => 'approved',
         'visibility' => 'public',
         'is_active' => true,
-        'starts_at' => CarbonImmutable::parse('2026-03-10 12:00:00', 'UTC'),
+        'starts_at' => $startsAt,
     ]);
 
     $event->speakers()->attach($speaker->id);

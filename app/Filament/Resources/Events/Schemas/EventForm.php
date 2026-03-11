@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Events\Schemas;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -24,13 +25,15 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Support\Events\SubmitterContactPresenter;
 use App\Support\Timezone\UserDateTimeFormatter;
-use Filament\Facades\Filament;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
@@ -386,11 +389,20 @@ class EventForm
                                     ->schema([
                                         Select::make('speakers')
                                             ->label('Penceramah')
-                                            ->relationship('speakers', 'name', fn ($query): mixed => $query->whereIn('status', ['verified', 'pending']))
+                                            ->required(fn (Get $get): bool => self::requiresSpeakersForEventTypes($get('event_type')))
                                             ->multiple()
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
+                                            ->options(fn (): array => Speaker::query()
+                                                ->whereIn('status', ['verified', 'pending'])
+                                                ->orderBy('name')
+                                                ->get()
+                                                ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                                ->all())
+                                            ->helperText(fn (Get $get): string => self::requiresSpeakersForEventTypes($get('event_type'))
+                                                ? 'Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.'
+                                                : 'Kosongkan jika majlis ini tidak mempunyai penceramah khusus.')
                                             ->getOptionLabelUsing(fn (mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
                                             ->getOptionLabelsUsing(fn (array $values): array => Speaker::query()
                                                 ->whereIn('id', $values)
@@ -399,6 +411,47 @@ class EventForm
                                                 ->toArray())
                                             ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                             ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
+                                        Repeater::make('other_participants')
+                                            ->label('Peranan Lain')
+                                            ->helperText('Tambahkan moderator, imam, khatib, bilal, atau PIC jika berkenaan.')
+                                            ->schema([
+                                                Select::make('role')
+                                                    ->label('Peranan')
+                                                    ->required()
+                                                    ->options(EventParticipantRole::nonSpeakerOptions())
+                                                    ->native(false),
+                                                Select::make('speaker_id')
+                                                    ->label('Pautkan Profil Penceramah')
+                                                    ->options(fn (): array => Speaker::query()
+                                                        ->whereIn('status', ['verified', 'pending'])
+                                                        ->orderBy('name')
+                                                        ->get()
+                                                        ->mapWithKeys(fn (Speaker $speaker): array => [(string) $speaker->id => $speaker->formatted_name])
+                                                        ->all())
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->live()
+                                                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('name', null) : null)
+                                                    ->getOptionLabelUsing(fn (mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
+                                                    ->createOptionForm(SpeakerFormSchema::createOptionForm())
+                                                    ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
+                                                TextInput::make('name')
+                                                    ->label('Nama Paparan')
+                                                    ->maxLength(255)
+                                                    ->required(fn (Get $get): bool => blank($get('speaker_id')))
+                                                    ->disabled(fn (Get $get): bool => filled($get('speaker_id')))
+                                                    ->dehydrated(fn (Get $get): bool => blank($get('speaker_id'))),
+                                                Toggle::make('is_public')
+                                                    ->label('Papar Secara Awam')
+                                                    ->default(true),
+                                                Textarea::make('notes')
+                                                    ->label('Nota Ringkas')
+                                                    ->rows(2)
+                                                    ->maxLength(500),
+                                            ])
+                                            ->default([])
+                                            ->addActionLabel('Tambah Peranan')
+                                            ->columns(2),
                                     ]),
                                 Section::make('Media')
                                     ->columnSpanFull()
@@ -686,6 +739,29 @@ class EventForm
                 ->toArray(),
             default => [],
         };
+    }
+
+    protected static function requiresSpeakersForEventTypes(mixed $eventTypes): bool
+    {
+        if ($eventTypes instanceof Collection) {
+            $eventTypes = $eventTypes->all();
+        }
+
+        if (! is_array($eventTypes)) {
+            $eventTypes = [$eventTypes];
+        }
+
+        foreach ($eventTypes as $eventTypeValue) {
+            $eventType = $eventTypeValue instanceof EventType
+                ? $eventTypeValue
+                : EventType::tryFrom((string) $eventTypeValue);
+
+            if ($eventType?->requiresSpeakerByDefault()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function canManageFeaturedFlag(): bool

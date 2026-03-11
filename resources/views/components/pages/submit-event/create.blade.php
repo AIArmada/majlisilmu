@@ -5,9 +5,11 @@ use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Forms\Components\Select;
 use App\Enums\TagType;
 use App\Forms\InstitutionFormSchema;
 use App\Forms\SpeakerFormSchema;
@@ -23,6 +25,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
+use App\Services\EventParticipantSyncService;
 use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserTimezoneResolver;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -30,8 +33,8 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -61,20 +64,27 @@ use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
+/** @phpstan-ignore-next-line Anonymous Livewire component entrypoint. */
 new #[Layout('layouts.app')] class extends Component implements HasActions, HasForms {
     use InteractsWithActions;
     use InteractsWithForms;
     use WithFileUploads;
 
+    /** @var array<string, mixed>|null */
     public ?array $data = [];
 
     public ?TemporaryUploadedFile $event_source_attachment = null;
+
+    protected function eventForm(): Schema
+    {
+        return $this->getForm('form') ?? throw new \RuntimeException('Submit event form is not available.');
+    }
 
     public function mount(): void
     {
         $timezone = $this->resolveUserTimezone();
 
-        $this->form->fill([
+        $this->eventForm()->fill([
             'submitter_name' => auth()->user()?->name,
             'submitter_email' => auth()->user()?->email,
             'children_allowed' => true,
@@ -86,6 +96,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'location_same_as_institution' => true,
             'location_type' => 'institution',
             'is_muslim_only' => false,
+            'other_participants' => [],
             'captcha_token' => null,
             'timezone' => $timezone,
         ]);
@@ -160,10 +171,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $mergedState['poster'] = $file;
         }
 
-        $this->form->fill($mergedState);
+        $this->eventForm()->fill($mergedState);
         $this->data = $mergedState;
 
-        $wizard = $this->form->getComponent(
+        $wizard = $this->eventForm()->getComponent(
             fn(mixed $component): bool => $component instanceof Wizard
         );
 
@@ -661,7 +672,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             }
 
                                             if (!empty($uuids)) {
-                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->pluck('name', 'id')->all());
                                             }
 
                                             return $labels;
@@ -702,7 +713,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->where('status', 'verified')
                                                 ->where('name', 'like', "%{$search}%")
                                                 ->limit(20)
-                                                ->get()
                                                 ->pluck('name', 'id')
                                                 ->toArray();
 
@@ -721,7 +731,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             }
 
                                             if (!empty($uuids)) {
-                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->pluck('name', 'id')->all());
                                             }
 
                                             return $labels;
@@ -767,7 +777,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             }
 
                                             if (!empty($uuids)) {
-                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->pluck('name', 'id')->all());
                                             }
 
                                             return $labels;
@@ -804,7 +814,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                 ->where('status', 'verified')
                                                 ->where('name', 'like', "%{$search}%")
                                                 ->limit(20)
-                                                ->get()
                                                 ->pluck('name', 'id')
                                                 ->toArray();
 
@@ -823,7 +832,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             }
 
                                             if (!empty($uuids)) {
-                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->get()->pluck('name', 'id')->toArray());
+                                                $labels = array_merge($labels, Tag::whereIn('id', $uuids)->pluck('name', 'id')->all());
                                             }
 
                                             return $labels;
@@ -934,7 +943,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                     ]);
 
                                     // Save media uploads via Filament's relationship-saving mechanism
-                                    $schema?->model($reference)->saveRelationships();
+                                    $schema->model($reference)->saveRelationships();
 
                                     // Save reference URL as social media link
                                     if (!empty($data['reference_url'])) {
@@ -1076,12 +1085,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->schema([
                                     Select::make('speakers')
                                         ->label(__('Pilih Penceramah'))
-                                        ->required()
+                                        ->required(fn (Get $get): bool => $this->eventTypesRequireSpeakers($get('event_type')))
                                         ->multiple()
                                         ->closeOnSelect()
-                                        ->relationship('speakers', 'name', fn(Builder $query) => app(EntitySubmissionAccess::class)->constrainSpeakerQueryForSubmitter($query, $this->submitterUser()))
                                         ->searchable()
                                         ->preload()
+                                        ->options(fn (): array => $this->availableSpeakerOptions())
+                                        ->helperText(fn (Get $get): string => $this->eventTypesRequireSpeakers($get('event_type'))
+                                            ? __('Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.')
+                                            : __('Kosongkan jika majlis ini tidak mempunyai penceramah khusus.'))
                                         ->getOptionLabelUsing(fn(mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
                                         ->getOptionLabelsUsing(fn(array $values): array => Speaker::query()
                                             ->whereIn('id', $values)
@@ -1090,6 +1102,45 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             ->toArray())
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                         ->createOptionUsing(fn(array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
+
+                                    Repeater::make('other_participants')
+                                        ->label(__('Peranan Lain'))
+                                        ->helperText(__('Tambahkan moderator, imam, khatib, bilal, atau PIC jika berkenaan.'))
+                                        ->schema([
+                                            Select::make('role')
+                                                ->label(__('Peranan'))
+                                                ->required()
+                                                ->options(EventParticipantRole::nonSpeakerOptions())
+                                                ->native(false),
+                                            Select::make('speaker_id')
+                                                ->label(__('Pautkan Profil Penceramah'))
+                                                ->options(fn (): array => $this->availableSpeakerOptions())
+                                                ->searchable()
+                                                ->preload()
+                                                ->live()
+                                                ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('name', null) : null)
+                                                ->getOptionLabelUsing(fn(mixed $value): ?string => Speaker::query()->find($value)?->formatted_name)
+                                                ->createOptionForm(SpeakerFormSchema::createOptionForm())
+                                                ->createOptionUsing(fn(array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
+                                            TextInput::make('name')
+                                                ->label(__('Nama Paparan'))
+                                                ->maxLength(255)
+                                                ->required(fn (Get $get): bool => blank($get('speaker_id')))
+                                                ->disabled(fn (Get $get): bool => filled($get('speaker_id')))
+                                                ->dehydrated(fn (Get $get): bool => blank($get('speaker_id')))
+                                                ->helperText(__('Isi nama jika tiada profil penceramah dipautkan.')),
+                                            Toggle::make('is_public')
+                                                ->label(__('Papar Secara Awam'))
+                                                ->default(true),
+                                            Textarea::make('notes')
+                                                ->label(__('Nota Peranan'))
+                                                ->rows(2)
+                                                ->maxLength(500),
+                                        ])
+                                        ->default([])
+                                        ->addActionLabel(__('Tambah Peranan'))
+                                        ->columns(2)
+                                        ->columnSpanFull(),
                                 ]),
 
                             Section::make(__('Media'))
@@ -1219,7 +1270,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public function submit(): mixed
     {
-        $validated = $this->form->getState();
+        $validated = $this->eventForm()->getState();
         $this->assertCaptchaIsValid($validated['captcha_token'] ?? null);
 
         // Enforce children_allowed when AllAges or Children is selected
@@ -1378,9 +1429,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
-        if (!empty($validated['speakers'])) {
-            $event->speakers()->attach($validated['speakers']);
-        }
+        app(EventParticipantSyncService::class)->sync(
+            $event,
+            $validated['speakers'] ?? [],
+            $validated['other_participants'] ?? [],
+        );
 
         // Sync selected languages
         if (!empty($validated['languages'])) {
@@ -1426,7 +1479,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $allTagIds = collect($allTagIds)
-            ->filter(fn(mixed $value): bool => is_string($value) && Str::isUuid($value))
+            ->filter(fn (mixed $value): bool => Str::isUuid((string) $value))
             ->unique()
             ->values()
             ->all();
@@ -1436,8 +1489,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $event->syncTags($tags);
         }
 
-        $this->form->model($event);
-        $this->form->saveRelationships();
+        $this->eventForm()->model($event);
+        $this->eventForm()->saveRelationships();
 
         $submitterName = $validated['submitter_name'] ?? auth()->user()?->name;
 
@@ -1600,6 +1653,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $speakerIds = collect(array_merge(
             (array) ($validated['speakers'] ?? []),
+            collect((array) ($validated['other_participants'] ?? []))
+                ->pluck('speaker_id')
+                ->all(),
             (array) ($this->data['speakers'] ?? []),
         ))
             ->map(fn (mixed $value): ?string => filled($value) ? (string) $value : null)
@@ -1639,6 +1695,29 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         return false;
     }
 
+    protected function eventTypesRequireSpeakers(mixed $eventTypes): bool
+    {
+        if ($eventTypes instanceof \Illuminate\Support\Collection) {
+            $eventTypes = $eventTypes->all();
+        }
+
+        if (! is_array($eventTypes)) {
+            $eventTypes = [$eventTypes];
+        }
+
+        foreach ($eventTypes as $eventTypeValue) {
+            $eventType = $eventTypeValue instanceof EventType
+                ? $eventTypeValue
+                : EventType::tryFrom((string) $eventTypeValue);
+
+            if ($eventType?->requiresSpeakerByDefault()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Resolve the starts_at datetime from event_date and prayer_time/custom_time.
      *
@@ -1661,7 +1740,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $defaultTimes = $this->getDefaultPrayerTimes();
 
-        $timeString = $defaultTimes[$prayerTime?->value ?? ''] ?? '20:00';
+        $timeString = $defaultTimes[$prayerTime instanceof EventPrayerTime ? $prayerTime->value : ''] ?? '20:00';
         $time = Carbon::parse($timeString);
 
         return $eventDate->setTime($time->hour, $time->minute)->utc();
@@ -1686,6 +1765,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         return $startInUserTimezone->setTime($time->hour, $time->minute)->utc();
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
     protected function validateEndsAtAfterStartsAt(array $validated, Carbon $startsAt, string $timezone): void
     {
         $endTimeValue = $validated['end_time'] ?? null;

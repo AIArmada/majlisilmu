@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -305,6 +306,24 @@ class EventSearchService
             }
         }
 
+        if (! empty($filters['participant_roles'])) {
+            $participantRoles = $this->normalizeArrayFilter($filters['participant_roles']);
+
+            if ($participantRoles !== []) {
+                $filterParts[] = 'participant_roles:['.implode(',', $participantRoles).']';
+            }
+        }
+
+        foreach (['moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $roleSpecificFilter) {
+            if (! empty($filters[$roleSpecificFilter])) {
+                $roleSpecificIds = $this->normalizeArrayFilter($filters[$roleSpecificFilter]);
+
+                if ($roleSpecificIds !== []) {
+                    $filterParts[] = $roleSpecificFilter.':['.implode(',', $roleSpecificIds).']';
+                }
+            }
+        }
+
         if (! empty($filters['topic_ids'])) {
             $topicIds = $this->normalizeArrayFilter($filters['topic_ids']);
 
@@ -484,6 +503,33 @@ class EventSearchService
         if ($speakerIds !== []) {
             $queryBuilder->whereHas('speakers', function (Builder $speakerQuery) use ($speakerIds) {
                 $speakerQuery->whereIn('speakers.id', $speakerIds);
+            });
+        }
+
+        $participantRoles = $this->normalizeParticipantRoles($filters['participant_roles'] ?? null);
+
+        if ($participantRoles !== []) {
+            $queryBuilder->whereHas('participants', function (Builder $participantQuery) use ($participantRoles): void {
+                $participantQuery->whereIn('role', $participantRoles);
+            });
+        }
+
+        foreach ([
+            'moderator_ids' => EventParticipantRole::Moderator,
+            'imam_ids' => EventParticipantRole::Imam,
+            'khatib_ids' => EventParticipantRole::Khatib,
+            'bilal_ids' => EventParticipantRole::Bilal,
+        ] as $filterKey => $role) {
+            $roleSpecificIds = $this->normalizeArrayFilter($filters[$filterKey] ?? null);
+
+            if ($roleSpecificIds === []) {
+                continue;
+            }
+
+            $queryBuilder->whereHas('participants', function (Builder $participantQuery) use ($roleSpecificIds, $role): void {
+                $participantQuery
+                    ->where('role', $role->value)
+                    ->whereIn('speaker_id', $roleSpecificIds);
             });
         }
 
@@ -856,6 +902,18 @@ class EventSearchService
         $values = is_array($value) ? $value : [$value];
 
         return array_values(array_filter($values, fn (mixed $item): bool => $item !== null && $item !== ''));
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function normalizeParticipantRoles(mixed $value): array
+    {
+        return collect($this->normalizeArrayFilter($value))
+            ->map(fn (mixed $role): ?string => EventParticipantRole::tryFrom((string) $role)?->value)
+            ->filter()
+            ->values()
+            ->all();
     }
 
     protected function normalizeBooleanFilter(mixed $value): ?bool

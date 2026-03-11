@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\EventParticipantRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
@@ -249,4 +251,78 @@ it('filters events by prayer_time keyword', function () {
     expect($eventIds)
         ->toContain($maghribEvent->id)
         ->not()->toContain($subuhEvent->id);
+});
+
+it('filters events by participant roles and role-specific linked speakers', function () {
+    $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
+    $moderatorSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
+
+    $imamEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $imamEvent->participants()->create([
+        'role' => EventParticipantRole::Imam,
+        'speaker_id' => $imamSpeaker->id,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $moderatedEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $moderatedEvent->participants()->create([
+        'role' => EventParticipantRole::Moderator,
+        'speaker_id' => $moderatorSpeaker->id,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $roleResponse = $this->getJson('/api/v1/events?filter[participant_roles]=imam');
+
+    $roleResponse->assertOk();
+
+    $roleEventIds = collect($roleResponse->json('data'))->pluck('id')->all();
+
+    expect($roleEventIds)
+        ->toContain($imamEvent->id)
+        ->not()->toContain($moderatedEvent->id);
+
+    $speakerResponse = $this->getJson('/api/v1/events?filter[moderator_ids]='.$moderatorSpeaker->id);
+
+    $speakerResponse->assertOk();
+
+    $speakerEventIds = collect($speakerResponse->json('data'))->pluck('id')->all();
+
+    expect($speakerEventIds)
+        ->toContain($moderatedEvent->id)
+        ->not()->toContain($imamEvent->id);
+});
+
+it('includes participant data in the event api response', function () {
+    $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $event->participants()->create([
+        'role' => EventParticipantRole::Imam,
+        'speaker_id' => $imamSpeaker->id,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $response = $this->getJson('/api/v1/events/'.$event->id);
+
+    $response->assertOk()
+        ->assertJsonPath('data.participants.0.role', EventParticipantRole::Imam->value)
+        ->assertJsonPath('data.participants.0.speaker.id', $imamSpeaker->id);
 });

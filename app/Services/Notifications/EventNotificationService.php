@@ -449,10 +449,16 @@ class EventNotificationService
 
     protected function notifyFollowedContentPublication(Event $event): void
     {
+        $event->loadMissing('speakerParticipants.speaker.followers');
+
         $this->dispatchFollowedEntityNotifications(
             trigger: NotificationTrigger::FollowedSpeakerEvent,
             event: $event,
-            followables: $event->speakers()->with('followers')->get(),
+            followables: $event->speakerParticipants
+                ->pluck('speaker')
+                ->filter()
+                ->unique('id')
+                ->values(),
             labelResolver: static fn (mixed $speaker): ?string => $speaker?->name,
         );
 

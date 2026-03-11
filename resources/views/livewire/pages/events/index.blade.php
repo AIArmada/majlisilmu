@@ -93,6 +93,11 @@
     $selectedIssueTagIds = array_values(array_filter((array) $this->issue_tag_ids));
     $selectedReferenceIds = array_values(array_filter((array) $this->reference_ids));
     $selectedSpeakerIds = array_values(array_filter((array) $this->speaker_ids));
+    $selectedParticipantRoles = array_values(array_filter((array) $this->participant_roles));
+    $selectedModeratorIds = array_values(array_filter((array) $this->moderator_ids));
+    $selectedImamIds = array_values(array_filter((array) $this->imam_ids));
+    $selectedKhatibIds = array_values(array_filter((array) $this->khatib_ids));
+    $selectedBilalIds = array_values(array_filter((array) $this->bilal_ids));
     $selectedEventTypes = array_values(array_filter((array) $this->event_type));
     $selectedEventFormats = array_values(array_filter((array) $this->event_format));
     $selectedLanguageCodes = array_values(array_filter((array) $this->language_codes));
@@ -101,6 +106,26 @@
         ->filter()
         ->values();
     $selectedSpeakerLabels = collect($selectedSpeakerIds)
+        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->filter()
+        ->values();
+    $selectedParticipantRoleLabels = collect($selectedParticipantRoles)
+        ->map(fn (string $role): ?string => \App\Enums\EventParticipantRole::tryFrom($role)?->getLabel())
+        ->filter()
+        ->values();
+    $selectedModeratorLabels = collect($selectedModeratorIds)
+        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->filter()
+        ->values();
+    $selectedImamLabels = collect($selectedImamIds)
+        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->filter()
+        ->values();
+    $selectedKhatibLabels = collect($selectedKhatibIds)
+        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->filter()
+        ->values();
+    $selectedBilalLabels = collect($selectedBilalIds)
         ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
         ->filter()
         ->values();
@@ -152,6 +177,11 @@
         'institution_id' => $institutionId,
         'venue_id' => $venueId,
         'speaker_ids' => $selectedSpeakerIds,
+        'participant_roles' => $selectedParticipantRoles,
+        'moderator_ids' => $selectedModeratorIds,
+        'imam_ids' => $selectedImamIds,
+        'khatib_ids' => $selectedKhatibIds,
+        'bilal_ids' => $selectedBilalIds,
         'language_codes' => $selectedLanguageCodes,
         'event_type' => $selectedEventTypes,
         'event_format' => $selectedEventFormats,
@@ -200,6 +230,11 @@
         $childrenAllowed !== null,
         $isMuslimOnly !== null,
         count($selectedSpeakerIds) > 0,
+        count($selectedParticipantRoles) > 0,
+        count($selectedModeratorIds) > 0,
+        count($selectedImamIds) > 0,
+        count($selectedKhatibIds) > 0,
+        count($selectedBilalIds) > 0,
         count($selectedTopicIds) > 0,
         count($selectedDomainTagIds) > 0,
         count($selectedSourceTagIds) > 0,
@@ -603,6 +638,36 @@
                     @foreach($selectedSpeakerLabels as $speakerLabel)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ $speakerLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedParticipantRoleLabels as $roleLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ $roleLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedModeratorLabels as $moderatorLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ __('Moderator') }}: {{ $moderatorLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedImamLabels as $imamLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ __('Imam') }}: {{ $imamLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedKhatibLabels as $khatibLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ __('Khatib') }}: {{ $khatibLabel }}
+                        </span>
+                    @endforeach
+
+                    @foreach($selectedBilalLabels as $bilalLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ __('Bilal') }}: {{ $bilalLabel }}
                         </span>
                     @endforeach
 

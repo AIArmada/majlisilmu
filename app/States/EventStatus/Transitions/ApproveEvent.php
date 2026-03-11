@@ -61,8 +61,9 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
      */
     protected function verifyPendingRelatedRecords(Event $event): void
     {
-        // Verify speakers
-        $event->speakers()
+        // Verify linked speaker profiles across all event roles.
+        \App\Models\Speaker::query()
+            ->whereIn('id', $event->participants()->whereNotNull('speaker_id')->pluck('speaker_id'))
             ->where('status', 'pending')
             ->update(['status' => 'verified']);
 
