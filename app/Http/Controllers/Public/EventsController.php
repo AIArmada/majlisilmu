@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Public;
 
 use App\Enums\RegistrationMode;
-use App\Enums\SessionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\EventSession;
 use App\Models\EventSettings;
 use App\Models\Registration;
 use App\Models\User;
@@ -79,16 +77,11 @@ class EventsController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
-            'event_session_id' => 'nullable|uuid',
         ]);
 
         // Require at least email or phone for guest
         if (! auth()->check() && empty($validated['email']) && empty($validated['phone'])) {
             return back()->withErrors(['contact' => 'Please provide either email or phone number.']);
-        }
-
-        if ($registrationMode === RegistrationMode::Session && empty($validated['event_session_id'])) {
-            return back()->withErrors(['event_session_id' => 'Please choose a session to register.']);
         }
 
         $createdRegistrationId = null;
@@ -103,41 +96,11 @@ class EventsController extends Controller
 
                 $lockedEvent->load('settings');
                 $lockedEventSettings = $lockedEvent->settings;
-                $mode = $this->resolveRegistrationMode($lockedEventSettings);
-
-                $selectedSession = null;
+                $mode = RegistrationMode::Event;
                 $capacity = $lockedEventSettings?->capacity;
-
-                if ($mode === RegistrationMode::Session) {
-                    $selectedSessionId = $validated['event_session_id'] ?? null;
-
-                    if (! is_string($selectedSessionId) || $selectedSessionId === '') {
-                        throw ValidationException::withMessages(['event_session_id' => 'Please choose a session to register.']);
-                    }
-
-                    /** @var EventSession|null $selectedSession */
-                    $selectedSession = EventSession::query()
-                        ->where('event_id', $lockedEvent->id)
-                        ->whereKey($selectedSessionId)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $selectedSession instanceof EventSession || $selectedSession->status !== SessionStatus::Scheduled) {
-                        throw ValidationException::withMessages(['event_session_id' => 'Selected session is not available.']);
-                    }
-
-                    if ($selectedSession->starts_at instanceof Carbon && $selectedSession->starts_at->isPast()) {
-                        throw ValidationException::withMessages(['event_session_id' => 'Selected session has already started.']);
-                    }
-
-                    if (is_int($selectedSession->capacity)) {
-                        $capacity = $selectedSession->capacity;
-                    }
-                }
 
                 $activeRegistrationsCount = Registration::query()
                     ->where('event_id', $lockedEvent->id)
-                    ->when($mode === RegistrationMode::Session, fn (Builder $query): Builder => $query->where('event_session_id', $validated['event_session_id'] ?? null))
                     ->where('status', '!=', 'cancelled')
                     ->count();
 
@@ -149,7 +112,6 @@ class EventsController extends Controller
 
                 $existingRegistrationQuery = Registration::query()
                     ->where('event_id', $lockedEvent->id)
-                    ->when($mode === RegistrationMode::Session, fn (Builder $query): Builder => $query->where('event_session_id', $validated['event_session_id'] ?? null))
                     ->where('status', '!=', 'cancelled');
 
                 if (auth()->check()) {
@@ -183,7 +145,6 @@ class EventsController extends Controller
 
                 $registration = Registration::create([
                     'event_id' => $lockedEvent->id,
-                    'event_session_id' => $mode === RegistrationMode::Session ? ($validated['event_session_id'] ?? null) : null,
                     'user_id' => auth()->id(),
                     'name' => $validated['name'],
                     'email' => $validated['email'] ?? null,
@@ -225,7 +186,6 @@ class EventsController extends Controller
                     request: $request,
                     metadata: [
                         'registration_id' => $registration->id,
-                        'event_session_id' => $registration->event_session_id,
                         'guest' => false,
                     ],
                 );
@@ -249,7 +209,6 @@ class EventsController extends Controller
                 request: $request,
                 metadata: [
                     'registration_id' => $guestRegistration->id,
-                    'event_session_id' => $guestRegistration->event_session_id,
                     'guest' => true,
                 ],
             );

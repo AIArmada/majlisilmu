@@ -6,8 +6,7 @@ use App\Filament\Ahli\Resources\Events\Pages\EditEvent;
 use App\Filament\Ahli\Resources\Events\Pages\ListEvents;
 use App\Filament\Ahli\Resources\Events\Pages\ViewEvent;
 use App\Filament\Resources\Events\EventResource as AdminEventResource;
-use App\Filament\Resources\Events\RelationManagers\EventRecurrenceRulesRelationManager;
-use App\Filament\Resources\Events\RelationManagers\EventSessionsRelationManager;
+use App\Filament\Resources\Events\RelationManagers\ChildEventsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
@@ -122,8 +121,7 @@ class EventResource extends AdminEventResource
     public static function getRelations(): array
     {
         return [
-            'sessions' => EventSessionsRelationManager::class,
-            'recurrence_rules' => EventRecurrenceRulesRelationManager::class,
+            ChildEventsRelationManager::class,
             'media_links' => MediaLinksRelationManager::class,
             'event_users' => EventUsersRelationManager::class,
             'moderation_reviews' => ModerationReviewsRelationManager::class,

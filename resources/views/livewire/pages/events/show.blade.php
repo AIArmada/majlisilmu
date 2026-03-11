@@ -19,9 +19,7 @@
     $lat = $venueAddress?->lat ?? $institutionAddress?->lat;
     $lng = $venueAddress?->lng ?? $institutionAddress?->lng;
     $galleryImages = $this->galleryImages;
-    $upcomingSessions = $this->upcomingSessions;
     $roleParticipants = $this->roleParticipants;
-    $nextSession = $upcomingSessions->first();
     $registrationMode = $this->registrationMode();
     $shareLinks = $this->shareLinks;
     $sharePreviewImage = $event->card_image_url;
@@ -1549,40 +1547,6 @@
             </section>
         @endif
 
-    {{-- UPCOMING SESSIONS --}}
-    @if($upcomingSessions->isNotEmpty())
-        <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8">
-            <div class="flex items-center justify-between">
-                <h2 class="font-heading text-xl font-bold text-slate-900 sm:text-2xl">{{ __('Upcoming Sessions') }}</h2>
-                <span
-                    class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{{ $upcomingSessions->count() }}
-                    {{ __('sessions') }}</span>
-            </div>
-            <div class="relative mt-5">
-                {{-- Timeline line --}}
-                <div class="absolute bottom-0 left-3 top-0 w-px bg-slate-200"></div>
-                <div class="space-y-4">
-                    @foreach($upcomingSessions->take(8) as $session)
-                        <div wire:key="session-{{ $session->id }}" class="relative flex items-start gap-4 pl-8">
-                            <div class="absolute left-1.5 top-2 size-3 rounded-full border-2 border-emerald-500 bg-white"></div>
-                            <div class="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="text-sm font-semibold text-slate-800">
-                                    {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($session->starts_at, 'l, j M Y') }}
-                                </p>
-                                <p class="mt-0.5 text-xs text-slate-500">
-                                    {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->starts_at, 'h:i A') }}
-                                    @if($session->ends_at)
-                                        - {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->ends_at, 'h:i A') }}
-                                    @endif
-                                </p>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        </section>
-    @endif
-
     {{-- REFERENCES --}}
     @if($event->references->isNotEmpty())
         <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
@@ -2190,18 +2154,12 @@
                         $regOpen = !$event->settings?->registration_opens_at || $event->settings->registration_opens_at <= now();
                         $regClosed = $event->settings?->registration_closes_at && $event->settings->registration_closes_at < now();
                         $atCapacity = $registrationMode === \App\Enums\RegistrationMode::Event && $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity;
-                        $sessionModeUnavailable = $registrationMode === \App\Enums\RegistrationMode::Session && $upcomingSessions->isEmpty();
                     @endphp
 
                     @if($regClosed)
                         <button disabled
                             class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed">
                             {{ __('Registration Closed') }}
-                        </button>
-                    @elseif($sessionModeUnavailable)
-                        <button disabled
-                            class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed">
-                            {{ __('No available sessions') }}
                         </button>
                     @elseif($atCapacity)
                         <button disabled
@@ -2538,24 +2496,6 @@ REGISTRATION MODAL
                         <input type="tel" name="phone"
                             class="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 font-medium text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10">
                     </div>
-                    @if($registrationMode === \App\Enums\RegistrationMode::Session)
-                        <div>
-                            <label class="mb-1.5 block text-sm font-bold text-slate-700">{{ __('Session') }} <span
-                                    class="text-rose-500">*</span></label>
-                            <select name="event_session_id" required
-                                class="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 font-medium text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10">
-                                <option value="">{{ __('Choose a session') }}</option>
-                                @foreach($upcomingSessions as $session)
-                                    <option value="{{ $session->id }}">
-                                        {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($session->starts_at, 'd M Y') }},
-                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->starts_at, 'h:i A') }}
-                                        @if($session->ends_at) -
-                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($session->ends_at, 'h:i A') }} @endif
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                    @endif
                     <div class="rounded-xl bg-blue-50 p-3">
                         <p class="flex items-start gap-2 text-xs font-medium text-blue-700">
                             <svg class="mt-0.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"

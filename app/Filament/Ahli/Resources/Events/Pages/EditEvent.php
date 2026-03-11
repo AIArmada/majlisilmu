@@ -174,6 +174,11 @@ class EditEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('add_child_event')
+                ->label('Add Child Event')
+                ->icon(Heroicon::OutlinedPlus)
+                ->url(fn (): string => route('submit-event.create', ['parent' => $this->eventRecord()->getKey()]))
+                ->visible(fn (): bool => $this->eventRecord()->isParentProgram()),
             $this->getSubmitForReviewAction(),
             $this->getApproveAction(),
             $this->getRejectAction(),

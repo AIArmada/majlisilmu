@@ -21,7 +21,6 @@ class EventCheckin extends Model
      */
     protected $fillable = [
         'event_id',
-        'event_session_id',
         'registration_id',
         'user_id',
         'verified_by_user_id',
@@ -49,14 +48,6 @@ class EventCheckin extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
-    }
-
-    /**
-     * @return BelongsTo<EventSession, $this>
-     */
-    public function session(): BelongsTo
-    {
-        return $this->belongsTo(EventSession::class, 'event_session_id');
     }
 
     /**

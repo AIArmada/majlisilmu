@@ -2,6 +2,7 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\EventStructure;
 use App\Livewire\Pages\Dashboard\InstitutionDashboard;
 use App\Livewire\Pages\Dashboard\UserDashboard;
 use App\Models\Event;
@@ -433,6 +434,14 @@ it('shows institution profile and events for members without a separate registra
         'starts_at' => now()->addDays(5),
     ]);
 
+    $parentProgram = Event::factory()->for($institution)->create([
+        'title' => 'Institution Parent Program',
+        'event_structure' => EventStructure::ParentProgram->value,
+        'status' => 'draft',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(7),
+    ]);
+
     $eventOutsideInstitution = Event::factory()->for($otherInstitution)->create([
         'title' => 'Outside Institution Event',
         'status' => 'approved',
@@ -458,14 +467,20 @@ it('shows institution profile and events for members without a separate registra
     $response->assertOk()
         ->assertSee('Masjid Al-Ikhlas')
         ->assertSee('Event List')
+        ->assertSee('Create Advanced Program')
         ->assertSee('Search by event title or venue')
         ->assertSee('Members & Roles')
         ->assertSee('Institution Dashboard Event')
+        ->assertSee('Institution Parent Program')
+        ->assertSee('Add Child Event')
         ->assertDontSee('Event Registrations')
         ->assertDontSee('Registrations (All)')
         ->assertDontSee('Ahmad Registrant')
         ->assertDontSee('Outside Institution Event')
         ->assertDontSee('External Registrant');
+
+    $response->assertSee(route('dashboard.events.create-advanced', ['institution' => $institution->id]), false);
+    $response->assertSee(route('submit-event.create', ['parent' => $parentProgram->id]), false);
 });
 
 it('highlights institution events that are waiting approval', function () {
@@ -796,7 +811,7 @@ it('does not expose removed institution dashboard legacy urls', function () {
         ->assertNotFound();
 });
 
-it('allows owner to access advanced schedule page and blocks others', function () {
+it('does not expose removed advanced schedule urls', function () {
     $owner = User::factory()->create();
     $otherUser = User::factory()->create();
 
@@ -808,9 +823,9 @@ it('allows owner to access advanced schedule page and blocks others', function (
 
     $this->actingAs($owner)
         ->get("/dashboard/events/{$event->id}/schedule")
-        ->assertOk();
+        ->assertNotFound();
 
     $this->actingAs($otherUser)
         ->get("/dashboard/events/{$event->id}/schedule")
-        ->assertForbidden();
+        ->assertNotFound();
 });

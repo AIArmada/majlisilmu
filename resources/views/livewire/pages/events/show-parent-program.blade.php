@@ -11,6 +11,7 @@
 
 @php
     $publicChildEvents = $this->publicChildEvents;
+    $parentProgramManagementLinks = $this->parentProgramManagementLinks;
     $primaryInstitution = $event->institution;
     $coverImage = $primaryInstitution?->getFirstMediaUrl('cover', 'banner') ?: $event->card_image_url;
 @endphp
@@ -85,7 +86,18 @@
                     </a>
                 @empty
                     <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
-                        {{ __('No public child events are available for this program yet.') }}
+                        <p>{{ __('No public child events are available for this program yet.') }}</p>
+
+                        @if($parentProgramManagementLinks)
+                            <div class="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                                <a href="{{ $parentProgramManagementLinks['create_child_url'] }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+                                    {{ __('Create First Child Event') }}
+                                </a>
+                                <a href="{{ $parentProgramManagementLinks['ahli_url'] }}" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+                                    {{ __('Manage in Ahli Panel') }}
+                                </a>
+                            </div>
+                        @endif
                     </div>
                 @endforelse
             </div>

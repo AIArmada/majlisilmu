@@ -161,10 +161,6 @@ return [
             'label' => 'Lokasi majlis berubah',
             'description' => 'Maklumkan apabila lokasi atau ruang majlis bertukar.',
         ],
-        'event_session_changed' => [
-            'label' => 'Sesi majlis berubah',
-            'description' => 'Maklumkan apabila susunan sesi majlis berubah.',
-        ],
         'reminder_24_hours' => [
             'label' => 'Peringatan 24 jam',
             'description' => 'Hantar peringatan sehari sebelum majlis bermula.',
@@ -240,9 +236,6 @@ return [
         ],
         'event_venue_changed' => [
             'body' => 'Lokasi atau ruang majlis telah berubah. :timing.',
-        ],
-        'event_session_changed' => [
-            'body' => 'Susunan sesi majlis telah berubah. :timing.',
         ],
         'registration_confirmed' => [
             'title' => 'Pendaftaran berjaya untuk :title',

@@ -6,11 +6,10 @@ use App\Enums\EventParticipantRole;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
-use App\Enums\SessionStatus;
+use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\EventParticipant;
-use App\Models\EventSession;
 use App\Models\Registration;
 use App\Models\User;
 use App\Services\CalendarService;
@@ -22,14 +21,12 @@ use App\States\EventStatus\Pending;
 use Carbon\CarbonInterface;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Throwable;
 
 #[Layout('layouts.app')]
 #[Title('Event Details')]
@@ -90,7 +87,6 @@ class Show extends Component
             'tags',
             'donationChannel.media',
             'settings',
-            'sessions',
             'series',
             'references.media',
             'languages',
@@ -165,34 +161,6 @@ class Show extends Component
             ->values();
     }
 
-    /**
-     * @return Collection<int, EventSession>
-     */
-    #[Computed]
-    public function upcomingSessions(): Collection
-    {
-        $now = now($this->event->timezone ?: 'Asia/Kuala_Lumpur');
-
-        return $this->event->sessions
-            ->filter(function (EventSession $session) use ($now): bool {
-                $startsAt = $session->starts_at;
-
-                if (is_string($startsAt) && $startsAt !== '') {
-                    try {
-                        $startsAt = Carbon::parse($startsAt, $this->event->timezone ?: 'Asia/Kuala_Lumpur');
-                    } catch (Throwable) {
-                        return false;
-                    }
-                }
-
-                return $session->status === SessionStatus::Scheduled
-                    && $startsAt instanceof CarbonInterface
-                    && $startsAt->greaterThanOrEqualTo($now);
-            })
-            ->sortBy('starts_at')
-            ->values();
-    }
-
     public function registrationMode(): RegistrationMode
     {
         $mode = $this->event->settings?->registration_mode;
@@ -202,6 +170,28 @@ class Show extends Component
         }
 
         return RegistrationMode::Event;
+    }
+
+    /**
+     * @return array{create_child_url: string, ahli_url: string}|null
+     */
+    #[Computed]
+    public function parentProgramManagementLinks(): ?array
+    {
+        if (! $this->event->isParentProgram()) {
+            return null;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User || ! $user->can('update', $this->event)) {
+            return null;
+        }
+
+        return [
+            'create_child_url' => route('submit-event.create', ['parent' => $this->event]),
+            'ahli_url' => AhliEventResource::getUrl('view', ['record' => $this->event], panel: 'ahli'),
+        ];
     }
 
     /**
@@ -343,7 +333,6 @@ class Show extends Component
 
         $checkin = EventCheckin::query()->create([
             'event_id' => $this->event->id,
-            'event_session_id' => $state['event_session_id'],
             'registration_id' => $state['registration_id'],
             'user_id' => $user->id,
             'method' => $state['method'],
@@ -358,7 +347,6 @@ class Show extends Component
             request: request(),
             metadata: [
                 'checkin_id' => $checkin->id,
-                'event_session_id' => $checkin->event_session_id,
                 'registration_id' => $checkin->registration_id,
                 'method' => $checkin->method,
             ],
@@ -575,7 +563,6 @@ class Show extends Component
      *   reason: string|null,
      *   method: 'self_reported'|'registered_self_checkin',
      *   registration_id: string|null,
-     *   event_session_id: string|null
      * }
      */
     protected function resolveCheckInState(User $user): array
@@ -586,7 +573,6 @@ class Show extends Component
                 'reason' => __('Majlis ini tidak tersedia untuk check-in.'),
                 'method' => 'self_reported',
                 'registration_id' => null,
-                'event_session_id' => null,
             ];
         }
 
@@ -597,7 +583,6 @@ class Show extends Component
                 'reason' => __('Masa majlis belum ditetapkan untuk check-in.'),
                 'method' => 'self_reported',
                 'registration_id' => null,
-                'event_session_id' => null,
             ];
         }
 
@@ -612,7 +597,6 @@ class Show extends Component
                 'reason' => __('Check-in dibuka 2 jam sebelum majlis bermula.'),
                 'method' => 'self_reported',
                 'registration_id' => null,
-                'event_session_id' => null,
             ];
         }
 
@@ -622,7 +606,6 @@ class Show extends Component
                 'reason' => __('Tempoh check-in telah tamat.'),
                 'method' => 'self_reported',
                 'registration_id' => null,
-                'event_session_id' => null,
             ];
         }
 
@@ -633,7 +616,6 @@ class Show extends Component
                 'reason' => null,
                 'method' => 'self_reported',
                 'registration_id' => null,
-                'event_session_id' => null,
             ];
         }
 
@@ -651,7 +633,6 @@ class Show extends Component
                 'reason' => __('Majlis ini memerlukan pendaftaran sebelum check-in.'),
                 'method' => 'registered_self_checkin',
                 'registration_id' => null,
-                'event_session_id' => null,
             ];
         }
 
@@ -660,7 +641,6 @@ class Show extends Component
             'reason' => null,
             'method' => 'registered_self_checkin',
             'registration_id' => $registration->id,
-            'event_session_id' => $registration->event_session_id,
         ];
     }
 }

@@ -30,6 +30,15 @@ new class extends Component {
                 {{ __('Terima kasih atas perkongsian anda! Pasukan kami akan menyemak butirannya dalam masa 24-48 jam.') }}
             </p>
 
+            @if(session('parent_event_title'))
+                <div class="bg-emerald-50/70 rounded-2xl p-5 shadow-sm border border-emerald-100 text-center mb-8 max-w-lg mx-auto">
+                    <h3 class="font-heading text-lg font-bold text-emerald-900 mb-2">{{ __('Attached to Parent Program') }}</h3>
+                    <p class="text-sm text-emerald-800/80">
+                        {{ __('This event has been attached to :title as a child event.', ['title' => session('parent_event_title')]) }}
+                    </p>
+                </div>
+            @endif
+
             @if(session('event_slug'))
                 <div
                     class="bg-indigo-50/50 rounded-2xl p-6 shadow-sm border border-indigo-100 text-center mb-8 max-w-lg mx-auto">
@@ -87,10 +96,16 @@ new class extends Component {
             </div>
 
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{{ route('submit-event.create') }}" wire:navigate
+                <a href="{{ session('parent_event_id') ? route('submit-event.create', ['parent' => session('parent_event_id')]) : route('submit-event.create') }}" wire:navigate
                     class="inline-flex h-12 items-center justify-center rounded-xl bg-emerald-600 px-6 font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition-colors">
-                    {{ __('Submit Another Event') }}
+                    {{ session('parent_event_id') ? __('Add Another Child Event') : __('Submit Another Event') }}
                 </a>
+                @if(session('parent_event_id'))
+                    <a href="{{ \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => session('parent_event_id')], panel: 'ahli') }}"
+                        class="inline-flex h-12 items-center justify-center rounded-xl bg-white border border-emerald-200 px-6 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">
+                        {{ __('Back to Parent Program') }}
+                    </a>
+                @endif
                 <a href="{{ route('events.index') }}" wire:navigate
                     class="inline-flex h-12 items-center justify-center rounded-xl bg-white border border-slate-200 px-6 font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                     {{ __('Browse Events') }}

@@ -20,6 +20,11 @@ class ViewEvent extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('add_child_event')
+                ->label('Add Child Event')
+                ->icon(Heroicon::OutlinedPlus)
+                ->url(fn (): string => route('submit-event.create', ['parent' => $this->eventRecord()->getKey()]))
+                ->visible(fn (): bool => $this->eventRecord()->isParentProgram()),
             EditAction::make(),
             Action::make('view_public')
                 ->label('View Public Page')

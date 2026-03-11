@@ -15,7 +15,6 @@ return new class extends Migration
         Schema::create('event_checkins', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('event_id')->index();
-            $table->foreignUuid('event_session_id')->nullable()->index();
             $table->foreignUuid('registration_id')->nullable()->index();
             $table->foreignUuid('user_id')->index();
             $table->foreignUuid('verified_by_user_id')->nullable()->index();
@@ -30,7 +29,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['event_id', 'user_id'], 'event_checkins_event_user_idx');
-            $table->index(['event_id', 'event_session_id', 'user_id'], 'event_checkins_event_session_user_idx');
         });
     }
 };

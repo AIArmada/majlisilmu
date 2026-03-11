@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
 use App\Livewire\Pages\About\Show as AboutPage;
@@ -50,7 +50,6 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/tetapan-akaun', \App\Livewire\Pages\Dashboard\AccountSettings::class)->name('dashboard.account-settings');
     Route::livewire('/dashboard/institusi', \App\Livewire\Pages\Dashboard\InstitutionDashboard::class)->name('dashboard.institutions');
     Route::livewire('/papan-pemuka/majlis/cipta-lanjutan', \App\Livewire\Pages\Dashboard\Events\CreateAdvanced::class)->name('dashboard.events.create-advanced');
-    Route::livewire('/papan-pemuka/majlis/{event}/jadual', \App\Livewire\Pages\Dashboard\Events\Schedule::class)->name('dashboard.events.schedule');
     Route::livewire('/carian-tersimpan', \App\Livewire\Pages\SavedSearches\Index::class)->name('saved-searches.index');
 });
 
@@ -105,6 +104,5 @@ Route::redirect('/sitemap-speakers.xml', '/peta-laman-penceramah.xml', 301);
 
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard/events/create-advanced', \App\Livewire\Pages\Dashboard\Events\CreateAdvanced::class);
-    Route::livewire('/dashboard/events/{event}/schedule', \App\Livewire\Pages\Dashboard\Events\Schedule::class);
     Route::livewire('/saved-searches', \App\Livewire\Pages\SavedSearches\Index::class);
 });

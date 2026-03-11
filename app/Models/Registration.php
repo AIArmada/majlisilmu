@@ -30,7 +30,6 @@ class Registration extends Model
      */
     protected $fillable = [
         'event_id',
-        'event_session_id',
         'user_id',
         'name',
         'email',
@@ -45,14 +44,6 @@ class Registration extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
-    }
-
-    /**
-     * @return BelongsTo<EventSession, $this>
-     */
-    public function session(): BelongsTo
-    {
-        return $this->belongsTo(EventSession::class, 'event_session_id');
     }
 
     /**
