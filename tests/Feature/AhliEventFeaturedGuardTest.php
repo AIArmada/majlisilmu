@@ -34,10 +34,16 @@ function createAhliInstitutionAdmin(): array
     $user = User::factory()->create();
     $institution = Institution::factory()->create();
     $speaker = Speaker::factory()->create();
+    $startsAt = now('Asia/Kuala_Lumpur')->addDays(2)->setTime(20, 0)->utc();
+    $endsAt = now('Asia/Kuala_Lumpur')->addDays(2)->setTime(22, 0)->utc();
+
     $event = Event::factory()->for($institution)->create([
         'organizer_type' => Institution::class,
         'organizer_id' => $institution->id,
         'is_featured' => false,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => $startsAt,
+        'ends_at' => $endsAt,
     ]);
 
     app(EventParticipantSyncService::class)->sync($event, [$speaker->id], []);
