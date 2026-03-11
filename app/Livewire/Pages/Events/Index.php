@@ -5,6 +5,7 @@ namespace App\Livewire\Pages\Events;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\TagType;
@@ -25,15 +26,14 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -104,6 +104,36 @@ class Index extends Component implements HasForms
      */
     #[Url]
     public array $speaker_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $participant_roles = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $moderator_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $imam_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $khatib_ids = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $bilal_ids = [];
 
     /**
      * @var list<string>
@@ -263,7 +293,7 @@ class Index extends Component implements HasForms
                                     ->searchable()
                                     ->options(collect(EventPrayerTime::cases())
                                         ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
-                                    ->all()
+                                        ->all()
                                     )
                                     ->live(),
 
@@ -412,6 +442,58 @@ class Index extends Component implements HasForms
                                 Select::make('speaker_ids')
                                     ->label(__('Speaker'))
                                     ->placeholder(__('Any Speaker'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->speakers()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('participant_roles')
+                                    ->label(__('Peranan Lain'))
+                                    ->placeholder(__('Any Role'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(EventParticipantRole::nonSpeakerOptions())
+                                    ->live(),
+
+                                Select::make('moderator_ids')
+                                    ->label(__('Moderator'))
+                                    ->placeholder(__('Any Moderator'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->speakers()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('imam_ids')
+                                    ->label(__('Imam'))
+                                    ->placeholder(__('Any Imam'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->speakers()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('khatib_ids')
+                                    ->label(__('Khatib'))
+                                    ->placeholder(__('Any Khatib'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->options(fn (): array => $this->speakers()
+                                        ->pluck('name', 'id')
+                                        ->all()
+                                    )
+                                    ->live(),
+
+                                Select::make('bilal_ids')
+                                    ->label(__('Bilal'))
+                                    ->placeholder(__('Any Bilal'))
                                     ->searchable()
                                     ->multiple()
                                     ->options(fn (): array => $this->speakers()
@@ -922,6 +1004,11 @@ class Index extends Component implements HasForms
             'institution_id' => $filters['institution_id'],
             'venue_id' => $filters['venue_id'],
             'speaker_ids' => $filters['speaker_ids'],
+            'participant_roles' => $filters['participant_roles'],
+            'moderator_ids' => $filters['moderator_ids'],
+            'imam_ids' => $filters['imam_ids'],
+            'khatib_ids' => $filters['khatib_ids'],
+            'bilal_ids' => $filters['bilal_ids'],
             'topic_ids' => $filters['topic_ids'],
             'domain_tag_ids' => $filters['domain_tag_ids'],
             'source_tag_ids' => $filters['source_tag_ids'],
@@ -1035,6 +1122,11 @@ class Index extends Component implements HasForms
             'institution_id' => null,
             'venue_id' => null,
             'speaker_ids' => [],
+            'participant_roles' => [],
+            'moderator_ids' => [],
+            'imam_ids' => [],
+            'khatib_ids' => [],
+            'bilal_ids' => [],
             'topic_ids' => [],
             'domain_tag_ids' => [],
             'source_tag_ids' => [],
@@ -1092,6 +1184,11 @@ class Index extends Component implements HasForms
             'institution_id' => filled($this->institution_id) ? (string) $this->institution_id : null,
             'venue_id' => filled($this->venue_id) ? (string) $this->venue_id : null,
             'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
+            'participant_roles' => $this->normalizeStringArray($this->participant_roles),
+            'moderator_ids' => $this->normalizeStringArray($this->moderator_ids),
+            'imam_ids' => $this->normalizeStringArray($this->imam_ids),
+            'khatib_ids' => $this->normalizeStringArray($this->khatib_ids),
+            'bilal_ids' => $this->normalizeStringArray($this->bilal_ids),
             'topic_ids' => $this->normalizeStringArray($this->topic_ids),
             'domain_tag_ids' => $this->normalizeStringArray($this->domain_tag_ids),
             'source_tag_ids' => $this->normalizeStringArray($this->source_tag_ids),
@@ -1136,6 +1233,11 @@ class Index extends Component implements HasForms
         $this->institution_id = $filters['institution_id'];
         $this->venue_id = $filters['venue_id'];
         $this->speaker_ids = $filters['speaker_ids'];
+        $this->participant_roles = $filters['participant_roles'];
+        $this->moderator_ids = $filters['moderator_ids'];
+        $this->imam_ids = $filters['imam_ids'];
+        $this->khatib_ids = $filters['khatib_ids'];
+        $this->bilal_ids = $filters['bilal_ids'];
         $this->topic_ids = $filters['topic_ids'];
         $this->domain_tag_ids = $filters['domain_tag_ids'];
         $this->source_tag_ids = $filters['source_tag_ids'];
@@ -1223,6 +1325,11 @@ class Index extends Component implements HasForms
             'institution_id' => filled($normalized['institution_id']) ? (string) $normalized['institution_id'] : null,
             'venue_id' => filled($normalized['venue_id']) ? (string) $normalized['venue_id'] : null,
             'speaker_ids' => $this->normalizeStringArray($normalized['speaker_ids'] ?? []),
+            'participant_roles' => $this->normalizeStringArray($normalized['participant_roles'] ?? []),
+            'moderator_ids' => $this->normalizeStringArray($normalized['moderator_ids'] ?? []),
+            'imam_ids' => $this->normalizeStringArray($normalized['imam_ids'] ?? []),
+            'khatib_ids' => $this->normalizeStringArray($normalized['khatib_ids'] ?? []),
+            'bilal_ids' => $this->normalizeStringArray($normalized['bilal_ids'] ?? []),
             'topic_ids' => $this->normalizeStringArray($normalized['topic_ids'] ?? []),
             'domain_tag_ids' => $this->normalizeStringArray($normalized['domain_tag_ids'] ?? []),
             'source_tag_ids' => $this->normalizeStringArray($normalized['source_tag_ids'] ?? []),

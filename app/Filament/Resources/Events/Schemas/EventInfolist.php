@@ -246,6 +246,18 @@ class EventInfolist
                                             ])
                                             ->contained(false)
                                             ->placeholder('-'),
+                                        RepeatableEntry::make('nonSpeakerParticipants')
+                                            ->label('Peranan Lain')
+                                            ->schema([
+                                                TextEntry::make('role')
+                                                    ->label('Peranan')
+                                                    ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state)),
+                                                TextEntry::make('display_name')
+                                                    ->label('Nama')
+                                                    ->state(fn ($record): string => $record->display_name),
+                                            ])
+                                            ->contained(false)
+                                            ->placeholder('-'),
                                     ]),
                                 Section::make('Media')
                                     ->schema([
@@ -443,7 +455,7 @@ class EventInfolist
     }
 
     protected static function resourceEditUrl(
-        int | string | null $record,
+        int|string|null $record,
         string $adminResourceClass,
         ?string $ahliResourceClass = null,
     ): ?string {
@@ -472,7 +484,7 @@ class EventInfolist
     protected static function resourceUrlForPanel(
         string $resourceClass,
         string $action,
-        int | string $record,
+        int|string $record,
         ?Panel $panel,
     ): ?string {
         if ($panel === null) {

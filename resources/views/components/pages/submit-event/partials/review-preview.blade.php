@@ -3,6 +3,7 @@
     use App\Enums\EventAgeGroup;
     use App\Enums\EventFormat;
     use App\Enums\EventGenderRestriction;
+    use App\Enums\EventParticipantRole;
     use App\Enums\EventPrayerTime;
     use App\Enums\EventType;
     use App\Enums\EventVisibility;
@@ -223,6 +224,27 @@
         ->filter()
         ->all();
 
+    $otherParticipantLabels = collect((array) $get('other_participants'))
+        ->map(function (mixed $participant) use ($speakerMap): ?string {
+            if (! is_array($participant)) {
+                return null;
+            }
+
+            $role = EventParticipantRole::tryFrom((string) ($participant['role'] ?? ''));
+            $speakerId = (string) ($participant['speaker_id'] ?? '');
+            $name = is_string($participant['name'] ?? null) ? trim((string) $participant['name']) : '';
+            $displayName = $speakerMap[$speakerId] ?? $name;
+
+            if (! $role instanceof EventParticipantRole || $displayName === '') {
+                return null;
+            }
+
+            return $role->getLabel().': '.$displayName;
+        })
+        ->filter()
+        ->values()
+        ->all();
+
     $institutionIds = collect([$get('organizer_institution_id'), $get('location_institution_id')])
         ->filter()
         ->values()
@@ -377,6 +399,10 @@
             <div class="md:col-span-2">
                 <dt class="text-slate-500">{{ __('Pilih Penceramah') }}</dt>
                 <dd class="font-medium text-slate-900">{{ $toJoined($speakerLabels) }}</dd>
+            </div>
+            <div class="md:col-span-2">
+                <dt class="text-slate-500">{{ __('Peranan Lain') }}</dt>
+                <dd class="font-medium text-slate-900">{{ $toJoined($otherParticipantLabels) }}</dd>
             </div>
         </dl>
     </div>

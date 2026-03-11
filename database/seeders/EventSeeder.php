@@ -7,6 +7,8 @@ use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventParticipantRole;
+use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
@@ -16,6 +18,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
+use App\Services\EventParticipantSyncService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -94,6 +97,7 @@ class EventSeeder extends Seeder
                             'venue_id' => null,
                             'space_id' => null,
                         ]);
+
                         continue;
                     }
 
@@ -111,6 +115,8 @@ class EventSeeder extends Seeder
                             'venue_id' => null,
                         ]);
                     }
+
+                    $this->seedParticipantsForEvent($event, $speakerIds);
                 }
 
                 // If a series exists in the system, attach events via pivot table.
@@ -128,26 +134,34 @@ class EventSeeder extends Seeder
                     }
                 }
 
-                // Prepare bulk relationship data
-                $speakerAttachments = [];
+                // Prepare bulk participant data
+                $speakerParticipants = [];
 
                 foreach ($events as $event) {
                     // Randomly select 1-3 speakers
                     if (! empty($speakerIds)) {
                         $numSpeakers = min(random_int(1, 3), count($speakerIds));
                         $selectedSpeakers = (array) array_rand(array_flip($speakerIds), $numSpeakers);
-                        foreach ($selectedSpeakers as $speakerId) {
-                            $speakerAttachments[] = [
+                        foreach (array_values($selectedSpeakers) as $index => $speakerId) {
+                            $speakerParticipants[] = [
+                                'id' => (string) \Illuminate\Support\Str::uuid(),
                                 'event_id' => $event->id,
                                 'speaker_id' => $speakerId,
+                                'role' => EventParticipantRole::Speaker->value,
+                                'name' => null,
+                                'order_column' => $index + 1,
+                                'is_public' => true,
+                                'notes' => null,
+                                'created_at' => now(),
+                                'updated_at' => now(),
                             ];
                         }
                     }
                 }
 
-                // Bulk insert relationships
-                if ($speakerAttachments !== []) {
-                    \Illuminate\Support\Facades\DB::table('event_speaker')->insert($speakerAttachments);
+                // Bulk insert speaker participants
+                if ($speakerParticipants !== []) {
+                    \Illuminate\Support\Facades\DB::table('event_participants')->insert($speakerParticipants);
                 }
 
                 $count += 10;
@@ -389,11 +403,10 @@ class EventSeeder extends Seeder
                 }
             }
 
-            if ($speaker instanceof Speaker) {
-                $event->speakers()->syncWithoutDetaching([
-                    $speaker->id => ['order_column' => 1],
-                ]);
-            }
+            app(EventParticipantSyncService::class)->sync(
+                $event,
+                $speaker instanceof Speaker ? [$speaker->id] : [],
+            );
 
             $this->ensureScheduleEventHasTags($event, $title, $topic);
 
@@ -688,5 +701,86 @@ class EventSeeder extends Seeder
                     }
                 }
             });
+    }
+
+    /**
+     * @param  list<string>  $speakerIds
+     */
+    private function seedParticipantsForEvent(Event $event, array $speakerIds): void
+    {
+        $eventTypes = $event->event_type instanceof Collection
+            ? $event->event_type->all()
+            : (is_array($event->event_type) ? $event->event_type : []);
+
+        $normalizedTypes = collect($eventTypes)
+            ->map(fn (mixed $type): ?EventType => $type instanceof EventType ? $type : EventType::tryFrom((string) $type))
+            ->filter()
+            ->values();
+
+        $speakerRoleRequired = $normalizedTypes->contains(fn (EventType $type): bool => $type->requiresSpeakerByDefault());
+        $selectedSpeakerIds = [];
+
+        if ($speakerRoleRequired && $speakerIds !== []) {
+            shuffle($speakerIds);
+            $selectedSpeakerIds = array_slice($speakerIds, 0, random_int(1, min(2, count($speakerIds))));
+        }
+
+        $otherParticipants = [];
+
+        if ($normalizedTypes->contains(EventType::Forum)) {
+            $moderatorSpeakerId = $selectedSpeakerIds[0] ?? ($speakerIds[0] ?? null);
+
+            if (is_string($moderatorSpeakerId)) {
+                $otherParticipants[] = [
+                    'role' => EventParticipantRole::Moderator->value,
+                    'speaker_id' => $moderatorSpeakerId,
+                    'is_public' => true,
+                ];
+            }
+        }
+
+        if ($normalizedTypes->contains(fn (EventType $type): bool => in_array($type, [EventType::Tahlil, EventType::SolatHajat, EventType::Qiamullail], true))) {
+            $imamSpeakerId = $speakerIds[0] ?? null;
+
+            $otherParticipants[] = [
+                'role' => EventParticipantRole::Imam->value,
+                'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
+                'name' => ! is_string($imamSpeakerId) ? fake()->name() : null,
+                'is_public' => true,
+            ];
+        }
+
+        if ($normalizedTypes->contains(EventType::KhutbahJumaat)) {
+            $khatibSpeakerId = $speakerIds[0] ?? null;
+            $imamSpeakerId = $speakerIds[1] ?? $khatibSpeakerId;
+
+            $otherParticipants[] = [
+                'role' => EventParticipantRole::Khatib->value,
+                'speaker_id' => is_string($khatibSpeakerId) ? $khatibSpeakerId : null,
+                'name' => ! is_string($khatibSpeakerId) ? fake()->name() : null,
+                'is_public' => true,
+            ];
+            $otherParticipants[] = [
+                'role' => EventParticipantRole::Imam->value,
+                'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
+                'name' => ! is_string($imamSpeakerId) ? fake()->name() : null,
+                'is_public' => true,
+            ];
+            $otherParticipants[] = [
+                'role' => EventParticipantRole::Bilal->value,
+                'name' => fake()->name(),
+                'is_public' => true,
+            ];
+        }
+
+        if ($normalizedTypes->contains(fn (EventType $type): bool => $type->isCommunity())) {
+            $otherParticipants[] = [
+                'role' => EventParticipantRole::PersonInCharge->value,
+                'name' => fake()->name(),
+                'is_public' => true,
+            ];
+        }
+
+        app(EventParticipantSyncService::class)->sync($event, $selectedSpeakerIds, $otherParticipants);
     }
 }

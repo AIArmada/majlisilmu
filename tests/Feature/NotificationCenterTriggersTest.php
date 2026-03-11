@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EventParticipantRole;
 use App\Enums\NotificationTrigger;
 use App\Models\Event;
 use App\Models\EventCheckin;
@@ -67,6 +68,35 @@ it('creates followed-content notifications for followed speakers institutions se
     $this->assertDatabaseHas('notification_messages', [
         'user_id' => $referenceFollower->id,
         'trigger' => NotificationTrigger::FollowedReferenceEvent->value,
+    ]);
+});
+
+it('does not create followed-speaker notifications when a followed profile is only a non-speaker participant', function () {
+    $speakerFollower = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $speaker = Speaker::factory()->create();
+
+    $speakerFollower->follow($speaker);
+
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Forum Dengan Moderator Sahaja',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $event->participants()->create([
+        'speaker_id' => $speaker->id,
+        'role' => EventParticipantRole::Moderator,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    app(EventNotificationService::class)->notifyPublication($event->fresh(['institution', 'participants.speaker', 'series', 'references']));
+
+    $this->assertDatabaseMissing('notification_messages', [
+        'user_id' => $speakerFollower->id,
+        'trigger' => NotificationTrigger::FollowedSpeakerEvent->value,
     ]);
 });
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\EventFormat;
+use App\Enums\EventParticipantRole;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
@@ -24,7 +25,7 @@ it('shows prayer-relative timing text on speaker page instead of absolute time',
         'prayer_display_text' => 'Selepas Asar',
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $expectedEndTime = $event->ends_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('h:i A');
 
@@ -48,7 +49,7 @@ it('shows cancelled public events with cancelled badge on speaker page', functio
         'ends_at' => now()->addDay()->setTime(19, 15),
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->get(route('speakers.show', $speaker))
         ->assertSuccessful()
@@ -68,7 +69,7 @@ it('uses stronger calendar event colors on speaker page', function () {
         'title' => 'Kuliah Kalender Penceramah',
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->get(route('speakers.show', $speaker))
         ->assertSuccessful()
@@ -91,7 +92,7 @@ it('renders event end time in event timezone on speaker page', function () {
         'prayer_display_text' => 'Selepas Asar',
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
@@ -126,7 +127,7 @@ it('shows dedicated venue name for event location on speaker page when available
         'prayer_display_text' => 'Selepas Asar',
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
@@ -155,7 +156,7 @@ it('falls back to institution name for event location on speaker page when venue
         'prayer_display_text' => 'Selepas Asar',
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
@@ -207,7 +208,7 @@ it('hides state when district is kuala lumpur putrajaya or labuan', function () 
         'prayer_display_text' => 'Selepas Asar',
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
@@ -233,10 +234,55 @@ it('renders speaker page when linked event has online format and no location add
         'timing_mode' => TimingMode::Absolute,
     ]);
 
-    $speaker->events()->attach($event->id);
+    $speaker->speakerEvents()->attach($event->id);
 
     $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertSee($event->title);
+});
+
+it('shows linked non-speaker roles in a separate section on the speaker page', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speakerEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDay(),
+        'title' => 'Kuliah Utama Penceramah',
+    ]);
+
+    $moderatedEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(2),
+        'title' => 'Forum Dengan Moderator',
+    ]);
+
+    $speakerEvent->participants()->create([
+        'speaker_id' => $speaker->id,
+        'role' => EventParticipantRole::Speaker,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $moderatedEvent->participants()->create([
+        'speaker_id' => $speaker->id,
+        'role' => EventParticipantRole::Moderator,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $response = $this->get(route('speakers.show', $speaker));
+
+    $response->assertSuccessful()
+        ->assertSee('Kuliah Utama Penceramah')
+        ->assertSee('Peranan Lain Dalam Majlis')
+        ->assertSee('Moderator')
+        ->assertSee('Forum Dengan Moderator');
+
+    expect(substr_count($response->getContent(), 'Forum Dengan Moderator'))->toBe(1);
 });

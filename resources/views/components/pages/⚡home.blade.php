@@ -121,23 +121,22 @@ new
                         </div>
 
                         {{-- Locate Button --}}
-                        <flux:tooltip content="{{ __('Cari majlis berdekatan anda') }}" position="top">
-                            <button type="button" @click="locate" :disabled="locating"
-                                class="hidden sm:flex items-center justify-center w-14 h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-400 hover:text-emerald-400 transition-all">
-                                <div x-show="!locating">
-                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    </svg>
-                                </div>
-                                <div x-show="locating" x-cloak>
-                                    <svg class="animate-spin w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                    </svg>
-                                </div>
-                            </button>
-                        </flux:tooltip>
+                        <button type="button" @click="locate" :disabled="locating"
+                            title="{{ __('Cari majlis berdekatan anda') }}"
+                            class="hidden sm:flex items-center justify-center w-14 h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-400 hover:text-emerald-400 transition-all">
+                            <div x-show="!locating">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </div>
+                            <div x-show="locating" x-cloak>
+                                <svg class="animate-spin w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                            </div>
+                        </button>
 
                         {{-- Search Button --}}
                         <button type="submit"
@@ -298,6 +297,34 @@ new
             </div>
         </section>
     @endguest
+
+    <section class="bg-slate-50 py-16">
+        <div class="container mx-auto px-6 lg:px-12">
+            <div class="mb-10 text-center">
+                <h2 class="font-heading text-3xl font-bold text-slate-900">{{ __('Jelajah Mengikut Kategori') }}</h2>
+                <p class="mt-3 text-slate-600">{{ __('Pilih topik yang anda minati') }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <a href="{{ route('events.index', ['search' => 'Tazkirah']) }}" wire:navigate class="rounded-2xl border border-emerald-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-600">{{ __('Kategori') }}</div>
+                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Tazkirah') }}</div>
+                </a>
+                <a href="{{ route('events.index', ['search' => 'Tafsir']) }}" wire:navigate class="rounded-2xl border border-blue-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md">
+                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-blue-600">{{ __('Kategori') }}</div>
+                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Tafsir') }}</div>
+                </a>
+                <a href="{{ route('events.index', ['search' => 'Fiqh']) }}" wire:navigate class="rounded-2xl border border-amber-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md">
+                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-amber-600">{{ __('Kategori') }}</div>
+                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Fiqh') }}</div>
+                </a>
+                <a href="{{ route('events.index', ['search' => 'Sirah']) }}" wire:navigate class="rounded-2xl border border-violet-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md">
+                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-violet-600">{{ __('Kategori') }}</div>
+                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Sirah') }}</div>
+                </a>
+            </div>
+        </div>
+    </section>
 
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- UPCOMING CONTEXTUAL EVENTS (Prayer-time based)          --}}

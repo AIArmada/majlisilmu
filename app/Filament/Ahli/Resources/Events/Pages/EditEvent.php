@@ -11,9 +11,9 @@ use App\Models\User;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Draft;
+use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
-use App\States\EventStatus\NeedsChanges;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -36,12 +36,33 @@ class EditEvent extends EditRecord
         $event = $this->eventRecord();
         $event->loadMissing(['languages:id', 'tags:id,type']);
 
-        $data['languages'] = $event->languages->pluck('id')->map(fn(mixed $id): int => (int) $id)->all();
+        $data['languages'] = $event->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $data['domain_tags'] = $this->getTagIdsByType(TagType::Domain);
         $data['discipline_tags'] = $this->getTagIdsByType(TagType::Discipline);
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
+
+        $event->loadMissing(['participants']);
+
+        $data['speakers'] = $event->participants
+            ->filter(fn ($p) => $p->role === \App\Enums\EventParticipantRole::Speaker)
+            ->pluck('speaker_id')
+            ->filter()
+            ->values()
+            ->all();
+
+        $data['other_participants'] = $event->participants
+            ->filter(fn ($p) => $p->role !== \App\Enums\EventParticipantRole::Speaker)
+            ->map(fn ($p) => [
+                'role' => $p->role instanceof \App\Enums\EventParticipantRole ? $p->role->value : $p->role,
+                'speaker_id' => $p->speaker_id,
+                'name' => $p->name,
+                'is_public' => $p->is_public,
+                'notes' => $p->notes,
+            ])
+            ->values()
+            ->all();
 
         return AdminEventTimeMapper::injectFormTimeFields($data);
     }
@@ -51,7 +72,7 @@ class EditEvent extends EditRecord
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
 
-        if (!$this->currentUser()?->hasApplicationAdminAccess()) {
+        if (! $this->currentUser()?->hasApplicationAdminAccess()) {
             unset($data['is_featured']);
         }
 
@@ -63,6 +84,8 @@ class EditEvent extends EditRecord
             $data['source_tags'],
             $data['issue_tags'],
             $data['registration_mode'],
+            $data['speakers'],
+            $data['other_participants'],
         );
 
         return $data;
@@ -95,8 +118,8 @@ class EditEvent extends EditRecord
         $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
 
         $languageIds = collect($rawLanguageIds)
-            ->filter(fn(mixed $id): bool => filled($id))
-            ->map(fn(mixed $id): int => (int) $id)
+            ->filter(fn (mixed $id): bool => filled($id))
+            ->map(fn (mixed $id): int => (int) $id)
             ->values()
             ->all();
 
@@ -108,8 +131,8 @@ class EditEvent extends EditRecord
         $issueTagIds = is_array($state['issue_tags'] ?? null) ? $state['issue_tags'] : [];
 
         $tagIds = collect(array_merge($domainTagIds, $disciplineTagIds, $sourceTagIds, $issueTagIds))
-            ->filter(fn(mixed $id): bool => filled($id))
-            ->map(fn(mixed $id): string => (string) $id)
+            ->filter(fn (mixed $id): bool => filled($id))
+            ->map(fn (mixed $id): string => (string) $id)
             ->unique()
             ->values()
             ->all();
@@ -127,7 +150,7 @@ class EditEvent extends EditRecord
         return $this->eventRecord()->tags
             ->where('type', $type->value)
             ->pluck('id')
-            ->map(fn(mixed $id): string => (string) $id)
+            ->map(fn (mixed $id): string => (string) $id)
             ->values()
             ->all();
     }
@@ -160,7 +183,7 @@ class EditEvent extends EditRecord
             Action::make('view_public')
                 ->label('View Public Page')
                 ->icon(Heroicon::OutlinedEye)
-                ->url(fn(): string => route('events.show', $this->eventRecord()))
+                ->url(fn (): string => route('events.show', $this->eventRecord()))
                 ->openUrlInNewTab(),
             DeleteAction::make(),
         ];
@@ -219,7 +242,7 @@ class EditEvent extends EditRecord
                     ->success()
                     ->send();
             })
-            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getRejectAction(): Action
@@ -259,7 +282,7 @@ class EditEvent extends EditRecord
                 $this->eventRecord()->refresh();
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Pending);
+            ->visible(fn (): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Pending);
     }
 
     protected function getReconsiderAction(): Action
@@ -290,7 +313,7 @@ class EditEvent extends EditRecord
                 $this->eventRecord()->refresh();
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Rejected);
+            ->visible(fn (): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Rejected);
     }
 
     protected function getRemoderateAction(): Action
@@ -321,7 +344,7 @@ class EditEvent extends EditRecord
                 $this->eventRecord()->refresh();
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Approved);
+            ->visible(fn (): bool => $this->canApproveSubmittedEvent() && $this->eventRecord()->status instanceof Approved);
     }
 
     protected function getRevertToDraftAction(): Action
@@ -351,7 +374,7 @@ class EditEvent extends EditRecord
                 $this->eventRecord()->refresh();
                 $this->refreshFormData(['status']);
             })
-            ->visible(fn(): bool => $this->canApproveSubmittedEvent() && (
+            ->visible(fn (): bool => $this->canApproveSubmittedEvent() && (
                 $this->eventRecord()->status instanceof Rejected
                 || $this->eventRecord()->status instanceof NeedsChanges
             ));
@@ -379,7 +402,7 @@ class EditEvent extends EditRecord
     {
         $record = $this->getRecord();
 
-        if (!$record instanceof Event) {
+        if (! $record instanceof Event) {
             throw new \RuntimeException('Expected Filament record to be an Event instance.');
         }
 

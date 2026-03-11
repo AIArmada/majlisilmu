@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\EventParticipantRole;
 use App\Livewire\Pages\SavedSearches\Index as SavedSearchesIndex;
 use App\Models\SavedSearch;
+use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -132,6 +134,20 @@ it('renders source issue and reference chips using human-readable values', funct
         ->assertSee('Sumber Rujukan Utama: Quran')
         ->assertSee('Tema / Isu: Keluarga')
         ->assertSee('Rujukan Kitab/Buku: Riyadhus Solihin');
+});
+
+it('renders participant role and linked profile chips using human-readable values', function () {
+    $user = User::factory()->create();
+    $imamSpeaker = Speaker::factory()->create(['name' => 'Ustaz Role Imam']);
+
+    $this->actingAs($user)
+        ->get(route('saved-searches.index', [
+            'participant_roles' => [EventParticipantRole::PersonInCharge->value],
+            'imam_ids' => [$imamSpeaker->id],
+        ]))
+        ->assertOk()
+        ->assertSee('Participant Roles: PIC / Penyelaras')
+        ->assertSee('Imam: Ustaz Role Imam');
 });
 
 it('does not show manual latitude/longitude inputs on the saved search form', function () {

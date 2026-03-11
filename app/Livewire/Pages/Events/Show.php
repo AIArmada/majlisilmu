@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Pages\Events;
 
+use App\Enums\EventParticipantRole;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Enums\SessionStatus;
 use App\Models\Event;
 use App\Models\EventCheckin;
+use App\Models\EventParticipant;
 use App\Models\EventSession;
 use App\Models\Registration;
 use App\Models\User;
@@ -83,6 +85,7 @@ class Show extends Component
             'venue.address.district',
             'venue.address.subdistrict',
             'speakers.media',
+            'participants.speaker.media',
             'tags',
             'donationChannel.media',
             'settings',
@@ -173,6 +176,23 @@ class Show extends Component
         }
 
         return RegistrationMode::Event;
+    }
+
+    /**
+     * @return Collection<int|string, \Illuminate\Database\Eloquent\Collection<int, EventParticipant>>
+     */
+    #[Computed]
+    public function roleParticipants(): Collection
+    {
+        return collect($this->event->participants
+            ->filter(fn (EventParticipant $participant): bool => $participant->role !== EventParticipantRole::Speaker && $participant->is_public)
+            ->groupBy(function (EventParticipant $participant): string {
+                $role = $participant->role;
+
+                return $role instanceof EventParticipantRole ? $role->value : (string) $role;
+            })
+            ->sortKeys()
+            ->all());
     }
 
     /**

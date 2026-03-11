@@ -1,5 +1,6 @@
 <?php
 
+use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\ContactCategory;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
@@ -14,7 +15,6 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 it('loads public index pages', function () {
@@ -102,7 +102,7 @@ it('renders noindex robots metadata for moderation-only or non-public detail pag
 it('renders optimized seo metadata on public listing pages', function () {
     $this->get(route('home'))
         ->assertSuccessful()
-        ->assertSee('<title>Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia</title>', false)
+        ->assertSee('<title>Majlis Ilmu - Cari Kuliah &amp; Majlis Ilmu di Malaysia</title>', false)
         ->assertSee('<meta name="description" content="Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.">', false)
         ->assertSee('<meta property="og:image" content="'.asset('images/default-mosque-hero.png').'">', false)
         ->assertSee('<meta property="og:image:width" content="1024">', false)

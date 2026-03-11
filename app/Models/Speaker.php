@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
+use App\Enums\EventParticipantRole;
 use App\Enums\Honorific;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
@@ -182,14 +184,49 @@ class Speaker extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return BelongsToMany<Event, $this>
+     * Generic participant link across all event roles.
+     *
+     * Prefer speakerEvents() for talk history and nonSpeakerEventParticipants()
+     * when role-specific participation matters.
+     *
+     * @return BelongsToMany<Event, $this, EventParticipantPivot, 'pivot'>
      */
     public function events(): BelongsToMany
     {
-        return $this->belongsToMany(Event::class, 'event_speaker')
-            ->withPivot('order_column')
+        return $this->belongsToMany(Event::class, 'event_participants', 'speaker_id', 'event_id')
+            ->using(EventParticipantPivot::class)
+            ->withPivot(['id', 'role', 'name', 'order_column', 'is_public', 'notes'])
             ->withTimestamps()
             ->orderByPivot('order_column');
+    }
+
+    /**
+     * @return BelongsToMany<Event, $this, EventParticipantPivot, 'pivot'>
+     */
+    public function speakerEvents(): BelongsToMany
+    {
+        return $this->events()
+            ->wherePivot('role', EventParticipantRole::Speaker->value)
+            ->withPivotValue('role', EventParticipantRole::Speaker->value);
+    }
+
+    /**
+     * @return HasMany<EventParticipant, $this>
+     */
+    public function eventParticipants(): HasMany
+    {
+        return $this->hasMany(EventParticipant::class);
+    }
+
+    /**
+     * @return HasMany<EventParticipant, $this>
+     */
+    public function nonSpeakerEventParticipants(): HasMany
+    {
+        return $this->eventParticipants()
+            ->where('role', '!=', EventParticipantRole::Speaker->value)
+            ->where('is_public', true)
+            ->orderBy('order_column');
     }
 
     /**

@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\EventParticipantRole;
+use App\Models\EventParticipant;
 use App\Models\Speaker;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Support\Carbon;
@@ -15,6 +17,10 @@ new class extends Component {
     public int $upcomingPerPage = 10;
 
     public int $pastPerPage = 10;
+
+    public int $otherRolesUpcomingPerPage = 6;
+
+    public int $otherRolesPastPerPage = 6;
 
     public bool $isFollowing = false;
 
@@ -86,12 +92,22 @@ new class extends Component {
         $this->pastPerPage += 10;
     }
 
+    public function loadMoreOtherRolesUpcoming(): void
+    {
+        $this->otherRolesUpcomingPerPage += 6;
+    }
+
+    public function loadMoreOtherRolesPast(): void
+    {
+        $this->otherRolesPastPerPage += 6;
+    }
+
     /**
      * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
      */
     public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
-        return $this->speaker->events()
+        return $this->speaker->speakerEvents()
             ->active()
             ->where('starts_at', '>=', now())
             ->with([
@@ -111,7 +127,7 @@ new class extends Component {
 
     public function getUpcomingTotalProperty(): int
     {
-        return $this->speaker->events()
+        return $this->speaker->speakerEvents()
             ->active()
             ->where('starts_at', '>=', now())
             ->count();
@@ -122,7 +138,7 @@ new class extends Component {
      */
     public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
     {
-        return $this->speaker->events()
+        return $this->speaker->speakerEvents()
             ->active()
             ->where('starts_at', '<', now())
             ->with([
@@ -142,9 +158,77 @@ new class extends Component {
 
     public function getPastTotalProperty(): int
     {
-        return $this->speaker->events()
+        return $this->speaker->speakerEvents()
             ->active()
             ->where('starts_at', '<', now())
+            ->count();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, EventParticipant>
+     */
+    public function getOtherRoleUpcomingParticipationsProperty(): \Illuminate\Support\Collection
+    {
+        return $this->speaker->nonSpeakerEventParticipants()
+            ->whereHas('event', function ($query): void {
+                $query->active()->where('starts_at', '>=', now());
+            })
+            ->with([
+                'event.institution',
+                'event.institution.address.state',
+                'event.institution.address.district',
+                'event.institution.address.subdistrict',
+                'event.venue.address.state',
+                'event.venue.address.district',
+                'event.venue.address.subdistrict',
+                'event.media',
+            ])
+            ->get()
+            ->sortBy(fn (EventParticipant $participant): int => $participant->event?->starts_at?->timestamp ?? PHP_INT_MAX)
+            ->take($this->otherRolesUpcomingPerPage)
+            ->values();
+    }
+
+    public function getOtherRoleUpcomingTotalProperty(): int
+    {
+        return $this->speaker->nonSpeakerEventParticipants()
+            ->whereHas('event', function ($query): void {
+                $query->active()->where('starts_at', '>=', now());
+            })
+            ->count();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, EventParticipant>
+     */
+    public function getOtherRolePastParticipationsProperty(): \Illuminate\Support\Collection
+    {
+        return $this->speaker->nonSpeakerEventParticipants()
+            ->whereHas('event', function ($query): void {
+                $query->active()->where('starts_at', '<', now());
+            })
+            ->with([
+                'event.institution',
+                'event.institution.address.state',
+                'event.institution.address.district',
+                'event.institution.address.subdistrict',
+                'event.venue.address.state',
+                'event.venue.address.district',
+                'event.venue.address.subdistrict',
+                'event.media',
+            ])
+            ->get()
+            ->sortByDesc(fn (EventParticipant $participant): int => $participant->event?->starts_at?->timestamp ?? 0)
+            ->take($this->otherRolesPastPerPage)
+            ->values();
+    }
+
+    public function getOtherRolePastTotalProperty(): int
+    {
+        return $this->speaker->nonSpeakerEventParticipants()
+            ->whereHas('event', function ($query): void {
+                $query->active()->where('starts_at', '<', now());
+            })
             ->count();
     }
 
@@ -168,6 +252,11 @@ new class extends Component {
     $pastEvents = $this->pastEvents;
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
+    $otherRoleUpcomingParticipations = $this->otherRoleUpcomingParticipations;
+    $otherRolePastParticipations = $this->otherRolePastParticipations;
+    $otherRoleUpcomingTotal = $this->otherRoleUpcomingTotal;
+    $otherRolePastTotal = $this->otherRolePastTotal;
+    $hasOtherRoleParticipations = $otherRoleUpcomingTotal > 0 || $otherRolePastTotal > 0;
 
     $avatarUrl = $speaker->hasMedia('avatar')
         ? $speaker->getFirstMediaUrl('avatar', 'profile')
@@ -289,6 +378,16 @@ new class extends Component {
 
     $resolveEventEndTimeDisplay = static function (\App\Models\Event $event): string {
         return \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A');
+    };
+
+    $resolveParticipantRoleLabel = static function (EventParticipant $participant): string {
+        $role = $participant->role;
+
+        if ($role instanceof EventParticipantRole) {
+            return $role->getLabel();
+        }
+
+        return Str::headline((string) $role);
     };
 
     // Calendar data: map events to dates for the calendar view
@@ -843,6 +942,132 @@ new class extends Component {
                 </div>
                 @endif
             </section>
+
+            @if($hasOtherRoleParticipations)
+                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
+                    <div class="mb-6 flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12M8.25 17.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75V12zm0 5.25h.008v.008H3.75v-.008z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Peranan Lain Dalam Majlis') }}</h2>
+                            <div class="mt-0.5 h-0.5 w-16 rounded-full bg-gradient-to-r from-amber-500 to-transparent"></div>
+                        </div>
+                    </div>
+
+                    @if($otherRoleUpcomingParticipations->isNotEmpty())
+                        <div class="mb-6">
+                            <div class="mb-3 flex items-center gap-2">
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200/70">{{ __('Akan Datang') }}</span>
+                                <span class="text-sm text-slate-500">{{ $otherRoleUpcomingTotal }}</span>
+                            </div>
+                            <div class="space-y-3">
+                                @foreach($otherRoleUpcomingParticipations as $participant)
+                                    @php
+                                        $event = $participant->event;
+                                        $venueLocation = $event ? $resolveVenueLocation($event) : '';
+                                        $eventFormatValue = $event?->event_format?->value ?? $event?->event_format;
+                                    @endphp
+                                    @if($event)
+                                        <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex items-start gap-4 rounded-2xl border border-amber-200/70 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-500/[0.08]">
+                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            </div>
+                                            <div class="min-w-0 flex-1 space-y-2">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/70">{{ $resolveParticipantRoleLabel($participant) }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/70">{{ $resolveEventTypeLabel($event->event_type) }}</span>
+                                                </div>
+                                                <h3 class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-amber-700">{{ $event->title }}</h3>
+                                                <div class="space-y-1 text-sm text-slate-500">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        {{ $resolveEventTimeDisplay($event) }}
+                                                        @if($event->ends_at)
+                                                            <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
+                                                        @endif
+                                                    </div>
+                                                    @if($venueLocation && $eventFormatValue !== 'online')
+                                                        <div class="flex items-center gap-1.5">
+                                                            <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                                            <span class="line-clamp-1">{{ $venueLocation }}</span>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </a>
+                                    @endif
+                                @endforeach
+                            </div>
+
+                            @if($otherRoleUpcomingTotal > $otherRoleUpcomingParticipations->count())
+                                <div class="mt-4 text-center">
+                                    <button wire:click="loadMoreOtherRolesUpcoming" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition-all duration-200 hover:border-amber-300 hover:bg-amber-50 disabled:opacity-50">
+                                        <span wire:loading.remove wire:target="loadMoreOtherRolesUpcoming">{{ __('Lihat Lagi') }} ({{ $otherRoleUpcomingTotal - $otherRoleUpcomingParticipations->count() }} {{ __('lagi') }})</span>
+                                        <span wire:loading wire:target="loadMoreOtherRolesUpcoming" class="inline-flex items-center gap-2">{{ __('Memuatkan...') }}</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    @if($otherRolePastParticipations->isNotEmpty())
+                        <div>
+                            <div class="mb-3 flex items-center gap-2">
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">{{ __('Lepas') }}</span>
+                                <span class="text-sm text-slate-500">{{ $otherRolePastTotal }}</span>
+                            </div>
+                            <div class="space-y-3">
+                                @foreach($otherRolePastParticipations as $participant)
+                                    @php
+                                        $event = $participant->event;
+                                        $pastVenueLocation = $event ? $resolveVenueLocation($event) : '';
+                                        $eventFormatValue = $event?->event_format?->value ?? $event?->event_format;
+                                    @endphp
+                                    @if($event)
+                                        <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-500/[0.06]">
+                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200/70">
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8.25v3.75l3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            </div>
+                                            <div class="min-w-0 flex-1 space-y-2">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/70">{{ $resolveParticipantRoleLabel($participant) }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/70">{{ $resolveEventTypeLabel($event->event_type) }}</span>
+                                                </div>
+                                                <h3 class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-slate-700">{{ $event->title }}</h3>
+                                                <div class="space-y-1 text-sm text-slate-500">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        {{ $resolveEventTimeDisplay($event) }}
+                                                        @if($event->ends_at)
+                                                            <span class="text-slate-300">–</span> {{ $resolveEventEndTimeDisplay($event) }}
+                                                        @endif
+                                                    </div>
+                                                    @if($pastVenueLocation && $eventFormatValue !== 'online')
+                                                        <div class="flex items-center gap-1.5">
+                                                            <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                                                            <span class="line-clamp-1">{{ $pastVenueLocation }}</span>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </a>
+                                    @endif
+                                @endforeach
+                            </div>
+
+                            @if($otherRolePastTotal > $otherRolePastParticipations->count())
+                                <div class="mt-4 text-center">
+                                    <button wire:click="loadMoreOtherRolesPast" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50">
+                                        <span wire:loading.remove wire:target="loadMoreOtherRolesPast">{{ __('Lihat Lagi') }} ({{ $otherRolePastTotal - $otherRolePastParticipations->count() }} {{ __('lagi') }})</span>
+                                        <span wire:loading wire:target="loadMoreOtherRolesPast" class="inline-flex items-center gap-2">{{ __('Memuatkan...') }}</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                </section>
+            @endif
 
             {{-- Cover image --}}
             @if($coverUrl)

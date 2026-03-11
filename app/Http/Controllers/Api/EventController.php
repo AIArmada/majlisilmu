@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -34,7 +35,7 @@ class EventController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $events = QueryBuilder::for(Event::query())
+        $events = QueryBuilder::for(Event::query()->with(['participants.speaker']))
             ->allowedFilters([
                 AllowedFilter::callback('status', function (Builder $query, mixed $value): void {
                     $statuses = array_values(array_intersect($this->normalizeArrayFilter($value), self::PUBLIC_STATUSES));
@@ -138,6 +139,69 @@ class EventController extends Controller
                         $speakerQuery->whereIn('speakers.id', $speakerIds);
                     });
                 }),
+                AllowedFilter::callback('participant_roles', function (Builder $query, mixed $value): void {
+                    $participantRoles = $this->normalizeParticipantRoles($value);
+
+                    if ($participantRoles === []) {
+                        return;
+                    }
+
+                    $query->whereHas('participants', function (Builder $participantQuery) use ($participantRoles): void {
+                        $participantQuery->whereIn('role', $participantRoles);
+                    });
+                }),
+                AllowedFilter::callback('moderator_ids', function (Builder $query, mixed $value): void {
+                    $speakerIds = $this->normalizeArrayFilter($value);
+
+                    if ($speakerIds === []) {
+                        return;
+                    }
+
+                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                        $participantQuery
+                            ->where('role', EventParticipantRole::Moderator->value)
+                            ->whereIn('speaker_id', $speakerIds);
+                    });
+                }),
+                AllowedFilter::callback('imam_ids', function (Builder $query, mixed $value): void {
+                    $speakerIds = $this->normalizeArrayFilter($value);
+
+                    if ($speakerIds === []) {
+                        return;
+                    }
+
+                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                        $participantQuery
+                            ->where('role', EventParticipantRole::Imam->value)
+                            ->whereIn('speaker_id', $speakerIds);
+                    });
+                }),
+                AllowedFilter::callback('khatib_ids', function (Builder $query, mixed $value): void {
+                    $speakerIds = $this->normalizeArrayFilter($value);
+
+                    if ($speakerIds === []) {
+                        return;
+                    }
+
+                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                        $participantQuery
+                            ->where('role', EventParticipantRole::Khatib->value)
+                            ->whereIn('speaker_id', $speakerIds);
+                    });
+                }),
+                AllowedFilter::callback('bilal_ids', function (Builder $query, mixed $value): void {
+                    $speakerIds = $this->normalizeArrayFilter($value);
+
+                    if ($speakerIds === []) {
+                        return;
+                    }
+
+                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                        $participantQuery
+                            ->where('role', EventParticipantRole::Bilal->value)
+                            ->whereIn('speaker_id', $speakerIds);
+                    });
+                }),
                 AllowedFilter::callback('series', function (Builder $query, mixed $value): void {
                     $seriesIds = $this->normalizeArrayFilter($value);
                     if ($seriesIds === []) {
@@ -196,6 +260,8 @@ class EventController extends Controller
                 'venue.address.district',
                 'venue.address.subdistrict',
                 'institution',
+                'participants',
+                'participants.speaker',
                 'speakers',
                 'series',
                 'mediaLinks',
@@ -230,7 +296,7 @@ class EventController extends Controller
      */
     public function show(Request $request, string $eventIdentifier): JsonResponse
     {
-        $event = QueryBuilder::for(Event::query())
+        $event = QueryBuilder::for(Event::query()->with(['participants.speaker']))
             ->allowedIncludes([
                 'venue',
                 'venue.address',
@@ -240,6 +306,8 @@ class EventController extends Controller
                 'venue.address.city',
                 'institution',
                 'institution.address',
+                'participants',
+                'participants.speaker',
                 'speakers',
                 'series',
                 'mediaLinks',
@@ -318,6 +386,19 @@ class EventController extends Controller
         return array_values(array_filter(
             array_map(static fn (mixed $item): string => (string) $item, $values),
             static fn (string $item): bool => $item !== ''
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeParticipantRoles(mixed $value): array
+    {
+        return array_values(array_filter(
+            array_map(
+                static fn (string $role): ?string => EventParticipantRole::tryFrom($role)?->value,
+                $this->normalizeArrayFilter($value)
+            )
         ));
     }
 

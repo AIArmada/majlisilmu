@@ -6,13 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @php
+        $decodeMeta = static fn (string $value): string => html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $defaultMetaDescription = __('Platform terbesar untuk mencari kuliah, ceramah, tazkirah, dan majlis ilmu di seluruh Malaysia. Cari yang berdekatan dengan anda.');
-        $pageTitle = trim($__env->yieldContent('title', config('app.name')));
-        $pageDescription = trim($__env->yieldContent('meta_description', $defaultMetaDescription));
+        $pageTitle = $decodeMeta(trim($__env->yieldContent('title', config('app.name'))));
+        $pageDescription = $decodeMeta(trim($__env->yieldContent('meta_description', $defaultMetaDescription)));
         $defaultOgImage = asset('images/default-mosque-hero.png');
         $pageUrl = trim($__env->yieldContent('og_url', url()->current()));
         $pageOgImage = trim($__env->yieldContent('og_image', $defaultOgImage));
-        $pageOgImageAlt = trim($__env->yieldContent('og_image_alt', $pageTitle !== '' ? $pageTitle : config('app.name')));
+        $pageOgImageAlt = $decodeMeta(trim($__env->yieldContent('og_image_alt', $pageTitle !== '' ? $pageTitle : config('app.name'))));
         $pageOgImageWidth = trim($__env->yieldContent('og_image_width', '1024'));
         $pageOgImageHeight = trim($__env->yieldContent('og_image_height', '1024'));
     @endphp
@@ -340,7 +341,7 @@
                 @yield('content')
             </main>
 
-            @include('components.ui.toast-stack')
+            <x-ui.toast-stack />
 
             <!-- Modern Footer -->
             <footer class="mt-20 border-t border-slate-200 bg-white/50 backdrop-blur-sm">

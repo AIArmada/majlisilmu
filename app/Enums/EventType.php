@@ -124,4 +124,48 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
             default => false,
         };
     }
+
+    public function requiresSpeakerByDefault(): bool
+    {
+        return match ($this) {
+            self::KuliahCeramah,
+            self::KelasDaurah,
+            self::Forum,
+            self::SeminarKonvensyen,
+            self::Tazkirah => true,
+            default => false,
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function suggestedParticipantRoles(): array
+    {
+        return match ($this) {
+            self::KuliahCeramah,
+            self::KelasDaurah,
+            self::SeminarKonvensyen,
+            self::Tazkirah => [EventParticipantRole::Speaker->value, EventParticipantRole::Moderator->value],
+            self::Forum => [EventParticipantRole::Speaker->value, EventParticipantRole::Moderator->value],
+            self::KhutbahJumaat => [EventParticipantRole::Khatib->value, EventParticipantRole::Imam->value, EventParticipantRole::Bilal->value],
+            self::Qiamullail,
+            self::Tahlil,
+            self::SolatHajat => [EventParticipantRole::Imam->value],
+            self::Zikir,
+            self::Selawat,
+            self::DoaSelamat,
+            self::BacaanYasin,
+            self::KhatamQuran,
+            self::Tilawah,
+            self::HafazanQuran => [EventParticipantRole::Imam->value, EventParticipantRole::Bilal->value],
+            self::GotongRoyong,
+            self::Kenduri,
+            self::Iftar,
+            self::Sahur,
+            self::Korban,
+            self::Aqiqah => [EventParticipantRole::PersonInCharge->value],
+            self::Other => [EventParticipantRole::Speaker->value, EventParticipantRole::PersonInCharge->value],
+        };
+    }
 }

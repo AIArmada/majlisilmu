@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use App\Enums\EventParticipantRole;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
+use App\Models\EventParticipant;
 use App\Models\Tag;
+use App\Services\EventParticipantSyncService;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\NeedsChanges;
@@ -40,6 +43,24 @@ class EditEvent extends EditRecord
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
+        $event->loadMissing(['participants']);
+        $data['speakers'] = $event->participants
+            ->where('role', EventParticipantRole::Speaker)
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->values()
+            ->all();
+        $data['other_participants'] = $event->participants
+            ->where('role', '!=', EventParticipantRole::Speaker)
+            ->map(fn (EventParticipant $participant): array => [
+                'role' => $participant->role instanceof EventParticipantRole ? $participant->role->value : (string) $participant->role,
+                'speaker_id' => $participant->speaker_id,
+                'name' => $participant->name,
+                'is_public' => (bool) $participant->is_public,
+                'notes' => $participant->notes,
+            ])
+            ->values()
+            ->all();
 
         return AdminEventTimeMapper::injectFormTimeFields($data);
     }
@@ -56,6 +77,8 @@ class EditEvent extends EditRecord
             $data['source_tags'],
             $data['issue_tags'],
             $data['registration_mode'],
+            $data['speakers'],
+            $data['other_participants'],
         );
 
         return $data;
@@ -116,6 +139,12 @@ class EditEvent extends EditRecord
         $tags = Tag::query()->whereKey($tagIds)->get();
 
         $event->syncTags($tags);
+
+        app(EventParticipantSyncService::class)->sync(
+            $event,
+            is_array($state['speakers'] ?? null) ? $state['speakers'] : [],
+            is_array($state['other_participants'] ?? null) ? $state['other_participants'] : [],
+        );
     }
 
     /**
