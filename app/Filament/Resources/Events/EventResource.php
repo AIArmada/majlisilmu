@@ -64,6 +64,7 @@ class EventResource extends Resource
         return $query
             ->with([
                 'media',
+                'parentEvent',
                 'institution',
                 'institution.media',
                 'settings',

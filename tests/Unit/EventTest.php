@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EventStructure;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\State;
@@ -122,4 +123,51 @@ it('searchable payload includes is_active and subdistrict_id location fields', f
         ->and($payload)->toHaveKey('state_id', $state->id)
         ->and($payload)->toHaveKey('district_id', $district->id)
         ->and($payload)->toHaveKey('subdistrict_id', $subdistrict->id);
+});
+
+it('supports parent program and child event hierarchy helpers', function () {
+    $parentEvent = Event::factory()->parentProgram()->create();
+    $childEvent = Event::factory()->childEvent($parentEvent)->create();
+    $standaloneEvent = Event::factory()->create();
+
+    expect($parentEvent->fresh()->isParentProgram())->toBeTrue()
+        ->and($parentEvent->isSchedulable())->toBeFalse()
+        ->and($parentEvent->childEvents->pluck('id')->all())->toContain($childEvent->id)
+        ->and($childEvent->fresh()->isChildEvent())->toBeTrue()
+        ->and($childEvent->isSchedulable())->toBeTrue()
+        ->and($childEvent->parentEvent?->is($parentEvent))->toBeTrue()
+        ->and($standaloneEvent->fresh()->isStandaloneEvent())->toBeTrue()
+        ->and($standaloneEvent->eventStructure())->toBe(EventStructure::Standalone);
+});
+
+it('discoverable scope and searchability exclude parent programs', function () {
+    $parentEvent = Event::factory()->parentProgram()->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $childEvent = Event::factory()->childEvent($parentEvent)->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $standaloneEvent = Event::factory()->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $discoverableIds = Event::discoverable()->pluck('id')->all();
+    $activeIds = Event::active()->pluck('id')->all();
+
+    expect($discoverableIds)->not->toContain($parentEvent->id)
+        ->and($discoverableIds)->toContain($childEvent->id)
+        ->and($discoverableIds)->toContain($standaloneEvent->id)
+        ->and($activeIds)->not->toContain($parentEvent->id)
+        ->and($activeIds)->toContain($childEvent->id)
+        ->and($activeIds)->toContain($standaloneEvent->id)
+        ->and($parentEvent->fresh()->shouldBeSearchable())->toBeFalse()
+        ->and($childEvent->fresh()->shouldBeSearchable())->toBeTrue();
 });

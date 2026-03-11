@@ -201,7 +201,7 @@ class EditEvent extends EditRecord
             ->action(function (ModerationService $service): void {
                 abort_unless($this->canSubmitSubmittedDraftForReview(), 403);
 
-                $service->submitForModeration($this->eventRecord());
+                $this->forModerationHierarchy(fn (Event $event) => $service->submitForModeration($event));
 
                 $this->eventRecord()->refresh();
                 $this->refreshFormData(['status']);
@@ -232,7 +232,7 @@ class EditEvent extends EditRecord
             ->action(function (array $data, ModerationService $service): void {
                 abort_unless($this->canApproveSubmittedEvent(), 403);
 
-                $service->approve($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+                $this->forModerationHierarchy(fn (Event $event) => $service->approve($event, $this->currentUser(), $data['note'] ?? null));
 
                 $this->eventRecord()->refresh();
                 $this->refreshFormData(['status']);
@@ -267,12 +267,12 @@ class EditEvent extends EditRecord
             ->action(function (array $data, ModerationService $service): void {
                 abort_unless($this->canApproveSubmittedEvent(), 403);
 
-                $service->reject(
-                    $this->eventRecord(),
+                $this->forModerationHierarchy(fn (Event $event) => $service->reject(
+                    $event,
                     $this->currentUser(),
                     $data['reason_code'],
                     $data['note']
-                );
+                ));
 
                 Notification::make()
                     ->title('Event rejected')
@@ -303,7 +303,7 @@ class EditEvent extends EditRecord
             ->action(function (array $data, ModerationService $service): void {
                 abort_unless($this->canApproveSubmittedEvent(), 403);
 
-                $service->reconsider($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+                $this->forModerationHierarchy(fn (Event $event) => $service->reconsider($event, $this->currentUser(), $data['note'] ?? null));
 
                 Notification::make()
                     ->title('Event moved back to pending review')
@@ -334,7 +334,7 @@ class EditEvent extends EditRecord
             ->action(function (array $data, ModerationService $service): void {
                 abort_unless($this->canApproveSubmittedEvent(), 403);
 
-                $service->remoderate($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+                $this->forModerationHierarchy(fn (Event $event) => $service->remoderate($event, $this->currentUser(), $data['note'] ?? null));
 
                 Notification::make()
                     ->title('Event sent for re-moderation')
@@ -365,7 +365,7 @@ class EditEvent extends EditRecord
             ->action(function (array $data, ModerationService $service): void {
                 abort_unless($this->canApproveSubmittedEvent(), 403);
 
-                $service->revertToDraft($this->eventRecord(), $this->currentUser(), $data['note'] ?? null);
+                $this->forModerationHierarchy(fn (Event $event) => $service->revertToDraft($event, $this->currentUser(), $data['note'] ?? null));
 
                 Notification::make()
                     ->title('Event reverted to draft')
@@ -441,5 +441,23 @@ class EditEvent extends EditRecord
         $user = auth()->user();
 
         return $user instanceof User ? $user : null;
+    }
+
+    /**
+     * @param  callable(Event): void  $callback
+     */
+    private function forModerationHierarchy(callable $callback): void
+    {
+        $event = $this->eventRecord()->loadMissing('childEvents');
+
+        $callback($event);
+
+        if (! $event->isParentProgram()) {
+            return;
+        }
+
+        foreach ($event->childEvents as $childEvent) {
+            $callback($childEvent);
+        }
     }
 }

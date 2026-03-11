@@ -3,22 +3,27 @@
 namespace App\Livewire\Pages\Dashboard\Events;
 
 use App\Enums\EventFormat;
+use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
-use App\Enums\RecurrenceFrequency;
 use App\Enums\RegistrationMode;
 use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
 use App\Models\Event;
-use App\Models\EventRecurrenceRule;
-use App\Services\EventScheduleGeneratorService;
+use App\Models\EventSubmission;
+use App\Models\Institution;
+use App\Models\Speaker;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Throwable;
 
 #[Layout('layouts.app')]
 #[Title('Create Advanced Event')]
@@ -32,137 +37,160 @@ class CreateAdvanced extends Component
     public function mount(): void
     {
         abort_unless(auth()->check(), 403);
+        abort_unless($this->hasBuilderAccess(), 403);
+
+        $defaultOrganizerType = $this->memberInstitutions()->isNotEmpty() ? 'institution' : 'speaker';
+        $defaultOrganizerId = $defaultOrganizerType === 'institution'
+            ? $this->memberInstitutions()->first()?->id
+            : $this->memberSpeakers()->first()?->id;
 
         $this->form = [
             'title' => '',
             'description' => '',
-            'schedule_kind' => ScheduleKind::Single->value,
             'timezone' => 'Asia/Kuala_Lumpur',
-            'event_format' => EventFormat::Physical->value,
+            'organizer_type' => $defaultOrganizerType,
+            'organizer_id' => $defaultOrganizerId,
+            'location_institution_id' => $defaultOrganizerType === 'institution' ? $defaultOrganizerId : $this->memberInstitutions()->first()?->id,
+            'default_event_type' => EventType::KuliahCeramah->value,
+            'default_event_format' => EventFormat::Physical->value,
             'visibility' => EventVisibility::Public->value,
             'registration_required' => true,
             'registration_mode' => RegistrationMode::Event->value,
-            'sessions' => [
-                [
-                    'starts_at' => now()->addDay()->setTime(20, 0)->format('Y-m-d\TH:i'),
-                    'ends_at' => now()->addDay()->setTime(22, 0)->format('Y-m-d\TH:i'),
-                    'status' => 'scheduled',
-                    'capacity' => null,
-                ],
-            ],
-            'recurrence' => [
-                'frequency' => RecurrenceFrequency::Weekly->value,
-                'interval' => 1,
-                'by_weekdays' => [5],
-                'by_month_day' => null,
-                'start_date' => now()->addDay()->toDateString(),
-                'until_date' => now()->addMonths(2)->toDateString(),
-                'occurrence_count' => null,
-                'timing_mode' => 'absolute',
-                'starts_time' => '20:00',
-                'ends_time' => '22:00',
-                'prayer_reference' => null,
-                'prayer_offset' => null,
-                'prayer_display_text' => null,
-            ],
+            'children' => [$this->defaultChildFormState()],
         ];
     }
 
-    public function addSession(): void
+    public function addChild(): void
     {
-        $this->form['sessions'][] = [
-            'starts_at' => now()->addDay()->setTime(20, 0)->format('Y-m-d\TH:i'),
-            'ends_at' => now()->addDay()->setTime(22, 0)->format('Y-m-d\TH:i'),
-            'status' => 'scheduled',
-            'capacity' => null,
-        ];
+        $this->form['children'][] = $this->defaultChildFormState(count($this->form['children']) + 1);
     }
 
-    public function removeSession(int $index): void
+    public function removeChild(int $index): void
     {
-        unset($this->form['sessions'][$index]);
-        $this->form['sessions'] = array_values($this->form['sessions']);
+        unset($this->form['children'][$index]);
+        $this->form['children'] = array_values($this->form['children']);
     }
 
-    public function submit(EventScheduleGeneratorService $generator): mixed
+    public function updatedFormOrganizerType(string $value): void
     {
-        $validated = $this->validate($this->rules(), $this->messages());
+        if ($value === 'institution') {
+            $organizerId = $this->memberInstitutions()->first()?->id;
+            $this->form['organizer_id'] = $organizerId;
+            $this->form['location_institution_id'] = $organizerId;
 
-        /** @var \App\Models\User|null $user */
-        $user = auth()->user();
+            return;
+        }
+
+        $this->form['organizer_id'] = $this->memberSpeakers()->first()?->id;
+
+        if (! filled($this->form['location_institution_id'] ?? null)) {
+            $this->form['location_institution_id'] = $this->memberInstitutions()->first()?->id;
+        }
+    }
+
+    public function submit(): mixed
+    {
+        $validated = $this->validate($this->rules());
+
+        $user = $this->currentUser();
 
         abort_unless($user !== null, 403);
 
-        $timezone = (string) ($validated['form']['timezone'] ?? 'Asia/Kuala_Lumpur');
+        $timezone = (string) $validated['form']['timezone'];
+        $organizerType = (string) $validated['form']['organizer_type'];
+        $organizerId = (string) $validated['form']['organizer_id'];
 
-        $event = Event::query()->create([
-            'user_id' => $user->id,
-            'submitter_id' => $user->id,
-            'title' => (string) $validated['form']['title'],
-            'slug' => Str::slug((string) $validated['form']['title']).'-'.Str::lower(Str::random(7)),
-            'description' => (string) ($validated['form']['description'] ?? ''),
-            'starts_at' => now($timezone),
-            'ends_at' => now($timezone)->addHours(2),
-            'timezone' => $timezone,
-            'event_type' => [EventType::KuliahCeramah],
-            'event_format' => (string) $validated['form']['event_format'],
-            'visibility' => (string) $validated['form']['visibility'],
-            'schedule_kind' => (string) $validated['form']['schedule_kind'],
-            'schedule_state' => ScheduleState::Active->value,
-            'is_active' => true,
-        ]);
+        $this->ensureOrganizerIsMemberOwned($user, $organizerType, $organizerId);
 
-        $event->settings()->updateOrCreate(
-            ['event_id' => $event->id],
-            [
-                'registration_required' => (bool) ($validated['form']['registration_required'] ?? true),
-                'registration_mode' => (string) ($validated['form']['registration_mode'] ?? RegistrationMode::Event->value),
-            ],
-        );
+        $locationInstitutionId = $this->resolveLocationInstitutionId($user, $organizerType, $organizerId, $validated['form']['location_institution_id'] ?? null);
 
-        $scheduleKind = (string) $validated['form']['schedule_kind'];
+        /** @var list<array<string, mixed>> $childForms */
+        $childForms = is_array($validated['form']['children']) ? $validated['form']['children'] : [];
 
-        if ($scheduleKind === ScheduleKind::Recurring->value) {
-            $recurrence = $validated['form']['recurrence'];
+        $childPayloads = collect($childForms)
+            ->map(fn (array $child): array => $this->normalizeChildPayload($child, $timezone, $validated['form']))
+            ->values();
 
-            EventRecurrenceRule::query()->create([
-                'event_id' => $event->id,
-                'frequency' => $recurrence['frequency'],
-                'interval' => (int) $recurrence['interval'],
-                'by_weekdays' => $recurrence['by_weekdays'] ?? null,
-                'by_month_day' => $recurrence['by_month_day'] ?? null,
-                'start_date' => $recurrence['start_date'],
-                'until_date' => $recurrence['until_date'] ?? null,
-                'occurrence_count' => $recurrence['occurrence_count'] ?? null,
-                'starts_time' => $recurrence['starts_time'] ? Carbon::parse($recurrence['starts_time'])->format('H:i:s') : null,
-                'ends_time' => $recurrence['ends_time'] ? Carbon::parse($recurrence['ends_time'])->format('H:i:s') : null,
-                'timezone' => $timezone,
-                'timing_mode' => $recurrence['timing_mode'],
-                'prayer_reference' => $recurrence['prayer_reference'] ?? null,
-                'prayer_offset' => $recurrence['prayer_offset'] ?? null,
-                'prayer_display_text' => $recurrence['prayer_display_text'] ?? null,
-                'status' => ScheduleState::Active->value,
-            ]);
-        } else {
-            $sessions = $validated['form']['sessions'] ?? [];
+        $parentStartsAt = $childPayloads->min('starts_at');
+        $parentEndsAt = $childPayloads->max('ends_at');
 
-            if ($scheduleKind === ScheduleKind::Single->value && isset($sessions[0])) {
-                $sessions = [$sessions[0]];
-            }
-
-            foreach ($sessions as $sessionData) {
-                $generator->upsertManualSession($event, [
-                    'starts_at' => Carbon::parse($sessionData['starts_at'], $timezone),
-                    'ends_at' => filled($sessionData['ends_at'] ?? null) ? Carbon::parse($sessionData['ends_at'], $timezone) : null,
-                    'timezone' => $timezone,
-                    'status' => $sessionData['status'] ?? 'scheduled',
-                    'capacity' => $sessionData['capacity'] ?: null,
-                    'timing_mode' => 'absolute',
-                ]);
-            }
+        if (! $parentStartsAt instanceof Carbon || ! $parentEndsAt instanceof Carbon) {
+            throw new \RuntimeException('Advanced event children must include valid schedule values.');
         }
 
-        return redirect()->route('dashboard.events.schedule', $event);
+        try {
+            $parentEvent = DB::transaction(function () use ($user, $validated, $timezone, $organizerType, $organizerId, $locationInstitutionId, $childPayloads, $parentStartsAt, $parentEndsAt): Event {
+                $parentEvent = Event::query()->create([
+                    'user_id' => $user->id,
+                    'submitter_id' => $user->id,
+                    'parent_event_id' => null,
+                    'event_structure' => EventStructure::ParentProgram->value,
+                    'title' => (string) $validated['form']['title'],
+                    'slug' => Str::slug((string) $validated['form']['title']).'-'.Str::lower(Str::random(7)),
+                    'description' => (string) ($validated['form']['description'] ?? ''),
+                    'starts_at' => $parentStartsAt,
+                    'ends_at' => $parentEndsAt,
+                    'timezone' => $timezone,
+                    'institution_id' => $locationInstitutionId,
+                    'organizer_type' => $this->organizerMorphClass($organizerType),
+                    'organizer_id' => $organizerId,
+                    'event_type' => [(string) $validated['form']['default_event_type']],
+                    'event_format' => (string) $validated['form']['default_event_format'],
+                    'visibility' => (string) $validated['form']['visibility'],
+                    'schedule_kind' => ScheduleKind::CustomChain->value,
+                    'schedule_state' => ScheduleState::Active->value,
+                    'status' => 'draft',
+                    'is_active' => true,
+                ]);
+
+                EventSubmission::query()->create([
+                    'event_id' => $parentEvent->id,
+                    'submitted_by' => $user->id,
+                    'submitter_name' => $user->name,
+                    'notes' => null,
+                ]);
+
+                foreach ($childPayloads as $childPayload) {
+                    $childEvent = Event::query()->create([
+                        'user_id' => $user->id,
+                        'submitter_id' => $user->id,
+                        'parent_event_id' => $parentEvent->id,
+                        'event_structure' => EventStructure::ChildEvent->value,
+                        'title' => $childPayload['title'],
+                        'slug' => Str::slug($childPayload['title']).'-'.Str::lower(Str::random(7)),
+                        'description' => $childPayload['description'],
+                        'starts_at' => $childPayload['starts_at'],
+                        'ends_at' => $childPayload['ends_at'],
+                        'timezone' => $timezone,
+                        'institution_id' => $locationInstitutionId,
+                        'organizer_type' => $this->organizerMorphClass($organizerType),
+                        'organizer_id' => $organizerId,
+                        'event_type' => [$childPayload['event_type']],
+                        'event_format' => $childPayload['event_format'],
+                        'visibility' => (string) $validated['form']['visibility'],
+                        'schedule_kind' => ScheduleKind::Single->value,
+                        'schedule_state' => ScheduleState::Active->value,
+                        'status' => 'draft',
+                        'is_active' => true,
+                    ]);
+
+                    $childEvent->settings()->create([
+                        'registration_required' => (bool) $validated['form']['registration_required'],
+                        'registration_mode' => (string) $validated['form']['registration_mode'],
+                    ]);
+                }
+
+                return $parentEvent;
+            });
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            $this->addError('form.title', __('The advanced event could not be created. Please try again.'));
+
+            return null;
+        }
+
+        return redirect()->to(\App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $parentEvent], panel: 'ahli'));
     }
 
     /**
@@ -170,61 +198,170 @@ class CreateAdvanced extends Component
      */
     protected function rules(): array
     {
-        $rules = [
+        return [
             'form.title' => ['required', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
-            'form.schedule_kind' => ['required', Rule::in(array_column(ScheduleKind::cases(), 'value'))],
             'form.timezone' => ['required', 'string', 'max:64'],
-            'form.event_format' => ['required', Rule::in(array_column(EventFormat::cases(), 'value'))],
+            'form.organizer_type' => ['required', Rule::in(['institution', 'speaker'])],
+            'form.organizer_id' => ['required', 'string'],
+            'form.location_institution_id' => ['nullable', 'string'],
+            'form.default_event_type' => ['required', Rule::in(array_column(EventType::cases(), 'value'))],
+            'form.default_event_format' => ['required', Rule::in(array_column(EventFormat::cases(), 'value'))],
             'form.visibility' => ['required', Rule::in(array_column(EventVisibility::cases(), 'value'))],
             'form.registration_required' => ['required', 'boolean'],
             'form.registration_mode' => ['required', Rule::in(array_column(RegistrationMode::cases(), 'value'))],
-            'form.sessions' => ['array'],
-            'form.sessions.*.starts_at' => ['required', 'date'],
-            'form.sessions.*.ends_at' => ['nullable', 'date', 'after:form.sessions.*.starts_at'],
-            'form.sessions.*.status' => ['nullable', 'in:scheduled,paused,cancelled'],
-            'form.sessions.*.capacity' => ['nullable', 'integer', 'min:1'],
-            'form.recurrence.frequency' => ['required', Rule::in(array_column(RecurrenceFrequency::cases(), 'value'))],
-            'form.recurrence.interval' => ['required', 'integer', 'min:1'],
-            'form.recurrence.by_weekdays' => ['nullable', 'array'],
-            'form.recurrence.by_weekdays.*' => ['integer', 'between:0,6'],
-            'form.recurrence.by_month_day' => ['nullable', 'integer', 'between:1,31'],
-            'form.recurrence.start_date' => ['required', 'date'],
-            'form.recurrence.until_date' => ['nullable', 'date'],
-            'form.recurrence.occurrence_count' => ['nullable', 'integer', 'min:1'],
-            'form.recurrence.timing_mode' => ['required', Rule::in(['absolute', 'prayer_relative'])],
-            'form.recurrence.starts_time' => ['nullable', 'date_format:H:i'],
-            'form.recurrence.ends_time' => ['nullable', 'date_format:H:i'],
-            'form.recurrence.prayer_reference' => ['nullable', 'string'],
-            'form.recurrence.prayer_offset' => ['nullable', 'string'],
-            'form.recurrence.prayer_display_text' => ['nullable', 'string', 'max:255'],
+            'form.children' => ['required', 'array', 'min:1'],
+            'form.children.*.title' => ['required', 'string', 'max:255'],
+            'form.children.*.description' => ['nullable', 'string'],
+            'form.children.*.starts_at' => ['required', 'date'],
+            'form.children.*.ends_at' => ['nullable', 'date'],
+            'form.children.*.event_format' => ['nullable', Rule::in(array_column(EventFormat::cases(), 'value'))],
+            'form.children.*.event_type' => ['nullable', Rule::in(array_column(EventType::cases(), 'value'))],
         ];
-
-        if (($this->form['schedule_kind'] ?? ScheduleKind::Single->value) !== ScheduleKind::Recurring->value) {
-            $rules['form.sessions'] = ['required', 'array', 'min:1'];
-        }
-
-        if (($this->form['schedule_kind'] ?? ScheduleKind::Single->value) === ScheduleKind::Recurring->value) {
-            $rules['form.recurrence.until_date'][] = 'required_without:form.recurrence.occurrence_count';
-            $rules['form.recurrence.occurrence_count'][] = 'required_without:form.recurrence.until_date';
-        }
-
-        return $rules;
     }
 
     /**
-     * @return array<string, string>
+     * @return array{title: string, description: string, starts_at: string, ends_at: string, event_format: null, event_type: null}
      */
-    protected function messages(): array
+    protected function defaultChildFormState(int $position = 1): array
     {
+        $startsAt = now()->addDays($position)->setTime(20, 0);
+
         return [
-            'form.recurrence.until_date.required_without' => __('Set either an end date or occurrence count.'),
-            'form.recurrence.occurrence_count.required_without' => __('Set either an end date or occurrence count.'),
+            'title' => '',
+            'description' => '',
+            'starts_at' => $startsAt->format('Y-m-d\TH:i'),
+            'ends_at' => $startsAt->copy()->addHours(2)->format('Y-m-d\TH:i'),
+            'event_format' => null,
+            'event_type' => null,
         ];
+    }
+
+    protected function hasBuilderAccess(): bool
+    {
+        return $this->memberInstitutions()->isNotEmpty() || $this->memberSpeakers()->isNotEmpty();
+    }
+
+    /**
+     * @return Collection<int, Institution>
+     */
+    protected function memberInstitutions(): Collection
+    {
+        $user = $this->currentUser();
+
+        if (! $user instanceof User) {
+            return collect();
+        }
+
+        return $user->institutions()
+            ->whereIn('status', ['verified', 'pending'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, Speaker>
+     */
+    protected function memberSpeakers(): Collection
+    {
+        $user = $this->currentUser();
+
+        if (! $user instanceof User) {
+            return collect();
+        }
+
+        return $user->speakers()
+            ->whereIn('status', ['verified', 'pending'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    protected function currentUser(): ?User
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user : null;
+    }
+
+    protected function ensureOrganizerIsMemberOwned(User $user, string $organizerType, string $organizerId): void
+    {
+        unset($user);
+
+        $allowed = match ($organizerType) {
+            'institution' => $this->memberInstitutions()->pluck('id')->contains($organizerId),
+            'speaker' => $this->memberSpeakers()->pluck('id')->contains($organizerId),
+            default => false,
+        };
+
+        if (! $allowed) {
+            abort(403);
+        }
+    }
+
+    protected function resolveLocationInstitutionId(User $user, string $organizerType, string $organizerId, mixed $locationInstitutionId): ?string
+    {
+        unset($user);
+
+        if ($organizerType === 'institution') {
+            return $organizerId;
+        }
+
+        if (! is_string($locationInstitutionId) || $locationInstitutionId === '') {
+            return null;
+        }
+
+        $allowedInstitutionIds = $this->memberInstitutions()->pluck('id');
+
+        if (! $allowedInstitutionIds->contains($locationInstitutionId)) {
+            abort(403);
+        }
+
+        return $locationInstitutionId;
+    }
+
+    /**
+     * @param  array<string, mixed>  $child
+     * @param  array<string, mixed>  $parentForm
+     * @return array{title: string, description: string, starts_at: Carbon, ends_at: Carbon, event_type: string, event_format: string}
+     */
+    protected function normalizeChildPayload(array $child, string $timezone, array $parentForm): array
+    {
+        $startsAt = Carbon::parse((string) $child['starts_at'], $timezone)->utc();
+        $endsAt = filled($child['ends_at'] ?? null)
+            ? Carbon::parse((string) $child['ends_at'], $timezone)->utc()
+            : $startsAt->copy()->addHours(2);
+
+        if ($endsAt->lessThanOrEqualTo($startsAt)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'form.children' => __('Each child event must end after it starts.'),
+            ]);
+        }
+
+        return [
+            'title' => trim((string) $child['title']),
+            'description' => trim((string) ($child['description'] ?? '')),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'event_type' => (string) ($child['event_type'] ?: $parentForm['default_event_type']),
+            'event_format' => (string) ($child['event_format'] ?: $parentForm['default_event_format']),
+        ];
+    }
+
+    protected function organizerMorphClass(string $organizerType): string
+    {
+        return $organizerType === 'institution' ? Institution::class : Speaker::class;
     }
 
     public function render(): View
     {
-        return view('livewire.pages.dashboard.events.create-advanced');
+        return view('livewire.pages.dashboard.events.create-advanced', [
+            'institutionOptions' => $this->memberInstitutions()->pluck('name', 'id')->all(),
+            'speakerOptions' => $this->memberSpeakers()->pluck('name', 'id')->all(),
+            'eventTypeOptions' => collect(EventType::cases())->mapWithKeys(fn (EventType $type): array => [$type->value => $type->getLabel()])->all(),
+            'eventFormatOptions' => collect(EventFormat::cases())->mapWithKeys(fn (EventFormat $format): array => [$format->value => $format->label()])->all(),
+            'visibilityOptions' => collect(EventVisibility::cases())->mapWithKeys(fn (EventVisibility $visibility): array => [$visibility->value => $visibility->getLabel()])->all(),
+        ]);
     }
 }
