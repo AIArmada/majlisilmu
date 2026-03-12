@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Database\Seeders\AdvancedEventSeeder;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DistrictSeeder;
@@ -110,8 +111,8 @@ it('tops up demo users without duplicating on subsequent runs', function () {
     $seeder->shouldReceive('call')->andReturnNull();
 
     $seeder->run();
-    expect(\App\Models\User::query()->count())->toBe(60);
+    expect(User::query()->count())->toBe(60);
 
     $seeder->run();
-    expect(\App\Models\User::query()->count())->toBe(60);
+    expect(User::query()->count())->toBe(60);
 });

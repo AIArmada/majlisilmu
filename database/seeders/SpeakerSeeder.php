@@ -10,6 +10,7 @@ use App\Enums\ContactType;
 use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SpeakerSeeder extends Seeder
@@ -23,7 +24,7 @@ class SpeakerSeeder extends Seeder
         Speaker::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 $this->seedSpeakers();
             });
         } finally {
@@ -110,7 +111,7 @@ class SpeakerSeeder extends Seeder
 
         // Bulk insert member attachments
         if ($memberAttachments !== []) {
-            \Illuminate\Support\Facades\DB::table('speaker_user')->insertOrIgnore($memberAttachments);
+            DB::table('speaker_user')->insertOrIgnore($memberAttachments);
         }
     }
 

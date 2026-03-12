@@ -5,9 +5,13 @@ namespace App\View\Components;
 use App\Models\Address;
 use App\Models\Event;
 use App\Models\EventSettings;
+use App\Models\Institution;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Venue;
 use Illuminate\View\Component;
 use Illuminate\View\View;
+use Spatie\Tags\Tag;
 
 class EventJsonLd extends Component
 {
@@ -50,11 +54,11 @@ class EventJsonLd extends Component
             'url' => route('events.show', $event),
         ];
 
-        if ($venue instanceof \App\Models\Venue) {
+        if ($venue instanceof Venue) {
             $venueAddress = $venue->addressModel;
             $region = '';
 
-            if ($venueAddress instanceof Address && $venueAddress->state instanceof \App\Models\State) {
+            if ($venueAddress instanceof Address && $venueAddress->state instanceof State) {
                 $region = $venueAddress->state->name;
             }
 
@@ -77,14 +81,14 @@ class EventJsonLd extends Component
                     'longitude' => $venueAddress->lng,
                 ];
             }
-        } elseif ($institution instanceof \App\Models\Institution) {
+        } elseif ($institution instanceof Institution) {
             $jsonLd['location'] = [
                 '@type' => 'Place',
                 'name' => $institution->name,
             ];
         }
 
-        if ($institution instanceof \App\Models\Institution) {
+        if ($institution instanceof Institution) {
             $jsonLd['organizer'] = [
                 '@type' => 'Organization',
                 'name' => $institution->name,
@@ -114,7 +118,7 @@ class EventJsonLd extends Component
 
         if ($event->tags->isNotEmpty()) {
             $jsonLd['about'] = $event->tags->map(function (mixed $tag): array {
-                $name = $tag instanceof \Spatie\Tags\Tag ? $tag->name : '';
+                $name = $tag instanceof Tag ? $tag->name : '';
 
                 return [
                     '@type' => 'Thing',

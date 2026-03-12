@@ -3,12 +3,15 @@
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
 use App\Models\Event;
+use App\Models\EventSettings;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 });
 
 it('shows the registrations relation manager for registration-required events', function () {
@@ -16,7 +19,7 @@ it('shows the registrations relation manager for registration-required events', 
     $administrator->assignRole('super_admin');
 
     $event = Event::factory()
-        ->has(\App\Models\EventSettings::factory()->state([
+        ->has(EventSettings::factory()->state([
             'registration_required' => true,
         ]), 'settings')
         ->create();
@@ -34,7 +37,7 @@ it('hides the registrations relation manager for events that do not require regi
     $administrator->assignRole('super_admin');
 
     $event = Event::factory()
-        ->has(\App\Models\EventSettings::factory()->state([
+        ->has(EventSettings::factory()->state([
             'registration_required' => false,
         ]), 'settings')
         ->create();

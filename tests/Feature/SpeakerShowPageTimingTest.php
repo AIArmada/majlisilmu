@@ -225,7 +225,7 @@ it('renders speaker page when linked event has online format and no location add
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
-        'event_format' => \App\Enums\EventFormat::Online,
+        'event_format' => EventFormat::Online,
         'institution_id' => null,
         'venue_id' => null,
         'space_id' => null,
@@ -284,5 +284,5 @@ it('shows linked non-speaker roles in a separate section on the speaker page', f
         ->assertSee('Moderator')
         ->assertSee('Forum Dengan Moderator');
 
-    expect(substr_count($response->getContent(), 'Forum Dengan Moderator'))->toBe(1);
+    expect(substr_count((string) $response->getContent(), 'Forum Dengan Moderator'))->toBe(1);
 });

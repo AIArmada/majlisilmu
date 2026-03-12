@@ -2,6 +2,7 @@
 
 use App\Enums\EventParticipantRole;
 use App\Livewire\Pages\SavedSearches\Index as SavedSearchesIndex;
+use App\Models\Reference;
 use App\Models\SavedSearch;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -119,7 +120,7 @@ it('renders source issue and reference chips using human-readable values', funct
     $issueTag = Tag::factory()->issue()->create([
         'name' => ['en' => 'Keluarga', 'ms' => 'Keluarga'],
     ]);
-    $reference = \App\Models\Reference::factory()->create([
+    $reference = Reference::factory()->create([
         'title' => 'Riyadhus Solihin',
         'is_active' => true,
     ]);

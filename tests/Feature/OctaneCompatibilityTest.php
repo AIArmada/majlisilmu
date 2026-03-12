@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Contracts\Console\Kernel;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\Listeners\CollectGarbage;
 use Laravel\Octane\Listeners\DisconnectFromDatabases;
@@ -18,7 +19,7 @@ it('enables permission reset listener in octane mode by default', function () {
 });
 
 it('registers octane commands', function () {
-    $artisanCommands = collect(app(\Illuminate\Contracts\Console\Kernel::class)->all());
+    $artisanCommands = collect(app(Kernel::class)->all());
 
     expect($artisanCommands->keys())
         ->toContain('octane:start')

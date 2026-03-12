@@ -4,11 +4,12 @@ namespace Database\Factories;
 
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
+use App\Models\Institution;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Institution>
+ * @extends Factory<Institution>
  */
 class InstitutionFactory extends Factory
 {
@@ -115,7 +116,7 @@ class InstitutionFactory extends Factory
     #[\Override]
     public function configure(): static
     {
-        return $this->afterCreating(function (\App\Models\Institution $institution) {
+        return $this->afterCreating(function (Institution $institution) {
             $institution->address()->create([
                 'line1' => fake()->streetAddress(),
                 'line2' => fake()->optional()->words(2, true),

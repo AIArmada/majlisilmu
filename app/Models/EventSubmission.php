@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasContacts;
+use Database\Factories\EventSubmissionFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventSubmission extends Model
 {
-    /** @use HasFactory<\Database\Factories\EventSubmissionFactory> */
-    use \App\Models\Concerns\HasContacts, HasFactory, HasUuids;
+    /** @use HasFactory<EventSubmissionFactory> */
+    use HasContacts, HasFactory, HasUuids;
 
     public $incrementing = false;
 

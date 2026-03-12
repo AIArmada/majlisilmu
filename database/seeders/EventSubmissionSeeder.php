@@ -8,6 +8,8 @@ use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class EventSubmissionSeeder extends Seeder
 {
@@ -23,7 +25,7 @@ class EventSubmissionSeeder extends Seeder
         EventSubmission::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 $eventIds = Event::query()->pluck('id')->toArray();
                 $userIds = User::query()->pluck('id')->toArray();
 
@@ -34,7 +36,7 @@ class EventSubmissionSeeder extends Seeder
                     $isPublic = random_int(0, 4) === 0;
                     $submitterId = (! $isPublic && ! empty($userIds)) ? $userIds[array_rand($userIds)] : null;
 
-                    $submissionId = (string) \Illuminate\Support\Str::uuid();
+                    $submissionId = (string) Str::uuid();
 
                     $submissionsToInsert[] = array_merge(
                         EventSubmission::factory()->make([
@@ -52,7 +54,7 @@ class EventSubmissionSeeder extends Seeder
                     // Add contact for public submissions (no user)
                     if (! $submitterId) {
                         $contactsToInsert[] = [
-                            'id' => (string) \Illuminate\Support\Str::uuid(),
+                            'id' => (string) Str::uuid(),
                             'contactable_type' => 'event_submission',
                             'contactable_id' => $submissionId,
                             'type' => ContactType::Main->value,
@@ -72,7 +74,7 @@ class EventSubmissionSeeder extends Seeder
                 // Bulk insert contacts
                 if ($contactsToInsert !== []) {
                     foreach (array_chunk($contactsToInsert, 200) as $chunk) {
-                        \Illuminate\Support\Facades\DB::table('contacts')->insert($chunk);
+                        DB::table('contacts')->insert($chunk);
                     }
                 }
             });

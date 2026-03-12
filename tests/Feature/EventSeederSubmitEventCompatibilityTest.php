@@ -4,9 +4,11 @@ use App\Enums\EventFormat;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Space;
+use App\Models\Speaker;
 use App\Models\Venue;
 use Database\Seeders\EventSeeder;
 use Database\Seeders\TagSeeder;
+use Illuminate\Support\Collection;
 
 it('seeds schedule events with required submit-event fields', function () {
     $this->seed(TagSeeder::class);
@@ -24,9 +26,9 @@ it('seeds schedule events with required submit-event fields', function () {
 
     $ageGroup = $event?->age_group;
 
-    expect($ageGroup)->toBeInstanceOf(\Illuminate\Support\Collection::class)
+    expect($ageGroup)->toBeInstanceOf(Collection::class)
         ->and($ageGroup?->isNotEmpty())->toBeTrue()
-        ->and($event?->organizer_type)->toBeIn([App\Models\Institution::class, App\Models\Speaker::class])
+        ->and($event?->organizer_type)->toBeIn([Institution::class, Speaker::class])
         ->and($event?->organizer_id)->not->toBeNull();
 
     $tagTypes = $event?->tags()->pluck('type')->unique()->values()->all() ?? [];

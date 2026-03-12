@@ -1,10 +1,12 @@
 <?php
 
+use Spatie\DeletedModels\Models\DeletedModel;
+
 return [
     /*
      * The model uses to store deleted models.
      */
-    'model' => Spatie\DeletedModels\Models\DeletedModel::class,
+    'model' => DeletedModel::class,
 
     /*
      * After this amount of days, the records in `deleted_models` will be deleted

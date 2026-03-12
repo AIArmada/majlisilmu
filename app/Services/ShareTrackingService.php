@@ -13,7 +13,7 @@ use App\Services\ShareTracking\AffiliatesShareTrackingService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
-final class ShareTrackingService
+final readonly class ShareTrackingService
 {
     public function __construct(
         private AffiliatesShareTrackingService $affiliatesShareTrackingService,

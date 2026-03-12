@@ -6,6 +6,8 @@ use App\Enums\NotificationCadence;
 use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
+use Database\Factories\PendingNotificationFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PendingNotification extends Model
 {
-    /** @use HasFactory<\Database\Factories\PendingNotificationFactory> */
+    /** @use HasFactory<PendingNotificationFactory> */
     use HasFactory, HasUuids;
 
     protected $table = 'notification_messages';
@@ -83,7 +85,8 @@ class PendingNotification extends Model
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
-    public function scopeForCadence(Builder $query, NotificationCadence $cadence): Builder
+    #[Scope]
+    protected function forCadence(Builder $query, NotificationCadence $cadence): Builder
     {
         return $query->where('delivery_cadence', $cadence->value);
     }
@@ -92,7 +95,8 @@ class PendingNotification extends Model
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
-    public function scopePendingDispatch(Builder $query): Builder
+    #[Scope]
+    protected function pendingDispatch(Builder $query): Builder
     {
         return $query->whereNull('dispatched_at');
     }

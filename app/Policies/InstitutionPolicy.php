@@ -26,7 +26,7 @@ class InstitutionPolicy
             return true;
         }
 
-        if (! $user instanceof \App\Models\User) {
+        if (! $user instanceof User) {
             return false;
         }
 

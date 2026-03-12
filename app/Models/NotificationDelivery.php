@@ -6,6 +6,7 @@ use App\Enums\NotificationChannel;
 use App\Enums\NotificationDeliveryStatus;
 use App\Enums\NotificationFamily;
 use App\Enums\NotificationTrigger;
+use Database\Factories\NotificationDeliveryFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NotificationDelivery extends Model
 {
-    /** @use HasFactory<\Database\Factories\NotificationDeliveryFactory> */
+    /** @use HasFactory<NotificationDeliveryFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;

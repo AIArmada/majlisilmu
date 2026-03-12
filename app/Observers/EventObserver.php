@@ -2,8 +2,12 @@
 
 namespace App\Observers;
 
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
+use App\Models\Address;
 use App\Models\Event;
+use App\Services\Notifications\EventNotificationService;
 use App\Services\PrayerTimeService;
 use App\Support\Cache\PublicListingsCache;
 use Carbon\Carbon;
@@ -58,7 +62,7 @@ class EventObserver
             return;
         }
 
-        app(\App\Services\Notifications\EventNotificationService::class)
+        app(EventNotificationService::class)
             ->notifyMaterialEventChange($event->fresh(), $changedFields);
     }
 
@@ -81,7 +85,7 @@ class EventObserver
         $prayerReference = $event->prayer_reference;
         $prayerOffset = $event->prayer_offset;
 
-        if (! $prayerReference instanceof \App\Enums\PrayerReference || ! $prayerOffset instanceof \App\Enums\PrayerOffset) {
+        if (! $prayerReference instanceof PrayerReference || ! $prayerOffset instanceof PrayerOffset) {
             Log::warning('Prayer-relative event missing prayer_reference or prayer_offset', [
                 'event_id' => $event->id,
             ]);
@@ -162,7 +166,7 @@ class EventObserver
 
         $venueAddress = $event->venue?->addressModel;
 
-        if ($venueAddress instanceof \App\Models\Address
+        if ($venueAddress instanceof Address
             && $venueAddress->lat !== null
             && $venueAddress->lng !== null) {
             return [

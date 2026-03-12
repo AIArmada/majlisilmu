@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Report;
+use App\Models\Speaker;
 use App\Services\ModerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
@@ -94,7 +98,7 @@ class ReportController extends Controller
                 'message' => 'Report submitted successfully. Our team will review it.',
             ],
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ], 201);
     }
@@ -149,10 +153,10 @@ class ReportController extends Controller
     private function getEntityClass(string $entityType): string
     {
         return match ($entityType) {
-            'event' => \App\Models\Event::class,
-            'institution' => \App\Models\Institution::class,
-            'speaker' => \App\Models\Speaker::class,
-            'donation_channel' => \App\Models\DonationChannel::class,
+            'event' => Event::class,
+            'institution' => Institution::class,
+            'speaker' => Speaker::class,
+            'donation_channel' => DonationChannel::class,
             default => throw new InvalidArgumentException("Unsupported entity type [{$entityType}]"),
         };
     }

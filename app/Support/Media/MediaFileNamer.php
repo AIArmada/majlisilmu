@@ -3,6 +3,7 @@
 namespace App\Support\Media;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\Conversions\Conversion;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -51,7 +52,7 @@ class MediaFileNamer extends FileNamer
      */
     public static function resolveBaseNameFromModel(?Model $model): string
     {
-        if (! $model instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $model instanceof Model) {
             return 'media';
         }
 
@@ -80,7 +81,7 @@ class MediaFileNamer extends FileNamer
         }
 
         // Fallback: use morph alias or class basename
-        $morphMap = array_flip(\Illuminate\Database\Eloquent\Relations\Relation::morphMap());
+        $morphMap = array_flip(Relation::morphMap());
 
         return $morphMap[$model::class] ?? str(class_basename($model))->slug()->toString();
     }
@@ -134,7 +135,7 @@ class MediaFileNamer extends FileNamer
 
     protected static function resolveSubjectLabel(?Model $model): ?string
     {
-        if (! $model instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $model instanceof Model) {
             return null;
         }
 

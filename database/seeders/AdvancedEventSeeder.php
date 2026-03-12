@@ -210,7 +210,7 @@ class AdvancedEventSeeder extends Seeder
             'event_structure' => $eventStructure->value,
             'institution_id' => $institution?->id,
             'venue_id' => null,
-            'organizer_type' => $institution !== null ? Institution::class : null,
+            'organizer_type' => $institution instanceof Institution ? Institution::class : null,
             'organizer_id' => $institution?->id,
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower(Str::random(6)),
@@ -236,7 +236,7 @@ class AdvancedEventSeeder extends Seeder
             'prayer_display_text' => null,
         ]);
 
-        if (! empty($speakerIds)) {
+        if ($speakerIds !== []) {
             $selected = array_slice($speakerIds, 0, random_int(1, min(3, count($speakerIds))));
             $otherParticipants = [];
 

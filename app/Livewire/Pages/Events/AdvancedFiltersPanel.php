@@ -221,14 +221,12 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->label(__('Institution'))
                                     ->placeholder(__('Any Institution'))
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (Get $get, string $search): array {
-                                        return $this->searchInstitutionOptions(
-                                            stateId: $this->normalizeNullableString($get('state_id')),
-                                            districtId: $this->normalizeNullableString($get('district_id')),
-                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                            search: $search,
-                                        );
-                                    })
+                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchInstitutionOptions(
+                                        stateId: $this->normalizeNullableString($get('state_id')),
+                                        districtId: $this->normalizeNullableString($get('district_id')),
+                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        search: $search,
+                                    ))
                                     ->getOptionLabelUsing(fn (string $value): ?string => $this->institutionOptionLabel($value))
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
                                     ->live(),
@@ -237,14 +235,12 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->label(__('Tempat'))
                                     ->placeholder(__('Any Venue'))
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (Get $get, string $search): array {
-                                        return $this->searchVenueOptions(
-                                            stateId: $this->normalizeNullableString($get('state_id')),
-                                            districtId: $this->normalizeNullableString($get('district_id')),
-                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                            search: $search,
-                                        );
-                                    })
+                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchVenueOptions(
+                                        stateId: $this->normalizeNullableString($get('state_id')),
+                                        districtId: $this->normalizeNullableString($get('district_id')),
+                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        search: $search,
+                                    ))
                                     ->getOptionLabelUsing(fn (string $value): ?string => $this->venueOptionLabel($value))
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
                                     ->live(),
@@ -376,12 +372,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->placeholder(__('Any Type'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(function (): array {
-                                        return collect(EventType::cases())
-                                            ->mapToGroups(fn (EventType $type): array => [$type->getGroup() => [$type->value => $type->getLabel()]])
-                                            ->map(fn (Collection $group): array => $group->collapse()->all())
-                                            ->toArray();
-                                    })
+                                    ->options(fn (): array => collect(EventType::cases())
+                                        ->mapToGroups(fn (EventType $type): array => [$type->getGroup() => [$type->value => $type->getLabel()]])
+                                        ->map(fn (Collection $group): array => $group->collapse()->all())
+                                        ->toArray())
                                     ->live(),
 
                                 Select::make('event_format')
@@ -727,7 +721,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
 
         $values = is_array($value) ? $value : [$value];
 
-        return array_values(array_filter(array_map('strval', $values), static fn (string $item): bool => $item !== ''));
+        return array_values(array_filter(array_map(strval(...), $values), static fn (string $item): bool => $item !== ''));
     }
 
     private function normalizeNullableString(mixed $value): ?string

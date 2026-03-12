@@ -6,6 +6,7 @@ use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
 use Database\Factories\NotificationMessageFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -37,7 +38,8 @@ class NotificationMessage extends DatabaseNotification
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
-    public function scopeVisibleInInbox(Builder $query): Builder
+    #[Scope]
+    protected function visibleInInbox(Builder $query): Builder
     {
         return $query->where('inbox_visible', true);
     }

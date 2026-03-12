@@ -7,14 +7,16 @@ use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RoleSeeder::class);
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
 });
 
 it('shows verification warnings in moderation queue', function () {

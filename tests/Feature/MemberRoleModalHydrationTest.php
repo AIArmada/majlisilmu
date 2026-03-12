@@ -13,13 +13,16 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\ScopedMemberRolesSeeder;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function (): void {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
-    $this->seed(\Database\Seeders\ScopedMemberRolesSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+    $this->seed(ScopedMemberRolesSeeder::class);
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 });

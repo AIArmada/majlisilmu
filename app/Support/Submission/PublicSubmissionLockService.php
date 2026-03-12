@@ -3,19 +3,21 @@
 namespace App\Support\Submission;
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\AuthzScope;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
-final class PublicSubmissionLockService
+final readonly class PublicSubmissionLockService
 {
     public function __construct(
-        private readonly MemberRoleScopes $memberRoleScopes,
+        private MemberRoleScopes $memberRoleScopes,
     ) {}
 
     public function institutionEligibility(Institution $institution): SubmissionLockEligibilityResult
@@ -209,11 +211,11 @@ final class PublicSubmissionLockService
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, User>  $members
+     * @param  Collection<int, User>  $members
      */
     private function resolveEligibility(
-        \Illuminate\Support\Collection $members,
-        \AIArmada\FilamentAuthz\Models\AuthzScope $scope,
+        Collection $members,
+        AuthzScope $scope,
         string $noMembersReason,
         string $missingRoleReason,
         string $missingVerifiedPhoneReason,

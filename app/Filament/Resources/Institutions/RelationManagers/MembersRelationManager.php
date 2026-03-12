@@ -40,9 +40,7 @@ class MembersRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('roles')
                     ->label('Roles')
-                    ->getStateUsing(function (User $record): string {
-                        return Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
-                    }),
+                    ->getStateUsing(fn (User $record): string => Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—'),
             ])
             ->headerActions([
                 Action::make('addMember')
@@ -71,11 +69,9 @@ class MembersRelationManager extends RelationManager
                     ->form([
                         $this->makeRoleSelect(),
                     ])
-                    ->fillForm(function (User $record): array {
-                        return [
-                            'role_ids' => $this->getMemberRoleIds($record),
-                        ];
-                    })
+                    ->fillForm(fn (User $record): array => [
+                        'role_ids' => $this->getMemberRoleIds($record),
+                    ])
                     ->action(function (array $data, User $record): void {
                         $this->syncMemberRoles($record, $data['role_ids'] ?? []);
                         app(PublicSubmissionLockService::class)->syncForUser($record);

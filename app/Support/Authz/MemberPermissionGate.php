@@ -10,10 +10,10 @@ use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
-final class MemberPermissionGate
+final readonly class MemberPermissionGate
 {
     public function __construct(
-        private readonly MemberRoleScopes $memberRoleScopes,
+        private MemberRoleScopes $memberRoleScopes,
     ) {}
 
     public function canInstitution(User $user, string $permission, Institution $institution): bool

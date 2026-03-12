@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 
 class NotificationDestinationController extends Controller
@@ -63,7 +64,7 @@ class NotificationDestinationController extends Controller
         ]);
     }
 
-    public function destroyPush(Request $request, string $installation): \Illuminate\Http\Response
+    public function destroyPush(Request $request, string $installation): Response
     {
         $this->currentUser($request)
             ->notificationDestinations()

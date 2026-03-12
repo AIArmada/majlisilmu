@@ -15,4 +15,3 @@ class EditInstitution extends EditRecord
         return [];
     }
 }
-

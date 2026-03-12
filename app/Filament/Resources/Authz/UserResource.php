@@ -7,28 +7,28 @@ namespace App\Filament\Resources\Authz;
 use AIArmada\FilamentAuthz\Resources\UserResource as BaseUserResource;
 use AIArmada\FilamentAuthz\Support\UserAuthzForm;
 use AIArmada\FilamentAuthz\Tables\Actions\ImpersonateTableAction;
-use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
 use App\Filament\Resources\Authz\UserResource\Pages\CreateUser;
 use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
+use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
 use App\Filament\Resources\Authz\UserResource\Pages\ViewUser;
+use DateTimeZone;
 use Filament\Actions;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
-use Ysfkaya\FilamentPhoneInput\Tables\PhoneColumn;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
-use DateTimeZone;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
+use Ysfkaya\FilamentPhoneInput\Tables\PhoneColumn;
 
 class UserResource extends BaseUserResource
 {
-
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
@@ -39,6 +39,7 @@ class UserResource extends BaseUserResource
         ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return parent::table($table)
@@ -72,11 +73,12 @@ class UserResource extends BaseUserResource
             ->actions([
                 ImpersonateTableAction::make(),
                 Actions\ViewAction::make()
-                    ->url(fn(Model $record): string => static::getUrl('view', ['record' => $record])),
+                    ->url(fn (Model $record): string => static::getUrl('view', ['record' => $record])),
                 Actions\EditAction::make(),
             ]);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -126,18 +128,14 @@ class UserResource extends BaseUserResource
                 'password' => TextInput::make('password')
                     ->password()
                     ->dehydrateStateUsing(function (?string $state): ?string {
-                            if ($state === null || $state === '') {
-                                return null;
-                            }
+                        if ($state === null || $state === '') {
+                            return null;
+                        }
 
-                            return Hash::make($state);
-                        })
-                    ->dehydrated(function (?string $state): bool {
-                            return filled($state);
-                        })
-                    ->required(function (string $operation): bool {
-                            return $operation === 'create';
-                        })
+                        return Hash::make($state);
+                    })
+                    ->dehydrated(fn (?string $state): bool => filled($state))
+                    ->required(fn (string $operation): bool => $operation === 'create')
                     ->maxLength(255),
                 default => TextInput::make((string) $field)
                     ->maxLength(255),
@@ -153,7 +151,7 @@ class UserResource extends BaseUserResource
     protected static function getTimezoneOptions(): array
     {
         return collect(DateTimeZone::listIdentifiers())
-            ->mapWithKeys(fn(string $timezone): array => [$timezone => $timezone])
+            ->mapWithKeys(fn (string $timezone): array => [$timezone => $timezone])
             ->all();
     }
 }

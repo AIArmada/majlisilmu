@@ -9,9 +9,12 @@ use App\Enums\SocialMediaPlatform;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Submission\PublicSubmissionLockService;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -42,14 +45,14 @@ class InstitutionForm
                     ->columns(2),
                 Section::make('Media')
                     ->components([
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('logo')
+                        SpatieMediaLibraryFileUpload::make('logo')
                             ->collection('logo')
                             ->image()
                             ->imageEditor()
                             ->avatar()
                             ->conversion('thumb')
                             ->helperText('Institution logo (recommended: 400x400)'),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                        SpatieMediaLibraryFileUpload::make('cover')
                             ->collection('cover')
                             ->label('Cover Image')
                             ->image()
@@ -61,7 +64,7 @@ class InstitutionForm
                             ->responsiveImages()
                             ->conversion('banner')
                             ->helperText('Main image (recommended: 1200x675)'),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                        SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
                             ->reorderable()
@@ -74,7 +77,7 @@ class InstitutionForm
                     ->columns(2),
                 Section::make('Contact')
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('contacts')
+                        Repeater::make('contacts')
                             ->relationship()
                             ->schema([
                                 Select::make('category')
@@ -99,7 +102,7 @@ class InstitutionForm
                                     ->options(ContactType::class)
                                     ->default(ContactType::Main)
                                     ->required(),
-                                \Filament\Forms\Components\Toggle::make('is_public')
+                                Toggle::make('is_public')
                                     ->label('Public')
                                     ->default(true),
                             ])
@@ -193,22 +196,22 @@ class InstitutionForm
                                 'rejected' => 'Rejected',
                             ])
                             ->required(),
-                        \Filament\Forms\Components\Toggle::make('allow_public_event_submission')
+                        Toggle::make('allow_public_event_submission')
                             ->label('Allow Public Event Submission')
                             ->disabled(fn (?Institution $record, string $operation): bool => ! self::canManagePublicSubmissionToggle($record, $operation))
                             ->helperText(fn (?Institution $record, string $operation): string => self::publicSubmissionHelperText($record, $operation)),
-                        \Filament\Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
                     ])
                     ->columns(1),
                 Section::make('Social Media')
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('socialMedia')
+                        Repeater::make('socialMedia')
                             ->relationship()
                             ->schema([
                                 Select::make('platform')
-                                    ->options(\App\Enums\SocialMediaPlatform::class)
+                                    ->options(SocialMediaPlatform::class)
                                     ->searchable()
                                     ->required()
                                     ->columnSpan(1),

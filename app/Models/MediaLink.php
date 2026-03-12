@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\MediaLinkFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class MediaLink extends Model
 {
-    /** @use HasFactory<\Database\Factories\MediaLinkFactory> */
+    /** @use HasFactory<MediaLinkFactory> */
     use HasFactory, HasUuids;
 
     protected $table = 'media_links';

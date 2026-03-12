@@ -640,7 +640,7 @@ class EventForm
             return '-';
         }
 
-        return $submission->submitter instanceof \App\Models\User
+        return $submission->submitter instanceof User
             ? 'Pengguna berdaftar'
             : 'Penghantaran awam';
     }

@@ -15,6 +15,7 @@ class EditUser extends EditRecord
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    #[\Override]
     protected function mutateFormDataBeforeSave(array $data): array
     {
         unset($data['roles'], $data['permissions']);

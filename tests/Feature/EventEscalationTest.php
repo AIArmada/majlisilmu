@@ -5,14 +5,15 @@ use App\Models\Event;
 use App\Models\User;
 use App\Notifications\EventEscalationNotification;
 use Illuminate\Support\Facades\Notification;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     // Disable teams to simplify role lookup for these tests
     config(['permission.teams' => false]);
-    app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+    app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
     // Get the configured Role class
-    $roleClass = app(\Spatie\Permission\PermissionRegistrar::class)->getRoleClass();
+    $roleClass = app(PermissionRegistrar::class)->getRoleClass();
 
     // Create roles using the correct model
     if (! $roleClass::where('name', 'moderator')->exists()) {

@@ -1145,13 +1145,7 @@ class DawahShareService
             return false;
         }
 
-        foreach ((array) config('dawah-share.bot_user_agents', []) as $needle) {
-            if (str_contains($userAgent, Str::lower((string) $needle))) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any((array) config('dawah-share.bot_user_agents', []), fn ($needle) => str_contains($userAgent, Str::lower((string) $needle)));
     }
 
     private function shouldIgnoreRequest(Request $request): bool

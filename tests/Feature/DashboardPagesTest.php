@@ -3,6 +3,7 @@
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\EventStructure;
+use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Livewire\Pages\Dashboard\InstitutionDashboard;
 use App\Livewire\Pages\Dashboard\UserDashboard;
 use App\Models\Event;
@@ -181,7 +182,7 @@ it('renders a valid event management link on the user dashboard for manageable e
         'starts_at' => now()->addDays(3),
     ]);
 
-    $expectedManagementUrl = \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $event], panel: 'ahli');
+    $expectedManagementUrl = EventResource::getUrl('view', ['record' => $event], panel: 'ahli');
 
     $this->actingAs($user)
         ->get(route('dashboard'))

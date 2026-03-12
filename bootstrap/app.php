@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\SetFilamentTimezone;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TrackDawahShareAttribution;
 use Illuminate\Foundation\Application;
@@ -20,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Set default Filament timezone for every request (fixes Octane state persistence)
-        $middleware->append(\App\Http\Middleware\SetFilamentTimezone::class);
+        $middleware->append(SetFilamentTimezone::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -95,7 +95,7 @@ class Address extends Model
             return self::normalizeGoogleMapsUrlLength($trimmedUrl);
         }
 
-        $resolvedUrl = filled($effectiveUrl) ? (string) $effectiveUrl : $trimmedUrl;
+        $resolvedUrl = filled($effectiveUrl) ? $effectiveUrl : $trimmedUrl;
 
         return self::normalizeGoogleMapsUrlLength($resolvedUrl);
     }
@@ -153,7 +153,7 @@ class Address extends Model
             return '';
         }
 
-        $rawName = urldecode((string) $matches[1]);
+        $rawName = urldecode($matches[1]);
         $normalizedName = str_replace('+', ' ', $rawName);
 
         return trim($normalizedName);
