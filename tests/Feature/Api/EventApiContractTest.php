@@ -254,7 +254,7 @@ it('filters events by prayer_time keyword', function () {
         ->not()->toContain($subuhEvent->id);
 });
 
-it('filters events by participant roles and role-specific linked speakers', function () {
+it('filters events by key person roles and role-specific linked speakers', function () {
     $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
     $moderatorSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
 
@@ -305,7 +305,7 @@ it('filters events by participant roles and role-specific linked speakers', func
         ->not()->toContain($imamEvent->id);
 });
 
-it('includes participant data in the event api response', function () {
+it('includes key person data in the event api response', function () {
     $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
 
     $event = Event::factory()->create([

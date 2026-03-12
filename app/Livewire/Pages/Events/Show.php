@@ -204,7 +204,7 @@ class Show extends Component
      * @return Collection<int|string, \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson>>
      */
     #[Computed]
-    public function roleParticipants(): Collection
+    public function keyPeopleByRole(): Collection
     {
         return collect($this->event->keyPeople
             ->filter(fn (EventKeyPerson $keyPerson): bool => $keyPerson->role !== EventParticipantRole::Speaker && $keyPerson->is_public)

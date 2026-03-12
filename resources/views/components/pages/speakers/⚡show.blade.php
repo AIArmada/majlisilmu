@@ -184,7 +184,7 @@ new class extends Component {
                 'event.media',
             ])
             ->get()
-            ->sortBy(fn (EventKeyPerson $participant): int => $participant->event?->starts_at?->timestamp ?? PHP_INT_MAX)
+            ->sortBy(fn (EventKeyPerson $keyPerson): int => $keyPerson->event?->starts_at?->timestamp ?? PHP_INT_MAX)
             ->take($this->otherRolesUpcomingPerPage)
             ->values();
     }
@@ -218,7 +218,7 @@ new class extends Component {
                 'event.media',
             ])
             ->get()
-            ->sortByDesc(fn (EventKeyPerson $participant): int => $participant->event?->starts_at?->timestamp ?? 0)
+            ->sortByDesc(fn (EventKeyPerson $keyPerson): int => $keyPerson->event?->starts_at?->timestamp ?? 0)
             ->take($this->otherRolesPastPerPage)
             ->values();
     }
@@ -380,8 +380,8 @@ new class extends Component {
         return \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A');
     };
 
-    $resolveParticipantRoleLabel = static function (EventKeyPerson $participant): string {
-        $role = $participant->role;
+    $resolveKeyPersonRoleLabel = static function (EventKeyPerson $keyPerson): string {
+        $role = $keyPerson->role;
 
         if ($role instanceof EventParticipantRole) {
             return $role->getLabel();
@@ -975,7 +975,7 @@ new class extends Component {
                                             </div>
                                             <div class="min-w-0 flex-1 space-y-2">
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/70">{{ $resolveParticipantRoleLabel($participant) }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/70">{{ $resolveKeyPersonRoleLabel($participant) }}</span>
                                                     <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/70">{{ $resolveEventTypeLabel($event->event_type) }}</span>
                                                 </div>
                                                 <h3 class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-amber-700">{{ $event->title }}</h3>
@@ -1031,7 +1031,7 @@ new class extends Component {
                                             </div>
                                             <div class="min-w-0 flex-1 space-y-2">
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/70">{{ $resolveParticipantRoleLabel($participant) }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/70">{{ $resolveKeyPersonRoleLabel($participant) }}</span>
                                                     <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/70">{{ $resolveEventTypeLabel($event->event_type) }}</span>
                                                 </div>
                                                 <h3 class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-slate-700">{{ $event->title }}</h3>

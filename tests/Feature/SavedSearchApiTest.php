@@ -77,7 +77,7 @@ describe('Saved Search API Endpoints', function () {
                     ->assertJsonValidationErrors(['notify']);
             });
 
-            it('validates participant role options', function () {
+            it('validates key person role options', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Role Search',
                     'filters' => [

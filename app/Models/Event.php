@@ -17,6 +17,7 @@ use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasDonationChannels;
+use App\Models\Concerns\HasLanguages;
 use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
 use App\Support\Authz\MemberPermissionGate;
@@ -74,7 +75,7 @@ use Spatie\Tags\HasTags;
 class Event extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<EventFactory> */
-    use \App\Models\Concerns\HasLanguages, Auditable, HasAddress, HasDonationChannels, HasFactory, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
+    use Auditable, HasAddress, HasDonationChannels, HasFactory, HasLanguages, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     /**
      * Statuses visible on public listings and detail pages.
@@ -304,7 +305,7 @@ class Event extends Model implements AuditableContract, HasMedia
         /** @var \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson> $keyPeople */
         $keyPeople = $this->keyPeople;
 
-        $participantRoles = $keyPeople
+        $keyPersonRoles = $keyPeople
             ->map(function (EventKeyPerson $keyPerson): string {
                 $role = $keyPerson->role;
 
@@ -315,7 +316,7 @@ class Event extends Model implements AuditableContract, HasMedia
             ->values()
             ->all();
 
-        $participantSpeakerIds = $keyPeople
+        $keyPersonSpeakerIds = $keyPeople
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->unique()
@@ -405,8 +406,8 @@ class Event extends Model implements AuditableContract, HasMedia
                 ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
                 ->values()
                 ->all(),
-            'key_person_roles' => $participantRoles,
-            'participant_speaker_ids' => $participantSpeakerIds,
+            'key_person_roles' => $keyPersonRoles,
+            'key_person_speaker_ids' => $keyPersonSpeakerIds,
             'moderator_ids' => $moderatorIds,
             'imam_ids' => $imamIds,
             'khatib_ids' => $khatibIds,

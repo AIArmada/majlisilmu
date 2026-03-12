@@ -141,14 +141,14 @@ class EventController extends Controller
                     });
                 }),
                 AllowedFilter::callback('key_person_roles', function (Builder $query, mixed $value): void {
-                    $participantRoles = $this->normalizeParticipantRoles($value);
+                    $keyPersonRoles = $this->normalizeKeyPersonRoles($value);
 
-                    if ($participantRoles === []) {
+                    if ($keyPersonRoles === []) {
                         return;
                     }
 
-                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($participantRoles): void {
-                        $participantQuery->whereIn('role', $participantRoles);
+                    $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($keyPersonRoles): void {
+                        $keyPersonQuery->whereIn('role', $keyPersonRoles);
                     });
                 }),
                 AllowedFilter::callback('moderator_ids', function (Builder $query, mixed $value): void {
@@ -158,8 +158,8 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
-                        $participantQuery
+                    $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
+                        $keyPersonQuery
                             ->where('role', EventParticipantRole::Moderator->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
@@ -171,8 +171,8 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
-                        $participantQuery
+                    $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
+                        $keyPersonQuery
                             ->where('role', EventParticipantRole::Imam->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
@@ -184,8 +184,8 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
-                        $participantQuery
+                    $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
+                        $keyPersonQuery
                             ->where('role', EventParticipantRole::Khatib->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
@@ -197,8 +197,8 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
-                        $participantQuery
+                    $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
+                        $keyPersonQuery
                             ->where('role', EventParticipantRole::Bilal->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
@@ -393,7 +393,7 @@ class EventController extends Controller
     /**
      * @return list<string>
      */
-    private function normalizeParticipantRoles(mixed $value): array
+    private function normalizeKeyPersonRoles(mixed $value): array
     {
         return array_values(array_filter(
             array_map(

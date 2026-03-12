@@ -238,17 +238,17 @@ class AdvancedEventSeeder extends Seeder
 
         if ($speakerIds !== []) {
             $selected = array_slice($speakerIds, 0, random_int(1, min(3, count($speakerIds))));
-            $otherParticipants = [];
+            $otherKeyPeople = [];
 
             if (count($selected) > 1) {
-                $otherParticipants[] = [
+                $otherKeyPeople[] = [
                     'role' => EventParticipantRole::Moderator->value,
                     'speaker_id' => $selected[0],
                     'is_public' => true,
                 ];
             }
 
-            app(EventKeyPersonSyncService::class)->sync($event, $selected, $otherParticipants);
+            app(EventKeyPersonSyncService::class)->sync($event, $selected, $otherKeyPeople);
         }
 
         return $event;
