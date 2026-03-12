@@ -65,7 +65,7 @@ class VenueSeeder extends Seeder
                         'line2' => fake()->optional()->words(2, true),
                         'postcode' => fake()->postcode(),
                         'country_id' => $malaysia?->id,
-                        'state_id' => $state?->id,
+                        'state_id' => $state->id,
                         'lat' => fake()->randomFloat(7, 1.0, 7.0),
                         'lng' => fake()->randomFloat(7, 99.0, 119.0),
                         'google_place_id' => fake()->optional()->numerify('ChI###########'),

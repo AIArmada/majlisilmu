@@ -8,6 +8,9 @@ use Carbon\CarbonInterface;
 
 final readonly class ShareTrackingOutcomeData
 {
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
     public function __construct(
         public string $id,
         public string $backend,

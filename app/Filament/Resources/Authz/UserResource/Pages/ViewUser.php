@@ -47,7 +47,7 @@ class ViewUser extends ViewRecord
                 ->with(['event:id,title,status,starts_at', 'verifiedBy:id,name'])
                 ->orderByDesc('checked_in_at'),
             'registrations' => fn ($query) => $query
-                ->with(['event:id,title,status,starts_at', 'session:id,title,event_id'])
+                ->with(['event:id,title,status,starts_at'])
                 ->latest(),
             'followingInstitutions' => fn ($query) => $query->orderBy('name'),
             'followingSpeakers' => fn ($query) => $query->orderBy('name'),

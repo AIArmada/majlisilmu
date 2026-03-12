@@ -86,7 +86,7 @@ class Address extends Model
                     ],
                     'on_stats' => static function (TransferStats $stats) use (&$effectiveUrl): void {
                         $effectiveUri = $stats->getEffectiveUri();
-                        $effectiveUrl = $effectiveUri ? (string) $effectiveUri : null;
+                        $effectiveUrl = (string) $effectiveUri;
                     },
                 ])
                 ->timeout(10)
@@ -95,7 +95,7 @@ class Address extends Model
             return self::normalizeGoogleMapsUrlLength($trimmedUrl);
         }
 
-        $resolvedUrl = filled($effectiveUrl) ? $effectiveUrl : $trimmedUrl;
+        $resolvedUrl = is_string($effectiveUrl) && $effectiveUrl !== '' ? $effectiveUrl : $trimmedUrl;
 
         return self::normalizeGoogleMapsUrlLength($resolvedUrl);
     }

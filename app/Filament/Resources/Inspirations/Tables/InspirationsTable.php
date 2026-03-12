@@ -85,8 +85,12 @@ class InspirationsTable
                         ->label('Toggle Active')
                         ->icon('heroicon-o-arrow-path')
                         ->color('warning')
-                        ->action(function (Collection $records) {
-                            $records->each(function ($record) {
+                        ->action(function (Collection $records): void {
+                            $records->each(function ($record): void {
+                                if (! $record instanceof Inspiration) {
+                                    return;
+                                }
+
                                 $record->update(['is_active' => ! $record->is_active]);
                             });
                         })

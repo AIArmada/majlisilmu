@@ -9,6 +9,7 @@ use App\Data\ShareTracking\ShareTrackingOutcomeData;
 use App\Data\ShareTracking\ShareTrackingVisitData;
 use App\Models\User;
 use App\Services\ShareTracking\AffiliatesShareTrackingAnalyticsService;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 final readonly class ShareTrackingAnalyticsService

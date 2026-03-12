@@ -673,8 +673,8 @@
                         </div>
                     @else
                         <div class="mt-6 grid gap-4 lg:grid-cols-2">
-                            @foreach($paginatedSubmittedEvents as $submission)
-                                @php($event = $submission->event)
+                            @foreach($paginatedSubmittedEvents as $submissionEntry)
+                                @php($event = $submissionEntry['event'])
                                 @if($event)
                                     <article class="overflow-hidden rounded-[1.5rem] border border-slate-200">
                                     <div class="aspect-[16/8] overflow-hidden bg-slate-100">
@@ -686,7 +686,7 @@
                                                 {{ $eventWorkflowStatusLabel((string) $event->status) }}
                                             </span>
                                             <span class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                                                {{ __('Submitted') }} {{ $submission->created_at?->diffForHumans() }}
+                                                {{ __('Submitted') }} {{ $submissionEntry['created_at']?->diffForHumans() }}
                                             </span>
                                         </div>
                                         <div>
@@ -694,9 +694,9 @@
                                             <p class="mt-2 text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A') : __('Time to be confirmed') }}</p>
                                             <p class="mt-1 text-sm text-slate-500">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online / TBD') }}</p>
                                         </div>
-                                        @if(filled($submission->notes))
+                                        @if(filled($submissionEntry['notes']))
                                             <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                                                {{ $submission->notes }}
+                                                {{ $submissionEntry['notes'] }}
                                             </div>
                                         @endif
                                         <div class="flex flex-wrap gap-2">
@@ -704,7 +704,7 @@
                                                 class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-600">
                                                 {{ __('View event') }}
                                             </a>
-                                            @if($user instanceof \App\Models\User && $event->userCanManage($user))
+                                            @if($this->canManageSubmittedEvent($event))
                                                 <a href="{{ \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $event], panel: 'ahli') }}"
                                                     class="inline-flex items-center justify-center rounded-xl border border-violet-200 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">
                                                     {{ __('Manage event') }}
