@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use Database\Factories\EventKeyPersonFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,7 +37,7 @@ class EventKeyPerson extends Model
     protected function casts(): array
     {
         return [
-            'role' => EventParticipantRole::class,
+            'role' => EventKeyPersonRole::class,
             'order_column' => 'integer',
             'is_public' => 'boolean',
         ];

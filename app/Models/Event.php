@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -309,7 +309,7 @@ class Event extends Model implements AuditableContract, HasMedia
             ->map(function (EventKeyPerson $keyPerson): string {
                 $role = $keyPerson->role;
 
-                return $role instanceof EventParticipantRole ? $role->value : '';
+                return $role instanceof EventKeyPersonRole ? $role->value : '';
             })
             ->reject(static fn (string $role): bool => $role === '')
             ->unique()
@@ -324,28 +324,28 @@ class Event extends Model implements AuditableContract, HasMedia
             ->all();
 
         $moderatorIds = $keyPeople
-            ->where('role', EventParticipantRole::Moderator)
+            ->where('role', EventKeyPersonRole::Moderator)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
 
         $imamIds = $keyPeople
-            ->where('role', EventParticipantRole::Imam)
+            ->where('role', EventKeyPersonRole::Imam)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
 
         $khatibIds = $keyPeople
-            ->where('role', EventParticipantRole::Khatib)
+            ->where('role', EventKeyPersonRole::Khatib)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
 
         $bilalIds = $keyPeople
-            ->where('role', EventParticipantRole::Bilal)
+            ->where('role', EventKeyPersonRole::Bilal)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
@@ -529,7 +529,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function speakerKeyPeople(): HasMany
     {
-        return $this->keyPeople()->where('role', EventParticipantRole::Speaker->value);
+        return $this->keyPeople()->where('role', EventKeyPersonRole::Speaker->value);
     }
 
     /**
@@ -537,7 +537,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function nonSpeakerKeyPeople(): HasMany
     {
-        return $this->keyPeople()->where('role', '!=', EventParticipantRole::Speaker->value);
+        return $this->keyPeople()->where('role', '!=', EventKeyPersonRole::Speaker->value);
     }
 
     public function eventStructure(): EventStructure
@@ -578,8 +578,8 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         return $this->belongsToMany(Speaker::class, 'event_key_people', 'event_id', 'speaker_id')
             ->using(EventKeyPersonPivot::class)
-            ->wherePivot('role', EventParticipantRole::Speaker->value)
-            ->withPivotValue('role', EventParticipantRole::Speaker->value)
+            ->wherePivot('role', EventKeyPersonRole::Speaker->value)
+            ->withPivotValue('role', EventKeyPersonRole::Speaker->value)
             ->withPivot(['id', 'role', 'name', 'order_column', 'is_public', 'notes'])
             ->withTimestamps()
             ->orderByPivot('order_column');

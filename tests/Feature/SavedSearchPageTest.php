@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Livewire\Pages\SavedSearches\Index as SavedSearchesIndex;
 use App\Models\Reference;
 use App\Models\SavedSearch;
@@ -143,7 +143,7 @@ it('renders key person role and linked profile chips using human-readable values
 
     $this->actingAs($user)
         ->get(route('saved-searches.index', [
-            'key_person_roles' => [EventParticipantRole::PersonInCharge->value],
+            'key_person_roles' => [EventKeyPersonRole::PersonInCharge->value],
             'imam_ids' => [$imamSpeaker->id],
         ]))
         ->assertOk()

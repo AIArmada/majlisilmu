@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Speaker;
@@ -23,7 +23,7 @@ class EventKeyPersonFactory extends Factory
         return [
             'event_id' => Event::factory(),
             'speaker_id' => Speaker::factory(),
-            'role' => EventParticipantRole::Speaker,
+            'role' => EventKeyPersonRole::Speaker,
             'name' => null,
             'order_column' => 1,
             'is_public' => true,

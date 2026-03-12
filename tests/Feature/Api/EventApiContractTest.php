@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\District;
@@ -265,7 +265,7 @@ it('filters events by key person roles and role-specific linked speakers', funct
     ]);
 
     $imamEvent->keyPeople()->create([
-        'role' => EventParticipantRole::Imam,
+        'role' => EventKeyPersonRole::Imam,
         'speaker_id' => $imamSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
@@ -278,7 +278,7 @@ it('filters events by key person roles and role-specific linked speakers', funct
     ]);
 
     $moderatedEvent->keyPeople()->create([
-        'role' => EventParticipantRole::Moderator,
+        'role' => EventKeyPersonRole::Moderator,
         'speaker_id' => $moderatorSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
@@ -315,7 +315,7 @@ it('includes key person data in the event api response', function () {
     ]);
 
     $event->keyPeople()->create([
-        'role' => EventParticipantRole::Imam,
+        'role' => EventKeyPersonRole::Imam,
         'speaker_id' => $imamSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
@@ -324,6 +324,6 @@ it('includes key person data in the event api response', function () {
     $response = $this->getJson('/api/v1/events/'.$event->id);
 
     $response->assertOk()
-        ->assertJsonPath('data.key_people.0.role', EventParticipantRole::Imam->value)
+        ->assertJsonPath('data.key_people.0.role', EventKeyPersonRole::Imam->value)
         ->assertJsonPath('data.key_people.0.speaker.id', $imamSpeaker->id);
 });

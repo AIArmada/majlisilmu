@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Models\EventKeyPerson;
 use App\Models\Speaker;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
@@ -383,7 +383,7 @@ new class extends Component {
     $resolveKeyPersonRoleLabel = static function (EventKeyPerson $keyPerson): string {
         $role = $keyPerson->role;
 
-        if ($role instanceof EventParticipantRole) {
+        if ($role instanceof EventKeyPersonRole) {
             return $role->getLabel();
         }
 

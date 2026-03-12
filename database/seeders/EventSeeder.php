@@ -7,7 +7,7 @@ use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
@@ -155,7 +155,7 @@ class EventSeeder extends Seeder
                                 'id' => (string) Str::uuid(),
                                 'event_id' => $event->id,
                                 'speaker_id' => $speakerId,
-                                'role' => EventParticipantRole::Speaker->value,
+                                'role' => EventKeyPersonRole::Speaker->value,
                                 'name' => null,
                                 'order_column' => $index + 1,
                                 'is_public' => true,
@@ -740,7 +740,7 @@ class EventSeeder extends Seeder
 
             if (is_string($moderatorSpeakerId)) {
                 $otherKeyPeople[] = [
-                    'role' => EventParticipantRole::Moderator->value,
+                    'role' => EventKeyPersonRole::Moderator->value,
                     'speaker_id' => $moderatorSpeakerId,
                     'is_public' => true,
                 ];
@@ -751,7 +751,7 @@ class EventSeeder extends Seeder
             $imamSpeakerId = $speakerIds[0] ?? null;
 
             $otherKeyPeople[] = [
-                'role' => EventParticipantRole::Imam->value,
+                'role' => EventKeyPersonRole::Imam->value,
                 'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
                 'name' => is_string($imamSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
@@ -763,19 +763,19 @@ class EventSeeder extends Seeder
             $imamSpeakerId = $speakerIds[1] ?? $khatibSpeakerId;
 
             $otherKeyPeople[] = [
-                'role' => EventParticipantRole::Khatib->value,
+                'role' => EventKeyPersonRole::Khatib->value,
                 'speaker_id' => is_string($khatibSpeakerId) ? $khatibSpeakerId : null,
                 'name' => is_string($khatibSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
             $otherKeyPeople[] = [
-                'role' => EventParticipantRole::Imam->value,
+                'role' => EventKeyPersonRole::Imam->value,
                 'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
                 'name' => is_string($imamSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
             $otherKeyPeople[] = [
-                'role' => EventParticipantRole::Bilal->value,
+                'role' => EventKeyPersonRole::Bilal->value,
                 'name' => fake()->name(),
                 'is_public' => true,
             ];
@@ -783,7 +783,7 @@ class EventSeeder extends Seeder
 
         if ($normalizedTypes->contains(fn (EventType $type): bool => $type->isCommunity())) {
             $otherKeyPeople[] = [
-                'role' => EventParticipantRole::PersonInCharge->value,
+                'role' => EventKeyPersonRole::PersonInCharge->value,
                 'name' => fake()->name(),
                 'is_public' => true,
             ];

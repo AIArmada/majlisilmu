@@ -275,8 +275,8 @@ This allows MajlisIlmu to express:
 
 So the correct future direction is:
 - `Speaker` remains the profile entity
-- `EventParticipant` represents event involvement
-- `EventParticipantRole` represents the role played in that event
+- `EventKeyPerson` represents event involvement
+- `EventKeyPersonRole` represents the role played in that event
 
 This preserves speaker prominence without forcing every event-linked person into the speaker concept.
 

@@ -920,7 +920,7 @@
                     <div class="grid gap-4 md:grid-cols-2">
                         @foreach($keyPeopleByRole as $role => $keyPeople)
                             @php
-                                $roleLabel = \App\Enums\EventParticipantRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
+                                $roleLabel = \App\Enums\EventKeyPersonRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
                             @endphp
                             <div class="rounded-3xl border border-amber-200/70 bg-amber-50/60 p-5 shadow-sm">
                                 <h3 class="font-heading text-lg font-bold text-slate-900">{{ $roleLabel }}</h3>

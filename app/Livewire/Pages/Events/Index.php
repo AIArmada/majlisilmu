@@ -5,7 +5,7 @@ namespace App\Livewire\Pages\Events;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\TagType;
@@ -470,7 +470,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Role'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(EventParticipantRole::nonSpeakerOptions())
+                                    ->options(EventKeyPersonRole::nonSpeakerOptions())
                                     ->live(),
 
                                 Select::make('moderator_ids')

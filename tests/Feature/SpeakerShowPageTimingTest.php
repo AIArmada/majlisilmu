@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\EventFormat;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
@@ -264,14 +264,14 @@ it('shows linked non-speaker roles in a separate section on the speaker page', f
 
     $speakerEvent->keyPeople()->create([
         'speaker_id' => $speaker->id,
-        'role' => EventParticipantRole::Speaker,
+        'role' => EventKeyPersonRole::Speaker,
         'order_column' => 1,
         'is_public' => true,
     ]);
 
     $moderatedEvent->keyPeople()->create([
         'speaker_id' => $speaker->id,
-        'role' => EventParticipantRole::Moderator,
+        'role' => EventKeyPersonRole::Moderator,
         'order_column' => 1,
         'is_public' => true,
     ]);

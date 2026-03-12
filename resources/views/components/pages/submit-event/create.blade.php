@@ -5,7 +5,7 @@ use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -1110,7 +1110,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             Select::make('role')
                                                 ->label(__('Peranan'))
                                                 ->required()
-                                                ->options(EventParticipantRole::nonSpeakerOptions())
+                                                ->options(EventKeyPersonRole::nonSpeakerOptions())
                                                 ->native(false),
                                             Select::make('speaker_id')
                                                 ->label(__('Pautkan Profil Penceramah'))

@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\NotificationTrigger;
 use App\Models\Event;
 use App\Models\EventCheckin;
@@ -87,7 +87,7 @@ it('does not create followed-speaker notifications when a followed profile is on
 
     $event->keyPeople()->create([
         'speaker_id' => $speaker->id,
-        'role' => EventParticipantRole::Moderator,
+        'role' => EventKeyPersonRole::Moderator,
         'order_column' => 1,
         'is_public' => true,
     ]);
