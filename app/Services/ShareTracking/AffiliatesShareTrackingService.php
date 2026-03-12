@@ -1,0 +1,827 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\ShareTracking;
+
+use AIArmada\Affiliates\Enums\CommissionType;
+use AIArmada\Affiliates\Models\Affiliate;
+use AIArmada\Affiliates\Models\AffiliateAttribution;
+use AIArmada\Affiliates\Models\AffiliateConversion;
+use AIArmada\Affiliates\Models\AffiliateLink;
+use AIArmada\Affiliates\Models\AffiliateTouchpoint;
+use AIArmada\Affiliates\States\Active;
+use AIArmada\Affiliates\States\ApprovedConversion;
+use App\Data\ShareTracking\ShareTrackingAttributionData;
+use App\Data\ShareTracking\ShareTrackingLinkData;
+use App\Data\ShareTracking\ShareTrackingOutcomeData;
+use App\Enums\DawahShareOutcomeType;
+use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Series;
+use App\Models\Speaker;
+use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Cookie\CookieValuePrefix;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
+
+final class AffiliatesShareTrackingService
+{
+    public function __construct(
+        private readonly ShareTrackingUrlService $shareTrackingUrlService,
+    ) {}
+
+    /**
+     * @return list<string>
+     */
+    public function supportedProviders(): array
+    {
+        return $this->shareTrackingUrlService->supportedProviders();
+    }
+
+    /**
+     * @return array{url: string, platform_links: array<string, string>}
+     */
+    public function sharePayload(?User $user, string $url, string $shareText, ?string $fallbackTitle = null): array
+    {
+        if (! $user instanceof User) {
+            $shareUrl = $this->shareTrackingUrlService->normalizeAbsoluteInternalUrl($url);
+
+            return [
+                'url' => $shareUrl,
+                'platform_links' => $this->shareTrackingUrlService->platformLinks($shareUrl, $shareText),
+            ];
+        }
+
+        $link = $this->createOrReuseAffiliateLink($user, $url, $fallbackTitle);
+        $shareUrl = $this->sharedUrlForLink($link);
+
+        return [
+            'url' => $shareUrl,
+            'platform_links' => $this->shareTrackingUrlService->platformLinks($shareUrl, $shareText),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function redirectLinks(string $url, string $shareText, ?string $fallbackTitle = null): array
+    {
+        $normalizedUrl = $this->shareTrackingUrlService->normalizeAbsoluteInternalUrl($url);
+        $query = [
+            'url' => $normalizedUrl,
+            'text' => $shareText,
+        ];
+
+        if (filled($fallbackTitle)) {
+            $query['title'] = $fallbackTitle;
+        }
+
+        return collect($this->supportedProviders())
+            ->mapWithKeys(fn (string $provider): array => [
+                $provider => route('dawah-share.redirect', ['provider' => $provider] + $query),
+            ])
+            ->all();
+    }
+
+    public function redirectUrl(
+        string $provider,
+        ?User $user,
+        string $url,
+        string $shareText,
+        ?string $fallbackTitle = null,
+        ?Request $request = null,
+    ): string {
+        if (! $user instanceof User) {
+            $shareUrl = $this->shareTrackingUrlService->normalizeAbsoluteInternalUrl($url);
+
+            return $this->shareTrackingUrlService->platformLinks($shareUrl, $shareText)[$provider] ?? $shareUrl;
+        }
+
+        $link = $this->createOrReuseAffiliateLink($user, $url, $fallbackTitle);
+        $this->recordOutboundShare($link, $user, $provider, $request);
+
+        return $this->shareTrackingUrlService->platformLinks($this->sharedUrlForLink($link), $shareText)[$provider] ?? $url;
+    }
+
+    public function attributedUrl(User $user, string $url, ?string $fallbackTitle = null): string
+    {
+        return $this->sharedUrlForLink($this->createOrReuseAffiliateLink($user, $url, $fallbackTitle));
+    }
+
+    public function captureRequest(Request $request): ?string
+    {
+        $cookieState = $this->readCookieState($request);
+
+        if ($this->shouldIgnoreRequest($request) || ! $request->isMethod('GET') || $request->expectsJson() || $request->ajax() || $this->isBotRequest($request)) {
+            return $cookieState['encoded'] ?? null;
+        }
+
+        $parameter = (string) config('dawah-share.query_parameter', 'mi_share');
+        $signedToken = $request->query($parameter);
+        $visitorKey = $cookieState['visitor_key'] ?? (string) Str::ulid();
+        $shareProvider = $this->shareProviderFromRequest($request);
+
+        if (is_string($signedToken) && $signedToken !== '') {
+            $link = $this->resolveLinkFromSignedToken($signedToken);
+
+            if ($link instanceof AffiliateLink) {
+                $attribution = $this->upsertLandingAttribution($link, $request, $visitorKey, $shareProvider);
+                $this->recordVisitTouchpoint($attribution, $request, 'landing', $this->cleanTrackedUrl($request->fullUrl()));
+
+                return $this->encodeCookieState($visitorKey, (string) $attribution->cookie_value);
+            }
+        }
+
+        $attribution = $this->resolveActiveAffiliateAttribution($request);
+
+        if (! $attribution instanceof AffiliateAttribution) {
+            return $cookieState['encoded'] ?? null;
+        }
+
+        $requestUser = $request->user();
+
+        $attribution->forceFill([
+            'last_seen_at' => now(),
+            'expires_at' => $this->expiryTimestamp(),
+            'user_id' => $requestUser instanceof User ? (string) $requestUser->getAuthIdentifier() : $attribution->user_id,
+        ])->save();
+
+        $cleanUrl = $this->cleanTrackedUrl($request->fullUrl());
+        $kind = $cleanUrl === (string) $attribution->landing_url ? 'return' : 'navigated';
+
+        if (! $this->recentDuplicateVisitExists($attribution, $cleanUrl)) {
+            $this->recordVisitTouchpoint($attribution, $request, $kind, $cleanUrl);
+        }
+
+        return $this->encodeCookieState(
+            (string) data_get($attribution->metadata, 'visitor_key', $visitorKey),
+            (string) $attribution->cookie_value,
+        );
+    }
+
+    public function resolveActiveAttribution(?Request $request = null): ?ShareTrackingAttributionData
+    {
+        $attribution = $this->resolveActiveAffiliateAttribution($request);
+
+        return $attribution instanceof AffiliateAttribution ? $this->mapAttribution($attribution) : null;
+    }
+
+    public function recordSignup(User $user, ?Request $request = null): ?ShareTrackingOutcomeData
+    {
+        return $this->recordOutcome(
+            type: DawahShareOutcomeType::Signup,
+            outcomeKey: 'signup:user:'.$user->id,
+            actor: $user,
+            request: $request,
+            metadata: [
+                'signed_up_user_id' => $user->id,
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    public function recordOutcome(
+        DawahShareOutcomeType $type,
+        string $outcomeKey,
+        ?Model $subject = null,
+        ?User $actor = null,
+        ?Request $request = null,
+        array $metadata = [],
+    ): ?ShareTrackingOutcomeData {
+        $attribution = $this->resolveActiveAffiliateAttribution($request);
+
+        if (! $attribution instanceof AffiliateAttribution) {
+            return null;
+        }
+
+        $existing = AffiliateConversion::query()
+            ->where('external_reference', $outcomeKey)
+            ->first();
+
+        if ($existing instanceof AffiliateConversion) {
+            return $this->mapOutcome($existing);
+        }
+
+        $occurredAt = now();
+        $linkId = (string) data_get($attribution->metadata, 'link_id');
+        $sharerUserId = data_get($attribution->metadata, 'sharer_user_id');
+        $link = $linkId !== '' ? AffiliateLink::query()->find($linkId) : null;
+        $subjectData = $this->resolveOutcomeSubjectData($subject, $attribution, $link);
+
+        $conversion = AffiliateConversion::query()->create([
+            'affiliate_id' => $attribution->affiliate_id,
+            'affiliate_attribution_id' => $attribution->id,
+            'affiliate_code' => $attribution->affiliate_code,
+            'subject_type' => $subjectData['subject_type'],
+            'subject_identifier' => $subjectData['subject_key'],
+            'subject_instance' => 'web',
+            'cart_identifier' => $subjectData['subject_id'],
+            'cart_instance' => 'default',
+            'subject_title_snapshot' => Str::limit($subjectData['title_snapshot'], 200, ''),
+            'external_reference' => $outcomeKey,
+            'order_reference' => $outcomeKey,
+            'conversion_type' => $type->value,
+            'subtotal_minor' => 0,
+            'value_minor' => 0,
+            'total_minor' => 0,
+            'commission_minor' => 0,
+            'commission_currency' => (string) config('affiliates.currency.default', 'MYR'),
+            'status' => ApprovedConversion::class,
+            'channel' => data_get($attribution->metadata, 'share_provider'),
+            'metadata' => array_merge($metadata, [
+                'link_id' => $linkId,
+                'share_provider' => data_get($attribution->metadata, 'share_provider'),
+                'subject_type' => $subjectData['subject_type'],
+                'subject_id' => $subjectData['subject_id'],
+                'subject_key' => $subjectData['subject_key'],
+                'outcome_key' => $outcomeKey,
+                'link_title_snapshot' => $link?->subject_title_snapshot,
+                'sharer_user_id' => $sharerUserId,
+                'actor_user_id' => $actor?->id,
+            ]),
+            'occurred_at' => $occurredAt,
+            'approved_at' => $occurredAt,
+        ]);
+
+        if ($linkId !== '') {
+            AffiliateLink::query()->whereKey($linkId)->first()?->incrementConversions();
+        }
+
+        return $this->mapOutcome($conversion);
+    }
+
+    public function createOrReuseLink(User $user, string $url, ?string $fallbackTitle = null): ShareTrackingLinkData
+    {
+        return $this->mapLink($this->createOrReuseAffiliateLink($user, $url, $fallbackTitle));
+    }
+
+    public function deleteUserTracking(User $user): void
+    {
+        $affiliate = $this->findAffiliateForUser($user);
+
+        if (! $affiliate instanceof Affiliate) {
+            return;
+        }
+
+        $affiliate->links()->delete();
+        $affiliate->conversions()->delete();
+        $affiliate->attributions()->each(fn (AffiliateAttribution $attribution): bool => (bool) $attribution->delete());
+        $affiliate->delete();
+    }
+
+    public function findAffiliateForUser(User $user): ?Affiliate
+    {
+        return Affiliate::query()
+            ->where('metadata->majlis_user_id', $user->id)
+            ->first();
+    }
+
+    private function createOrReuseAffiliateLink(User $user, string $url, ?string $fallbackTitle = null): AffiliateLink
+    {
+        $affiliate = $this->ensureAffiliateForUser($user);
+        $target = $this->shareTrackingUrlService->classifyUrl($url, $fallbackTitle);
+
+        $link = AffiliateLink::query()
+            ->where('affiliate_id', $affiliate->id)
+            ->where('tracking_url', $target['canonical_url'])
+            ->first();
+
+        if ($link instanceof AffiliateLink) {
+            $link->fill([
+                'destination_url' => $target['destination_url'],
+                'tracking_url' => $target['canonical_url'],
+                'subject_type' => $target['subject_type'],
+                'subject_identifier' => $target['subject_key'],
+                'subject_instance' => 'web',
+                'subject_title_snapshot' => Str::limit($target['title_snapshot'], 200, ''),
+                'subject_metadata' => array_merge($target['metadata'], [
+                    'subject_id' => $target['subject_id'],
+                    'subject_key' => $target['subject_key'],
+                ]),
+            ]);
+            $link->touch();
+
+            return $link;
+        }
+
+        return AffiliateLink::query()->create([
+            'affiliate_id' => $affiliate->id,
+            'destination_url' => $target['destination_url'],
+            'tracking_url' => $target['canonical_url'],
+            'custom_slug' => Str::random(40),
+            'subject_type' => $target['subject_type'],
+            'subject_identifier' => $target['subject_key'],
+            'subject_instance' => 'web',
+            'subject_title_snapshot' => Str::limit($target['title_snapshot'], 200, ''),
+            'subject_metadata' => array_merge($target['metadata'], [
+                'subject_id' => $target['subject_id'],
+                'subject_key' => $target['subject_key'],
+            ]),
+            'is_active' => true,
+        ]);
+    }
+
+    private function ensureAffiliateForUser(User $user): Affiliate
+    {
+        $affiliate = $this->findAffiliateForUser($user);
+
+        if ($affiliate instanceof Affiliate) {
+            $affiliate->fill([
+                'name' => $user->name,
+                'contact_email' => $user->email,
+                'metadata' => $this->affiliateMetadata($user),
+            ]);
+            $affiliate->save();
+
+            return $affiliate;
+        }
+
+        return Affiliate::query()->create([
+            'code' => $this->generateAffiliateCode($user),
+            'name' => $user->name,
+            'description' => 'MajlisIlmu share-tracking affiliate profile',
+            'status' => Active::class,
+            'commission_type' => CommissionType::Percentage,
+            'commission_rate' => 0,
+            'currency' => (string) config('affiliates.currency.default', 'MYR'),
+            'contact_email' => $user->email,
+            'metadata' => $this->affiliateMetadata($user),
+            'activated_at' => now(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function affiliateMetadata(User $user): array
+    {
+        return [
+            'majlis_user_id' => $user->id,
+            'majlis_user_email' => $user->email,
+            'majlis_user_name' => $user->name,
+        ];
+    }
+
+    private function generateAffiliateCode(User $user): string
+    {
+        $base = 'MI'.Str::upper(substr(str_replace('-', '', $user->id), 0, 8));
+        $code = $base;
+        $suffix = 1;
+
+        while (Affiliate::query()->where('code', $code)->exists()) {
+            if (Affiliate::query()->where('code', $code)->where('metadata->majlis_user_id', $user->id)->exists()) {
+                return $code;
+            }
+
+            $code = $base.$suffix;
+            $suffix++;
+        }
+
+        return $code;
+    }
+
+    private function sharedUrlForLink(AffiliateLink $link): string
+    {
+        return $this->appendQueryParameters($link->destination_url, [
+            (string) config('dawah-share.query_parameter', 'mi_share') => $this->signedToken((string) $link->custom_slug),
+        ]);
+    }
+
+    private function signedToken(string $token): string
+    {
+        return $token.'.'.hash_hmac('sha256', $token, (string) config('dawah-share.signing_key'));
+    }
+
+    private function resolveLinkFromSignedToken(string $signedToken): ?AffiliateLink
+    {
+        $parts = explode('.', $signedToken, 2);
+
+        if (count($parts) !== 2) {
+            return null;
+        }
+
+        [$token, $signature] = $parts;
+        $expected = hash_hmac('sha256', $token, (string) config('dawah-share.signing_key'));
+
+        if (! hash_equals($expected, $signature)) {
+            return null;
+        }
+
+        return AffiliateLink::query()->where('custom_slug', $token)->first();
+    }
+
+    private function upsertLandingAttribution(AffiliateLink $link, Request $request, string $visitorKey, ?string $shareProvider): AffiliateAttribution
+    {
+        $cookieState = $this->readCookieState($request);
+        $cookieValue = $cookieState['attribution_cookie'] ?? (string) Str::ulid();
+        $linkMetadata = $this->linkMetadata($link);
+        $affiliate = $link->affiliate()->first();
+        $requestUser = $request->user();
+
+        $attribution = AffiliateAttribution::query()
+            ->where('cookie_value', $cookieValue)
+            ->first();
+
+        $payload = [
+            'affiliate_id' => $link->affiliate_id,
+            'affiliate_code' => (string) $affiliate?->code,
+            'subject_identifier' => (string) ($linkMetadata['subject_key'] ?? $link->subject_identifier ?? $link->id),
+            'subject_instance' => 'web',
+            'cart_identifier' => $linkMetadata['subject_id'],
+            'cart_instance' => 'default',
+            'cookie_value' => $cookieValue,
+            'landing_url' => $this->cleanTrackedUrl($request->fullUrl()),
+            'referrer_url' => $request->headers->get('referer'),
+            'user_agent' => $request->userAgent(),
+            'ip_address' => $request->ip(),
+            'user_id' => $requestUser instanceof User ? (string) $requestUser->getAuthIdentifier() : null,
+            'first_seen_at' => $attribution instanceof AffiliateAttribution ? $attribution->first_seen_at : now(),
+            'last_seen_at' => now(),
+            'last_cookie_seen_at' => now(),
+            'expires_at' => $this->expiryTimestamp(),
+            'metadata' => array_merge($linkMetadata, [
+                'tracking_mode' => 'landing',
+                'visitor_key' => $visitorKey,
+                'share_provider' => $shareProvider,
+                'query' => Arr::except($request->query(), [
+                    (string) config('dawah-share.query_parameter', 'mi_share'),
+                    (string) config('dawah-share.provider_query_parameter', 'mi_channel'),
+                ]),
+            ]),
+        ];
+
+        if ($attribution instanceof AffiliateAttribution) {
+            $attribution->fill($payload);
+            $attribution->save();
+
+            return $attribution;
+        }
+
+        return AffiliateAttribution::query()->create($payload);
+    }
+
+    private function resolveActiveAffiliateAttribution(?Request $request = null): ?AffiliateAttribution
+    {
+        $request ??= request();
+
+        if (! $request instanceof Request) {
+            return null;
+        }
+
+        $cookieState = $this->readCookieState($request);
+        $cookieValue = $cookieState['attribution_cookie'] ?? null;
+
+        if (! is_string($cookieValue) || $cookieValue === '') {
+            return null;
+        }
+
+        return AffiliateAttribution::query()
+            ->where('cookie_value', $cookieValue)
+            ->where('metadata->tracking_mode', 'landing')
+            ->active()
+            ->latest('last_cookie_seen_at')
+            ->first();
+    }
+
+    private function recordVisitTouchpoint(AffiliateAttribution $attribution, Request $request, string $kind, string $cleanUrl): AffiliateTouchpoint
+    {
+        $subject = $this->shareTrackingUrlService->classifyUrl($cleanUrl, (string) data_get($attribution->metadata, 'title_snapshot', config('app.name')));
+
+        return AffiliateTouchpoint::query()->create([
+            'affiliate_attribution_id' => $attribution->id,
+            'affiliate_id' => $attribution->affiliate_id,
+            'affiliate_code' => $attribution->affiliate_code,
+            'source' => $attribution->source,
+            'medium' => $attribution->medium,
+            'campaign' => $attribution->campaign,
+            'term' => $attribution->term,
+            'content' => $attribution->content,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'metadata' => [
+                'event_type' => 'visit',
+                'link_id' => data_get($attribution->metadata, 'link_id'),
+                'visited_url' => $cleanUrl,
+                'visitor_key' => data_get($attribution->metadata, 'visitor_key'),
+                'visit_kind' => $kind,
+                'subject_type' => $subject['subject_type'],
+                'subject_id' => $subject['subject_id'],
+                'subject_key' => $subject['subject_key'],
+                'share_provider' => data_get($attribution->metadata, 'share_provider'),
+                'referrer_url' => $request->headers->get('referer'),
+            ],
+            'touched_at' => now(),
+        ]);
+    }
+
+    private function recentDuplicateVisitExists(AffiliateAttribution $attribution, string $cleanUrl): bool
+    {
+        return AffiliateTouchpoint::query()
+            ->where('affiliate_attribution_id', $attribution->id)
+            ->where('metadata->event_type', 'visit')
+            ->where('metadata->visited_url', $cleanUrl)
+            ->where('touched_at', '>=', now()->subMinutes((int) config('dawah-share.visit_dedupe_minutes', 5)))
+            ->exists();
+    }
+
+    private function recordOutboundShare(AffiliateLink $link, User $user, string $provider, ?Request $request = null): AffiliateTouchpoint
+    {
+        $affiliate = $link->affiliate()->first();
+        $attribution = AffiliateAttribution::query()->firstOrCreate(
+            [
+                'affiliate_id' => $link->affiliate_id,
+                'cookie_value' => null,
+                'subject_identifier' => 'share-link:'.$link->id,
+                'subject_instance' => 'outbound-share',
+            ],
+            [
+                'affiliate_code' => (string) $affiliate?->code,
+                'cart_instance' => 'default',
+                'user_id' => $user->id,
+                'metadata' => array_merge($this->linkMetadata($link), [
+                    'tracking_mode' => 'outbound_share',
+                    'sharer_user_id' => $user->id,
+                ]),
+                'first_seen_at' => now(),
+                'last_seen_at' => now(),
+            ],
+        );
+
+        $link->incrementClicks();
+
+        return AffiliateTouchpoint::query()->create([
+            'affiliate_attribution_id' => $attribution->id,
+            'affiliate_id' => $link->affiliate_id,
+            'affiliate_code' => (string) $affiliate?->code,
+            'ip_address' => $request?->ip(),
+            'user_agent' => $request?->userAgent(),
+            'metadata' => [
+                'event_type' => 'outbound_share',
+                'link_id' => $link->id,
+                'provider' => $provider,
+                'referrer_url' => $request?->headers->get('referer'),
+            ],
+            'touched_at' => now(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function linkMetadata(AffiliateLink $link): array
+    {
+        $affiliate = $link->relationLoaded('affiliate') ? $link->affiliate : $link->affiliate()->first();
+
+        return [
+            'link_id' => $link->id,
+            'subject_type' => $link->subject_type ?: 'page',
+            'subject_id' => data_get($link->subject_metadata, 'subject_id'),
+            'subject_key' => $link->subject_identifier ?: 'page:unknown',
+            'title_snapshot' => $link->subject_title_snapshot ?: config('app.name'),
+            'canonical_url' => $link->tracking_url,
+            'destination_url' => $link->destination_url,
+            'share_token' => $link->custom_slug,
+            'sharer_user_id' => data_get($affiliate?->metadata, 'majlis_user_id'),
+        ];
+    }
+
+    private function mapLink(AffiliateLink $link): ShareTrackingLinkData
+    {
+        return new ShareTrackingLinkData(
+            id: (string) $link->id,
+            backend: 'affiliates',
+            subjectType: (string) ($link->subject_type ?: 'page'),
+            subjectId: data_get($link->subject_metadata, 'subject_id'),
+            subjectKey: (string) ($link->subject_identifier ?: 'page:unknown'),
+            destinationUrl: (string) $link->destination_url,
+            canonicalUrl: (string) $link->tracking_url,
+            titleSnapshot: (string) ($link->subject_title_snapshot ?: config('app.name')),
+            lastSharedAt: $link->updated_at,
+        );
+    }
+
+    private function mapAttribution(AffiliateAttribution $attribution): ShareTrackingAttributionData
+    {
+        return new ShareTrackingAttributionData(
+            id: (string) $attribution->id,
+            backend: 'affiliates',
+            linkId: (string) data_get($attribution->metadata, 'link_id', ''),
+            visitorKey: data_get($attribution->metadata, 'visitor_key'),
+            cookieValue: $attribution->cookie_value,
+            landingUrl: $attribution->landing_url,
+            shareProvider: data_get($attribution->metadata, 'share_provider'),
+            subjectType: $this->nullableString($attribution->subject_type) ?? $this->nullableString(data_get($attribution->metadata, 'subject_type')),
+            subjectId: $this->nullableString($attribution->cart_identifier) ?? $this->nullableString(data_get($attribution->metadata, 'subject_id')),
+            subjectKey: $this->nullableString($attribution->subject_identifier) ?? $this->nullableString(data_get($attribution->metadata, 'subject_key')),
+            titleSnapshot: $this->nullableString($attribution->subject_title_snapshot) ?? $this->nullableString(data_get($attribution->metadata, 'title_snapshot')),
+            firstSeenAt: $attribution->first_seen_at,
+            lastSeenAt: $attribution->last_seen_at,
+            expiresAt: $attribution->expires_at,
+            metadata: $attribution->metadata ?? [],
+        );
+    }
+
+    private function mapOutcome(AffiliateConversion $conversion): ShareTrackingOutcomeData
+    {
+        return new ShareTrackingOutcomeData(
+            id: (string) $conversion->id,
+            backend: 'affiliates',
+            linkId: (string) data_get($conversion->metadata, 'link_id', ''),
+            attributionId: $conversion->affiliate_attribution_id,
+            sharerUserId: data_get($conversion->metadata, 'sharer_user_id'),
+            actorUserId: data_get($conversion->metadata, 'actor_user_id'),
+            outcomeType: (string) ($conversion->conversion_type ?: 'unknown'),
+            subjectType: $this->nullableString($conversion->subject_type) ?? $this->nullableString(data_get($conversion->metadata, 'subject_type')),
+            subjectId: $this->nullableString($conversion->cart_identifier) ?? $this->nullableString(data_get($conversion->metadata, 'subject_id')),
+            subjectKey: $this->nullableString($conversion->subject_identifier) ?? $this->nullableString(data_get($conversion->metadata, 'subject_key')),
+            outcomeKey: (string) data_get($conversion->metadata, 'outcome_key', $conversion->external_reference),
+            linkTitleSnapshot: $this->nullableString(data_get($conversion->metadata, 'link_title_snapshot')) ?? $this->nullableString($conversion->subject_title_snapshot),
+            occurredAt: $conversion->occurred_at,
+            metadata: $conversion->metadata ?? [],
+        );
+    }
+
+    /**
+     * @return array{subject_type: string, subject_id: string|null, subject_key: string, title_snapshot: string}
+     */
+    private function resolveOutcomeSubjectData(?Model $subject, AffiliateAttribution $attribution, ?AffiliateLink $link): array
+    {
+        if ($subject instanceof Model) {
+            $classifiedSubject = $this->shareTrackingUrlService->classifySubjectModel($subject);
+
+            return [
+                'subject_type' => $classifiedSubject['subject_type'],
+                'subject_id' => is_string($classifiedSubject['subject_id'] ?? null) ? $classifiedSubject['subject_id'] : null,
+                'subject_key' => $classifiedSubject['subject_key'],
+                'title_snapshot' => $this->subjectTitleSnapshotForModel($subject)
+                    ?? $this->nullableString($link?->subject_title_snapshot)
+                    ?? $this->nullableString($attribution->subject_title_snapshot)
+                    ?? (string) config('app.name'),
+            ];
+        }
+
+        return [
+            'subject_type' => $this->nullableString($attribution->subject_type) ?? (string) data_get($attribution->metadata, 'subject_type', 'page'),
+            'subject_id' => $this->nullableString($attribution->cart_identifier) ?? $this->nullableString(data_get($attribution->metadata, 'subject_id')),
+            'subject_key' => $this->nullableString($attribution->subject_identifier) ?? (string) data_get($attribution->metadata, 'subject_key', 'page:unknown'),
+            'title_snapshot' => $this->nullableString($attribution->subject_title_snapshot)
+                ?? $this->nullableString(data_get($attribution->metadata, 'title_snapshot'))
+                ?? $this->nullableString($link?->subject_title_snapshot)
+                ?? (string) config('app.name'),
+        ];
+    }
+
+    private function subjectTitleSnapshotForModel(Model $subject): ?string
+    {
+        return match (true) {
+            $subject instanceof Event => $this->nullableString($subject->title),
+            $subject instanceof Institution => $this->nullableString($subject->name),
+            $subject instanceof Speaker => $this->nullableString($subject->formatted_name),
+            $subject instanceof Series => $this->nullableString($subject->title),
+            $subject instanceof Reference => $this->nullableString($subject->title),
+            default => null,
+        };
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function shouldIgnoreRequest(Request $request): bool
+    {
+        return $request->is('livewire/*')
+            || $request->is('_debugbar/*')
+            || $request->is('filament/*')
+            || $request->is('api/*')
+            || $request->routeIs('dawah-share.payload')
+            || $request->routeIs('dawah-share.redirect');
+    }
+
+    private function isBotRequest(Request $request): bool
+    {
+        return $this->shareTrackingUrlService->isBotRequest($request);
+    }
+
+    private function expiryTimestamp(): ?CarbonInterface
+    {
+        $ttlDays = (int) config('dawah-share.ttl_days', 30);
+
+        return $ttlDays > 0 ? now()->addDays($ttlDays) : null;
+    }
+
+    private function encodeCookieState(string $visitorKey, string $attributionCookie): string
+    {
+        return base64_encode(json_encode([
+            'visitor_key' => $visitorKey,
+            'attribution_cookie' => $attributionCookie,
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @return array{visitor_key?: string, attribution_cookie?: string, encoded?: string}
+     */
+    private function readCookieState(Request $request): array
+    {
+        $cookieName = (string) config('dawah-share.cookie.name', 'mi_dawah_share');
+        $encoded = $request->cookie($cookieName);
+
+        if (! is_string($encoded) || $encoded === '') {
+            return [];
+        }
+
+        $payload = $this->decodeCookieStatePayload($encoded);
+
+        if (is_array($payload) && ! $this->isDecodedCookieStatePayload($payload)) {
+            $payload = null;
+        }
+
+        if (! is_array($payload)) {
+            try {
+                $decrypted = app('encrypter')->decrypt($encoded, false);
+            } catch (\Throwable) {
+                $decrypted = null;
+            }
+
+            if (! is_string($decrypted) || $decrypted === '') {
+                return [];
+            }
+
+            $decrypted = CookieValuePrefix::validate($cookieName, $decrypted, app('encrypter')->getAllKeys());
+
+            if (! is_string($decrypted) || $decrypted === '') {
+                return [];
+            }
+
+            $payload = $this->decodeCookieStatePayload($decrypted);
+
+            if (! is_array($payload) || ! $this->isDecodedCookieStatePayload($payload)) {
+                return [];
+            }
+        }
+
+        return [
+            'visitor_key' => is_string($payload['visitor_key'] ?? null) ? $payload['visitor_key'] : null,
+            'attribution_cookie' => is_string($payload['attribution_cookie'] ?? null) ? $payload['attribution_cookie'] : null,
+            'encoded' => $encoded,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeCookieStatePayload(string $encoded): ?array
+    {
+        $decoded = base64_decode($encoded, true);
+
+        if (! is_string($decoded) || $decoded === '') {
+            return null;
+        }
+
+        try {
+            $payload = json_decode($decoded, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function isDecodedCookieStatePayload(array $payload): bool
+    {
+        return is_string($payload['visitor_key'] ?? null)
+            && $payload['visitor_key'] !== ''
+            && is_string($payload['attribution_cookie'] ?? null)
+            && $payload['attribution_cookie'] !== '';
+    }
+
+    /**
+     * @param  array<string, scalar|array<array-key, scalar|null>|null>  $parameters
+     */
+    private function appendQueryParameters(string $url, array $parameters): string
+    {
+        return $this->shareTrackingUrlService->appendQueryParameters($url, $parameters);
+    }
+
+    private function cleanTrackedUrl(string $url): string
+    {
+        return $this->shareTrackingUrlService->cleanTrackedUrl($url);
+    }
+
+    private function shareProviderFromRequest(Request $request): ?string
+    {
+        $provider = $request->query((string) config('dawah-share.provider_query_parameter', 'mi_channel'));
+
+        return is_string($provider) ? $this->shareTrackingUrlService->normalizeProvider($provider) : null;
+    }
+}

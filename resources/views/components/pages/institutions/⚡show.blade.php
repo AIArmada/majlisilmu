@@ -53,7 +53,7 @@ new class extends Component {
         } else {
             $user->follow($this->institution);
             $this->isFollowing = true;
-            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+            app(\App\Services\ShareTrackingService::class)->recordOutcome(
                 type: \App\Enums\DawahShareOutcomeType::InstitutionFollow,
                 outcomeKey: 'institution_follow:user:'.$user->id.':institution:'.$this->institution->id,
                 subject: $this->institution,
@@ -187,7 +187,7 @@ new class extends Component {
     $languages = $institution->languages;
     $institutionUrl = route('institutions.show', $institution);
     $shareText = trim($institution->name . ' - ' . config('app.name'));
-    $shareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+    $shareLinks = app(\App\Services\ShareTrackingService::class)->redirectLinks(
         $institutionUrl,
         $shareText,
         $institution->name,
@@ -215,9 +215,13 @@ new class extends Component {
             $stateName = null;
         }
 
-        return __('Negeri').': '.($stateName ?: '-')
-            .' • '.__('Daerah').': '.($districtName ?: '-')
-            .' • '.__('Bandar / Mukim / Zon').': '.($subdistrictName ?: '-');
+        $parts = array_filter([
+            $subdistrictName,
+            $districtName,
+            $stateName,
+        ], fn (?string $value): bool => is_string($value) && trim($value) !== '');
+
+        return $parts === [] ? '-' : implode(', ', $parts);
     };
     $locationString = $formatAddressHierarchy($address);
     $googleMapsApiKey = (string) config('services.google.maps_api_key', '');

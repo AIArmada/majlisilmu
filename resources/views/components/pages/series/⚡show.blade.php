@@ -50,7 +50,7 @@ new
         } else {
             $user->follow($this->series);
             $this->isFollowing = true;
-            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+            app(\App\Services\ShareTrackingService::class)->recordOutcome(
                 type: \App\Enums\DawahShareOutcomeType::SeriesFollow,
                 outcomeKey: 'series_follow:user:'.$user->id.':series:'.$this->series->id,
                 subject: $this->series,
@@ -163,7 +163,7 @@ new
         'fallbackTitle' => $series->title,
         'payloadEndpoint' => route('dawah-share.payload'),
     ];
-    $seriesShareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+    $seriesShareLinks = app(\App\Services\ShareTrackingService::class)->redirectLinks(
         $seriesUrl,
         $seriesShareText,
         $series->title,

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Public;
 
+use App\Enums\DawahShareOutcomeType;
+use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -9,8 +11,8 @@ use App\Models\EventSettings;
 use App\Models\Registration;
 use App\Models\User;
 use App\Services\CalendarService;
-use App\Services\DawahShare\DawahShareService;
 use App\Services\Notifications\EventNotificationService;
+use App\Services\ShareTrackingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -18,13 +20,14 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class EventsController extends Controller
 {
     public function __construct(
         protected CalendarService $calendarService,
-        protected DawahShareService $dawahShareService,
+        protected ShareTrackingService $shareTrackingService,
         protected EventNotificationService $eventNotificationService,
     ) {}
 
@@ -34,12 +37,12 @@ class EventsController extends Controller
     public function calendar(Event $event): Response
     {
         if ((! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true))
-            || $event->visibility !== \App\Enums\EventVisibility::Public) {
+            || $event->visibility !== EventVisibility::Public) {
             abort(404);
         }
 
         $icsContent = $this->calendarService->generateIcs($event);
-        $filename = \Illuminate\Support\Str::slug($event->title).'.ics';
+        $filename = Str::slug($event->title).'.ics';
 
         return response($icsContent)
             ->header('Content-Type', 'text/calendar; charset=utf-8')
@@ -178,8 +181,8 @@ class EventsController extends Controller
                 /** @var User|null $actor */
                 $actor = auth()->user();
 
-                $this->dawahShareService->recordOutcome(
-                    type: \App\Enums\DawahShareOutcomeType::EventRegistration,
+                $this->shareTrackingService->recordOutcome(
+                    type: DawahShareOutcomeType::EventRegistration,
                     outcomeKey: 'event_registration:registration:'.$registration->id,
                     subject: $event,
                     actor: $actor,
@@ -201,8 +204,8 @@ class EventsController extends Controller
             : null;
 
         if ($guestRegistration instanceof Registration) {
-            $this->dawahShareService->recordOutcome(
-                type: \App\Enums\DawahShareOutcomeType::EventRegistration,
+            $this->shareTrackingService->recordOutcome(
+                type: DawahShareOutcomeType::EventRegistration,
                 outcomeKey: 'event_registration:registration:'.$guestRegistration->id,
                 subject: $event,
                 actor: null,

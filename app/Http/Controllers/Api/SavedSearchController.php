@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventParticipantRole;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
 use App\Services\EventSearchService;
+use App\Services\ShareTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
@@ -17,7 +19,7 @@ class SavedSearchController extends Controller
 {
     public function __construct(
         protected EventSearchService $searchService,
-        protected DawahShareService $dawahShareService
+        protected ShareTrackingService $shareTrackingService
     ) {}
 
     /**
@@ -51,8 +53,8 @@ class SavedSearchController extends Controller
             'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
-            'filters.key_person_roles' => 'nullable|array',
-            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
+            'filters.participant_roles' => 'nullable|array',
+            'filters.participant_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
             'filters.moderator_ids' => 'nullable|array',
             'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
             'filters.imam_ids' => 'nullable|array',
@@ -103,8 +105,8 @@ class SavedSearchController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $this->dawahShareService->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::SavedSearchCreated,
+        $this->shareTrackingService->recordOutcome(
+            type: DawahShareOutcomeType::SavedSearchCreated,
             outcomeKey: 'saved_search_created:saved_search:'.$savedSearch->id,
             subject: null,
             actor: $user,
@@ -151,8 +153,8 @@ class SavedSearchController extends Controller
             'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
-            'filters.key_person_roles' => 'nullable|array',
-            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
+            'filters.participant_roles' => 'nullable|array',
+            'filters.participant_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
             'filters.moderator_ids' => 'nullable|array',
             'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
             'filters.imam_ids' => 'nullable|array',
@@ -188,7 +190,7 @@ class SavedSearchController extends Controller
     /**
      * Delete a saved search.
      */
-    public function destroy(SavedSearch $savedSearch): \Illuminate\Http\Response
+    public function destroy(SavedSearch $savedSearch): Response
     {
         $this->authorize('delete', $savedSearch);
 

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingService;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -68,7 +68,7 @@ class SocialiteController extends Controller
         Auth::login($user, remember: true);
 
         if ($createdFromShare) {
-            app(DawahShareService::class)->recordSignup($user, request());
+            app(ShareTrackingService::class)->recordSignup($user, request());
         }
 
         return redirect()->intended(route('home'));

@@ -34,7 +34,6 @@ class BlazeServiceProvider extends ServiceProvider
                 ->in(resource_path('views/components/glm'), compile: false)
                 ->in(resource_path('views/components/event-json-ld.blade.php'), compile: false)
                 ->in(resource_path('views/components/sidebar-inspiration.blade.php'), compile: false)
-                ->in(resource_path('views/components/join-majlisilmu-cta.blade.php'), compile: false)
                 ->in(resource_path('views/components/app-logo-icon.blade.php'), memo: true);
         };
 

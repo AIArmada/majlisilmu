@@ -3,7 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -46,7 +46,7 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $input['password'],
         ]);
 
-        app(DawahShareService::class)->recordSignup($user, request());
+        app(ShareTrackingService::class)->recordSignup($user, request());
 
         return $user;
     }

@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DawahShareOutcomeType;
+use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Event;
-use App\Services\DawahShare\DawahShareService;
+use App\Models\User;
+use App\Services\ShareTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class EventSaveController extends Controller
 {
     public function __construct(
-        private readonly DawahShareService $dawahShareService
+        private readonly ShareTrackingService $shareTrackingService
     ) {}
 
     /**
@@ -32,7 +35,7 @@ class EventSaveController extends Controller
         return response()->json([
             'data' => $savedEvents->items(),
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [
                     'page' => $savedEvents->currentPage(),
                     'per_page' => $savedEvents->perPage(),
@@ -63,7 +66,7 @@ class EventSaveController extends Controller
         }
 
         // Only allow saving public, approved events
-        if ((string) $event->status !== 'approved' || $event->visibility !== \App\Enums\EventVisibility::Public) {
+        if ((string) $event->status !== 'approved' || $event->visibility !== EventVisibility::Public) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',
@@ -119,8 +122,8 @@ class EventSaveController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $this->dawahShareService->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::EventSave,
+        $this->shareTrackingService->recordOutcome(
+            type: DawahShareOutcomeType::EventSave,
             outcomeKey: 'event_save:user:'.$user->id.':event:'.$event->id,
             subject: $event,
             actor: $user,
@@ -135,7 +138,7 @@ class EventSaveController extends Controller
                 'message' => 'Event saved successfully.',
             ],
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ], 201);
     }
@@ -181,7 +184,7 @@ class EventSaveController extends Controller
                 'message' => 'Event unsaved successfully.',
             ],
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ]);
     }
@@ -201,7 +204,7 @@ class EventSaveController extends Controller
                 'is_saved' => $isSaved,
             ],
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ]);
     }

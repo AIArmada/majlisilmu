@@ -7,7 +7,6 @@ use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventParticipantRole;
 use App\Enums\EventPrayerTime;
-use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Forms\Components\Select;
@@ -15,7 +14,6 @@ use App\Enums\TagType;
 use App\Forms\InstitutionFormSchema;
 use App\Forms\SpeakerFormSchema;
 use App\Forms\VenueFormSchema;
-use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -27,7 +25,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
-use App\Services\EventKeyPersonSyncService;
+use App\Services\EventParticipantSyncService;
 use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserTimezoneResolver;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -61,7 +59,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -76,11 +73,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    public ?string $parentEventId = null;
-
     public ?TemporaryUploadedFile $event_source_attachment = null;
-
-    protected ?Event $resolvedParentProgram = null;
 
     protected function eventForm(): Schema
     {
@@ -91,9 +84,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $timezone = $this->resolveUserTimezone();
 
-        $this->parentEventId = request()->query('parent');
-
-        $state = [
+        $this->eventForm()->fill([
             'submitter_name' => auth()->user()?->name,
             'submitter_email' => auth()->user()?->email,
             'children_allowed' => true,
@@ -105,115 +96,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'location_same_as_institution' => true,
             'location_type' => 'institution',
             'is_muslim_only' => false,
-            'other_key_people' => [],
+            'other_participants' => [],
             'captcha_token' => null,
             'timezone' => $timezone,
-        ];
-
-        if ($parentProgram = $this->parentProgram()) {
-            $state = array_replace($state, $this->parentProgramDefaultState($parentProgram));
-        }
-
-        $this->eventForm()->fill($state);
-    }
-
-    protected function parentProgram(): ?Event
-    {
-        if ($this->resolvedParentProgram instanceof Event) {
-            return $this->resolvedParentProgram;
-        }
-
-        if (! is_string($this->parentEventId) || $this->parentEventId === '') {
-            return null;
-        }
-
-        $user = auth()->user();
-
-        abort_unless($user instanceof User, 403);
-
-        $parentProgram = Event::query()->with('settings')->findOrFail($this->parentEventId);
-
-        abort_unless($parentProgram->isParentProgram(), 404);
-        abort_unless($this->canAttachToParentProgram($user, $parentProgram), 403);
-
-        $this->resolvedParentProgram = $parentProgram;
-
-        return $this->resolvedParentProgram;
-    }
-
-    protected function canAttachToParentProgram(User $user, Event $parentProgram): bool
-    {
-        if ($user->can('update', $parentProgram)) {
-            return true;
-        }
-
-        $access = app(EntitySubmissionAccess::class);
-
-        if ($parentProgram->organizer_type === Institution::class && is_string($parentProgram->organizer_id) && $parentProgram->organizer_id !== '') {
-            return $access->canUseInstitution($user, $parentProgram->organizer_id);
-        }
-
-        if ($parentProgram->organizer_type === Speaker::class && is_string($parentProgram->organizer_id) && $parentProgram->organizer_id !== '') {
-            return $access->canUseSpeaker($user, $parentProgram->organizer_id);
-        }
-
-        return false;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function parentProgramDefaultState(Event $parentProgram): array
-    {
-        $organizerType = $parentProgram->organizer_type === Institution::class ? 'institution' : 'speaker';
-
-        $state = [
-            'visibility' => $parentProgram->visibility?->value ?? EventVisibility::Public->value,
-            'event_format' => $parentProgram->event_format?->value ?? EventFormat::Physical->value,
-            'organizer_type' => $organizerType,
-            'location_same_as_institution' => $organizerType === 'institution',
-        ];
-
-        if ($organizerType === 'institution') {
-            $state['organizer_institution_id'] = $parentProgram->organizer_id;
-        } else {
-            $state['organizer_speaker_id'] = $parentProgram->organizer_id;
-        }
-
-        if ($parentProgram->institution_id) {
-            $state['location_type'] = 'institution';
-            $state['location_institution_id'] = $parentProgram->institution_id;
-        }
-
-        if ($parentProgram->venue_id) {
-            $state['location_type'] = 'venue';
-            $state['location_venue_id'] = $parentProgram->venue_id;
-            $state['location_same_as_institution'] = false;
-        }
-
-        return $state;
-    }
-
-    /**
-     * @return array{title: string, ahli_url: string, public_url: string|null}|null
-     */
-    #[Computed]
-    public function parentProgramNavigation(): ?array
-    {
-        $parentProgram = $this->parentProgram();
-
-        if (! $parentProgram instanceof Event) {
-            return null;
-        }
-
-        $canViewPublic = $parentProgram->is_active
-            && in_array((string) $parentProgram->status, Event::PUBLIC_STATUSES, true);
-
-        return [
-            'title' => $parentProgram->title,
-            'ahli_url' => AhliEventResource::getUrl('view', ['record' => $parentProgram], panel: 'ahli'),
-            'public_url' => $canViewPublic ? route('events.show', $parentProgram) : null,
-        ];
+        ]);
     }
 
     public function extractEventFromMedia(EventMediaExtractionService $eventMediaExtractionService): void
@@ -316,11 +202,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     Step::make(__('Maklumat Majlis'))
                         ->icon('heroicon-o-document-text')
                         ->schema([
-                            Callout::make(__('Submitting a child event under :title', ['title' => $this->parentProgram()?->title ?? '']))
-                                ->description(__('This child event will be attached to the selected parent program after submission. The parent-child relationship is handled automatically.'))
-                                ->info()
-                                ->visible(fn (): bool => $this->parentProgram() instanceof Event),
-
                             Select::make('event_type')
                                 ->label(__('Jenis Majlis'))
                                 ->required()
@@ -1089,8 +970,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             'speaker' => __('Penceramah'),
                                         ])
                                         ->default('institution')
-                                        ->disabled(fn (): bool => $this->parentProgram() instanceof Event)
-                                        ->dehydrated()
                                         ->inline(),
 
                                     Select::make('organizer_institution_id')
@@ -1098,8 +977,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(fn (): array => $this->availableInstitutionOptions())
                                         ->searchable()
                                         ->preload()
-                                        ->disabled(fn (): bool => $this->parentProgram() instanceof Event)
-                                        ->dehydrated()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'institution'
                                                             JS)
@@ -1112,8 +989,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(fn (): array => $this->availableSpeakerOptions())
                                         ->searchable()
                                         ->preload()
-                                        ->disabled(fn (): bool => $this->parentProgram() instanceof Event)
-                                        ->dehydrated()
                                         ->visibleJs(<<<'JS'
                                                             $get('organizer_type') === 'speaker'
                                                             JS)
@@ -1228,7 +1103,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                         ->createOptionUsing(fn(array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
 
-                                    Repeater::make('other_key_people')
+                                    Repeater::make('other_participants')
                                         ->label(__('Peranan Lain'))
                                         ->helperText(__('Tambahkan moderator, imam, khatib, bilal, atau PIC jika berkenaan.'))
                                         ->schema([
@@ -1397,7 +1272,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $validated = $this->eventForm()->getState();
         $this->assertCaptchaIsValid($validated['captcha_token'] ?? null);
-        $parentProgram = $this->parentProgram();
 
         // Enforce children_allowed when AllAges or Children is selected
         $ageGroups = $validated['age_group'] ?? [];
@@ -1520,10 +1394,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $event = Event::create([
-            'parent_event_id' => $parentProgram?->id,
             'title' => $validated['title'],
             'slug' => Str::slug($validated['title']) . '-' . Str::random(7),
-            'event_structure' => $parentProgram instanceof Event ? EventStructure::ChildEvent->value : EventStructure::Standalone->value,
             'description' => $validated['description'] ?? null,
             'timezone' => $timezone,
             'starts_at' => $startsAt,
@@ -1549,15 +1421,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'submitter_id' => auth()->id(),
         ]);
 
-        if ($parentProgram?->settings) {
-            $registrationMode = $parentProgram->settings->registration_mode;
-
-            $event->settings()->create([
-                'registration_required' => (bool) $parentProgram->settings->registration_required,
-                'registration_mode' => $registrationMode instanceof \App\Enums\RegistrationMode ? $registrationMode->value : (string) $registrationMode,
-            ]);
-        }
-
         // Attach selected space to institution if not already attached
         if (!empty($validated['space_id']) && !empty($event->institution_id)) {
             $institution = Institution::find($event->institution_id);
@@ -1566,10 +1429,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
-        app(EventKeyPersonSyncService::class)->sync(
+        app(EventParticipantSyncService::class)->sync(
             $event,
             $validated['speakers'] ?? [],
-            $validated['other_key_people'] ?? [],
+            $validated['other_participants'] ?? [],
         );
 
         // Sync selected languages
@@ -1638,7 +1501,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+        app(\App\Services\ShareTrackingService::class)->recordOutcome(
             type: \App\Enums\DawahShareOutcomeType::EventSubmission,
             outcomeKey: 'event_submission:submission:'.$submission->id,
             subject: $event,
@@ -1660,11 +1523,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         session()->flash('event_title', $event->title);
         session()->flash('event_slug', $event->slug);
         session()->flash('event_visibility', $event->visibility->value ?? 'public');
-
-        if ($parentProgram instanceof Event) {
-            session()->flash('parent_event_id', $parentProgram->id);
-            session()->flash('parent_event_title', $parentProgram->title);
-        }
 
         return redirect()->route('submit-event.success');
     }
@@ -1795,7 +1653,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $speakerIds = collect(array_merge(
             (array) ($validated['speakers'] ?? []),
-            collect((array) ($validated['other_key_people'] ?? []))
+            collect((array) ($validated['other_participants'] ?? []))
                 ->pluck('speaker_id')
                 ->all(),
             (array) ($this->data['speakers'] ?? []),
@@ -2082,30 +1940,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 <div class="bg-slate-50 min-h-screen py-12 pb-32">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="max-w-6xl xl:max-w-7xl mx-auto">
-            @php($parentProgramNavigation = $this->parentProgramNavigation)
-
-            @if($parentProgramNavigation)
-                <div class="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 shadow-sm">
-                    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{{ __('Child Event Submission') }}</p>
-                            <h2 class="mt-2 text-lg font-semibold text-slate-900">{{ __('Adding a child event under :title', ['title' => $parentProgramNavigation['title']]) }}</h2>
-                            <p class="mt-2 text-sm text-slate-600">{{ __('This submission will attach to the selected parent program automatically. You can return to the parent anytime to review the full program structure.') }}</p>
-                        </div>
-                        <div class="flex flex-col gap-3 sm:flex-row">
-                            <a href="{{ $parentProgramNavigation['ahli_url'] }}" class="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100">
-                                {{ __('Back to Parent Program') }}
-                            </a>
-                            @if($parentProgramNavigation['public_url'])
-                                <a href="{{ $parentProgramNavigation['public_url'] }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-                                    {{ __('View Parent Public Page') }}
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             <!-- Header -->
             <div class="text-center mb-12">
                 <h1 class="font-heading text-4xl font-bold text-slate-900">{{ __('Hantar Majlis Ilmu') }}</h1>

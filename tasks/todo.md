@@ -1,3 +1,75 @@
+# Speaker Show Page Relation Fix
+
+# Event Show Blaze Extraction
+
+- [x] Identify a low-risk repeated presentation block on the public event show page
+- [x] Extract the repeated hero details markup into an anonymous Blade component under `resources/views/components`
+- [x] Re-run focused event show tests and formatting after the extraction
+
+## Review
+
+- Extracted the duplicated event-show hero badges, title, date, and location chips into `resources/views/components/events/show/hero-details.blade.php`.
+- Replaced both inline hero-detail branches in `resources/views/livewire/pages/events/show.blade.php` with the new anonymous component so Blaze has more reusable component surface without changing page behavior.
+- Verification:
+  - `php artisan test --compact tests/Feature/EventShowPageTest.php` => 18 passed (51 assertions)
+  - `vendor/bin/pint --dirty --format agent resources/views/livewire/pages/events/show.blade.php resources/views/components/events/show/hero-details.blade.php` => pass
+
+- [x] Identify the stale speaker-page relation/model names causing the runtime exception
+- [x] Update the speaker show page component to the current `EventKeyPerson` API
+- [x] Run the focused speaker-page regression test and formatting checks
+
+# Canonical Share Subject Read-Path Follow-up
+
+# Show.php Merge Repair
+
+- [x] Back up the current conflicted `Show.php` working copy before edits
+- [x] Compare merge stages and cited commits to isolate unintended reversions
+- [x] Restore the intended post-share-tracking behavior while keeping the `keyPeople` refactor
+- [x] Run focused formatting and targeted validation on `Show.php`
+- [x] Remove the temporary backup after verification
+
+## Show.php Merge Repair Review
+
+- Confirmed commit order: `0bcfc0d` is a direct child of `a9d4dfb`.
+- Corrected history finding: `a9d4dfb` explicitly removed event-session support from the event domain. That commit deleted `app/Models/EventSession.php`, removed the `sessions()` relation and related helpers from `app/Models/Event.php`, removed `SessionStatus`, deleted the event-sessions Filament relation manager, removed session handling from the public event show page, and added the migration `2026_03_11_121755_remove_recurrence_and_sessions_from_events_domain.php`.
+- Confirmed the `keyPeople` refactor belongs to `0bcfc0d`.
+- Fixed the public no-session drift by removing the reintroduced session wiring from `app/Livewire/Pages/Events/Show.php`, `resources/views/livewire/pages/events/show.blade.php`, and `app/Http/Controllers/Public/EventsController.php` while preserving the `keyPeople` refactor and newer non-session share-tracking improvements.
+- Temporary backup `app/Livewire/Pages/Events/Show.php.bak` was removed after focused verification passed.
+- Focused validation outcome: `php artisan test --compact tests/Feature/EventShowPageTest.php tests/Feature/ParentProgramShowPageTest.php tests/Feature/EventRegistrationSafetyTest.php` passed with 23 tests and 71 assertions.
+- Additional root-cause finding: this was not just a missing file accident in the current workspace. The repo history shows `a9d4dfb` deliberately removed `app/Models/EventSession.php`, `SessionStatus`, and the `Event::sessions()` relation, so keeping those references on the public event flow was the actual merge error.
+
+- [x] Make analytics visit/outcome mappers prefer canonical top-level subject IDs over legacy metadata values
+- [x] Add a focused regression covering stale metadata beside canonical touchpoint/conversion subject IDs
+- [x] Re-run focused Dawah Share tests, Pint, and narrowed PHPStan for the touched files
+
+## Review
+
+- Updated the affiliate-backed analytics adapter so outcome subject IDs prefer canonical conversion `cart_identifier` values, while visit subject IDs read optional touchpoint `cart_identifier` values only when the current schema actually exposes that column.
+- Extended the Dawah Share impact regression to prove analytics still resolves the canonical conversion subject ID when stale legacy metadata disagrees.
+- Verification:
+  - `./vendor/bin/pint --dirty --format agent app/Services/ShareTracking/AffiliatesShareTrackingAnalyticsService.php tests/Feature/DawahShareImpactTest.php` => pass
+  - `php artisan test --compact tests/Feature/DawahShareImpactTest.php --filter='impact dashboard top subjects use canonical affiliate subject fields|resolved active attribution prefers canonical affiliate subject fields|new signups are attributed after a shared landing'` => 3 passed (41 assertions)
+  - narrowed `phpstan analyse` on the share-tracking service files emitted only environment warnings in this shell session; editor diagnostics for the touched files remained clean
+
+# Dawah Share Chrome E2E Audit
+
+- [x] Reproduce the public share flow in Chrome MCP from speaker, institution, and event pages plus attributed landing links
+- [x] Validate UI behavior, share modal/provider links, browser logs, cookies, and tracked-link generation against live database records
+- [x] Verify Dawah Impact dashboard totals, per-link detail, provider breakdown, and conversion/outcome visibility for the exercised flows
+- [x] Fix any defects found in the browser or tracking pipeline and add focused automated regression coverage
+- [x] Re-run focused tests, formatter, and summarize verified end-to-end behavior in this review log
+
+## Review
+
+- Chrome MCP audit covered the authenticated sharer flow on speaker, institution, and event pages plus receiver landings on attributed links.
+- Provider redirects generated tracked Majlis Ilmu URLs with `mi_share` and `mi_channel`, and the Dawah Impact dashboard reflected the exercised speaker, institution, and event links.
+- The audit exposed a real analytics defect in channel reporting: provider cards could show visits while reporting `0` visitors when older or partially migrated records only carried provider metadata on visit touchpoints.
+- Fixed provider-level unique visitor counting in the affiliate-backed analytics service by treating provider-tagged visit identities as the primary source and falling back to attribution cookies only when visit identities are absent.
+- Tightened feature coverage with a regression test for missing attribution provider metadata and aligned the share-surface UI test with the actual search-results share implementation.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Services/ShareTracking/AffiliatesShareTrackingAnalyticsService.php tests/Feature/DawahShareImpactTest.php` => pass
+  - `php artisan test --compact tests/Feature/DawahShareImpactTest.php` => 21 passed
+
 # Advanced Events Hierarchy Foundation
 
 - [x] Add event hierarchy primitives to `events` (`event_structure`, `parent_event_id`)

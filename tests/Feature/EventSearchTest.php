@@ -2,29 +2,38 @@
 
 use App\Enums\EventFormat;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
+use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
+use App\Livewire\Pages\Events\Index;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\EventSettings;
 use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Registration;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Nnjeim\World\Models\Language;
 
 uses(RefreshDatabase::class);
 
 describe('Event Search Filters', function () {
     beforeEach(function () {
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RoleSeeder::class);
         // Set locale to English for tests
         app()->setLocale('en');
         // Get an actual state for filtering
@@ -52,6 +61,57 @@ describe('Event Search Filters', function () {
             ->assertSee('Cari mengikut tajuk...');
     });
 
+    it('loads the advanced filter panel only after it is opened', function () {
+        Livewire::test(Index::class)
+            ->assertDontSee('People & Content')
+            ->call('toggleAdvancedFiltersPanel')
+            ->assertSee('People & Content');
+    });
+
+    it('does not preload unrelated filter option labels into the initial events index response', function () {
+        Speaker::factory()->create([
+            'name' => 'Speaker Hidden Filter Payload Test',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Institution::factory()->create([
+            'name' => 'Institution Hidden Filter Payload Test',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Venue::factory()->create([
+            'name' => 'Venue Hidden Filter Payload Test',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Reference::factory()->create([
+            'title' => 'Reference Hidden Filter Payload Test',
+            'is_active' => true,
+        ]);
+
+        Tag::factory()->discipline()->create([
+            'name' => ['en' => 'Discipline Hidden Filter Payload Test', 'ms' => 'Discipline Hidden Filter Payload Test'],
+            'status' => 'verified',
+        ]);
+
+        Tag::factory()->domain()->create([
+            'name' => ['en' => 'Domain Hidden Filter Payload Test', 'ms' => 'Domain Hidden Filter Payload Test'],
+            'status' => 'verified',
+        ]);
+
+        $this->get('/events')
+            ->assertOk()
+            ->assertDontSee('Speaker Hidden Filter Payload Test')
+            ->assertDontSee('Institution Hidden Filter Payload Test')
+            ->assertDontSee('Venue Hidden Filter Payload Test')
+            ->assertDontSee('Reference Hidden Filter Payload Test')
+            ->assertDontSee('Discipline Hidden Filter Payload Test')
+            ->assertDontSee('Domain Hidden Filter Payload Test');
+    });
+
     it('shows save this search link for guests when search query is active', function () {
         $response = $this->get('/events?search=halaqah');
 
@@ -71,7 +131,7 @@ describe('Event Search Filters', function () {
     });
 
     it('sets default nearby radius to 15 km when location is detected', function () {
-        Livewire::test(\App\Livewire\Pages\Events\Index::class)
+        Livewire::test(Index::class)
             ->call('setLocation', 3.0969303799671, 101.48910903397)
             ->assertSet('lat', '3.0969303799671')
             ->assertSet('lng', '101.48910903397')
@@ -374,7 +434,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $component = Livewire::test(\App\Livewire\Pages\Events\Index::class)
+        $component = Livewire::test(Index::class)
             ->set('search', 'Melawti')
             ->assertSet('search', 'Melawti');
 
@@ -396,8 +456,8 @@ describe('Event Search Filters', function () {
             'visibility' => 'public',
             'published_at' => now(),
             'starts_at' => now()->addDays(2),
-            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
-            'prayer_reference' => \App\Enums\PrayerReference::Maghrib,
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_reference' => PrayerReference::Maghrib,
             'prayer_display_text' => 'Selepas Maghrib',
         ]);
 
@@ -407,8 +467,8 @@ describe('Event Search Filters', function () {
             'visibility' => 'public',
             'published_at' => now(),
             'starts_at' => now()->addDays(2),
-            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
-            'prayer_reference' => \App\Enums\PrayerReference::Asr,
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_reference' => PrayerReference::Asr,
             'prayer_display_text' => 'Selepas Asar',
         ]);
 
@@ -507,8 +567,8 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by language', function () {
-        $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
-        $english = \Nnjeim\World\Models\Language::where('code', 'en')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
+        $malay = Language::where('code', 'ms')->first() ?? Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
+        $english = Language::where('code', 'en')->first() ?? Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
 
         $event1 = Event::factory()->create([
             'title' => 'Malay Event',
@@ -536,8 +596,8 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by language_codes array filter', function () {
-        $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
-        $english = \Nnjeim\World\Models\Language::where('code', 'en')->first() ?? \Nnjeim\World\Models\Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
+        $malay = Language::where('code', 'ms')->first() ?? Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
+        $english = Language::where('code', 'en')->first() ?? Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
 
         $englishEvent = Event::factory()->create([
             'title' => 'English Language Codes Event',
@@ -752,7 +812,7 @@ describe('Event Search Filters', function () {
         $state = State::where('country_code', 'MY')->first();
 
         if (! $state) {
-            $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+            $countryId = DB::table('countries')->insertGetId([
                 'iso2' => 'MY',
                 'name' => 'Malaysia',
                 'status' => 1,
@@ -762,7 +822,7 @@ describe('Event Search Filters', function () {
                 'subregion' => 'South-Eastern Asia',
             ]);
 
-            $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+            $stateId = DB::table('states')->insertGetId([
                 'country_id' => $countryId,
                 'name' => 'Selangor',
                 'country_code' => 'MY',
@@ -842,7 +902,7 @@ describe('Event Search Filters', function () {
         $state = State::where('country_code', 'MY')->first();
 
         if (! $state) {
-            $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+            $countryId = DB::table('countries')->insertGetId([
                 'iso2' => 'MY',
                 'name' => 'Malaysia',
                 'status' => 1,
@@ -852,7 +912,7 @@ describe('Event Search Filters', function () {
                 'subregion' => 'South-Eastern Asia',
             ]);
 
-            $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+            $stateId = DB::table('states')->insertGetId([
                 'country_id' => $countryId,
                 'name' => 'Selangor',
                 'country_code' => 'MY',
@@ -924,7 +984,7 @@ describe('Event Search Filters', function () {
     it('filters events by genre', function () {
         Event::factory()->create([
             'title' => 'Kuliah Event',
-            'event_type' => [\App\Enums\EventType::KuliahCeramah],
+            'event_type' => [EventType::KuliahCeramah],
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -933,7 +993,7 @@ describe('Event Search Filters', function () {
 
         Event::factory()->create([
             'title' => 'Forum Event',
-            'event_type' => [\App\Enums\EventType::Forum],
+            'event_type' => [EventType::Forum],
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -1094,12 +1154,12 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by selected rujukan kitab buku', function () {
-        $riyadhRef = \App\Models\Reference::factory()->create([
+        $riyadhRef = Reference::factory()->create([
             'title' => 'Riyadhus Solihin',
             'is_active' => true,
         ]);
 
-        $bulughRef = \App\Models\Reference::factory()->create([
+        $bulughRef = Reference::factory()->create([
             'title' => 'Bulughul Maram',
             'is_active' => true,
         ]);
@@ -1202,8 +1262,8 @@ describe('Event Search Filters', function () {
     it('eager loads event card relationships', function () {
         config(['scout.driver' => 'database']);
 
-        $institution = \App\Models\Institution::factory()->create();
-        $venue = \App\Models\Venue::factory()->create();
+        $institution = Institution::factory()->create();
+        $venue = Venue::factory()->create();
 
         Event::factory()
             ->for($institution)
@@ -1214,7 +1274,7 @@ describe('Event Search Filters', function () {
                 'visibility' => 'public',
                 'published_at' => now(),
                 'starts_at' => now()->addDays(1),
-                'event_type' => [\App\Enums\EventType::KuliahCeramah],
+                'event_type' => [EventType::KuliahCeramah],
             ]);
 
         $events = app(EventSearchService::class)->search(
@@ -1370,8 +1430,8 @@ describe('Event Search Filters', function () {
             'visibility' => 'public',
             'published_at' => now(),
             'starts_at' => now()->addDays(2),
-            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
-            'prayer_reference' => \App\Enums\PrayerReference::Maghrib,
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_reference' => PrayerReference::Maghrib,
             'prayer_display_text' => 'Selepas Maghrib',
         ]);
 
@@ -1381,8 +1441,8 @@ describe('Event Search Filters', function () {
             'visibility' => 'public',
             'published_at' => now(),
             'starts_at' => now()->addDays(2),
-            'timing_mode' => \App\Enums\TimingMode::PrayerRelative,
-            'prayer_reference' => \App\Enums\PrayerReference::Fajr,
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_reference' => PrayerReference::Fajr,
             'prayer_display_text' => 'Selepas Subuh',
         ]);
 
@@ -1824,7 +1884,7 @@ describe('Event Registration', function () {
 
     it('shows registration button for events requiring registration', function () {
         $event = Event::factory()
-            ->has(\App\Models\EventSettings::factory()->state(['registration_required' => true]), 'settings')
+            ->has(EventSettings::factory()->state(['registration_required' => true]), 'settings')
             ->create([
                 'title' => 'Registration Event',
                 'status' => 'approved',
@@ -1840,7 +1900,7 @@ describe('Event Registration', function () {
 
     it('shows no registration message for open events', function () {
         $event = Event::factory()
-            ->has(\App\Models\EventSettings::factory()->state(['registration_required' => false]), 'settings')
+            ->has(EventSettings::factory()->state(['registration_required' => false]), 'settings')
             ->create([
                 'status' => 'approved',
                 'visibility' => 'public',
@@ -1856,7 +1916,7 @@ describe('Event Registration', function () {
 
     it('allows guest registration', function () {
         $event = Event::factory()
-            ->has(\App\Models\EventSettings::factory()->state([
+            ->has(EventSettings::factory()->state([
                 'registration_required' => true,
                 'registration_opens_at' => now()->subDay(),
                 'registration_closes_at' => now()->addDay(),
@@ -1884,7 +1944,7 @@ describe('Event Registration', function () {
 
     it('prevents duplicate registration', function () {
         $event = Event::factory()
-            ->has(\App\Models\EventSettings::factory()->state([
+            ->has(EventSettings::factory()->state([
                 'registration_required' => true,
                 'registration_opens_at' => now()->subDay(),
                 'registration_closes_at' => now()->addDay(),
@@ -1912,7 +1972,7 @@ describe('Event Registration', function () {
 
     it('enforces capacity limits', function () {
         $event = Event::factory()
-            ->has(\App\Models\EventSettings::factory()->state([
+            ->has(EventSettings::factory()->state([
                 'registration_required' => true,
                 'registration_opens_at' => now()->subDay(),
                 'registration_closes_at' => now()->addDay(),
@@ -1925,7 +1985,7 @@ describe('Event Registration', function () {
                 'registrations_count' => 1,
             ]);
 
-        \App\Models\Registration::factory()->create([
+        Registration::factory()->create([
             'event_id' => $event->id,
             'status' => 'registered',
             'name' => 'Existing Registrant',

@@ -77,14 +77,6 @@
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
-    $disciplines = $this->disciplines;
-    $domains = $this->domains;
-    $sources = $this->sources;
-    $issues = $this->issues;
-    $references = $this->references;
-    $institutions = $this->institutions;
-    $venues = $this->venues;
-    $speakers = $this->speakers;
     $languageOptions = $this->languageOptions();
     $selectedAgeGroups = array_values(array_filter((array) $this->age_group));
     $selectedTopicIds = array_values(array_filter((array) $this->topic_ids));
@@ -101,12 +93,27 @@
     $selectedEventTypes = array_values(array_filter((array) $this->event_type));
     $selectedEventFormats = array_values(array_filter((array) $this->event_format));
     $selectedLanguageCodes = array_values(array_filter((array) $this->language_codes));
+    $selectedTopicOptions = $this->tagOptionLabels(
+        \App\Enums\TagType::Discipline,
+        $selectedTopicIds,
+    );
+    $selectedSpeakerOptions = $this->speakerOptionLabels($selectedSpeakerIds);
+    $selectedModeratorOptions = $this->speakerOptionLabels($selectedModeratorIds);
+    $selectedImamOptions = $this->speakerOptionLabels($selectedImamIds);
+    $selectedKhatibOptions = $this->speakerOptionLabels($selectedKhatibIds);
+    $selectedBilalOptions = $this->speakerOptionLabels($selectedBilalIds);
+    $selectedDomainTagOptions = $this->tagOptionLabels(\App\Enums\TagType::Domain, $selectedDomainTagIds);
+    $selectedSourceTagOptions = $this->tagOptionLabels(\App\Enums\TagType::Source, $selectedSourceTagIds);
+    $selectedIssueTagOptions = $this->tagOptionLabels(\App\Enums\TagType::Issue, $selectedIssueTagIds);
+    $selectedReferenceOptions = $this->referenceOptionLabels($selectedReferenceIds);
+    $selectedInstitutionLabel = filled($institutionId) ? $this->institutionOptionLabel((string) $institutionId) : null;
+    $selectedVenueLabel = filled($venueId) ? $this->venueOptionLabel((string) $venueId) : null;
     $selectedTopicLabels = collect($selectedTopicIds)
-        ->map(fn (string $topicId): ?string => $disciplines->firstWhere('id', $topicId)?->name)
+        ->map(fn (string $topicId): ?string => $selectedTopicOptions[$topicId] ?? null)
         ->filter()
         ->values();
     $selectedSpeakerLabels = collect($selectedSpeakerIds)
-        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->map(fn (string $speakerId): ?string => $selectedSpeakerOptions[$speakerId] ?? null)
         ->filter()
         ->values();
     $selectedKeyPersonRoleLabels = collect($selectedKeyPersonRoles)
@@ -114,35 +121,35 @@
         ->filter()
         ->values();
     $selectedModeratorLabels = collect($selectedModeratorIds)
-        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->map(fn (string $speakerId): ?string => $selectedModeratorOptions[$speakerId] ?? null)
         ->filter()
         ->values();
     $selectedImamLabels = collect($selectedImamIds)
-        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->map(fn (string $speakerId): ?string => $selectedImamOptions[$speakerId] ?? null)
         ->filter()
         ->values();
     $selectedKhatibLabels = collect($selectedKhatibIds)
-        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->map(fn (string $speakerId): ?string => $selectedKhatibOptions[$speakerId] ?? null)
         ->filter()
         ->values();
     $selectedBilalLabels = collect($selectedBilalIds)
-        ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
+        ->map(fn (string $speakerId): ?string => $selectedBilalOptions[$speakerId] ?? null)
         ->filter()
         ->values();
     $selectedDomainTagLabels = collect($selectedDomainTagIds)
-        ->map(fn (string $tagId): ?string => $domains->firstWhere('id', $tagId)?->name)
+        ->map(fn (string $tagId): ?string => $selectedDomainTagOptions[$tagId] ?? null)
         ->filter()
         ->values();
     $selectedSourceTagLabels = collect($selectedSourceTagIds)
-        ->map(fn (string $tagId): ?string => $sources->firstWhere('id', $tagId)?->name)
+        ->map(fn (string $tagId): ?string => $selectedSourceTagOptions[$tagId] ?? null)
         ->filter()
         ->values();
     $selectedIssueTagLabels = collect($selectedIssueTagIds)
-        ->map(fn (string $tagId): ?string => $issues->firstWhere('id', $tagId)?->name)
+        ->map(fn (string $tagId): ?string => $selectedIssueTagOptions[$tagId] ?? null)
         ->filter()
         ->values();
     $selectedReferenceLabels = collect($selectedReferenceIds)
-        ->map(fn (string $referenceId): ?string => $references->firstWhere('id', $referenceId)?->title)
+        ->map(fn (string $referenceId): ?string => $selectedReferenceOptions[$referenceId] ?? null)
         ->filter()
         ->values();
     $selectedLanguageLabels = collect($selectedLanguageCodes)
@@ -447,6 +454,20 @@
                             class="h-11 px-4 rounded-xl border border-rose-100 bg-rose-50 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition">
                             {{ __('Clear Location') }}
                         </button>
+
+                        @if(! $showAdvancedFiltersPanel)
+                            <label class="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+                                <span>{{ __('Radius (km)') }}</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="1000"
+                                    step="1"
+                                    wire:model.live="filterData.radius_km"
+                                    class="h-8 w-20 rounded-lg border border-slate-200 px-2 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:outline-none"
+                                >
+                            </label>
+                        @endif
                     @endif
                 </div>
 
@@ -471,8 +492,30 @@
                 </div>
             </div>
 
-            <div class="mi-filter-shell">
-                {{ $this->form }}
+            <div class="mi-filter-shell space-y-4">
+                <button type="button" wire:click="toggleAdvancedFiltersPanel"
+                    class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-500/10">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">{{ __('Advanced Filters') }}</p>
+                        <p class="text-xs text-slate-500">
+                            {{ $showAdvancedFiltersPanel
+                                ? __('Hide the full filter panel once you are done refining results.')
+                                : __('Open the full filter panel only when you need detailed filtering.') }}
+                        </p>
+                    </div>
+
+                    <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                        @if($activeFilterCount > 0)
+                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">{{ $activeFilterCount }}</span>
+                        @endif
+
+                        {{ $showAdvancedFiltersPanel ? __('Hide') : __('Show') }}
+                    </span>
+                </button>
+
+                @if($showAdvancedFiltersPanel)
+                    <livewire:pages.events.advanced-filters-panel :filters="$filterData" />
+                @endif
             </div>
 
             @if($hasActiveFilters)
@@ -517,13 +560,13 @@
 
                     @if($institutionId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $institutions->firstWhere('id', $institutionId)?->name ?? __('Institution') }}
+                            {{ $selectedInstitutionLabel ?? __('Institution') }}
                         </span>
                     @endif
 
                     @if($venueId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $venues->firstWhere('id', $venueId)?->name ?? __('Tempat') }}
+                            {{ $selectedVenueLabel ?? __('Tempat') }}
                         </span>
                     @endif
 

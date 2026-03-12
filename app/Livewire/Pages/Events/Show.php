@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Events;
 
+use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventParticipantRole;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
@@ -10,10 +11,15 @@ use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\EventKeyPerson;
+use App\Models\EventSubmission;
+use App\Models\Institution;
 use App\Models\Registration;
+use App\Models\Speaker;
 use App\Models\User;
+use App\Models\Venue;
 use App\Services\CalendarService;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\Notifications\EventNotificationService;
+use App\Services\ShareTrackingService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
@@ -100,9 +106,9 @@ class Show extends Component
         ]);
 
         $event->loadMorph('organizer', [
-            \App\Models\Institution::class => ['media', 'contacts'],
-            \App\Models\Speaker::class => ['media'],
-            \App\Models\Venue::class => ['media'],
+            Institution::class => ['media', 'contacts'],
+            Speaker::class => ['media'],
+            Venue::class => ['media'],
         ]);
 
         $this->event = $event;
@@ -268,7 +274,7 @@ class Show extends Component
     public function shareLinks(): array
     {
         /** @var array<string, string> $platformLinks */
-        $platformLinks = app(DawahShareService::class)->redirectLinks(
+        $platformLinks = app(ShareTrackingService::class)->redirectLinks(
             route('events.show', $this->event),
             trim($this->event->title.' - '.config('app.name')),
             $this->event->title,
@@ -339,8 +345,8 @@ class Show extends Component
             'checked_in_at' => now(),
         ]);
 
-        app(DawahShareService::class)->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::EventCheckin,
+        app(ShareTrackingService::class)->recordOutcome(
+            type: DawahShareOutcomeType::EventCheckin,
             outcomeKey: 'event_checkin:checkin:'.$checkin->id,
             subject: $this->event,
             actor: $user,
@@ -352,7 +358,7 @@ class Show extends Component
             ],
         );
 
-        app(\App\Services\Notifications\EventNotificationService::class)
+        app(EventNotificationService::class)
             ->notifyCheckinConfirmed($checkin);
 
         $this->isCheckedIn = true;
@@ -426,17 +432,17 @@ class Show extends Component
     protected function recordEngagementOutcome(string $relation, User $user): void
     {
         $type = match ($relation) {
-            'savedEvents' => \App\Enums\DawahShareOutcomeType::EventSave,
-            'interestedEvents' => \App\Enums\DawahShareOutcomeType::EventInterest,
-            'goingEvents' => \App\Enums\DawahShareOutcomeType::EventGoing,
+            'savedEvents' => DawahShareOutcomeType::EventSave,
+            'interestedEvents' => DawahShareOutcomeType::EventInterest,
+            'goingEvents' => DawahShareOutcomeType::EventGoing,
             default => null,
         };
 
-        if (! $type instanceof \App\Enums\DawahShareOutcomeType) {
+        if (! $type instanceof DawahShareOutcomeType) {
             return;
         }
 
-        app(DawahShareService::class)->recordOutcome(
+        app(ShareTrackingService::class)->recordOutcome(
             type: $type,
             outcomeKey: $type->value.':user:'.$user->id.':event:'.$this->event->id,
             subject: $this->event,
@@ -552,7 +558,7 @@ class Show extends Component
             return true;
         }
 
-        return \App\Models\EventSubmission::where('event_id', $event->id)
+        return EventSubmission::where('event_id', $event->id)
             ->where('submitted_by', $user->id)
             ->exists();
     }
@@ -562,7 +568,7 @@ class Show extends Component
      *   available: bool,
      *   reason: string|null,
      *   method: 'self_reported'|'registered_self_checkin',
-     *   registration_id: string|null,
+     *   registration_id: string|null
      * }
      */
     protected function resolveCheckInState(User $user): array
