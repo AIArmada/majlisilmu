@@ -4,16 +4,16 @@ namespace Database\Factories;
 
 use App\Enums\EventParticipantRole;
 use App\Models\Event;
-use App\Models\EventParticipant;
+use App\Models\EventKeyPerson;
 use App\Models\Speaker;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<EventParticipant>
+ * @extends Factory<EventKeyPerson>
  */
-class EventParticipantFactory extends Factory
+class EventKeyPersonFactory extends Factory
 {
-    protected $model = EventParticipant::class;
+    protected $model = EventKeyPerson::class;
 
     /**
      * @return array<string, mixed>

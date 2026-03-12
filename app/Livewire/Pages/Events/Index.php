@@ -109,7 +109,7 @@ class Index extends Component implements HasForms
      * @var list<string>
      */
     #[Url]
-    public array $participant_roles = [];
+    public array $key_person_roles = [];
 
     /**
      * @var list<string>
@@ -450,7 +450,7 @@ class Index extends Component implements HasForms
                                     )
                                     ->live(),
 
-                                Select::make('participant_roles')
+                                Select::make('key_person_roles')
                                     ->label(__('Peranan Lain'))
                                     ->placeholder(__('Any Role'))
                                     ->searchable()
@@ -1004,7 +1004,7 @@ class Index extends Component implements HasForms
             'institution_id' => $filters['institution_id'],
             'venue_id' => $filters['venue_id'],
             'speaker_ids' => $filters['speaker_ids'],
-            'participant_roles' => $filters['participant_roles'],
+            'key_person_roles' => $filters['key_person_roles'],
             'moderator_ids' => $filters['moderator_ids'],
             'imam_ids' => $filters['imam_ids'],
             'khatib_ids' => $filters['khatib_ids'],
@@ -1122,7 +1122,7 @@ class Index extends Component implements HasForms
             'institution_id' => null,
             'venue_id' => null,
             'speaker_ids' => [],
-            'participant_roles' => [],
+            'key_person_roles' => [],
             'moderator_ids' => [],
             'imam_ids' => [],
             'khatib_ids' => [],
@@ -1184,7 +1184,7 @@ class Index extends Component implements HasForms
             'institution_id' => filled($this->institution_id) ? (string) $this->institution_id : null,
             'venue_id' => filled($this->venue_id) ? (string) $this->venue_id : null,
             'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
-            'participant_roles' => $this->normalizeStringArray($this->participant_roles),
+            'key_person_roles' => $this->normalizeStringArray($this->key_person_roles),
             'moderator_ids' => $this->normalizeStringArray($this->moderator_ids),
             'imam_ids' => $this->normalizeStringArray($this->imam_ids),
             'khatib_ids' => $this->normalizeStringArray($this->khatib_ids),
@@ -1233,7 +1233,7 @@ class Index extends Component implements HasForms
         $this->institution_id = $filters['institution_id'];
         $this->venue_id = $filters['venue_id'];
         $this->speaker_ids = $filters['speaker_ids'];
-        $this->participant_roles = $filters['participant_roles'];
+        $this->key_person_roles = $filters['key_person_roles'];
         $this->moderator_ids = $filters['moderator_ids'];
         $this->imam_ids = $filters['imam_ids'];
         $this->khatib_ids = $filters['khatib_ids'];
@@ -1325,7 +1325,7 @@ class Index extends Component implements HasForms
             'institution_id' => filled($normalized['institution_id']) ? (string) $normalized['institution_id'] : null,
             'venue_id' => filled($normalized['venue_id']) ? (string) $normalized['venue_id'] : null,
             'speaker_ids' => $this->normalizeStringArray($normalized['speaker_ids'] ?? []),
-            'participant_roles' => $this->normalizeStringArray($normalized['participant_roles'] ?? []),
+            'key_person_roles' => $this->normalizeStringArray($normalized['key_person_roles'] ?? []),
             'moderator_ids' => $this->normalizeStringArray($normalized['moderator_ids'] ?? []),
             'imam_ids' => $this->normalizeStringArray($normalized['imam_ids'] ?? []),
             'khatib_ids' => $this->normalizeStringArray($normalized['khatib_ids'] ?? []),

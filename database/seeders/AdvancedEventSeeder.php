@@ -15,7 +15,7 @@ use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
-use App\Services\EventParticipantSyncService;
+use App\Services\EventKeyPersonSyncService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -248,7 +248,7 @@ class AdvancedEventSeeder extends Seeder
                 ];
             }
 
-            app(EventParticipantSyncService::class)->sync($event, $selected, $otherParticipants);
+            app(EventKeyPersonSyncService::class)->sync($event, $selected, $otherParticipants);
         }
 
         return $event;

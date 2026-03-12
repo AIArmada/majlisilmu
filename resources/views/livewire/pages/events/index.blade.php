@@ -93,7 +93,7 @@
     $selectedIssueTagIds = array_values(array_filter((array) $this->issue_tag_ids));
     $selectedReferenceIds = array_values(array_filter((array) $this->reference_ids));
     $selectedSpeakerIds = array_values(array_filter((array) $this->speaker_ids));
-    $selectedParticipantRoles = array_values(array_filter((array) $this->participant_roles));
+    $selectedKeyPersonRoles = array_values(array_filter((array) $this->key_person_roles));
     $selectedModeratorIds = array_values(array_filter((array) $this->moderator_ids));
     $selectedImamIds = array_values(array_filter((array) $this->imam_ids));
     $selectedKhatibIds = array_values(array_filter((array) $this->khatib_ids));
@@ -109,7 +109,7 @@
         ->map(fn (string $speakerId): ?string => $speakers->firstWhere('id', $speakerId)?->name)
         ->filter()
         ->values();
-    $selectedParticipantRoleLabels = collect($selectedParticipantRoles)
+    $selectedKeyPersonRoleLabels = collect($selectedKeyPersonRoles)
         ->map(fn (string $role): ?string => \App\Enums\EventParticipantRole::tryFrom($role)?->getLabel())
         ->filter()
         ->values();
@@ -177,7 +177,7 @@
         'institution_id' => $institutionId,
         'venue_id' => $venueId,
         'speaker_ids' => $selectedSpeakerIds,
-        'participant_roles' => $selectedParticipantRoles,
+        'key_person_roles' => $selectedKeyPersonRoles,
         'moderator_ids' => $selectedModeratorIds,
         'imam_ids' => $selectedImamIds,
         'khatib_ids' => $selectedKhatibIds,
@@ -230,7 +230,7 @@
         $childrenAllowed !== null,
         $isMuslimOnly !== null,
         count($selectedSpeakerIds) > 0,
-        count($selectedParticipantRoles) > 0,
+        count($selectedKeyPersonRoles) > 0,
         count($selectedModeratorIds) > 0,
         count($selectedImamIds) > 0,
         count($selectedKhatibIds) > 0,
@@ -641,7 +641,7 @@
                         </span>
                     @endforeach
 
-                    @foreach($selectedParticipantRoleLabels as $roleLabel)
+                    @foreach($selectedKeyPersonRoleLabels as $roleLabel)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
                             {{ $roleLabel }}
                         </span>
@@ -746,7 +746,38 @@
 
             <div wire:loading.delay.short
                 wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
-                <x-ui.skeleton.event-card-grid />
+                <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                    @foreach(range(1, 6) as $index)
+                        <article class="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm animate-pulse">
+                            <div class="relative aspect-[3/2] bg-slate-200">
+                                <div class="absolute left-4 top-4 h-14 w-14 rounded-xl bg-white/80"></div>
+                                <div class="absolute bottom-4 left-4 h-6 w-20 rounded-full bg-white/70"></div>
+                            </div>
+
+                            <div class="space-y-4 p-6">
+                                <div class="space-y-2">
+                                    <div class="h-6 w-5/6 rounded-full bg-slate-200"></div>
+                                    <div class="h-6 w-2/3 rounded-full bg-slate-200"></div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div class="flex items-start gap-2.5">
+                                        <div class="mt-1 h-4 w-4 rounded-full bg-emerald-100"></div>
+                                        <div class="w-full space-y-2">
+                                            <div class="h-4 w-3/4 rounded-full bg-slate-200"></div>
+                                            <div class="h-3 w-1/2 rounded-full bg-slate-100"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="h-4 w-4 rounded-full bg-emerald-100"></div>
+                                        <div class="h-4 w-2/3 rounded-full bg-slate-200"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
             </div>
 
             <div wire:loading.remove wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">

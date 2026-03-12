@@ -63,7 +63,7 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
     {
         // Verify linked speaker profiles across all event roles.
         \App\Models\Speaker::query()
-            ->whereIn('id', $event->participants()->whereNotNull('speaker_id')->pluck('speaker_id'))
+            ->whereIn('id', $event->keyPeople()->whereNotNull('speaker_id')->pluck('speaker_id'))
             ->where('status', 'pending')
             ->update(['status' => 'verified']);
 

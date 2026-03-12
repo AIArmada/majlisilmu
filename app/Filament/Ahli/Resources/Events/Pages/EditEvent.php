@@ -43,16 +43,16 @@ class EditEvent extends EditRecord
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
 
-        $event->loadMissing(['participants']);
+        $event->loadMissing(['keyPeople']);
 
-        $data['speakers'] = $event->participants
+        $data['speakers'] = $event->keyPeople
             ->filter(fn ($p) => $p->role === \App\Enums\EventParticipantRole::Speaker)
             ->pluck('speaker_id')
             ->filter()
             ->values()
             ->all();
 
-        $data['other_participants'] = $event->participants
+        $data['other_key_people'] = $event->keyPeople
             ->filter(fn ($p) => $p->role !== \App\Enums\EventParticipantRole::Speaker)
             ->map(fn ($p) => [
                 'role' => $p->role instanceof \App\Enums\EventParticipantRole ? $p->role->value : $p->role,
@@ -85,7 +85,7 @@ class EditEvent extends EditRecord
             $data['issue_tags'],
             $data['registration_mode'],
             $data['speakers'],
-            $data['other_participants'],
+            $data['other_key_people'],
         );
 
         return $data;

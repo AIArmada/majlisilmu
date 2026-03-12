@@ -142,11 +142,11 @@ it('renders participant role and linked profile chips using human-readable value
 
     $this->actingAs($user)
         ->get(route('saved-searches.index', [
-            'participant_roles' => [EventParticipantRole::PersonInCharge->value],
+            'key_person_roles' => [EventParticipantRole::PersonInCharge->value],
             'imam_ids' => [$imamSpeaker->id],
         ]))
         ->assertOk()
-        ->assertSee('Participant Roles: PIC / Penyelaras')
+        ->assertSee('Key Person Roles: PIC / Penyelaras')
         ->assertSee('Imam: Ustaz Role Imam');
 });
 

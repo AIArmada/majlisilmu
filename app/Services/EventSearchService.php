@@ -307,11 +307,11 @@ class EventSearchService
             }
         }
 
-        if (! empty($filters['participant_roles'])) {
-            $participantRoles = $this->normalizeArrayFilter($filters['participant_roles']);
+        if (! empty($filters['key_person_roles'])) {
+            $participantRoles = $this->normalizeArrayFilter($filters['key_person_roles']);
 
             if ($participantRoles !== []) {
-                $filterParts[] = 'participant_roles:['.implode(',', $participantRoles).']';
+                $filterParts[] = 'key_person_roles:['.implode(',', $participantRoles).']';
             }
         }
 
@@ -507,10 +507,10 @@ class EventSearchService
             });
         }
 
-        $participantRoles = $this->normalizeParticipantRoles($filters['participant_roles'] ?? null);
+        $participantRoles = $this->normalizeParticipantRoles($filters['key_person_roles'] ?? null);
 
         if ($participantRoles !== []) {
-            $queryBuilder->whereHas('participants', function (Builder $participantQuery) use ($participantRoles): void {
+            $queryBuilder->whereHas('keyPeople', function (Builder $participantQuery) use ($participantRoles): void {
                 $participantQuery->whereIn('role', $participantRoles);
             });
         }
@@ -527,7 +527,7 @@ class EventSearchService
                 continue;
             }
 
-            $queryBuilder->whereHas('participants', function (Builder $participantQuery) use ($roleSpecificIds, $role): void {
+            $queryBuilder->whereHas('keyPeople', function (Builder $participantQuery) use ($roleSpecificIds, $role): void {
                 $participantQuery
                     ->where('role', $role->value)
                     ->whereIn('speaker_id', $roleSpecificIds);

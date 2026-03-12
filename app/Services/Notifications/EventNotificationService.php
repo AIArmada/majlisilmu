@@ -298,11 +298,6 @@ class EventNotificationService
         }
     }
 
-    public function notifySessionChange(Event $event): void
-    {
-        $this->notifyMaterialEventChange($event, ['event_session']);
-    }
-
     public function notifyRegistrationConfirmed(Registration $registration): void
     {
         $user = $registration->user;
@@ -449,12 +444,12 @@ class EventNotificationService
 
     protected function notifyFollowedContentPublication(Event $event): void
     {
-        $event->loadMissing('speakerParticipants.speaker.followers');
+        $event->loadMissing('speakerKeyPeople.speaker.followers');
 
         $this->dispatchFollowedEntityNotifications(
             trigger: NotificationTrigger::FollowedSpeakerEvent,
             event: $event,
-            followables: $event->speakerParticipants
+            followables: $event->speakerKeyPeople
                 ->pluck('speaker')
                 ->filter()
                 ->unique('id')

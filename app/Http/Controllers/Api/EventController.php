@@ -35,7 +35,7 @@ class EventController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $events = QueryBuilder::for(Event::query()->with(['participants.speaker']))
+        $events = QueryBuilder::for(Event::query()->with(['keyPeople.speaker']))
             ->allowedFilters([
                 AllowedFilter::callback('status', function (Builder $query, mixed $value): void {
                     $statuses = array_values(array_intersect($this->normalizeArrayFilter($value), self::PUBLIC_STATUSES));
@@ -139,14 +139,14 @@ class EventController extends Controller
                         $speakerQuery->whereIn('speakers.id', $speakerIds);
                     });
                 }),
-                AllowedFilter::callback('participant_roles', function (Builder $query, mixed $value): void {
+                AllowedFilter::callback('key_person_roles', function (Builder $query, mixed $value): void {
                     $participantRoles = $this->normalizeParticipantRoles($value);
 
                     if ($participantRoles === []) {
                         return;
                     }
 
-                    $query->whereHas('participants', function (Builder $participantQuery) use ($participantRoles): void {
+                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($participantRoles): void {
                         $participantQuery->whereIn('role', $participantRoles);
                     });
                 }),
@@ -157,7 +157,7 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
                         $participantQuery
                             ->where('role', EventParticipantRole::Moderator->value)
                             ->whereIn('speaker_id', $speakerIds);
@@ -170,7 +170,7 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
                         $participantQuery
                             ->where('role', EventParticipantRole::Imam->value)
                             ->whereIn('speaker_id', $speakerIds);
@@ -183,7 +183,7 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
                         $participantQuery
                             ->where('role', EventParticipantRole::Khatib->value)
                             ->whereIn('speaker_id', $speakerIds);
@@ -196,7 +196,7 @@ class EventController extends Controller
                         return;
                     }
 
-                    $query->whereHas('participants', function (Builder $participantQuery) use ($speakerIds): void {
+                    $query->whereHas('keyPeople', function (Builder $participantQuery) use ($speakerIds): void {
                         $participantQuery
                             ->where('role', EventParticipantRole::Bilal->value)
                             ->whereIn('speaker_id', $speakerIds);
@@ -260,8 +260,8 @@ class EventController extends Controller
                 'venue.address.district',
                 'venue.address.subdistrict',
                 'institution',
-                'participants',
-                'participants.speaker',
+                'keyPeople',
+                'keyPeople.speaker',
                 'speakers',
                 'series',
                 'mediaLinks',
@@ -296,7 +296,7 @@ class EventController extends Controller
      */
     public function show(Request $request, string $eventIdentifier): JsonResponse
     {
-        $event = QueryBuilder::for(Event::query()->with(['participants.speaker']))
+        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker']))
             ->allowedIncludes([
                 'venue',
                 'venue.address',
@@ -306,8 +306,8 @@ class EventController extends Controller
                 'venue.address.city',
                 'institution',
                 'institution.address',
-                'participants',
-                'participants.speaker',
+                'keyPeople',
+                'keyPeople.speaker',
                 'speakers',
                 'series',
                 'mediaLinks',

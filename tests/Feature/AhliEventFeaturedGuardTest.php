@@ -9,7 +9,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
-use App\Services\EventParticipantSyncService;
+use App\Services\EventKeyPersonSyncService;
 use App\Support\Authz\MemberRoleScopes;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -46,7 +46,7 @@ function createAhliInstitutionAdmin(): array
         'ends_at' => $endsAt,
     ]);
 
-    app(EventParticipantSyncService::class)->sync($event, [$speaker->id], []);
+    app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id], []);
 
     $institution->members()->syncWithoutDetaching([$user->id]);
 
@@ -117,7 +117,7 @@ it('allows application admins to save events without mass assigning speakers', f
         'is_featured' => false,
     ]);
 
-    app(EventParticipantSyncService::class)->sync($event, [$speaker->id], []);
+    app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id], []);
 
     Livewire::actingAs($administrator)
         ->test(AdminEditEvent::class, ['record' => $event->id])

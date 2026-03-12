@@ -97,7 +97,7 @@ class CreateAdvanced extends Component
             ],
             'weekend_intensive' => [
                 'title' => $this->form['title'] ?: __('Weekend Intensive Program'),
-                'description' => $this->form['description'] ?: __('A compact multi-session program across one focused weekend.'),
+                'description' => $this->form['description'] ?: __('A compact multi-day program across one focused weekend.'),
                 'program_starts_at' => $startsAt->copy()->next('Friday')->setTime(20, 30)->format('Y-m-d\TH:i'),
                 'program_ends_at' => $startsAt->copy()->next('Sunday')->setTime(12, 30)->format('Y-m-d\TH:i'),
             ],
@@ -335,7 +335,7 @@ class CreateAdvanced extends Component
     {
         return [
             ['key' => 'weekly_series', 'title' => __('Weekly Series'), 'description' => __('Use one parent program for a weekly chain of child event submissions.'), 'eyebrow' => __('Series')],
-            ['key' => 'weekend_intensive', 'title' => __('Weekend Intensive'), 'description' => __('Create one parent, then submit each session separately under it.'), 'eyebrow' => __('Focused')],
+            ['key' => 'weekend_intensive', 'title' => __('Weekend Intensive'), 'description' => __('Create one parent, then submit each child event separately under it.'), 'eyebrow' => __('Focused')],
             ['key' => 'ramadan_program', 'title' => __('Ramadan Program'), 'description' => __('Set up the parent first, then add nightly child events one by one.'), 'eyebrow' => __('Seasonal')],
         ];
     }

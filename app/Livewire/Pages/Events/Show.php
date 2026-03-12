@@ -9,7 +9,7 @@ use App\Enums\RegistrationMode;
 use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Models\Event;
 use App\Models\EventCheckin;
-use App\Models\EventParticipant;
+use App\Models\EventKeyPerson;
 use App\Models\Registration;
 use App\Models\User;
 use App\Services\CalendarService;
@@ -83,7 +83,7 @@ class Show extends Component
             'venue.address.district',
             'venue.address.subdistrict',
             'speakers.media',
-            'participants.speaker.media',
+            'keyPeople.speaker.media',
             'tags',
             'donationChannel.media',
             'settings',
@@ -195,15 +195,15 @@ class Show extends Component
     }
 
     /**
-     * @return Collection<int|string, \Illuminate\Database\Eloquent\Collection<int, EventParticipant>>
+     * @return Collection<int|string, \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson>>
      */
     #[Computed]
     public function roleParticipants(): Collection
     {
-        return collect($this->event->participants
-            ->filter(fn (EventParticipant $participant): bool => $participant->role !== EventParticipantRole::Speaker && $participant->is_public)
-            ->groupBy(function (EventParticipant $participant): string {
-                $role = $participant->role;
+        return collect($this->event->keyPeople
+            ->filter(fn (EventKeyPerson $keyPerson): bool => $keyPerson->role !== EventParticipantRole::Speaker && $keyPerson->is_public)
+            ->groupBy(function (EventKeyPerson $keyPerson): string {
+                $role = $keyPerson->role;
 
                 return $role instanceof EventParticipantRole ? $role->value : (string) $role;
             })

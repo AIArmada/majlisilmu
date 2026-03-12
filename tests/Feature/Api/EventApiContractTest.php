@@ -263,7 +263,7 @@ it('filters events by participant roles and role-specific linked speakers', func
         'is_active' => true,
     ]);
 
-    $imamEvent->participants()->create([
+    $imamEvent->keyPeople()->create([
         'role' => EventParticipantRole::Imam,
         'speaker_id' => $imamSpeaker->id,
         'order_column' => 1,
@@ -276,14 +276,14 @@ it('filters events by participant roles and role-specific linked speakers', func
         'is_active' => true,
     ]);
 
-    $moderatedEvent->participants()->create([
+    $moderatedEvent->keyPeople()->create([
         'role' => EventParticipantRole::Moderator,
         'speaker_id' => $moderatorSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
     ]);
 
-    $roleResponse = $this->getJson('/api/v1/events?filter[participant_roles]=imam');
+    $roleResponse = $this->getJson('/api/v1/events?filter[key_person_roles]=imam');
 
     $roleResponse->assertOk();
 
@@ -313,7 +313,7 @@ it('includes participant data in the event api response', function () {
         'is_active' => true,
     ]);
 
-    $event->participants()->create([
+    $event->keyPeople()->create([
         'role' => EventParticipantRole::Imam,
         'speaker_id' => $imamSpeaker->id,
         'order_column' => 1,
@@ -323,6 +323,6 @@ it('includes participant data in the event api response', function () {
     $response = $this->getJson('/api/v1/events/'.$event->id);
 
     $response->assertOk()
-        ->assertJsonPath('data.participants.0.role', EventParticipantRole::Imam->value)
-        ->assertJsonPath('data.participants.0.speaker.id', $imamSpeaker->id);
+        ->assertJsonPath('data.key_people.0.role', EventParticipantRole::Imam->value)
+        ->assertJsonPath('data.key_people.0.speaker.id', $imamSpeaker->id);
 });

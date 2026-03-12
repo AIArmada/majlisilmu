@@ -58,7 +58,7 @@ use Spatie\Tags\HasTags;
  * @property-read Address|null $addressModel
  * @property-read Institution|null $institution
  * @property-read Venue|null $venue
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EventParticipant> $participants
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson> $keyPeople
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Speaker> $speakers
  */
 class Event extends Model implements AuditableContract, HasMedia
@@ -93,7 +93,7 @@ class Event extends Model implements AuditableContract, HasMedia
             });
 
             $event->members()->detach();
-            $event->participants()->delete();
+            $event->keyPeople()->delete();
             $event->references()->detach();
             $event->savedBy()->detach();
             $event->interestedBy()->detach();
@@ -252,7 +252,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
-        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'participants.speaker', 'tags', 'references']);
+        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references']);
         $venueAddress = $this->venue?->addressModel;
         $institutionAddress = $this->institution?->addressModel;
         $institution = $this->institution;
@@ -291,12 +291,12 @@ class Event extends Model implements AuditableContract, HasMedia
             ->values()
             ->all();
 
-        /** @var \Illuminate\Database\Eloquent\Collection<int, EventParticipant> $participants */
-        $participants = $this->participants;
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson> $keyPeople */
+        $keyPeople = $this->keyPeople;
 
-        $participantRoles = $participants
-            ->map(function (EventParticipant $participant): string {
-                $role = $participant->role;
+        $participantRoles = $keyPeople
+            ->map(function (EventKeyPerson $keyPerson): string {
+                $role = $keyPerson->role;
 
                 return $role instanceof EventParticipantRole ? $role->value : '';
             })
@@ -305,35 +305,35 @@ class Event extends Model implements AuditableContract, HasMedia
             ->values()
             ->all();
 
-        $participantSpeakerIds = $participants
+        $participantSpeakerIds = $keyPeople
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->unique()
             ->values()
             ->all();
 
-        $moderatorIds = $participants
+        $moderatorIds = $keyPeople
             ->where('role', EventParticipantRole::Moderator)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
 
-        $imamIds = $participants
+        $imamIds = $keyPeople
             ->where('role', EventParticipantRole::Imam)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
 
-        $khatibIds = $participants
+        $khatibIds = $keyPeople
             ->where('role', EventParticipantRole::Khatib)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
 
-        $bilalIds = $participants
+        $bilalIds = $keyPeople
             ->where('role', EventParticipantRole::Bilal)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
@@ -354,8 +354,8 @@ class Event extends Model implements AuditableContract, HasMedia
             'slug' => $this->slug,
             'event_structure' => $this->eventStructure()->value,
             'parent_event_id' => $this->parent_event_id,
-            'speaker_names' => $this->speakerParticipants
-                ->map(fn (EventParticipant $participant): string => $participant->speaker !== null ? $participant->speaker->name : (string) ($participant->name ?? ''))
+            'speaker_names' => $this->speakerKeyPeople
+                ->map(fn (EventKeyPerson $keyPerson): string => $keyPerson->speaker !== null ? $keyPerson->speaker->name : (string) ($keyPerson->name ?? ''))
                 ->filter(fn (string $name): bool => $name !== '')
                 ->implode(', '),
             'institution_name' => $institution instanceof Institution ? $institution->name : '',
@@ -390,12 +390,12 @@ class Event extends Model implements AuditableContract, HasMedia
             'source_tag_ids' => $sourceTagIds,
             'issue_tag_ids' => $issueTagIds,
             'reference_ids' => $this->references->pluck('id')->values()->all(),
-            'speaker_ids' => $this->speakerParticipants
+            'speaker_ids' => $this->speakerKeyPeople
                 ->pluck('speaker_id')
                 ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
                 ->values()
                 ->all(),
-            'participant_roles' => $participantRoles,
+            'key_person_roles' => $participantRoles,
             'participant_speaker_ids' => $participantSpeakerIds,
             'moderator_ids' => $moderatorIds,
             'imam_ids' => $imamIds,
@@ -506,27 +506,27 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return HasMany<EventParticipant, $this>
+     * @return HasMany<EventKeyPerson, $this>
      */
-    public function participants(): HasMany
+    public function keyPeople(): HasMany
     {
-        return $this->hasMany(EventParticipant::class)->orderBy('order_column')->orderBy('created_at');
+        return $this->hasMany(EventKeyPerson::class)->orderBy('order_column')->orderBy('created_at');
     }
 
     /**
-     * @return HasMany<EventParticipant, $this>
+     * @return HasMany<EventKeyPerson, $this>
      */
-    public function speakerParticipants(): HasMany
+    public function speakerKeyPeople(): HasMany
     {
-        return $this->participants()->where('role', EventParticipantRole::Speaker->value);
+        return $this->keyPeople()->where('role', EventParticipantRole::Speaker->value);
     }
 
     /**
-     * @return HasMany<EventParticipant, $this>
+     * @return HasMany<EventKeyPerson, $this>
      */
-    public function nonSpeakerParticipants(): HasMany
+    public function nonSpeakerKeyPeople(): HasMany
     {
-        return $this->participants()->where('role', '!=', EventParticipantRole::Speaker->value);
+        return $this->keyPeople()->where('role', '!=', EventParticipantRole::Speaker->value);
     }
 
     public function eventStructure(): EventStructure
@@ -561,12 +561,12 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return BelongsToMany<Speaker, $this, EventParticipantPivot, 'pivot'>
+     * @return BelongsToMany<Speaker, $this, EventKeyPersonPivot, 'pivot'>
      */
     public function speakers(): BelongsToMany
     {
-        return $this->belongsToMany(Speaker::class, 'event_participants', 'event_id', 'speaker_id')
-            ->using(EventParticipantPivot::class)
+        return $this->belongsToMany(Speaker::class, 'event_key_people', 'event_id', 'speaker_id')
+            ->using(EventKeyPersonPivot::class)
             ->wherePivot('role', EventParticipantRole::Speaker->value)
             ->withPivotValue('role', EventParticipantRole::Speaker->value)
             ->withPivot(['id', 'role', 'name', 'order_column', 'is_public', 'notes'])

@@ -18,7 +18,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
-use App\Services\EventParticipantSyncService;
+use App\Services\EventKeyPersonSyncService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -134,8 +134,8 @@ class EventSeeder extends Seeder
                     }
                 }
 
-                // Prepare bulk participant data
-                $speakerParticipants = [];
+                // Prepare bulk key-person data
+                $speakerKeyPeople = [];
 
                 foreach ($events as $event) {
                     // Randomly select 1-3 speakers
@@ -143,7 +143,7 @@ class EventSeeder extends Seeder
                         $numSpeakers = min(random_int(1, 3), count($speakerIds));
                         $selectedSpeakers = (array) array_rand(array_flip($speakerIds), $numSpeakers);
                         foreach (array_values($selectedSpeakers) as $index => $speakerId) {
-                            $speakerParticipants[] = [
+                            $speakerKeyPeople[] = [
                                 'id' => (string) \Illuminate\Support\Str::uuid(),
                                 'event_id' => $event->id,
                                 'speaker_id' => $speakerId,
@@ -159,9 +159,9 @@ class EventSeeder extends Seeder
                     }
                 }
 
-                // Bulk insert speaker participants
-                if ($speakerParticipants !== []) {
-                    \Illuminate\Support\Facades\DB::table('event_participants')->insert($speakerParticipants);
+                // Bulk insert speaker key people
+                if ($speakerKeyPeople !== []) {
+                    \Illuminate\Support\Facades\DB::table('event_key_people')->insert($speakerKeyPeople);
                 }
 
                 $count += 10;
@@ -403,7 +403,7 @@ class EventSeeder extends Seeder
                 }
             }
 
-            app(EventParticipantSyncService::class)->sync(
+            app(EventKeyPersonSyncService::class)->sync(
                 $event,
                 $speaker instanceof Speaker ? [$speaker->id] : [],
             );
@@ -781,6 +781,6 @@ class EventSeeder extends Seeder
             ];
         }
 
-        app(EventParticipantSyncService::class)->sync($event, $selectedSpeakerIds, $otherParticipants);
+        app(EventKeyPersonSyncService::class)->sync($event, $selectedSpeakerIds, $otherParticipants);
     }
 }

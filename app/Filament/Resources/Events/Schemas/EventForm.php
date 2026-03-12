@@ -391,7 +391,7 @@ class EventForm
                                                 ->toArray())
                                             ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                             ->createOptionUsing(fn (array $data): string => SpeakerFormSchema::createOptionUsing($data)),
-                                        Repeater::make('other_participants')
+                                        Repeater::make('other_key_people')
                                             ->label('Peranan Lain')
                                             ->helperText('Tambahkan moderator, imam, khatib, bilal, atau PIC jika berkenaan.')
                                             ->schema([

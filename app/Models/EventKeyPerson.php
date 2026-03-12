@@ -8,10 +8,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class EventParticipant extends Model
+class EventKeyPerson extends Model
 {
-    /** @use HasFactory<\Database\Factories\EventParticipantFactory> */
+    /** @use HasFactory<\Database\Factories\EventKeyPersonFactory> */
     use HasFactory, HasUuids;
+
+    protected $table = 'event_key_people';
 
     public $incrementing = false;
 

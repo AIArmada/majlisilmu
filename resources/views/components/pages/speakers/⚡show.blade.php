@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\EventParticipantRole;
-use App\Models\EventParticipant;
+use App\Models\EventKeyPerson;
 use App\Models\Speaker;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Support\Carbon;
@@ -165,11 +165,11 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, EventParticipant>
+    * @return \Illuminate\Support\Collection<int, EventKeyPerson>
      */
     public function getOtherRoleUpcomingParticipationsProperty(): \Illuminate\Support\Collection
     {
-        return $this->speaker->nonSpeakerEventParticipants()
+        return $this->speaker->nonSpeakerEventKeyPeople()
             ->whereHas('event', function ($query): void {
                 $query->active()->where('starts_at', '>=', now());
             })
@@ -184,14 +184,14 @@ new class extends Component {
                 'event.media',
             ])
             ->get()
-            ->sortBy(fn (EventParticipant $participant): int => $participant->event?->starts_at?->timestamp ?? PHP_INT_MAX)
+                ->sortBy(fn (EventKeyPerson $participant): int => $participant->event?->starts_at?->timestamp ?? PHP_INT_MAX)
             ->take($this->otherRolesUpcomingPerPage)
             ->values();
     }
 
     public function getOtherRoleUpcomingTotalProperty(): int
     {
-        return $this->speaker->nonSpeakerEventParticipants()
+        return $this->speaker->nonSpeakerEventKeyPeople()
             ->whereHas('event', function ($query): void {
                 $query->active()->where('starts_at', '>=', now());
             })
@@ -199,11 +199,11 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, EventParticipant>
+    * @return \Illuminate\Support\Collection<int, EventKeyPerson>
      */
     public function getOtherRolePastParticipationsProperty(): \Illuminate\Support\Collection
     {
-        return $this->speaker->nonSpeakerEventParticipants()
+        return $this->speaker->nonSpeakerEventKeyPeople()
             ->whereHas('event', function ($query): void {
                 $query->active()->where('starts_at', '<', now());
             })
@@ -218,14 +218,14 @@ new class extends Component {
                 'event.media',
             ])
             ->get()
-            ->sortByDesc(fn (EventParticipant $participant): int => $participant->event?->starts_at?->timestamp ?? 0)
+            ->sortByDesc(fn (EventKeyPerson $participant): int => $participant->event?->starts_at?->timestamp ?? 0)
             ->take($this->otherRolesPastPerPage)
             ->values();
     }
 
     public function getOtherRolePastTotalProperty(): int
     {
-        return $this->speaker->nonSpeakerEventParticipants()
+        return $this->speaker->nonSpeakerEventKeyPeople()
             ->whereHas('event', function ($query): void {
                 $query->active()->where('starts_at', '<', now());
             })
@@ -380,7 +380,7 @@ new class extends Component {
         return \App\Support\Timezone\UserDateTimeFormatter::format($event->ends_at, 'h:i A');
     };
 
-    $resolveParticipantRoleLabel = static function (EventParticipant $participant): string {
+    $resolveParticipantRoleLabel = static function (EventKeyPerson $participant): string {
         $role = $participant->role;
 
         if ($role instanceof EventParticipantRole) {
