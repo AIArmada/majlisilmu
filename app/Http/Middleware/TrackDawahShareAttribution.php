@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -10,15 +10,15 @@ use Symfony\Component\HttpFoundation\Response;
 class TrackDawahShareAttribution
 {
     public function __construct(
-        private readonly DawahShareService $dawahShares
+        private readonly ShareTrackingService $shareTrackingService
     ) {}
 
     /**
-     * @param  \Closure(\Illuminate\Http\Request): \Symfony\Component\HttpFoundation\Response  $next
+     * @param  Closure(Request): Response  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $cookieValue = $this->dawahShares->captureRequest($request);
+        $cookieValue = $this->shareTrackingService->captureRequest($request);
 
         /** @var Response $response */
         $response = $next($request);

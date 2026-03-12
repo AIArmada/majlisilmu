@@ -11,7 +11,6 @@ use App\Enums\EventType;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Models\District;
-use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
@@ -19,7 +18,6 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
-use App\Services\EventSearchService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -30,218 +28,35 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Title;
-use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
 use Nnjeim\World\Models\Language;
 
-#[Layout('layouts.app')]
-#[Title('Upcoming Events')]
-class Index extends Component implements HasForms
+class AdvancedFiltersPanel extends Component implements HasForms
 {
     use InteractsWithForms;
-    use WithPagination;
-
-    #[Url]
-    public ?string $search = null;
-
-    #[Url]
-    public ?string $state_id = null;
-
-    #[Url]
-    public ?string $district_id = null;
-
-    #[Url]
-    public ?string $subdistrict_id = null;
-
-    // Legacy single-language query support.
-    #[Url]
-    public ?string $language = null;
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $language_codes = [];
-
-    /**
-     * @var list<string>|string|null
-     */
-    #[Url]
-    public array|string|null $event_type = [];
-
-    #[Url]
-    public ?string $gender = null;
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $age_group = [];
-
-    #[Url]
-    public ?bool $children_allowed = null;
-
-    #[Url]
-    public ?bool $is_muslim_only = null;
-
-    #[Url]
-    public ?string $institution_id = null;
-
-    #[Url]
-    public ?string $venue_id = null;
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $speaker_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $key_person_roles = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $moderator_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $imam_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $khatib_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $bilal_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $topic_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $domain_tag_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $source_tag_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $issue_tag_ids = [];
-
-    /**
-     * @var list<string>
-     */
-    #[Url]
-    public array $reference_ids = [];
-
-    #[Url]
-    public ?string $starts_after = null;
-
-    #[Url]
-    public ?string $starts_before = null;
-
-    #[Url]
-    public ?string $time_scope = null;
-
-    #[Url]
-    public ?string $prayer_time = null;
-
-    #[Url]
-    public ?string $timing_mode = null;
-
-    #[Url]
-    public ?string $starts_time_from = null;
-
-    #[Url]
-    public ?string $starts_time_until = null;
-
-    /**
-     * @var list<string>|string|null
-     */
-    #[Url]
-    public array|string|null $event_format = [];
-
-    #[Url]
-    public ?bool $has_event_url = null;
-
-    #[Url]
-    public ?bool $has_live_url = null;
-
-    #[Url]
-    public ?bool $has_end_time = null;
-
-    #[Url]
-    public ?string $lat = null;
-
-    #[Url]
-    public ?string $lng = null;
-
-    #[Url]
-    public int $radius_km = 15;
-
-    #[Url]
-    public string $sort = 'time';
 
     /**
      * @var array<string, mixed>
      */
     public array $filterData = [];
 
-    public bool $showAdvancedFiltersPanel = false;
-
-    public function mount(): void
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function mount(array $filters = []): void
     {
-        $normalized = $this->normalizedUrlState();
+        $normalized = $filters === []
+            ? $this->defaultFilterData()
+            : $this->normalizedFilterData($filters);
 
-        $this->fillPublicPropertiesFromFilters($normalized);
         $this->filterData = $normalized;
-    }
-
-    public function toggleAdvancedFiltersPanel(): void
-    {
-        $this->showAdvancedFiltersPanel = ! $this->showAdvancedFiltersPanel;
-    }
-
-    #[On('event-filters-updated')]
-    public function syncAdvancedFilters(array $filters): void
-    {
-        $normalized = $this->normalizedFilterData($filters);
-
-        $this->fillPublicPropertiesFromFilters($normalized);
-        $this->filterData = $normalized;
-        $this->resetPage();
+        $this->getForm('form')->fill($normalized);
     }
 
     public function form(Schema $schema): Schema
@@ -252,8 +67,6 @@ class Index extends Component implements HasForms
                 Section::make(__('Advanced Filters'))
                     ->extraAttributes(['class' => 'mi-advanced-filter-section'])
                     ->description(__('Refine events using format, timing, audience, speakers, and links.'))
-                    ->collapsible()
-                    ->collapsed()
                     ->schema([
                         Section::make(__('Time & Date'))
                             ->extraAttributes(['class' => 'mi-advanced-filter-group'])
@@ -310,8 +123,7 @@ class Index extends Component implements HasForms
                                     ->searchable()
                                     ->options(collect(EventPrayerTime::cases())
                                         ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
-                                        ->all()
-                                    )
+                                        ->all())
                                     ->live(),
 
                                 TimePicker::make('starts_time_from')
@@ -344,8 +156,7 @@ class Index extends Component implements HasForms
                                     ->options(fn (): array => $this->states()
                                         ->pluck('name', 'id')
                                         ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                        ->all()
-                                    )
+                                        ->all())
                                     ->searchable()
                                     ->live()
                                     ->afterStateUpdated(function (Set $set): void {
@@ -445,11 +256,7 @@ class Index extends Component implements HasForms
                                     ->minValue(1)
                                     ->maxValue(1000)
                                     ->step(1)
-                                    ->extraInputAttributes([
-                                        'min' => 1,
-                                        'max' => 1000,
-                                        'step' => 1,
-                                    ])
+                                    ->extraInputAttributes(['min' => 1, 'max' => 1000, 'step' => 1])
                                     ->suffix(__('km'))
                                     ->visible(fn (Get $get): bool => filled($get('lat')) && filled($get('lng')))
                                     ->live(),
@@ -571,9 +378,7 @@ class Index extends Component implements HasForms
                                     ->multiple()
                                     ->options(function (): array {
                                         return collect(EventType::cases())
-                                            ->mapToGroups(fn (EventType $type): array => [
-                                                $type->getGroup() => [$type->value => $type->getLabel()],
-                                            ])
+                                            ->mapToGroups(fn (EventType $type): array => [$type->getGroup() => [$type->value => $type->getLabel()]])
                                             ->map(fn (Collection $group): array => $group->collapse()->all())
                                             ->toArray();
                                     })
@@ -584,8 +389,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Format'))
                                     ->options(collect(EventFormat::cases())
                                         ->mapWithKeys(fn (EventFormat $format): array => [$format->value => $format->getLabel()])
-                                        ->all()
-                                    )
+                                        ->all())
                                     ->multiple()
                                     ->live(),
 
@@ -594,8 +398,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any'))
                                     ->options(collect(EventGenderRestriction::cases())
                                         ->mapWithKeys(fn (EventGenderRestriction $gender): array => [$gender->value => $gender->getLabel()])
-                                        ->all()
-                                    )
+                                        ->all())
                                     ->live(),
 
                                 Select::make('age_group')
@@ -603,8 +406,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Age Group'))
                                     ->options(collect(EventAgeGroup::cases())
                                         ->mapWithKeys(fn (EventAgeGroup $age): array => [$age->value => $age->getLabel()])
-                                        ->all()
-                                    )
+                                        ->all())
                                     ->multiple()
                                     ->live()
                                     ->afterStateUpdated(function (mixed $state, Set $set): void {
@@ -636,19 +438,13 @@ class Index extends Component implements HasForms
                                 Select::make('children_allowed')
                                     ->label(__('Children Allowed'))
                                     ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Yes'),
-                                        '0' => __('No'),
-                                    ])
+                                    ->options(['1' => __('Yes'), '0' => __('No')])
                                     ->live(),
 
                                 Select::make('is_muslim_only')
                                     ->label(__('Muslim Only'))
                                     ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Yes'),
-                                        '0' => __('No'),
-                                    ])
+                                    ->options(['1' => __('Yes'), '0' => __('No')])
                                     ->live(),
                             ]),
 
@@ -660,19 +456,13 @@ class Index extends Component implements HasForms
                                 Select::make('has_event_url')
                                     ->label(__('Event URL'))
                                     ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Has URL'),
-                                        '0' => __('No URL'),
-                                    ])
+                                    ->options(['1' => __('Has URL'), '0' => __('No URL')])
                                     ->live(),
 
                                 Select::make('has_live_url')
                                     ->label(__('Live URL'))
                                     ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Has Live URL'),
-                                        '0' => __('No Live URL'),
-                                    ])
+                                    ->options(['1' => __('Has Live URL'), '0' => __('No Live URL')])
                                     ->live(),
                             ]),
                     ]),
@@ -683,74 +473,14 @@ class Index extends Component implements HasForms
     {
         $normalized = $this->normalizedFilterData($this->filterData);
 
-        $this->fillPublicPropertiesFromFilters($normalized);
-        $this->resetPage();
+        $this->filterData = $normalized;
+        $this->dispatch('event-filters-updated', filters: $normalized);
     }
 
-    public function setLocation(float $lat, float $lng): void
+    #[On('event-filters-synced')]
+    public function syncFilters(array $filters): void
     {
-        $this->lat = (string) $lat;
-        $this->lng = (string) $lng;
-        $this->radius_km = 15;
-        $this->sort = 'distance';
-
-        $this->filterData['lat'] = $this->lat;
-        $this->filterData['lng'] = $this->lng;
-        $this->filterData['radius_km'] = $this->radius_km;
-        $this->filterData['sort'] = $this->sort;
-
-        $this->dispatch('event-filters-synced', filters: $this->filterData);
-        $this->resetPage();
-    }
-
-    public function clearLocation(): void
-    {
-        $this->lat = null;
-        $this->lng = null;
-
-        $defaultSort = $this->sort === 'distance' ? 'time' : $this->sort;
-        $this->sort = $defaultSort;
-
-        $this->filterData['lat'] = null;
-        $this->filterData['lng'] = null;
-        $this->filterData['sort'] = $defaultSort;
-
-        $this->dispatch('event-filters-synced', filters: $this->filterData);
-        $this->resetPage();
-    }
-
-    public function clearAllFilters(): void
-    {
-        $defaults = $this->defaultFilterData();
-
-        $this->fillPublicPropertiesFromFilters($defaults);
-        $this->filterData = $defaults;
-
-        $this->dispatch('event-filters-synced', filters: $defaults);
-        $this->resetPage();
-    }
-
-    public function clearSearch(): void
-    {
-        $this->search = null;
-        $this->filterData['search'] = null;
-        $this->resetPage();
-    }
-
-    public function setSort(string $sort): void
-    {
-        if (! in_array($sort, ['time', 'relevance', 'distance'], true)) {
-            return;
-        }
-
-        if ($sort === 'distance' && (! filled($this->lat) || ! filled($this->lng))) {
-            return;
-        }
-
-        $this->sort = $sort;
-        $this->filterData['sort'] = $sort;
-
-        $this->resetPage();
+        $this->filterData = $this->normalizedFilterData($filters);
     }
 
     /**
@@ -762,459 +492,7 @@ class Index extends Component implements HasForms
         return cache()->remember('states_my', 3600, fn () => State::query()
             ->where('country_code', 'MY')
             ->orderBy('name')
-            ->get()
-        );
-    }
-
-    /**
-     * @return Collection<int, District>
-     */
-    #[Computed]
-    public function districts(): Collection
-    {
-        $stateId = $this->state_id;
-
-        if (! filled($stateId)) {
-            return collect();
-        }
-
-        return District::query()
-            ->where('state_id', $stateId)
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
-     * @return Collection<int, Subdistrict>
-     */
-    #[Computed]
-    public function subdistricts(): Collection
-    {
-        $districtId = $this->district_id;
-
-        if (! filled($districtId)) {
-            return collect();
-        }
-
-        return Subdistrict::query()
-            ->where('district_id', $districtId)
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
-     * @return Collection<int, Tag>
-     */
-    #[Computed]
-    public function disciplines(): Collection
-    {
-        return cache()->remember('events_disciplines_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Discipline->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
-        );
-    }
-
-    /**
-     * @return Collection<int, Tag>
-     */
-    #[Computed]
-    public function domains(): Collection
-    {
-        return cache()->remember('events_domains_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Domain->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
-        );
-    }
-
-    /**
-     * @return Collection<int, Tag>
-     */
-    #[Computed]
-    public function sources(): Collection
-    {
-        return cache()->remember('events_sources_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Source->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
-        );
-    }
-
-    /**
-     * @return Collection<int, Tag>
-     */
-    #[Computed]
-    public function issues(): Collection
-    {
-        return cache()->remember('events_issues_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Issue->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
-        );
-    }
-
-    /**
-     * @return Collection<int, Reference>
-     */
-    #[Computed]
-    public function references(): Collection
-    {
-        return cache()->remember('events_references_'.app()->getLocale(), 300, fn () => Reference::query()
-            ->where('is_active', true)
-            ->orderBy('title')
-            ->limit(400)
-            ->get(['id', 'title'])
-        );
-    }
-
-    /**
-     * @return Collection<int, Institution>
-     */
-    #[Computed]
-    public function institutions(): Collection
-    {
-        return cache()->remember('events_institutions_'.app()->getLocale(), 300, fn () => Institution::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(400)
-            ->get(['id', 'name'])
-        );
-    }
-
-    /**
-     * @return Collection<int, Venue>
-     */
-    #[Computed]
-    public function venues(): Collection
-    {
-        return cache()->remember('events_venues_'.app()->getLocale(), 300, fn () => Venue::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(500)
-            ->get(['id', 'name'])
-        );
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function searchInstitutionOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
-    {
-        $query = Institution::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true);
-
-        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
-        $this->applySearchConstraint($query, 'name', $search);
-
-        return $this->pluckOptions($query->orderBy('name'), 'name', 50);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function searchVenueOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
-    {
-        $query = Venue::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true);
-
-        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
-        $this->applySearchConstraint($query, 'name', $search);
-
-        return $this->pluckOptions($query->orderBy('name'), 'name', 50);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function searchSpeakerOptions(string $search): array
-    {
-        return $this->pluckOptions(
-            Speaker::query()
-                ->whereIn('status', ['verified', 'pending'])
-                ->where('is_active', true)
-                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'name', $search))
-                ->orderBy('name'),
-            'name',
-            50,
-        );
-    }
-
-    /**
-     * @param  list<string>  $values
-     * @return array<string, string>
-     */
-    public function speakerOptionLabels(array $values): array
-    {
-        if ($values === []) {
-            return [];
-        }
-
-        return $this->pluckOptions(
-            Speaker::query()
-                ->whereIn('status', ['verified', 'pending'])
-                ->where('is_active', true)
-                ->whereIn('id', $values),
-            'name',
-            count($values),
-        );
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function searchTagOptions(TagType $type, string $search): array
-    {
-        return $this->pluckOptions(
-            Tag::query()
-                ->where('type', $type->value)
-                ->whereIn('status', ['verified', 'pending'])
-                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'name', $search))
-                ->ordered(),
-            'name',
-            50,
-        );
-    }
-
-    /**
-     * @param  list<string>  $values
-     * @return array<string, string>
-     */
-    public function tagOptionLabels(TagType $type, array $values): array
-    {
-        if ($values === []) {
-            return [];
-        }
-
-        return $this->pluckOptions(
-            Tag::query()
-                ->where('type', $type->value)
-                ->whereIn('status', ['verified', 'pending'])
-                ->whereIn('id', $values)
-                ->ordered(),
-            'name',
-            count($values),
-        );
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function searchReferenceOptions(string $search): array
-    {
-        return $this->pluckOptions(
-            Reference::query()
-                ->where('is_active', true)
-                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'title', $search))
-                ->orderBy('title'),
-            'title',
-            50,
-        );
-    }
-
-    /**
-     * @param  list<string>  $values
-     * @return array<string, string>
-     */
-    public function referenceOptionLabels(array $values): array
-    {
-        if ($values === []) {
-            return [];
-        }
-
-        return $this->pluckOptions(
-            Reference::query()
-                ->where('is_active', true)
-                ->whereIn('id', $values)
-                ->orderBy('title'),
-            'title',
-            count($values),
-        );
-    }
-
-    public function institutionOptionLabel(string $value): ?string
-    {
-        return Institution::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->whereKey($value)
-            ->value('name');
-    }
-
-    public function venueOptionLabel(string $value): ?string
-    {
-        return Venue::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->whereKey($value)
-            ->value('name');
-    }
-
-    /**
-     * @template TModel of Model
-     *
-     * @param  Builder<TModel>  $query
-     * @return array<string, string>
-     */
-    private function pluckOptions(Builder $query, string $labelColumn, int $limit): array
-    {
-        return $query
-            ->limit($limit)
-            ->pluck($labelColumn, 'id')
-            ->mapWithKeys(fn (string $label, mixed $id): array => [(string) $id => $label])
-            ->all();
-    }
-
-    /**
-     * @template TModel of Model
-     *
-     * @param  Builder<TModel>  $query
-     */
-    private function applySearchConstraint(Builder $query, string $column, string $search): Builder
-    {
-        $normalizedSearch = trim($search);
-
-        if ($normalizedSearch === '') {
-            return $query;
-        }
-
-        return $query->where($column, $this->databaseLikeOperator(), "%{$normalizedSearch}%");
-    }
-
-    private function databaseLikeOperator(): string
-    {
-        return config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
-    }
-
-    /**
-     * @template TModel of Model
-     *
-     * @param  Builder<TModel>  $query
-     */
-    private function applyAddressLocationFilters(
-        Builder $query,
-        ?string $stateId,
-        ?string $districtId,
-        ?string $subdistrictId
-    ): void {
-        if (! filled($stateId) && ! filled($districtId) && ! filled($subdistrictId)) {
-            return;
-        }
-
-        $query->whereHas('address', function (Builder $addressQuery) use ($stateId, $districtId, $subdistrictId): void {
-            if (filled($stateId)) {
-                $addressQuery->where('state_id', $stateId);
-            }
-
-            if (filled($districtId)) {
-                $addressQuery->where('district_id', $districtId);
-            }
-
-            if (filled($subdistrictId)) {
-                $addressQuery->where('subdistrict_id', $subdistrictId);
-            }
-        });
-    }
-
-    /**
-     * @return Collection<int, Speaker>
-     */
-    #[Computed]
-    public function speakers(): Collection
-    {
-        return cache()->remember('events_speakers_'.app()->getLocale(), 300, fn () => Speaker::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(500)
-            ->get(['id', 'name'])
-        );
-    }
-
-    /**
-     * @return LengthAwarePaginator<int, Event>
-     */
-    #[Computed]
-    public function events(): LengthAwarePaginator
-    {
-        $filters = $this->normalizedUrlState();
-
-        $searchFilters = [
-            'state_id' => $filters['state_id'],
-            'district_id' => $filters['district_id'],
-            'subdistrict_id' => $filters['subdistrict_id'],
-            'language' => $filters['language'],
-            'language_codes' => $filters['language_codes'],
-            'event_type' => $filters['event_type'],
-            'gender' => $filters['gender'],
-            'age_group' => $filters['age_group'],
-            'children_allowed' => $filters['children_allowed'],
-            'is_muslim_only' => $filters['is_muslim_only'],
-            'institution_id' => $filters['institution_id'],
-            'venue_id' => $filters['venue_id'],
-            'speaker_ids' => $filters['speaker_ids'],
-            'key_person_roles' => $filters['key_person_roles'],
-            'moderator_ids' => $filters['moderator_ids'],
-            'imam_ids' => $filters['imam_ids'],
-            'khatib_ids' => $filters['khatib_ids'],
-            'bilal_ids' => $filters['bilal_ids'],
-            'topic_ids' => $filters['topic_ids'],
-            'domain_tag_ids' => $filters['domain_tag_ids'],
-            'source_tag_ids' => $filters['source_tag_ids'],
-            'issue_tag_ids' => $filters['issue_tag_ids'],
-            'reference_ids' => $filters['reference_ids'],
-            'starts_after' => $filters['starts_after'],
-            'starts_before' => $filters['starts_before'],
-            'time_scope' => $filters['time_scope'],
-            'prayer_time' => $filters['prayer_time'],
-            'timing_mode' => $filters['timing_mode'],
-            'starts_time_from' => $filters['starts_time_from'],
-            'starts_time_until' => $filters['starts_time_until'],
-            'event_format' => $filters['event_format'],
-            'has_event_url' => $filters['has_event_url'],
-            'has_live_url' => $filters['has_live_url'],
-            'has_end_time' => $filters['has_end_time'],
-        ];
-
-        $searchFilters = array_filter($searchFilters, function (mixed $value): bool {
-            if ($value === null || $value === '') {
-                return false;
-            }
-
-            if (is_array($value)) {
-                return $value !== [];
-            }
-
-            return true;
-        });
-
-        /** @var EventSearchService $searchService */
-        $searchService = app(EventSearchService::class);
-
-        if ($filters['lat'] !== null && $filters['lng'] !== null) {
-            return $searchService->searchNearby(
-                lat: (float) $filters['lat'],
-                lng: (float) $filters['lng'],
-                radiusKm: $filters['radius_km'],
-                filters: $searchFilters,
-                perPage: 12
-            );
-        }
-
-        return $searchService->search(
-            query: $filters['search'],
-            filters: $searchFilters,
-            perPage: 12,
-            sort: $filters['sort']
-        );
+            ->get());
     }
 
     /**
@@ -1248,9 +526,58 @@ class Index extends Component implements HasForms
         });
     }
 
+    public function speakerOptionLabels(array $values): array
+    {
+        if ($values === []) {
+            return [];
+        }
+
+        return $this->pluckOptions(
+            Speaker::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true)->whereIn('id', $values),
+            'name',
+            count($values),
+        );
+    }
+
+    public function tagOptionLabels(TagType $type, array $values): array
+    {
+        if ($values === []) {
+            return [];
+        }
+
+        return $this->pluckOptions(
+            Tag::query()->where('type', $type->value)->whereIn('status', ['verified', 'pending'])->whereIn('id', $values)->ordered(),
+            'name',
+            count($values),
+        );
+    }
+
+    public function referenceOptionLabels(array $values): array
+    {
+        if ($values === []) {
+            return [];
+        }
+
+        return $this->pluckOptions(
+            Reference::query()->where('is_active', true)->whereIn('id', $values)->orderBy('title'),
+            'title',
+            count($values),
+        );
+    }
+
+    public function institutionOptionLabel(string $value): ?string
+    {
+        return Institution::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true)->whereKey($value)->value('name');
+    }
+
+    public function venueOptionLabel(string $value): ?string
+    {
+        return Venue::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true)->whereKey($value)->value('name');
+    }
+
     public function render(): View
     {
-        return view('livewire.pages.events.index');
+        return view('livewire.pages.events.advanced-filters-panel');
     }
 
     /**
@@ -1258,12 +585,6 @@ class Index extends Component implements HasForms
      */
     private function defaultFilterData(): array
     {
-        $prayerTime = filled($this->prayer_time) ? (string) $this->prayer_time : null;
-
-        if ($this->timing_mode === TimingMode::Absolute->value) {
-            $prayerTime = null;
-        }
-
         return [
             'search' => null,
             'state_id' => null,
@@ -1310,121 +631,9 @@ class Index extends Component implements HasForms
     /**
      * @return array<string, mixed>
      */
-    private function normalizedUrlState(): array
-    {
-        $defaults = $this->defaultFilterData();
-
-        $languageCodes = $this->normalizeStringArray($this->language_codes);
-
-        if ($languageCodes === [] && filled($this->language)) {
-            $languageCodes = [(string) $this->language];
-        }
-
-        $prayerTime = filled($this->prayer_time) ? (string) $this->prayer_time : null;
-
-        if ($this->timing_mode === TimingMode::Absolute->value) {
-            $prayerTime = null;
-        }
-
-        return [
-            'search' => filled($this->search) ? trim((string) $this->search) : null,
-            'state_id' => filled($this->state_id) ? (string) $this->state_id : null,
-            'district_id' => filled($this->district_id) ? (string) $this->district_id : null,
-            'subdistrict_id' => filled($this->subdistrict_id) ? (string) $this->subdistrict_id : null,
-            'language' => filled($this->language) ? (string) $this->language : null,
-            'language_codes' => $languageCodes,
-            'event_type' => $this->normalizeStringArray($this->event_type),
-            'gender' => filled($this->gender) ? (string) $this->gender : null,
-            'age_group' => $this->normalizeStringArray($this->age_group),
-            'children_allowed' => $this->normalizeNullableBoolean($this->children_allowed),
-            'is_muslim_only' => $this->normalizeNullableBoolean($this->is_muslim_only),
-            'institution_id' => filled($this->institution_id) ? (string) $this->institution_id : null,
-            'venue_id' => filled($this->venue_id) ? (string) $this->venue_id : null,
-            'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
-            'key_person_roles' => $this->normalizeStringArray($this->key_person_roles),
-            'moderator_ids' => $this->normalizeStringArray($this->moderator_ids),
-            'imam_ids' => $this->normalizeStringArray($this->imam_ids),
-            'khatib_ids' => $this->normalizeStringArray($this->khatib_ids),
-            'bilal_ids' => $this->normalizeStringArray($this->bilal_ids),
-            'topic_ids' => $this->normalizeStringArray($this->topic_ids),
-            'domain_tag_ids' => $this->normalizeStringArray($this->domain_tag_ids),
-            'source_tag_ids' => $this->normalizeStringArray($this->source_tag_ids),
-            'issue_tag_ids' => $this->normalizeStringArray($this->issue_tag_ids),
-            'reference_ids' => $this->normalizeStringArray($this->reference_ids),
-            'starts_after' => filled($this->starts_after) ? (string) $this->starts_after : null,
-            'starts_before' => filled($this->starts_before) ? (string) $this->starts_before : null,
-            'time_scope' => in_array($this->time_scope, ['upcoming', 'past', 'all'], true) ? $this->time_scope : $defaults['time_scope'],
-            'prayer_time' => $prayerTime,
-            'timing_mode' => in_array($this->timing_mode, [TimingMode::Absolute->value, TimingMode::PrayerRelative->value], true)
-                ? $this->timing_mode
-                : null,
-            'starts_time_from' => $this->normalizeTimeString($this->starts_time_from),
-            'starts_time_until' => $this->normalizeTimeString($this->starts_time_until),
-            'event_format' => $this->normalizeStringArray($this->event_format),
-            'has_event_url' => $this->normalizeNullableBoolean($this->has_event_url),
-            'has_live_url' => $this->normalizeNullableBoolean($this->has_live_url),
-            'has_end_time' => $this->normalizeNullableBoolean($this->has_end_time),
-            'lat' => filled($this->lat) ? (string) $this->lat : null,
-            'lng' => filled($this->lng) ? (string) $this->lng : null,
-            'radius_km' => max(1, min(1000, (int) $this->radius_km)),
-            'sort' => in_array($this->sort, ['time', 'relevance', 'distance'], true) ? $this->sort : $defaults['sort'],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $filters
-     */
-    private function fillPublicPropertiesFromFilters(array $filters): void
-    {
-        $this->search = $filters['search'];
-        $this->state_id = $filters['state_id'];
-        $this->district_id = $filters['district_id'];
-        $this->subdistrict_id = $filters['subdistrict_id'];
-        $this->language = $filters['language'];
-        $this->language_codes = $filters['language_codes'];
-        $this->event_type = $filters['event_type'];
-        $this->gender = $filters['gender'];
-        $this->age_group = $filters['age_group'];
-        $this->children_allowed = $filters['children_allowed'];
-        $this->is_muslim_only = $filters['is_muslim_only'];
-        $this->institution_id = $filters['institution_id'];
-        $this->venue_id = $filters['venue_id'];
-        $this->speaker_ids = $filters['speaker_ids'];
-        $this->key_person_roles = $filters['key_person_roles'];
-        $this->moderator_ids = $filters['moderator_ids'];
-        $this->imam_ids = $filters['imam_ids'];
-        $this->khatib_ids = $filters['khatib_ids'];
-        $this->bilal_ids = $filters['bilal_ids'];
-        $this->topic_ids = $filters['topic_ids'];
-        $this->domain_tag_ids = $filters['domain_tag_ids'];
-        $this->source_tag_ids = $filters['source_tag_ids'];
-        $this->issue_tag_ids = $filters['issue_tag_ids'];
-        $this->reference_ids = $filters['reference_ids'];
-        $this->starts_after = $filters['starts_after'];
-        $this->starts_before = $filters['starts_before'];
-        $this->time_scope = $filters['time_scope'];
-        $this->prayer_time = $filters['prayer_time'];
-        $this->timing_mode = $filters['timing_mode'];
-        $this->starts_time_from = $filters['starts_time_from'];
-        $this->starts_time_until = $filters['starts_time_until'];
-        $this->event_format = $filters['event_format'];
-        $this->has_event_url = $filters['has_event_url'];
-        $this->has_live_url = $filters['has_live_url'];
-        $this->has_end_time = $filters['has_end_time'];
-        $this->lat = $filters['lat'];
-        $this->lng = $filters['lng'];
-        $this->radius_km = $filters['radius_km'];
-        $this->sort = $filters['sort'];
-    }
-
-    /**
-     * @param  array<string, mixed>  $raw
-     * @return array<string, mixed>
-     */
     private function normalizedFilterData(array $raw): array
     {
         $defaults = $this->defaultFilterData();
-
         $normalized = array_replace($defaults, $raw);
 
         $languageCodes = $this->normalizeStringArray($normalized['language_codes'] ?? []);
@@ -1435,20 +644,17 @@ class Index extends Component implements HasForms
         }
 
         $normalizedLanguage = $languageCodes !== [] ? $languageCodes[0] : $legacyLanguage;
-
         $timeScope = (string) ($normalized['time_scope'] ?? $defaults['time_scope']);
+        $sort = (string) ($normalized['sort'] ?? $defaults['sort']);
+        $timingMode = (string) ($normalized['timing_mode'] ?? '');
 
         if (! in_array($timeScope, ['upcoming', 'past', 'all'], true)) {
             $timeScope = (string) $defaults['time_scope'];
         }
 
-        $sort = (string) ($normalized['sort'] ?? $defaults['sort']);
-
         if (! in_array($sort, ['time', 'relevance', 'distance'], true)) {
             $sort = (string) $defaults['sort'];
         }
-
-        $timingMode = (string) ($normalized['timing_mode'] ?? '');
 
         if (! in_array($timingMode, [TimingMode::Absolute->value, TimingMode::PrayerRelative->value], true)) {
             $timingMode = '';
@@ -1573,5 +779,125 @@ class Index extends Component implements HasForms
         }
 
         return null;
+    }
+
+    private function searchInstitutionOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
+    {
+        $query = Institution::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
+
+        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
+        $this->applySearchConstraint($query, 'name', $search);
+
+        return $this->pluckOptions($query->orderBy('name'), 'name', 50);
+    }
+
+    private function searchVenueOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
+    {
+        $query = Venue::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
+
+        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
+        $this->applySearchConstraint($query, 'name', $search);
+
+        return $this->pluckOptions($query->orderBy('name'), 'name', 50);
+    }
+
+    private function searchSpeakerOptions(string $search): array
+    {
+        return $this->pluckOptions(
+            Speaker::query()
+                ->whereIn('status', ['verified', 'pending'])
+                ->where('is_active', true)
+                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'name', $search))
+                ->orderBy('name'),
+            'name',
+            50,
+        );
+    }
+
+    private function searchTagOptions(TagType $type, string $search): array
+    {
+        return $this->pluckOptions(
+            Tag::query()
+                ->where('type', $type->value)
+                ->whereIn('status', ['verified', 'pending'])
+                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'name', $search))
+                ->ordered(),
+            'name',
+            50,
+        );
+    }
+
+    private function searchReferenceOptions(string $search): array
+    {
+        return $this->pluckOptions(
+            Reference::query()
+                ->where('is_active', true)
+                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'title', $search))
+                ->orderBy('title'),
+            'title',
+            50,
+        );
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return array<string, string>
+     */
+    private function pluckOptions(Builder $query, string $labelColumn, int $limit): array
+    {
+        return $query
+            ->limit($limit)
+            ->pluck($labelColumn, 'id')
+            ->mapWithKeys(fn (string $label, mixed $id): array => [(string) $id => $label])
+            ->all();
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     */
+    private function applySearchConstraint(Builder $query, string $column, string $search): Builder
+    {
+        $normalizedSearch = trim($search);
+
+        if ($normalizedSearch === '') {
+            return $query;
+        }
+
+        return $query->where($column, $this->databaseLikeOperator(), "%{$normalizedSearch}%");
+    }
+
+    private function databaseLikeOperator(): string
+    {
+        return config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     */
+    private function applyAddressLocationFilters(Builder $query, ?string $stateId, ?string $districtId, ?string $subdistrictId): void
+    {
+        if (! filled($stateId) && ! filled($districtId) && ! filled($subdistrictId)) {
+            return;
+        }
+
+        $query->whereHas('address', function (Builder $addressQuery) use ($stateId, $districtId, $subdistrictId): void {
+            if (filled($stateId)) {
+                $addressQuery->where('state_id', $stateId);
+            }
+
+            if (filled($districtId)) {
+                $addressQuery->where('district_id', $districtId);
+            }
+
+            if (filled($subdistrictId)) {
+                $addressQuery->where('subdistrict_id', $subdistrictId);
+            }
+        });
     }
 }

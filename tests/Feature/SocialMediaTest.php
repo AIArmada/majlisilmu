@@ -58,3 +58,15 @@ test('social media is polymorphic', function () {
     expect($social->socialable)->toBeInstanceOf(Institution::class);
     expect($social->socialable->id)->toBe($institution->id);
 });
+
+test('social media icon urls use public storage assets', function () {
+    $institution = Institution::factory()->create();
+
+    $social = $institution->socialMedia()->create([
+        'platform' => 'telegram',
+        'url' => 'https://t.me/majlisilmu',
+    ]);
+
+    expect($social->icon_file)->toBe('telegram.svg')
+        ->and($social->icon_url)->toEndWith('/storage/social-media-icons/telegram.svg');
+});

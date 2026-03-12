@@ -3,10 +3,14 @@
 namespace App\Models;
 
 use App\Enums\NotificationChannel;
+use App\Enums\NotificationDestinationStatus;
+use App\Notifications\NotificationCenterMessage;
+use App\Services\ShareTrackingService;
 use App\Support\Submission\PublicSubmissionLockService;
-use App\Models\DawahShareLink;
+use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,16 +20,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, HasLocalePreference
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable;
 
     public $incrementing = false;
@@ -60,12 +64,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             $user->registrations()->each(fn ($reg) => $reg->delete());
             $user->eventCheckins()->each(fn ($checkin) => $checkin->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
-            $user->dawahShareLinks()->each(function (DawahShareLink $link): void {
-                $link->outcomes()->delete();
-                $link->visits()->delete();
-                $link->attributions()->delete();
-                $link->delete();
-            });
+            app(ShareTrackingService::class)->deleteUserTracking($user);
             $user->notificationSetting()->delete();
             $user->notificationRules()->each(fn ($rule) => $rule->delete());
             $user->notificationDestinations()->each(fn ($destination) => $destination->delete());
@@ -73,7 +72,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             $user->notificationMessages()->each(fn ($message) => $message->delete());
             $user->notificationDeliveries()->each(fn ($delivery) => $delivery->delete());
 
-            \Illuminate\Support\Facades\DB::table('followings')->where('user_id', $user->id)->delete();
+            DB::table('followings')->where('user_id', $user->id)->delete();
         });
     }
 
@@ -253,7 +252,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
 
     public function follow(Model $followable): void
     {
-        \Illuminate\Support\Facades\DB::table('followings')->insertOrIgnore([
+        DB::table('followings')->insertOrIgnore([
             'user_id' => $this->id,
             'followable_id' => $followable->getKey(),
             'followable_type' => $followable->getMorphClass(),
@@ -264,7 +263,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
 
     public function unfollow(Model $followable): void
     {
-        \Illuminate\Support\Facades\DB::table('followings')
+        DB::table('followings')
             ->where('user_id', $this->id)
             ->where('followable_id', $followable->getKey())
             ->where('followable_type', $followable->getMorphClass())
@@ -273,7 +272,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
 
     public function isFollowing(Model $followable): bool
     {
-        return \Illuminate\Support\Facades\DB::table('followings')
+        return DB::table('followings')
             ->where('user_id', $this->id)
             ->where('followable_id', $followable->getKey())
             ->where('followable_type', $followable->getMorphClass())
@@ -400,37 +399,37 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
      */
     public function routeNotificationForMail(Notification $notification): array|string|null
     {
-        if (! $notification instanceof \App\Notifications\NotificationCenterMessage) {
+        if (! $notification instanceof NotificationCenterMessage) {
             return $this->email;
         }
 
         return $this->notificationDestinations()
             ->where('channel', NotificationChannel::Email->value)
-            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
+            ->where('status', NotificationDestinationStatus::Active->value)
             ->orderByDesc('is_primary')
             ->value('address');
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, NotificationDestination>
+     * @return Collection<int, NotificationDestination>
      */
-    public function routeNotificationForPush(Notification $notification): \Illuminate\Support\Collection
+    public function routeNotificationForPush(Notification $notification): Collection
     {
         return $this->notificationDestinations()
             ->where('channel', NotificationChannel::Push->value)
-            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
+            ->where('status', NotificationDestinationStatus::Active->value)
             ->orderByDesc('is_primary')
             ->get();
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, NotificationDestination>
+     * @return Collection<int, NotificationDestination>
      */
-    public function routeNotificationForWhatsapp(Notification $notification): \Illuminate\Support\Collection
+    public function routeNotificationForWhatsapp(Notification $notification): Collection
     {
         return $this->notificationDestinations()
             ->where('channel', NotificationChannel::Whatsapp->value)
-            ->where('status', \App\Enums\NotificationDestinationStatus::Active->value)
+            ->where('status', NotificationDestinationStatus::Active->value)
             ->orderByDesc('is_primary')
             ->get();
     }

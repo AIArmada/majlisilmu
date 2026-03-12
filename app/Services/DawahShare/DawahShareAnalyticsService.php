@@ -7,6 +7,7 @@ use App\Models\DawahShareOutcome;
 use App\Models\DawahShareShareEvent;
 use App\Models\DawahShareVisit;
 use App\Models\User;
+use App\Services\ShareTrackingService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -469,7 +470,7 @@ class DawahShareAnalyticsService
      */
     protected function providerBreakdown(Builder $shareEvents, Builder $visits, Builder $outcomes): Collection
     {
-        $providers = app(DawahShareService::class)->supportedProviders();
+        $providers = app(ShareTrackingService::class)->supportedProviders();
 
         return collect($providers)
             ->map(function (string $provider) use ($shareEvents, $visits, $outcomes): array {

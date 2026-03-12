@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,19 +11,19 @@ use Illuminate\Validation\ValidationException;
 
 class DawahShareController extends Controller
 {
-    public function payload(Request $request, DawahShareService $dawahShareService): JsonResponse
+    public function payload(Request $request, ShareTrackingService $shareTrackingService): JsonResponse
     {
         $data = $this->validatedData($request);
 
-        return response()->json($this->buildPayload($request, $dawahShareService, $data));
+        return response()->json($this->buildPayload($request, $shareTrackingService, $data));
     }
 
-    public function redirect(string $provider, Request $request, DawahShareService $dawahShareService): RedirectResponse
+    public function redirect(string $provider, Request $request, ShareTrackingService $shareTrackingService): RedirectResponse
     {
         $data = $this->validatedData($request);
 
         try {
-            return redirect()->away($dawahShareService->redirectUrl(
+            return redirect()->away($shareTrackingService->redirectUrl(
                 provider: $provider,
                 user: $this->authenticatedUser($request),
                 url: $data['url'],
@@ -64,10 +64,10 @@ class DawahShareController extends Controller
      * @param  array{url: string, text: string, title?: string}  $data
      * @return array{url: string, platform_links: array<string, string>}
      */
-    protected function buildPayload(Request $request, DawahShareService $dawahShareService, array $data): array
+    protected function buildPayload(Request $request, ShareTrackingService $shareTrackingService, array $data): array
     {
         try {
-            return $dawahShareService->sharePayload(
+            return $shareTrackingService->sharePayload(
                 $this->authenticatedUser($request),
                 $data['url'],
                 $data['text'],

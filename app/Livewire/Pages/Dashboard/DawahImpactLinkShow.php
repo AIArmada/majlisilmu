@@ -2,10 +2,13 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
-use App\Models\DawahShareLink;
+use App\Data\ShareTracking\ShareTrackingLinkData;
+use App\Data\ShareTracking\ShareTrackingOutcomeData;
+use App\Data\ShareTracking\ShareTrackingVisitData;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareAnalyticsService;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingAnalyticsService;
+use App\Services\ShareTrackingService;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -15,13 +18,23 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class DawahImpactLinkShow extends Component
 {
-    public DawahShareLink $link;
+    public string $linkId;
 
-    public function mount(DawahShareLink $link): void
+    public function mount(string $link): void
     {
-        abort_unless($link->user_id === $this->currentUser()->id, 404);
+        abort_unless($this->analytics()->findLinkForUser($this->currentUser(), $link) instanceof ShareTrackingLinkData, 404);
 
-        $this->link = $link;
+        $this->linkId = $link;
+    }
+
+    #[Computed]
+    public function linkData(): ShareTrackingLinkData
+    {
+        $resolvedLink = $this->analytics()->findLinkForUser($this->currentUser(), $this->linkId);
+
+        abort_unless($resolvedLink instanceof ShareTrackingLinkData, 404);
+
+        return $resolvedLink;
     }
 
     /**
@@ -39,7 +52,7 @@ class DawahImpactLinkShow extends Component
     #[Computed]
     public function summary(): array
     {
-        return $this->analytics()->summaryForLink($this->link);
+        return $this->analytics()->summaryForLink($this->linkData());
     }
 
     /**
@@ -59,7 +72,7 @@ class DawahImpactLinkShow extends Component
     #[Computed]
     public function providerBreakdown(): Collection
     {
-        return $this->analytics()->providerBreakdownForLink($this->link);
+        return $this->analytics()->providerBreakdownForLink($this->linkData());
     }
 
     /**
@@ -69,9 +82,9 @@ class DawahImpactLinkShow extends Component
     public function shareLinks(): array
     {
         return $this->shareService()->redirectLinks(
-            $this->link->destination_url,
-            trim(($this->link->title_snapshot ?: config('app.name')).' - '.config('app.name')),
-            $this->link->title_snapshot,
+            $this->linkData()->destination_url,
+            trim(($this->linkData()->title_snapshot ?: config('app.name')).' - '.config('app.name')),
+            $this->linkData()->title_snapshot,
         );
     }
 
@@ -89,7 +102,7 @@ class DawahImpactLinkShow extends Component
     #[Computed]
     public function dailyPerformance(): Collection
     {
-        return $this->analytics()->dailyPerformanceForLink($this->link, 14);
+        return $this->analytics()->dailyPerformanceForLink($this->linkData(), 14);
     }
 
     /**
@@ -98,49 +111,49 @@ class DawahImpactLinkShow extends Component
     #[Computed]
     public function outcomeBreakdown(): Collection
     {
-        return $this->analytics()->outcomeBreakdownForLink($this->link);
+        return $this->analytics()->outcomeBreakdownForLink($this->linkData());
     }
 
     /**
-     * @return Collection<int, \App\Models\DawahShareVisit>
+     * @return Collection<int, ShareTrackingVisitData>
      */
     #[Computed]
     public function recentVisits(): Collection
     {
-        return $this->analytics()->recentVisitsForLink($this->link, 20);
+        return $this->analytics()->recentVisitsForLink($this->linkData(), 20);
     }
 
     /**
-     * @return Collection<int, \App\Models\DawahShareOutcome>
+     * @return Collection<int, ShareTrackingOutcomeData>
      */
     #[Computed]
     public function recentOutcomes(): Collection
     {
-        return $this->analytics()->recentOutcomesForLink($this->link, 20);
+        return $this->analytics()->recentOutcomesForLink($this->linkData(), 20);
     }
 
     /**
      * @return array{
-     *     first_seen_at: \Carbon\CarbonInterface|null,
-     *     last_visit_at: \Carbon\CarbonInterface|null,
-     *     last_outcome_at: \Carbon\CarbonInterface|null,
-     *     latest_activity_at: \Carbon\CarbonInterface|null
+     *     first_seen_at: CarbonInterface|null,
+     *     last_visit_at: CarbonInterface|null,
+     *     last_outcome_at: CarbonInterface|null,
+     *     latest_activity_at: CarbonInterface|null
      * }
      */
     #[Computed]
     public function activityWindow(): array
     {
-        return $this->analytics()->activityWindowForLink($this->link);
+        return $this->analytics()->activityWindowForLink($this->linkData());
     }
 
-    protected function analytics(): DawahShareAnalyticsService
+    protected function analytics(): ShareTrackingAnalyticsService
     {
-        return app(DawahShareAnalyticsService::class);
+        return app(ShareTrackingAnalyticsService::class);
     }
 
-    protected function shareService(): DawahShareService
+    protected function shareService(): ShareTrackingService
     {
-        return app(DawahShareService::class);
+        return app(ShareTrackingService::class);
     }
 
     protected function currentUser(): User

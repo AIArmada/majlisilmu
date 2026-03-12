@@ -7,7 +7,7 @@ use App\Models\EventCheckin;
 use App\Models\EventSubmission;
 use App\Models\Registration;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareAnalyticsService;
+use App\Services\ShareTrackingAnalyticsService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -73,7 +73,7 @@ class UserDashboard extends Component
     #[Computed]
     public function dawahImpactSummary(): array
     {
-        return app(DawahShareAnalyticsService::class)->summaryForUser($this->user());
+        return app(ShareTrackingAnalyticsService::class)->summaryForUser($this->user());
     }
 
     /**

@@ -1,7 +1,5 @@
-@section('title', ($link->title_snapshot ?: __('Share Link')) . ' - ' . config('app.name'))
-
 @php
-    $link = $this->link;
+    $link = $this->linkData;
     $summary = $this->summary;
     $providerBreakdown = $this->providerBreakdown;
     $shareLinks = $this->shareLinks;
@@ -36,6 +34,8 @@
     };
 @endphp
 
+@section('title', ($link->title_snapshot ?: __('Share Link')) . ' - ' . config('app.name'))
+
 <div class="min-h-screen bg-slate-50 py-12 pb-32">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="mx-auto max-w-7xl space-y-8">
@@ -50,6 +50,9 @@
                                 <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $subjectBadgeClass }}">{{ $subjectLabel }}</span>
                                 <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                                     {{ __('Shared') }} {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($link->last_shared_at, 'j M Y, g:i A') }}
+                                </span>
+                                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                                    {{ __('Subject') }}: {{ $link->subject_key }}
                                 </span>
                             </div>
                             <h1 class="mt-4 font-heading text-3xl font-bold text-slate-900">{{ $link->title_snapshot ?: __('Untitled page') }}</h1>

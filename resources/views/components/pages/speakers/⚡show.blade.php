@@ -69,7 +69,7 @@ new class extends Component {
         } else {
             $user->follow($this->speaker);
             $this->isFollowing = true;
-            app(\App\Services\DawahShare\DawahShareService::class)->recordOutcome(
+            app(\App\Services\ShareTrackingService::class)->recordOutcome(
                 type: \App\Enums\DawahShareOutcomeType::SpeakerFollow,
                 outcomeKey: 'speaker_follow:user:'.$user->id.':speaker:'.$this->speaker->id,
                 subject: $this->speaker,
@@ -165,7 +165,7 @@ new class extends Component {
     }
 
     /**
-    * @return \Illuminate\Support\Collection<int, EventKeyPerson>
+     * @return \Illuminate\Support\Collection<int, EventKeyPerson>
      */
     public function getOtherRoleUpcomingParticipationsProperty(): \Illuminate\Support\Collection
     {
@@ -184,7 +184,7 @@ new class extends Component {
                 'event.media',
             ])
             ->get()
-                ->sortBy(fn (EventKeyPerson $participant): int => $participant->event?->starts_at?->timestamp ?? PHP_INT_MAX)
+            ->sortBy(fn (EventKeyPerson $participant): int => $participant->event?->starts_at?->timestamp ?? PHP_INT_MAX)
             ->take($this->otherRolesUpcomingPerPage)
             ->values();
     }
@@ -199,7 +199,7 @@ new class extends Component {
     }
 
     /**
-    * @return \Illuminate\Support\Collection<int, EventKeyPerson>
+     * @return \Illuminate\Support\Collection<int, EventKeyPerson>
      */
     public function getOtherRolePastParticipationsProperty(): \Illuminate\Support\Collection
     {
@@ -271,7 +271,7 @@ new class extends Component {
     $bioExcerpt = $isBioFilled ? Str::limit(strip_tags($bioHtml), 180) : null;
     $speakerUrl = route('speakers.show', $speaker);
     $shareText = trim($speaker->formatted_name . ' - ' . config('app.name'));
-    $shareLinks = app(\App\Services\DawahShare\DawahShareService::class)->redirectLinks(
+    $shareLinks = app(\App\Services\ShareTrackingService::class)->redirectLinks(
         $speakerUrl,
         $shareText,
         $speaker->formatted_name,

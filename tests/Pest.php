@@ -1,5 +1,15 @@
 <?php
 
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -11,10 +21,17 @@
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->beforeEach(function () {
-        \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::except('*');
+        VerifyCsrfToken::except('*');
+
+        if (! Schema::hasTable(config('affiliates.database.tables.affiliates', 'affiliate_affiliates'))) {
+            Artisan::call('migrate', [
+                '--path' => realpath(base_path('vendor/aiarmada/affiliates/database/migrations')),
+                '--realpath' => true,
+            ]);
+        }
 
         config()->set('services.turnstile.enabled', false);
         config()->set('services.turnstile.site_key');
@@ -22,8 +39,8 @@ pest()->extend(Tests\TestCase::class)
 
         // Clear tag option caches to prevent stale data in tests
         foreach (['domain', 'discipline', 'source', 'issue'] as $type) {
-            \Illuminate\Support\Facades\Cache::forget("submit_tags_{$type}_ms");
-            \Illuminate\Support\Facades\Cache::forget("submit_tags_{$type}_en");
+            Cache::forget("submit_tags_{$type}_ms");
+            Cache::forget("submit_tags_{$type}_en");
         }
 
         // Seed common languages for tests that use the submit event form
@@ -37,7 +54,7 @@ pest()->extend(Tests\TestCase::class)
             ['id' => 154, 'code' => 'ta', 'name' => 'Tamil', 'name_native' => 'தமிழ்', 'dir' => 'ltr'],
         ];
 
-        \Illuminate\Support\Facades\DB::table('languages')->insertOrIgnore($languages);
+        DB::table('languages')->insertOrIgnore($languages);
     })
     ->in('Feature');
 
@@ -72,8 +89,8 @@ function something()
 
 function fakePrayerTimesApi(): void
 {
-    \Illuminate\Support\Facades\Http::fake([
-        'api.aladhan.com/*' => \Illuminate\Support\Facades\Http::response([
+    Http::fake([
+        'api.aladhan.com/*' => Http::response([
             'code' => 200,
             'status' => 'OK',
             'data' => [
@@ -96,8 +113,8 @@ function setSubmitEventFormState(mixed $component, array $state): mixed
 {
     foreach ($state as $field => $value) {
         if (
-            $value instanceof \Illuminate\Http\UploadedFile ||
-            (is_array($value) && isset($value[0]) && $value[0] instanceof \Illuminate\Http\UploadedFile)
+            $value instanceof UploadedFile ||
+            (is_array($value) && isset($value[0]) && $value[0] instanceof UploadedFile)
         ) {
             $component->set("data.{$field}", $value);
 

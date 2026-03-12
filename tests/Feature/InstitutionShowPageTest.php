@@ -16,6 +16,7 @@ use App\Models\Venue;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Spatie\Permission\PermissionRegistrar;
 
 it('renders the institution show page for a verified institution', function () {
     $institution = Institution::factory()->create([
@@ -39,9 +40,9 @@ it('returns 404 for unverified institution for guest', function () {
 
 it('allows super_admin to view unverified institution', function () {
     config(['permission.teams' => false]);
-    app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $roleClass = app(\Spatie\Permission\PermissionRegistrar::class)->getRoleClass();
+    $roleClass = app(PermissionRegistrar::class)->getRoleClass();
     if (! $roleClass::where('name', 'super_admin')->exists()) {
         $roleClass::create(['name' => 'super_admin', 'guard_name' => 'web']);
     }
@@ -410,6 +411,7 @@ it('hides duplicated state for kuala lumpur putrajaya and labuan in institution 
 
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
-        ->assertSee('Dewan Utama KL • Negeri: - • Daerah: Kuala Lumpur • Bandar / Mukim / Zon: -')
+        ->assertSee('Dewan Utama KL • Kuala Lumpur')
+        ->assertDontSee('Dewan Utama KL • Negeri: - • Daerah: Kuala Lumpur • Bandar / Mukim / Zon: -')
         ->assertDontSee('Dewan Utama KL • Negeri: Kuala Lumpur • Daerah: Kuala Lumpur');
 });

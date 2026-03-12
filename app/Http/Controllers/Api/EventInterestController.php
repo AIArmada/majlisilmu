@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DawahShareOutcomeType;
+use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class EventInterestController extends Controller
 {
     public function __construct(
-        private readonly DawahShareService $dawahShareService
+        private readonly ShareTrackingService $shareTrackingService
     ) {}
 
     /**
@@ -32,7 +35,7 @@ class EventInterestController extends Controller
         return response()->json([
             'data' => $interestedEvents->items(),
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [
                     'page' => $interestedEvents->currentPage(),
                     'per_page' => $interestedEvents->perPage(),
@@ -63,7 +66,7 @@ class EventInterestController extends Controller
         }
 
         // Only allow interest for public, approved events
-        if ((string) $event->status !== 'approved' || $event->visibility !== \App\Enums\EventVisibility::Public) {
+        if ((string) $event->status !== 'approved' || $event->visibility !== EventVisibility::Public) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',
@@ -129,8 +132,8 @@ class EventInterestController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $this->dawahShareService->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::EventInterest,
+        $this->shareTrackingService->recordOutcome(
+            type: DawahShareOutcomeType::EventInterest,
             outcomeKey: 'event_interest:user:'.$user->id.':event:'.$event->id,
             subject: $event,
             actor: $user,
@@ -146,7 +149,7 @@ class EventInterestController extends Controller
                 'interests_count' => (int) (Event::query()->whereKey($event->id)->value('interests_count') ?? 0),
             ],
             'meta' => [
-                'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
         ], 201);
     }
@@ -195,7 +198,7 @@ class EventInterestController extends Controller
                 'interests_count' => $interestsCount,
             ],
             'meta' => [
-                'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
         ]);
     }
@@ -218,7 +221,7 @@ class EventInterestController extends Controller
                 'interests_count' => $event ? $event->interests_count : 0,
             ],
             'meta' => [
-                'request_id' => $request->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
         ]);
     }

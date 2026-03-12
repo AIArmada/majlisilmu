@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
+use App\Data\ShareTracking\ShareTrackingLinkData;
+use App\Data\ShareTracking\ShareTrackingOutcomeData;
 use App\Enums\DawahShareOutcomeType;
 use App\Enums\DawahShareSubjectType;
 use App\Models\User;
-use App\Services\DawahShare\DawahShareAnalyticsService;
+use App\Services\ShareTrackingAnalyticsService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
@@ -203,7 +205,28 @@ class DawahImpactIndex extends Component
     }
 
     /**
-     * @return Collection<int, \App\Models\DawahShareLink>
+     * @return Collection<int, array{
+     *     subject_type: string,
+     *     subject_key: string,
+     *     title_snapshot: string,
+     *     type_label: string,
+     *     links: int,
+     *     visits: int,
+     *     signups: int,
+     *     event_registrations: int,
+     *     event_checkins: int,
+     *     event_submissions: int,
+     *     total_outcomes: int
+     * }>
+     */
+    #[Computed]
+    public function topSubjects(): Collection
+    {
+        return $this->analytics()->topSubjectsForUser($this->currentUser());
+    }
+
+    /**
+     * @return Collection<int, ShareTrackingLinkData>
      */
     #[Computed]
     public function topLinks(): Collection
@@ -215,7 +238,7 @@ class DawahImpactIndex extends Component
     }
 
     /**
-     * @return Collection<int, \App\Models\DawahShareOutcome>
+     * @return Collection<int, ShareTrackingOutcomeData>
      */
     #[Computed]
     public function recentResponses(): Collection
@@ -224,7 +247,7 @@ class DawahImpactIndex extends Component
     }
 
     /**
-     * @return LengthAwarePaginator<int, \App\Models\DawahShareLink>
+     * @return LengthAwarePaginator<int, ShareTrackingLinkData>
      */
     #[Computed]
     public function links(): LengthAwarePaginator
@@ -252,9 +275,9 @@ class DawahImpactIndex extends Component
         );
     }
 
-    protected function analytics(): DawahShareAnalyticsService
+    protected function analytics(): ShareTrackingAnalyticsService
     {
-        return app(DawahShareAnalyticsService::class);
+        return app(ShareTrackingAnalyticsService::class);
     }
 
     protected function currentUser(): User

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\SavedSearches;
 
+use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -20,7 +21,7 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
-use App\Services\DawahShare\DawahShareService;
+use App\Services\ShareTrackingService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -151,8 +152,8 @@ class Index extends Component
             'notify' => $validated['notify'],
         ]);
 
-        app(DawahShareService::class)->recordOutcome(
-            type: \App\Enums\DawahShareOutcomeType::SavedSearchCreated,
+        app(ShareTrackingService::class)->recordOutcome(
+            type: DawahShareOutcomeType::SavedSearchCreated,
             outcomeKey: 'saved_search_created:saved_search:'.$savedSearch->id,
             subject: null,
             actor: $user,
@@ -344,7 +345,7 @@ class Index extends Component
             'gender',
             'institution_id',
             'venue_id',
-            'key_person_roles',
+            'participant_roles',
             'moderator_ids',
             'imam_ids',
             'khatib_ids',
@@ -413,10 +414,10 @@ class Index extends Component
             $filters['speaker_ids'] = $speakerIds;
         }
 
-        $participantRoles = array_values(array_filter((array) request()->input('key_person_roles', [])));
+        $participantRoles = array_values(array_filter((array) request()->input('participant_roles', [])));
 
         if ($participantRoles !== []) {
-            $filters['key_person_roles'] = $participantRoles;
+            $filters['participant_roles'] = $participantRoles;
         }
 
         foreach (['moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $filterKey) {
@@ -481,7 +482,7 @@ class Index extends Component
             'institution_id' => __('Institution'),
             'venue_id' => __('Venue'),
             'speaker_ids' => __('Speaker'),
-            'key_person_roles' => __('Key Person Roles'),
+            'participant_roles' => __('Participant Roles'),
             'moderator_ids' => __('Moderator'),
             'imam_ids' => __('Imam'),
             'khatib_ids' => __('Khatib'),
@@ -536,7 +537,7 @@ class Index extends Component
             'institution_id' => $this->institutionName($value) ?? $value,
             'venue_id' => $this->venueName($value) ?? $value,
             'speaker_ids' => $this->speakerName($value) ?? $value,
-            'key_person_roles' => EventParticipantRole::tryFrom($value)?->getLabel() ?? $value,
+            'participant_roles' => EventParticipantRole::tryFrom($value)?->getLabel() ?? $value,
             'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids' => $this->speakerName($value) ?? $value,
             'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
             'reference_ids' => $this->referenceTitle($value) ?? $value,

@@ -4,6 +4,7 @@
     $summary = $this->impactSummary;
     $subjectSummaries = $this->subjectSummaries;
     $providerBreakdown = $this->providerBreakdown;
+    $topSubjects = $this->topSubjects;
     $topLinks = $this->topLinks;
     $recentResponses = $this->recentResponses;
     $links = $this->links;
@@ -287,7 +288,7 @@
 
                                     <div class="flex flex-wrap gap-3 lg:justify-end">
                                         <a
-                                            href="{{ route('dashboard.dawah-impact.links.show', $link) }}"
+                                            href="{{ route('dashboard.dawah-impact.links.show', ['link' => $link->id]) }}"
                                             wire:navigate
                                             class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                                         >
@@ -323,6 +324,44 @@
                 </div>
 
                 <div class="space-y-8">
+                    @if($topSubjects->isNotEmpty())
+                        <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Top Shared Subjects') }}</p>
+                            <h2 class="mt-1 font-heading text-2xl font-bold text-slate-900">{{ __('Which topics and pages are driving the strongest response') }}</h2>
+
+                            <div class="mt-5 space-y-4">
+                                @foreach($topSubjects as $subject)
+                                    <article class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div>
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $subjectBadgeClass($subject['subject_type']) }}">
+                                                        {{ $subject['type_label'] }}
+                                                    </span>
+                                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                                                        {{ trans_choice(':count link|:count links', $subject['links'], ['count' => $subject['links']]) }}
+                                                    </span>
+                                                </div>
+                                                <p class="mt-3 text-sm font-semibold text-slate-900">{{ $subject['title_snapshot'] }}</p>
+                                                <p class="mt-1 text-xs text-slate-500 break-all">{{ $subject['subject_key'] }}</p>
+                                            </div>
+                                            <div class="grid min-w-44 grid-cols-2 gap-2 text-right">
+                                                <div class="rounded-2xl bg-white px-3 py-2">
+                                                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Visits') }}</p>
+                                                    <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($subject['visits']) }}</p>
+                                                </div>
+                                                <div class="rounded-2xl bg-white px-3 py-2">
+                                                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ __('Responses') }}</p>
+                                                    <p class="mt-1 text-lg font-black text-slate-900">{{ number_format($subject['total_outcomes']) }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </article>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endif
+
                     @if($topLinks->isNotEmpty())
                         <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
                             <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Top Shared Items') }}</p>
@@ -330,7 +369,7 @@
 
                             <div class="mt-5 space-y-4">
                                 @foreach($topLinks as $link)
-                                    <a href="{{ route('dashboard.dawah-impact.links.show', $link) }}" wire:navigate class="block rounded-3xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-emerald-300 hover:bg-white">
+                                    <a href="{{ route('dashboard.dawah-impact.links.show', ['link' => $link->id]) }}" wire:navigate class="block rounded-3xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-emerald-300 hover:bg-white">
                                         <div class="flex items-center justify-between gap-4">
                                             <div>
                                                 <p class="text-sm font-semibold text-slate-900">{{ $link->title_snapshot ?: __('Untitled page') }}</p>
@@ -357,7 +396,7 @@
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
                                             <p class="text-sm font-semibold text-slate-900">{{ $outcomeLabel((string) $response->outcome_type) }}</p>
-                                            <p class="mt-1 text-sm text-slate-600">{{ $response->link?->title_snapshot ?: __('Shared page') }}</p>
+                                            <p class="mt-1 text-sm text-slate-600">{{ $response->link_title_snapshot ?: __('Shared page') }}</p>
                                         </div>
                                         <p class="text-xs font-semibold text-slate-500">
                                             {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($response->occurred_at, 'j M Y, g:i A') }}

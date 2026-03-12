@@ -10,6 +10,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "aiarmada/affiliates": "dev-main",
+        "aiarmada/commerce-support": "dev-main as 1.0.0",
         "aiarmada/filament-authz": "1.0.0",
         "bezhansalleh/filament-language-switch": "dev-main",
         "cocosmos/filament-quick-add-select": "^1.1",
@@ -126,6 +128,14 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "repositories": [
+        {
+            "name": "aiarmada-affiliates",
+            "type": "path",
+            "url": "../commerce/packages/affiliates",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "vcs",
             "url": "https://github.com/sairiz/filament-language-switch"
