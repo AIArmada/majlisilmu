@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -160,7 +160,7 @@ class EventController extends Controller
 
                     $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
                         $keyPersonQuery
-                            ->where('role', EventParticipantRole::Moderator->value)
+                            ->where('role', EventKeyPersonRole::Moderator->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
                 }),
@@ -173,7 +173,7 @@ class EventController extends Controller
 
                     $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
                         $keyPersonQuery
-                            ->where('role', EventParticipantRole::Imam->value)
+                            ->where('role', EventKeyPersonRole::Imam->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
                 }),
@@ -186,7 +186,7 @@ class EventController extends Controller
 
                     $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
                         $keyPersonQuery
-                            ->where('role', EventParticipantRole::Khatib->value)
+                            ->where('role', EventKeyPersonRole::Khatib->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
                 }),
@@ -199,7 +199,7 @@ class EventController extends Controller
 
                     $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
                         $keyPersonQuery
-                            ->where('role', EventParticipantRole::Bilal->value)
+                            ->where('role', EventKeyPersonRole::Bilal->value)
                             ->whereIn('speaker_id', $speakerIds);
                     });
                 }),
@@ -397,7 +397,7 @@ class EventController extends Controller
     {
         return array_values(array_filter(
             array_map(
-                static fn (string $role): ?string => EventParticipantRole::tryFrom($role)?->value,
+                static fn (string $role): ?string => EventKeyPersonRole::tryFrom($role)?->value,
                 $this->normalizeArrayFilter($value)
             )
         ));

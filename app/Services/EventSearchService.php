@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -517,10 +517,10 @@ class EventSearchService
         }
 
         foreach ([
-            'moderator_ids' => EventParticipantRole::Moderator,
-            'imam_ids' => EventParticipantRole::Imam,
-            'khatib_ids' => EventParticipantRole::Khatib,
-            'bilal_ids' => EventParticipantRole::Bilal,
+            'moderator_ids' => EventKeyPersonRole::Moderator,
+            'imam_ids' => EventKeyPersonRole::Imam,
+            'khatib_ids' => EventKeyPersonRole::Khatib,
+            'bilal_ids' => EventKeyPersonRole::Bilal,
         ] as $filterKey => $role) {
             $roleSpecificIds = $this->normalizeArrayFilter($filters[$filterKey] ?? null);
 
@@ -910,7 +910,7 @@ class EventSearchService
     protected function normalizeKeyPersonRoles(mixed $value): array
     {
         return collect($this->normalizeArrayFilter($value))
-            ->map(fn (mixed $role): ?string => EventParticipantRole::tryFrom((string) $role)?->value)
+            ->map(fn (mixed $role): ?string => EventKeyPersonRole::tryFrom((string) $role)?->value)
             ->filter()
             ->values()
             ->all();

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\DawahShareOutcomeType;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
@@ -54,9 +54,7 @@ class SavedSearchController extends Controller
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
             'filters.key_person_roles' => 'nullable|array',
-            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
-            'filters.participant_roles' => 'nullable|array',
-            'filters.participant_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
+            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
             'filters.moderator_ids' => 'nullable|array',
             'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
             'filters.imam_ids' => 'nullable|array',
@@ -80,8 +78,6 @@ class SavedSearchController extends Controller
             'lng' => 'nullable|required_with:radius_km|numeric|between:-180,180',
             'notify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
         ]);
-
-        $validated['filters'] = $this->normalizeSavedSearchFilters($validated['filters'] ?? null);
 
         // Check limit (max 10 saved searches per user)
         $count = SavedSearch::where('user_id', Auth::id())->count();
@@ -158,9 +154,7 @@ class SavedSearchController extends Controller
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
             'filters.key_person_roles' => 'nullable|array',
-            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
-            'filters.participant_roles' => 'nullable|array',
-            'filters.participant_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
+            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
             'filters.moderator_ids' => 'nullable|array',
             'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
             'filters.imam_ids' => 'nullable|array',
@@ -184,10 +178,6 @@ class SavedSearchController extends Controller
             'lng' => 'nullable|numeric|between:-180,180',
             'notify' => ['nullable', Rule::in(['off', 'instant', 'daily', 'weekly'])],
         ]);
-
-        if (array_key_exists('filters', $validated)) {
-            $validated['filters'] = $this->normalizeSavedSearchFilters($validated['filters']);
-        }
 
         $savedSearch->update($validated);
 
@@ -244,24 +234,5 @@ class SavedSearchController extends Controller
                 'total' => $events->total(),
             ],
         ]);
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $filters
-     * @return array<string, mixed>|null
-     */
-    private function normalizeSavedSearchFilters(?array $filters): ?array
-    {
-        if ($filters === null) {
-            return null;
-        }
-
-        if (! array_key_exists('key_person_roles', $filters) && array_key_exists('participant_roles', $filters)) {
-            $filters['key_person_roles'] = $filters['participant_roles'];
-        }
-
-        unset($filters['participant_roles']);
-
-        return $filters;
     }
 }

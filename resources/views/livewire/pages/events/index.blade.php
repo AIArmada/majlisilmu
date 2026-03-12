@@ -117,7 +117,7 @@
         ->filter()
         ->values();
     $selectedKeyPersonRoleLabels = collect($selectedKeyPersonRoles)
-        ->map(fn (string $role): ?string => \App\Enums\EventParticipantRole::tryFrom($role)?->getLabel())
+        ->map(fn (string $role): ?string => \App\Enums\EventKeyPersonRole::tryFrom($role)?->getLabel())
         ->filter()
         ->values();
     $selectedModeratorLabels = collect($selectedModeratorIds)

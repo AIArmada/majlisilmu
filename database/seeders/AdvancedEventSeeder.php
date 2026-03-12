@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -242,7 +242,7 @@ class AdvancedEventSeeder extends Seeder
 
             if (count($selected) > 1) {
                 $otherKeyPeople[] = [
-                    'role' => EventParticipantRole::Moderator->value,
+                    'role' => EventKeyPersonRole::Moderator->value,
                     'speaker_id' => $selected[0],
                     'is_public' => true,
                 ];

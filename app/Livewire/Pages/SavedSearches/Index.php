@@ -6,7 +6,7 @@ use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\NotificationFrequency;
@@ -414,10 +414,7 @@ class Index extends Component
             $filters['speaker_ids'] = $speakerIds;
         }
 
-        $keyPersonRoles = array_values(array_filter((array) request()->input(
-            'key_person_roles',
-            request()->input('participant_roles', []),
-        )));
+        $keyPersonRoles = array_values(array_filter((array) request()->input('key_person_roles', [])));
 
         if ($keyPersonRoles !== []) {
             $filters['key_person_roles'] = $keyPersonRoles;
@@ -540,7 +537,7 @@ class Index extends Component
             'institution_id' => $this->institutionName($value) ?? $value,
             'venue_id' => $this->venueName($value) ?? $value,
             'speaker_ids' => $this->speakerName($value) ?? $value,
-            'key_person_roles' => EventParticipantRole::tryFrom($value)?->getLabel() ?? $value,
+            'key_person_roles' => EventKeyPersonRole::tryFrom($value)?->getLabel() ?? $value,
             'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids' => $this->speakerName($value) ?? $value,
             'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
             'reference_ids' => $this->referenceTitle($value) ?? $value,
