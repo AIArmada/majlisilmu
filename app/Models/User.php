@@ -199,14 +199,6 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     }
 
     /**
-     * @return HasMany<DawahShareLink, $this>
-     */
-    public function dawahShareLinks(): HasMany
-    {
-        return $this->hasMany(DawahShareLink::class);
-    }
-
-    /**
      * @return BelongsToMany<Event, $this>
      */
     public function savedEvents(): BelongsToMany

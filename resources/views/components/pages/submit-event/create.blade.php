@@ -25,7 +25,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
-use App\Services\EventParticipantSyncService;
+use App\Services\EventKeyPersonSyncService;
 use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserTimezoneResolver;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -1429,7 +1429,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
-        app(EventParticipantSyncService::class)->sync(
+        app(EventKeyPersonSyncService::class)->sync(
             $event,
             $validated['speakers'] ?? [],
             $validated['other_participants'] ?? [],

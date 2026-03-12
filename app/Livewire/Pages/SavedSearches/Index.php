@@ -645,7 +645,14 @@ class Index extends Component
 
                 if (is_array($name)) {
                     $locale = app()->getLocale();
-                    $fallback = array_find($name, fn ($value) => is_string($value) && $value !== '');
+                    $fallback = null;
+
+                    foreach ($name as $value) {
+                        if (is_string($value) && $value !== '') {
+                            $fallback = $value;
+                            break;
+                        }
+                    }
 
                     $this->tagNames[$id] = (is_string($name[$locale] ?? null) && ($name[$locale] ?? '') !== '')
                         ? $name[$locale]

@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Services\ShareTrackingAnalyticsService;
 use App\Services\ShareTrackingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -115,6 +116,14 @@ function dawahShareSubmitEventFormData(array $fixtures, array $overrides = []): 
         'submitter_email' => 'guest-submitter@example.com',
     ], $overrides);
 }
+
+test('fresh migrations do not create the removed local dawah share tables', function () {
+    expect(Schema::hasTable('dawah_share_links'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_attributions'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_visits'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_outcomes'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_share_events'))->toBeFalse();
+});
 
 test('viewing a shareable page does not create a share link until payload is requested', function () {
     $event = Event::factory()->create([
