@@ -234,6 +234,9 @@ class Index extends Component implements HasForms
         $this->showAdvancedFiltersPanel = ! $this->showAdvancedFiltersPanel;
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
     #[On('event-filters-updated')]
     public function syncAdvancedFilters(array $filters): void
     {
@@ -1071,6 +1074,7 @@ class Index extends Component implements HasForms
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     private function applySearchConstraint(Builder $query, string $column, string $search): Builder
     {

@@ -491,6 +491,9 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             ->count();
     }
 
+    /**
+     * @return Builder<AffiliateTouchpoint>
+     */
     private function outboundSharesQuery(Affiliate $affiliate): Builder
     {
         return AffiliateTouchpoint::query()
@@ -498,6 +501,9 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             ->where('metadata->event_type', 'outbound_share');
     }
 
+    /**
+     * @return Builder<AffiliateTouchpoint>
+     */
     private function visitTouchpointsQuery(Affiliate $affiliate): Builder
     {
         return AffiliateTouchpoint::query()
@@ -505,11 +511,17 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             ->where('metadata->event_type', 'visit');
     }
 
+    /**
+     * @return Builder<AffiliateConversion>
+     */
     private function conversionsQuery(Affiliate $affiliate): Builder
     {
         return AffiliateConversion::query()->where('affiliate_id', $affiliate->id);
     }
 
+    /**
+     * @return Builder<AffiliateAttribution>
+     */
     private function landingAttributionsQuery(Affiliate $affiliate): Builder
     {
         return AffiliateAttribution::query()
@@ -517,6 +529,9 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             ->where('metadata->tracking_mode', 'landing');
     }
 
+    /**
+     * @return Builder<AffiliateTouchpoint>
+     */
     private function outboundSharesQueryForLink(string $linkId): Builder
     {
         return AffiliateTouchpoint::query()
@@ -524,6 +539,9 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             ->where('metadata->link_id', $linkId);
     }
 
+    /**
+     * @return Builder<AffiliateTouchpoint>
+     */
     private function visitTouchpointsQueryForLink(string $linkId): Builder
     {
         return AffiliateTouchpoint::query()
@@ -531,11 +549,17 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             ->where('metadata->link_id', $linkId);
     }
 
+    /**
+     * @return Builder<AffiliateConversion>
+     */
     private function conversionsQueryForLink(string $linkId): Builder
     {
         return AffiliateConversion::query()->where('metadata->link_id', $linkId);
     }
 
+    /**
+     * @return Builder<AffiliateAttribution>
+     */
     private function landingAttributionsQueryForLink(string $linkId): Builder
     {
         return AffiliateAttribution::query()

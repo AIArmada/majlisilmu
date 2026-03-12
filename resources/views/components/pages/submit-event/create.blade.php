@@ -73,6 +73,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    public ?string $parentEventId = null;
+
     public ?TemporaryUploadedFile $event_source_attachment = null;
 
     protected function eventForm(): Schema
@@ -83,8 +85,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     public function mount(): void
     {
         $timezone = $this->resolveUserTimezone();
+        $this->parentEventId = request()->query('parent');
 
-        $this->eventForm()->fill([
+        $state = [
             'submitter_name' => auth()->user()?->name,
             'submitter_email' => auth()->user()?->email,
             'children_allowed' => true,
@@ -99,7 +102,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'other_key_people' => [],
             'captcha_token' => null,
             'timezone' => $timezone,
-        ]);
+        ];
+
+        if ($parentEvent = $this->selectedParentEvent()) {
+            $state = array_replace($state, $this->parentEventDefaults($parentEvent));
+        }
+
+        $this->eventForm()->fill($state);
     }
 
     public function extractEventFromMedia(EventMediaExtractionService $eventMediaExtractionService): void
@@ -1393,6 +1402,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ]);
         }
 
+        $parentEvent = $this->selectedParentEvent();
+
         $event = Event::create([
             'title' => $validated['title'],
             'slug' => Str::slug($validated['title']) . '-' . Str::random(7),
@@ -1403,6 +1414,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'institution_id' => $targetInstitutionId,
             'venue_id' => $targetVenueId,
             'space_id' => $validated['space_id'] ?? null,
+            'parent_event_id' => $parentEvent?->id,
+            'event_structure' => $parentEvent instanceof Event ? \App\Enums\EventStructure::ChildEvent->value : \App\Enums\EventStructure::Standalone->value,
             'event_type' => $validated['event_type'] ?? [\App\Enums\EventType::KuliahCeramah],
             'gender' => $validated['gender'] ?? EventGenderRestriction::All->value,
             'age_group' => $validated['age_group'] ?? [EventAgeGroup::AllAges],
@@ -1517,14 +1530,103 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $this->storeSubmitterContacts($submission, $validated);
         }
 
+        if (($parentEvent = $this->selectedParentEvent()) instanceof Event && $parentEvent->settings !== null) {
+            $registrationMode = $parentEvent->settings->registration_mode;
+            $resolvedRegistrationMode = $registrationMode instanceof \App\Enums\RegistrationMode
+                ? $registrationMode->value
+                : (is_string($registrationMode) && $registrationMode !== '' ? $registrationMode : 'event');
+
+            \App\Models\EventSettings::query()->updateOrCreate(
+                ['event_id' => $event->id],
+                [
+                    'registration_required' => (bool) $parentEvent->settings->registration_required,
+                    'registration_mode' => $resolvedRegistrationMode,
+                ]
+            );
+        }
+
         // Transition from Draft → Pending (notifies moderators)
         $event->status->transitionTo(\App\States\EventStatus\Pending::class);
 
         session()->flash('event_title', $event->title);
         session()->flash('event_slug', $event->slug);
-        session()->flash('event_visibility', $event->visibility->value ?? 'public');
+        $eventVisibility = $event->visibility;
+
+        session()->flash(
+            'event_visibility',
+            $eventVisibility instanceof EventVisibility
+                ? $eventVisibility->value
+                : (is_string($eventVisibility) && $eventVisibility !== '' ? $eventVisibility : 'public')
+        );
+
+        if ($parentEvent = $this->selectedParentEvent()) {
+            session()->flash('parent_event_id', $parentEvent->id);
+            session()->flash('parent_event_title', $parentEvent->title);
+        }
 
         return redirect()->route('submit-event.success');
+    }
+
+    protected function selectedParentEvent(): ?Event
+    {
+        $parentId = $this->parentEventId;
+
+        if (! is_string($parentId) || ! Str::isUuid($parentId)) {
+            return null;
+        }
+
+        $parentEvent = Event::query()
+            ->with(['institution:id,name', 'settings'])
+            ->find($parentId);
+
+        return $parentEvent instanceof Event && $parentEvent->isParentProgram()
+            ? $parentEvent
+            : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentEventDefaults(Event $parentEvent): array
+    {
+        $parentVisibility = $parentEvent->visibility;
+
+        $defaults = [
+            'visibility' => $parentVisibility instanceof EventVisibility
+                ? $parentVisibility->value
+                : (is_string($parentVisibility) && $parentVisibility !== '' ? $parentVisibility : EventVisibility::Public->value),
+        ];
+
+        if ($parentEvent->organizer_type === Institution::class && filled($parentEvent->organizer_id)) {
+            $defaults['organizer_type'] = 'institution';
+            $defaults['organizer_institution_id'] = $parentEvent->organizer_id;
+            $defaults['location_same_as_institution'] = true;
+            $defaults['location_type'] = 'institution';
+            $defaults['location_institution_id'] = $parentEvent->institution_id ?: $parentEvent->organizer_id;
+        }
+
+        if ($parentEvent->organizer_type === Speaker::class && filled($parentEvent->organizer_id)) {
+            $defaults['organizer_type'] = 'speaker';
+            $defaults['organizer_speaker_id'] = $parentEvent->organizer_id;
+            $defaults['location_type'] = $parentEvent->venue_id ? 'venue' : 'institution';
+            $defaults['location_institution_id'] = $parentEvent->institution_id;
+
+            if ($parentEvent->venue_id) {
+                $defaults['location_same_as_institution'] = false;
+                $defaults['location_venue_id'] = $parentEvent->venue_id;
+            }
+        }
+
+        return $defaults;
+    }
+
+    public function parentProgramManagementUrl(): ?string
+    {
+        $parentEvent = $this->selectedParentEvent();
+
+        return $parentEvent instanceof Event
+            ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $parentEvent], panel: 'ahli')
+            : null;
     }
 
     /**
@@ -1940,6 +2042,26 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 <div class="bg-slate-50 min-h-screen py-12 pb-32">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="max-w-6xl xl:max-w-7xl mx-auto">
+            @if(($parentEvent = $this->selectedParentEvent()) instanceof \App\Models\Event)
+                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">{{ __('Parent Program') }}</p>
+                            <h2 class="mt-2 font-heading text-2xl font-bold text-emerald-950">{{ $parentEvent->title }}</h2>
+                            <p class="mt-2 text-sm text-emerald-900/75">
+                                {{ __('This submission will be attached as a child event under the selected parent program.') }}
+                            </p>
+                        </div>
+                        @if($parentProgramManagementUrl = $this->parentProgramManagementUrl())
+                            <a href="{{ $parentProgramManagementUrl }}"
+                                class="inline-flex h-11 items-center justify-center rounded-xl border border-emerald-300 bg-white px-5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100/70">
+                                {{ __('Back to Parent Program') }}
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <!-- Header -->
             <div class="text-center mb-12">
                 <h1 class="font-heading text-4xl font-bold text-slate-900">{{ __('Hantar Majlis Ilmu') }}</h1>

@@ -181,7 +181,11 @@ class EventFactory extends Factory
     {
         return $this->afterCreating(function (Event $event) {
             // 30% of events have registration settings
-            if (fake()->boolean(30) && ! $event->settings()->exists()) {
+            if (
+                $event->eventStructure() !== EventStructure::ParentProgram
+                && fake()->boolean(30)
+                && ! $event->settings()->exists()
+            ) {
                 $event->settings()->create([
                     'registration_required' => true,
                     'capacity' => fake()->numberBetween(30, 300),

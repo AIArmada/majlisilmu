@@ -19,6 +19,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Inspiration extends Model implements HasMedia
 {
+    /** @property array<string, mixed> $content */
     /** @use HasFactory<InspirationFactory> */
     use HasFactory, HasUuids, InteractsWithMedia;
 
@@ -47,6 +48,9 @@ class Inspiration extends Model implements HasMedia
         ];
     }
 
+    /**
+     * @return Attribute<array<string, mixed>, mixed>
+     */
     protected function content(): Attribute
     {
         return Attribute::make(

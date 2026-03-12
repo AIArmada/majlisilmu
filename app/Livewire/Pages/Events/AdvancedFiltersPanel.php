@@ -471,6 +471,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         $this->dispatch('event-filters-updated', filters: $normalized);
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
     #[On('event-filters-synced')]
     public function syncFilters(array $filters): void
     {
@@ -520,6 +523,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
         });
     }
 
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
     public function speakerOptionLabels(array $values): array
     {
         if ($values === []) {
@@ -533,6 +540,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
     public function tagOptionLabels(TagType $type, array $values): array
     {
         if ($values === []) {
@@ -546,6 +557,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
     public function referenceOptionLabels(array $values): array
     {
         if ($values === []) {
@@ -623,6 +638,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
     }
 
     /**
+     * @param  array<string, mixed>  $raw
      * @return array<string, mixed>
      */
     private function normalizedFilterData(array $raw): array
@@ -775,6 +791,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         return null;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchInstitutionOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
     {
         $query = Institution::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
@@ -785,6 +804,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         return $this->pluckOptions($query->orderBy('name'), 'name', 50);
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchVenueOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
     {
         $query = Venue::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
@@ -795,6 +817,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         return $this->pluckOptions($query->orderBy('name'), 'name', 50);
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchSpeakerOptions(string $search): array
     {
         return $this->pluckOptions(
@@ -808,6 +833,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchTagOptions(TagType $type, string $search): array
     {
         return $this->pluckOptions(
@@ -821,6 +849,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchReferenceOptions(string $search): array
     {
         return $this->pluckOptions(
@@ -852,6 +883,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     private function applySearchConstraint(Builder $query, string $column, string $search): Builder
     {
