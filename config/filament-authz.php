@@ -1,6 +1,9 @@
 <?php
 
 declare(strict_types=1);
+use Filament\Pages\Dashboard;
+use Filament\Widgets\AccountWidget;
+use Filament\Widgets\FilamentInfoWidget;
 
 return [
     /*
@@ -49,15 +52,15 @@ return [
     'pages' => [
         'prefix' => 'page',
         'exclude' => [
-            \Filament\Pages\Dashboard::class,
+            Dashboard::class,
         ],
     ],
 
     'widgets' => [
         'prefix' => 'widget',
         'exclude' => [
-            \Filament\Widgets\AccountWidget::class,
-            \Filament\Widgets\FilamentInfoWidget::class,
+            AccountWidget::class,
+            FilamentInfoWidget::class,
         ],
     ],
 

@@ -6,6 +6,7 @@ use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Submission\PublicSubmissionLockService;
+use App\Support\Submission\PublicSubmissionUiEvents;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +28,7 @@ class EditInstitution extends EditRecord
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    #[\Override]
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $actor = $this->currentUser();
@@ -64,7 +66,7 @@ class EditInstitution extends EditRecord
         return $data;
     }
 
-    #[On(\App\Support\Submission\PublicSubmissionUiEvents::REFRESH_TOGGLE)]
+    #[On(PublicSubmissionUiEvents::REFRESH_TOGGLE)]
     public function refreshPublicSubmissionToggleState(): void
     {
         $this->institutionRecord()->refresh();

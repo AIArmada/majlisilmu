@@ -158,19 +158,17 @@ class DawahShareAnalyticsService
     {
         return $this->linksForUser($user)
             ->groupBy('subject_type')
-            ->map(function (Collection $links, string $subjectType): array {
-                return [
-                    'subject_type' => $subjectType,
-                    'label' => $this->subjectTypeLabel($subjectType),
-                    'links' => $links->count(),
-                    'visits' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->visits_count ?? 0)),
-                    'signups' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->signups_count ?? 0)),
-                    'event_registrations' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_registrations_count ?? 0)),
-                    'event_checkins' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_checkins_count ?? 0)),
-                    'event_submissions' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_submissions_count ?? 0)),
-                    'total_outcomes' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->outcomes_count ?? 0)),
-                ];
-            })
+            ->map(fn (Collection $links, string $subjectType): array => [
+                'subject_type' => $subjectType,
+                'label' => $this->subjectTypeLabel($subjectType),
+                'links' => $links->count(),
+                'visits' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->visits_count ?? 0)),
+                'signups' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->signups_count ?? 0)),
+                'event_registrations' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_registrations_count ?? 0)),
+                'event_checkins' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_checkins_count ?? 0)),
+                'event_submissions' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->event_submissions_count ?? 0)),
+                'total_outcomes' => (int) $links->sum(fn (DawahShareLink $link): int => (int) ($link->outcomes_count ?? 0)),
+            ])
             ->sortByDesc('visits')
             ->values();
     }
@@ -473,51 +471,47 @@ class DawahShareAnalyticsService
         $providers = app(ShareTrackingService::class)->supportedProviders();
 
         return collect($providers)
-            ->map(function (string $provider) use ($shareEvents, $visits, $outcomes): array {
-                return [
-                    'provider' => $provider,
-                    'label' => $this->shareProviderLabel($provider),
-                    'outbound_shares' => (clone $shareEvents)
-                        ->where('event_type', 'outbound_click')
-                        ->where('provider', $provider)
-                        ->count(),
-                    'visits' => $this->filterByShareProvider(clone $visits, $provider)
-                        ->count(),
-                    'unique_visitors' => $this->filterByShareProvider(clone $visits, $provider)
-                        ->distinct('visitor_key')
-                        ->count('visitor_key'),
-                    'outcomes' => $this->filterByShareProvider(clone $outcomes, $provider)
-                        ->count(),
-                    'signups' => $this->filterByShareProvider(clone $outcomes, $provider)
-                        ->where('outcome_type', 'signup')
-                        ->count(),
-                    'event_registrations' => $this->filterByShareProvider(clone $outcomes, $provider)
-                        ->where('outcome_type', 'event_registration')
-                        ->count(),
-                    'event_checkins' => $this->filterByShareProvider(clone $outcomes, $provider)
-                        ->where('outcome_type', 'event_checkin')
-                        ->count(),
-                    'event_submissions' => $this->filterByShareProvider(clone $outcomes, $provider)
-                        ->where('outcome_type', 'event_submission')
-                        ->count(),
-                ];
-            })
+            ->map(fn (string $provider): array => [
+                'provider' => $provider,
+                'label' => $this->shareProviderLabel($provider),
+                'outbound_shares' => (clone $shareEvents)
+                    ->where('event_type', 'outbound_click')
+                    ->where('provider', $provider)
+                    ->count(),
+                'visits' => $this->filterByShareProvider(clone $visits, $provider)
+                    ->count(),
+                'unique_visitors' => $this->filterByShareProvider(clone $visits, $provider)
+                    ->distinct('visitor_key')
+                    ->count('visitor_key'),
+                'outcomes' => $this->filterByShareProvider(clone $outcomes, $provider)
+                    ->count(),
+                'signups' => $this->filterByShareProvider(clone $outcomes, $provider)
+                    ->where('outcome_type', 'signup')
+                    ->count(),
+                'event_registrations' => $this->filterByShareProvider(clone $outcomes, $provider)
+                    ->where('outcome_type', 'event_registration')
+                    ->count(),
+                'event_checkins' => $this->filterByShareProvider(clone $outcomes, $provider)
+                    ->where('outcome_type', 'event_checkin')
+                    ->count(),
+                'event_submissions' => $this->filterByShareProvider(clone $outcomes, $provider)
+                    ->where('outcome_type', 'event_submission')
+                    ->count(),
+            ])
             ->filter(fn (array $provider): bool => collect([
                 $provider['outbound_shares'],
                 $provider['visits'],
                 $provider['outcomes'],
             ])->some(fn (int $count): bool => $count > 0))
-            ->sort(function (array $left, array $right): int {
-                return [
-                    $right['outcomes'],
-                    $right['visits'],
-                    $right['outbound_shares'],
-                ] <=> [
-                    $left['outcomes'],
-                    $left['visits'],
-                    $left['outbound_shares'],
-                ];
-            })
+            ->sort(fn (array $left, array $right): int => [
+                $right['outcomes'],
+                $right['visits'],
+                $right['outbound_shares'],
+            ] <=> [
+                $left['outcomes'],
+                $left['visits'],
+                $left['outbound_shares'],
+            ])
             ->values();
     }
 

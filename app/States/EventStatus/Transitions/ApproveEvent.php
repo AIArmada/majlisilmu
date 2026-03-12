@@ -3,8 +3,14 @@
 namespace App\States\EventStatus\Transitions;
 
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\ModerationReview;
+use App\Models\Speaker;
+use App\Models\Tag;
 use App\Models\User;
+use App\Models\Venue;
+use App\Services\Notifications\EventNotificationService;
+use App\States\EventStatus\Approved;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -33,7 +39,7 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
             ]);
 
             // Update event status
-            $this->event->status = \App\States\EventStatus\Approved::class;
+            $this->event->status = Approved::class;
             $this->event->published_at = now();
             $this->event->save();
 
@@ -43,8 +49,8 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
             // Make searchable (Scout)
             $this->event->searchable();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionApproved($this->event);
-            app(\App\Services\Notifications\EventNotificationService::class)->notifyPublication($this->event);
+            app(EventNotificationService::class)->notifySubmissionApproved($this->event);
+            app(EventNotificationService::class)->notifyPublication($this->event);
 
             Log::info('Event approved', [
                 'event_id' => $this->event->id,
@@ -62,41 +68,41 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
     protected function verifyPendingRelatedRecords(Event $event): void
     {
         // Verify linked speaker profiles across all event roles.
-        \App\Models\Speaker::query()
+        Speaker::query()
             ->whereIn('id', $event->keyPeople()->whereNotNull('speaker_id')->pluck('speaker_id'))
             ->where('status', 'pending')
             ->update(['status' => 'verified']);
 
         // Verify organizer if Speaker
-        if ($event->organizer_type === \App\Models\Speaker::class && $event->organizer_id) {
-            \App\Models\Speaker::where('id', $event->organizer_id)
+        if ($event->organizer_type === Speaker::class && $event->organizer_id) {
+            Speaker::where('id', $event->organizer_id)
                 ->where('status', 'pending')
                 ->update(['status' => 'verified']);
         }
 
         // Verify organizer if Institution
-        if ($event->organizer_type === \App\Models\Institution::class && $event->organizer_id) {
-            \App\Models\Institution::where('id', $event->organizer_id)
+        if ($event->organizer_type === Institution::class && $event->organizer_id) {
+            Institution::where('id', $event->organizer_id)
                 ->where('status', 'pending')
                 ->update(['status' => 'verified']);
         }
 
         // Verify location institution
         if ($event->institution_id) {
-            \App\Models\Institution::where('id', $event->institution_id)
+            Institution::where('id', $event->institution_id)
                 ->where('status', 'pending')
                 ->update(['status' => 'verified']);
         }
 
         // Verify venue
         if ($event->venue_id) {
-            \App\Models\Venue::where('id', $event->venue_id)
+            Venue::where('id', $event->venue_id)
                 ->where('status', 'pending')
                 ->update(['status' => 'verified']);
         }
 
         // Verify tags
-        \App\Models\Tag::whereIn('id', $event->tags->pluck('id'))
+        Tag::whereIn('id', $event->tags->pluck('id'))
             ->where('status', 'pending')
             ->update(['status' => 'verified']);
 

@@ -15,9 +15,16 @@ use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use App\Models\Concerns\HasAddress;
+use App\Models\Concerns\HasDonationChannels;
+use App\States\EventStatus\EventStatus;
+use App\States\EventStatus\Pending;
 use App\Support\Authz\MemberPermissionGate;
 use App\Support\Timezone\UserDateTimeFormatter;
+use Database\Factories\EventFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +35,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Laravel\Scout\Searchable;
+use Nnjeim\World\Models\Language;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
@@ -44,15 +54,15 @@ use Spatie\Tags\HasTags;
  * @property string $title
  * @property string $slug
  * @property array<string, mixed>|string|null $description
- * @property \Illuminate\Support\Carbon|null $starts_at
- * @property \Illuminate\Support\Carbon|null $ends_at
- * @property \App\States\EventStatus\EventStatus|string $status
- * @property \App\Enums\EventVisibility|string|null $visibility
- * @property \App\Enums\EventFormat|string|null $event_format
- * @property \App\Enums\EventStructure|string $event_structure
- * @property \App\Enums\EventGenderRestriction|string|null $gender
- * @property \Illuminate\Support\Collection<int, \App\Enums\EventAgeGroup>|array<int, string>|null $age_group
- * @property \Illuminate\Support\Collection<int, \App\Enums\EventType>|array<int, string>|null $event_type
+ * @property Carbon|null $starts_at
+ * @property Carbon|null $ends_at
+ * @property EventStatus|string $status
+ * @property EventVisibility|string|null $visibility
+ * @property EventFormat|string|null $event_format
+ * @property EventStructure|string $event_structure
+ * @property EventGenderRestriction|string|null $gender
+ * @property Collection<int, EventAgeGroup>|array<int, string>|null $age_group
+ * @property Collection<int, EventType>|array<int, string>|null $event_type
  * @property bool $is_active
  * @property-read Address|null $address
  * @property-read Address|null $addressModel
@@ -63,8 +73,8 @@ use Spatie\Tags\HasTags;
  */
 class Event extends Model implements AuditableContract, HasMedia
 {
-    /** @use HasFactory<\Database\Factories\EventFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasLanguages, Auditable, HasFactory, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
+    /** @use HasFactory<EventFactory> */
+    use \App\Models\Concerns\HasLanguages, Auditable, HasAddress, HasDonationChannels, HasFactory, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     /**
      * Statuses visible on public listings and detail pages.
@@ -173,7 +183,7 @@ class Event extends Model implements AuditableContract, HasMedia
     protected function casts(): array
     {
         return [
-            'status' => \App\States\EventStatus\EventStatus::class,
+            'status' => EventStatus::class,
             'description' => 'array',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
@@ -184,9 +194,9 @@ class Event extends Model implements AuditableContract, HasMedia
             'prayer_reference' => PrayerReference::class,
             'prayer_offset' => PrayerOffset::class,
             'gender' => EventGenderRestriction::class,
-            'age_group' => \Illuminate\Database\Eloquent\Casts\AsEnumCollection::of(EventAgeGroup::class),
+            'age_group' => AsEnumCollection::of(EventAgeGroup::class),
             'event_format' => EventFormat::class,
-            'event_type' => \Illuminate\Database\Eloquent\Casts\AsEnumCollection::of(EventType::class),
+            'event_type' => AsEnumCollection::of(EventType::class),
             'visibility' => EventVisibility::class,
             'children_allowed' => 'boolean',
             'views_count' => 'integer',
@@ -208,7 +218,7 @@ class Event extends Model implements AuditableContract, HasMedia
      *
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $table = $query->getModel()->getTable();
@@ -224,7 +234,7 @@ class Event extends Model implements AuditableContract, HasMedia
      *
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function discoverable(Builder $query): void
     {
         $table = $query->getModel()->getTable();
@@ -263,7 +273,7 @@ class Event extends Model implements AuditableContract, HasMedia
 
         $ageGroupCollection = $this->age_group;
 
-        $ageGroupValues = $ageGroupCollection instanceof \Illuminate\Support\Collection && $ageGroupCollection->isNotEmpty()
+        $ageGroupValues = $ageGroupCollection instanceof Collection && $ageGroupCollection->isNotEmpty()
             ? $ageGroupCollection->map(fn (EventAgeGroup $value): string => $value->value)->toArray()
             : ['all_ages'];
 
@@ -401,8 +411,8 @@ class Event extends Model implements AuditableContract, HasMedia
             'imam_ids' => $imamIds,
             'khatib_ids' => $khatibIds,
             'bilal_ids' => $bilalIds,
-            'starts_at' => $this->starts_at instanceof \Illuminate\Support\Carbon ? $this->starts_at->timestamp : 0,
-            'ends_at' => $this->ends_at instanceof \Illuminate\Support\Carbon ? $this->ends_at->timestamp : null,
+            'starts_at' => $this->starts_at instanceof Carbon ? $this->starts_at->timestamp : 0,
+            'ends_at' => $this->ends_at instanceof Carbon ? $this->ends_at->timestamp : null,
             'saves_count' => $this->saves_count ?? 0,
             'registrations_count' => $this->registrations_count ?? 0,
         ];
@@ -806,8 +816,8 @@ class Event extends Model implements AuditableContract, HasMedia
             $dimensions = @getimagesize($posterPath);
 
             if (is_array($dimensions)) {
-                $width = (int) $dimensions[0];
-                $height = (int) $dimensions[1];
+                $width = $dimensions[0];
+                $height = $dimensions[1];
             }
         }
 
@@ -846,7 +856,7 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         $ageGroup = $this->age_group;
 
-        if ($ageGroup instanceof \Illuminate\Support\Collection) {
+        if ($ageGroup instanceof Collection) {
             return $ageGroup
                 ->map(fn (EventAgeGroup $value): string => $value->value)
                 ->values()
@@ -870,7 +880,7 @@ class Event extends Model implements AuditableContract, HasMedia
 
         $language = $this->languages->first();
 
-        if ($language instanceof \Nnjeim\World\Models\Language && is_string($language->code) && $language->code !== '') {
+        if ($language instanceof Language && is_string($language->code) && $language->code !== '') {
             return $language->code;
         }
 
@@ -889,7 +899,7 @@ class Event extends Model implements AuditableContract, HasMedia
     {
         $eventType = $this->event_type;
 
-        if ($eventType instanceof \Illuminate\Support\Collection) {
+        if ($eventType instanceof Collection) {
             return $eventType
                 ->map(fn (EventType $value): string => $value->value)
                 ->filter(fn (string $value): bool => $value !== '')
@@ -984,7 +994,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function userCanApprovePublicSubmission(User $user): bool
     {
-        if (! $this->status instanceof \App\States\EventStatus\Pending) {
+        if (! $this->status instanceof Pending) {
             return false;
         }
 
@@ -1015,10 +1025,6 @@ class Event extends Model implements AuditableContract, HasMedia
             return true;
         }
 
-        if ($this->institution instanceof Institution && $memberPermissions->canInstitution($user, $permission, $this->institution)) {
-            return true;
-        }
-
-        return false;
+        return $this->institution instanceof Institution && $memberPermissions->canInstitution($user, $permission, $this->institution);
     }
 }

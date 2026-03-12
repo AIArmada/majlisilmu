@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -16,7 +17,7 @@ class InstitutionFormSchema
     /**
      * Shared createOptionForm for Institution selects.
      *
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     public static function createOptionForm(): array
     {

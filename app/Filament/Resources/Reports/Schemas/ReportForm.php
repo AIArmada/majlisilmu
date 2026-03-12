@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Reports\Schemas;
 
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -40,7 +41,7 @@ class ReportForm
                         Textarea::make('description')
                             ->columnSpanFull()
                             ->maxLength(2000),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('evidence')
+                        SpatieMediaLibraryFileUpload::make('evidence')
                             ->label('Evidence Files')
                             ->collection('evidence')
                             ->multiple()

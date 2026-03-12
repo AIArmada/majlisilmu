@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasFollowers;
+use Database\Factories\SeriesFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,8 +16,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Series extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\SeriesFactory> */
-    use \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, HasFactory, HasUuids, InteractsWithMedia;
+    /** @use HasFactory<SeriesFactory> */
+    use \App\Models\Concerns\HasLanguages, HasFactory, HasFollowers, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -84,7 +87,7 @@ class Series extends Model implements HasMedia
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);

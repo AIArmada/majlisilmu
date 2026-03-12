@@ -29,10 +29,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
-final class AffiliatesShareTrackingService
+final readonly class AffiliatesShareTrackingService
 {
     public function __construct(
-        private readonly ShareTrackingUrlService $shareTrackingUrlService,
+        private ShareTrackingUrlService $shareTrackingUrlService,
     ) {}
 
     /**

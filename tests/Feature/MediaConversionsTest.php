@@ -8,9 +8,12 @@ use App\Models\Report;
 use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\Venue;
+use App\Support\Media\MediaFileNamer;
+use App\Support\Media\MediaPathGenerator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileUnacceptableForCollection;
+use Spatie\MediaLibrary\Support\FileRemover\FileBaseFileRemover;
 
 beforeEach(function () {
     Storage::fake('public');
@@ -299,16 +302,16 @@ it('has lazy loading set as default in media library config', function () {
 });
 
 it('uses custom path generator', function () {
-    expect(config('media-library.path_generator'))->toBe(\App\Support\Media\MediaPathGenerator::class);
+    expect(config('media-library.path_generator'))->toBe(MediaPathGenerator::class);
 });
 
 it('uses custom file namer', function () {
-    expect(config('media-library.file_namer'))->toBe(\App\Support\Media\MediaFileNamer::class);
+    expect(config('media-library.file_namer'))->toBe(MediaFileNamer::class);
 });
 
 it('uses file-based media remover strategy for shared directories', function () {
     expect(config('media-library.file_remover_class'))
-        ->toBe(\Spatie\MediaLibrary\Support\FileRemover\FileBaseFileRemover::class);
+        ->toBe(FileBaseFileRemover::class);
 });
 
 it('enables media url versioning for cache busting', function () {

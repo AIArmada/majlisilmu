@@ -7,6 +7,7 @@ use App\Enums\EventPrayerTime;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Support\Timezone\UserDateTimeFormatter;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -418,7 +419,7 @@ class EventController extends Controller
 
     private function databaseDriver(): string
     {
-        /** @var \Illuminate\Database\Connection $connection */
+        /** @var Connection $connection */
         $connection = Event::query()->getConnection();
 
         return $connection->getDriverName();

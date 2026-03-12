@@ -645,14 +645,7 @@ class Index extends Component
 
                 if (is_array($name)) {
                     $locale = app()->getLocale();
-                    $fallback = null;
-
-                    foreach ($name as $value) {
-                        if (is_string($value) && $value !== '') {
-                            $fallback = $value;
-                            break;
-                        }
-                    }
+                    $fallback = array_find($name, fn ($value) => is_string($value) && $value !== '');
 
                     $this->tagNames[$id] = (is_string($name[$locale] ?? null) && ($name[$locale] ?? '') !== '')
                         ? $name[$locale]
@@ -744,8 +737,7 @@ class Index extends Component
     private function translatedFilterFallbackLabel(string $filterKey): string
     {
         $fallback = str($filterKey)->replace('_', ' ')->headline()->toString();
-        $translated = __($fallback);
 
-        return $translated !== $fallback ? $translated : $fallback;
+        return __($fallback);
     }
 }

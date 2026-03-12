@@ -11,6 +11,7 @@ use App\Filament\Resources\Series\SeriesResource as AdminSeriesResource;
 use App\Filament\Resources\Speakers\SpeakerResource as AdminSpeakerResource;
 use App\Filament\Resources\Venues\VenueResource as AdminVenueResource;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
@@ -186,11 +187,11 @@ class EventInfolist
                                                     return null;
                                                 }
 
-                                                if ($record->organizer_type === \App\Models\Institution::class) {
+                                                if ($record->organizer_type === Institution::class) {
                                                     return self::resourceEditUrl($record->organizer_id, AdminInstitutionResource::class, AhliInstitutionResource::class);
                                                 }
 
-                                                if ($record->organizer_type === \App\Models\Speaker::class) {
+                                                if ($record->organizer_type === Speaker::class) {
                                                     return self::resourceEditUrl($record->organizer_id, AdminSpeakerResource::class);
                                                 }
 
@@ -399,8 +400,8 @@ class EventInfolist
     protected static function formatOrganizerType(?string $state): string
     {
         return match ($state) {
-            \App\Models\Institution::class, 'institution' => 'Institusi',
-            \App\Models\Speaker::class, 'speaker' => 'Penceramah',
+            Institution::class, 'institution' => 'Institusi',
+            Speaker::class, 'speaker' => 'Penceramah',
             default => '-',
         };
     }
@@ -479,7 +480,7 @@ class EventInfolist
         int|string $record,
         ?Panel $panel,
     ): ?string {
-        if ($panel === null) {
+        if (! $panel instanceof Panel) {
             return null;
         }
 

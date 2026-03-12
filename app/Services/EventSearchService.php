@@ -12,6 +12,7 @@ use App\Models\Venue;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Facades\Log;
@@ -381,7 +382,7 @@ class EventSearchService
 
         $startsAfter = $this->startsAfterDateTime($filters, $timeScope);
 
-        if ($startsAfter instanceof \Carbon\CarbonInterface) {
+        if ($startsAfter instanceof CarbonInterface) {
             $queryBuilder->where(function (Builder $heldAfterQuery) use ($startsAfter, $table): void {
                 $heldAfterQuery
                     ->where("{$table}.ends_at", '>=', $startsAfter)
@@ -395,12 +396,12 @@ class EventSearchService
 
         $startsBefore = $this->startsBeforeDateTime($filters, $timeScope);
 
-        if ($startsBefore instanceof \Carbon\CarbonInterface) {
+        if ($startsBefore instanceof CarbonInterface) {
             $queryBuilder->where("{$table}.starts_at", '<=', $startsBefore);
         }
 
         if (filled($query)) {
-            $this->applyDirectSearch($queryBuilder, (string) $query);
+            $this->applyDirectSearch($queryBuilder, $query);
         }
 
         if (! empty($filters['state_id'])) {
@@ -723,12 +724,10 @@ class EventSearchService
         $rankedCandidates = $this->buildDatabaseQuery(null, $filters)
             ->select(['events.id', 'events.title'])
             ->get()
-            ->map(function (Event $event) use ($normalizedSearch): array {
-                return [
-                    'id' => $event->id,
-                    'score' => $this->eventSimilarityScore($normalizedSearch, $event),
-                ];
-            })
+            ->map(fn (Event $event): array => [
+                'id' => $event->id,
+                'score' => $this->eventSimilarityScore($normalizedSearch, $event),
+            ])
             ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
             ->sortByDesc('score')
             ->values();
@@ -810,7 +809,7 @@ class EventSearchService
     {
         $startsAfter = $this->parseDateFilter($filters['starts_after'] ?? null, false);
 
-        if ($startsAfter instanceof \Carbon\CarbonInterface) {
+        if ($startsAfter instanceof CarbonInterface) {
             if ($timeScope === 'upcoming' && now()->greaterThan($startsAfter)) {
                 return now();
             }
@@ -848,7 +847,7 @@ class EventSearchService
     {
         $startsBefore = $this->parseDateFilter($filters['starts_before'] ?? null, true);
 
-        if ($startsBefore instanceof \Carbon\CarbonInterface) {
+        if ($startsBefore instanceof CarbonInterface) {
             return $startsBefore;
         }
 
@@ -1080,7 +1079,7 @@ class EventSearchService
 
     protected function databaseDriver(): string
     {
-        /** @var \Illuminate\Database\Connection $connection */
+        /** @var Connection $connection */
         $connection = Event::query()->getConnection();
 
         return $connection->getDriverName();
@@ -1093,7 +1092,7 @@ class EventSearchService
 
     private function startsAtUserTimeSqlExpression(int $offsetMinutes): string
     {
-        $safeOffsetMinutes = (int) $offsetMinutes;
+        $safeOffsetMinutes = $offsetMinutes;
 
         return match ($this->databaseDriver()) {
             'pgsql' => "to_char(events.starts_at + interval '{$safeOffsetMinutes} minutes', 'HH24:MI')",

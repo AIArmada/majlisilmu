@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EventVisibility;
 use App\Filament\Pages\AdminDashboard;
 use App\Filament\Pages\ModerationQueue;
 use App\Filament\Resources\Institutions\InstitutionResource;
@@ -14,12 +15,14 @@ use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
 
 beforeEach(function (): void {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 });
 
 /**
@@ -28,8 +31,7 @@ beforeEach(function (): void {
 function getDashboardStats(string $widgetClass): array
 {
     $widget = app($widgetClass);
-    $method = new \ReflectionMethod($widget, 'getStats');
-    $method->setAccessible(true);
+    $method = new ReflectionMethod($widget, 'getStats');
 
     /** @var array<int, Stat> $stats */
     $stats = $method->invoke($widget);
@@ -78,7 +80,7 @@ it('computes approval and event overview dashboard stats from the intended datas
     Event::factory()->count(2)->create([
         'status' => 'pending',
         'is_active' => false,
-        'visibility' => \App\Enums\EventVisibility::Private,
+        'visibility' => EventVisibility::Private,
     ]);
 
     Speaker::factory()->create([
@@ -100,7 +102,7 @@ it('computes approval and event overview dashboard stats from the intended datas
     Event::factory()->create([
         'status' => 'approved',
         'is_active' => true,
-        'visibility' => \App\Enums\EventVisibility::Public,
+        'visibility' => EventVisibility::Public,
         'starts_at' => Carbon::now()->addDay(),
         'is_featured' => false,
     ]);
@@ -108,7 +110,7 @@ it('computes approval and event overview dashboard stats from the intended datas
     Event::factory()->create([
         'status' => 'approved',
         'is_active' => true,
-        'visibility' => \App\Enums\EventVisibility::Public,
+        'visibility' => EventVisibility::Public,
         'starts_at' => Carbon::now()->subDay(),
         'is_featured' => false,
     ]);
@@ -116,7 +118,7 @@ it('computes approval and event overview dashboard stats from the intended datas
     Event::factory()->create([
         'status' => 'approved',
         'is_active' => true,
-        'visibility' => \App\Enums\EventVisibility::Public,
+        'visibility' => EventVisibility::Public,
         'starts_at' => Carbon::now()->addDays(2),
         'is_featured' => true,
     ]);

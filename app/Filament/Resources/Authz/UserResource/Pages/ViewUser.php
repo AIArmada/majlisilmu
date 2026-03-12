@@ -27,6 +27,7 @@ class ViewUser extends ViewRecord
 
     protected string $view = 'filament.resources.authz.user-resource.pages.view-user';
 
+    #[\Override]
     public function mount(int|string $record): void
     {
         parent::mount($record);
@@ -89,22 +90,22 @@ class ViewUser extends ViewRecord
 
     public function eventUrl(?Event $event): ?string
     {
-        return $event ? EventResource::getUrl('view', ['record' => $event]) : null;
+        return $event instanceof Event ? EventResource::getUrl('view', ['record' => $event]) : null;
     }
 
     public function institutionUrl(?Institution $institution): ?string
     {
-        return $institution ? InstitutionResource::getUrl('view', ['record' => $institution]) : null;
+        return $institution instanceof Institution ? InstitutionResource::getUrl('view', ['record' => $institution]) : null;
     }
 
     public function speakerUrl(?Speaker $speaker): ?string
     {
-        return $speaker ? SpeakerResource::getUrl('view', ['record' => $speaker]) : null;
+        return $speaker instanceof Speaker ? SpeakerResource::getUrl('view', ['record' => $speaker]) : null;
     }
 
     public function referenceUrl(?Reference $reference): ?string
     {
-        return $reference ? ReferenceResource::getUrl('edit', ['record' => $reference]) : null;
+        return $reference instanceof Reference ? ReferenceResource::getUrl('edit', ['record' => $reference]) : null;
     }
 
     /**

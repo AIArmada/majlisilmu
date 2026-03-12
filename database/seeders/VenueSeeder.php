@@ -2,8 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Models\Country;
+use App\Models\State;
 use App\Models\Venue;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class VenueSeeder extends Seeder
 {
@@ -19,7 +23,7 @@ class VenueSeeder extends Seeder
         Venue::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 $venuesToCreate = [];
 
                 $count = 50;
@@ -33,7 +37,7 @@ class VenueSeeder extends Seeder
                         $venueData['facilities'] = json_encode($venueData['facilities']);
                     }
                     $venuesToCreate[] = array_merge($venueData, [
-                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'id' => (string) Str::uuid(),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -48,13 +52,13 @@ class VenueSeeder extends Seeder
                 $venues = Venue::query()->doesntHave('address')->get();
                 $addressesToInsert = [];
 
-                $malaysia = \App\Models\Country::where('iso2', 'MY')->first();
-                $malaysiaStates = \App\Models\State::where('country_id', $malaysia?->id)->get();
+                $malaysia = Country::where('iso2', 'MY')->first();
+                $malaysiaStates = State::where('country_id', $malaysia?->id)->get();
 
                 foreach ($venues as $venue) {
                     $state = $malaysiaStates->random();
                     $addressesToInsert[] = [
-                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'id' => (string) Str::uuid(),
                         'addressable_type' => 'venue',
                         'addressable_id' => $venue->getKey(),
                         'line1' => fake()->streetAddress(),
@@ -73,7 +77,7 @@ class VenueSeeder extends Seeder
 
                 // Bulk insert addresses
                 foreach (array_chunk($addressesToInsert, 100) as $chunk) {
-                    \Illuminate\Support\Facades\DB::table('addresses')->insert($chunk);
+                    DB::table('addresses')->insert($chunk);
                 }
             });
         } finally {

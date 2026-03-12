@@ -6,12 +6,14 @@ use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\User;
 use App\Support\Timezone\UserDateTimeFormatter;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 });
 
 it('does not expose submissions as an editable relation manager on the admin event edit page', function () {

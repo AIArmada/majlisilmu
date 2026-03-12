@@ -35,4 +35,3 @@ trait ResolvesPanelDomain
         return "{$panelId}.{$host}";
     }
 }
-

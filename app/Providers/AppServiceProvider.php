@@ -33,6 +33,7 @@ use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Ai\Events\AgentPrompted;
 use Laravel\Ai\Events\AgentStreamed;
 use Laravel\Ai\Events\AudioGenerated;
@@ -169,7 +170,7 @@ class AppServiceProvider extends ServiceProvider
                         $baseName = MediaFileNamer::resolveBaseNameFromModel($record);
 
                         // Append 8-char ULID suffix for uniqueness
-                        $suffix = strtolower(substr(\Illuminate\Support\Str::ulid(), 0, 8));
+                        $suffix = strtolower(substr(Str::ulid(), 0, 8));
 
                         return "{$baseName}-{$suffix}.{$extension}";
                     }

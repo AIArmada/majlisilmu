@@ -2,13 +2,16 @@
 
 namespace App\Filament\Resources\Venues\Tables;
 
+use App\Filament\Resources\Venues\VenueResource;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class VenuesTable
@@ -40,7 +43,7 @@ class VenuesTable
                         default => 'gray',
                     })
                     ->sortable(),
-                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                ToggleColumn::make('is_active')
                     ->label('Active'),
                 TextColumn::make('address.state.name')
                     ->label('State')
@@ -75,14 +78,14 @@ class VenuesTable
                         'verified' => 'Verified',
                         'rejected' => 'Rejected',
                     ]),
-                \Filament\Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Active'),
             ])
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
             ])
-            ->recordUrl(fn ($record): string => \App\Filament\Resources\Venues\VenueResource::getUrl('view', ['record' => $record]))
+            ->recordUrl(fn ($record): string => VenueResource::getUrl('view', ['record' => $record]))
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\SavedSearch;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SavedSearch>
+ * @extends Factory<SavedSearch>
  */
 class SavedSearchFactory extends Factory
 {

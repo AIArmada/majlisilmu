@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\DawahShareLinkFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DawahShareLink extends Model
 {
-    /** @use HasFactory<\Database\Factories\DawahShareLinkFactory> */
+    /** @use HasFactory<DawahShareLinkFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;

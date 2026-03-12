@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
+use App\Enums\NotificationCadence;
 use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
-use App\Enums\NotificationCadence;
 use App\Models\PendingNotification;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;

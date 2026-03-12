@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Event;
+use App\States\EventStatus\Approved;
 use Illuminate\Console\Command;
 
 class IndexEventsToTypesense extends Command
@@ -51,7 +52,7 @@ class IndexEventsToTypesense extends Command
 
         // Count searchable events
         $total = Event::query()
-            ->whereState('status', \App\States\EventStatus\Approved::class)
+            ->whereState('status', Approved::class)
             ->where('visibility', 'public')
             ->count();
 
@@ -71,7 +72,7 @@ class IndexEventsToTypesense extends Command
         $indexed = 0;
 
         Event::query()
-            ->whereState('status', \App\States\EventStatus\Approved::class)
+            ->whereState('status', Approved::class)
             ->where('visibility', 'public')
             ->with(['institution', 'venue.address', 'speakers', 'address', 'tags', 'languages'])
             ->chunkById($chunk, function ($events) use (&$indexed, $bar) {

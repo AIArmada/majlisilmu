@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Event;
+
 return [
 
     /*
@@ -181,7 +183,7 @@ return [
         ],
         // 'max_total_results' => env('TYPESENSE_MAX_TOTAL_RESULTS', 1000),
         'model-settings' => [
-            \App\Models\Event::class => [
+            Event::class => [
                 'collection-schema' => [
                     'fields' => [
                         ['name' => 'id', 'type' => 'string'],

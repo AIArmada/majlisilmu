@@ -15,6 +15,7 @@ class CreateUser extends CreateRecord
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    #[\Override]
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         unset($data['roles'], $data['permissions']);

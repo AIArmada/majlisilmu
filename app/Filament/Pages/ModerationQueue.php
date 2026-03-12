@@ -4,6 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
+use App\Services\ModerationService;
+use App\States\EventStatus\Approved;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
@@ -260,10 +262,10 @@ class ModerationQueue extends Page implements HasTable
                             ->label('Note (optional)')
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, array $data, ModerationService $service): void {
                         $service->approve($record, auth()->user(), $data['note'] ?? null);
                     })
-                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
+                    ->visible(fn (Event $record) => $record->status instanceof Pending),
 
                 Action::make('reject')
                     ->label('Reject')
@@ -291,10 +293,10 @@ class ModerationQueue extends Page implements HasTable
                             ->required()
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, array $data, ModerationService $service): void {
                         $service->reject($record, auth()->user(), $data['reason_code'], $data['note']);
                     })
-                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
+                    ->visible(fn (Event $record) => $record->status instanceof Pending),
 
                 Action::make('cancel')
                     ->label('Cancel')
@@ -308,11 +310,11 @@ class ModerationQueue extends Page implements HasTable
                             ->label('Cancellation note (optional)')
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, array $data, ModerationService $service): void {
                         $service->cancel($record, auth()->user(), $data['note'] ?? null);
                     })
-                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending
-                        || $record->status instanceof \App\States\EventStatus\Approved),
+                    ->visible(fn (Event $record) => $record->status instanceof Pending
+                        || $record->status instanceof Approved),
 
                 Action::make('needs_changes')
                     ->label('Request Changes')
@@ -339,10 +341,10 @@ class ModerationQueue extends Page implements HasTable
                             ->required()
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, array $data, ModerationService $service): void {
                         $service->requestChanges($record, auth()->user(), $data['reason_code'], $data['note']);
                     })
-                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Pending),
+                    ->visible(fn (Event $record) => $record->status instanceof Pending),
 
                 Action::make('reconsider')
                     ->label('Reconsider')
@@ -356,10 +358,10 @@ class ModerationQueue extends Page implements HasTable
                             ->label('Reason for reconsideration')
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, array $data, ModerationService $service): void {
                         $service->reconsider($record, auth()->user(), $data['note'] ?? null);
                     })
-                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Rejected),
+                    ->visible(fn (Event $record) => $record->status instanceof Rejected),
 
                 Action::make('revert_to_draft')
                     ->label('Revert to Draft')
@@ -373,11 +375,11 @@ class ModerationQueue extends Page implements HasTable
                             ->label('Reason (optional)')
                             ->rows(3),
                     ])
-                    ->action(function (Event $record, array $data, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, array $data, ModerationService $service): void {
                         $service->revertToDraft($record, auth()->user(), $data['note'] ?? null);
                     })
-                    ->visible(fn (Event $record) => $record->status instanceof \App\States\EventStatus\Rejected
-                        || $record->status instanceof \App\States\EventStatus\NeedsChanges),
+                    ->visible(fn (Event $record) => $record->status instanceof Rejected
+                        || $record->status instanceof NeedsChanges),
 
                 Action::make('return_to_pending')
                     ->label('Return to Pending')
@@ -386,7 +388,7 @@ class ModerationQueue extends Page implements HasTable
                     ->requiresConfirmation()
                     ->modalHeading('Return to Pending')
                     ->modalDescription('Move this event back to pending for moderation review.')
-                    ->action(function (Event $record, \App\Services\ModerationService $service): void {
+                    ->action(function (Event $record, ModerationService $service): void {
                         $service->submitForModeration($record);
                     })
                     ->visible(fn (Event $record): bool => $record->status instanceof NeedsChanges),

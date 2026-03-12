@@ -3,10 +3,11 @@
 namespace Database\Factories;
 
 use App\Models\Event;
+use App\Models\EventSettings;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\EventSettings>
+ * @extends Factory<EventSettings>
  */
 class EventSettingsFactory extends Factory
 {

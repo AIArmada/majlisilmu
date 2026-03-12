@@ -14,6 +14,7 @@ use App\Models\Venue;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 
 class SharedFormSchema
@@ -21,7 +22,7 @@ class SharedFormSchema
     /**
      * Address fields (line1, line2, postcode, state/district/subdistrict cascades, maps URLs).
      *
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     public static function addressFields(bool $requireGoogleMaps = false): array
     {

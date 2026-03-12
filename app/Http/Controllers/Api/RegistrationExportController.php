@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use OwenIt\Auditing\Models\Audit;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -46,7 +47,7 @@ class RegistrationExportController extends Controller
 
         // Log the export action using Laravel Auditing (per B9d)
         Audit::create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'id' => (string) Str::uuid(),
             'user_type' => $request->user()::class,
             'user_id' => $request->user()->id,
             'event' => 'export_registrations',

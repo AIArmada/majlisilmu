@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Speakers\RelationManagers;
 
+use App\Filament\Resources\Institutions\InstitutionResource;
 use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -10,9 +11,12 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\DetachAction;
 use Filament\Actions\DetachBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -40,12 +44,12 @@ class InstitutionsRelationManager extends RelationManager
                     ->searchable()
                     ->sortable()
                     ->url(fn ($record): ?string => $record?->id
-                        ? \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->id])
+                        ? InstitutionResource::getUrl('edit', ['record' => $record->id])
                         : null),
                 TextColumn::make('position')
                     ->label('Position')
                     ->searchable(),
-                \Filament\Tables\Columns\IconColumn::make('is_primary')
+                IconColumn::make('is_primary')
                     ->label('Primary')
                     ->boolean(),
                 TextColumn::make('joined_at')
@@ -63,9 +67,9 @@ class InstitutionsRelationManager extends RelationManager
                         $action->getRecordSelect(),
                         TextInput::make('position')
                             ->placeholder('e.g. Imam, Guest Speaker'),
-                        \Filament\Forms\Components\Toggle::make('is_primary')
+                        Toggle::make('is_primary')
                             ->label('Primary Affiliation'),
-                        \Filament\Forms\Components\DatePicker::make('joined_at')
+                        DatePicker::make('joined_at')
                             ->label('Joined At'),
                     ]),
             ])
@@ -73,8 +77,8 @@ class InstitutionsRelationManager extends RelationManager
                 EditAction::make()
                     ->form([
                         TextInput::make('position'),
-                        \Filament\Forms\Components\Toggle::make('is_primary'),
-                        \Filament\Forms\Components\DatePicker::make('joined_at'),
+                        Toggle::make('is_primary'),
+                        DatePicker::make('joined_at'),
                     ]),
                 DetachAction::make(),
                 // DeleteAction::make(), // Should not delete institution, only detach

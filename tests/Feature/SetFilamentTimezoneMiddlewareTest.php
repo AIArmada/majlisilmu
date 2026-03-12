@@ -59,9 +59,8 @@ it('prioritizes X-Timezone header over cookie and session', function () {
     expect($result['resolved_timezone'])->toBe('Asia/Bangkok');
 });
 
-
 it('uses user_timezone request input when header is missing', function () {
-    $result = runTimezoneMiddleware(requestUserTimezoneInput: 'Asia/Tokyo', session: 'Asia/Manila');
+    $result = runTimezoneMiddleware(session: 'Asia/Manila', requestUserTimezoneInput: 'Asia/Tokyo');
 
     expect($result['resolved_timezone'])->toBe('Asia/Tokyo');
 });
@@ -69,9 +68,9 @@ it('uses user_timezone request input when header is missing', function () {
 it('prioritizes X-Timezone header over user_timezone request input', function () {
     $result = runTimezoneMiddleware(
         header: 'Asia/Bangkok',
-        requestUserTimezoneInput: 'Asia/Tokyo',
         cookie: 'Asia/Singapore',
         session: 'Asia/Manila',
+        requestUserTimezoneInput: 'Asia/Tokyo',
     );
 
     expect($result['resolved_timezone'])->toBe('Asia/Bangkok');
@@ -142,7 +141,6 @@ it('does not persist fallback timezone to authenticated user when request timezo
     expect($result['resolved_timezone'])->toBe('UTC');
     expect($user->fresh()?->timezone)->toBeNull();
 });
-
 
 it('persists user_timezone request input to authenticated user profile when null', function () {
     $user = User::factory()->create([

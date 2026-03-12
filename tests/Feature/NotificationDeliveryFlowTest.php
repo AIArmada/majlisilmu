@@ -337,12 +337,10 @@ it('uses configured fallback channels on queued notifications', function () {
 
     Queue::assertPushed(SendQueuedNotifications::class, 1);
 
-    Queue::assertPushed(SendQueuedNotifications::class, function (SendQueuedNotifications $job) use ($pending): bool {
-        return $job->notification instanceof NotificationCenterMessage
-            && $job->notification->pendingNotificationId === $pending->id
-            && $job->notification->targetChannel === NotificationChannel::Push
-            && $job->notification->fallbackChannels === [NotificationChannel::Email->value];
-    });
+    Queue::assertPushed(SendQueuedNotifications::class, fn (SendQueuedNotifications $job): bool => $job->notification instanceof NotificationCenterMessage
+        && $job->notification->pendingNotificationId === $pending->id
+        && $job->notification->targetChannel === NotificationChannel::Push
+        && $job->notification->fallbackChannels === [NotificationChannel::Email->value]);
 });
 
 it('defers overnight quiet hours only until the same morning boundary', function () {
@@ -463,7 +461,7 @@ it('builds daily digests from pending notifications in the scheduled window', fu
             ],
         ]);
 
-        (new DispatchNotificationDigests('daily'))
+        new DispatchNotificationDigests('daily')
             ->handle(app(NotificationEngine::class), app(NotificationSettingsManager::class));
 
         $digestPending = PendingNotification::query()
@@ -548,7 +546,7 @@ it('localizes daily digest notifications per recipient locale', function () {
             'meta' => ['inbox_visible' => false],
         ]);
 
-        (new DispatchNotificationDigests('daily'))
+        new DispatchNotificationDigests('daily')
             ->handle(app(NotificationEngine::class), app(NotificationSettingsManager::class));
 
         $englishDigest = PendingNotification::query()
@@ -717,8 +715,8 @@ it('records push delivery results through the notification sent listener', funct
 });
 
 it('logs whatsapp configuration failures through the notification failed listener', function () {
-    config()->set('notification-center.whatsapp.phone_number_id', null);
-    config()->set('notification-center.whatsapp.access_token', null);
+    config()->set('notification-center.whatsapp.phone_number_id');
+    config()->set('notification-center.whatsapp.access_token');
 
     $user = User::factory()->create([
         'phone' => '+60128889999',

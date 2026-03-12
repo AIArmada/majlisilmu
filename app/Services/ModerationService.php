@@ -4,6 +4,12 @@ namespace App\Services;
 
 use App\Models\Event;
 use App\Models\User;
+use App\States\EventStatus\Approved;
+use App\States\EventStatus\Cancelled;
+use App\States\EventStatus\Draft;
+use App\States\EventStatus\NeedsChanges;
+use App\States\EventStatus\Pending;
+use App\States\EventStatus\Rejected;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -16,7 +22,7 @@ class ModerationService
      */
     public function submitForModeration(Event $event): void
     {
-        $event->status->transitionTo(\App\States\EventStatus\Pending::class);
+        $event->status->transitionTo(Pending::class);
     }
 
     /**
@@ -27,7 +33,7 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Approved::class, $moderator, $note);
+        $event->status->transitionTo(Approved::class, $moderator, $note);
     }
 
     /**
@@ -39,7 +45,7 @@ class ModerationService
         string $reasonCode,
         ?string $note = null
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\NeedsChanges::class, $moderator, $reasonCode, $note);
+        $event->status->transitionTo(NeedsChanges::class, $moderator, $reasonCode, $note);
     }
 
     /**
@@ -51,7 +57,7 @@ class ModerationService
         string $reasonCode,
         ?string $note = null
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Rejected::class, $moderator, $reasonCode, $note);
+        $event->status->transitionTo(Rejected::class, $moderator, $reasonCode, $note);
     }
 
     /**
@@ -62,7 +68,7 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Cancelled::class, $moderator, $note);
+        $event->status->transitionTo(Cancelled::class, $moderator, $note);
     }
 
     /**
@@ -73,7 +79,7 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Pending::class, $moderator, $note);
+        $event->status->transitionTo(Pending::class, $moderator, $note);
     }
 
     /**
@@ -84,7 +90,7 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Draft::class, $moderator, $note);
+        $event->status->transitionTo(Draft::class, $moderator, $note);
     }
 
     /**
@@ -96,7 +102,7 @@ class ModerationService
         ?string $note = null,
         ?string $reasonCode = null,
     ): void {
-        $event->status->transitionTo(\App\States\EventStatus\Pending::class, $moderator, $note, $reasonCode);
+        $event->status->transitionTo(Pending::class, $moderator, $note, $reasonCode);
     }
 
     /**

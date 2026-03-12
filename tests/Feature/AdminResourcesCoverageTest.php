@@ -19,10 +19,12 @@ use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Filament\Resources\Tags\TagResource;
 use App\Filament\Resources\Venues\VenueResource;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 
 it('allows super admin to access all core admin resource index pages', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');

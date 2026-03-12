@@ -5,6 +5,7 @@ use App\Models\SavedSearch;
 use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -129,7 +130,7 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Geography Filter Test',
                     'filters' => [
-                        'state_id' => (string) \Illuminate\Support\Str::uuid(),
+                        'state_id' => (string) Str::uuid(),
                     ],
                     'notify' => 'daily',
                 ]);
@@ -142,7 +143,7 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Subdistrict Filter Test',
                     'filters' => [
-                        'subdistrict_id' => (string) \Illuminate\Support\Str::uuid(),
+                        'subdistrict_id' => (string) Str::uuid(),
                     ],
                     'notify' => 'daily',
                 ]);

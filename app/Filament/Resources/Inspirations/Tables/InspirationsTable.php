@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Inspirations\Tables;
 
 use App\Enums\InspirationCategory;
+use App\Models\Inspiration;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -13,6 +14,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 
 class InspirationsTable
 {
@@ -44,7 +46,7 @@ class InspirationsTable
                     ->limit(50),
 
                 TextColumn::make('content')
-                    ->formatStateUsing(fn (\App\Models\Inspiration $record): string => $record->contentPreviewText())
+                    ->formatStateUsing(fn (Inspiration $record): string => $record->contentPreviewText())
                     ->limit(80)
                     ->toggleable(),
 
@@ -83,7 +85,7 @@ class InspirationsTable
                         ->label('Toggle Active')
                         ->icon('heroicon-o-arrow-path')
                         ->color('warning')
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             $records->each(function ($record) {
                                 $record->update(['is_active' => ! $record->is_active]);
                             });

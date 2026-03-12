@@ -2,6 +2,7 @@
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
 
 it('can create user with email only', function () {
     User::factory()->emailOnly()->create();
@@ -29,7 +30,7 @@ it('requires either email or phone when creating user', function () {
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
-})->throws(\Illuminate\Validation\ValidationException::class);
+})->throws(ValidationException::class);
 
 it('validates unique email', function () {
     User::factory()->create(['email' => 'test@example.com']);
@@ -42,7 +43,7 @@ it('validates unique email', function () {
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
-})->throws(\Illuminate\Validation\ValidationException::class);
+})->throws(ValidationException::class);
 
 it('validates unique phone', function () {
     User::factory()->create(['phone' => '+60123456789']);
@@ -55,7 +56,7 @@ it('validates unique phone', function () {
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
-})->throws(\Illuminate\Validation\ValidationException::class);
+})->throws(ValidationException::class);
 
 it('allows registering with email and phone together', function () {
     $action = new CreateNewUser;

@@ -42,7 +42,7 @@ test('registration export streams csv and writes audit metadata', function () {
 
     Gate::shouldReceive('denies')
         ->once()
-        ->with('exportRegistrations', \Mockery::type(Event::class))
+        ->with('exportRegistrations', Mockery::type(Event::class))
         ->andReturnFalse();
 
     $response = $this->get(route('api.registrations.export', $event));

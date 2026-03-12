@@ -4,6 +4,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Institution;
@@ -38,7 +39,7 @@ function submitEventEndTimeFormData(array $fixtures, array $overrides = []): arr
         'title' => 'Submit Event End Time',
         'domain_tags' => [$fixtures['domain_tag']->id],
         'discipline_tags' => [$fixtures['discipline_tag']->id],
-        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_type' => [EventType::KuliahCeramah->value],
         'event_date' => now()->addDays(5)->toDateString(),
         'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
         'description' => 'Test description',
@@ -227,7 +228,7 @@ it('rejects non-physical format for community event types', function () {
         Livewire::test('pages.submit-event.create'),
         submitEventEndTimeFormData($fixtures, [
             'title' => 'Community Online Invalid',
-            'event_type' => [\App\Enums\EventType::Iftar->value],
+            'event_type' => [EventType::Iftar->value],
             'event_format' => EventFormat::Online->value,
         ]),
     )

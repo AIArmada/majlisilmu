@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Services\Notifications\EventNotificationService;
+use App\States\EventStatus\NeedsChanges;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -26,7 +28,7 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
     #[\Override]
     public function canTransition(): bool
     {
-        return $this->moderator instanceof \App\Models\User && filled($this->reasonCode);
+        return $this->moderator instanceof User && filled($this->reasonCode);
     }
 
     public function handle(): Event
@@ -49,11 +51,11 @@ class RequestChanges extends Transition implements HasColor, HasIcon, HasLabel
             ]);
 
             // Update status
-            $this->event->status = \App\States\EventStatus\NeedsChanges::class;
+            $this->event->status = NeedsChanges::class;
             $this->event->save();
 
             // Notify submitter and institution admins
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionNeedsChanges($this->event, $review->note);
+            app(EventNotificationService::class)->notifySubmissionNeedsChanges($this->event, $review->note);
 
             Log::info('Event needs changes', [
                 'event_id' => $this->event->id,

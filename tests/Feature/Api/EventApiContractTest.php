@@ -11,6 +11,7 @@ use App\Models\Subdistrict;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -96,7 +97,7 @@ it('filters events by district_id and subdistrict_id', function () {
     $state = State::where('country_code', 'MY')->first();
 
     if (! $state) {
-        $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+        $countryId = DB::table('countries')->insertGetId([
             'iso2' => 'MY',
             'name' => 'Malaysia',
             'status' => 1,
@@ -106,7 +107,7 @@ it('filters events by district_id and subdistrict_id', function () {
             'subregion' => 'South-Eastern Asia',
         ]);
 
-        $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+        $stateId = DB::table('states')->insertGetId([
             'country_id' => $countryId,
             'name' => 'Selangor',
             'country_code' => 'MY',

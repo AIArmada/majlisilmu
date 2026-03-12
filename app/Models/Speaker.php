@@ -7,6 +7,9 @@ use App\Enums\EventParticipantRole;
 use App\Enums\Honorific;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Models\Concerns\HasAddress;
+use Database\Factories\SpeakerFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,8 +33,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  */
 class Speaker extends Model implements AuditableContract, HasMedia
 {
-    /** @use HasFactory<\Database\Factories\SpeakerFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    /** @use HasFactory<SpeakerFactory> */
+    use \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -321,7 +324,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
      *
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);

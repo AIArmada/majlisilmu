@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasSocialMedia;
+use Database\Factories\ReferenceFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,8 +18,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Reference extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\ReferenceFactory> */
-    use \App\Models\Concerns\HasFollowers, HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    /** @use HasFactory<ReferenceFactory> */
+    use HasFactory, HasFollowers, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     #[\Override]
     protected static function booted(): void
@@ -50,7 +53,7 @@ class Reference extends Model implements HasMedia
      *
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);

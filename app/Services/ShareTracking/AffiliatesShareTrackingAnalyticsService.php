@@ -18,10 +18,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
-final class AffiliatesShareTrackingAnalyticsService
+final readonly class AffiliatesShareTrackingAnalyticsService
 {
     public function __construct(
-        private readonly AffiliatesShareTrackingService $shareTrackingService,
+        private AffiliatesShareTrackingService $shareTrackingService,
     ) {}
 
     /**
@@ -101,7 +101,7 @@ final class AffiliatesShareTrackingAnalyticsService
         $links = AffiliateLink::query()
             ->where('affiliate_id', $affiliate->id)
             ->get()
-            ->map(fn (AffiliateLink $link): ShareTrackingLinkData => $this->buildLinkData($affiliate, $link))
+            ->map(fn (AffiliateLink $link): ShareTrackingLinkData => $this->buildLinkData($link))
             ->when(
                 filled($subjectType) && $subjectType !== 'all',
                 fn (Collection $collection): Collection => $collection->filter(
@@ -158,7 +158,7 @@ final class AffiliatesShareTrackingAnalyticsService
             ->whereKey($linkId)
             ->first();
 
-        return $link instanceof AffiliateLink ? $this->buildLinkData($affiliate, $link) : null;
+        return $link instanceof AffiliateLink ? $this->buildLinkData($link) : null;
     }
 
     /**
@@ -350,7 +350,7 @@ final class AffiliatesShareTrackingAnalyticsService
         ];
     }
 
-    private function buildLinkData(Affiliate $affiliate, AffiliateLink $link): ShareTrackingLinkData
+    private function buildLinkData(AffiliateLink $link): ShareTrackingLinkData
     {
         $visits = $this->visitTouchpointsQueryForLink($link->id)->get();
         $conversions = $this->conversionsQueryForLink($link->id)->get();
@@ -457,17 +457,15 @@ final class AffiliatesShareTrackingAnalyticsService
                 ];
             })
             ->filter(fn (array $provider): bool => collect([$provider['outbound_shares'], $provider['visits'], $provider['outcomes']])->some(fn (int $count): bool => $count > 0))
-            ->sort(function (array $left, array $right): int {
-                return [
-                    $right['outcomes'],
-                    $right['visits'],
-                    $right['outbound_shares'],
-                ] <=> [
-                    $left['outcomes'],
-                    $left['visits'],
-                    $left['outbound_shares'],
-                ];
-            })
+            ->sort(fn (array $left, array $right): int => [
+                $right['outcomes'],
+                $right['visits'],
+                $right['outbound_shares'],
+            ] <=> [
+                $left['outcomes'],
+                $left['visits'],
+                $left['outbound_shares'],
+            ])
             ->values();
     }
 

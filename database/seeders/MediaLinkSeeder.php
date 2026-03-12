@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\Event;
 use App\Models\MediaLink;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class MediaLinkSeeder extends Seeder
 {
@@ -20,7 +22,7 @@ class MediaLinkSeeder extends Seeder
         MediaLink::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 $eventIds = Event::query()->pluck('id')->toArray();
 
                 $mediaToInsert = [];
@@ -33,7 +35,7 @@ class MediaLinkSeeder extends Seeder
                             'mediable_id' => $eventId,
                             'is_primary' => true,
                         ])->toArray(),
-                        ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                        ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                     );
 
                     // 50% chance for secondary media
@@ -44,7 +46,7 @@ class MediaLinkSeeder extends Seeder
                                 'mediable_id' => $eventId,
                                 'is_primary' => false,
                             ])->toArray(),
-                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                            ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                         );
                     }
                 }

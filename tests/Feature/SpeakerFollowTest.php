@@ -2,6 +2,7 @@
 
 use App\Models\Speaker;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 it('allows an authenticated user to follow a speaker', function () {
@@ -94,7 +95,7 @@ it('cleans up followings when user is deleted', function () {
     $user->delete();
 
     expect(
-        \Illuminate\Support\Facades\DB::table('followings')
+        DB::table('followings')
             ->where('user_id', $user->id)
             ->exists()
     )->toBeFalse();

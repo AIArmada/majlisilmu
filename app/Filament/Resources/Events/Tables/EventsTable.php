@@ -11,6 +11,7 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
+use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Models\Event;
 use App\Models\User;
 use BackedEnum;
@@ -23,8 +24,10 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -59,7 +62,7 @@ class EventsTable
                             return null;
                         }
 
-                        return \App\Filament\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $record->institution->id]);
+                        return InstitutionResource::getUrl('edit', ['record' => $record->institution->id]);
                     }),
                 TextColumn::make('event_type')
                     ->label('Type')
@@ -112,10 +115,10 @@ class EventsTable
                     ->formatStateUsing(fn (mixed $state): string => self::formatEnumCollection($state, EventAgeGroup::class))
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true),
-                \Filament\Tables\Columns\ToggleColumn::make('is_featured')
+                ToggleColumn::make('is_featured')
                     ->label('Featured')
                     ->visible(fn (): bool => self::canManageFeaturedFlag()),
-                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                ToggleColumn::make('is_active')
                     ->label('Active'),
                 IconColumn::make('is_muslim_only')
                     ->boolean()
@@ -168,13 +171,13 @@ class EventsTable
                     ]),
                 SelectFilter::make('institution')
                     ->relationship('institution', 'name'),
-                \Filament\Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Active'),
                 SelectFilter::make('event_type')
                     ->label('Event Type')
-                    ->options(\App\Enums\EventType::class)
+                    ->options(EventType::class)
                     ->query(
-                        fn (\Illuminate\Database\Eloquent\Builder $query, array $data) => $query
+                        fn (Builder $query, array $data) => $query
                             ->when(
                                 $data['value'],
                                 fn ($q, $value) => $q->whereJsonContains('event_type', $value)
@@ -240,17 +243,15 @@ class EventsTable
                         DatePicker::make('starts_before')
                             ->label('Starts Before'),
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when(
-                                filled($data['starts_after'] ?? null),
-                                fn (Builder $builder): Builder => $builder->whereDate('starts_at', '>=', (string) $data['starts_after'])
-                            )
-                            ->when(
-                                filled($data['starts_before'] ?? null),
-                                fn (Builder $builder): Builder => $builder->whereDate('starts_at', '<=', (string) $data['starts_before'])
-                            );
-                    })
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when(
+                            filled($data['starts_after'] ?? null),
+                            fn (Builder $builder): Builder => $builder->whereDate('starts_at', '>=', (string) $data['starts_after'])
+                        )
+                        ->when(
+                            filled($data['starts_before'] ?? null),
+                            fn (Builder $builder): Builder => $builder->whereDate('starts_at', '<=', (string) $data['starts_before'])
+                        ))
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
 

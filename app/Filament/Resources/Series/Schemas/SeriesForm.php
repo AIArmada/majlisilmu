@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Series\Schemas;
 
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -33,7 +35,7 @@ class SeriesForm
                                 'private' => 'Private',
                             ])
                             ->required(),
-                        \Filament\Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
                         Select::make('languages')
@@ -46,7 +48,7 @@ class SeriesForm
                     ->columns(2),
                 Section::make('Media')
                     ->components([
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                        SpatieMediaLibraryFileUpload::make('cover')
                             ->collection('cover')
                             ->image()
                             ->imageEditor()
@@ -57,7 +59,7 @@ class SeriesForm
                             ->conversion('thumb')
                             ->responsiveImages()
                             ->columnSpanFull(),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                        SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
                             ->reorderable()
