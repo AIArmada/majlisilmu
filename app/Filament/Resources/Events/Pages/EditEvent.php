@@ -7,9 +7,9 @@ use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
-use App\Models\EventParticipant;
+use App\Models\EventKeyPerson;
 use App\Models\Tag;
-use App\Services\EventParticipantSyncService;
+use App\Services\EventKeyPersonSyncService;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\NeedsChanges;
@@ -43,21 +43,21 @@ class EditEvent extends EditRecord
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
-        $event->loadMissing(['participants']);
-        $data['speakers'] = $event->participants
+        $event->loadMissing(['keyPeople']);
+        $data['speakers'] = $event->keyPeople
             ->where('role', EventParticipantRole::Speaker)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
-        $data['other_participants'] = $event->participants
+        $data['other_key_people'] = $event->keyPeople
             ->where('role', '!=', EventParticipantRole::Speaker)
-            ->map(fn (EventParticipant $participant): array => [
-                'role' => $participant->role instanceof EventParticipantRole ? $participant->role->value : (string) $participant->role,
-                'speaker_id' => $participant->speaker_id,
-                'name' => $participant->name,
-                'is_public' => (bool) $participant->is_public,
-                'notes' => $participant->notes,
+            ->map(fn (EventKeyPerson $keyPerson): array => [
+                'role' => $keyPerson->role instanceof EventParticipantRole ? $keyPerson->role->value : (string) $keyPerson->role,
+                'speaker_id' => $keyPerson->speaker_id,
+                'name' => $keyPerson->name,
+                'is_public' => (bool) $keyPerson->is_public,
+                'notes' => $keyPerson->notes,
             ])
             ->values()
             ->all();
@@ -78,7 +78,7 @@ class EditEvent extends EditRecord
             $data['issue_tags'],
             $data['registration_mode'],
             $data['speakers'],
-            $data['other_participants'],
+            $data['other_key_people'],
         );
 
         return $data;
@@ -140,10 +140,10 @@ class EditEvent extends EditRecord
 
         $event->syncTags($tags);
 
-        app(EventParticipantSyncService::class)->sync(
+        app(EventKeyPersonSyncService::class)->sync(
             $event,
             is_array($state['speakers'] ?? null) ? $state['speakers'] : [],
-            is_array($state['other_participants'] ?? null) ? $state['other_participants'] : [],
+            is_array($state['other_key_people'] ?? null) ? $state['other_key_people'] : [],
         );
     }
 

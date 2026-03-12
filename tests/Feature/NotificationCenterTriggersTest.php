@@ -85,14 +85,14 @@ it('does not create followed-speaker notifications when a followed profile is on
         'starts_at' => now()->addDays(2),
     ]);
 
-    $event->participants()->create([
+    $event->keyPeople()->create([
         'speaker_id' => $speaker->id,
         'role' => EventParticipantRole::Moderator,
         'order_column' => 1,
         'is_public' => true,
     ]);
 
-    app(EventNotificationService::class)->notifyPublication($event->fresh(['institution', 'participants.speaker', 'series', 'references']));
+    app(EventNotificationService::class)->notifyPublication($event->fresh(['institution', 'keyPeople.speaker', 'series', 'references']));
 
     $this->assertDatabaseMissing('notification_messages', [
         'user_id' => $speakerFollower->id,

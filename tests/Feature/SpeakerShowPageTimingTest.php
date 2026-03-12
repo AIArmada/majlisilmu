@@ -262,14 +262,14 @@ it('shows linked non-speaker roles in a separate section on the speaker page', f
         'title' => 'Forum Dengan Moderator',
     ]);
 
-    $speakerEvent->participants()->create([
+    $speakerEvent->keyPeople()->create([
         'speaker_id' => $speaker->id,
         'role' => EventParticipantRole::Speaker,
         'order_column' => 1,
         'is_public' => true,
     ]);
 
-    $moderatedEvent->participants()->create([
+    $moderatedEvent->keyPeople()->create([
         'speaker_id' => $speaker->id,
         'role' => EventParticipantRole::Moderator,
         'order_column' => 1,

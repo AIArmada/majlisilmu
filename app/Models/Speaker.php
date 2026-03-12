@@ -184,24 +184,24 @@ class Speaker extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * Generic participant link across all event roles.
+     * Generic key-person link across all event roles.
      *
-     * Prefer speakerEvents() for talk history and nonSpeakerEventParticipants()
-     * when role-specific participation matters.
+     * Prefer speakerEvents() for talk history and nonSpeakerEventKeyPeople()
+     * when role-specific assignment matters.
      *
-     * @return BelongsToMany<Event, $this, EventParticipantPivot, 'pivot'>
+     * @return BelongsToMany<Event, $this, EventKeyPersonPivot, 'pivot'>
      */
     public function events(): BelongsToMany
     {
-        return $this->belongsToMany(Event::class, 'event_participants', 'speaker_id', 'event_id')
-            ->using(EventParticipantPivot::class)
+        return $this->belongsToMany(Event::class, 'event_key_people', 'speaker_id', 'event_id')
+            ->using(EventKeyPersonPivot::class)
             ->withPivot(['id', 'role', 'name', 'order_column', 'is_public', 'notes'])
             ->withTimestamps()
             ->orderByPivot('order_column');
     }
 
     /**
-     * @return BelongsToMany<Event, $this, EventParticipantPivot, 'pivot'>
+     * @return BelongsToMany<Event, $this, EventKeyPersonPivot, 'pivot'>
      */
     public function speakerEvents(): BelongsToMany
     {
@@ -211,19 +211,19 @@ class Speaker extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * @return HasMany<EventParticipant, $this>
+     * @return HasMany<EventKeyPerson, $this>
      */
-    public function eventParticipants(): HasMany
+    public function eventKeyPeople(): HasMany
     {
-        return $this->hasMany(EventParticipant::class);
+        return $this->hasMany(EventKeyPerson::class);
     }
 
     /**
-     * @return HasMany<EventParticipant, $this>
+     * @return HasMany<EventKeyPerson, $this>
      */
-    public function nonSpeakerEventParticipants(): HasMany
+    public function nonSpeakerEventKeyPeople(): HasMany
     {
-        return $this->eventParticipants()
+        return $this->eventKeyPeople()
             ->where('role', '!=', EventParticipantRole::Speaker->value)
             ->where('is_public', true)
             ->orderBy('order_column');

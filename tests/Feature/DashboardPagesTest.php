@@ -170,6 +170,26 @@ it('renders the attendee-first planner dashboard without saved search or digest 
     $response->assertDontSee('bg-emerald-50/80', false);
 });
 
+it('renders a valid event management link on the user dashboard for manageable events', function () {
+    $user = User::factory()->create();
+
+    $event = Event::factory()->for($user)->create([
+        'submitter_id' => $user->id,
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => true,
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    $expectedManagementUrl = \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $event], panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee($expectedManagementUrl, false)
+        ->assertDontSee('dashboard.events.schedule');
+});
+
 it('shows a featured next event without repeating it inside an otherwise empty agenda list', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create();

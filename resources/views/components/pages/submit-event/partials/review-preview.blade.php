@@ -224,7 +224,7 @@
         ->filter()
         ->all();
 
-    $otherParticipantLabels = collect((array) $get('other_participants'))
+    $otherKeyPeopleLabels = collect((array) $get('other_key_people'))
         ->map(function (mixed $participant) use ($speakerMap): ?string {
             if (! is_array($participant)) {
                 return null;
@@ -402,7 +402,7 @@
             </div>
             <div class="md:col-span-2">
                 <dt class="text-slate-500">{{ __('Peranan Lain') }}</dt>
-                <dd class="font-medium text-slate-900">{{ $toJoined($otherParticipantLabels) }}</dd>
+                <dd class="font-medium text-slate-900">{{ $toJoined($otherKeyPeopleLabels) }}</dd>
             </div>
         </dl>
     </div>

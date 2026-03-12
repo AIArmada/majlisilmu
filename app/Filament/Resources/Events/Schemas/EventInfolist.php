@@ -238,7 +238,7 @@ class EventInfolist
                                             ])
                                             ->contained(false)
                                             ->placeholder('-'),
-                                        RepeatableEntry::make('nonSpeakerParticipants')
+                                        RepeatableEntry::make('nonSpeakerKeyPeople')
                                             ->label('Peranan Lain')
                                             ->schema([
                                                 TextEntry::make('role')

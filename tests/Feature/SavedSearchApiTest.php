@@ -42,7 +42,7 @@ describe('Saved Search API Endpoints', function () {
                     'query' => 'maghrib',
                     'filters' => [
                         'language' => 'malay',
-                        'participant_roles' => [EventParticipantRole::Imam->value],
+                        'key_person_roles' => [EventParticipantRole::Imam->value],
                         'imam_ids' => [$imamSpeaker->id],
                     ],
                     'notify' => 'daily',
@@ -50,7 +50,7 @@ describe('Saved Search API Endpoints', function () {
 
                 $response->assertCreated()
                     ->assertJsonPath('data.name', 'Kuliah Maghrib')
-                    ->assertJsonPath('data.filters.participant_roles.0', EventParticipantRole::Imam->value)
+                    ->assertJsonPath('data.filters.key_person_roles.0', EventParticipantRole::Imam->value)
                     ->assertJsonPath('data.filters.imam_ids.0', $imamSpeaker->id);
 
                 $this->assertDatabaseHas('saved_searches', [
@@ -80,13 +80,13 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Role Search',
                     'filters' => [
-                        'participant_roles' => ['invalid-role'],
+                        'key_person_roles' => ['invalid-role'],
                     ],
                     'notify' => 'daily',
                 ]);
 
                 $response->assertUnprocessable()
-                    ->assertJsonValidationErrors(['filters.participant_roles.0']);
+                    ->assertJsonValidationErrors(['filters.key_person_roles.0']);
             });
 
             it('enforces max 10 saved searches per user', function () {

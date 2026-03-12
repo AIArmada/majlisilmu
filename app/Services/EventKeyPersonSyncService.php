@@ -4,22 +4,22 @@ namespace App\Services;
 
 use App\Enums\EventParticipantRole;
 use App\Models\Event;
-use App\Models\EventParticipant;
+use App\Models\EventKeyPerson;
 
-class EventParticipantSyncService
+class EventKeyPersonSyncService
 {
     /**
      * @param  list<string>  $speakerIds
-     * @param  list<array<string, mixed>>  $otherParticipants
+     * @param  list<array<string, mixed>>  $otherKeyPeople
      */
-    public function sync(Event $event, array $speakerIds = [], array $otherParticipants = []): void
+    public function sync(Event $event, array $speakerIds = [], array $otherKeyPeople = []): void
     {
-        $event->participants()->delete();
+        $event->keyPeople()->delete();
 
         $order = 1;
 
         foreach ($this->normalizeSpeakerIds($speakerIds) as $speakerId) {
-            EventParticipant::query()->create([
+            EventKeyPerson::query()->create([
                 'event_id' => $event->id,
                 'speaker_id' => $speakerId,
                 'role' => EventParticipantRole::Speaker->value,
@@ -28,15 +28,15 @@ class EventParticipantSyncService
             ]);
         }
 
-        foreach ($this->normalizeParticipants($otherParticipants) as $participant) {
-            EventParticipant::query()->create([
+        foreach ($this->normalizeKeyPeople($otherKeyPeople) as $keyPerson) {
+            EventKeyPerson::query()->create([
                 'event_id' => $event->id,
-                'speaker_id' => $participant['speaker_id'],
-                'role' => $participant['role'],
-                'name' => $participant['name'],
+                'speaker_id' => $keyPerson['speaker_id'],
+                'role' => $keyPerson['role'],
+                'name' => $keyPerson['name'],
                 'order_column' => $order++,
-                'is_public' => $participant['is_public'],
-                'notes' => $participant['notes'],
+                'is_public' => $keyPerson['is_public'],
+                'notes' => $keyPerson['notes'],
             ]);
         }
     }
@@ -55,25 +55,25 @@ class EventParticipantSyncService
     }
 
     /**
-     * @param  list<array<string, mixed>>  $participants
+     * @param  list<array<string, mixed>>  $keyPeople
      * @return list<array{role: string, speaker_id: ?string, name: ?string, is_public: bool, notes: ?string}>
      */
-    protected function normalizeParticipants(array $participants): array
+    protected function normalizeKeyPeople(array $keyPeople): array
     {
-        return collect($participants)
-            ->map(function (mixed $participant): ?array {
-                $role = $participant['role'] ?? null;
+        return collect($keyPeople)
+            ->map(function (mixed $keyPerson): ?array {
+                $role = $keyPerson['role'] ?? null;
 
                 if (! is_string($role) || EventParticipantRole::tryFrom($role) === null || $role === EventParticipantRole::Speaker->value) {
                     return null;
                 }
 
-                $speakerId = is_string($participant['speaker_id'] ?? null) && $participant['speaker_id'] !== ''
-                    ? $participant['speaker_id']
+                $speakerId = is_string($keyPerson['speaker_id'] ?? null) && $keyPerson['speaker_id'] !== ''
+                    ? $keyPerson['speaker_id']
                     : null;
 
-                $name = is_string($participant['name'] ?? null)
-                    ? trim($participant['name'])
+                $name = is_string($keyPerson['name'] ?? null)
+                    ? trim($keyPerson['name'])
                     : null;
 
                 if ($speakerId === null && ($name === null || $name === '')) {
@@ -84,9 +84,9 @@ class EventParticipantSyncService
                     'role' => $role,
                     'speaker_id' => $speakerId,
                     'name' => $name !== '' ? $name : null,
-                    'is_public' => (bool) ($participant['is_public'] ?? true),
-                    'notes' => is_string($participant['notes'] ?? null) && trim($participant['notes']) !== ''
-                        ? trim($participant['notes'])
+                    'is_public' => (bool) ($keyPerson['is_public'] ?? true),
+                    'notes' => is_string($keyPerson['notes'] ?? null) && trim($keyPerson['notes']) !== ''
+                        ? trim($keyPerson['notes'])
                         : null,
                 ];
             })

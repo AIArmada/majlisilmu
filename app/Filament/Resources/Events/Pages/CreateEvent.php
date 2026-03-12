@@ -5,7 +5,7 @@ namespace App\Filament\Resources\Events\Pages;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Tag;
-use App\Services\EventParticipantSyncService;
+use App\Services\EventKeyPersonSyncService;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
@@ -29,7 +29,7 @@ class CreateEvent extends CreateRecord
             $data['issue_tags'],
             $data['registration_mode'],
             $data['speakers'],
-            $data['other_participants'],
+            $data['other_key_people'],
         );
 
         return $data;
@@ -77,10 +77,10 @@ class CreateEvent extends CreateRecord
 
         $event->syncTags($tags);
 
-        app(EventParticipantSyncService::class)->sync(
+        app(EventKeyPersonSyncService::class)->sync(
             $event,
             is_array($state['speakers'] ?? null) ? $state['speakers'] : [],
-            is_array($state['other_participants'] ?? null) ? $state['other_participants'] : [],
+            is_array($state['other_key_people'] ?? null) ? $state['other_key_people'] : [],
         );
     }
 

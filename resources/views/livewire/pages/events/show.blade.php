@@ -1832,19 +1832,6 @@
                             </svg>
                             <span class="truncate">{{ $sidebarTimeText }}</span>
                         </p>
-                        @if($nextSession)
-                            <div
-                                class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {{ __('Next:') }}
-                                {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($nextSession->starts_at, 'd M') }},
-                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($nextSession->starts_at, 'h:i A') }}
-                            </div>
-                        @endif
                     </div>
                 </div>
 
