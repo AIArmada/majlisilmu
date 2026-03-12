@@ -345,7 +345,7 @@ class Index extends Component
             'gender',
             'institution_id',
             'venue_id',
-            'participant_roles',
+            'key_person_roles',
             'moderator_ids',
             'imam_ids',
             'khatib_ids',
@@ -414,10 +414,13 @@ class Index extends Component
             $filters['speaker_ids'] = $speakerIds;
         }
 
-        $participantRoles = array_values(array_filter((array) request()->input('participant_roles', [])));
+        $keyPersonRoles = array_values(array_filter((array) request()->input(
+            'key_person_roles',
+            request()->input('participant_roles', []),
+        )));
 
-        if ($participantRoles !== []) {
-            $filters['participant_roles'] = $participantRoles;
+        if ($keyPersonRoles !== []) {
+            $filters['key_person_roles'] = $keyPersonRoles;
         }
 
         foreach (['moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $filterKey) {
@@ -482,7 +485,7 @@ class Index extends Component
             'institution_id' => __('Institution'),
             'venue_id' => __('Venue'),
             'speaker_ids' => __('Speaker'),
-            'participant_roles' => __('Participant Roles'),
+            'key_person_roles' => __('Key Person Roles'),
             'moderator_ids' => __('Moderator'),
             'imam_ids' => __('Imam'),
             'khatib_ids' => __('Khatib'),
@@ -537,7 +540,7 @@ class Index extends Component
             'institution_id' => $this->institutionName($value) ?? $value,
             'venue_id' => $this->venueName($value) ?? $value,
             'speaker_ids' => $this->speakerName($value) ?? $value,
-            'participant_roles' => EventParticipantRole::tryFrom($value)?->getLabel() ?? $value,
+            'key_person_roles' => EventParticipantRole::tryFrom($value)?->getLabel() ?? $value,
             'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids' => $this->speakerName($value) ?? $value,
             'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
             'reference_ids' => $this->referenceTitle($value) ?? $value,

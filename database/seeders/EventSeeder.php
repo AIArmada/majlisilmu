@@ -124,7 +124,7 @@ class EventSeeder extends Seeder
                         ]);
                     }
 
-                    $this->seedParticipantsForEvent($event, $speakerIds);
+                    $this->seedKeyPeopleForEvent($event, $speakerIds);
                 }
 
                 // If a series exists in the system, attach events via pivot table.
@@ -714,7 +714,7 @@ class EventSeeder extends Seeder
     /**
      * @param  list<string>  $speakerIds
      */
-    private function seedParticipantsForEvent(Event $event, array $speakerIds): void
+    private function seedKeyPeopleForEvent(Event $event, array $speakerIds): void
     {
         $eventTypes = $event->event_type instanceof Collection
             ? $event->event_type->all()
@@ -733,13 +733,13 @@ class EventSeeder extends Seeder
             $selectedSpeakerIds = array_slice($speakerIds, 0, random_int(1, min(2, count($speakerIds))));
         }
 
-        $otherParticipants = [];
+        $otherKeyPeople = [];
 
         if ($normalizedTypes->contains(EventType::Forum)) {
             $moderatorSpeakerId = $selectedSpeakerIds[0] ?? ($speakerIds[0] ?? null);
 
             if (is_string($moderatorSpeakerId)) {
-                $otherParticipants[] = [
+                $otherKeyPeople[] = [
                     'role' => EventParticipantRole::Moderator->value,
                     'speaker_id' => $moderatorSpeakerId,
                     'is_public' => true,
@@ -750,7 +750,7 @@ class EventSeeder extends Seeder
         if ($normalizedTypes->contains(fn (EventType $type): bool => in_array($type, [EventType::Tahlil, EventType::SolatHajat, EventType::Qiamullail], true))) {
             $imamSpeakerId = $speakerIds[0] ?? null;
 
-            $otherParticipants[] = [
+            $otherKeyPeople[] = [
                 'role' => EventParticipantRole::Imam->value,
                 'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
                 'name' => is_string($imamSpeakerId) ? null : fake()->name(),
@@ -762,19 +762,19 @@ class EventSeeder extends Seeder
             $khatibSpeakerId = $speakerIds[0] ?? null;
             $imamSpeakerId = $speakerIds[1] ?? $khatibSpeakerId;
 
-            $otherParticipants[] = [
+            $otherKeyPeople[] = [
                 'role' => EventParticipantRole::Khatib->value,
                 'speaker_id' => is_string($khatibSpeakerId) ? $khatibSpeakerId : null,
                 'name' => is_string($khatibSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
-            $otherParticipants[] = [
+            $otherKeyPeople[] = [
                 'role' => EventParticipantRole::Imam->value,
                 'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
                 'name' => is_string($imamSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
-            $otherParticipants[] = [
+            $otherKeyPeople[] = [
                 'role' => EventParticipantRole::Bilal->value,
                 'name' => fake()->name(),
                 'is_public' => true,
@@ -782,13 +782,13 @@ class EventSeeder extends Seeder
         }
 
         if ($normalizedTypes->contains(fn (EventType $type): bool => $type->isCommunity())) {
-            $otherParticipants[] = [
+            $otherKeyPeople[] = [
                 'role' => EventParticipantRole::PersonInCharge->value,
                 'name' => fake()->name(),
                 'is_public' => true,
             ];
         }
 
-        app(EventKeyPersonSyncService::class)->sync($event, $selectedSpeakerIds, $otherParticipants);
+        app(EventKeyPersonSyncService::class)->sync($event, $selectedSpeakerIds, $otherKeyPeople);
     }
 }

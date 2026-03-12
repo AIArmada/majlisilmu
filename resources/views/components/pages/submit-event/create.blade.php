@@ -96,7 +96,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'location_same_as_institution' => true,
             'location_type' => 'institution',
             'is_muslim_only' => false,
-            'other_participants' => [],
+            'other_key_people' => [],
             'captcha_token' => null,
             'timezone' => $timezone,
         ]);
@@ -1103,7 +1103,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->createOptionForm(SpeakerFormSchema::createOptionForm())
                                         ->createOptionUsing(fn(array $data, Schema $schema): string => SpeakerFormSchema::createOptionUsing($data, $schema)),
 
-                                    Repeater::make('other_participants')
+                                    Repeater::make('other_key_people')
                                         ->label(__('Peranan Lain'))
                                         ->helperText(__('Tambahkan moderator, imam, khatib, bilal, atau PIC jika berkenaan.'))
                                         ->schema([
@@ -1432,7 +1432,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         app(EventKeyPersonSyncService::class)->sync(
             $event,
             $validated['speakers'] ?? [],
-            $validated['other_participants'] ?? [],
+            $validated['other_key_people'] ?? [],
         );
 
         // Sync selected languages
@@ -1653,7 +1653,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $speakerIds = collect(array_merge(
             (array) ($validated['speakers'] ?? []),
-            collect((array) ($validated['other_participants'] ?? []))
+            collect((array) ($validated['other_key_people'] ?? []))
                 ->pluck('speaker_id')
                 ->all(),
             (array) ($this->data['speakers'] ?? []),

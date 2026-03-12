@@ -309,10 +309,10 @@ class EventSearchService
         }
 
         if (! empty($filters['key_person_roles'])) {
-            $participantRoles = $this->normalizeArrayFilter($filters['key_person_roles']);
+            $keyPersonRoles = $this->normalizeArrayFilter($filters['key_person_roles']);
 
-            if ($participantRoles !== []) {
-                $filterParts[] = 'key_person_roles:['.implode(',', $participantRoles).']';
+            if ($keyPersonRoles !== []) {
+                $filterParts[] = 'key_person_roles:['.implode(',', $keyPersonRoles).']';
             }
         }
 
@@ -508,11 +508,11 @@ class EventSearchService
             });
         }
 
-        $participantRoles = $this->normalizeParticipantRoles($filters['key_person_roles'] ?? null);
+        $keyPersonRoles = $this->normalizeKeyPersonRoles($filters['key_person_roles'] ?? null);
 
-        if ($participantRoles !== []) {
-            $queryBuilder->whereHas('keyPeople', function (Builder $participantQuery) use ($participantRoles): void {
-                $participantQuery->whereIn('role', $participantRoles);
+        if ($keyPersonRoles !== []) {
+            $queryBuilder->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($keyPersonRoles): void {
+                $keyPersonQuery->whereIn('role', $keyPersonRoles);
             });
         }
 
@@ -528,8 +528,8 @@ class EventSearchService
                 continue;
             }
 
-            $queryBuilder->whereHas('keyPeople', function (Builder $participantQuery) use ($roleSpecificIds, $role): void {
-                $participantQuery
+            $queryBuilder->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($roleSpecificIds, $role): void {
+                $keyPersonQuery
                     ->where('role', $role->value)
                     ->whereIn('speaker_id', $roleSpecificIds);
             });
@@ -907,7 +907,7 @@ class EventSearchService
     /**
      * @return list<string>
      */
-    protected function normalizeParticipantRoles(mixed $value): array
+    protected function normalizeKeyPersonRoles(mixed $value): array
     {
         return collect($this->normalizeArrayFilter($value))
             ->map(fn (mixed $role): ?string => EventParticipantRole::tryFrom((string) $role)?->value)

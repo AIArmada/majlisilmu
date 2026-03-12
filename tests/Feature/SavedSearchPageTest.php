@@ -137,7 +137,7 @@ it('renders source issue and reference chips using human-readable values', funct
         ->assertSee('Rujukan Kitab/Buku: Riyadhus Solihin');
 });
 
-it('renders participant role and linked profile chips using human-readable values', function () {
+it('renders key person role and linked profile chips using human-readable values', function () {
     $user = User::factory()->create();
     $imamSpeaker = Speaker::factory()->create(['name' => 'Ustaz Role Imam']);
 

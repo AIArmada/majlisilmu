@@ -140,7 +140,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     /**
      * @return list<string>
      */
-    public function suggestedParticipantRoles(): array
+    public function suggestedKeyPersonRoles(): array
     {
         return match ($this) {
             self::KuliahCeramah,
@@ -167,5 +167,13 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
             self::Aqiqah => [EventParticipantRole::PersonInCharge->value],
             self::Other => [EventParticipantRole::Speaker->value, EventParticipantRole::PersonInCharge->value],
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function suggestedParticipantRoles(): array
+    {
+        return $this->suggestedKeyPersonRoles();
     }
 }
