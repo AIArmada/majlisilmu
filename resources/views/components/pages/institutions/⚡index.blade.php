@@ -1,33 +1,24 @@
 <?php
 
-use App\Forms\InstitutionFormSchema;
 use App\Models\Institution;
 use App\Models\District;
 use App\Models\State;
 use App\Models\Subdistrict;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Schemas\Schema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 new
 #[Title('Institutions - Majlis Ilmu')]
-class extends Component implements HasForms
+class extends Component
 {
-    use InteractsWithForms;
-    use WithFileUploads;
     use WithPagination;
 
     #[Url]
@@ -41,69 +32,6 @@ class extends Component implements HasForms
 
     #[Url]
     public ?string $subdistrict_id = null;
-
-    /**
-     * @var array<string, mixed>|null
-     */
-    public ?array $institutionSubmissionData = [];
-
-    public bool $showInstitutionSubmissionForm = false;
-
-    public function mount(): void
-    {
-        $this->form->fill();
-    }
-
-    public function form(Schema $schema): Schema
-    {
-        return $schema
-            ->statePath('institutionSubmissionData')
-            ->schema(InstitutionFormSchema::createOptionForm());
-    }
-
-    public function openInstitutionSubmissionForm(): void
-    {
-        if (! auth()->check()) {
-            $this->redirectRoute('login', navigate: true);
-
-            return;
-        }
-
-        $this->showInstitutionSubmissionForm = true;
-
-        $prefillName = $this->normalizedSearch();
-        $this->form->fill($prefillName !== null ? ['name' => $prefillName] : []);
-    }
-
-    public function cancelInstitutionSubmissionForm(): void
-    {
-        $this->showInstitutionSubmissionForm = false;
-        $this->form->fill();
-    }
-
-    public function submitInstitution(): void
-    {
-        if (! auth()->check()) {
-            $this->redirectRoute('login', navigate: true);
-
-            return;
-        }
-
-        $data = $this->form->getState();
-
-        InstitutionFormSchema::createOptionUsing($data, $this->form);
-
-        Cache::forget('submit_institutions');
-
-        $this->showInstitutionSubmissionForm = false;
-        $this->form->fill();
-
-        FilamentNotification::make()
-            ->title(__('Institusi berjaya dihantar untuk semakan pentadbir.'))
-            ->body(__('Status institusi adalah pending sehingga diluluskan oleh admin.'))
-            ->success()
-            ->send();
-    }
 
     #[Computed]
     public function institutions(): LengthAwarePaginatorContract
@@ -419,7 +347,6 @@ class extends Component implements HasForms
 @php
     $institutions = $this->institutions;
     $search = $this->search;
-    $showInstitutionSubmissionForm = $this->showInstitutionSubmissionForm;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
@@ -547,13 +474,13 @@ class extends Component implements HasForms
 	                    @endif
 
                         <div class="mt-4">
-                            <button
-                                type="button"
-                                wire:click="openInstitutionSubmissionForm"
+                            <a
+                                href="{{ route('contributions.submit-institution') }}"
+                                wire:navigate
                                 class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
                             >
                                 {{ __('Tak jumpa institusi? Tambah institusi') }}
-                            </button>
+                            </a>
                         </div>
 	                 </div>
 	            </div>
@@ -563,37 +490,6 @@ class extends Component implements HasForms
                 @php
                     $institutionLoadingTarget = 'search,state_id,district_id,subdistrict_id,clearSearch,clearFilters';
                 @endphp
-
-                @if($showInstitutionSubmissionForm)
-                    <div class="mb-10 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm md:p-8">
-                        <div class="mb-6">
-                            <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Tambah Institusi') }}</h2>
-                            <p class="mt-2 text-sm text-slate-600">
-                                {{ __('Institusi baharu akan ditandakan sebagai pending dan menunggu kelulusan admin sebelum dipaparkan secara umum.') }}
-                            </p>
-                        </div>
-
-                        <form wire:submit="submitInstitution" novalidate>
-                            {{ $this->form }}
-
-                            <div class="mt-6 flex flex-wrap items-center gap-3">
-                                <button
-                                    type="submit"
-                                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                                >
-                                    {{ __('Hantar Institusi') }}
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="cancelInstitutionSubmissionForm"
-                                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                                >
-                                    {{ __('Batal') }}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                @endif
 
                 <div wire:loading.delay.short wire:target="{{ $institutionLoadingTarget }}">
                     <x-ui.skeleton.institution-card-grid />
@@ -611,13 +507,13 @@ class extends Component implements HasForms
                             <button type="button" wire:click="clearFilters" class="font-semibold text-emerald-600 hover:text-emerald-700">
                                 {{ __('Clear Filters') }} &rarr;
                             </button>
-                            <button
-                                type="button"
-                                wire:click="openInstitutionSubmissionForm"
+                            <a
+                                href="{{ route('contributions.submit-institution') }}"
+                                wire:navigate
                                 class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
                             >
                                 {{ __('Tambah Institusi') }}
-                            </button>
+                            </a>
                         </div>
 	                </div>
 	            @else
@@ -676,5 +572,4 @@ class extends Component implements HasForms
 	            @endif
                 </div>
 	        </div>
-        <x-filament-actions::modals />
 	    </div>

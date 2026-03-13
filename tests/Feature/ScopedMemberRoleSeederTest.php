@@ -5,6 +5,7 @@ use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
@@ -83,5 +84,22 @@ it('seeds event scoped member roles when missing', function () {
 
         expect($coOrganizerRole->hasPermissionTo('event.manage-members'))->toBeTrue()
             ->and($coOrganizerRole->hasPermissionTo('event.delete'))->toBeFalse();
+    });
+});
+
+it('seeds reference scoped member roles when missing', function () {
+    Reference::factory()->create();
+    $seeder = app(ScopedMemberRoleSeeder::class);
+    $scope = app(MemberRoleScopes::class)->reference();
+
+    $seeder->ensureForReference();
+
+    Authz::withScope($scope, function (): void {
+        expect(Role::query()->whereIn('name', ['owner', 'admin', 'editor', 'viewer'])->count())->toBe(4);
+
+        $ownerRole = Role::findByName('owner', 'web');
+
+        expect($ownerRole->hasPermissionTo('reference.manage-members'))->toBeTrue()
+            ->and($ownerRole->hasPermissionTo('reference.approve'))->toBeTrue();
     });
 });

@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Livewire\Pages\Contributions;
+
+use App\Enums\ContributionSubjectType;
+use App\Forms\SpeakerContributionFormSchema;
+use App\Livewire\Concerns\InteractsWithToasts;
+use App\Models\Speaker;
+use App\Models\User;
+use App\Services\ContributionEntityMutationService;
+use App\Services\ContributionWorkflowService;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Arr;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
+use Livewire\Component;
+use RuntimeException;
+
+#[Layout('layouts.app')]
+#[Title('Submit Speaker')]
+class SubmitSpeaker extends Component implements HasForms
+{
+    use InteractsWithForms;
+    use InteractsWithToasts;
+
+    /** @var array<string, mixed>|null */
+    public ?array $data = [];
+
+    public function mount(): void
+    {
+        $this->contributionForm()->fill([
+            'gender' => 'male',
+            'address' => [
+                'country_id' => 132,
+            ],
+        ]);
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema
+            ->model(new Speaker)
+            ->statePath('data')
+            ->components([
+                ...SpeakerContributionFormSchema::components(includeMedia: true),
+                Section::make(__('Submission Note'))
+                    ->schema([
+                        Textarea::make('proposer_note')
+                            ->label(__('Anything the reviewer should know?'))
+                            ->rows(4)
+                            ->maxLength(2000),
+                    ]),
+            ]);
+    }
+
+    public function submit(ContributionWorkflowService $workflow, ContributionEntityMutationService $entityMutationService): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user instanceof User, 403);
+
+        $state = $this->contributionForm()->getState();
+        $note = isset($state['proposer_note']) && is_string($state['proposer_note'])
+            ? trim($state['proposer_note'])
+            : null;
+
+        unset($state['proposer_note']);
+
+        $speaker = $entityMutationService->createSpeaker($state, $user);
+        $this->contributionForm()->model($speaker)->saveRelationships();
+
+        $workflow->submitCreateRequest(
+            ContributionSubjectType::Speaker,
+            $user,
+            Arr::except($state, ['avatar', 'cover', 'gallery']),
+            $note !== '' ? $note : null,
+            $speaker,
+        );
+
+        $this->successToast(__('Speaker submitted for review.'));
+
+        $this->redirect(route('contributions.index'), navigate: true);
+    }
+
+    protected function contributionForm(): Schema
+    {
+        return $this->getForm('form') ?? throw new RuntimeException('Speaker contribution form is not available.');
+    }
+}

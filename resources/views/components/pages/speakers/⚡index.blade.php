@@ -1,97 +1,24 @@
 <?php
 
-use App\Forms\SpeakerFormSchema;
 use App\Models\Speaker;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Schemas\Schema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 new
     #[Title('Speakers - Majlis Ilmu')]
-    class extends Component implements HasForms
+    class extends Component
     {
-        use InteractsWithForms;
-        use WithFileUploads;
         use WithPagination;
 
         #[Url]
         public ?string $search = null;
-
-        /**
-         * @var array<string, mixed>|null
-         */
-        public ?array $speakerSubmissionData = [];
-
-        public bool $showSpeakerSubmissionForm = false;
-
-        public function mount(): void
-        {
-            $this->form->fill();
-        }
-
-        public function form(Schema $schema): Schema
-        {
-            return $schema
-                ->statePath('speakerSubmissionData')
-                ->schema(SpeakerFormSchema::createOptionForm());
-        }
-
-        public function openSpeakerSubmissionForm(): void
-        {
-            if (! auth()->check()) {
-                $this->redirectRoute('login', navigate: true);
-
-                return;
-            }
-
-            $this->showSpeakerSubmissionForm = true;
-
-            $prefillName = $this->normalizedSearch();
-            $this->form->fill($prefillName !== null ? ['name' => $prefillName] : []);
-        }
-
-        public function cancelSpeakerSubmissionForm(): void
-        {
-            $this->showSpeakerSubmissionForm = false;
-            $this->form->fill();
-        }
-
-        public function submitSpeaker(): void
-        {
-            if (! auth()->check()) {
-                $this->redirectRoute('login', navigate: true);
-
-                return;
-            }
-
-            $data = $this->form->getState();
-
-            SpeakerFormSchema::createOptionUsing($data, $this->form);
-
-            Cache::forget('submit_speakers');
-
-            $this->showSpeakerSubmissionForm = false;
-            $this->form->fill();
-
-            FilamentNotification::make()
-                ->title(__('Penceramah berjaya dihantar untuk semakan pentadbir.'))
-                ->body(__('Status penceramah adalah pending sehingga diluluskan oleh admin.'))
-                ->success()
-                ->send();
-        }
 
         #[Computed]
         public function speakers(): LengthAwarePaginatorContract
@@ -300,7 +227,6 @@ new
 @php
     $speakers = $this->speakers;
     $search = $this->search;
-    $showSpeakerSubmissionForm = $this->showSpeakerSubmissionForm;
     $speakerLoadingTarget = 'search,clearSearch';
 @endphp
 
@@ -315,7 +241,7 @@ new
                 class="font-heading text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight text-balance mb-6">
                 {{ __('Voices of') }} <br class="hidden md:block" />
                 <span
-                    class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{{ __('Knowledge & Wisdom') }}</span>
+                    class="text-transparent bg-clip-text bg-linear-to-r from-emerald-600 to-teal-500">{{ __('Knowledge & Wisdom') }}</span>
             </h1>
             <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto text-balance">
                 {{ __('Scholars, teachers, and speakers sharing their knowledge with the community.') }}
@@ -343,50 +269,19 @@ new
                 </div>
 
                 <div class="mt-4">
-                    <button
-                        type="button"
-                        wire:click="openSpeakerSubmissionForm"
+                    <a
+                        href="{{ route('contributions.submit-speaker') }}"
+                        wire:navigate
                         class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
                     >
                         {{ __('Tak jumpa penceramah? Tambah penceramah') }}
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="container mx-auto px-6 lg:px-12 mt-12">
-        @if($showSpeakerSubmissionForm)
-            <div class="mb-10 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm md:p-8">
-                <div class="mb-6">
-                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Tambah Penceramah') }}</h2>
-                    <p class="mt-2 text-sm text-slate-600">
-                        {{ __('Penceramah baharu akan ditandakan sebagai pending dan menunggu kelulusan admin sebelum dipaparkan secara umum.') }}
-                    </p>
-                </div>
-
-                <form wire:submit="submitSpeaker" novalidate>
-                    {{ $this->form }}
-
-                    <div class="mt-6 flex flex-wrap items-center gap-3">
-                        <button
-                            type="submit"
-                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                        >
-                            {{ __('Hantar Penceramah') }}
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="cancelSpeakerSubmissionForm"
-                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                        >
-                            {{ __('Batal') }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        @endif
-
         <div wire:loading.delay.short wire:target="{{ $speakerLoadingTarget }}">
             <x-ui.skeleton.speaker-card-grid />
         </div>
@@ -410,13 +305,13 @@ new
                         class="font-semibold text-emerald-600 hover:text-emerald-700">
                         {{ __('Clear Search') }} &rarr;
                     </button>
-                    <button
-                        type="button"
-                        wire:click="openSpeakerSubmissionForm"
+                    <a
+                        href="{{ route('contributions.submit-speaker') }}"
+                        wire:navigate
                         class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
                     >
                         {{ __('Tambah Penceramah') }}
-                    </button>
+                    </a>
                 </div>
             </div>
         @else
@@ -427,7 +322,7 @@ new
 
                         <!-- Background Decoration -->
                         <div
-                            class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate-50 to-transparent -z-10 opacity-50 transition-opacity group-hover:opacity-100">
+                            class="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-slate-50 to-transparent -z-10 opacity-50 transition-opacity group-hover:opacity-100">
                         </div>
 
                         <div
@@ -459,5 +354,4 @@ new
         </div>
     </div>
 
-    <x-filament-actions::modals />
 </div>

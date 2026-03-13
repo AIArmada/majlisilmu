@@ -1,4 +1,44 @@
+# Contribution Workflow Correction
+
+- [x] Restore dedicated `/sumbangan/institusi/baru` and `/sumbangan/penceramah/baru` pages as the canonical create flow
+- [x] Remove the inaccurate inline institution and speaker submission forms from the public index pages
+- [x] Expand the institution and speaker contribution pages to use richer, source-aligned form sections
+- [x] Upgrade update suggestions so institution, speaker, reference, and event edits submit directly-applicable payloads
+- [x] Extend contribution approval to apply structured relationship data instead of flat fillable attributes only
+- [x] Re-run focused tests, Pint, and narrowed PHPStan for the corrected flow
+
+## Contribution Workflow Correction Review
+
+- Restored dedicated authenticated create pages at `/sumbangan/institusi/baru` and `/sumbangan/penceramah/baru`, and removed the incorrect inline submission forms from the public institution and speaker directory pages.
+- Added richer shared contribution schemas for institution, speaker, reference, and event edits so update requests now carry structured data aligned with the real source forms instead of a small note-style subset.
+- Added `ContributionEntityMutationService` so direct edits and approval actions apply nested address, contacts, social links, speakers, references, tags, and other structured payloads instead of only `fillable` attributes.
+- Changed institution and speaker creation to stage pending entities first, then attach contribution requests to those staged records so reviewers can approve the real record in one action.
+- Verification:
+  - `runTests`: `tests/Feature/ContributionPagesTest.php`, `tests/Feature/ContributionWorkflowServiceTest.php` => 17 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - Editor diagnostics on all touched files => clean
+  - Narrowed `phpstan analyse` attempts were interrupted in this shell before completion, so static verification fell back to clean editor diagnostics for the touched files
+
 # Speaker Show Page Relation Fix
+
+# Community Contribution Workflow Completion
+
+- [x] Add authenticated contribution pages for institution and speaker submissions plus generic update suggestions
+- [x] Add contributor dashboard page for request history and maintainer approvals
+- [x] Extend reporting flow to cover references and expose public report entrypoints
+- [x] Wire contribution/report links into existing public pages and navigation
+- [x] Run focused Pest coverage, Pint, and narrowed PHPStan for the new workflow
+
+## Community Contribution Workflow Review
+
+- Added authenticated contribution pages for new institution and speaker submissions, plus a generic record update page that either saves immediately for maintainers or creates a pending contribution request for everyone else.
+- Added a contribution inbox page where contributors can track their own requests and maintainers can approve or reject pending updates for records they manage.
+- Added a public report page and shared `ReportService`, extended reports to support references, and wired the report flow into the existing API path so duplicate checks and moderation escalation logic stay consistent.
+- Linked the new workflow from the app layout, dashboard, and public event/institution/speaker/reference pages so the contribution/report actions are reachable from normal browsing flows.
+- Verification:
+  - `runTests`: `tests/Feature/ContributionPagesTest.php`, `tests/Feature/EventShowPageTest.php`, `tests/Feature/InstitutionShowPageTest.php`, `tests/Feature/SpeakerFollowTest.php`, `tests/Feature/ReferenceAuthorizationTest.php` => 53 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/ReportController.php app/Services/ReportService.php app/Models/Reference.php tests/Feature/ContributionPagesTest.php routes/web.php` => no errors
 
 # Event Show Blaze Extraction
 
@@ -258,9 +298,24 @@
 
 ## Laravel Notification Refactor
 
-- [x] Replace the custom notification delivery engine with Laravel-native notifications and queued custom channels
-- [x] Move the inbox surface and unread counts onto Laravel's `notifications` table
-- [x] Simplify notification settings to Laravel-aligned cadence/channel controls while keeping quiet hours, digest schedule, locale, timezone, and destinations
+# Contribution Workflow Foundation
+
+- [x] Add the shared contribution-request model, enums, factory, and migration
+- [x] Add reference maintainers and scoped reference member roles/permissions
+- [x] Implement the first contribution workflow service for create/update approval and rejection
+- [x] Add focused Pest coverage for contribution requests and reference-member authorization
+- [x] Run focused verification, Pint, and record review notes
+
+## Review
+
+- Added the initial contribution workflow backend foundation with `ContributionRequest` enums/model/factory, create/update request persistence, approval/rejection/cancellation service logic, and new migrations for `contribution_requests` plus `reference_user`.
+- Extended references into the existing member-role architecture with `ReferencePolicy`, `reference_user` maintainers, new reference scoped roles/permissions, and reference-aware member permission checks.
+- Verified the first slice with focused Pest coverage for contribution approval behavior and reference authorization, then ran Pint and narrow PHPStan on the touched files.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowServiceTest.php tests/Feature/ReferenceAuthorizationTest.php tests/Feature/ScopedMemberRoleSeederTest.php` => 12 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Enums/ContributionRequestStatus.php app/Enums/ContributionRequestType.php app/Enums/ContributionSubjectType.php app/Models/ContributionRequest.php app/Policies/ReferencePolicy.php app/Services/ContributionWorkflowService.php app/Support/Authz/MemberRoleScopes.php app/Support/Authz/ScopedMemberRoleSeeder.php app/Support/Authz/MemberPermissionGate.php tests/Feature/ContributionWorkflowServiceTest.php tests/Feature/ReferenceAuthorizationTest.php tests/Feature/ScopedMemberRoleSeederTest.php` => no errors
+
 - [x] Refactor all notification trigger entry points to dispatch native notifications after commit
 - [x] Update focused notification tests and verify the refactor with Pest and PHPStan
 
