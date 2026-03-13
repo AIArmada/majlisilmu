@@ -2,6 +2,7 @@
 
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\SignalsServiceProvider;
 use App\Enums\DawahShareOutcomeType;
 use App\Models\Event;
 use App\Models\User;
@@ -10,6 +11,19 @@ use App\Services\Signals\AffiliateSignalsBridge;
 use App\Services\Signals\SignalsTracker;
 use Illuminate\Http\Request;
 use Mockery\MockInterface;
+
+it('registers the signals package migrations with the application', function () {
+    $provider = new SignalsServiceProvider(app());
+    $provider->register();
+
+    $reflection = new ReflectionProperty($provider, 'package');
+    $reflection->setAccessible(true);
+
+    $package = $reflection->getValue($provider);
+
+    expect($package->runsMigrations)->toBeTrue()
+        ->and($package->discoversMigrations)->toBeTrue();
+});
 
 it('injects the signals tracker script into public layouts when a tracked property exists', function () {
     $trackedProperty = TrackedProperty::query()->first();
