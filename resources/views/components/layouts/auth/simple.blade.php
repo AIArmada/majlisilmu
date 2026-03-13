@@ -207,7 +207,9 @@
                         {{ $slot }}
                     </div>
 
-                    <x-ui.toast-stack />
+                    <div data-toast-root class="hidden" aria-hidden="true"></div>
+
+                    @include('components.ui.toast-stack')
 
                 </div>
 

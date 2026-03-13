@@ -1,5 +1,7 @@
 <?php
 
+use AIArmada\Signals\Models\TrackedProperty;
+use App\Support\Signals\ProductSignalsSurfaceResolver;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -8,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -31,6 +34,38 @@ pest()->extend(TestCase::class)
                 '--path' => realpath(base_path('vendor/aiarmada/affiliates/database/migrations')),
                 '--realpath' => true,
             ]);
+        }
+
+        if (! Schema::hasTable(config('signals.database.tables.tracked_properties', 'signal_tracked_properties'))) {
+            Artisan::call('migrate', [
+                '--path' => realpath(base_path('vendor/aiarmada/signals/database/migrations')),
+                '--realpath' => true,
+            ]);
+        }
+
+        if (Schema::hasTable(config('signals.database.tables.tracked_properties', 'signal_tracked_properties'))) {
+            $surfaceResolver = app(ProductSignalsSurfaceResolver::class);
+
+            foreach (['public' => 'Website', 'admin' => 'Admin'] as $surface => $label) {
+                $slug = $surfaceResolver->slugForSurface($surface);
+
+                if (! is_string($slug) || $slug === '') {
+                    continue;
+                }
+
+                TrackedProperty::query()->firstOrCreate(
+                    ['slug' => $slug],
+                    [
+                        'name' => config('app.name').' '.$label,
+                        'write_key' => Str::random(40),
+                        'domain' => $surfaceResolver->domainForSurface($surface),
+                        'type' => (string) config('signals.defaults.property_type', 'website'),
+                        'timezone' => (string) config('signals.defaults.timezone', config('app.timezone', 'UTC')),
+                        'currency' => (string) config('signals.defaults.currency', 'MYR'),
+                        'is_active' => true,
+                    ],
+                );
+            }
         }
 
         config()->set('services.turnstile.enabled', false);

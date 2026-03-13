@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\TagType;
 use App\Models\Address;
 use App\Models\Contact;
@@ -339,13 +339,13 @@ class ContributionEntityMutationService
             'reference_ids' => $event->references->pluck('id')->values()->all(),
             'series_ids' => $event->series->pluck('id')->values()->all(),
             'speaker_ids' => $event->keyPeople
-                ->where('role', EventParticipantRole::Speaker)
+                ->where('role', EventKeyPersonRole::Speaker)
                 ->pluck('speaker_id')
                 ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
                 ->values()
                 ->all(),
             'other_key_people' => $event->keyPeople
-                ->reject(fn ($keyPerson): bool => $keyPerson->role === EventParticipantRole::Speaker)
+                ->reject(fn ($keyPerson): bool => $keyPerson->role === EventKeyPersonRole::Speaker)
                 ->map(fn ($keyPerson): array => [
                     'role' => $keyPerson->role instanceof \BackedEnum ? $keyPerson->role->value : (string) $keyPerson->role,
                     'speaker_id' => $keyPerson->speaker_id,

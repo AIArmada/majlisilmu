@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Event;
 use App\Models\User;
+use App\Services\Signals\ProductSignalsService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\Draft;
@@ -22,7 +23,11 @@ class ModerationService
      */
     public function submitForModeration(Event $event): void
     {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Pending::class);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'submitted', previousStatus: $previousStatus, request: request());
     }
 
     /**
@@ -33,7 +38,11 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Approved::class, $moderator, $note);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'approved', $moderator, $previousStatus, note: $note, request: request());
     }
 
     /**
@@ -45,7 +54,11 @@ class ModerationService
         string $reasonCode,
         ?string $note = null
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(NeedsChanges::class, $moderator, $reasonCode, $note);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'needs_changes_requested', $moderator, $previousStatus, $reasonCode, $note, request());
     }
 
     /**
@@ -57,7 +70,11 @@ class ModerationService
         string $reasonCode,
         ?string $note = null
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Rejected::class, $moderator, $reasonCode, $note);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'rejected', $moderator, $previousStatus, $reasonCode, $note, request());
     }
 
     /**
@@ -68,7 +85,11 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Cancelled::class, $moderator, $note);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'cancelled', $moderator, $previousStatus, note: $note, request: request());
     }
 
     /**
@@ -79,7 +100,11 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Pending::class, $moderator, $note);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'reconsidered', $moderator, $previousStatus, note: $note, request: request());
     }
 
     /**
@@ -90,7 +115,11 @@ class ModerationService
         ?User $moderator = null,
         ?string $note = null
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Draft::class, $moderator, $note);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'reverted_to_draft', $moderator, $previousStatus, note: $note, request: request());
     }
 
     /**
@@ -102,7 +131,11 @@ class ModerationService
         ?string $note = null,
         ?string $reasonCode = null,
     ): void {
+        $previousStatus = (string) $event->status;
         $event->status->transitionTo(Pending::class, $moderator, $note, $reasonCode);
+        $event->refresh();
+
+        app(ProductSignalsService::class)->recordModerationTransition($event, 'remoderated', $moderator, $previousStatus, $reasonCode, $note, request());
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Models\User;
 use App\Services\ShareTrackingService;
+use App\Services\Signals\ProductSignalsService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -47,6 +48,7 @@ class CreateNewUser implements CreatesNewUsers
         ]);
 
         app(ShareTrackingService::class)->recordSignup($user, request());
+        app(ProductSignalsService::class)->recordSignup($user, request());
 
         return $user;
     }

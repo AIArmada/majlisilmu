@@ -4,6 +4,8 @@ use App\Models\Institution;
 use App\Models\District;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Models\User;
+use App\Services\ContributionEntityMutationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -24,6 +26,13 @@ class extends Component
     #[Url]
     public ?string $search = null;
 
+    /**
+     * @var array<string, mixed>
+     */
+    public array $institutionSubmissionData = [];
+
+    public bool $showInstitutionSubmissionForm = false;
+
     #[Url]
     public ?string $state_id = null;
 
@@ -32,6 +41,63 @@ class extends Component
 
     #[Url]
     public ?string $subdistrict_id = null;
+
+    public function openInstitutionSubmissionForm(): void
+    {
+        if (! auth()->check()) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $this->showInstitutionSubmissionForm = true;
+
+        $prefillName = $this->normalizedSearch();
+
+        $this->institutionSubmissionData = $prefillName !== null
+            ? ['name' => $prefillName]
+            : [];
+    }
+
+    public function cancelInstitutionSubmissionForm(): void
+    {
+        $this->showInstitutionSubmissionForm = false;
+        $this->institutionSubmissionData = [];
+    }
+
+    public function submitInstitution(): void
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $payload = $this->institutionSubmissionData;
+        $payload['name'] ??= $this->normalizedSearch() ?? 'Institution';
+
+        $address = array_filter([
+            'line1' => $payload['line1'] ?? null,
+            'line2' => $payload['line2'] ?? null,
+            'postcode' => $payload['postcode'] ?? null,
+            'state_id' => $payload['state_id'] ?? null,
+            'district_id' => $payload['district_id'] ?? null,
+            'subdistrict_id' => $payload['subdistrict_id'] ?? null,
+            'google_maps_url' => $payload['google_maps_url'] ?? null,
+            'waze_url' => $payload['waze_url'] ?? null,
+        ], static fn (mixed $value): bool => filled($value));
+
+        if ($address !== []) {
+            $payload['address'] = $address;
+        }
+
+        app(ContributionEntityMutationService::class)->createInstitution($payload, $user);
+
+        $this->showInstitutionSubmissionForm = false;
+        $this->institutionSubmissionData = [];
+    }
 
     #[Computed]
     public function institutions(): LengthAwarePaginatorContract

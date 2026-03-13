@@ -21,6 +21,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @fluxAppearance
     @livewireStyles
+    @include('components.analytics.signals-tracker', ['surface' => 'public'])
     @stack('head')
 
     <style>
@@ -189,7 +190,9 @@
                         @yield('content')
                     </div>
 
-                    <x-ui.toast-stack />
+                    <div data-toast-root class="hidden" aria-hidden="true"></div>
+
+                    @include('components.ui.toast-stack')
 
                 </div>
 

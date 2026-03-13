@@ -19,6 +19,76 @@
   - Editor diagnostics on all touched files => clean
   - Narrowed `phpstan analyse` attempts were interrupted in this shell before completion, so static verification fell back to clean editor diagnostics for the touched files
 
+# Signals Surface Split And Identity Stitching
+
+- [x] Replace implicit default property lookup with explicit public/admin Signals surface resolution
+- [x] Stop reusing the public tracker config on admin pages unless a dedicated admin property is enabled
+- [x] Stitch browser and server telemetry with shared anonymous/session identifiers plus identify calls for authenticated users
+- [x] Refine search telemetry taxonomy to separate query-driven searches from filter-only discovery
+- [x] Expand auth and moderation telemetry for signup, password reset, email verification, and moderation state transitions
+- [x] Run focused tests, formatting, and static analysis for the completed Signals rollout
+
+## Review
+
+- Added app-level Signals surface config in `config/product-signals.php` so Majlis Ilmu now resolves public and admin properties explicitly instead of choosing the oldest active property implicitly.
+- Updated `App\Services\Signals\SignalsTracker` and the tracker Blade include so public pages always use the public property, while admin tracking is off by default and only activates when a dedicated admin property slug is configured and enabled.
+- Extended the Signals tracker script in the Commerce package to persist a stable browser anonymous identifier, mirror the browser session identifier into a first-party cookie, and call the identify endpoint for authenticated users. `ProductSignalsService` now reuses those cookies so server-side login/report/notification/search/moderation events stitch onto the same identity/session records.
+- Refined product telemetry taxonomy so filter-only API discovery traffic records `listing.filtered` under the `discovery` category, while query-driven interactions remain `search.executed`.
+- Expanded auth telemetry coverage with `auth.signup.completed`, `auth.password_reset.completed`, and `auth.email_verified`, and added moderation telemetry events for submit, approve, reject, request changes, cancel, reconsider, revert-to-draft, and re-moderation flows through `ModerationService`.
+- Admin telemetry now defaults on with a dedicated `majlis-ilmu-admin` tracked property bootstrapped by migration, so admin traffic no longer depends on manual property creation unless the deployment overrides the slug/domain explicitly.
+- Panel Signals surfaces are now generic instead of admin-only: `ahli` gets its own tracked property automatically, and future panel IDs resolve to their own deterministic Signals properties without new hardcoded tracker logic.
+- Panel-specific Signals settings now live under a single `product-signals.panels` map, so future panel overrides stay in one place instead of being split between separate `properties` and `surfaces` sections.
+- Verification:
+  - `php artisan test --compact tests/Feature/SignalsIntegrationTest.php tests/Feature/ProductSignalsTelemetryTest.php tests/Feature/AdminShareAnalyticsPageTest.php tests/Feature/ModerationServiceTest.php` => 38 passed (132 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Services/Signals/ProductSignalsService.php app/Services/Signals/SignalsTracker.php app/Services/Signals/SignalEventRecorder.php app/Services/Signals/AffiliateSignalsBridge.php app/Services/ShareTracking/AffiliatesShareTrackingService.php app/Services/ModerationService.php app/Actions/Fortify/CreateNewUser.php app/Actions/Fortify/ResetUserPassword.php app/Listeners/Auth/RecordVerifiedEmail.php app/Providers/AppServiceProvider.php tests/Feature/SignalsIntegrationTest.php tests/Feature/ProductSignalsTelemetryTest.php tests/Feature/AdminShareAnalyticsPageTest.php tests/Feature/ModerationServiceTest.php` => no errors
+  - `/Users/Saiffil/Herd/commerce/vendor/bin/phpstan analyse --ansi packages/signals/src/Actions/ServeSignalsTracker.php` => no errors
+  - `vendor/bin/pint --dirty --format agent` in Majlis Ilmu => pass
+  - `/Users/Saiffil/Herd/commerce/vendor/bin/pint --dirty --format agent packages/signals/src/Actions/ServeSignalsTracker.php` => pass
+
+# Signals Fail-Open Hardening
+
+- [x] Wrap app-side product Signals ingestion so telemetry failures never break user flows
+- [x] Wrap affiliate-to-Signals bridge so attribution/conversion telemetry failures never break share outcomes
+- [x] Add focused regressions proving login, report, notification, search, and affiliate outcomes stay successful when Signals throws
+- [x] Run focused tests and formatting for the hardening batch
+
+## Review
+
+- Added app-owned wrapper services for Signals package integration at `app/Services/Signals/SignalEventRecorder.php` and `app/Services/Signals/AffiliateSignalsBridge.php` so Majlis Ilmu owns the resilience boundary instead of binding directly to final package classes.
+- Hardened `App\Services\Signals\ProductSignalsService` to fail open: Signals ingestion exceptions are now reported/logged and skipped instead of bubbling into auth, report, notification, or search flows.
+- Hardened the affiliate-backed share tracking path in `App\Services\ShareTracking\AffiliatesShareTrackingService` so attribution/conversion telemetry failures are reported/logged and do not block share capture or outcome recording.
+- Added focused regressions in `tests/Feature/ProductSignalsTelemetryTest.php` and `tests/Feature/SignalsIntegrationTest.php` proving password login, report submission, notification reads, search execution, and affiliate outcomes still succeed when the app-owned Signals boundary throws.
+- Verification:
+  - `php artisan test --compact tests/Feature/SignalsIntegrationTest.php tests/Feature/ProductSignalsTelemetryTest.php` => 13 passed (50 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Services/Signals/ProductSignalsService.php app/Services/Signals/SignalEventRecorder.php app/Services/Signals/AffiliateSignalsBridge.php app/Services/ShareTracking/AffiliatesShareTrackingService.php tests/Feature/ProductSignalsTelemetryTest.php tests/Feature/SignalsIntegrationTest.php` => no errors
+  - `vendor/bin/pint --dirty --format agent` => pass
+
+# Affiliates And Signals Review
+
+- [x] Audit installed AIArmada packages and service-provider wiring for affiliates, signals, and any Filament/admin counterparts
+- [x] Trace Dawah Share runtime capture, attribution, and analytics surfaces across public flows and backend dashboards
+- [x] Verify live backend visibility with database/admin inspection and summarize coverage gaps, risks, and missing analytics events
+- [x] Require and register `aiarmada/signals` plus `aiarmada/filament-signals`
+- [x] Bootstrap a default Signals tracked property and inject the tracker on public/auth/admin surfaces
+- [x] Bridge affiliate attributions and conversions into Signals events from the local share-tracking adapter
+- [x] Add a Filament admin share analytics page with cross-user/provider/link summaries
+- [x] Run focused analytics tests, migrations, and formatting
+
+## Review
+
+- `aiarmada/affiliates` is installed and registered in the app, then wrapped by the local `ShareTrackingService` and `ShareTrackingAnalyticsService` adapters. Public Dawah Share routes, attribution middleware, signup attribution, event outcomes, follow outcomes, and saved-search outcomes are wired to that backend.
+- `aiarmada/signals` and `aiarmada/filament-signals` are now required from the local Commerce path packages, discovered by Laravel, and registered into the admin panel. Their dashboard page is intentionally disabled so the existing Majlis Ilmu admin dashboard remains the panel home while Signals report pages/resources still register under the `Insights` navigation group.
+- Runtime verification in Chrome MCP confirmed the superadmin can see a private user dashboard at `/dashboard/dawah-impact` plus per-link detail pages under `/dashboard/dawah-impact/links/{id}`. Those pages are not part of the Filament admin panel.
+- Backend operators now have two admin-facing analytics surfaces: Signals report pages/resources in Filament plus a custom `Share Analytics` Filament page that summarizes provider performance, top sharers, top links, recent visits, and recent outcomes across all affiliates.
+- Current live data is minimal: 1 affiliate profile, 1 tracked link, 2 outbound shares, 15 attributed visits, and 0 conversions in `affiliate_conversions`. The visible live report belongs to `superadmin@majlisilmu.my` and currently shows only speaker-share traffic.
+- Signals page-view collection is now active through the built-in tracker script on the app/auth layouts and the admin panel head hook, and the local affiliate tracking service now records `affiliate.attributed` and `affiliate.conversion.recorded` events directly into Signals.
+- Coverage is still not full product analytics. Current Signals + affiliate coverage now includes anonymous page views plus affiliate attributions/conversions tied to existing Dawah Share outcomes. Broader non-affiliate product telemetry called out in repo notes remains future work: login method, report submission, notification opens/clicks, search execution/result clicks, moderation funnel, AI extraction lifecycle, profile completion, donation intent, and other product telemetry.
+- Important semantic caveat: per-link visit counts are attribution-path visits, not only exact target-page views. The live speaker link report included downstream navigations to `/`, `/institusi`, and `/penceramah` under the same shared link because touchpoints stay attached to the landing attribution's `link_id`.
+- Verification for this implementation:
+  - `php artisan migrate --no-interaction`
+  - `php artisan test --compact tests/Feature/SignalsIntegrationTest.php tests/Feature/AdminShareAnalyticsPageTest.php` => 5 passed (18 assertions)
+  - `vendor/bin/pint --dirty --format agent`
+
 # Affiliate Dead-Code Cleanup
 
 - [x] Audit remaining direct usages of the legacy `App\Services\DawahShare` layer and old `dawah_share_*` schema/models
