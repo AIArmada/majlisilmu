@@ -6,6 +6,7 @@ use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\AuthzScope;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -32,6 +33,12 @@ final class MemberPermissionGate
     {
         return $this->isEventMember($user, $event)
             && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->event());
+    }
+
+    public function canReference(User $user, string $permission, Reference $reference): bool
+    {
+        return $this->isReferenceMember($user, $reference)
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->reference());
     }
 
     public function hasAnyInstitutionPermission(User $user, string $permission): bool
@@ -74,6 +81,11 @@ final class MemberPermissionGate
         return $this->memberRoleScopes->event();
     }
 
+    public function referenceScope(): AuthzScope
+    {
+        return $this->memberRoleScopes->reference();
+    }
+
     private function isInstitutionMember(User $user, Institution $institution): bool
     {
         return $institution->members()->whereKey($user->getKey())->exists();
@@ -87,5 +99,10 @@ final class MemberPermissionGate
     private function isEventMember(User $user, Event $event): bool
     {
         return $event->members()->whereKey($user->getKey())->exists();
+    }
+
+    private function isReferenceMember(User $user, Reference $reference): bool
+    {
+        return $reference->members()->whereKey($user->getKey())->exists();
     }
 }

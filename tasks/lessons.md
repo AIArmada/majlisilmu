@@ -118,6 +118,8 @@
 - When diagnosing merge history, do not treat a missing model or relation as merely absent in a snapshot until the commit diff is checked; a commit may have intentionally deleted the whole domain and that changes the correct merge target.
 - When a user reports missing share icons from `storage/app/public/social-media-icons`, do not move the app to a new `public/images` asset path; keep the canonical `/storage/social-media-icons/*.svg` URLs and fix the callers instead.
 - Before closing work after a merge or replayed patch set, scan the touched task files for unresolved `<<<<<<<`, `=======`, and `>>>>>>>` markers; documentation files are easy to miss when code paths look correct.
+- On PostgreSQL UUID columns, never append `orWhere('id', $slugLikeString)` to slug lookups; guard UUID fallback with `Str::isUuid(...)` first or public pages will 500 on non-UUID slugs.
+- When a user says a rich contribution flow should keep its own dedicated page, preserve that canonical route and rebuild the form there; do not collapse it into a simpler inline directory form just to reuse an existing surface.
 - When an Ahli workflow needs to move submitted events out of `draft`, do not reuse the pending-only `approve` policy helper for visibility; add a dedicated draft-review eligibility check that still requires the submission record and scoped `event.approve` permission.
 - On self-service settings pages, avoid redundant “Back to Dashboard” hero buttons unless the user explicitly asks for them; keep the header actions focused on adjacent account tasks instead of generic navigation.
 - On dense dashboard calendars, avoid extra per-day count badges when the cell already shows the event cards themselves; remove duplicate signals before adding more summary UI.

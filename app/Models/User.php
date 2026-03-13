@@ -51,6 +51,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             $user->socialAccounts()->each(fn ($account) => $account->delete());
             $user->institutions()->detach();
             $user->speakers()->detach();
+            $user->references()->detach();
             $user->memberEvents()->detach();
             $user->savedEvents()->detach();
             $user->interestedEvents()->detach();
@@ -58,6 +59,8 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
 
             $user->ownedEvents()->update(['user_id' => null]);
             $user->eventSubmissions()->update(['submitted_by' => null]);
+            $user->contributionRequests()->update(['proposer_id' => null]);
+            $user->reviewedContributionRequests()->update(['reviewer_id' => null]);
             $user->moderationReviews()->update(['reviewer_id' => null]);
             $user->reports()->update(['reporter_id' => null]);
             $user->handledReports()->update(['handled_by' => null]);
@@ -135,11 +138,36 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     }
 
     /**
+     * @return BelongsToMany<Reference, $this>
+     */
+    public function references(): BelongsToMany
+    {
+        return $this->belongsToMany(Reference::class, 'reference_user')
+            ->withTimestamps();
+    }
+
+    /**
      * @return HasMany<EventSubmission, $this>
      */
     public function eventSubmissions(): HasMany
     {
         return $this->hasMany(EventSubmission::class, 'submitted_by');
+    }
+
+    /**
+     * @return HasMany<ContributionRequest, $this>
+     */
+    public function contributionRequests(): HasMany
+    {
+        return $this->hasMany(ContributionRequest::class, 'proposer_id');
+    }
+
+    /**
+     * @return HasMany<ContributionRequest, $this>
+     */
+    public function reviewedContributionRequests(): HasMany
+    {
+        return $this->hasMany(ContributionRequest::class, 'reviewer_id');
     }
 
     /**

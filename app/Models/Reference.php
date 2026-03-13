@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasSocialMedia;
+use Database\Factories\ReferenceFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -15,8 +19,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Reference extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\ReferenceFactory> */
-    use \App\Models\Concerns\HasFollowers, HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    /** @use HasFactory<ReferenceFactory> */
+    use HasFactory, HasFollowers, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     #[\Override]
     protected static function booted(): void
@@ -50,7 +54,7 @@ class Reference extends Model implements HasMedia
      *
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);
@@ -65,6 +69,23 @@ class Reference extends Model implements HasMedia
             ->withPivot('order_column')
             ->withTimestamps()
             ->orderByPivot('order_column');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'reference_user')
+            ->withTimestamps();
+    }
+
+    /**
+     * @return MorphMany<Report, $this>
+     */
+    public function reports(): MorphMany
+    {
+        return $this->morphMany(Report::class, 'entity');
     }
 
     /**

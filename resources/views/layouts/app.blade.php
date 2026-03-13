@@ -210,6 +210,10 @@
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                                         {{ __('Saved Searches') }}
                                     </a>
+                                    <a href="{{ route('contributions.index') }}" wire:navigate
+                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                        {{ __('My Contributions') }}
+                                    </a>
                                     @if($hasInstitutionDashboardAccess)
                                         <a href="{{ route('dashboard.institutions') }}" wire:navigate
                                             class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
@@ -303,6 +307,10 @@
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                                     {{ __('Saved Searches') }}
                                 </a>
+                                <a href="{{ route('contributions.index') }}" wire:navigate
+                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                    {{ __('My Contributions') }}
+                                </a>
                                 @if($hasInstitutionDashboardAccess)
                                     <a href="{{ route('dashboard.institutions') }}" wire:navigate
                                         class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
@@ -380,8 +388,17 @@
                                 <li><a href="{{ route('home') }}#submit" wire:navigate
                                         class="hover:text-emerald-600 transition-colors">{{ __('Submit Event') }}</a>
                                 </li>
-                                <li><a href="#"
-                                        class="hover:text-emerald-600 transition-colors">{{ __('Contact Support') }}</a>
+                                @php
+                                    $supportEmail = config('mail.from.address');
+                                    $hasSupportEmail = filled($supportEmail) && $supportEmail !== 'hello@example.com';
+                                @endphp
+                                <li>
+                                    @if ($hasSupportEmail)
+                                        <a href="mailto:{{ $supportEmail }}"
+                                            class="hover:text-emerald-600 transition-colors">{{ __('Contact Support') }}</a>
+                                    @else
+                                        <span>{{ __('Contact Support') }}</span>
+                                    @endif
                                 </li>
                             </ul>
                         </div>
@@ -391,8 +408,8 @@
                         class="mt-12 flex flex-col gap-6 border-t border-slate-200 pt-8 md:flex-row md:items-center md:justify-between text-sm text-slate-400">
                         <span>&copy; {{ date('Y') }} Majlis Ilmu. {{ __('All rights reserved.') }}</span>
                         <div class="flex gap-6">
-                            <a href="#" class="hover:text-emerald-600 transition-colors">{{ __('Privacy') }}</a>
-                            <a href="#" class="hover:text-emerald-600 transition-colors">{{ __('Terms') }}</a>
+                            <span>{{ __('Privacy') }}</span>
+                            <span>{{ __('Terms') }}</span>
                         </div>
                     </div>
                 </div>

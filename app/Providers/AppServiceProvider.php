@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Ai\Listeners\RecordAiUsage;
 use App\Listeners\Notifications\HandleNotificationFailed;
 use App\Listeners\Notifications\RecordNotificationSent;
+use App\Models\ContributionRequest;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventSubmission;
@@ -33,6 +34,7 @@ use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Ai\Events\AgentPrompted;
 use Laravel\Ai\Events\AgentStreamed;
 use Laravel\Ai\Events\AudioGenerated;
@@ -122,6 +124,7 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'event' => Event::class,
             'event_submission' => EventSubmission::class,
+            'contribution_request' => ContributionRequest::class,
             'institution' => Institution::class,
             'speaker' => Speaker::class,
             'series' => Series::class,
@@ -169,7 +172,7 @@ class AppServiceProvider extends ServiceProvider
                         $baseName = MediaFileNamer::resolveBaseNameFromModel($record);
 
                         // Append 8-char ULID suffix for uniqueness
-                        $suffix = strtolower(substr(\Illuminate\Support\Str::ulid(), 0, 8));
+                        $suffix = strtolower(substr(Str::ulid(), 0, 8));
 
                         return "{$baseName}-{$suffix}.{$extension}";
                     }

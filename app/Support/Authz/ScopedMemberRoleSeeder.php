@@ -114,6 +114,32 @@ class ScopedMemberRoleSeeder
         ],
     ];
 
+    /**
+     * @var array<string, list<string>>
+     */
+    private const array REFERENCE_ROLE_PERMISSIONS = [
+        'owner' => [
+            'reference.view',
+            'reference.update',
+            'reference.delete',
+            'reference.manage-members',
+            'reference.approve',
+        ],
+        'admin' => [
+            'reference.view',
+            'reference.update',
+            'reference.manage-members',
+            'reference.approve',
+        ],
+        'editor' => [
+            'reference.view',
+            'reference.update',
+        ],
+        'viewer' => [
+            'reference.view',
+        ],
+    ];
+
     public function ensureForInstitution(): void
     {
         $this->seedRolesForScope($this->memberRoleScopes->institution(), self::INSTITUTION_ROLE_PERMISSIONS, false);
@@ -127,6 +153,11 @@ class ScopedMemberRoleSeeder
     public function ensureForEvent(): void
     {
         $this->seedRolesForScope($this->memberRoleScopes->event(), self::EVENT_ROLE_PERMISSIONS, false);
+    }
+
+    public function ensureForReference(): void
+    {
+        $this->seedRolesForScope($this->memberRoleScopes->reference(), self::REFERENCE_ROLE_PERMISSIONS, false);
     }
 
     /**

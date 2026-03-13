@@ -14,6 +14,8 @@ final class MemberRoleScopes
 
     private const string EVENT_SCOPEABLE_ID = '33333333-3333-4333-8333-333333333333';
 
+    private const string REFERENCE_SCOPEABLE_ID = '44444444-4444-4444-8444-444444444444';
+
     public function institution(): AuthzScope
     {
         return $this->ensure(self::INSTITUTION_SCOPEABLE_ID, 'Institution Members');
@@ -27,6 +29,11 @@ final class MemberRoleScopes
     public function event(): AuthzScope
     {
         return $this->ensure(self::EVENT_SCOPEABLE_ID, 'Event Members');
+    }
+
+    public function reference(): AuthzScope
+    {
+        return $this->ensure(self::REFERENCE_SCOPEABLE_ID, 'Reference Members');
     }
 
     private function ensure(string $scopeableId, string $label): AuthzScope

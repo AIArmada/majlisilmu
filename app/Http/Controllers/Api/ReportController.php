@@ -3,18 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DonationChannel;
 use App\Models\Event;
-use App\Models\Report;
-use App\Services\ModerationService;
+use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Speaker;
+use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 class ReportController extends Controller
 {
     public function __construct(
-        private readonly ModerationService $moderationService
+        private readonly ReportService $reportService,
     ) {}
 
     /**
@@ -26,7 +30,7 @@ class ReportController extends Controller
         $reporterFingerprint = $this->resolveReporterFingerprint($request);
 
         $validated = $request->validate([
-            'entity_type' => ['required', Rule::in(['event', 'institution', 'speaker', 'donation_channel'])],
+            'entity_type' => ['required', Rule::in(['event', 'institution', 'speaker', 'reference', 'donation_channel'])],
             'entity_id' => ['required', 'uuid'],
             'category' => [
                 'required',
@@ -34,6 +38,8 @@ class ReportController extends Controller
                     'wrong_info',
                     'cancelled_not_updated',
                     'fake_speaker',
+                    'fake_institution',
+                    'fake_reference',
                     'inappropriate_content',
                     'donation_scam',
                     'other',
@@ -44,7 +50,9 @@ class ReportController extends Controller
 
         // Verify entity exists
         $entityClass = $this->getEntityClass($validated['entity_type']);
-        if (! $entityClass::where('id', $validated['entity_id'])->exists()) {
+        $entity = $entityClass::query()->find($validated['entity_id']);
+
+        if (! $entity) {
             return response()->json([
                 'error' => [
                     'code' => 'not_found',
@@ -53,15 +61,20 @@ class ReportController extends Controller
             ], 404);
         }
 
-        // Check for duplicate reports within 24 hours (per B9e)
-        $existingReport = Report::query()
-            ->where('entity_type', $validated['entity_type'])
-            ->where('entity_id', $validated['entity_id'])
-            ->where('reporter_fingerprint', $reporterFingerprint)
-            ->where('created_at', '>=', now()->subDay())
-            ->exists();
+        try {
+            $report = $this->reportService->submit(
+                $entity,
+                $validated['entity_type'],
+                $request->user(),
+                $reporterFingerprint,
+                $validated['category'],
+                $validated['description'] ?? null,
+            );
+        } catch (\RuntimeException $exception) {
+            if ($exception->getMessage() !== 'duplicate_report') {
+                throw $exception;
+            }
 
-        if ($existingReport) {
             return response()->json([
                 'error' => [
                     'code' => 'conflict',
@@ -70,77 +83,15 @@ class ReportController extends Controller
             ], 409);
         }
 
-        $report = Report::create([
-            'entity_type' => $validated['entity_type'],
-            'entity_id' => $validated['entity_id'],
-            'category' => $validated['category'],
-            'description' => $validated['description'] ?? null,
-            'reporter_id' => $request->user()?->id,
-            'reporter_fingerprint' => $reporterFingerprint,
-            'status' => 'open',
-        ]);
-
-        // Handle high-risk reports per B6b
-        if (in_array($validated['category'], ['donation_scam', 'fake_speaker'])) {
-            $this->handleHighRiskReport($report);
-        }
-
-        // Check for escalation threshold (2 reports in 24 hours)
-        $this->checkEscalationThreshold($validated['entity_type'], $validated['entity_id']);
-
         return response()->json([
             'data' => [
                 'id' => $report->id,
                 'message' => 'Report submitted successfully. Our team will review it.',
             ],
             'meta' => [
-                'request_id' => request()->header('X-Request-ID', (string) \Illuminate\Support\Str::uuid()),
+                'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ], 201);
-    }
-
-    /**
-     * Handle high-risk report categories.
-     */
-    private function handleHighRiskReport(Report $report): void
-    {
-        if ($report->entity_type !== 'event') {
-            return;
-        }
-
-        $event = Event::query()->find($report->entity_id);
-
-        if (! $event) {
-            return;
-        }
-
-        $this->queueEventForModeration($event, 'High-risk report: '.$report->category);
-    }
-
-    /**
-     * Check if escalation threshold is met (2 unique reports in 24 hours).
-     */
-    private function checkEscalationThreshold(string $entityType, string $entityId): void
-    {
-        $recentReportCount = Report::query()
-            ->where('entity_type', $entityType)
-            ->where('entity_id', $entityId)
-            ->where('created_at', '>=', now()->subDay())
-            ->whereNotNull('reporter_fingerprint')
-            ->distinct()
-            ->count('reporter_fingerprint');
-
-        if ($recentReportCount < 2 || $entityType !== 'event') {
-            return;
-        }
-
-        $event = Event::query()->find($entityId);
-
-        if (! $event) {
-            return;
-        }
-
-        $this->queueEventForModeration($event, 'Escalated due to multiple reports within 24 hours.');
     }
 
     /**
@@ -149,21 +100,13 @@ class ReportController extends Controller
     private function getEntityClass(string $entityType): string
     {
         return match ($entityType) {
-            'event' => \App\Models\Event::class,
-            'institution' => \App\Models\Institution::class,
-            'speaker' => \App\Models\Speaker::class,
-            'donation_channel' => \App\Models\DonationChannel::class,
+            'event' => Event::class,
+            'institution' => Institution::class,
+            'speaker' => Speaker::class,
+            'reference' => Reference::class,
+            'donation_channel' => DonationChannel::class,
             default => throw new InvalidArgumentException("Unsupported entity type [{$entityType}]"),
         };
-    }
-
-    private function queueEventForModeration(Event $event, string $note): void
-    {
-        if ((string) $event->status !== 'approved') {
-            return;
-        }
-
-        $this->moderationService->remoderate($event, null, $note);
     }
 
     private function resolveReporterFingerprint(Request $request): string
