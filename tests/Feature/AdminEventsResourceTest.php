@@ -1,8 +1,13 @@
 <?php
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 
 it('resolves pending transitionable states without moderation context', function () {
     $event = Event::factory()->create([
@@ -18,7 +23,7 @@ it('resolves pending transitionable states without moderation context', function
 });
 
 it('resolves moderation transitions when context is provided', function () {
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $moderator = User::factory()->create();
     $moderator->assignRole('moderator');
@@ -36,8 +41,8 @@ it('resolves moderation transitions when context is provided', function () {
 });
 
 it('renders admin events list and search with pending events', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');
@@ -59,8 +64,8 @@ it('renders admin events list and search with pending events', function () {
 });
 
 it('shows typed event fields on the admin edit form', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');
@@ -69,9 +74,9 @@ it('shows typed event fields on the admin edit form', function () {
         'status' => 'pending',
         'event_url' => 'https://example.org/events/admin-typed-fields',
         'live_url' => 'https://youtube.com/watch?v=typed-admin-fields',
-        'event_format' => \App\Enums\EventFormat::Hybrid,
-        'gender' => \App\Enums\EventGenderRestriction::MenOnly,
-        'age_group' => [\App\Enums\EventAgeGroup::Adults],
+        'event_format' => EventFormat::Hybrid,
+        'gender' => EventGenderRestriction::MenOnly,
+        'age_group' => [EventAgeGroup::Adults],
         'children_allowed' => false,
     ]);
 
@@ -91,8 +96,8 @@ it('shows typed event fields on the admin edit form', function () {
 });
 
 it('renders the admin event view page with infolist tabs', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');
@@ -112,8 +117,8 @@ it('renders the admin event view page with infolist tabs', function () {
 });
 
 it('sanitizes description and uses full-width layout on admin event view page', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');
@@ -132,8 +137,8 @@ it('sanitizes description and uses full-width layout on admin event view page', 
 });
 
 it('shows date-only start time for prayer-relative events in the admin view', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');

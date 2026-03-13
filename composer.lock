@@ -5109,16 +5109,16 @@
         },
         {
             "name": "livewire/blaze",
-            "version": "v1.0.5",
+            "version": "v1.0.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/livewire/blaze.git",
-                "reference": "28565fb28a5ddd66b3e3678fef44f7f09e5a7b79"
+                "reference": "332c15895077fad114c4669a494948849f672179"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/livewire/blaze/zipball/28565fb28a5ddd66b3e3678fef44f7f09e5a7b79",
-                "reference": "28565fb28a5ddd66b3e3678fef44f7f09e5a7b79",
+                "url": "https://api.github.com/repos/livewire/blaze/zipball/332c15895077fad114c4669a494948849f672179",
+                "reference": "332c15895077fad114c4669a494948849f672179",
                 "shasum": ""
             },
             "require": {
@@ -5161,9 +5161,9 @@
             "description": "A tool for optimizing Blade component performance by folding them into parent templates",
             "support": {
                 "issues": "https://github.com/livewire/blaze/issues",
-                "source": "https://github.com/livewire/blaze/tree/v1.0.5"
+                "source": "https://github.com/livewire/blaze/tree/v1.0.6"
             },
-            "time": "2026-03-10T17:50:23+00:00"
+            "time": "2026-03-11T10:15:23+00:00"
         },
         {
             "name": "livewire/flux",
@@ -5753,16 +5753,16 @@
         },
         {
             "name": "nesbot/carbon",
-            "version": "3.11.1",
+            "version": "3.11.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/CarbonPHP/carbon.git",
-                "reference": "f438fcc98f92babee98381d399c65336f3a3827f"
+                "reference": "6a7e652845bb018c668220c2a545aded8594fbbf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/f438fcc98f92babee98381d399c65336f3a3827f",
-                "reference": "f438fcc98f92babee98381d399c65336f3a3827f",
+                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/6a7e652845bb018c668220c2a545aded8594fbbf",
+                "reference": "6a7e652845bb018c668220c2a545aded8594fbbf",
                 "shasum": ""
             },
             "require": {
@@ -5854,7 +5854,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-29T09:26:29+00:00"
+            "time": "2026-03-11T17:23:39+00:00"
         },
         {
             "name": "nette/php-generator",
@@ -13593,16 +13593,16 @@
         },
         {
             "name": "ysfkaya/filament-phone-input",
-            "version": "v4.1.1",
+            "version": "v4.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/ysfkaya/filament-phone-input.git",
-                "reference": "416fc765f611fde7c4e11140ceff336f48bd3090"
+                "reference": "b5384d45a8ddf6c2437c22512c6b69d012f12ba0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ysfkaya/filament-phone-input/zipball/416fc765f611fde7c4e11140ceff336f48bd3090",
-                "reference": "416fc765f611fde7c4e11140ceff336f48bd3090",
+                "url": "https://api.github.com/repos/ysfkaya/filament-phone-input/zipball/b5384d45a8ddf6c2437c22512c6b69d012f12ba0",
+                "reference": "b5384d45a8ddf6c2437c22512c6b69d012f12ba0",
                 "shasum": ""
             },
             "require": {
@@ -13651,9 +13651,9 @@
             ],
             "support": {
                 "issues": "https://github.com/ysfkaya/filament-phone-input/issues",
-                "source": "https://github.com/ysfkaya/filament-phone-input/tree/v4.1.1"
+                "source": "https://github.com/ysfkaya/filament-phone-input/tree/v4.1.2"
             },
-            "time": "2026-02-25T11:14:02+00:00"
+            "time": "2026-03-10T19:35:04+00:00"
         }
     ],
     "packages-dev": [

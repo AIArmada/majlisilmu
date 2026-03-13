@@ -4,7 +4,7 @@ namespace App\Enums;
 
 use Filament\Support\Contracts\HasLabel;
 
-enum EventParticipantRole: string implements HasLabel
+enum EventKeyPersonRole: string implements HasLabel
 {
     case Speaker = 'speaker';
     case Moderator = 'moderator';

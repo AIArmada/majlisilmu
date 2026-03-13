@@ -9,6 +9,7 @@ use Livewire\Blaze\Runtime\BlazeRuntime;
 
 class BlazeServiceProvider extends ServiceProvider
 {
+    #[\Override]
     public function register(): void
     {
         //

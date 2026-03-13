@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\DawahShareOutcomeType;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
@@ -53,8 +53,8 @@ class SavedSearchController extends Controller
             'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
-            'filters.participant_roles' => 'nullable|array',
-            'filters.participant_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
+            'filters.key_person_roles' => 'nullable|array',
+            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
             'filters.moderator_ids' => 'nullable|array',
             'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
             'filters.imam_ids' => 'nullable|array',
@@ -153,8 +153,8 @@ class SavedSearchController extends Controller
             'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
-            'filters.participant_roles' => 'nullable|array',
-            'filters.participant_roles.*' => ['string', Rule::in(array_keys(EventParticipantRole::nonSpeakerOptions()))],
+            'filters.key_person_roles' => 'nullable|array',
+            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
             'filters.moderator_ids' => 'nullable|array',
             'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
             'filters.imam_ids' => 'nullable|array',

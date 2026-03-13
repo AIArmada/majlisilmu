@@ -5,11 +5,12 @@ use AIArmada\FilamentAuthz\Models\Role;
 use App\Models\Event;
 use App\Models\EventUser;
 use App\Models\User;
-use App\Support\Authz\MemberRoleScopes;
-use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
+use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\ScopedMemberRoleSeeder;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
@@ -69,7 +70,7 @@ describe('viewAny', function () {
     });
 
     it('allows guests to view event list', function () {
-        expect(\Illuminate\Support\Facades\Gate::forUser(null)->allows('viewAny', Event::class))->toBeTrue();
+        expect(Gate::forUser(null)->allows('viewAny', Event::class))->toBeTrue();
     });
 });
 
@@ -80,7 +81,7 @@ describe('view', function () {
             'status' => Approved::class,
         ]);
 
-        expect(\Illuminate\Support\Facades\Gate::forUser(null)->allows('view', $event))->toBeTrue();
+        expect(Gate::forUser(null)->allows('view', $event))->toBeTrue();
     });
 
     it('allows anyone to view unlisted events', function () {
@@ -88,7 +89,7 @@ describe('view', function () {
             'visibility' => 'unlisted',
         ]);
 
-        expect(\Illuminate\Support\Facades\Gate::forUser(null)->allows('view', $event))->toBeTrue();
+        expect(Gate::forUser(null)->allows('view', $event))->toBeTrue();
     });
 
     it('denies guests from viewing private events', function () {
@@ -96,7 +97,7 @@ describe('view', function () {
             'visibility' => 'private',
         ]);
 
-        expect(\Illuminate\Support\Facades\Gate::forUser(null)->allows('view', $event))->toBeFalse();
+        expect(Gate::forUser(null)->allows('view', $event))->toBeFalse();
     });
 
     it('allows event members to view private events', function () {

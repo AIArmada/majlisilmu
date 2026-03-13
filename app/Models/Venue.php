@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Enums\VenueType;
+use App\Models\Concerns\HasAddress;
+use Database\Factories\VenueFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,8 +19,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Venue extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\VenueFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasSocialMedia, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    /** @use HasFactory<VenueFactory> */
+    use \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasSocialMedia, HasAddress, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -57,7 +60,7 @@ class Venue extends Model implements HasMedia
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);

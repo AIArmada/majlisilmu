@@ -7,6 +7,7 @@ use App\Models\NotificationDestination;
 use App\Notifications\Channels\Exceptions\ChannelDeliveryException;
 use App\Services\Notifications\NotificationSettingsManager;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 
 class WhatsappChannel
@@ -47,7 +48,7 @@ class WhatsappChannel
         $accessToken = config('notification-center.whatsapp.access_token');
         $results = [];
 
-        if (! $destinations instanceof \Illuminate\Support\Collection || $destinations->isEmpty()) {
+        if (! $destinations instanceof Collection || $destinations->isEmpty()) {
             throw new ChannelDeliveryException(
                 'WhatsApp delivery failed because no destinations are available.',
                 $provider,

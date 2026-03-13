@@ -6,6 +6,7 @@ use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
 use Database\Factories\NotificationMessageFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -13,6 +14,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\DatabaseNotification;
 
 #[UseFactory(NotificationMessageFactory::class)]
+/**
+ * @property-read string $title
+ * @property-read string $body
+ * @property-read ?string $action_url
+ * @property-read array<int, string> $channels_attempted
+ * @property-read array<string, mixed> $meta
+ * @property-read ?string $entity_type
+ * @property-read ?string $entity_id
+ */
 class NotificationMessage extends DatabaseNotification
 {
     /** @use HasFactory<NotificationMessageFactory> */
@@ -37,26 +47,39 @@ class NotificationMessage extends DatabaseNotification
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
-    public function scopeVisibleInInbox(Builder $query): Builder
+    #[Scope]
+    protected function visibleInInbox(Builder $query): Builder
     {
         return $query->where('inbox_visible', true);
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function title(): Attribute
     {
         return Attribute::get(fn (): string => (string) data_get($this->data, 'title', ''));
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function body(): Attribute
     {
         return Attribute::get(fn (): string => (string) data_get($this->data, 'body', ''));
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function actionUrl(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->stringOrNull((string) ($this->attributes['action_url'] ?? data_get($this->data, 'action_url'))));
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function channelsAttempted(): Attribute
     {
         return Attribute::get(function (): array {
@@ -75,21 +98,33 @@ class NotificationMessage extends DatabaseNotification
         });
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function meta(): Attribute
     {
         return Attribute::get(fn (): array => is_array(data_get($this->data, 'meta')) ? data_get($this->data, 'meta') : []);
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function entityType(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->stringOrNull((string) ($this->attributes['entity_type'] ?? data_get($this->data, 'entity_type'))));
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function entityId(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->stringOrNull((string) ($this->attributes['entity_id'] ?? data_get($this->data, 'entity_id'))));
     }
 
+    /**
+     * @return Attribute<mixed, never>
+     */
     protected function userId(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->stringOrNull($this->notifiable_id));

@@ -3,17 +3,22 @@
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\ModerationReview;
+use App\Models\Speaker;
+use App\Models\Tag;
 use App\Models\User;
+use App\Models\Venue;
 use App\Notifications\EventSubmittedNotification;
 use App\Services\ModerationService;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
     Notification::fake();
     $this->service = new ModerationService;
 });
@@ -98,7 +103,7 @@ describe('Event Approval', function () {
         $moderator->assignRole('moderator');
 
         // Create pending speaker
-        $speaker = \App\Models\Speaker::factory()->create([
+        $speaker = Speaker::factory()->create([
             'status' => 'pending',
         ]);
 
@@ -113,18 +118,18 @@ describe('Event Approval', function () {
         ]);
 
         // Create pending venue
-        $venue = \App\Models\Venue::factory()->create([
+        $venue = Venue::factory()->create([
             'status' => 'pending',
         ]);
 
         // Create pending tags
-        $disciplineTag = \App\Models\Tag::create([
+        $disciplineTag = Tag::create([
             'name' => ['ms' => 'Pending Fiqh', 'en' => 'Pending Fiqh'],
             'type' => 'discipline',
             'status' => 'pending',
         ]);
 
-        $issueTag = \App\Models\Tag::create([
+        $issueTag = Tag::create([
             'name' => ['ms' => 'Pending Issue', 'en' => 'Pending Issue'],
             'type' => 'issue',
             'status' => 'pending',
@@ -158,7 +163,7 @@ describe('Event Approval', function () {
         $moderator->assignRole('moderator');
 
         // Create already verified speaker
-        $speaker = \App\Models\Speaker::factory()->create([
+        $speaker = Speaker::factory()->create([
             'status' => 'verified',
         ]);
 

@@ -6,6 +6,8 @@ use App\Models\DonationChannel;
 use App\Models\Institution;
 use App\Models\Speaker;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class DonationChannelSeeder extends Seeder
 {
@@ -21,7 +23,7 @@ class DonationChannelSeeder extends Seeder
         DonationChannel::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 // Create donation channels for institutions in bulk
                 $institutions = Institution::query()->pluck('status', 'id')->toArray();
 
@@ -40,7 +42,7 @@ class DonationChannelSeeder extends Seeder
                             'status' => $status === 'verified' ? 'verified' : 'unverified',
                             'is_default' => true,
                         ])->toArray(),
-                        ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                        ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                     );
 
                     // Optionally add DuitNow (60% chance)
@@ -51,7 +53,7 @@ class DonationChannelSeeder extends Seeder
                                 'donatable_id' => $institutionId,
                                 'status' => $status === 'verified' ? 'verified' : 'unverified',
                             ])->toArray(),
-                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                            ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                         );
                     }
 
@@ -63,7 +65,7 @@ class DonationChannelSeeder extends Seeder
                                 'donatable_id' => $institutionId,
                                 'status' => 'unverified',
                             ])->toArray(),
-                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                            ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                         );
                     }
                 }
@@ -80,7 +82,7 @@ class DonationChannelSeeder extends Seeder
                                 'status' => $status === 'verified' ? 'verified' : 'unverified',
                                 'is_default' => true,
                             ])->toArray(),
-                            ['id' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
+                            ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]
                         );
                     }
                 }

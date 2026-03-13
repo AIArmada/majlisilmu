@@ -5,7 +5,7 @@ namespace App\Livewire\Pages\Events;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\TagType;
@@ -221,14 +221,12 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->label(__('Institution'))
                                     ->placeholder(__('Any Institution'))
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (Get $get, string $search): array {
-                                        return $this->searchInstitutionOptions(
-                                            stateId: $this->normalizeNullableString($get('state_id')),
-                                            districtId: $this->normalizeNullableString($get('district_id')),
-                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                            search: $search,
-                                        );
-                                    })
+                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchInstitutionOptions(
+                                        stateId: $this->normalizeNullableString($get('state_id')),
+                                        districtId: $this->normalizeNullableString($get('district_id')),
+                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        search: $search,
+                                    ))
                                     ->getOptionLabelUsing(fn (string $value): ?string => $this->institutionOptionLabel($value))
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
                                     ->live(),
@@ -237,14 +235,12 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->label(__('Tempat'))
                                     ->placeholder(__('Any Venue'))
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (Get $get, string $search): array {
-                                        return $this->searchVenueOptions(
-                                            stateId: $this->normalizeNullableString($get('state_id')),
-                                            districtId: $this->normalizeNullableString($get('district_id')),
-                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                            search: $search,
-                                        );
-                                    })
+                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchVenueOptions(
+                                        stateId: $this->normalizeNullableString($get('state_id')),
+                                        districtId: $this->normalizeNullableString($get('district_id')),
+                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        search: $search,
+                                    ))
                                     ->getOptionLabelUsing(fn (string $value): ?string => $this->venueOptionLabel($value))
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
                                     ->live(),
@@ -281,7 +277,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->placeholder(__('Any Role'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(EventParticipantRole::nonSpeakerOptions())
+                                    ->options(EventKeyPersonRole::nonSpeakerOptions())
                                     ->live(),
 
                                 Select::make('moderator_ids')
@@ -376,12 +372,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->placeholder(__('Any Type'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(function (): array {
-                                        return collect(EventType::cases())
-                                            ->mapToGroups(fn (EventType $type): array => [$type->getGroup() => [$type->value => $type->getLabel()]])
-                                            ->map(fn (Collection $group): array => $group->collapse()->all())
-                                            ->toArray();
-                                    })
+                                    ->options(fn (): array => collect(EventType::cases())
+                                        ->mapToGroups(fn (EventType $type): array => [$type->getGroup() => [$type->value => $type->getLabel()]])
+                                        ->map(fn (Collection $group): array => $group->collapse()->all())
+                                        ->toArray())
                                     ->live(),
 
                                 Select::make('event_format')
@@ -477,6 +471,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         $this->dispatch('event-filters-updated', filters: $normalized);
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
     #[On('event-filters-synced')]
     public function syncFilters(array $filters): void
     {
@@ -526,6 +523,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
         });
     }
 
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
     public function speakerOptionLabels(array $values): array
     {
         if ($values === []) {
@@ -539,6 +540,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
     public function tagOptionLabels(TagType $type, array $values): array
     {
         if ($values === []) {
@@ -552,6 +557,10 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
     public function referenceOptionLabels(array $values): array
     {
         if ($values === []) {
@@ -629,6 +638,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
     }
 
     /**
+     * @param  array<string, mixed>  $raw
      * @return array<string, mixed>
      */
     private function normalizedFilterData(array $raw): array
@@ -727,7 +737,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
 
         $values = is_array($value) ? $value : [$value];
 
-        return array_values(array_filter(array_map('strval', $values), static fn (string $item): bool => $item !== ''));
+        return array_values(array_filter(array_map(strval(...), $values), static fn (string $item): bool => $item !== ''));
     }
 
     private function normalizeNullableString(mixed $value): ?string
@@ -781,6 +791,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         return null;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchInstitutionOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
     {
         $query = Institution::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
@@ -791,6 +804,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         return $this->pluckOptions($query->orderBy('name'), 'name', 50);
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchVenueOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
     {
         $query = Venue::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
@@ -801,6 +817,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         return $this->pluckOptions($query->orderBy('name'), 'name', 50);
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchSpeakerOptions(string $search): array
     {
         return $this->pluckOptions(
@@ -814,6 +833,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchTagOptions(TagType $type, string $search): array
     {
         return $this->pluckOptions(
@@ -827,6 +849,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function searchReferenceOptions(string $search): array
     {
         return $this->pluckOptions(
@@ -858,6 +883,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     private function applySearchConstraint(Builder $query, string $column, string $search): Builder
     {

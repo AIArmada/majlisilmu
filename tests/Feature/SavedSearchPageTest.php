@@ -1,7 +1,8 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Livewire\Pages\SavedSearches\Index as SavedSearchesIndex;
+use App\Models\Reference;
 use App\Models\SavedSearch;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -119,7 +120,7 @@ it('renders source issue and reference chips using human-readable values', funct
     $issueTag = Tag::factory()->issue()->create([
         'name' => ['en' => 'Keluarga', 'ms' => 'Keluarga'],
     ]);
-    $reference = \App\Models\Reference::factory()->create([
+    $reference = Reference::factory()->create([
         'title' => 'Riyadhus Solihin',
         'is_active' => true,
     ]);
@@ -136,13 +137,13 @@ it('renders source issue and reference chips using human-readable values', funct
         ->assertSee('Rujukan Kitab/Buku: Riyadhus Solihin');
 });
 
-it('renders participant role and linked profile chips using human-readable values', function () {
+it('renders key person role and linked profile chips using human-readable values', function () {
     $user = User::factory()->create();
     $imamSpeaker = Speaker::factory()->create(['name' => 'Ustaz Role Imam']);
 
     $this->actingAs($user)
         ->get(route('saved-searches.index', [
-            'key_person_roles' => [EventParticipantRole::PersonInCharge->value],
+            'key_person_roles' => [EventKeyPersonRole::PersonInCharge->value],
             'imam_ids' => [$imamSpeaker->id],
         ]))
         ->assertOk()

@@ -5,6 +5,7 @@ use App\Enums\ContactCategory;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\EventSubmission;
@@ -13,6 +14,7 @@ use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\Tag;
+use App\Models\User;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -40,7 +42,7 @@ it('loads public detail pages', function () {
         'visibility' => 'public',
     ]);
     $series->events()->attach($event->id, [
-        'id' => (string) \Illuminate\Support\Str::uuid(),
+        'id' => (string) Str::uuid(),
         'order_column' => 1,
     ]);
 
@@ -57,7 +59,7 @@ it('renders noindex robots metadata for moderation-only or non-public detail pag
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     Role::findOrCreate('moderator', 'web');
 
-    $moderator = \App\Models\User::factory()->create();
+    $moderator = User::factory()->create();
     $moderator->assignRole('moderator');
 
     $pendingInstitution = Institution::factory()->create([
@@ -200,7 +202,7 @@ it('renders optimized seo metadata on public detail pages', function () {
 
 it('loads institution detail page with upcoming event type enum collection', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
-    $eventType = \App\Enums\EventType::KuliahCeramah;
+    $eventType = EventType::KuliahCeramah;
     $event = Event::factory()
         ->for($institution)
         ->create([
@@ -245,7 +247,7 @@ it('records guest submissions without a submitter id', function () {
         ->set('data.description', 'Test event description')
         ->set('data.event_date', now()->addDay()->toDateString())
         ->set('data.prayer_time', EventPrayerTime::SelepasMaghrib->value)
-        ->set('data.event_type', [\App\Enums\EventType::KuliahCeramah->value])
+        ->set('data.event_type', [EventType::KuliahCeramah->value])
         ->set('data.gender', EventGenderRestriction::All->value)
         ->set('data.age_group', [EventAgeGroup::AllAges->value])
         ->set('data.domain_tags', [$domainTag->id])

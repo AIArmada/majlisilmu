@@ -18,7 +18,7 @@ trait HasFollowers
 
     public function isFollowedBy(?User $user): bool
     {
-        if (! $user) {
+        if (! $user instanceof User) {
             return false;
         }
 

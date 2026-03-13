@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\EventSubmittedNotification;
+use App\Services\Notifications\EventNotificationService;
+use App\States\EventStatus\Pending;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -12,6 +14,7 @@ use Filament\Support\Contracts\HasLabel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Spatie\ModelStates\Transition;
+use Spatie\Permission\Exceptions\RoleDoesNotExist;
 
 class SubmitForModeration extends Transition implements HasColor, HasIcon, HasLabel
 {
@@ -21,10 +24,10 @@ class SubmitForModeration extends Transition implements HasColor, HasIcon, HasLa
 
     public function handle(): Event
     {
-        $this->event->status = \App\States\EventStatus\Pending::class;
+        $this->event->status = Pending::class;
         $this->event->save();
 
-        app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionReceived($this->event);
+        app(EventNotificationService::class)->notifySubmissionReceived($this->event);
 
         // Notify moderators
         try {
@@ -32,7 +35,7 @@ class SubmitForModeration extends Transition implements HasColor, HasIcon, HasLa
             if ($moderators->isNotEmpty()) {
                 Notification::send($moderators, new EventSubmittedNotification($this->event));
             }
-        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist) {
+        } catch (RoleDoesNotExist) {
             Log::warning('Could not notify moderators: roles not found', ['event_id' => $this->event->id]);
         }
 

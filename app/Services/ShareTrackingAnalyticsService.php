@@ -9,12 +9,13 @@ use App\Data\ShareTracking\ShareTrackingOutcomeData;
 use App\Data\ShareTracking\ShareTrackingVisitData;
 use App\Models\User;
 use App\Services\ShareTracking\AffiliatesShareTrackingAnalyticsService;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
-final class ShareTrackingAnalyticsService
+final readonly class ShareTrackingAnalyticsService
 {
     public function __construct(
-        private readonly AffiliatesShareTrackingAnalyticsService $affiliates,
+        private AffiliatesShareTrackingAnalyticsService $affiliates,
     ) {}
 
     /**
@@ -70,19 +71,17 @@ final class ShareTrackingAnalyticsService
     {
         return $this->linksForUser($user)
             ->groupBy(fn (ShareTrackingLinkData $link): string => $link->subjectType)
-            ->map(function (Collection $links, string $subjectType): array {
-                return [
-                    'subject_type' => $subjectType,
-                    'label' => $this->subjectTypeLabel($subjectType),
-                    'links' => $links->count(),
-                    'visits' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->visitsCount),
-                    'signups' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->signupsCount),
-                    'event_registrations' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->eventRegistrationsCount),
-                    'event_checkins' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->eventCheckinsCount),
-                    'event_submissions' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->eventSubmissionsCount),
-                    'total_outcomes' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->outcomesCount),
-                ];
-            })
+            ->map(fn (Collection $links, string $subjectType): array => [
+                'subject_type' => $subjectType,
+                'label' => $this->subjectTypeLabel($subjectType),
+                'links' => $links->count(),
+                'visits' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->visitsCount),
+                'signups' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->signupsCount),
+                'event_registrations' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->eventRegistrationsCount),
+                'event_checkins' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->eventCheckinsCount),
+                'event_submissions' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->eventSubmissionsCount),
+                'total_outcomes' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->outcomesCount),
+            ])
             ->sortByDesc('visits')
             ->values();
     }
@@ -124,19 +123,17 @@ final class ShareTrackingAnalyticsService
                     'total_outcomes' => (int) $links->sum(fn (ShareTrackingLinkData $link): int => $link->outcomesCount),
                 ];
             })
-            ->sort(function (array $left, array $right): int {
-                return [
-                    $right['total_outcomes'],
-                    $right['visits'],
-                    $right['event_checkins'],
-                    $right['event_registrations'],
-                ] <=> [
-                    $left['total_outcomes'],
-                    $left['visits'],
-                    $left['event_checkins'],
-                    $left['event_registrations'],
-                ];
-            })
+            ->sort(fn (array $left, array $right): int => [
+                $right['total_outcomes'],
+                $right['visits'],
+                $right['event_checkins'],
+                $right['event_registrations'],
+            ] <=> [
+                $left['total_outcomes'],
+                $left['visits'],
+                $left['event_checkins'],
+                $left['event_registrations'],
+            ])
             ->take($limit)
             ->values();
     }

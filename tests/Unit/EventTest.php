@@ -11,6 +11,7 @@ use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -69,7 +70,7 @@ it('searchable payload includes is_active and subdistrict_id location fields', f
     $state = State::where('country_code', 'MY')->first();
 
     if (! $state) {
-        $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+        $countryId = DB::table('countries')->insertGetId([
             'iso2' => 'MY',
             'name' => 'Malaysia',
             'status' => 1,
@@ -79,7 +80,7 @@ it('searchable payload includes is_active and subdistrict_id location fields', f
             'subregion' => 'South-Eastern Asia',
         ]);
 
-        $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+        $stateId = DB::table('states')->insertGetId([
             'country_id' => $countryId,
             'name' => 'Selangor',
             'country_code' => 'MY',

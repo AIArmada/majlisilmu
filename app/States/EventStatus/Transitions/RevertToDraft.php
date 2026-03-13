@@ -5,6 +5,7 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\States\EventStatus\Draft;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -31,7 +32,7 @@ class RevertToDraft extends Transition implements HasColor, HasIcon, HasLabel
                 'note' => $this->note ?? 'Event reverted to draft.',
             ]);
 
-            $this->event->status = \App\States\EventStatus\Draft::class;
+            $this->event->status = Draft::class;
             $this->event->published_at = null;
             $this->event->save();
 

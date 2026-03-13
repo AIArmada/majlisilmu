@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
+use Database\Factories\NotificationDestinationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class NotificationDestination extends Model
 {
-    /** @use HasFactory<\Database\Factories\NotificationDestinationFactory> */
+    /** @use HasFactory<NotificationDestinationFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;

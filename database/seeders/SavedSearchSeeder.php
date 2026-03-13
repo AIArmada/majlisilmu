@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\SavedSearch;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SavedSearchSeeder extends Seeder
 {
@@ -20,7 +22,7 @@ class SavedSearchSeeder extends Seeder
         SavedSearch::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 $userIds = User::query()->pluck('id')->toArray();
 
                 $searchesToInsert = [];
@@ -38,7 +40,7 @@ class SavedSearchSeeder extends Seeder
                         $searchesToInsert[] = array_merge(
                             $searchData,
                             [
-                                'id' => (string) \Illuminate\Support\Str::uuid(),
+                                'id' => (string) Str::uuid(),
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ]

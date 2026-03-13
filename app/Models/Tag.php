@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\TagType;
+use Database\Factories\TagFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +14,7 @@ use Spatie\Tags\Tag as SpatieTag;
 
 class Tag extends SpatieTag implements Sortable
 {
-    /** @use HasFactory<\Database\Factories\TagFactory> */
+    /** @use HasFactory<TagFactory> */
     use HasFactory, HasUuids, SortableTrait;
 
     public $incrementing = false;
@@ -75,7 +77,7 @@ class Tag extends SpatieTag implements Sortable
      *
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function ofType(Builder $query, TagType|string $type): void
     {
         $value = $type instanceof TagType ? $type->value : $type;

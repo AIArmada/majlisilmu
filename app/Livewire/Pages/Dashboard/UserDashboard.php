@@ -26,13 +26,13 @@ class UserDashboard extends Component
 {
     use WithPagination;
 
-    private const AGENDA_PER_PAGE = 6;
+    private const int AGENDA_PER_PAGE = 6;
 
-    private const PLANNER_BUCKET_PER_PAGE = 3;
+    private const int PLANNER_BUCKET_PER_PAGE = 3;
 
-    private const SUBMITTED_PER_PAGE = 4;
+    private const int SUBMITTED_PER_PAGE = 4;
 
-    private const CHECKINS_PER_PAGE = 6;
+    private const int CHECKINS_PER_PAGE = 6;
 
     public function mount(): void
     {
@@ -136,12 +136,14 @@ class UserDashboard extends Component
     }
 
     /**
-     * @return Collection<int, EventSubmission>
+     * @return Collection<int, array<string, mixed>>
      */
     #[Computed]
     public function submittedEvents(): Collection
     {
-        /** @var Collection<int, EventSubmission> $submissions */
+        /** @var Collection<int, array<string, mixed>> $entries */
+        $entries = collect();
+
         $submissions = EventSubmission::query()
             ->where('submitted_by', $this->user()->id)
             ->with([
@@ -149,10 +151,45 @@ class UserDashboard extends Component
             ])
             ->latest()
             ->get()
-            ->filter(fn (EventSubmission $submission): bool => $submission->event instanceof Event)
             ->values();
 
-        return $submissions;
+        foreach ($submissions as $submission) {
+            if (! $submission instanceof EventSubmission || ! $submission->event instanceof Event) {
+                continue;
+            }
+
+            $entries->push([
+                'event' => $submission->event,
+                'created_at' => $submission->created_at,
+                'notes' => $submission->notes,
+            ]);
+        }
+
+        $directEvents = Event::query()
+            ->where('submitter_id', $this->user()->id)
+            ->with($this->plannerEventRelations())
+            ->whereDoesntHave('submissions', fn ($query) => $query->where('submitted_by', $this->user()->id))
+            ->latest('created_at')
+            ->get();
+
+        foreach ($directEvents as $event) {
+            if (! $event instanceof Event) {
+                continue;
+            }
+
+            $entries->push([
+                'event' => $event,
+                'created_at' => $event->created_at,
+                'notes' => null,
+            ]);
+        }
+
+        /** @var Collection<int, array<string, mixed>> $sortedEntries */
+        $sortedEntries = $entries
+            ->sortByDesc(fn (array $entry): int => $entry['created_at']?->getTimestamp() ?? 0)
+            ->values();
+
+        return $sortedEntries;
     }
 
     /**
@@ -208,12 +245,8 @@ class UserDashboard extends Component
             $this->mergeEventIntoCalendarEntries($entries, $registration->event, 'registered');
         }
 
-        foreach ($submittedEvents as $submission) {
-            if (! $submission->event instanceof Event) {
-                continue;
-            }
-
-            $this->mergeEventIntoCalendarEntries($entries, $submission->event, 'submitted');
+        foreach ($submittedEvents as $submissionEntry) {
+            $this->mergeEventIntoCalendarEntries($entries, $submissionEntry['event'], 'submitted');
         }
 
         foreach ($recentCheckins as $checkin) {
@@ -281,7 +314,7 @@ class UserDashboard extends Component
             }
         }
 
-        foreach ($definitions as $role => $definition) {
+        foreach (array_keys($definitions) as $role) {
             $definitions[$role]['count'] = $counts[$role];
         }
 
@@ -301,11 +334,9 @@ class UserDashboard extends Component
 
         /** @var Collection<int, array<string, mixed>> $agenda */
         $agenda = collect($entries)
-            ->filter(function (array $entry) use ($nowTimestamp): bool {
-                return ! ($entry['is_checkin'] ?? false)
-                    && is_int($entry['starts_at_ts'] ?? null)
-                    && $entry['starts_at_ts'] >= $nowTimestamp;
-            })
+            ->filter(fn (array $entry): bool => ! ($entry['is_checkin'] ?? false)
+                && is_int($entry['starts_at_ts'] ?? null)
+                && $entry['starts_at_ts'] >= $nowTimestamp)
             ->sortBy('starts_at_ts')
             ->values();
 
@@ -377,12 +408,15 @@ class UserDashboard extends Component
     }
 
     /**
-     * @return LengthAwarePaginator<int, EventSubmission>
+     * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     #[Computed]
     public function paginatedSubmittedEvents(): LengthAwarePaginator
     {
-        return $this->paginateCollection($this->submittedEvents(), self::SUBMITTED_PER_PAGE, 'submitted_page');
+        /** @var Collection<int, array<string, mixed>> $submittedEntries */
+        $submittedEntries = $this->submittedEvents();
+
+        return $this->paginateCollection($submittedEntries, self::SUBMITTED_PER_PAGE, 'submitted_page');
     }
 
     /**
@@ -397,6 +431,13 @@ class UserDashboard extends Component
     public function render(): View
     {
         return view('livewire.pages.dashboard.user-dashboard');
+    }
+
+    public function canManageSubmittedEvent(Event $event): bool
+    {
+        $user = $this->user();
+
+        return $event->userCanManage($user) || $event->submitter_id === $user->id;
     }
 
     /**
@@ -644,9 +685,7 @@ class UserDashboard extends Component
             'primary_role' => $primaryRole,
             'panel_class' => $this->entryPanelClass($status, $primaryRole, $isCheckin),
             'starts_at_ts' => $timestamp,
-            'is_past' => $startsAt instanceof CarbonInterface
-                ? $startsAt->copy()->timezone(UserDateTimeFormatter::resolveTimezone())->isPast()
-                : false,
+            'is_past' => $startsAt instanceof CarbonInterface && $startsAt->copy()->timezone(UserDateTimeFormatter::resolveTimezone())->isPast(),
             'is_checkin' => $isCheckin,
         ];
     }

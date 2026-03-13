@@ -44,38 +44,32 @@ class KimiHome extends Component
 
     private function loadStats(): void
     {
-        $this->stats = Cache::remember('kimi_home_stats', 300, function () {
-            return [
-                'events' => Event::count(),
-                'institutions' => Institution::count(),
-                'speakers' => Speaker::count(),
-                'this_week' => Event::whereBetween('starts_at', [now(), now()->addWeek()])->count(),
-            ];
-        });
+        $this->stats = Cache::remember('kimi_home_stats', 300, fn () => [
+            'events' => Event::count(),
+            'institutions' => Institution::count(),
+            'speakers' => Speaker::count(),
+            'this_week' => Event::whereBetween('starts_at', [now(), now()->addWeek()])->count(),
+        ]);
     }
 
     private function loadFeaturedEvents(): void
     {
-        $this->featuredEvents = Cache::remember('kimi_featured_events', 300, function () {
-            return Event::with(['institution', 'speakers', 'media'])
-                ->where('starts_at', '>=', now())
-                ->active()
-                ->orderBy('starts_at')
-                ->limit(6)
-                ->get();
-        });
+        $this->featuredEvents = Cache::remember('kimi_featured_events', 300, fn () => Event::with(['institution', 'speakers', 'media'])
+            ->where('starts_at', '>=', now())
+            ->active()
+            ->orderBy('starts_at')
+            ->limit(6)
+            ->get());
     }
 
     private function loadUpcomingEvents(): void
     {
-        $this->upcomingEvents = Cache::remember('kimi_upcoming_events', 300, function () {
-            return Event::with(['institution', 'speakers'])
-                ->where('starts_at', '>=', now())
-                ->active()
-                ->orderBy('starts_at')
-                ->limit(4)
-                ->get();
-        });
+        $this->upcomingEvents = Cache::remember('kimi_upcoming_events', 300, fn () => Event::with(['institution', 'speakers'])
+            ->where('starts_at', '>=', now())
+            ->active()
+            ->orderBy('starts_at')
+            ->limit(4)
+            ->get());
     }
 
     private function loadCategories(): void

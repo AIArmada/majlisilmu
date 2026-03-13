@@ -73,7 +73,7 @@ class EventsController extends Controller
             return back()->withErrors(['registration' => 'Registration has closed.']);
         }
 
-        $registrationMode = $this->resolveRegistrationMode($settings);
+        $this->resolveRegistrationMode($settings);
 
         // Validate request
         $validated = $request->validate([

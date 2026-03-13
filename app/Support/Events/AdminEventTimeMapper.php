@@ -31,7 +31,7 @@ class AdminEventTimeMapper
             $data['end_time'] = $endsAt->format('H:i');
         }
 
-        $data['prayer_time'] = self::resolvePrayerTimeForFill($data)?->value ?? EventPrayerTime::LainWaktu->value;
+        $data['prayer_time'] = self::resolvePrayerTimeForFill($data)->value;
 
         return $data;
     }
@@ -50,7 +50,7 @@ class AdminEventTimeMapper
         $startsAt = self::resolveStartsAt($eventDate, $prayerTime, (string) ($data['custom_time'] ?? null));
         $endsAt = self::resolveEndsAt($startsAt, (string) ($data['end_time'] ?? null), $timezone);
 
-        if ($endsAt !== null && $endsAt->lessThanOrEqualTo($startsAt)) {
+        if ($endsAt instanceof Carbon && $endsAt->lessThanOrEqualTo($startsAt)) {
             throw ValidationException::withMessages([
                 'data.end_time' => __('Masa akhir mestilah selepas masa mula.'),
             ]);
@@ -68,7 +68,10 @@ class AdminEventTimeMapper
         return $data;
     }
 
-    protected static function resolvePrayerTimeForFill(array $data): ?EventPrayerTime
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected static function resolvePrayerTimeForFill(array $data): EventPrayerTime
     {
         $timingMode = (string) ($data['timing_mode'] ?? TimingMode::Absolute->value);
         $reference = PrayerReference::tryFrom((string) ($data['prayer_reference'] ?? ''));
@@ -96,12 +99,19 @@ class AdminEventTimeMapper
                 : EventPrayerTime::SelepasIsyak;
         }
 
-        return match ($reference) {
-            PrayerReference::Fajr => EventPrayerTime::SelepasSubuh,
-            PrayerReference::Dhuhr => EventPrayerTime::SelepasZuhur,
-            PrayerReference::Asr => EventPrayerTime::SelepasAsar,
-            default => EventPrayerTime::LainWaktu,
-        };
+        if ($reference === PrayerReference::Fajr) {
+            return EventPrayerTime::SelepasSubuh;
+        }
+
+        if ($reference === PrayerReference::Dhuhr) {
+            return EventPrayerTime::SelepasZuhur;
+        }
+
+        if ($reference === PrayerReference::Asr) {
+            return EventPrayerTime::SelepasAsar;
+        }
+
+        return EventPrayerTime::LainWaktu;
     }
 
     protected static function resolveStartsAt(Carbon $eventDate, EventPrayerTime $prayerTime, ?string $customTime): Carbon
@@ -171,7 +181,7 @@ class AdminEventTimeMapper
         if (preg_match('/^(\d{1,2})[:.](\d{2})(?::\d{2})?\s*([\p{L}.]+)?$/u', $normalized, $matches) === 1) {
             $rawHour = (int) $matches[1];
             $minute = (int) $matches[2];
-            $suffix = isset($matches[3]) ? str_replace('.', '', (string) $matches[3]) : '';
+            $suffix = isset($matches[3]) ? str_replace('.', '', $matches[3]) : '';
             $meridiem = self::normalizeMeridiem($suffix);
 
             if ($minute < 0 || $minute > 59) {

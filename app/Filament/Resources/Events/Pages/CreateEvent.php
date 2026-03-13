@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use App\Enums\RegistrationMode;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Tag;
@@ -37,7 +38,7 @@ class CreateEvent extends CreateRecord
 
     protected function afterCreate(): void
     {
-        $registrationMode = $this->form->getState()['registration_mode'] ?? \App\Enums\RegistrationMode::Event->value;
+        $registrationMode = $this->form->getState()['registration_mode'] ?? RegistrationMode::Event->value;
         $this->eventRecord()->settings()->updateOrCreate(
             ['event_id' => $this->eventRecord()->id],
             ['registration_mode' => (string) $registrationMode]

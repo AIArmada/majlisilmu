@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\SpaceFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Space extends Model
 {
-    /** @use HasFactory<\Database\Factories\SpaceFactory> */
+    /** @use HasFactory<SpaceFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -45,7 +47,7 @@ class Space extends Model
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);

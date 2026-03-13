@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AiModelPricing extends Model
 {
-    /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
+    /** @use HasFactory<Factory<self>> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;
@@ -64,7 +66,7 @@ class AiModelPricing extends Model
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function activeAt(Builder $query, ?\DateTimeInterface $moment = null): void
     {
         $moment ??= now();

@@ -23,12 +23,12 @@ return new class extends Migration
 
             try {
                 $table->dropIndex('event_participants_event_role');
-            } catch (\Throwable) {
+            } catch (Throwable) {
             }
 
             try {
                 $table->dropIndex('event_participants_event_speaker');
-            } catch (\Throwable) {
+            } catch (Throwable) {
             }
 
             $table->index(['event_id', 'role'], 'event_key_people_event_role');

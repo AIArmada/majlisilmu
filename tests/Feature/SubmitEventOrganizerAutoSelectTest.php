@@ -3,6 +3,7 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Speaker;
@@ -40,7 +41,7 @@ function submitEventOrganizerFormData(array $fixtures, array $overrides = []): a
         'title' => 'Auto Select Speaker Event',
         'event_date' => now()->addDay()->toDateString(),
         'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
-        'event_type' => [\App\Enums\EventType::KuliahCeramah->value],
+        'event_type' => [EventType::KuliahCeramah->value],
         'gender' => EventGenderRestriction::All->value,
         'age_group' => [EventAgeGroup::AllAges->value],
         'languages' => [101],

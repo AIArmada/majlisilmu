@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Enums\EventVisibility;
 use App\Enums\NotificationCadence;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
@@ -694,7 +695,7 @@ class EventNotificationService
         $events = Event::query()
             ->where('is_active', true)
             ->whereIn('status', Event::ENGAGEABLE_STATUSES)
-            ->where('visibility', \App\Enums\EventVisibility::Public)
+            ->where('visibility', EventVisibility::Public)
             ->whereBetween('starts_at', [
                 $windowStart->utc()->toDateTimeString(),
                 $windowEnd->utc()->toDateTimeString(),
@@ -742,18 +743,12 @@ class EventNotificationService
      */
     protected function trackedReminderUsers(Event $event, bool $checkinOpen = false): Collection
     {
-        $users = collect()
+        return collect()
             ->merge($event->goingBy()->get())
             ->merge($this->registeredUsers($event))
             ->filter(fn (mixed $user): bool => $user instanceof User)
             ->unique('id')
             ->values();
-
-        if (! $checkinOpen) {
-            return $users;
-        }
-
-        return $users;
     }
 
     /**
@@ -844,7 +839,7 @@ class EventNotificationService
     {
         return $event->is_active
             && (string) $event->status === 'approved'
-            && $event->visibility === \App\Enums\EventVisibility::Public
+            && $event->visibility === EventVisibility::Public
             && $event->starts_at !== null
             && $event->starts_at->isFuture();
     }

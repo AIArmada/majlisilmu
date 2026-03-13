@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RegistrationMode;
+use Database\Factories\EventSettingsFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventSettings extends Model
 {
-    /** @use HasFactory<\Database\Factories\EventSettingsFactory> */
+    /** @use HasFactory<EventSettingsFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;

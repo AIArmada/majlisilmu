@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\User;
+use App\States\EventStatus\Draft;
 
 class EventPolicy
 {
@@ -36,7 +37,7 @@ class EventPolicy
         }
 
         // Private events require authorization
-        if (!$user instanceof \App\Models\User) {
+        if (! $user instanceof User) {
             return false;
         }
 
@@ -102,7 +103,7 @@ class EventPolicy
         }
 
         // For other users, only draft events can be deleted
-        if ($event->status === null || !$event->status->equals(\App\States\EventStatus\Draft::class)) {
+        if ($event->status === null || ! $event->status->equals(Draft::class)) {
             return false;
         }
 

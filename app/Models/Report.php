@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\ReportFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Report extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\ReportFactory> */
+    /** @use HasFactory<ReportFactory> */
     use HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;

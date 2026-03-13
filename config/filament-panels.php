@@ -6,4 +6,3 @@ return [
         'ahli' => env('FILAMENT_AHLI_DOMAIN'),
     ],
 ];
-

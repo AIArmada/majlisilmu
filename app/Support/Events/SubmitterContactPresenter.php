@@ -137,7 +137,6 @@ final class SubmitterContactPresenter
             return self::filledString($value);
         }
 
-        /** @var mixed $value */
         $value = $submission->contacts()
             ->where('category', $category->value)
             ->value('value');

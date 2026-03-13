@@ -5,7 +5,7 @@ namespace App\Filament\Resources\Events\Schemas;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -398,7 +398,7 @@ class EventForm
                                                 Select::make('role')
                                                     ->label('Peranan')
                                                     ->required()
-                                                    ->options(EventParticipantRole::nonSpeakerOptions())
+                                                    ->options(EventKeyPersonRole::nonSpeakerOptions())
                                                     ->native(false),
                                                 Select::make('speaker_id')
                                                     ->label('Pautkan Profil Penceramah')
@@ -640,7 +640,7 @@ class EventForm
             return '-';
         }
 
-        return $submission->submitter instanceof \App\Models\User
+        return $submission->submitter instanceof User
             ? 'Pengguna berdaftar'
             : 'Penghantaran awam';
     }

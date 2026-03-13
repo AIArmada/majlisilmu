@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 
@@ -22,7 +22,7 @@ class EventKeyPersonSyncService
             EventKeyPerson::query()->create([
                 'event_id' => $event->id,
                 'speaker_id' => $speakerId,
-                'role' => EventParticipantRole::Speaker->value,
+                'role' => EventKeyPersonRole::Speaker->value,
                 'order_column' => $order++,
                 'is_public' => true,
             ]);
@@ -64,7 +64,7 @@ class EventKeyPersonSyncService
             ->map(function (mixed $keyPerson): ?array {
                 $role = $keyPerson['role'] ?? null;
 
-                if (! is_string($role) || EventParticipantRole::tryFrom($role) === null || $role === EventParticipantRole::Speaker->value) {
+                if (! is_string($role) || EventKeyPersonRole::tryFrom($role) === null || $role === EventKeyPersonRole::Speaker->value) {
                     return null;
                 }
 

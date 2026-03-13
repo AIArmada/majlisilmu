@@ -8,13 +8,14 @@ use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
 use App\Models\NotificationDelivery;
-use App\Models\PendingNotification;
 use App\Models\NotificationSetting;
+use App\Models\PendingNotification;
 use App\Models\User;
 use App\Services\Notifications\NotificationEngine;
 use App\Services\Notifications\NotificationMessageRenderer;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationDispatchData;
+use App\Support\Notifications\ResolvedNotificationPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -32,8 +33,7 @@ class DispatchNotificationDigests implements ShouldQueue
         NotificationEngine $engine,
         NotificationSettingsManager $settingsManager,
         ?NotificationMessageRenderer $messageRenderer = null,
-    ): void
-    {
+    ): void {
         $messageRenderer ??= app(NotificationMessageRenderer::class);
         $cadence = NotificationCadence::tryFrom($this->cadence) ?? NotificationCadence::Daily;
         $now = CarbonImmutable::now('UTC');
@@ -161,7 +161,7 @@ class DispatchNotificationDigests implements ShouldQueue
      * @return array{start: CarbonImmutable, end: CarbonImmutable}|null
      */
     protected function digestWindow(
-        \App\Support\Notifications\ResolvedNotificationPolicy $policy,
+        ResolvedNotificationPolicy $policy,
         NotificationCadence $cadence,
         CarbonImmutable $now,
     ): ?array {

@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\EventFormat;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
@@ -225,7 +225,7 @@ it('renders speaker page when linked event has online format and no location add
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
-        'event_format' => \App\Enums\EventFormat::Online,
+        'event_format' => EventFormat::Online,
         'institution_id' => null,
         'venue_id' => null,
         'space_id' => null,
@@ -264,14 +264,14 @@ it('shows linked non-speaker roles in a separate section on the speaker page', f
 
     $speakerEvent->keyPeople()->create([
         'speaker_id' => $speaker->id,
-        'role' => EventParticipantRole::Speaker,
+        'role' => EventKeyPersonRole::Speaker,
         'order_column' => 1,
         'is_public' => true,
     ]);
 
     $moderatedEvent->keyPeople()->create([
         'speaker_id' => $speaker->id,
-        'role' => EventParticipantRole::Moderator,
+        'role' => EventKeyPersonRole::Moderator,
         'order_column' => 1,
         'is_public' => true,
     ]);
@@ -284,5 +284,5 @@ it('shows linked non-speaker roles in a separate section on the speaker page', f
         ->assertSee('Moderator')
         ->assertSee('Forum Dengan Moderator');
 
-    expect(substr_count($response->getContent(), 'Forum Dengan Moderator'))->toBe(1);
+    expect(substr_count((string) $response->getContent(), 'Forum Dengan Moderator'))->toBe(1);
 });

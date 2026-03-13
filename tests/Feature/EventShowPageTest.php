@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\ContactCategory;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
@@ -282,9 +284,9 @@ describe('Event Show Page Location & Contact Info', function () {
     });
 
     it('displays institution contact info on event page', function () {
-        $institution = \App\Models\Institution::factory()->create();
-        $emailContact = $institution->contacts()->where('category', \App\Enums\ContactCategory::Email->value)->first();
-        $phoneContact = $institution->contacts()->where('category', \App\Enums\ContactCategory::Phone->value)->first();
+        $institution = Institution::factory()->create();
+        $emailContact = $institution->contacts()->where('category', ContactCategory::Email->value)->first();
+        $phoneContact = $institution->contacts()->where('category', ContactCategory::Phone->value)->first();
 
         $event = Event::factory()->create([
             'status' => 'approved',

@@ -7,6 +7,7 @@ use App\Models\Venue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -15,7 +16,7 @@ class VenueFormSchema
     /**
      * Shared createOptionForm for Venue selects.
      *
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     public static function createOptionForm(): array
     {

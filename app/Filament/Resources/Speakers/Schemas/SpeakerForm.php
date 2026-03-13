@@ -12,9 +12,12 @@ use App\Enums\SocialMediaPlatform;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Submission\PublicSubmissionLockService;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -37,7 +40,7 @@ class SpeakerForm
                             ->options(Gender::class)
                             ->default(Gender::Male->value)
                             ->required(),
-                        \Filament\Forms\Components\Toggle::make('is_freelance')
+                        Toggle::make('is_freelance')
                             ->label(__('Penceramah Bebas'))
                             ->live(),
                         TextInput::make('job_title')
@@ -135,7 +138,7 @@ class SpeakerForm
                     ->columns(2),
                 Section::make(__('Education'))
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('qualifications')
+                        Repeater::make('qualifications')
                             ->label(__('Qualifications'))
                             ->default([])
                             ->schema([
@@ -157,7 +160,7 @@ class SpeakerForm
                     ]),
                 Section::make(__('Contact'))
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('contacts')
+                        Repeater::make('contacts')
                             ->label(__('Contact Details'))
                             ->relationship()
                             ->default([])
@@ -186,7 +189,7 @@ class SpeakerForm
                                     ->options(ContactType::class)
                                     ->default(ContactType::Main)
                                     ->required(),
-                                \Filament\Forms\Components\Toggle::make('is_public')
+                                Toggle::make('is_public')
                                     ->label(__('Public'))
                                     ->default(true),
                             ])
@@ -207,7 +210,7 @@ class SpeakerForm
                     ]),
                 Section::make(__('Media'))
                     ->components([
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('avatar')
+                        SpatieMediaLibraryFileUpload::make('avatar')
                             ->label(__('Avatar'))
                             ->collection('avatar')
                             ->image()
@@ -216,7 +219,7 @@ class SpeakerForm
                             ->avatar()
                             ->conversion('thumb')
                             ->helperText(__('Speaker photo (recommended: 400x400)')),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                        SpatieMediaLibraryFileUpload::make('cover')
                             ->collection('cover')
                             ->label(__('Cover Image'))
                             ->image()
@@ -228,7 +231,7 @@ class SpeakerForm
                             ->responsiveImages()
                             ->conversion('banner')
                             ->helperText(__('Cover featured image')),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                        SpatieMediaLibraryFileUpload::make('gallery')
                             ->label(__('Gallery'))
                             ->collection('gallery')
                             ->multiple()
@@ -241,14 +244,14 @@ class SpeakerForm
                     ->columns(2),
                 Section::make(__('Social Media'))
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('socialMedia')
+                        Repeater::make('socialMedia')
                             ->label(__('Social Media Links'))
                             ->relationship()
                             ->default([])
                             ->schema([
                                 Select::make('platform')
                                     ->label(__('Platform'))
-                                    ->options(\App\Enums\SocialMediaPlatform::class)
+                                    ->options(SocialMediaPlatform::class)
                                     ->searchable()
                                     ->required()
                                     ->columnSpan(1),
@@ -294,11 +297,11 @@ class SpeakerForm
                                 }
                             })
                             ->required(),
-                        \Filament\Forms\Components\Toggle::make('allow_public_event_submission')
+                        Toggle::make('allow_public_event_submission')
                             ->label(__('Allow Public Event Submission'))
                             ->disabled(fn (?Speaker $record, string $operation): bool => ! self::canManagePublicSubmissionToggle($record, $operation))
                             ->helperText(fn (?Speaker $record, string $operation): string => self::publicSubmissionHelperText($record, $operation)),
-                        \Filament\Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label(__('Active'))
                             ->disabled(fn (Get $get): bool => $get('status') === 'rejected')
                             ->default(true),

@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Services\ShareTrackingAnalyticsService;
 use App\Services\ShareTrackingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -73,7 +74,7 @@ function dawahShareExtractSharedUrlFromWhatsAppRedirect(TestResponse $response):
 
     expect($matches[0] ?? null)->not->toBeNull();
 
-    return (string) ($matches[0] ?? '');
+    return $matches[0] ?? '';
 }
 
 /**
@@ -115,6 +116,14 @@ function dawahShareSubmitEventFormData(array $fixtures, array $overrides = []): 
         'submitter_email' => 'guest-submitter@example.com',
     ], $overrides);
 }
+
+test('fresh migrations do not create the removed local dawah share tables', function () {
+    expect(Schema::hasTable('dawah_share_links'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_attributions'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_visits'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_outcomes'))->toBeFalse();
+    expect(Schema::hasTable('dawah_share_share_events'))->toBeFalse();
+});
 
 test('viewing a shareable page does not create a share link until payload is requested', function () {
     $event = Event::factory()->create([
@@ -494,23 +503,21 @@ test('follow actions are attributed across supported public followable pages', f
         'metadata->actor_user_id' => $visitor->id,
         'metadata->subject_id' => $record->id,
     ]);
-})->with(function (): array {
-    return [
-        'institution follow' => ['pages.institutions.show', 'institutions.show', 'institution', fn () => Institution::factory()->create([
-            'status' => 'verified',
-        ]), 'institution_follow', 'institution'],
-        'speaker follow' => ['pages.speakers.show', 'speakers.show', 'speaker', fn () => Speaker::factory()->create([
-            'status' => 'verified',
-            'is_active' => true,
-        ]), 'speaker_follow', 'speaker'],
-        'series follow' => ['pages.series.show', 'series.show', 'series', fn () => Series::factory()->create([
-            'visibility' => 'public',
-        ]), 'series_follow', 'series'],
-        'reference follow' => ['pages.references.show', 'references.show', 'reference', fn () => Reference::factory()->create([
-            'is_active' => true,
-        ]), 'reference_follow', 'reference'],
-    ];
-});
+})->with(fn (): array => [
+    'institution follow' => ['pages.institutions.show', 'institutions.show', 'institution', fn () => Institution::factory()->create([
+        'status' => 'verified',
+    ]), 'institution_follow', 'institution'],
+    'speaker follow' => ['pages.speakers.show', 'speakers.show', 'speaker', fn () => Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]), 'speaker_follow', 'speaker'],
+    'series follow' => ['pages.series.show', 'series.show', 'series', fn () => Series::factory()->create([
+        'visibility' => 'public',
+    ]), 'series_follow', 'series'],
+    'reference follow' => ['pages.references.show', 'references.show', 'reference', fn () => Reference::factory()->create([
+        'is_active' => true,
+    ]), 'reference_follow', 'reference'],
+]);
 
 test('impact dashboard highlights event check-ins and submissions', function () {
     fakePrayerTimesApi();

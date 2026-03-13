@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\DonationChannel;
 use App\Models\Institution;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\DonationChannel>
+ * @extends Factory<DonationChannel>
  */
 class DonationChannelFactory extends Factory
 {

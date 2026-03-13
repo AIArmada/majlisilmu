@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Resources\Events\EventResource;
@@ -45,15 +45,15 @@ class EditEvent extends EditRecord
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
         $event->loadMissing(['keyPeople']);
         $data['speakers'] = $event->keyPeople
-            ->where('role', EventParticipantRole::Speaker)
+            ->where('role', EventKeyPersonRole::Speaker)
             ->pluck('speaker_id')
             ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
             ->values()
             ->all();
         $data['other_key_people'] = $event->keyPeople
-            ->where('role', '!=', EventParticipantRole::Speaker)
+            ->where('role', '!=', EventKeyPersonRole::Speaker)
             ->map(fn (EventKeyPerson $keyPerson): array => [
-                'role' => $keyPerson->role instanceof EventParticipantRole ? $keyPerson->role->value : (string) $keyPerson->role,
+                'role' => $keyPerson->role instanceof EventKeyPersonRole ? $keyPerson->role->value : (string) $keyPerson->role,
                 'speaker_id' => $keyPerson->speaker_id,
                 'name' => $keyPerson->name,
                 'is_public' => (bool) $keyPerson->is_public,

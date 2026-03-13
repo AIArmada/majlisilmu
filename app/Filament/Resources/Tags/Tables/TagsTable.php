@@ -6,6 +6,7 @@ use App\Enums\TagType;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -17,14 +18,14 @@ class TagsTable
     {
         return $table
             ->columns([
-                \Filament\Tables\Columns\TextColumn::make('type')
+                TextColumn::make('type')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => TagType::from($state)->label())
                     ->color(fn (string $state): string => TagType::from($state)->color())
                     ->icon(fn (string $state): string => TagType::from($state)->icon())
                     ->sortable(),
 
-                \Filament\Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function ($query) use ($search) {
                         $query->where('name->ms', 'like', "%{$search}%")
                             ->orWhere('name->en', 'like', "%{$search}%");
@@ -41,7 +42,7 @@ class TagsTable
                     })
                     ->sortable(),
 
-                \Filament\Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->colors([
                         'warning' => 'pending',
@@ -49,17 +50,17 @@ class TagsTable
                     ])
                     ->sortable(),
 
-                \Filament\Tables\Columns\TextColumn::make('order_column')
+                TextColumn::make('order_column')
                     ->label('Order')
                     ->sortable()
                     ->toggleable(),
 
-                \Filament\Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                \Filament\Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

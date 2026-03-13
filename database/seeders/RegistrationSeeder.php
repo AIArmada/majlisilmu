@@ -6,6 +6,8 @@ use App\Models\Event;
 use App\Models\Registration;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class RegistrationSeeder extends Seeder
 {
@@ -22,7 +24,7 @@ class RegistrationSeeder extends Seeder
         Event::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 $events = Event::query()
                     ->whereHas('settings', function ($query) {
                         $query->where('registration_required', true);
@@ -65,7 +67,7 @@ class RegistrationSeeder extends Seeder
                                 'status' => 'registered',
                             ])->toArray(),
                             [
-                                'id' => (string) \Illuminate\Support\Str::uuid(),
+                                'id' => (string) Str::uuid(),
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ]

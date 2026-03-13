@@ -3,8 +3,13 @@
 namespace App\Filament\Resources\References\Schemas;
 
 use App\Enums\SocialMediaPlatform;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class ReferenceForm
@@ -13,7 +18,7 @@ class ReferenceForm
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Section::make('Reference Details')
+                Section::make('Reference Details')
                     ->components([
                         TextInput::make('title')
                             ->required()
@@ -34,7 +39,7 @@ class ReferenceForm
                             ->maxLength(255),
                         TextInput::make('publisher')
                             ->maxLength(255),
-                        \Filament\Forms\Components\Toggle::make('is_canonical')
+                        Toggle::make('is_canonical')
                             ->label('Canonical / Official')
                             ->helperText('Is this a standard reference?'),
                         Select::make('status')
@@ -44,27 +49,27 @@ class ReferenceForm
                             ])
                             ->default('verified')
                             ->required(),
-                        \Filament\Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
                     ])->columns(2),
-                \Filament\Schemas\Components\Section::make('Imagery')
+                Section::make('Imagery')
                     ->components([
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('front_cover')
+                        SpatieMediaLibraryFileUpload::make('front_cover')
                             ->label('Front Cover')
                             ->collection('front_cover')
                             ->image()
                             ->imageEditor()
                             ->conversion('thumb')
                             ->responsiveImages(),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('back_cover')
+                        SpatieMediaLibraryFileUpload::make('back_cover')
                             ->label('Back Cover')
                             ->collection('back_cover')
                             ->image()
                             ->imageEditor()
                             ->conversion('thumb')
                             ->responsiveImages(),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                        SpatieMediaLibraryFileUpload::make('gallery')
                             ->label('Gallery')
                             ->collection('gallery')
                             ->multiple()
@@ -75,9 +80,9 @@ class ReferenceForm
                             ->maxFiles(10)
                             ->columnSpanFull(),
                     ])->columns(2),
-                \Filament\Schemas\Components\Section::make('Links')
+                Section::make('Links')
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('socialMedia')
+                        Repeater::make('socialMedia')
                             ->relationship()
                             ->schema([
                                 Select::make('platform')
@@ -114,9 +119,9 @@ class ReferenceForm
                                 return null;
                             }),
                     ]),
-                \Filament\Schemas\Components\Section::make('Description')
+                Section::make('Description')
                     ->components([
-                        \Filament\Forms\Components\Textarea::make('description')
+                        Textarea::make('description')
                             ->columnSpanFull(),
                     ]),
             ]);

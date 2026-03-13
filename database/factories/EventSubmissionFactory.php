@@ -3,11 +3,12 @@
 namespace Database\Factories;
 
 use App\Models\Event;
+use App\Models\EventSubmission;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\EventSubmission>
+ * @extends Factory<EventSubmission>
  */
 class EventSubmissionFactory extends Factory
 {

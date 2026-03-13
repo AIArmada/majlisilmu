@@ -4,10 +4,14 @@ namespace App\Filament\Resources\Venues\Schemas;
 
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
+use App\Enums\SocialMediaPlatform;
 use App\Enums\VenueType;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -36,7 +40,7 @@ class VenueForm
                             ])
                             ->required()
                             ->default('verified'),
-                        \Filament\Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
                         TextInput::make('slug')
@@ -47,7 +51,7 @@ class VenueForm
                     ->columns(2),
                 Section::make('Contact')
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('contacts')
+                        Repeater::make('contacts')
                             ->relationship()
                             ->schema([
                                 Select::make('category')
@@ -72,7 +76,7 @@ class VenueForm
                                     ->options(ContactType::class)
                                     ->default(ContactType::Main)
                                     ->required(),
-                                \Filament\Forms\Components\Toggle::make('is_public')
+                                Toggle::make('is_public')
                                     ->label('Public')
                                     ->default(true),
                             ])
@@ -179,7 +183,7 @@ class VenueForm
                     ->columns(1),
                 Section::make('Media')
                     ->components([
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                        SpatieMediaLibraryFileUpload::make('cover')
                             ->collection('cover')
                             ->image()
                             ->imageEditor()
@@ -190,7 +194,7 @@ class VenueForm
                             ->responsiveImages()
                             ->conversion('banner')
                             ->helperText('Cover venue image (recommended: 1200x675)'),
-                        \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                        SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
                             ->multiple()
                             ->image()
@@ -203,11 +207,11 @@ class VenueForm
                     ->columns(2),
                 Section::make('Social Media')
                     ->components([
-                        \Filament\Forms\Components\Repeater::make('socialMedia')
+                        Repeater::make('socialMedia')
                             ->relationship()
                             ->schema([
                                 Select::make('platform')
-                                    ->options(\App\Enums\SocialMediaPlatform::class)
+                                    ->options(SocialMediaPlatform::class)
                                     ->searchable()
                                     ->required()
                                     ->columnSpan(1),
@@ -223,7 +227,7 @@ class VenueForm
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
-                            ->itemLabel(fn (array $state): ?string => $state['platform'] instanceof \App\Enums\SocialMediaPlatform
+                            ->itemLabel(fn (array $state): ?string => $state['platform'] instanceof SocialMediaPlatform
                                 ? $state['platform']->getLabel()
                                 : ($state['platform'] ?? null)),
                     ]),

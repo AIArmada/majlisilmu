@@ -4,11 +4,15 @@ namespace Database\Factories;
 
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
+use App\Models\Institution;
+use App\Models\Speaker;
+use App\Models\State;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
+use Nnjeim\World\Models\Language;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Speaker>
+ * @extends Factory<Speaker>
  */
 class SpeakerFactory extends Factory
 {
@@ -243,9 +247,9 @@ class SpeakerFactory extends Factory
     #[\Override]
     public function configure(): static
     {
-        return $this->afterCreating(function (\App\Models\Speaker $speaker) {
+        return $this->afterCreating(function (Speaker $speaker) {
             // Create Address
-            $state = \App\Models\State::inRandomOrder()->first();
+            $state = State::inRandomOrder()->first();
             if ($state) {
                 $speaker->address()->create([
                     'state_id' => $state->id,
@@ -266,14 +270,14 @@ class SpeakerFactory extends Factory
             ]);
 
             // Attach Languages
-            if (class_exists(\Nnjeim\World\Models\Language::class)) {
-                $languages = \Nnjeim\World\Models\Language::inRandomOrder()->limit(random_int(1, 3))->pluck('id');
+            if (class_exists(Language::class)) {
+                $languages = Language::inRandomOrder()->limit(random_int(1, 3))->pluck('id');
                 $speaker->languages()->attach($languages);
             }
 
             // Attach Institutions
             if (! $speaker->is_freelance) {
-                $institutions = \App\Models\Institution::inRandomOrder()->limit(random_int(1, 2))->get();
+                $institutions = Institution::inRandomOrder()->limit(random_int(1, 2))->get();
                 foreach ($institutions as $institution) {
                     $speaker->institutions()->attach($institution->id, [
                         'position' => fake()->randomElement(['Imam', 'Lecturer', 'Guest Speaker', 'Advisor']),

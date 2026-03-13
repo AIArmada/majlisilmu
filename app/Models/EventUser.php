@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Database\Factories\EventUserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class EventUser extends Pivot
 {
-    /** @use HasFactory<\Database\Factories\EventUserFactory> */
+    /** @use HasFactory<EventUserFactory> */
     use HasFactory;
 
     /**

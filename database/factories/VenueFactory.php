@@ -2,11 +2,14 @@
 
 namespace Database\Factories;
 
+use App\Models\Country;
+use App\Models\State;
+use App\Models\Venue;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Venue>
+ * @extends Factory<Venue>
  */
 class VenueFactory extends Factory
 {
@@ -58,9 +61,9 @@ class VenueFactory extends Factory
     #[\Override]
     public function configure(): static
     {
-        return $this->afterCreating(function (\App\Models\Venue $venue) {
-            $malaysia = \App\Models\Country::where('iso2', 'MY')->first();
-            $state = \App\Models\State::where('country_id', $malaysia?->id)->inRandomOrder()->first();
+        return $this->afterCreating(function (Venue $venue) {
+            $malaysia = Country::where('iso2', 'MY')->first();
+            $state = State::where('country_id', $malaysia?->id)->inRandomOrder()->first();
 
             $venue->address()->create([
                 'line1' => fake()->streetAddress(),

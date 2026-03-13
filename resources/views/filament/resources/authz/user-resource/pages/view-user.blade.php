@@ -195,7 +195,7 @@
                                 <x-filament::badge :color="$this->registrationStatusBadgeColor($registration->status)">{{ $this->humanLabel($registration->status) }}</x-filament::badge>
                             </div>
                             <div class="mt-3 text-sm text-gray-500">
-                                Session: {{ $registration->session?->title ?: '-' }}
+                                Event: {{ $registration->event?->title ?: '-' }}
                             </div>
                             <div class="text-sm text-gray-500">
                                 Registered At: {{ $registration->created_at?->format('d M Y H:i') ?: '-' }}
