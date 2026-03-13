@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -12,6 +12,7 @@ use App\Models\Venue;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Facades\Log;
@@ -308,10 +309,10 @@ class EventSearchService
         }
 
         if (! empty($filters['key_person_roles'])) {
-            $participantRoles = $this->normalizeArrayFilter($filters['key_person_roles']);
+            $keyPersonRoles = $this->normalizeArrayFilter($filters['key_person_roles']);
 
-            if ($participantRoles !== []) {
-                $filterParts[] = 'key_person_roles:['.implode(',', $participantRoles).']';
+            if ($keyPersonRoles !== []) {
+                $filterParts[] = 'key_person_roles:['.implode(',', $keyPersonRoles).']';
             }
         }
 
@@ -381,7 +382,7 @@ class EventSearchService
 
         $startsAfter = $this->startsAfterDateTime($filters, $timeScope);
 
-        if ($startsAfter instanceof \Carbon\CarbonInterface) {
+        if ($startsAfter instanceof CarbonInterface) {
             $queryBuilder->where(function (Builder $heldAfterQuery) use ($startsAfter, $table): void {
                 $heldAfterQuery
                     ->where("{$table}.ends_at", '>=', $startsAfter)
@@ -395,12 +396,12 @@ class EventSearchService
 
         $startsBefore = $this->startsBeforeDateTime($filters, $timeScope);
 
-        if ($startsBefore instanceof \Carbon\CarbonInterface) {
+        if ($startsBefore instanceof CarbonInterface) {
             $queryBuilder->where("{$table}.starts_at", '<=', $startsBefore);
         }
 
         if (filled($query)) {
-            $this->applyDirectSearch($queryBuilder, (string) $query);
+            $this->applyDirectSearch($queryBuilder, $query);
         }
 
         if (! empty($filters['state_id'])) {
@@ -507,19 +508,19 @@ class EventSearchService
             });
         }
 
-        $participantRoles = $this->normalizeParticipantRoles($filters['key_person_roles'] ?? null);
+        $keyPersonRoles = $this->normalizeKeyPersonRoles($filters['key_person_roles'] ?? null);
 
-        if ($participantRoles !== []) {
-            $queryBuilder->whereHas('keyPeople', function (Builder $participantQuery) use ($participantRoles): void {
-                $participantQuery->whereIn('role', $participantRoles);
+        if ($keyPersonRoles !== []) {
+            $queryBuilder->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($keyPersonRoles): void {
+                $keyPersonQuery->whereIn('role', $keyPersonRoles);
             });
         }
 
         foreach ([
-            'moderator_ids' => EventParticipantRole::Moderator,
-            'imam_ids' => EventParticipantRole::Imam,
-            'khatib_ids' => EventParticipantRole::Khatib,
-            'bilal_ids' => EventParticipantRole::Bilal,
+            'moderator_ids' => EventKeyPersonRole::Moderator,
+            'imam_ids' => EventKeyPersonRole::Imam,
+            'khatib_ids' => EventKeyPersonRole::Khatib,
+            'bilal_ids' => EventKeyPersonRole::Bilal,
         ] as $filterKey => $role) {
             $roleSpecificIds = $this->normalizeArrayFilter($filters[$filterKey] ?? null);
 
@@ -527,8 +528,8 @@ class EventSearchService
                 continue;
             }
 
-            $queryBuilder->whereHas('keyPeople', function (Builder $participantQuery) use ($roleSpecificIds, $role): void {
-                $participantQuery
+            $queryBuilder->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($roleSpecificIds, $role): void {
+                $keyPersonQuery
                     ->where('role', $role->value)
                     ->whereIn('speaker_id', $roleSpecificIds);
             });
@@ -723,12 +724,10 @@ class EventSearchService
         $rankedCandidates = $this->buildDatabaseQuery(null, $filters)
             ->select(['events.id', 'events.title'])
             ->get()
-            ->map(function (Event $event) use ($normalizedSearch): array {
-                return [
-                    'id' => $event->id,
-                    'score' => $this->eventSimilarityScore($normalizedSearch, $event),
-                ];
-            })
+            ->map(fn (Event $event): array => [
+                'id' => $event->id,
+                'score' => $this->eventSimilarityScore($normalizedSearch, $event),
+            ])
             ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
             ->sortByDesc('score')
             ->values();
@@ -810,7 +809,7 @@ class EventSearchService
     {
         $startsAfter = $this->parseDateFilter($filters['starts_after'] ?? null, false);
 
-        if ($startsAfter instanceof \Carbon\CarbonInterface) {
+        if ($startsAfter instanceof CarbonInterface) {
             if ($timeScope === 'upcoming' && now()->greaterThan($startsAfter)) {
                 return now();
             }
@@ -848,7 +847,7 @@ class EventSearchService
     {
         $startsBefore = $this->parseDateFilter($filters['starts_before'] ?? null, true);
 
-        if ($startsBefore instanceof \Carbon\CarbonInterface) {
+        if ($startsBefore instanceof CarbonInterface) {
             return $startsBefore;
         }
 
@@ -908,10 +907,10 @@ class EventSearchService
     /**
      * @return list<string>
      */
-    protected function normalizeParticipantRoles(mixed $value): array
+    protected function normalizeKeyPersonRoles(mixed $value): array
     {
         return collect($this->normalizeArrayFilter($value))
-            ->map(fn (mixed $role): ?string => EventParticipantRole::tryFrom((string) $role)?->value)
+            ->map(fn (mixed $role): ?string => EventKeyPersonRole::tryFrom((string) $role)?->value)
             ->filter()
             ->values()
             ->all();
@@ -1080,7 +1079,7 @@ class EventSearchService
 
     protected function databaseDriver(): string
     {
-        /** @var \Illuminate\Database\Connection $connection */
+        /** @var Connection $connection */
         $connection = Event::query()->getConnection();
 
         return $connection->getDriverName();
@@ -1093,7 +1092,7 @@ class EventSearchService
 
     private function startsAtUserTimeSqlExpression(int $offsetMinutes): string
     {
-        $safeOffsetMinutes = (int) $offsetMinutes;
+        $safeOffsetMinutes = $offsetMinutes;
 
         return match ($this->databaseDriver()) {
             'pgsql' => "to_char(events.starts_at + interval '{$safeOffsetMinutes} minutes', 'HH24:MI')",

@@ -6,6 +6,21 @@ namespace App\Data\ShareTracking;
 
 use Carbon\CarbonInterface;
 
+/**
+ * @property-read string $destination_url
+ * @property-read string $canonical_url
+ * @property-read string $title_snapshot
+ * @property-read ?CarbonInterface $last_shared_at
+ * @property-read int $outbound_shares
+ * @property-read int $visits_count
+ * @property-read int $outcomes_count
+ * @property-read int $signups_count
+ * @property-read int $event_registrations_count
+ * @property-read int $event_checkins_count
+ * @property-read int $event_submissions_count
+ * @property-read ?CarbonInterface $latest_visit_at
+ * @property-read ?CarbonInterface $latest_outcome_at
+ */
 final readonly class ShareTrackingLinkData
 {
     public function __construct(

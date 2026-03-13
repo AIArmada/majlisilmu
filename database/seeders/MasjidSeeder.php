@@ -71,7 +71,7 @@ class MasjidSeeder extends Seeder
 
             // Find matching state
             $state = $this->findState($states, $negeri);
-            if (! $state instanceof \App\Models\State) {
+            if (! $state instanceof State) {
                 // If we can't find the state, skip this mosque
                 $skipped++;
 

@@ -7,20 +7,28 @@ use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use App\Models\Country;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Series;
 use App\Models\Speaker;
+use App\Models\State;
 use App\Models\Tag;
+use App\Models\Venue;
 use App\Services\EventKeyPersonSyncService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Nnjeim\World\Models\Language;
 
 class EventSeeder extends Seeder
 {
@@ -56,13 +64,13 @@ class EventSeeder extends Seeder
     private function seedBulkEvents(): void
     {
 
-        \Illuminate\Support\Facades\DB::transaction(function (): void {
+        DB::transaction(function (): void {
             $institutions = Institution::query()
                 ->limit(90)
                 ->get();
-            $seriesIds = \App\Models\Series::query()->pluck('id')->toArray();
+            $seriesIds = Series::query()->pluck('id')->toArray();
             $speakerIds = Speaker::query()->pluck('id')->toArray();
-            $venueIds = \App\Models\Venue::query()->pluck('id')->toArray();
+            $venueIds = Venue::query()->pluck('id')->toArray();
 
             if ($institutions->isEmpty()) {
                 return;
@@ -91,7 +99,7 @@ class EventSeeder extends Seeder
                 // - online: no physical location
                 // - non-online: institution XOR venue
                 foreach ($events as $event) {
-                    if ($event->event_format === \App\Enums\EventFormat::Online) {
+                    if ($event->event_format === EventFormat::Online) {
                         $event->update([
                             'institution_id' => null,
                             'venue_id' => null,
@@ -116,15 +124,15 @@ class EventSeeder extends Seeder
                         ]);
                     }
 
-                    $this->seedParticipantsForEvent($event, $speakerIds);
+                    $this->seedKeyPeopleForEvent($event, $speakerIds);
                 }
 
                 // If a series exists in the system, attach events via pivot table.
                 if ($randomSeriesId) {
                     $order = 1;
                     foreach ($events as $event) {
-                        \Illuminate\Support\Facades\DB::table('event_series')->insert([
-                            'id' => (string) \Illuminate\Support\Str::uuid(),
+                        DB::table('event_series')->insert([
+                            'id' => (string) Str::uuid(),
                             'event_id' => $event->id,
                             'series_id' => $randomSeriesId,
                             'order_column' => $order++,
@@ -144,10 +152,10 @@ class EventSeeder extends Seeder
                         $selectedSpeakers = (array) array_rand(array_flip($speakerIds), $numSpeakers);
                         foreach (array_values($selectedSpeakers) as $index => $speakerId) {
                             $speakerKeyPeople[] = [
-                                'id' => (string) \Illuminate\Support\Str::uuid(),
+                                'id' => (string) Str::uuid(),
                                 'event_id' => $event->id,
                                 'speaker_id' => $speakerId,
-                                'role' => EventParticipantRole::Speaker->value,
+                                'role' => EventKeyPersonRole::Speaker->value,
                                 'name' => null,
                                 'order_column' => $index + 1,
                                 'is_public' => true,
@@ -161,7 +169,7 @@ class EventSeeder extends Seeder
 
                 // Bulk insert speaker key people
                 if ($speakerKeyPeople !== []) {
-                    \Illuminate\Support\Facades\DB::table('event_key_people')->insert($speakerKeyPeople);
+                    DB::table('event_key_people')->insert($speakerKeyPeople);
                 }
 
                 $count += 10;
@@ -171,7 +179,7 @@ class EventSeeder extends Seeder
 
     private function seedMajlisIlmuSchedule(): void
     {
-        $malaysia = \App\Models\Country::where('iso2', 'MY')->first();
+        $malaysia = Country::where('iso2', 'MY')->first();
         $likeOperator = $this->databaseLikeOperator();
 
         $institution = Institution::query()->firstOrCreate([
@@ -201,7 +209,7 @@ class EventSeeder extends Seeder
                 'country_id' => $malaysia?->id,
             ]);
 
-            $state = \App\Models\State::query()
+            $state = State::query()
                 ->where('name', $likeOperator, '%selangor%')
                 ->first();
 
@@ -220,7 +228,7 @@ class EventSeeder extends Seeder
             ]);
         }
 
-        $venue = \App\Models\Venue::query()->firstOrCreate([
+        $venue = Venue::query()->firstOrCreate([
             'slug' => 'dewan-solat-utama-mtaj',
         ], [
             'name' => 'Dewan Solat Utama',
@@ -306,7 +314,7 @@ class EventSeeder extends Seeder
         ];
 
         foreach ($schedule as $entry) {
-            $startsAtLocal = \Illuminate\Support\Carbon::parse($entry['date'].' '.$entry['time'], 'Asia/Kuala_Lumpur');
+            $startsAtLocal = Carbon::parse($entry['date'].' '.$entry['time'], 'Asia/Kuala_Lumpur');
             $endsAtLocal = $startsAtLocal->copy()->addMinutes(90);
             $startsAt = $startsAtLocal->copy()->utc();
             $endsAt = $endsAtLocal->copy()->utc();
@@ -332,7 +340,7 @@ class EventSeeder extends Seeder
                 $descriptionParts[] = $note;
             }
 
-            $slug = \Illuminate\Support\Str::slug($title.'-'.$entry['date']);
+            $slug = Str::slug($title.'-'.$entry['date']);
 
             // Determine timing mode
             $timingMode = TimingMode::Absolute->value;
@@ -380,7 +388,7 @@ class EventSeeder extends Seeder
                 'ends_at' => $endsAt,
                 'timezone' => 'Asia/Kuala_Lumpur',
                 // 'language' has been removed; genre/audience are now event_type/age_group etc
-                'event_type' => \App\Enums\EventType::KuliahCeramah,
+                'event_type' => EventType::KuliahCeramah,
                 'gender' => EventGenderRestriction::All,
                 'age_group' => [EventAgeGroup::AllAges->value],
                 'children_allowed' => true,
@@ -396,8 +404,8 @@ class EventSeeder extends Seeder
             ]);
 
             // Attach default language (Malay) if exists
-            if (class_exists(\Nnjeim\World\Models\Language::class)) {
-                $malay = \Nnjeim\World\Models\Language::where('code', 'ms')->first();
+            if (class_exists(Language::class)) {
+                $malay = Language::where('code', 'ms')->first();
                 if ($malay) {
                     $event->languages()->syncWithoutDetaching([$malay->getKey()]);
                 }
@@ -420,7 +428,7 @@ class EventSeeder extends Seeder
         }
 
         return Speaker::query()->firstOrCreate([
-            'slug' => \Illuminate\Support\Str::slug($speakerName),
+            'slug' => Str::slug($speakerName),
         ], [
             'name' => $speakerName,
             'status' => 'verified',
@@ -575,7 +583,7 @@ class EventSeeder extends Seeder
 
     private function databaseLikeOperator(): string
     {
-        return \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
+        return DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
     }
 
     private function backfillSeededEventRequiredFields(): void
@@ -706,14 +714,14 @@ class EventSeeder extends Seeder
     /**
      * @param  list<string>  $speakerIds
      */
-    private function seedParticipantsForEvent(Event $event, array $speakerIds): void
+    private function seedKeyPeopleForEvent(Event $event, array $speakerIds): void
     {
         $eventTypes = $event->event_type instanceof Collection
             ? $event->event_type->all()
             : (is_array($event->event_type) ? $event->event_type : []);
 
         $normalizedTypes = collect($eventTypes)
-            ->map(fn (mixed $type): ?EventType => $type instanceof EventType ? $type : EventType::tryFrom((string) $type))
+            ->map(fn (mixed $type): ?EventType => $type instanceof EventType ? $type : EventType::tryFrom($type))
             ->filter()
             ->values();
 
@@ -725,14 +733,14 @@ class EventSeeder extends Seeder
             $selectedSpeakerIds = array_slice($speakerIds, 0, random_int(1, min(2, count($speakerIds))));
         }
 
-        $otherParticipants = [];
+        $otherKeyPeople = [];
 
         if ($normalizedTypes->contains(EventType::Forum)) {
             $moderatorSpeakerId = $selectedSpeakerIds[0] ?? ($speakerIds[0] ?? null);
 
             if (is_string($moderatorSpeakerId)) {
-                $otherParticipants[] = [
-                    'role' => EventParticipantRole::Moderator->value,
+                $otherKeyPeople[] = [
+                    'role' => EventKeyPersonRole::Moderator->value,
                     'speaker_id' => $moderatorSpeakerId,
                     'is_public' => true,
                 ];
@@ -742,10 +750,10 @@ class EventSeeder extends Seeder
         if ($normalizedTypes->contains(fn (EventType $type): bool => in_array($type, [EventType::Tahlil, EventType::SolatHajat, EventType::Qiamullail], true))) {
             $imamSpeakerId = $speakerIds[0] ?? null;
 
-            $otherParticipants[] = [
-                'role' => EventParticipantRole::Imam->value,
+            $otherKeyPeople[] = [
+                'role' => EventKeyPersonRole::Imam->value,
                 'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
-                'name' => ! is_string($imamSpeakerId) ? fake()->name() : null,
+                'name' => is_string($imamSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
         }
@@ -754,33 +762,33 @@ class EventSeeder extends Seeder
             $khatibSpeakerId = $speakerIds[0] ?? null;
             $imamSpeakerId = $speakerIds[1] ?? $khatibSpeakerId;
 
-            $otherParticipants[] = [
-                'role' => EventParticipantRole::Khatib->value,
+            $otherKeyPeople[] = [
+                'role' => EventKeyPersonRole::Khatib->value,
                 'speaker_id' => is_string($khatibSpeakerId) ? $khatibSpeakerId : null,
-                'name' => ! is_string($khatibSpeakerId) ? fake()->name() : null,
+                'name' => is_string($khatibSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
-            $otherParticipants[] = [
-                'role' => EventParticipantRole::Imam->value,
+            $otherKeyPeople[] = [
+                'role' => EventKeyPersonRole::Imam->value,
                 'speaker_id' => is_string($imamSpeakerId) ? $imamSpeakerId : null,
-                'name' => ! is_string($imamSpeakerId) ? fake()->name() : null,
+                'name' => is_string($imamSpeakerId) ? null : fake()->name(),
                 'is_public' => true,
             ];
-            $otherParticipants[] = [
-                'role' => EventParticipantRole::Bilal->value,
+            $otherKeyPeople[] = [
+                'role' => EventKeyPersonRole::Bilal->value,
                 'name' => fake()->name(),
                 'is_public' => true,
             ];
         }
 
         if ($normalizedTypes->contains(fn (EventType $type): bool => $type->isCommunity())) {
-            $otherParticipants[] = [
-                'role' => EventParticipantRole::PersonInCharge->value,
+            $otherKeyPeople[] = [
+                'role' => EventKeyPersonRole::PersonInCharge->value,
                 'name' => fake()->name(),
                 'is_public' => true,
             ];
         }
 
-        app(EventKeyPersonSyncService::class)->sync($event, $selectedSpeakerIds, $otherParticipants);
+        app(EventKeyPersonSyncService::class)->sync($event, $selectedSpeakerIds, $otherKeyPeople);
     }
 }

@@ -5,7 +5,7 @@ namespace App\Livewire\Pages\Events;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\TagType;
@@ -234,6 +234,9 @@ class Index extends Component implements HasForms
         $this->showAdvancedFiltersPanel = ! $this->showAdvancedFiltersPanel;
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
     #[On('event-filters-updated')]
     public function syncAdvancedFilters(array $filters): void
     {
@@ -410,14 +413,12 @@ class Index extends Component implements HasForms
                                     ->label(__('Institution'))
                                     ->placeholder(__('Any Institution'))
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (Get $get, string $search): array {
-                                        return $this->searchInstitutionOptions(
-                                            stateId: $this->normalizeNullableString($get('state_id')),
-                                            districtId: $this->normalizeNullableString($get('district_id')),
-                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                            search: $search,
-                                        );
-                                    })
+                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchInstitutionOptions(
+                                        stateId: $this->normalizeNullableString($get('state_id')),
+                                        districtId: $this->normalizeNullableString($get('district_id')),
+                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        search: $search,
+                                    ))
                                     ->getOptionLabelUsing(fn (string $value): ?string => $this->institutionOptionLabel($value))
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
                                     ->live(),
@@ -426,14 +427,12 @@ class Index extends Component implements HasForms
                                     ->label(__('Tempat'))
                                     ->placeholder(__('Any Venue'))
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (Get $get, string $search): array {
-                                        return $this->searchVenueOptions(
-                                            stateId: $this->normalizeNullableString($get('state_id')),
-                                            districtId: $this->normalizeNullableString($get('district_id')),
-                                            subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                            search: $search,
-                                        );
-                                    })
+                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchVenueOptions(
+                                        stateId: $this->normalizeNullableString($get('state_id')),
+                                        districtId: $this->normalizeNullableString($get('district_id')),
+                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                        search: $search,
+                                    ))
                                     ->getOptionLabelUsing(fn (string $value): ?string => $this->venueOptionLabel($value))
                                     ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
                                     ->live(),
@@ -474,7 +473,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Role'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(EventParticipantRole::nonSpeakerOptions())
+                                    ->options(EventKeyPersonRole::nonSpeakerOptions())
                                     ->live(),
 
                                 Select::make('moderator_ids')
@@ -569,14 +568,12 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Type'))
                                     ->searchable()
                                     ->multiple()
-                                    ->options(function (): array {
-                                        return collect(EventType::cases())
-                                            ->mapToGroups(fn (EventType $type): array => [
-                                                $type->getGroup() => [$type->value => $type->getLabel()],
-                                            ])
-                                            ->map(fn (Collection $group): array => $group->collapse()->all())
-                                            ->toArray();
-                                    })
+                                    ->options(fn (): array => collect(EventType::cases())
+                                        ->mapToGroups(fn (EventType $type): array => [
+                                            $type->getGroup() => [$type->value => $type->getLabel()],
+                                        ])
+                                        ->map(fn (Collection $group): array => $group->collapse()->all())
+                                        ->toArray())
                                     ->live(),
 
                                 Select::make('event_format')
@@ -1077,6 +1074,7 @@ class Index extends Component implements HasForms
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     private function applySearchConstraint(Builder $query, string $column, string $search): Builder
     {
@@ -1258,7 +1256,7 @@ class Index extends Component implements HasForms
      */
     private function defaultFilterData(): array
     {
-        $prayerTime = filled($this->prayer_time) ? (string) $this->prayer_time : null;
+        $prayerTime = filled($this->prayer_time) ? $this->prayer_time : null;
 
         if ($this->timing_mode === TimingMode::Absolute->value) {
             $prayerTime = null;
@@ -1317,29 +1315,29 @@ class Index extends Component implements HasForms
         $languageCodes = $this->normalizeStringArray($this->language_codes);
 
         if ($languageCodes === [] && filled($this->language)) {
-            $languageCodes = [(string) $this->language];
+            $languageCodes = [$this->language];
         }
 
-        $prayerTime = filled($this->prayer_time) ? (string) $this->prayer_time : null;
+        $prayerTime = filled($this->prayer_time) ? $this->prayer_time : null;
 
         if ($this->timing_mode === TimingMode::Absolute->value) {
             $prayerTime = null;
         }
 
         return [
-            'search' => filled($this->search) ? trim((string) $this->search) : null,
-            'state_id' => filled($this->state_id) ? (string) $this->state_id : null,
-            'district_id' => filled($this->district_id) ? (string) $this->district_id : null,
-            'subdistrict_id' => filled($this->subdistrict_id) ? (string) $this->subdistrict_id : null,
-            'language' => filled($this->language) ? (string) $this->language : null,
+            'search' => filled($this->search) ? trim($this->search) : null,
+            'state_id' => filled($this->state_id) ? $this->state_id : null,
+            'district_id' => filled($this->district_id) ? $this->district_id : null,
+            'subdistrict_id' => filled($this->subdistrict_id) ? $this->subdistrict_id : null,
+            'language' => filled($this->language) ? $this->language : null,
             'language_codes' => $languageCodes,
             'event_type' => $this->normalizeStringArray($this->event_type),
-            'gender' => filled($this->gender) ? (string) $this->gender : null,
+            'gender' => filled($this->gender) ? $this->gender : null,
             'age_group' => $this->normalizeStringArray($this->age_group),
             'children_allowed' => $this->normalizeNullableBoolean($this->children_allowed),
             'is_muslim_only' => $this->normalizeNullableBoolean($this->is_muslim_only),
-            'institution_id' => filled($this->institution_id) ? (string) $this->institution_id : null,
-            'venue_id' => filled($this->venue_id) ? (string) $this->venue_id : null,
+            'institution_id' => filled($this->institution_id) ? $this->institution_id : null,
+            'venue_id' => filled($this->venue_id) ? $this->venue_id : null,
             'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
             'key_person_roles' => $this->normalizeStringArray($this->key_person_roles),
             'moderator_ids' => $this->normalizeStringArray($this->moderator_ids),
@@ -1351,8 +1349,8 @@ class Index extends Component implements HasForms
             'source_tag_ids' => $this->normalizeStringArray($this->source_tag_ids),
             'issue_tag_ids' => $this->normalizeStringArray($this->issue_tag_ids),
             'reference_ids' => $this->normalizeStringArray($this->reference_ids),
-            'starts_after' => filled($this->starts_after) ? (string) $this->starts_after : null,
-            'starts_before' => filled($this->starts_before) ? (string) $this->starts_before : null,
+            'starts_after' => filled($this->starts_after) ? $this->starts_after : null,
+            'starts_before' => filled($this->starts_before) ? $this->starts_before : null,
             'time_scope' => in_array($this->time_scope, ['upcoming', 'past', 'all'], true) ? $this->time_scope : $defaults['time_scope'],
             'prayer_time' => $prayerTime,
             'timing_mode' => in_array($this->timing_mode, [TimingMode::Absolute->value, TimingMode::PrayerRelative->value], true)
@@ -1364,9 +1362,9 @@ class Index extends Component implements HasForms
             'has_event_url' => $this->normalizeNullableBoolean($this->has_event_url),
             'has_live_url' => $this->normalizeNullableBoolean($this->has_live_url),
             'has_end_time' => $this->normalizeNullableBoolean($this->has_end_time),
-            'lat' => filled($this->lat) ? (string) $this->lat : null,
-            'lng' => filled($this->lng) ? (string) $this->lng : null,
-            'radius_km' => max(1, min(1000, (int) $this->radius_km)),
+            'lat' => filled($this->lat) ? $this->lat : null,
+            'lng' => filled($this->lng) ? $this->lng : null,
+            'radius_km' => max(1, min(1000, $this->radius_km)),
             'sort' => in_array($this->sort, ['time', 'relevance', 'distance'], true) ? $this->sort : $defaults['sort'],
         ];
     }
@@ -1521,7 +1519,7 @@ class Index extends Component implements HasForms
 
         $values = is_array($value) ? $value : [$value];
 
-        return array_values(array_filter(array_map('strval', $values), static fn (string $item): bool => $item !== ''));
+        return array_values(array_filter(array_map(strval(...), $values), static fn (string $item): bool => $item !== ''));
     }
 
     private function normalizeNullableString(mixed $value): ?string

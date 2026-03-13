@@ -2,6 +2,7 @@
 
 namespace App\Filament\Ahli\Resources\Events\Pages;
 
+use App\Enums\EventKeyPersonRole;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Ahli\Resources\Events\EventResource;
@@ -46,16 +47,16 @@ class EditEvent extends EditRecord
         $event->loadMissing(['keyPeople']);
 
         $data['speakers'] = $event->keyPeople
-            ->filter(fn ($p) => $p->role === \App\Enums\EventParticipantRole::Speaker)
+            ->filter(fn ($p) => $p->role === EventKeyPersonRole::Speaker)
             ->pluck('speaker_id')
             ->filter()
             ->values()
             ->all();
 
         $data['other_key_people'] = $event->keyPeople
-            ->filter(fn ($p) => $p->role !== \App\Enums\EventParticipantRole::Speaker)
+            ->filter(fn ($p) => $p->role !== EventKeyPersonRole::Speaker)
             ->map(fn ($p) => [
-                'role' => $p->role instanceof \App\Enums\EventParticipantRole ? $p->role->value : $p->role,
+                'role' => $p->role instanceof EventKeyPersonRole ? $p->role->value : $p->role,
                 'speaker_id' => $p->speaker_id,
                 'name' => $p->name,
                 'is_public' => $p->is_public,

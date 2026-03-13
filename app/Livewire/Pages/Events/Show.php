@@ -3,7 +3,7 @@
 namespace App\Livewire\Pages\Events;
 
 use App\Enums\DawahShareOutcomeType;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
@@ -204,14 +204,14 @@ class Show extends Component
      * @return Collection<int|string, \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson>>
      */
     #[Computed]
-    public function roleParticipants(): Collection
+    public function keyPeopleByRole(): Collection
     {
         return collect($this->event->keyPeople
-            ->filter(fn (EventKeyPerson $keyPerson): bool => $keyPerson->role !== EventParticipantRole::Speaker && $keyPerson->is_public)
+            ->filter(fn (EventKeyPerson $keyPerson): bool => $keyPerson->role !== EventKeyPersonRole::Speaker && $keyPerson->is_public)
             ->groupBy(function (EventKeyPerson $keyPerson): string {
                 $role = $keyPerson->role;
 
-                return $role instanceof EventParticipantRole ? $role->value : (string) $role;
+                return $role instanceof EventKeyPersonRole ? $role->value : (string) $role;
             })
             ->sortKeys()
             ->all());

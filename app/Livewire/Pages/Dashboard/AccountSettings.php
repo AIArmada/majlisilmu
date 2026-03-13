@@ -267,13 +267,13 @@ class AccountSettings extends Component implements HasForms
     protected function notificationPayload(): array
     {
         $preferredChannels = collect($this->preferredChannelSlots)
-            ->map(static fn (mixed $value): string => (string) $value)
+            ->map(static fn (mixed $value): string => $value)
             ->filter(static fn (string $value): bool => $value !== '')
             ->unique()
             ->values()
             ->all();
         $fallbackChannels = collect($this->fallbackChannelSlots)
-            ->map(static fn (mixed $value): string => (string) $value)
+            ->map(static fn (mixed $value): string => $value)
             ->filter(static fn (string $value): bool => $value !== '')
             ->unique()
             ->values()
@@ -325,13 +325,7 @@ class AccountSettings extends Component implements HasForms
 
     protected function normalizeOptionalPhone(mixed $value): ?string
     {
-        $normalized = $this->normalizeOptionalString($value);
-
-        if ($normalized === null) {
-            return null;
-        }
-
-        return $normalized;
+        return $this->normalizeOptionalString($value);
     }
 
     protected function normalizeTab(string $tab): string

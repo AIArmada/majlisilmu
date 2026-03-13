@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Services\Notifications\EventNotificationService;
+use App\States\EventStatus\Pending;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -31,10 +33,10 @@ class ReconsiderEvent extends Transition implements HasColor, HasIcon, HasLabel
                 'note' => $this->note ?? 'Event moved back to pending for reconsideration.',
             ]);
 
-            $this->event->status = \App\States\EventStatus\Pending::class;
+            $this->event->status = Pending::class;
             $this->event->save();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionRemoderated($this->event, $this->note);
+            app(EventNotificationService::class)->notifySubmissionRemoderated($this->event, $this->note);
 
             Log::info('Rejected event reconsidered', [
                 'event_id' => $this->event->id,

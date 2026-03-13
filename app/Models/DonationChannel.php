@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\DonationChannelFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class DonationChannel extends Model implements AuditableContract, HasMedia
 {
-    /** @use HasFactory<\Database\Factories\DonationChannelFactory> */
+    /** @use HasFactory<DonationChannelFactory> */
     use Auditable, HasFactory, HasUuids, InteractsWithMedia;
 
     protected $table = 'donation_channels';
@@ -58,6 +59,7 @@ class DonationChannel extends Model implements AuditableContract, HasMedia
         ];
     }
 
+    #[\Override]
     protected static function booted(): void
     {
         static::saved(function (self $channel): void {

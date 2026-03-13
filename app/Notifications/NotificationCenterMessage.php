@@ -70,7 +70,6 @@ class NotificationCenterMessage extends Notification implements ShouldQueue
             $occurredAt = null;
         }
 
-        /** @var mixed $sourcePendingIds */
         $sourcePendingIds = data_get($meta, 'source_message_ids', []);
         $sourcePendingIds = is_array($sourcePendingIds) ? $sourcePendingIds : [];
 
@@ -234,7 +233,7 @@ class NotificationCenterMessage extends Notification implements ShouldQueue
         $timezone = method_exists($notifiable, 'preferredTimezone')
             ? (string) $notifiable->preferredTimezone()
             : (is_string(data_get($notifiable, 'timezone')) && data_get($notifiable, 'timezone') !== ''
-                ? (string) data_get($notifiable, 'timezone')
+                ? data_get($notifiable, 'timezone')
                 : (string) config('app.timezone', 'UTC'));
 
         $locale = method_exists($notifiable, 'preferredLocale')

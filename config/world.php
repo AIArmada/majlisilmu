@@ -1,5 +1,12 @@
 <?php
 
+use Nnjeim\World\Models\City;
+use Nnjeim\World\Models\Country;
+use Nnjeim\World\Models\Currency;
+use Nnjeim\World\Models\Language;
+use Nnjeim\World\Models\State;
+use Nnjeim\World\Models\Timezone;
+
 return [
 
     /*
@@ -205,12 +212,12 @@ return [
     */
 
     'models' => [
-        'cities' => \Nnjeim\World\Models\City::class,
-        'countries' => \Nnjeim\World\Models\Country::class,
-        'currencies' => \Nnjeim\World\Models\Currency::class,
-        'languages' => \Nnjeim\World\Models\Language::class,
-        'states' => \Nnjeim\World\Models\State::class,
-        'timezones' => \Nnjeim\World\Models\Timezone::class,
+        'cities' => City::class,
+        'countries' => Country::class,
+        'currencies' => Currency::class,
+        'languages' => Language::class,
+        'states' => State::class,
+        'timezones' => Timezone::class,
     ],
 
 ];

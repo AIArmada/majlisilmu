@@ -33,6 +33,7 @@ class ModelStateSelectFilter extends SelectFilter
         });
     }
 
+    #[\Override]
     public function attribute(string|Closure|null $attribute): static
     {
         $this->attribute = $attribute;
@@ -40,6 +41,7 @@ class ModelStateSelectFilter extends SelectFilter
         return $this;
     }
 
+    #[\Override]
     public function getAttribute(): string
     {
         return $this->evaluate($this->attribute ?? $this->getName());

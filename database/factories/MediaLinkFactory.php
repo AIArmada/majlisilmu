@@ -3,11 +3,12 @@
 namespace Database\Factories;
 
 use App\Models\Event;
+use App\Models\MediaLink;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\MediaLink>
+ * @extends Factory<MediaLink>
  */
 class MediaLinkFactory extends Factory
 {

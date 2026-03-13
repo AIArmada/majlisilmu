@@ -19,8 +19,13 @@
 - The Dawah Impact dashboard exposes provider and channel impact at the user level.
 - The per-link Dawah Impact detail page also exposes provider and channel impact.
 - If future work adds sorting or filtering by provider, reuse:
-  - `DawahShareAnalyticsService::providerBreakdownForUser()`
-  - `DawahShareAnalyticsService::providerBreakdownForLink()`
+  - `ShareTrackingAnalyticsService::providerBreakdownForUser()`
+  - `ShareTrackingAnalyticsService::providerBreakdownForLink()`
+
+## Legacy Cleanup Note
+
+- The old local `dawah_share_*` tables and `App\Services\DawahShare\*` services have been removed.
+- Majlis Ilmu share attribution now runs through the affiliate-backed `ShareTrackingService` and `ShareTrackingAnalyticsService` only.
 
 ## High-Value Next Analytics Events
 

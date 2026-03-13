@@ -5,6 +5,8 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
+use App\Services\Notifications\EventNotificationService;
+use App\States\EventStatus\Cancelled;
 use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
@@ -43,14 +45,14 @@ class CancelEvent extends Transition implements HasColor, HasIcon, HasLabel
                 'note' => $this->note,
             ]);
 
-            $this->event->status = \App\States\EventStatus\Cancelled::class;
+            $this->event->status = Cancelled::class;
             $this->event->save();
 
             // Cancelled events remain searchable so users can still discover status updates.
             $this->event->searchable();
 
-            app(\App\Services\Notifications\EventNotificationService::class)->notifySubmissionCancelled($this->event, $this->note);
-            app(\App\Services\Notifications\EventNotificationService::class)->notifyTrackedEventCancelled($this->event, $this->note);
+            app(EventNotificationService::class)->notifySubmissionCancelled($this->event, $this->note);
+            app(EventNotificationService::class)->notifyTrackedEventCancelled($this->event, $this->note);
 
             Log::info('Event cancelled', [
                 'event_id' => $this->event->id,

@@ -19,7 +19,7 @@
     $lat = $venueAddress?->lat ?? $institutionAddress?->lat;
     $lng = $venueAddress?->lng ?? $institutionAddress?->lng;
     $galleryImages = $this->galleryImages;
-    $roleParticipants = $this->roleParticipants;
+    $keyPeopleByRole = $this->keyPeopleByRole;
     $registrationMode = $this->registrationMode();
     $shareLinks = $this->shareLinks;
     $sharePreviewImage = $event->card_image_url;
@@ -905,7 +905,7 @@
                 </section>
             @endif
 
-            @if($roleParticipants->isNotEmpty())
+            @if($keyPeopleByRole->isNotEmpty())
                 <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
@@ -918,19 +918,19 @@
                     </div>
 
                     <div class="grid gap-4 md:grid-cols-2">
-                        @foreach($roleParticipants as $role => $participants)
+                        @foreach($keyPeopleByRole as $role => $keyPeople)
                             @php
-                                $roleLabel = \App\Enums\EventParticipantRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
+                                $roleLabel = \App\Enums\EventKeyPersonRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
                             @endphp
                             <div class="rounded-3xl border border-amber-200/70 bg-amber-50/60 p-5 shadow-sm">
                                 <h3 class="font-heading text-lg font-bold text-slate-900">{{ $roleLabel }}</h3>
                                 <div class="mt-3 space-y-3">
-                                    @foreach($participants as $participant)
+                                    @foreach($keyPeople as $keyPerson)
                                         @php
-                                            $linkedSpeaker = $participant->speaker;
-                                            $displayName = $participant->display_name;
+                                            $linkedSpeaker = $keyPerson->speaker;
+                                            $displayName = $keyPerson->display_name;
                                         @endphp
-                                        <div wire:key="participant-{{ $participant->id }}" class="rounded-2xl bg-white/80 p-3 ring-1 ring-amber-100">
+                                        <div wire:key="key-person-{{ $keyPerson->id }}" class="rounded-2xl bg-white/80 p-3 ring-1 ring-amber-100">
                                             @if($linkedSpeaker)
                                                 <a href="{{ route('speakers.show', $linkedSpeaker) }}" wire:navigate class="font-semibold text-slate-900 hover:text-emerald-700">
                                                     {{ $displayName }}
@@ -939,8 +939,8 @@
                                                 <p class="font-semibold text-slate-900">{{ $displayName }}</p>
                                             @endif
 
-                                            @if(filled($participant->notes))
-                                                <p class="mt-1 text-sm text-slate-600">{{ $participant->notes }}</p>
+                                            @if(filled($keyPerson->notes))
+                                                <p class="mt-1 text-sm text-slate-600">{{ $keyPerson->notes }}</p>
                                             @endif
                                         </div>
                                     @endforeach

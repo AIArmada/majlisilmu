@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AiModelPricings\Tables;
 
+use App\Models\AiModelPricing;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -66,7 +67,7 @@ class AiModelPricingsTable
             ])
             ->filters([
                 SelectFilter::make('provider')
-                    ->options(fn (): array => \App\Models\AiModelPricing::query()
+                    ->options(fn (): array => AiModelPricing::query()
                         ->whereNotNull('provider')
                         ->distinct()
                         ->orderBy('provider')
@@ -74,7 +75,7 @@ class AiModelPricingsTable
                         ->all()),
 
                 SelectFilter::make('operation')
-                    ->options(fn (): array => \App\Models\AiModelPricing::query()
+                    ->options(fn (): array => AiModelPricing::query()
                         ->whereNotNull('operation')
                         ->distinct()
                         ->orderBy('operation')

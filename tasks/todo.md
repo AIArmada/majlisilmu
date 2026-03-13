@@ -19,6 +19,25 @@
   - Editor diagnostics on all touched files => clean
   - Narrowed `phpstan analyse` attempts were interrupted in this shell before completion, so static verification fell back to clean editor diagnostics for the touched files
 
+# Affiliate Dead-Code Cleanup
+
+- [x] Audit remaining direct usages of the legacy `App\Services\DawahShare` layer and old `dawah_share_*` schema/models
+- [x] Rewire the remaining runtime callers to `App\Services\ShareTrackingService`
+- [x] Remove obsolete local Dawah Share services, models, factories, and legacy user relation if no longer referenced
+- [x] Add a safe cleanup migration for stale `dawah_share_*` tables and delete the obsolete create migrations
+- [x] Run focused tests, formatting, and targeted static/error checks
+
+## Review
+
+- Rewired the last direct callers in event, saved-search, institution, speaker, and submit-event flows from `App\Services\DawahShare\DawahShareService` to the active affiliate-backed `App\Services\ShareTrackingService`.
+- Removed the obsolete local Dawah Share service layer, unused Eloquent models, factories, `DawahShareVisitKind` enum, and the legacy `User::dawahShareLinks()` relation.
+- Deleted the old local `dawah_share_*` create migrations and added `database/migrations/2026_03_12_104922_drop_legacy_dawah_share_tables.php` so existing databases safely drop the stale tables while fresh databases never create them.
+- Updated `analytic-plan.md` to reference `ShareTrackingAnalyticsService` instead of the removed local analytics service.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php` => 24 passed (180 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Show.php app/Livewire/Pages/SavedSearches/Index.php app/Http/Controllers/Api/SavedSearchController.php app/Models/User.php tests/Feature/DawahShareImpactTest.php database/migrations/2026_03_12_104922_drop_legacy_dawah_share_tables.php` => no errors
+  - editor diagnostics for the changed files => no errors
+
 # Speaker Show Page Relation Fix
 
 # Community Contribution Workflow Completion

@@ -4,6 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Series;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Nnjeim\World\Models\Language;
 
 class SeriesSeeder extends Seeder
 {
@@ -19,9 +22,9 @@ class SeriesSeeder extends Seeder
         Series::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function (): void {
+            DB::transaction(function (): void {
                 // Pre-load language IDs
-                $languageIds = \Nnjeim\World\Models\Language::query()->pluck('id')->toArray();
+                $languageIds = Language::query()->pluck('id')->toArray();
 
                 // Create a batch of series
                 $seriesToCreate = [];
@@ -36,7 +39,7 @@ class SeriesSeeder extends Seeder
                 // Insert series in chunks
                 foreach (array_chunk($seriesToCreate, 100) as $chunk) {
                     Series::insert(array_map(fn ($s) => array_merge($s, [
-                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'id' => (string) Str::uuid(),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]), $chunk));
@@ -62,7 +65,7 @@ class SeriesSeeder extends Seeder
 
                 // Bulk insert language attachments
                 foreach (array_chunk($languageAttachments, 500) as $chunk) {
-                    \Illuminate\Support\Facades\DB::table('languageables')->insert($chunk);
+                    DB::table('languageables')->insert($chunk);
                 }
             });
         } finally {

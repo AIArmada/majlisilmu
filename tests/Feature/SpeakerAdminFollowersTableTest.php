@@ -3,11 +3,13 @@
 use App\Filament\Resources\Speakers\Pages\ListSpeakers;
 use App\Models\Speaker;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Livewire\Livewire;
 
 it('shows follower count on admin speakers list', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');

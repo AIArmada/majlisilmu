@@ -2,14 +2,14 @@
 
 namespace App\Support\Submission;
 
-final class SubmissionLockEligibilityResult
+final readonly class SubmissionLockEligibilityResult
 {
     /**
      * @param  list<string>  $reasons
      */
     public function __construct(
-        public readonly bool $eligible,
-        public readonly array $reasons = [],
+        public bool $eligible,
+        public array $reasons = [],
     ) {}
 
     public static function eligible(): self

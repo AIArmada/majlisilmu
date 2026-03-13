@@ -150,7 +150,7 @@ class InstitutionDashboard extends Component
 
         $validated = $this->validate($this->memberCreationRules());
 
-        $email = mb_strtolower(trim($validated['newMemberEmail']));
+        $email = mb_strtolower(trim((string) $validated['newMemberEmail']));
         $member = User::query()
             ->whereRaw('LOWER(email) = ?', [$email])
             ->first();

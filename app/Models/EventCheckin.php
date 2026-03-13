@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\EventCheckinFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventCheckin extends Model
 {
-    /** @use HasFactory<\Database\Factories\EventCheckinFactory> */
+    /** @use HasFactory<EventCheckinFactory> */
     use HasFactory, HasUuids;
 
     public $incrementing = false;

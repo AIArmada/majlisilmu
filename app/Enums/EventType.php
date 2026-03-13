@@ -140,32 +140,32 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     /**
      * @return list<string>
      */
-    public function suggestedParticipantRoles(): array
+    public function suggestedKeyPersonRoles(): array
     {
         return match ($this) {
             self::KuliahCeramah,
             self::KelasDaurah,
             self::SeminarKonvensyen,
-            self::Tazkirah => [EventParticipantRole::Speaker->value, EventParticipantRole::Moderator->value],
-            self::Forum => [EventParticipantRole::Speaker->value, EventParticipantRole::Moderator->value],
-            self::KhutbahJumaat => [EventParticipantRole::Khatib->value, EventParticipantRole::Imam->value, EventParticipantRole::Bilal->value],
+            self::Tazkirah => [EventKeyPersonRole::Speaker->value, EventKeyPersonRole::Moderator->value],
+            self::Forum => [EventKeyPersonRole::Speaker->value, EventKeyPersonRole::Moderator->value],
+            self::KhutbahJumaat => [EventKeyPersonRole::Khatib->value, EventKeyPersonRole::Imam->value, EventKeyPersonRole::Bilal->value],
             self::Qiamullail,
             self::Tahlil,
-            self::SolatHajat => [EventParticipantRole::Imam->value],
+            self::SolatHajat => [EventKeyPersonRole::Imam->value],
             self::Zikir,
             self::Selawat,
             self::DoaSelamat,
             self::BacaanYasin,
             self::KhatamQuran,
             self::Tilawah,
-            self::HafazanQuran => [EventParticipantRole::Imam->value, EventParticipantRole::Bilal->value],
+            self::HafazanQuran => [EventKeyPersonRole::Imam->value, EventKeyPersonRole::Bilal->value],
             self::GotongRoyong,
             self::Kenduri,
             self::Iftar,
             self::Sahur,
             self::Korban,
-            self::Aqiqah => [EventParticipantRole::PersonInCharge->value],
-            self::Other => [EventParticipantRole::Speaker->value, EventParticipantRole::PersonInCharge->value],
+            self::Aqiqah => [EventKeyPersonRole::PersonInCharge->value],
+            self::Other => [EventKeyPersonRole::Speaker->value, EventKeyPersonRole::PersonInCharge->value],
         };
     }
 }

@@ -6,6 +6,8 @@ use App\Models\Event;
 use App\Models\ModerationReview;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ModerationReviewSeeder extends Seeder
 {
@@ -27,7 +29,7 @@ class ModerationReviewSeeder extends Seeder
         ModerationReview::unsetEventDispatcher();
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($reviewerIds): void {
+            DB::transaction(function () use ($reviewerIds): void {
                 $events = Event::query()
                     ->whereIn('status', ['approved', 'rejected', 'pending'])
                     ->select(['id', 'status'])
@@ -49,7 +51,7 @@ class ModerationReviewSeeder extends Seeder
                             'decision' => $decision,
                         ])->toArray(),
                         [
-                            'id' => (string) \Illuminate\Support\Str::uuid(),
+                            'id' => (string) Str::uuid(),
                             'created_at' => now(),
                             'updated_at' => now(),
                         ]

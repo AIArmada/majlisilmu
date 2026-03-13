@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\InspirationCategory;
+use Database\Factories\InspirationFactory;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -17,7 +19,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Inspiration extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\InspirationFactory> */
+    /** @property array<string, mixed> $content */
+    /** @use HasFactory<InspirationFactory> */
     use HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
@@ -45,6 +48,9 @@ class Inspiration extends Model implements HasMedia
         ];
     }
 
+    /**
+     * @return Attribute<array<string, mixed>, mixed>
+     */
     protected function content(): Attribute
     {
         return Attribute::make(
@@ -127,7 +133,7 @@ class Inspiration extends Model implements HasMedia
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);
@@ -136,7 +142,7 @@ class Inspiration extends Model implements HasMedia
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function forLocale(Builder $query, ?string $locale = null): void
     {
         $query->where('locale', $locale ?? app()->getLocale());

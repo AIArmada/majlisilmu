@@ -12,7 +12,6 @@ it('uses formatted speaker names for organizer options in event form', function 
     ]);
 
     $method = new ReflectionMethod(EventForm::class, 'getOrganizerOptions');
-    $method->setAccessible(true);
 
     /** @var array<string, string> $options */
     $options = $method->invoke(null, Speaker::class);

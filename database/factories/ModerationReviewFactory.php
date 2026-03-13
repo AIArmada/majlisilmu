@@ -3,11 +3,12 @@
 namespace Database\Factories;
 
 use App\Models\Event;
+use App\Models\ModerationReview;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ModerationReview>
+ * @extends Factory<ModerationReview>
  */
 class ModerationReviewFactory extends Factory
 {

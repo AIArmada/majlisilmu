@@ -116,8 +116,8 @@ class CreateAdvanced extends Component
 
         $this->form['title'] = (string) $templateState['title'];
         $this->form['description'] = (string) $templateState['description'];
-        $this->form['program_starts_at'] = (string) $templateState['program_starts_at'];
-        $this->form['program_ends_at'] = (string) $templateState['program_ends_at'];
+        $this->form['program_starts_at'] = $templateState['program_starts_at'];
+        $this->form['program_ends_at'] = $templateState['program_ends_at'];
         $this->activeStep = 2;
     }
 
@@ -144,7 +144,7 @@ class CreateAdvanced extends Component
 
         $user = $this->currentUser();
 
-        abort_unless($user !== null, 403);
+        abort_unless($user instanceof User, 403);
 
         $timezone = (string) $validated['form']['timezone'];
         $organizerType = (string) $validated['form']['organizer_type'];

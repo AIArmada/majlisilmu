@@ -34,9 +34,7 @@ class EventUsersRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('roles')
                     ->label('Roles')
-                    ->getStateUsing(function (User $record): string {
-                        return Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—';
-                    }),
+                    ->getStateUsing(fn (User $record): string => Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—'),
                 TextColumn::make('pivot.joined_at')
                     ->label('Joined')
                     ->dateTime('d M Y')
@@ -78,11 +76,9 @@ class EventUsersRelationManager extends RelationManager
                     ->form([
                         $this->makeRoleSelect(),
                     ])
-                    ->fillForm(function (User $record): array {
-                        return [
-                            'role_ids' => $this->getMemberRoleIds($record),
-                        ];
-                    })
+                    ->fillForm(fn (User $record): array => [
+                        'role_ids' => $this->getMemberRoleIds($record),
+                    ])
                     ->action(function (array $data, User $record): void {
                         $this->syncMemberRoles($record, $data['role_ids'] ?? []);
                     }),

@@ -5,7 +5,7 @@ namespace App\Services\Notifications;
 use App\Enums\NotificationCadence;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
-use App\Enums\NotificationFamily;
+use App\Enums\NotificationPriority;
 use App\Enums\NotificationRuleScope;
 use App\Enums\NotificationTrigger;
 use App\Models\NotificationDestination;
@@ -165,8 +165,8 @@ class NotificationSettingsManager
                 'description' => $definition['description'],
                 'priority' => $definition['priority']->value,
                 'supports_urgent_override' => in_array($definition['priority'], [
-                    \App\Enums\NotificationPriority::High,
-                    \App\Enums\NotificationPriority::Urgent,
+                    NotificationPriority::High,
+                    NotificationPriority::Urgent,
                 ], true),
                 'urgent_override' => $rule instanceof NotificationRule ? $rule->urgent_override : null,
             ];
@@ -337,7 +337,7 @@ class NotificationSettingsManager
         /** @var NotificationSetting $setting */
         $setting = $user->notificationSetting()->firstOrFail();
         $triggerDefinition = NotificationCatalog::triggerDefinition($trigger);
-        $familyDefinition = NotificationCatalog::familyDefinition($triggerDefinition['family']);
+        NotificationCatalog::familyDefinition($triggerDefinition['family']);
 
         /** @var NotificationRule $familyRule */
         $familyRule = $user->notificationRules()
@@ -542,7 +542,6 @@ class NotificationSettingsManager
     }
 
     /**
-     * @param  mixed  $value
      * @param  list<string>  $allowed
      * @param  list<string>  $fallback
      * @return list<string>

@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\District;
@@ -11,6 +11,7 @@ use App\Models\Subdistrict;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -96,7 +97,7 @@ it('filters events by district_id and subdistrict_id', function () {
     $state = State::where('country_code', 'MY')->first();
 
     if (! $state) {
-        $countryId = \Illuminate\Support\Facades\DB::table('countries')->insertGetId([
+        $countryId = DB::table('countries')->insertGetId([
             'iso2' => 'MY',
             'name' => 'Malaysia',
             'status' => 1,
@@ -106,7 +107,7 @@ it('filters events by district_id and subdistrict_id', function () {
             'subregion' => 'South-Eastern Asia',
         ]);
 
-        $stateId = \Illuminate\Support\Facades\DB::table('states')->insertGetId([
+        $stateId = DB::table('states')->insertGetId([
             'country_id' => $countryId,
             'name' => 'Selangor',
             'country_code' => 'MY',
@@ -253,7 +254,7 @@ it('filters events by prayer_time keyword', function () {
         ->not()->toContain($subuhEvent->id);
 });
 
-it('filters events by participant roles and role-specific linked speakers', function () {
+it('filters events by key person roles and role-specific linked speakers', function () {
     $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
     $moderatorSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
 
@@ -264,7 +265,7 @@ it('filters events by participant roles and role-specific linked speakers', func
     ]);
 
     $imamEvent->keyPeople()->create([
-        'role' => EventParticipantRole::Imam,
+        'role' => EventKeyPersonRole::Imam,
         'speaker_id' => $imamSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
@@ -277,7 +278,7 @@ it('filters events by participant roles and role-specific linked speakers', func
     ]);
 
     $moderatedEvent->keyPeople()->create([
-        'role' => EventParticipantRole::Moderator,
+        'role' => EventKeyPersonRole::Moderator,
         'speaker_id' => $moderatorSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
@@ -304,7 +305,7 @@ it('filters events by participant roles and role-specific linked speakers', func
         ->not()->toContain($imamEvent->id);
 });
 
-it('includes participant data in the event api response', function () {
+it('includes key person data in the event api response', function () {
     $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
 
     $event = Event::factory()->create([
@@ -314,7 +315,7 @@ it('includes participant data in the event api response', function () {
     ]);
 
     $event->keyPeople()->create([
-        'role' => EventParticipantRole::Imam,
+        'role' => EventKeyPersonRole::Imam,
         'speaker_id' => $imamSpeaker->id,
         'order_column' => 1,
         'is_public' => true,
@@ -323,6 +324,6 @@ it('includes participant data in the event api response', function () {
     $response = $this->getJson('/api/v1/events/'.$event->id);
 
     $response->assertOk()
-        ->assertJsonPath('data.key_people.0.role', EventParticipantRole::Imam->value)
+        ->assertJsonPath('data.key_people.0.role', EventKeyPersonRole::Imam->value)
         ->assertJsonPath('data.key_people.0.speaker.id', $imamSpeaker->id);
 });

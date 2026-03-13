@@ -3,7 +3,7 @@
     use App\Enums\EventAgeGroup;
     use App\Enums\EventFormat;
     use App\Enums\EventGenderRestriction;
-    use App\Enums\EventParticipantRole;
+    use App\Enums\EventKeyPersonRole;
     use App\Enums\EventPrayerTime;
     use App\Enums\EventType;
     use App\Enums\EventVisibility;
@@ -225,17 +225,17 @@
         ->all();
 
     $otherKeyPeopleLabels = collect((array) $get('other_key_people'))
-        ->map(function (mixed $participant) use ($speakerMap): ?string {
-            if (! is_array($participant)) {
+        ->map(function (mixed $keyPerson) use ($speakerMap): ?string {
+            if (! is_array($keyPerson)) {
                 return null;
             }
 
-            $role = EventParticipantRole::tryFrom((string) ($participant['role'] ?? ''));
-            $speakerId = (string) ($participant['speaker_id'] ?? '');
-            $name = is_string($participant['name'] ?? null) ? trim((string) $participant['name']) : '';
+            $role = EventKeyPersonRole::tryFrom((string) ($keyPerson['role'] ?? ''));
+            $speakerId = (string) ($keyPerson['speaker_id'] ?? '');
+            $name = is_string($keyPerson['name'] ?? null) ? trim((string) $keyPerson['name']) : '';
             $displayName = $speakerMap[$speakerId] ?? $name;
 
-            if (! $role instanceof EventParticipantRole || $displayName === '') {
+            if (! $role instanceof EventKeyPersonRole || $displayName === '') {
                 return null;
             }
 

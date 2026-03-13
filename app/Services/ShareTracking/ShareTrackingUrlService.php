@@ -191,15 +191,12 @@ final class ShareTrackingUrlService
             return false;
         }
 
-        foreach ((array) config('dawah-share.bot_user_agents', []) as $needle) {
-            if (str_contains($userAgent, Str::lower((string) $needle))) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any((array) config('dawah-share.bot_user_agents', []), fn ($needle) => str_contains($userAgent, Str::lower((string) $needle)));
     }
 
+    /**
+     * @param  array<string, scalar|null>  $params
+     */
     public function appendQueryParameters(string $url, array $params): string
     {
         $parsed = parse_url($url) ?: [];

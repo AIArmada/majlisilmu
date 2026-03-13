@@ -116,19 +116,19 @@ class NotificationEngine
                 'user_id' => $user->id,
                 'fingerprint' => $fingerprint,
             ],
-                [
-                    'family' => $policy->family->value,
-                    'trigger' => $policy->trigger->value,
-                    'title' => $title,
-                    'body' => $body,
-                    'priority' => $policy->trigger === NotificationTrigger::EventCancelled
-                        ? NotificationPriority::Urgent->value
-                        : NotificationPriority::Medium->value,
-                    'delivery_cadence' => NotificationCadence::Instant->value,
-                    'occurred_at' => now(),
-                    'meta' => $meta,
-                ]
-            );
+            [
+                'family' => $policy->family->value,
+                'trigger' => $policy->trigger->value,
+                'title' => $title,
+                'body' => $body,
+                'priority' => $policy->trigger === NotificationTrigger::EventCancelled
+                    ? NotificationPriority::Urgent->value
+                    : NotificationPriority::Medium->value,
+                'delivery_cadence' => NotificationCadence::Instant->value,
+                'occurred_at' => now(),
+                'meta' => $meta,
+            ]
+        );
     }
 
     public function queueFallbackForNotification(User $user, NotificationCenterMessage $notification): void

@@ -7,6 +7,9 @@ use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
+use Database\Seeders\InspirationSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -92,7 +95,7 @@ it('supports all inspiration categories', function () {
 });
 
 it('seeds inspirations via InspirationSeeder', function () {
-    $this->seed(\Database\Seeders\InspirationSeeder::class);
+    $this->seed(InspirationSeeder::class);
 
     expect(Inspiration::query()->count())->toBeGreaterThanOrEqual(18);
 
@@ -192,8 +195,8 @@ it('does not show inspiration from a different locale', function () {
 });
 
 it('allows super admin to access inspiration admin index', function () {
-    $this->seed(\Database\Seeders\PermissionSeeder::class);
-    $this->seed(\Database\Seeders\RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
 
     $admin = User::factory()->create();
     $admin->assignRole('super_admin');

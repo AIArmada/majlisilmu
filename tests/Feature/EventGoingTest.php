@@ -2,6 +2,7 @@
 
 use App\Models\Event;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 
 describe('Event Going Feature', function () {
     it('allows a user to mark as going to an event', function () {
@@ -97,6 +98,6 @@ describe('Event Going Feature', function () {
 
         // Attempting to attach again should fail due to primary key constraint
         expect(fn () => $event->goingBy()->attach($user->id))
-            ->toThrow(\Illuminate\Database\QueryException::class);
+            ->toThrow(QueryException::class);
     });
 });

@@ -3,9 +3,15 @@
 namespace App\Filament\Resources\DonationChannels\Schemas;
 
 use App\Models\DonationChannel;
+use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Speaker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
@@ -17,17 +23,17 @@ class DonationChannelForm
         $components = [];
 
         if ($withOwnerSection) {
-            $components[] = \Filament\Schemas\Components\Section::make('Owner')
+            $components[] = Section::make('Owner')
                 ->schema([
-                    \Filament\Forms\Components\Select::make('donatable_type')
+                    Select::make('donatable_type')
                         ->options([
-                            \App\Models\Institution::class => 'Institution',
-                            \App\Models\Speaker::class => 'Speaker',
-                            \App\Models\Event::class => 'Event',
+                            Institution::class => 'Institution',
+                            Speaker::class => 'Speaker',
+                            Event::class => 'Event',
                         ])
                         ->required()
                         ->live(),
-                    \Filament\Forms\Components\Select::make('donatable_id')
+                    Select::make('donatable_id')
                         ->label('Recipient Entity')
                         ->searchable()
                         ->preload()
@@ -43,14 +49,14 @@ class DonationChannelForm
                 ])->columns(2);
         }
 
-        $components[] = \Filament\Schemas\Components\Section::make('Account Details')
+        $components[] = Section::make('Account Details')
             ->schema([
                 TextInput::make('label')
                     ->placeholder('e.g. Tabung Masjid, Dana Pembangunan'),
                 TextInput::make('recipient')
                     ->required()
                     ->placeholder('Full name on account'),
-                \Filament\Forms\Components\Select::make('method')
+                Select::make('method')
                     ->options([
                         'bank_account' => 'Bank Account',
                         'duitnow' => 'DuitNow',
@@ -60,7 +66,7 @@ class DonationChannelForm
                     ->live(),
             ])->columns(3);
 
-        $components[] = \Filament\Schemas\Components\Section::make('Payment Info')
+        $components[] = Section::make('Payment Info')
             ->schema([
                 // Bank Account Fields
                 TextInput::make('bank_name')
@@ -91,9 +97,9 @@ class DonationChannelForm
                     ->visible(fn (Get $get) => $get('method') === 'ewallet'),
             ])->columns(3);
 
-        $components[] = \Filament\Schemas\Components\Section::make('QR Code')
+        $components[] = Section::make('QR Code')
             ->schema([
-                \Filament\Forms\Components\SpatieMediaLibraryFileUpload::make('qr')
+                SpatieMediaLibraryFileUpload::make('qr')
                     ->label('QR Image')
                     ->collection('qr')
                     ->image()
@@ -103,9 +109,9 @@ class DonationChannelForm
                     ->helperText('Upload an official payment QR image.'),
             ]);
 
-        $components[] = \Filament\Schemas\Components\Section::make('Verification')
+        $components[] = Section::make('Verification')
             ->schema([
-                \Filament\Forms\Components\Select::make('status')
+                Select::make('status')
                     ->options([
                         'unverified' => 'Unverified',
                         'verified' => 'Verified',
@@ -119,10 +125,8 @@ class DonationChannelForm
                     ->helperText('Enable this to replace the current default channel for this owner.')
                     ->dehydrated(false)
                     ->live()
-                    ->visible(function (Get $get, ?DonationChannel $record = null, mixed $livewire = null): bool {
-                        return self::hasAnotherDefaultChannel($get, $record, $livewire)
-                            && ! (bool) $get('is_default');
-                    }),
+                    ->visible(fn (Get $get, ?DonationChannel $record = null, mixed $livewire = null): bool => self::hasAnotherDefaultChannel($get, $record, $livewire)
+                        && ! (bool) $get('is_default')),
                 Toggle::make('is_default')
                     ->label('Default')
                     ->live()

@@ -4,6 +4,9 @@ namespace App\Models;
 
 use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use App\Enums\InstitutionType;
+use App\Models\Concerns\HasAddress;
+use Database\Factories\InstitutionFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,8 +24,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Institution extends Model implements AuditableContract, HasMedia
 {
-    /** @use HasFactory<\Database\Factories\InstitutionFactory> */
-    use \App\Models\Concerns\HasAddress, \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    /** @use HasFactory<InstitutionFactory> */
+    use \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -150,13 +153,13 @@ class Institution extends Model implements AuditableContract, HasMedia
 
     public function getAuthzScopeLabel(): string
     {
-        return 'Institution: ' . $this->name;
+        return 'Institution: '.$this->name;
     }
 
     /**
      * @param  Builder<self>  $query
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);

@@ -1,10 +1,11 @@
 <?php
 
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Models\SavedSearch;
 use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -42,7 +43,7 @@ describe('Saved Search API Endpoints', function () {
                     'query' => 'maghrib',
                     'filters' => [
                         'language' => 'malay',
-                        'key_person_roles' => [EventParticipantRole::Imam->value],
+                        'key_person_roles' => [EventKeyPersonRole::Imam->value],
                         'imam_ids' => [$imamSpeaker->id],
                     ],
                     'notify' => 'daily',
@@ -50,7 +51,7 @@ describe('Saved Search API Endpoints', function () {
 
                 $response->assertCreated()
                     ->assertJsonPath('data.name', 'Kuliah Maghrib')
-                    ->assertJsonPath('data.filters.key_person_roles.0', EventParticipantRole::Imam->value)
+                    ->assertJsonPath('data.filters.key_person_roles.0', EventKeyPersonRole::Imam->value)
                     ->assertJsonPath('data.filters.imam_ids.0', $imamSpeaker->id);
 
                 $this->assertDatabaseHas('saved_searches', [
@@ -76,7 +77,7 @@ describe('Saved Search API Endpoints', function () {
                     ->assertJsonValidationErrors(['notify']);
             });
 
-            it('validates participant role options', function () {
+            it('validates key person role options', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Role Search',
                     'filters' => [
@@ -129,7 +130,7 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Geography Filter Test',
                     'filters' => [
-                        'state_id' => (string) \Illuminate\Support\Str::uuid(),
+                        'state_id' => (string) Str::uuid(),
                     ],
                     'notify' => 'daily',
                 ]);
@@ -142,7 +143,7 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Subdistrict Filter Test',
                     'filters' => [
-                        'subdistrict_id' => (string) \Illuminate\Support\Str::uuid(),
+                        'subdistrict_id' => (string) Str::uuid(),
                     ],
                     'notify' => 'daily',
                 ]);

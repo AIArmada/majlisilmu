@@ -3,6 +3,7 @@
 use App\Models\Event;
 use App\Models\EventUser;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 it('can create an event member', function () {
     $event = Event::factory()->create();
@@ -37,7 +38,7 @@ it('enforces unique event and user combination', function () {
 
     // Attempting to create duplicate should fail
     EventUser::factory()->for($event)->for($user)->create();
-})->throws(\Illuminate\Database\UniqueConstraintViolationException::class);
+})->throws(UniqueConstraintViolationException::class);
 
 it('can access members from event', function () {
     $event = Event::factory()->create();
