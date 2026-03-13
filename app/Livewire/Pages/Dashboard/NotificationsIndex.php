@@ -4,6 +4,7 @@ namespace App\Livewire\Pages\Dashboard;
 
 use App\Models\NotificationMessage;
 use App\Models\User;
+use App\Services\Signals\ProductSignalsService;
 use App\Support\Notifications\NotificationCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -54,16 +55,24 @@ class NotificationsIndex extends Component
             abort(404);
         }
 
+        $wasUnread = $message->read_at === null;
+
         $message->markAsRead();
+
+        if ($wasUnread) {
+            app(ProductSignalsService::class)->recordNotificationRead($message->fresh(), $this->currentUser(), request());
+        }
     }
 
     public function markAllAsRead(): void
     {
-        $this->currentUser()
+        $updated = $this->currentUser()
             ->notificationMessages()
             ->visibleInInbox()
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
+
+        app(ProductSignalsService::class)->recordNotificationsReadAll($this->currentUser(), $updated, request());
     }
 
     /**

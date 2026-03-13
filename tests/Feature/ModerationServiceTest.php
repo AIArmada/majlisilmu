@@ -1,5 +1,6 @@
 <?php
 
+use AIArmada\Signals\Models\SignalEvent;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\ModerationReview;
@@ -41,6 +42,7 @@ describe('Event Submission', function () {
         $this->service->submitForModeration($event);
 
         expect((string) $event->fresh()->status)->toBe('pending');
+        expect(SignalEvent::query()->where('event_name', 'moderation.event.submitted')->exists())->toBeTrue();
         Notification::assertSentTo($moderator, EventSubmittedNotification::class);
     });
 
@@ -80,6 +82,7 @@ describe('Event Approval', function () {
         expect($review->decision)->toBe('approved');
         expect((string) $event->fresh()->status)->toBe('approved');
         expect($event->fresh()->published_at)->not->toBeNull();
+        expect(SignalEvent::query()->where('event_name', 'moderation.event.approved')->exists())->toBeTrue();
     });
 
     it('notifies submitter on approval', function () {
@@ -235,6 +238,7 @@ describe('Event Rejection', function () {
 
         expect($review->decision)->toBe('rejected');
         expect((string) $event->fresh()->status)->toBe('rejected');
+        expect(SignalEvent::query()->where('event_name', 'moderation.event.rejected')->exists())->toBeTrue();
 
         $this->assertDatabaseHas('notification_messages', [
             'user_id' => $submitter->id,

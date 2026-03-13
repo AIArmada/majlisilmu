@@ -1,6 +1,7 @@
 <?php
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\Signals\Models\SignalEvent;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
@@ -194,6 +195,8 @@ it('stores reference reports from the public report page', function () {
         'entity_id' => $reference->id,
         'category' => 'fake_reference',
     ]);
+
+    expect(SignalEvent::query()->where('event_name', 'report.submitted')->exists())->toBeTrue();
 });
 
 it('resolves speaker slugs on the update suggestion page without uuid casting errors', function () {

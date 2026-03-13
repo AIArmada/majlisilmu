@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\ShareTrackingService;
+use App\Services\Signals\ProductSignalsService;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -66,6 +67,7 @@ class SocialiteController extends Controller
         }
 
         Auth::login($user, remember: true);
+        app(ProductSignalsService::class)->recordLogin($user, request(), $provider, $createdFromShare);
 
         if ($createdFromShare) {
             app(ShareTrackingService::class)->recordSignup($user, request());

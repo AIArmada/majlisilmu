@@ -2,10 +2,12 @@
 
 use App\Models\Tag;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new
+    #[Layout('layouts.app')]
     #[Title('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')]
     class extends Component {
         #[Computed]
@@ -390,4 +392,6 @@ new
             </div>
         </div>
     </section>
+
+    @include('components.ui.toast-stack')
 </div>

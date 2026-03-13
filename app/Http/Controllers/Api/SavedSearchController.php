@@ -9,6 +9,7 @@ use App\Models\SavedSearch;
 use App\Models\User;
 use App\Services\EventSearchService;
 use App\Services\ShareTrackingService;
+use App\Services\Signals\ProductSignalsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -19,7 +20,8 @@ class SavedSearchController extends Controller
 {
     public function __construct(
         protected EventSearchService $searchService,
-        protected ShareTrackingService $shareTrackingService
+        protected ShareTrackingService $shareTrackingService,
+        protected ProductSignalsService $productSignalsService,
     ) {}
 
     /**
@@ -224,6 +226,22 @@ class SavedSearchController extends Controller
                 perPage: 20
             );
         }
+
+        $user = request()->user();
+
+        $this->productSignalsService->recordSearchExecuted(
+            user: $user instanceof User ? $user : null,
+            request: request(),
+            surface: 'saved_search.execute',
+            query: $savedSearch->query,
+            filters: array_merge($filters, array_filter([
+                'lat' => $savedSearch->lat,
+                'lng' => $savedSearch->lng,
+                'radius_km' => $savedSearch->radius_km,
+            ], static fn (mixed $value): bool => $value !== null)),
+            resultCount: $events->total(),
+            savedSearchId: (string) $savedSearch->getKey(),
+        );
 
         return response()->json([
             'data' => $events->items(),

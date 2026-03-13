@@ -12,6 +12,8 @@
         "php": "^8.4",
         "aiarmada/affiliates": "dev-main",
         "aiarmada/commerce-support": "dev-main as 1.0.0",
+        "aiarmada/filament-signals": "dev-main",
+        "aiarmada/signals": "dev-main",
         "aiarmada/filament-authz": "1.0.0",
         "bezhansalleh/filament-language-switch": "dev-main",
         "cocosmos/filament-quick-add-select": "^1.1",
@@ -132,6 +134,22 @@
             "name": "aiarmada-affiliates",
             "type": "path",
             "url": "../commerce/packages/affiliates",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "name": "aiarmada-signals",
+            "type": "path",
+            "url": "../commerce/packages/signals",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "name": "aiarmada-filament-signals",
+            "type": "path",
+            "url": "../commerce/packages/filament-signals",
             "options": {
                 "symlink": true
             }

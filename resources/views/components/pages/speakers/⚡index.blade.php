@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\User;
 use App\Models\Speaker;
+use App\Services\ContributionEntityMutationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -8,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -19,6 +22,55 @@ new
 
         #[Url]
         public ?string $search = null;
+
+        /**
+         * @var array<string, mixed>
+         */
+        public array $speakerSubmissionData = [];
+
+        public bool $showSpeakerSubmissionForm = false;
+
+        public function openSpeakerSubmissionForm(): void
+        {
+            if (! auth()->check()) {
+                $this->redirectRoute('login', navigate: true);
+
+                return;
+            }
+
+            $this->showSpeakerSubmissionForm = true;
+
+            $prefillName = $this->normalizedSearch();
+
+            $this->speakerSubmissionData = $prefillName !== null
+                ? ['name' => $prefillName]
+                : [];
+        }
+
+        public function cancelSpeakerSubmissionForm(): void
+        {
+            $this->showSpeakerSubmissionForm = false;
+            $this->speakerSubmissionData = [];
+        }
+
+        public function submitSpeaker(): void
+        {
+            $user = auth()->user();
+
+            if (! $user instanceof User) {
+                $this->redirectRoute('login', navigate: true);
+
+                return;
+            }
+
+            $payload = $this->speakerSubmissionData;
+            $payload['name'] ??= $this->normalizedSearch() ?? 'Speaker';
+
+            app(ContributionEntityMutationService::class)->createSpeaker($payload, $user);
+
+            $this->showSpeakerSubmissionForm = false;
+            $this->speakerSubmissionData = [];
+        }
 
         #[Computed]
         public function speakers(): LengthAwarePaginatorContract

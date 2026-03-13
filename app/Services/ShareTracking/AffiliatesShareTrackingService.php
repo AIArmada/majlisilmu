@@ -22,17 +22,20 @@ use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Services\Signals\AffiliateSignalsBridge;
 use Carbon\CarbonInterface;
 use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Throwable;
 
 final readonly class AffiliatesShareTrackingService
 {
     public function __construct(
         private ShareTrackingUrlService $shareTrackingUrlService,
+        private AffiliateSignalsBridge $affiliateSignalsBridge,
     ) {}
 
     /**
@@ -254,6 +257,8 @@ final readonly class AffiliatesShareTrackingService
             AffiliateLink::query()->whereKey($linkId)->first()?->incrementConversions();
         }
 
+        $this->dispatchAffiliateConversionRecorded($conversion);
+
         return $this->mapOutcome($conversion);
     }
 
@@ -460,11 +465,15 @@ final readonly class AffiliatesShareTrackingService
         if ($attribution instanceof AffiliateAttribution) {
             $attribution->fill($payload);
             $attribution->save();
+            $this->dispatchAffiliateAttributed($attribution);
 
             return $attribution;
         }
 
-        return AffiliateAttribution::query()->create($payload);
+        $attribution = AffiliateAttribution::query()->create($payload);
+        $this->dispatchAffiliateAttributed($attribution);
+
+        return $attribution;
     }
 
     private function resolveActiveAffiliateAttribution(?Request $request = null): ?AffiliateAttribution
@@ -590,6 +599,33 @@ final readonly class AffiliatesShareTrackingService
             'share_token' => $link->custom_slug,
             'sharer_user_id' => data_get($affiliate?->metadata, 'majlis_user_id'),
         ];
+    }
+
+    private function dispatchAffiliateAttributed(AffiliateAttribution $attribution): void
+    {
+        try {
+            $this->affiliateSignalsBridge->recordAffiliateAttributed($attribution);
+        } catch (Throwable $exception) {
+            report($exception);
+            logger()->warning('Signals affiliate attribution telemetry skipped after ingestion failure.', [
+                'affiliate_attribution_id' => $attribution->getKey(),
+                'affiliate_id' => $attribution->affiliate_id,
+            ]);
+        }
+    }
+
+    private function dispatchAffiliateConversionRecorded(AffiliateConversion $conversion): void
+    {
+        try {
+            $this->affiliateSignalsBridge->recordAffiliateConversionRecorded($conversion);
+        } catch (Throwable $exception) {
+            report($exception);
+            logger()->warning('Signals affiliate conversion telemetry skipped after ingestion failure.', [
+                'affiliate_conversion_id' => $conversion->getKey(),
+                'affiliate_id' => $conversion->affiliate_id,
+                'conversion_type' => $conversion->conversion_type,
+            ]);
+        }
     }
 
     private function mapLink(AffiliateLink $link): ShareTrackingLinkData
@@ -746,7 +782,7 @@ final readonly class AffiliatesShareTrackingService
         if (! is_array($payload)) {
             try {
                 $decrypted = app('encrypter')->decrypt($encoded, false);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $decrypted = null;
             }
 

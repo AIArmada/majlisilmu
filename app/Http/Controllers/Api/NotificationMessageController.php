@@ -8,6 +8,7 @@ use App\Enums\NotificationTrigger;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationMessage;
 use App\Models\User;
+use App\Services\Signals\ProductSignalsService;
 use App\Support\Notifications\NotificationCatalog;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,10 @@ use Illuminate\Http\Request;
 
 class NotificationMessageController extends Controller
 {
+    public function __construct(
+        private readonly ProductSignalsService $productSignalsService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -53,7 +58,13 @@ class NotificationMessageController extends Controller
             ->whereKey($message)
             ->firstOrFail();
 
+        $wasUnread = $notification->read_at === null;
+
         $notification->markAsRead();
+
+        if ($wasUnread) {
+            $this->productSignalsService->recordNotificationRead($notification->fresh(), $this->currentUser($request), $request);
+        }
 
         return response()->json([
             'message' => __('notifications.api.read_success'),
@@ -63,11 +74,15 @@ class NotificationMessageController extends Controller
 
     public function readAll(Request $request): JsonResponse
     {
-        $updated = $this->currentUser($request)
+        $user = $this->currentUser($request);
+
+        $updated = $user
             ->notificationMessages()
             ->visibleInInbox()
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
+
+        $this->productSignalsService->recordNotificationsReadAll($user, $updated, $request);
 
         return response()->json([
             'message' => __('notifications.api.read_all_success'),

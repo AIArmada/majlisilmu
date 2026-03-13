@@ -60,6 +60,7 @@
     </script>
     @livewireStyles
     @filamentStyles
+    @include('components.analytics.signals-tracker', ['surface' => 'public'])
     @stack('head')
 </head>
 
@@ -349,7 +350,9 @@
                 @yield('content')
             </main>
 
-            <x-ui.toast-stack />
+            <div data-toast-root class="hidden" aria-hidden="true"></div>
+
+            @include('components.ui.toast-stack')
 
             <!-- Modern Footer -->
             <footer class="mt-20 border-t border-slate-200 bg-white/50 backdrop-blur-sm">

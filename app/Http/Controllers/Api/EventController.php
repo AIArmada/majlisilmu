@@ -6,6 +6,8 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\User;
+use App\Services\Signals\ProductSignalsService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +20,10 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class EventController extends Controller
 {
+    public function __construct(
+        private readonly ProductSignalsService $productSignalsService,
+    ) {}
+
     /**
      * @var list<string>
      */
@@ -288,6 +294,17 @@ class EventController extends Controller
             ->where('visibility', 'public')
             ->paginate((int) $request->input('per_page', 20))
             ->appends($request->query());
+
+        $user = $request->user();
+
+        $this->productSignalsService->recordSearchExecuted(
+            user: $user instanceof User ? $user : null,
+            request: $request,
+            surface: 'api.events.index',
+            query: is_string(data_get($request->query(), 'filter.search')) ? data_get($request->query(), 'filter.search') : null,
+            filters: is_array($request->query('filter')) ? $request->query('filter') : [],
+            resultCount: $events->total(),
+        );
 
         return response()->json($events);
     }

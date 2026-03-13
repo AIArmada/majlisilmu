@@ -5,7 +5,7 @@ namespace App\Forms;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventParticipantRole;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\TagType;
@@ -244,7 +244,7 @@ class EventContributionFormSchema
                         ->schema([
                             Select::make('role')
                                 ->label(__('Role'))
-                                ->options(EventParticipantRole::nonSpeakerOptions())
+                                ->options(EventKeyPersonRole::nonSpeakerOptions())
                                 ->required(),
                             Select::make('speaker_id')
                                 ->label(__('Linked Speaker Profile'))

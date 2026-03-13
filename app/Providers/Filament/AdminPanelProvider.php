@@ -3,8 +3,10 @@
 namespace App\Providers\Filament;
 
 use AIArmada\FilamentAuthz\FilamentAuthzPlugin;
+use AIArmada\FilamentSignals\FilamentSignalsPlugin;
 use App\Filament\Pages\AdminDashboard;
 use App\Providers\Filament\Concerns\ResolvesPanelDomain;
+use App\Providers\Filament\Concerns\TracksSignalsPanel;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -24,12 +26,15 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 class AdminPanelProvider extends PanelProvider
 {
     use ResolvesPanelDomain;
+    use TracksSignalsPanel;
 
     public function panel(Panel $panel): Panel
     {
         $adminDomain = $this->resolvePanelDomain('admin');
 
-        return $panel
+        config()->set('filament-signals.features.dashboard', false);
+
+        return $this->trackSignalsForPanel($panel, 'admin')
             ->default()
             ->id('admin')
             ->domain($adminDomain)
@@ -55,6 +60,7 @@ class AdminPanelProvider extends PanelProvider
                 // FilamentInfoWidget::class,
             ])
             ->plugins([
+                FilamentSignalsPlugin::make(),
                 FilamentAuthzPlugin::make()->centralApp(),
             ])
             ->middleware([

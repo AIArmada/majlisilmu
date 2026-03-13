@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "23b3daee5a467ba991dfb738729fe21e",
+    "content-hash": "edf10a4b5d6b78de977f805dec38f4b9",
     "packages": [
         {
             "name": "aiarmada/affiliates",
@@ -163,6 +163,99 @@
                 "source": "https://github.com/aiarmada/commerce"
             },
             "time": "2026-03-08T09:35:02+00:00"
+        },
+        {
+            "name": "aiarmada/filament-signals",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../commerce/packages/filament-signals",
+                "reference": "af7a9230eff23e7f5a8891ccd075acad8b8f3d16"
+            },
+            "require": {
+                "aiarmada/signals": "self.version",
+                "filament/filament": "^5.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "AIArmada\\FilamentSignals\\FilamentSignalsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "AIArmada\\FilamentSignals\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "AIArmada",
+                    "email": "dev@aiarmada.com"
+                }
+            ],
+            "description": "Filament admin dashboard for AIArmada Signals analytics",
+            "keywords": [
+                "analytics",
+                "filament",
+                "laravel",
+                "product-analytics",
+                "signals"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "aiarmada/signals",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../commerce/packages/signals",
+                "reference": "3ba3c6055a58582ed2e3135264106d02abca0c86"
+            },
+            "require": {
+                "aiarmada/commerce-support": "self.version"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "AIArmada\\Signals\\SignalsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "AIArmada\\Signals\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "AIArmada",
+                    "email": "dev@aiarmada.com"
+                }
+            ],
+            "description": "Privacy-first behavioral analytics foundation for Laravel applications",
+            "keywords": [
+                "analytics",
+                "behavioral-analytics",
+                "laravel",
+                "product-analytics",
+                "signals"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "akaunting/laravel-money",
@@ -17187,6 +17280,8 @@
     "stability-flags": {
         "aiarmada/affiliates": 20,
         "aiarmada/commerce-support": 20,
+        "aiarmada/filament-signals": 20,
+        "aiarmada/signals": 20,
         "bezhansalleh/filament-language-switch": 20
     },
     "prefer-stable": true,

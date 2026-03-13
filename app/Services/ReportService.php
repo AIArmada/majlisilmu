@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Models\Event;
 use App\Models\Report;
 use App\Models\User;
+use App\Services\Signals\ProductSignalsService;
 use Illuminate\Database\Eloquent\Model;
 
 class ReportService
 {
     public function __construct(
         private readonly ModerationService $moderationService,
+        private readonly ProductSignalsService $productSignalsService,
     ) {}
 
     public function submit(
@@ -41,6 +43,8 @@ class ReportService
             'reporter_fingerprint' => $reporterFingerprint,
             'status' => 'open',
         ]);
+
+        $this->productSignalsService->recordReportSubmitted($report, request());
 
         if (in_array($category, ['donation_scam', 'fake_speaker', 'fake_institution', 'fake_reference'], true)) {
             $this->handleHighRiskReport($entity, $report);

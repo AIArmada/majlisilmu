@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\AhliDashboard;
 use App\Providers\Filament\Concerns\ResolvesPanelDomain;
+use App\Providers\Filament\Concerns\TracksSignalsPanel;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -21,12 +22,13 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 class AhliPanelProvider extends PanelProvider
 {
     use ResolvesPanelDomain;
+    use TracksSignalsPanel;
 
     public function panel(Panel $panel): Panel
     {
         $ahliDomain = $this->resolvePanelDomain('ahli');
 
-        return $panel
+        return $this->trackSignalsForPanel($panel, 'ahli')
             ->id('ahli')
             ->domain($ahliDomain)
             ->path(filled($ahliDomain) ? '' : 'ahli')

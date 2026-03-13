@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Ai\Listeners\RecordAiUsage;
+use App\Listeners\Auth\RecordVerifiedEmail;
 use App\Listeners\Notifications\HandleNotificationFailed;
 use App\Listeners\Notifications\RecordNotificationSent;
 use App\Models\ContributionRequest;
@@ -29,6 +30,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -56,13 +58,19 @@ class AppServiceProvider extends ServiceProvider
 
     protected static bool $notificationListenersRegistered = false;
 
+    protected static bool $authSignalListenersRegistered = false;
+
     /**
      * Register any application services.
      */
     #[\Override]
     public function register(): void
     {
-        //
+        $filamentSignalsViews = base_path('../commerce/packages/filament-signals/resources/views');
+
+        if (is_dir($filamentSignalsViews)) {
+            $this->loadViewsFrom($filamentSignalsViews, 'filament-signals');
+        }
     }
 
     /**
@@ -70,6 +78,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $signalsRoutes = base_path('../commerce/packages/signals/routes/api.php');
+
+        if (! $this->app->routesAreCached() && is_file($signalsRoutes) && ! app('router')->has('signals.collect.pageview')) {
+            $this->loadRoutesFrom($signalsRoutes);
+        }
+
         // Register custom scripts
         FilamentAsset::register([
             Js::make('close-on-select', __DIR__.'/../../resources/js/filament/close-on-select.js'),
@@ -111,6 +125,11 @@ class AppServiceProvider extends ServiceProvider
             EventFacade::listen(NotificationSent::class, RecordNotificationSent::class);
             EventFacade::listen(NotificationFailed::class, HandleNotificationFailed::class);
             self::$notificationListenersRegistered = true;
+        }
+
+        if (! self::$authSignalListenersRegistered) {
+            EventFacade::listen(Verified::class, RecordVerifiedEmail::class);
+            self::$authSignalListenersRegistered = true;
         }
 
         if (! self::$languageSwitchConfigured) {
