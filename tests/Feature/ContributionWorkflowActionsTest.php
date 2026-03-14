@@ -5,10 +5,13 @@ use App\Actions\Contributions\ApproveContributionRequestAction;
 use App\Actions\Contributions\CancelContributionRequestAction;
 use App\Actions\Contributions\CanReviewContributionRequestAction;
 use App\Actions\Contributions\ResolveContributionChangedPayloadAction;
+use App\Actions\Contributions\ResolveContributionEntityMetadataAction;
 use App\Actions\Contributions\ResolveContributionSubjectAction;
 use App\Actions\Contributions\ResolveContributionSubjectPresentationAction;
 use App\Actions\Contributions\ResolveContributionSubmissionStateAction;
 use App\Actions\Contributions\ResolveContributionUpdateContextAction;
+use App\Actions\Contributions\ResolveLatestPendingContributionRequestAction;
+use App\Actions\Contributions\ResolveOwnContributionRequestAction;
 use App\Actions\Contributions\ResolvePendingContributionApprovalsAction;
 use App\Actions\Contributions\ResolveReviewableContributionRequestAction;
 use App\Actions\Contributions\SubmitContributionCreateRequestAction;
@@ -26,6 +29,7 @@ use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Database\Seeders\PermissionSeeder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Spatie\Permission\PermissionRegistrar;
@@ -68,6 +72,28 @@ it('submits contribution create requests through the action layer', function () 
             'name' => 'Masjid Action',
             'type' => 'masjid',
         ]);
+});
+
+it('submits staged contribution create requests with shared entity metadata', function () {
+    $proposer = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'pending',
+    ]);
+
+    $request = SubmitContributionCreateRequestAction::run(
+        ContributionSubjectType::Institution,
+        $proposer,
+        [
+            'name' => $institution->name,
+            'type' => 'masjid',
+        ],
+        'Track staged metadata.',
+        $institution,
+    );
+
+    expect($request->subject_type)->toBe(ContributionSubjectType::Institution)
+        ->and($request->entity_type)->toBe($institution->getMorphClass())
+        ->and($request->entity_id)->toBe($institution->id);
 });
 
 it('submits staged institution contributions through the action layer', function () {
@@ -140,6 +166,7 @@ it('submits contribution update requests through the action layer', function () 
     );
 
     expect($request->type)->toBe(ContributionRequestType::Update)
+        ->and($request->subject_type)->toBe(ContributionSubjectType::Reference)
         ->and($request->original_data)->toMatchArray([
             'title' => 'Original Action Title',
             'description' => 'Original description.',
@@ -255,6 +282,41 @@ it('resolves contribution subjects from slug and uuid identifiers through the ac
 
     expect($resolvedInstitution->is($institution))->toBeTrue()
         ->and($resolvedReference->is($reference))->toBeTrue();
+});
+
+it('resolves contribution entity metadata through the action layer', function () {
+    $event = Event::factory()->create();
+
+    $metadata = app(ResolveContributionEntityMetadataAction::class)->handle($event);
+
+    expect($metadata)->toBe([
+        'subject_type' => ContributionSubjectType::Event,
+        'entity_type' => $event->getMorphClass(),
+        'entity_id' => (string) $event->getKey(),
+    ]);
+});
+
+it('resolves the latest pending contribution request for a proposer and entity', function () {
+    $proposer = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $olderRequest = ContributionRequest::factory()->create([
+        'proposer_id' => $proposer->id,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->id,
+        'status' => ContributionRequestStatus::Pending,
+        'created_at' => now()->subDay(),
+    ]);
+    $latestRequest = ContributionRequest::factory()->create([
+        'proposer_id' => $proposer->id,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->id,
+        'status' => ContributionRequestStatus::Pending,
+    ]);
+
+    $resolvedRequest = app(ResolveLatestPendingContributionRequestAction::class)->handle($proposer, $institution);
+
+    expect($resolvedRequest?->is($latestRequest))->toBeTrue()
+        ->and($resolvedRequest?->is($olderRequest))->toBeFalse();
 });
 
 it('resolves contribution subject presentation through the action layer', function () {
@@ -379,4 +441,20 @@ it('resolves reviewable contribution requests through the action layer', functio
 
     expect(fn () => app(ResolveReviewableContributionRequestAction::class)->handle($stranger, $request->id))
         ->toThrow(HttpException::class);
+});
+
+it('resolves only the proposer owned contribution request for cancel flows', function () {
+    $owner = User::factory()->create();
+    $stranger = User::factory()->create();
+    $request = ContributionRequest::factory()->create([
+        'proposer_id' => $owner->id,
+        'status' => ContributionRequestStatus::Pending,
+    ]);
+
+    $resolvedRequest = app(ResolveOwnContributionRequestAction::class)->handle($owner, $request->id);
+
+    expect($resolvedRequest->is($request))->toBeTrue();
+
+    expect(fn () => app(ResolveOwnContributionRequestAction::class)->handle($stranger, $request->id))
+        ->toThrow(ModelNotFoundException::class);
 });

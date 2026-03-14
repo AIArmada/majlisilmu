@@ -15,6 +15,10 @@ class SubmitContributionCreateRequestAction
 {
     use AsAction;
 
+    public function __construct(
+        private readonly ResolveContributionEntityMetadataAction $resolveContributionEntityMetadataAction,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $proposedData
      */
@@ -29,11 +33,15 @@ class SubmitContributionCreateRequestAction
             throw new RuntimeException('Only institution and speaker creation requests are currently supported.');
         }
 
+        $entityMetadata = $entity instanceof Model
+            ? $this->resolveContributionEntityMetadataAction->handle($entity)
+            : null;
+
         return ContributionRequest::create([
             'type' => ContributionRequestType::Create,
-            'subject_type' => $subjectType,
-            'entity_type' => $entity?->getMorphClass(),
-            'entity_id' => $entity?->getKey(),
+            'subject_type' => $entityMetadata['subject_type'] ?? $subjectType,
+            'entity_type' => $entityMetadata['entity_type'] ?? null,
+            'entity_id' => $entityMetadata['entity_id'] ?? null,
             'proposer_id' => $proposer->getKey(),
             'status' => ContributionRequestStatus::Pending,
             'proposed_data' => $proposedData,

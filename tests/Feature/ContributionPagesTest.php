@@ -136,6 +136,28 @@ it('creates pending update requests for non-maintainer suggestions', function ()
         ->and(data_get($request?->proposed_data, 'address.line1'))->toBe('No. 8, Jalan Baru');
 });
 
+it('shows the latest pending request notice on the suggest update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    ContributionRequest::factory()->create([
+        'proposer_id' => $user->id,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->id,
+        'status' => ContributionRequestStatus::Pending,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => 'institution',
+        'subjectId' => $institution->slug,
+    ])
+        ->assertSee(__('Pending Request'))
+        ->assertSee('You already have a pending update request for this record from');
+});
+
 it('lets maintainers approve pending update requests from the contributions inbox', function () {
     $owner = User::factory()->create();
     $proposer = User::factory()->create();
@@ -204,6 +226,22 @@ it('lets maintainers reject pending update requests from the contributions inbox
         ->and($request->fresh()->reviewer_note)->toBe('Need stronger evidence.')
         ->and($request->fresh()->reason_code)->toBe('needs_more_evidence')
         ->and($institution->fresh()->description)->toBe('Keep this description');
+});
+
+it('lets proposers cancel their own pending requests from the contributions inbox', function () {
+    $proposer = User::factory()->create();
+    $request = ContributionRequest::factory()->create([
+        'proposer_id' => $proposer->id,
+        'status' => ContributionRequestStatus::Pending,
+    ]);
+
+    $this->actingAs($proposer);
+
+    Livewire::test(ContributionsIndex::class)
+        ->call('cancel', $request->id);
+
+    expect($request->fresh()->status)->toBe(ContributionRequestStatus::Cancelled)
+        ->and($request->fresh()->cancelled_at)->not->toBeNull();
 });
 
 it('stores reference reports from the public report page', function () {

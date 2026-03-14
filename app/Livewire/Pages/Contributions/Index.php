@@ -5,6 +5,7 @@ namespace App\Livewire\Pages\Contributions;
 use App\Actions\Contributions\ApproveContributionRequestAction;
 use App\Actions\Contributions\CancelContributionRequestAction;
 use App\Actions\Contributions\RejectContributionRequestAction;
+use App\Actions\Contributions\ResolveOwnContributionRequestAction;
 use App\Actions\Contributions\ResolvePendingContributionApprovalsAction;
 use App\Actions\Contributions\ResolveReviewableContributionRequestAction;
 use App\Livewire\Concerns\InteractsWithToasts;
@@ -95,11 +96,14 @@ class Index extends Component
         unset($this->reviewNotes[$requestId], $this->rejectionReasons[$requestId]);
     }
 
-    public function cancel(string $requestId, CancelContributionRequestAction $cancelContributionRequestAction): void
-    {
+    public function cancel(
+        string $requestId,
+        CancelContributionRequestAction $cancelContributionRequestAction,
+        ResolveOwnContributionRequestAction $resolveOwnContributionRequestAction,
+    ): void {
         /** @var User $user */
         $user = auth()->user();
-        $request = $user->contributionRequests()->findOrFail($requestId);
+        $request = $resolveOwnContributionRequestAction->handle($user, $requestId);
 
         $cancelContributionRequestAction->handle($request, $user);
     }

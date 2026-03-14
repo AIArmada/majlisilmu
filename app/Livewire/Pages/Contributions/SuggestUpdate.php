@@ -7,8 +7,8 @@ use App\Actions\Contributions\ResolveContributionChangedPayloadAction;
 use App\Actions\Contributions\ResolveContributionSubjectPresentationAction;
 use App\Actions\Contributions\ResolveContributionSubmissionStateAction;
 use App\Actions\Contributions\ResolveContributionUpdateContextAction;
+use App\Actions\Contributions\ResolveLatestPendingContributionRequestAction;
 use App\Actions\Contributions\SubmitContributionUpdateRequestAction;
-use App\Enums\ContributionRequestStatus;
 use App\Forms\EventContributionFormSchema;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\ReferenceContributionFormSchema;
@@ -95,13 +95,7 @@ class SuggestUpdate extends Component implements HasForms
             return null;
         }
 
-        return ContributionRequest::query()
-            ->where('proposer_id', $user->getKey())
-            ->where('entity_type', $this->entity->getMorphClass())
-            ->where('entity_id', (string) $this->entity->getKey())
-            ->where('status', ContributionRequestStatus::Pending)
-            ->latest('created_at')
-            ->first();
+        return app(ResolveLatestPendingContributionRequestAction::class)->handle($user, $this->entity);
     }
 
     public function form(Schema $schema): Schema
