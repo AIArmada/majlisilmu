@@ -1,20 +1,30 @@
-# Contribution Approval and Registration Review Fixes
+# Contribution Pending Lookup Extraction
 
-- [x] Restore nullable-proposer safety in contribution approval owner assignment
-- [x] Restore registration availability for unlisted events when registration is enabled
-- [x] Add regression coverage for missing proposer approval and unlisted event registration
-- [x] Run focused Rector, PHPStan, Pest, and Pint verification for the touched paths
+- [x] Reuse the shared contribution entity metadata action in create-request creation
+- [x] Extract latest pending contribution request lookup into a reusable action
+- [x] Rewire the suggest-update page around the shared pending request resolver
+- [x] Add focused regression coverage for staged create metadata and pending-request lookup
+- [x] Run focused PHPStan, Pest, and Pint verification for the touched paths
 
-## Contribution Approval and Registration Review Fixes Review
+## Contribution Pending Lookup Extraction Review
 
-- Restored the explicit nullable proposer guard in `ApproveContributionRequestAction` before delegating to `AssignOwnerToNewSubject`, so approving staged create requests still verifies the entity even when the proposer relation has gone missing.
-- Removed the accidental public-only visibility gate from `RegisterForEventAction`, which returns registration eligibility to the pre-action behavior for approved or pending events with registration enabled, including unlisted events.
-- Added a contribution workflow regression proving a staged create request can still be approved after the proposer user has been deleted, and added an event registration regression proving unlisted events can still accept registrations.
+- Reused `app/Actions/Contributions/ResolveContributionEntityMetadataAction.php` inside `app/Actions/Contributions/SubmitContributionCreateRequestAction.php`, so staged create requests now pull `subject_type`, `entity_type`, and `entity_id` through the same metadata resolver already used by update-request creation.
+- Added `app/Actions/Contributions/ResolveLatestPendingContributionRequestAction.php` so the “latest pending request for this proposer and entity” lookup now lives in the contribution action layer instead of inline inside the suggest-update Livewire page.
+- Rewired `app/Livewire/Pages/Contributions/SuggestUpdate.php` to use the shared pending-request resolver while leaving the page responsible only for presentation and submission flow.
+- Added focused regressions proving staged create requests still persist shared entity metadata, the latest pending request resolver returns the newest matching pending request, and the suggest-update page still shows the pending-request notice for contributors with an open request.
 - Verification:
-  - `vendor/bin/rector process app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Events/RegisterForEventAction.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/EventRegistrationSafetyTest.php` => pass
-  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Events/RegisterForEventAction.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/EventRegistrationSafetyTest.php` => no errors
-  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(ContributionWorkflowActionsTest|EventRegistrationSafetyTest)'` => 20 passed
   - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveLatestPendingContributionRequestAction.php app/Actions/Contributions/SubmitContributionCreateRequestAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(ContributionWorkflowActionsTest|ContributionPagesTest)'` => 33 passed
+
+- Added `app/Actions/Contributions/ResolveContributionEntityMetadataAction.php` so contribution update-request creation no longer owns its own model-to-subject match; the shared action now resolves `subject_type`, `entity_type`, and `entity_id` in one place.
+- Rewired `app/Actions/Contributions/SubmitContributionUpdateRequestAction.php` around that shared metadata action, leaving the update-request writer focused on state diff capture and persistence.
+- Added `app/Actions/Contributions/ResolveOwnContributionRequestAction.php` and rewired `app/Livewire/Pages/Contributions/Index.php` so inbox cancel now follows the same resolve-first, act-second shape already used by approve and reject.
+- Added focused regressions proving the shared contribution metadata action resolves event metadata correctly, update-request creation still records the expected reference subject type, the own-request resolver rejects non-proposers, and the inbox page still lets proposers cancel pending requests.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionEntityMetadataAction.php app/Actions/Contributions/ResolveOwnContributionRequestAction.php app/Actions/Contributions/SubmitContributionUpdateRequestAction.php app/Livewire/Pages/Contributions/Index.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(ContributionWorkflowActionsTest|ContributionPagesTest)'` => 30 passed
 
 # Workflow Action Extraction Batch
 
