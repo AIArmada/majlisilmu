@@ -9,6 +9,7 @@ use App\Filament\Resources\Events\EventResource as AdminEventResource;
 use App\Filament\Resources\Events\RelationManagers\ChildEventsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
+use App\Filament\Resources\Events\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
 use App\Models\Event;
@@ -124,6 +125,7 @@ class EventResource extends AdminEventResource
             ChildEventsRelationManager::class,
             'media_links' => MediaLinksRelationManager::class,
             'event_users' => EventUsersRelationManager::class,
+            'member_invitations' => MemberInvitationsRelationManager::class,
             'moderation_reviews' => ModerationReviewsRelationManager::class,
             'registrations' => RegistrationsRelationManager::class,
         ];

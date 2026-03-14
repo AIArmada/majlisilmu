@@ -18,6 +18,7 @@ use App\Livewire\Pages\Dashboard\InstitutionDashboard;
 use App\Livewire\Pages\Dashboard\NotificationsIndex;
 use App\Livewire\Pages\Dashboard\UserDashboard;
 use App\Livewire\Pages\Home\GlmHome;
+use App\Livewire\Pages\Membership\ShowInvitation as ShowMemberInvitation;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
 use Illuminate\Support\Facades\Route;
@@ -66,6 +67,7 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard/institusi', InstitutionDashboard::class)->name('dashboard.institutions');
     Route::livewire('/papan-pemuka/majlis/cipta-lanjutan', CreateAdvanced::class)->name('dashboard.events.create-advanced');
     Route::livewire('/carian-tersimpan', Index::class)->name('saved-searches.index');
+    Route::livewire('/jemputan-ahli/{token}', ShowMemberInvitation::class)->name('member-invitations.show');
     Route::livewire('/sumbangan', ContributionsIndex::class)->name('contributions.index');
     Route::livewire('/sumbangan/institusi/baru', SubmitInstitution::class)->name('contributions.submit-institution');
     Route::livewire('/sumbangan/penceramah/baru', SubmitSpeaker::class)->name('contributions.submit-speaker');
@@ -130,6 +132,7 @@ Route::redirect('/sitemap-speakers.xml', '/peta-laman-penceramah.xml', 301);
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard/events/create-advanced', CreateAdvanced::class);
     Route::livewire('/saved-searches', Index::class);
+    Route::livewire('/member-invitations/{token}', ShowMemberInvitation::class);
     Route::livewire('/contributions', ContributionsIndex::class);
     Route::livewire('/contributions/institutions/create', SubmitInstitution::class);
     Route::livewire('/contributions/speakers/create', SubmitSpeaker::class);

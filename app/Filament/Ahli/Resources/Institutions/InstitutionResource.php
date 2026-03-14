@@ -4,6 +4,7 @@ namespace App\Filament\Ahli\Resources\Institutions;
 
 use App\Filament\Ahli\Resources\Institutions\Pages\EditInstitution;
 use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager;
+use App\Filament\Resources\Institutions\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm;
 use App\Models\Institution;
 use App\Models\User;
@@ -67,7 +68,8 @@ class InstitutionResource extends Resource
     public static function getRelations(): array
     {
         return [
-            DonationChannelsRelationManager::class,
+            'donation_channels' => DonationChannelsRelationManager::class,
+            'member_invitations' => MemberInvitationsRelationManager::class,
         ];
     }
 

@@ -6,7 +6,14 @@ use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Filament\Ahli\Resources\Events\Pages\ViewEvent as AhliViewEvent;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource;
 use App\Filament\Ahli\Resources\Institutions\Pages\EditInstitution as AhliEditInstitution;
+use App\Filament\Ahli\Resources\References\Pages\EditReference as AhliEditReference;
+use App\Filament\Ahli\Resources\References\ReferenceResource as AhliReferenceResource;
+use App\Filament\Ahli\Resources\Speakers\Pages\EditSpeaker as AhliEditSpeaker;
+use App\Filament\Ahli\Resources\Speakers\SpeakerResource as AhliSpeakerResource;
 use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager;
+use App\Filament\Resources\Institutions\RelationManagers\MemberInvitationsRelationManager as InstitutionMemberInvitationsRelationManager;
+use App\Filament\Resources\References\RelationManagers\MemberInvitationsRelationManager as ReferenceMemberInvitationsRelationManager;
+use App\Filament\Resources\Speakers\RelationManagers\MemberInvitationsRelationManager as SpeakerMemberInvitationsRelationManager;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -409,6 +416,7 @@ it('shows ahli edit links on institution dashboard only when user can update', f
     }, $viewerUser);
 
     $institutionEditUrl = InstitutionResource::getUrl('edit', ['record' => $institution], panel: 'ahli');
+    $institutionInvitationsUrl = InstitutionResource::getUrl('edit', ['record' => $institution, 'relation' => 'member_invitations'], panel: 'ahli');
     $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
     $eventRegistrationsUrl = EventResource::getUrl('view', ['record' => $event, 'relation' => 'registrations'], panel: 'ahli');
 
@@ -416,15 +424,25 @@ it('shows ahli edit links on institution dashboard only when user can update', f
         ->get(route('dashboard.institutions', ['institution' => $institution->id]))
         ->assertOk()
         ->assertSee(__('Edit Institution'))
+        ->assertSee(__('Manage Invitations'))
         ->assertSee(__('Edit'))
         ->assertDontSee(__('Edit in Ahli Panel'))
         ->assertSee($institutionEditUrl, false)
+        ->assertSee($institutionInvitationsUrl, false)
         ->assertSee($eventEditUrl, false)
         ->assertSee($eventRegistrationsUrl, false);
 
     $this->actingAs($adminUser)
+        ->get($institutionInvitationsUrl)
+        ->assertOk();
+
+    $this->actingAs($adminUser)
         ->get($eventRegistrationsUrl)
         ->assertOk();
+
+    Livewire::withQueryParams(['relation' => 'member_invitations'])
+        ->test(AhliEditInstitution::class, ['record' => $institution->id])
+        ->assertSet('activeRelationManager', 'member_invitations');
 
     Livewire::withQueryParams(['relation' => 'registrations'])
         ->test(AhliViewEvent::class, ['record' => $event->id])
@@ -434,9 +452,11 @@ it('shows ahli edit links on institution dashboard only when user can update', f
         ->get(route('dashboard.institutions', ['institution' => $institution->id]))
         ->assertOk()
         ->assertDontSee(__('Edit Institution'))
+        ->assertDontSee(__('Manage Invitations'))
         ->assertDontSee(__('Edit'))
         ->assertDontSee(__('Edit in Ahli Panel'))
         ->assertDontSee($institutionEditUrl, false)
+        ->assertDontSee($institutionInvitationsUrl, false)
         ->assertDontSee($eventEditUrl, false)
         ->assertDontSee($eventRegistrationsUrl, false);
 });
@@ -460,7 +480,63 @@ it('shows the donation channels relation manager on the ahli institution edit pa
 
     $relationManagers = $component->instance()->getRelationManagers();
 
-    expect($relationManagers)->toContain(DonationChannelsRelationManager::class);
+    expect($relationManagers)
+        ->toContain(DonationChannelsRelationManager::class)
+        ->toContain(InstitutionMemberInvitationsRelationManager::class);
+});
+
+it('allows speaker admins to open ahli speaker edit pages with invitation management', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create();
+
+    $speaker->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForSpeaker();
+
+    $speakerScope = app(MemberRoleScopes::class)->speaker();
+
+    Authz::withScope($speakerScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $speakerEditUrl = AhliSpeakerResource::getUrl('edit', ['record' => $speaker], panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get($speakerEditUrl)
+        ->assertOk();
+
+    $component = Livewire::actingAs($user)
+        ->test(AhliEditSpeaker::class, ['record' => $speaker->id]);
+
+    expect($component->instance()->getRelationManagers())
+        ->toContain(SpeakerMemberInvitationsRelationManager::class);
+});
+
+it('allows reference admins to open ahli reference edit pages with invitation management', function () {
+    $user = User::factory()->create();
+    $reference = Reference::factory()->create();
+
+    $reference->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForReference();
+
+    $referenceScope = app(MemberRoleScopes::class)->reference();
+
+    Authz::withScope($referenceScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $referenceEditUrl = AhliReferenceResource::getUrl('edit', ['record' => $reference], panel: 'ahli');
+
+    $this->actingAs($user)
+        ->get($referenceEditUrl)
+        ->assertOk();
+
+    $component = Livewire::actingAs($user)
+        ->test(AhliEditReference::class, ['record' => $reference->id]);
+
+    expect($component->instance()->getRelationManagers())
+        ->toContain(ReferenceMemberInvitationsRelationManager::class);
 });
 
 it('shows review instead of edit for pending institution events on the dashboard', function () {

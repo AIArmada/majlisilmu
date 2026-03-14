@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MemberSubjectType;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasSocialMedia;
 use Database\Factories\ReferenceFactory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
@@ -78,6 +80,15 @@ class Reference extends Model implements HasMedia
     {
         return $this->belongsToMany(User::class, 'reference_user')
             ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<MemberInvitation, $this>
+     */
+    public function memberInvitations(): HasMany
+    {
+        return $this->hasMany(MemberInvitation::class, 'subject_id')
+            ->where('subject_type', MemberSubjectType::Reference->value);
     }
 
     /**

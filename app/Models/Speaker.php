@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EventKeyPersonRole;
 use App\Enums\Honorific;
+use App\Enums\MemberSubjectType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Models\Concerns\HasAddress;
@@ -253,6 +254,15 @@ class Speaker extends Model implements AuditableContract, HasMedia
     {
         return $this->belongsToMany(User::class, 'speaker_user')
             ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<MemberInvitation, $this>
+     */
+    public function memberInvitations(): HasMany
+    {
+        return $this->hasMany(MemberInvitation::class, 'subject_id')
+            ->where('subject_type', MemberSubjectType::Speaker->value);
     }
 
     /**

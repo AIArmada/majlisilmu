@@ -529,6 +529,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     {
         return $this->institutions()->exists()
             || $this->speakers()->exists()
+            || $this->references()->exists()
             || $this->memberEvents()->exists();
     }
 

@@ -31,6 +31,9 @@
     $ahliInstitutionEditUrl = $canEditInstitution
         ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution], panel: 'ahli')
         : null;
+    $ahliInstitutionInvitationsUrl = $selectedInstitution !== null && $canManageMembers
+        ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution, 'relation' => 'member_invitations'], panel: 'ahli')
+        : null;
     $advancedCreateUrl = $selectedInstitution !== null
         ? route('dashboard.events.create-advanced', ['institution' => $selectedInstitution->id])
         : null;
@@ -355,7 +358,18 @@
                             </p>
                         </div>
 
-                        <p class="text-sm font-medium text-slate-500">{{ __('Members') }}: {{ $members->total() }}</p>
+                        <div class="flex flex-col items-start gap-3 md:items-end">
+                            <p class="text-sm font-medium text-slate-500">{{ __('Members') }}: {{ $members->total() }}</p>
+
+                            @if($ahliInstitutionInvitationsUrl)
+                                <a
+                                    href="{{ $ahliInstitutionInvitationsUrl }}"
+                                    class="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    {{ __('Manage Invitations') }}
+                                </a>
+                            @endif
+                        </div>
                     </div>
 
                     @if($canManageMembers)

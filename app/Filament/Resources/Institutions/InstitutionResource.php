@@ -8,6 +8,7 @@ use App\Filament\Resources\Institutions\Pages\ListInstitutions;
 use App\Filament\Resources\Institutions\Pages\ViewInstitution;
 use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\EventsRelationManager;
+use App\Filament\Resources\Institutions\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\MembersRelationManager;
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm;
 use App\Filament\Resources\Institutions\Schemas\InstitutionInfolist;
@@ -55,6 +56,7 @@ class InstitutionResource extends Resource
             EventsRelationManager::class,
             DonationChannelsRelationManager::class,
             MembersRelationManager::class,
+            MemberInvitationsRelationManager::class,
         ];
     }
 
