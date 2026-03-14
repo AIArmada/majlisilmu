@@ -13,6 +13,7 @@ class PermissionSeeder extends Seeder
     public function run(): void
     {
         $permissions = [
+            'feedback.blocked',
             'institution.view',
             'institution.update',
             'institution.delete',

@@ -72,11 +72,11 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/sumbangan/{subjectType}/{subjectId}/kemas-kini', SuggestContributionUpdate::class)
         ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference'])
         ->name('contributions.suggest-update');
-});
 
-Route::livewire('/lapor/{subjectType}/{subjectId}', CreateReportPage::class)
-    ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference'])
-    ->name('reports.create');
+    Route::livewire('/lapor/{subjectType}/{subjectId}', CreateReportPage::class)
+        ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference'])
+        ->name('reports.create');
+});
 
 // Event Registration - Rate limited
 Route::post('/majlis/{event:slug}/daftar', [EventsController::class, 'register'])

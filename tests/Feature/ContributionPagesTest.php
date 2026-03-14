@@ -15,10 +15,13 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use Database\Seeders\PermissionSeeder;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
+    $this->seed(PermissionSeeder::class);
+    setPermissionsTeamId(null);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
 
@@ -176,10 +179,13 @@ it('lets maintainers reject pending update requests from the contributions inbox
 });
 
 it('stores reference reports from the public report page', function () {
+    $user = User::factory()->create();
     $reference = Reference::factory()->create([
         'status' => 'verified',
         'is_active' => true,
     ]);
+
+    $this->actingAs($user);
 
     Livewire::test(CreateReportPage::class, [
         'subjectType' => 'reference',
@@ -199,6 +205,36 @@ it('stores reference reports from the public report page', function () {
     expect(SignalEvent::query()->where('event_name', 'report.submitted')->exists())->toBeTrue();
 });
 
+it('redirects guests to login before opening report and suggest update pages', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->get(route('contributions.suggest-update', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+        ->assertRedirect(route('login'));
+
+    $this->get(route('reports.create', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+        ->assertRedirect(route('login'));
+});
+
+it('forbids users banned from directory feedback from opening update and report pages', function () {
+    $user = User::factory()->create();
+    $user->givePermissionTo('feedback.blocked');
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+        ->assertForbidden();
+
+    $this->get(route('reports.create', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+        ->assertForbidden();
+});
+
 it('resolves speaker slugs on the update suggestion page without uuid casting errors', function () {
     $user = User::factory()->create();
     $speaker = Speaker::factory()->create([
@@ -215,10 +251,13 @@ it('resolves speaker slugs on the update suggestion page without uuid casting er
 });
 
 it('resolves institution slugs on the report page without uuid casting errors', function () {
+    $user = User::factory()->create();
     $institution = Institution::factory()->create([
         'status' => 'verified',
         'is_active' => true,
     ]);
+
+    $this->actingAs($user);
 
     Livewire::test(CreateReportPage::class, [
         'subjectType' => 'institution',

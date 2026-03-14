@@ -49,7 +49,14 @@ class SuggestUpdate extends Component implements HasForms
         $this->subjectType = $subjectType;
         $this->entity = $this->resolveEntity($subjectType, $subjectId);
 
-        abort_unless(auth()->user()?->can('view', $this->entity) ?? false, 403);
+        $user = auth()->user();
+
+        abort_unless($user instanceof User, 403);
+        abort_unless($user->can('view', $this->entity), 403);
+
+        if (! $user->canSubmitDirectoryFeedback()) {
+            abort(403, $user->directoryFeedbackBanMessage());
+        }
 
         $this->contributionForm()->fill($this->initialState());
     }
@@ -108,6 +115,10 @@ class SuggestUpdate extends Component implements HasForms
         $user = auth()->user();
 
         abort_unless($user instanceof User, 403);
+
+        if (! $user->canSubmitDirectoryFeedback()) {
+            abort(403, $user->directoryFeedbackBanMessage());
+        }
 
         $state = $this->contributionForm()->getState();
         $note = isset($state['proposer_note']) && is_string($state['proposer_note'])

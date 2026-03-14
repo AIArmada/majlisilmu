@@ -7,6 +7,7 @@ use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
+use App\Models\Report;
 use App\Models\Speaker;
 use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,8 @@ class ReportController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Report::class);
+
         $reporterFingerprint = $this->resolveReporterFingerprint($request);
 
         $validated = $request->validate([
