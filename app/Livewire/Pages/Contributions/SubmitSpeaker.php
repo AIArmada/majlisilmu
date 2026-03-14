@@ -2,19 +2,17 @@
 
 namespace App\Livewire\Pages\Contributions;
 
+use App\Actions\Contributions\SubmitStagedContributionCreateAction;
 use App\Enums\ContributionSubjectType;
 use App\Forms\SpeakerContributionFormSchema;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Speaker;
 use App\Models\User;
-use App\Services\ContributionEntityMutationService;
-use App\Services\ContributionWorkflowService;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Arr;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -57,28 +55,19 @@ class SubmitSpeaker extends Component implements HasForms
             ]);
     }
 
-    public function submit(ContributionWorkflowService $workflow, ContributionEntityMutationService $entityMutationService): void
+    public function submit(SubmitStagedContributionCreateAction $submitStagedContributionCreateAction): void
     {
         $user = auth()->user();
 
         abort_unless($user instanceof User, 403);
 
-        $state = $this->contributionForm()->getState();
-        $note = isset($state['proposer_note']) && is_string($state['proposer_note'])
-            ? trim($state['proposer_note'])
-            : null;
-
-        unset($state['proposer_note']);
-
-        $speaker = $entityMutationService->createSpeaker($state, $user);
-        $this->contributionForm()->model($speaker)->saveRelationships();
-
-        $workflow->submitCreateRequest(
+        $submitStagedContributionCreateAction->handle(
             ContributionSubjectType::Speaker,
+            $this->contributionForm()->getState(),
             $user,
-            Arr::except($state, ['avatar', 'cover', 'gallery']),
-            $note !== '' ? $note : null,
-            $speaker,
+            function (Speaker $speaker): void {
+                $this->contributionForm()->model($speaker)->saveRelationships();
+            },
         );
 
         $this->successToast(__('Speaker submitted for review.'));

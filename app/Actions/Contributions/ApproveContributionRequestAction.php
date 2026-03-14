@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Actions\Contributions;
 
 use App\Actions\Membership\AssignOwnerToNewSubject;
 use App\Enums\ContributionRequestStatus;
@@ -9,77 +9,27 @@ use App\Enums\ContributionSubjectType;
 use App\Models\ContributionRequest;
 use App\Models\Event;
 use App\Models\Institution;
-use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Services\ContributionEntityMutationService;
+use App\Services\ModerationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
-class ContributionWorkflowService
+class ApproveContributionRequestAction
 {
+    use AsAction;
+
     public function __construct(
         private readonly ModerationService $moderationService,
         private readonly ContributionEntityMutationService $entityMutationService,
         private readonly AssignOwnerToNewSubject $assignOwnerToNewSubject,
     ) {}
 
-    /**
-     * @param  array<string, mixed>  $proposedData
-     */
-    public function submitCreateRequest(
-        ContributionSubjectType $subjectType,
-        User $proposer,
-        array $proposedData,
-        ?string $proposerNote = null,
-        ?Model $entity = null,
-    ): ContributionRequest {
-        if (! in_array($subjectType, [ContributionSubjectType::Institution, ContributionSubjectType::Speaker], true)) {
-            throw new RuntimeException('Only institution and speaker creation requests are currently supported.');
-        }
-
-        return ContributionRequest::create([
-            'type' => ContributionRequestType::Create,
-            'subject_type' => $subjectType,
-            'entity_type' => $entity?->getMorphClass(),
-            'entity_id' => $entity?->getKey(),
-            'proposer_id' => $proposer->getKey(),
-            'status' => ContributionRequestStatus::Pending,
-            'proposed_data' => $proposedData,
-            'proposer_note' => $proposerNote,
-        ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $proposedData
-     */
-    public function submitUpdateRequest(
-        Model $entity,
-        User $proposer,
-        array $proposedData,
-        ?string $proposerNote = null,
-    ): ContributionRequest {
-        $subjectType = $this->subjectTypeForModel($entity);
-        $originalData = array_intersect_key(
-            $this->entityMutationService->stateFor($entity),
-            $proposedData,
-        );
-
-        return ContributionRequest::create([
-            'type' => ContributionRequestType::Update,
-            'subject_type' => $subjectType,
-            'entity_type' => $entity->getMorphClass(),
-            'entity_id' => (string) $entity->getKey(),
-            'proposer_id' => $proposer->getKey(),
-            'status' => ContributionRequestStatus::Pending,
-            'proposed_data' => $proposedData,
-            'original_data' => $originalData,
-            'proposer_note' => $proposerNote,
-        ]);
-    }
-
-    public function approve(ContributionRequest $request, User $reviewer, ?string $reviewerNote = null): ContributionRequest
+    public function handle(ContributionRequest $request, User $reviewer, ?string $reviewerNote = null): ContributionRequest
     {
         if (! $request->isPending()) {
             throw new RuntimeException('Only pending contribution requests can be approved.');
@@ -104,56 +54,6 @@ class ContributionWorkflowService
                 'reviewed_at' => now(),
             ])->save();
         });
-
-        return $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
-    }
-
-    public function reject(
-        ContributionRequest $request,
-        User $reviewer,
-        string $reasonCode,
-        ?string $reviewerNote = null,
-    ): ContributionRequest {
-        if (! $request->isPending()) {
-            throw new RuntimeException('Only pending contribution requests can be rejected.');
-        }
-
-        $request->forceFill([
-            'reviewer_id' => $reviewer->getKey(),
-            'reason_code' => $reasonCode,
-            'reviewer_note' => $reviewerNote,
-            'status' => ContributionRequestStatus::Rejected,
-            'reviewed_at' => now(),
-        ])->save();
-
-        if ($request->type === ContributionRequestType::Create) {
-            $entity = $request->entity;
-
-            if ($entity instanceof Institution || $entity instanceof Speaker) {
-                $entity->forceFill([
-                    'status' => 'rejected',
-                    'is_active' => false,
-                ])->save();
-            }
-        }
-
-        return $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
-    }
-
-    public function cancel(ContributionRequest $request, User $proposer): ContributionRequest
-    {
-        if (! $request->isPending()) {
-            throw new RuntimeException('Only pending contribution requests can be cancelled.');
-        }
-
-        if ((string) $request->proposer_id !== (string) $proposer->getKey()) {
-            throw new RuntimeException('Only the original proposer can cancel this request.');
-        }
-
-        $request->forceFill([
-            'status' => ContributionRequestStatus::Cancelled,
-            'cancelled_at' => now(),
-        ])->save();
 
         return $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
     }
@@ -245,19 +145,8 @@ class ContributionWorkflowService
         return $speaker;
     }
 
-    private function attachAsOwner(User $user, Institution|Speaker $entity): void
+    private function attachAsOwner(?User $user, Institution|Speaker $entity): void
     {
         $this->assignOwnerToNewSubject->handle($entity, $user);
-    }
-
-    private function subjectTypeForModel(Model $entity): ContributionSubjectType
-    {
-        return match ($entity::class) {
-            Event::class => ContributionSubjectType::Event,
-            Institution::class => ContributionSubjectType::Institution,
-            Speaker::class => ContributionSubjectType::Speaker,
-            Reference::class => ContributionSubjectType::Reference,
-            default => throw new RuntimeException('Unsupported contribution entity type.'),
-        };
     }
 }

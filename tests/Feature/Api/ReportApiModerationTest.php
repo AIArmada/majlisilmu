@@ -2,6 +2,7 @@
 
 use App\Enums\EventVisibility;
 use App\Models\Event;
+use App\Models\Reference;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Spatie\Permission\PermissionRegistrar;
@@ -135,4 +136,23 @@ it('forbids users banned from directory feedback from api report submission', fu
             'category' => 'wrong_info',
         ])
         ->assertForbidden();
+});
+
+it('accepts shared reference report categories through the api controller', function () {
+    $user = User::factory()->create();
+    $reference = Reference::factory()->create();
+
+    $this->actingAs($user, 'sanctum')
+        ->postJson('/api/v1/reports', [
+            'entity_type' => 'reference',
+            'entity_id' => $reference->id,
+            'category' => 'fake_reference',
+        ])
+        ->assertCreated();
+
+    $this->assertDatabaseHas('reports', [
+        'entity_type' => 'reference',
+        'entity_id' => $reference->id,
+        'category' => 'fake_reference',
+    ]);
 });
