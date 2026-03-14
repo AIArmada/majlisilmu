@@ -11,6 +11,7 @@ use App\Models\Concerns\HasContacts;
 use App\Models\Concerns\HasDonationChannels;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasLanguages;
+use App\Models\Concerns\HasSocialMedia;
 use Database\Factories\SpeakerFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,7 +38,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Speaker extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<SpeakerFactory> */
-    use \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 

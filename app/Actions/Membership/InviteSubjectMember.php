@@ -16,13 +16,13 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-final class InviteSubjectMember
+final readonly class InviteSubjectMember
 {
     use AsAction;
 
     public function __construct(
-        private readonly MemberRoleCatalog $memberRoleCatalog,
-        private readonly ScopedMemberRoleSeeder $scopedMemberRoleSeeder,
+        private MemberRoleCatalog $memberRoleCatalog,
+        private ScopedMemberRoleSeeder $scopedMemberRoleSeeder,
     ) {}
 
     public function handle(

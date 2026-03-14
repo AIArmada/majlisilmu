@@ -14,6 +14,78 @@ use App\Services\ShareTrackingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
+/**
+ * @phpstan-type ShareAnalyticsSummary array{
+ *     affiliates: int,
+ *     shared_links: int,
+ *     outbound_shares: int,
+ *     visits: int,
+ *     unique_visitors: int,
+ *     signups: int,
+ *     event_registrations: int,
+ *     event_checkins: int,
+ *     event_submissions: int,
+ *     total_outcomes: int
+ * }
+ * @phpstan-type ShareProviderBreakdownRow array{
+ *     provider: string,
+ *     label: string,
+ *     outbound_shares: int,
+ *     visits: int,
+ *     unique_visitors: int,
+ *     outcomes: int,
+ *     signups: int
+ * }
+ * @phpstan-type ShareTopSharerRow array{
+ *     affiliate_id: string,
+ *     affiliate_code: string,
+ *     user_name: string,
+ *     user_email: string|null,
+ *     links: int,
+ *     visits: int,
+ *     unique_visitors: int,
+ *     outcomes: int,
+ *     signups: int,
+ *     event_registrations: int,
+ *     last_activity_at: string|null
+ * }
+ * @phpstan-type ShareTopLinkRow array{
+ *     link_id: string,
+ *     title_snapshot: string|null,
+ *     subject_type: string,
+ *     destination_url: string,
+ *     affiliate_code: string|null,
+ *     sharer_name: string|null,
+ *     outbound_shares: int,
+ *     visits: int,
+ *     unique_visitors: int,
+ *     outcomes: int,
+ *     last_shared_at: string|null
+ * }
+ * @phpstan-type ShareRecentVisitRow array{
+ *     visited_url: string,
+ *     provider: string,
+ *     visit_kind: string,
+ *     visitor_key: mixed,
+ *     sharer_name: string|null,
+ *     occurred_at: string|null
+ * }
+ * @phpstan-type ShareRecentOutcomeRow array{
+ *     conversion_type: string,
+ *     subject_type: string,
+ *     title_snapshot: string,
+ *     sharer_name: string|null,
+ *     occurred_at: string|null
+ * }
+ * @phpstan-type ShareAnalyticsDashboard array{
+ *     summary: ShareAnalyticsSummary,
+ *     provider_breakdown: list<ShareProviderBreakdownRow>,
+ *     top_sharers: list<ShareTopSharerRow>,
+ *     top_links: list<ShareTopLinkRow>,
+ *     recent_visits: list<ShareRecentVisitRow>,
+ *     recent_outcomes: list<ShareRecentOutcomeRow>
+ * }
+ */
 final readonly class AdminShareAnalyticsService
 {
     public function __construct(
@@ -21,14 +93,7 @@ final readonly class AdminShareAnalyticsService
     ) {}
 
     /**
-     * @return array{
-     *     summary: array<string, int>,
-     *     provider_breakdown: list<array<string, int|string>>,
-     *     top_sharers: list<array<string, int|string|null>>,
-     *     top_links: list<array<string, int|string|null>>,
-     *     recent_visits: list<array<string, int|string|null>>,
-     *     recent_outcomes: list<array<string, int|string|null>>
-     * }
+     * @return ShareAnalyticsDashboard
      */
     public function dashboard(
         int $topSharersLimit = 8,
@@ -58,11 +123,11 @@ final readonly class AdminShareAnalyticsService
 
         return [
             'summary' => $this->summary($affiliates, $links, $landingAttributions, $outboundShares, $visits, $conversions),
-            'provider_breakdown' => $this->providerBreakdown($outboundShares, $visits, $landingAttributions, $conversions)->all(),
-            'top_sharers' => $this->topSharers($affiliates, $users, $links, $landingAttributions, $visits, $conversions, $topSharersLimit)->all(),
-            'top_links' => $this->topLinks($links, $affiliates, $users, $landingAttributions, $outboundShares, $visits, $conversions, $topLinksLimit)->all(),
-            'recent_visits' => $this->recentVisits($visits, $affiliates, $users, $recentVisitsLimit)->all(),
-            'recent_outcomes' => $this->recentOutcomes($conversions, $affiliates, $users, $recentOutcomesLimit)->all(),
+            'provider_breakdown' => $this->providerBreakdown($outboundShares, $visits, $landingAttributions, $conversions),
+            'top_sharers' => $this->topSharers($affiliates, $users, $links, $landingAttributions, $visits, $conversions, $topSharersLimit),
+            'top_links' => $this->topLinks($links, $affiliates, $users, $landingAttributions, $outboundShares, $visits, $conversions, $topLinksLimit),
+            'recent_visits' => $this->recentVisits($visits, $affiliates, $users, $recentVisitsLimit),
+            'recent_outcomes' => $this->recentOutcomes($conversions, $affiliates, $users, $recentOutcomesLimit),
         ];
     }
 
@@ -95,7 +160,7 @@ final readonly class AdminShareAnalyticsService
      * @param  Collection<int, AffiliateTouchpoint>  $outboundShares
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, AffiliateConversion>  $conversions
-     * @return array<string, int>
+     * @return ShareAnalyticsSummary
      */
     private function summary(
         Collection $affiliates,
@@ -124,14 +189,14 @@ final readonly class AdminShareAnalyticsService
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, AffiliateAttribution>  $landingAttributions
      * @param  Collection<int, AffiliateConversion>  $conversions
-     * @return Collection<int, array<string, int|string>>
+     * @return list<ShareProviderBreakdownRow>
      */
     private function providerBreakdown(
         Collection $outboundShares,
         Collection $visits,
         Collection $landingAttributions,
         Collection $conversions,
-    ): Collection {
+    ): array {
         return collect($this->shareTrackingService->supportedProviders())
             ->map(function (string $provider) use ($outboundShares, $visits, $landingAttributions, $conversions): array {
                 $providerOutbound = $outboundShares->filter(fn (AffiliateTouchpoint $touchpoint): bool => data_get($touchpoint->metadata, 'provider') === $provider);
@@ -159,7 +224,8 @@ final readonly class AdminShareAnalyticsService
                 $left['visits'],
                 $left['outbound_shares'],
             ])
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
@@ -169,7 +235,7 @@ final readonly class AdminShareAnalyticsService
      * @param  Collection<int, AffiliateAttribution>  $landingAttributions
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, AffiliateConversion>  $conversions
-     * @return Collection<int, array<string, int|string|null>>
+     * @return list<ShareTopSharerRow>
      */
     private function topSharers(
         Collection $affiliates,
@@ -179,7 +245,7 @@ final readonly class AdminShareAnalyticsService
         Collection $visits,
         Collection $conversions,
         int $limit,
-    ): Collection {
+    ): array {
         $linksByAffiliate = $links->groupBy('affiliate_id');
         $visitsByAffiliate = $visits->groupBy('affiliate_id');
         $attributionsByAffiliate = $landingAttributions->groupBy('affiliate_id');
@@ -201,8 +267,8 @@ final readonly class AdminShareAnalyticsService
                 return [
                     'affiliate_id' => $affiliate->id,
                     'affiliate_code' => $affiliate->code,
-                    'user_name' => $user?->name ?? $affiliate->name,
-                    'user_email' => $user?->email ?? $affiliate->contact_email,
+                    'user_name' => $user instanceof User ? $user->name : $affiliate->name,
+                    'user_email' => $user instanceof User ? $user->email : $affiliate->contact_email,
                     'links' => $affiliateLinks->count(),
                     'visits' => $affiliateVisits->count(),
                     'unique_visitors' => $affiliateAttributions->pluck('cookie_value')->filter()->unique()->count(),
@@ -222,7 +288,8 @@ final readonly class AdminShareAnalyticsService
                 $left['links'],
             ])
             ->take($limit)
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
@@ -233,7 +300,7 @@ final readonly class AdminShareAnalyticsService
      * @param  Collection<int, AffiliateTouchpoint>  $outboundShares
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, AffiliateConversion>  $conversions
-     * @return Collection<int, array<string, int|string|null>>
+     * @return list<ShareTopLinkRow>
      */
     private function topLinks(
         Collection $links,
@@ -244,7 +311,7 @@ final readonly class AdminShareAnalyticsService
         Collection $visits,
         Collection $conversions,
         int $limit,
-    ): Collection {
+    ): array {
         $affiliatesById = $affiliates->keyBy('id');
         $visitCountsByLink = $visits->groupBy(fn (AffiliateTouchpoint $touchpoint): string => (string) data_get($touchpoint->metadata, 'link_id'))->map->count();
         $outboundCountsByLink = $outboundShares->groupBy(fn (AffiliateTouchpoint $touchpoint): string => (string) data_get($touchpoint->metadata, 'link_id'))->map->count();
@@ -265,7 +332,7 @@ final readonly class AdminShareAnalyticsService
                     'subject_type' => $link->subject_type ?: 'page',
                     'destination_url' => $link->destination_url,
                     'affiliate_code' => $affiliate?->code,
-                    'sharer_name' => $user?->name ?? $affiliate?->name,
+                    'sharer_name' => $user instanceof User ? $user->name : $affiliate?->name,
                     'outbound_shares' => (int) ($outboundCountsByLink->get($link->id) ?? 0),
                     'visits' => (int) ($visitCountsByLink->get($link->id) ?? 0),
                     'unique_visitors' => (int) ($uniqueVisitorsByLink->get($link->id) ?? 0),
@@ -283,16 +350,17 @@ final readonly class AdminShareAnalyticsService
                 $left['outbound_shares'],
             ])
             ->take($limit)
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, Affiliate>  $affiliates
      * @param  Collection<string, User>  $users
-     * @return Collection<int, array<string, int|string|null>>
+     * @return list<ShareRecentVisitRow>
      */
-    private function recentVisits(Collection $visits, Collection $affiliates, Collection $users, int $limit): Collection
+    private function recentVisits(Collection $visits, Collection $affiliates, Collection $users, int $limit): array
     {
         $affiliatesById = $affiliates->keyBy('id');
 
@@ -307,20 +375,21 @@ final readonly class AdminShareAnalyticsService
                     'provider' => str((string) data_get($visit->metadata, 'share_provider', 'direct'))->replace('_', ' ')->headline()->toString(),
                     'visit_kind' => str((string) data_get($visit->metadata, 'visit_kind', 'visit'))->replace('_', ' ')->headline()->toString(),
                     'visitor_key' => data_get($visit->metadata, 'visitor_key'),
-                    'sharer_name' => $user?->name ?? $affiliate?->name,
+                    'sharer_name' => $user instanceof User ? $user->name : $affiliate?->name,
                     'occurred_at' => $visit->touched_at?->toDateTimeString(),
                 ];
             })
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
      * @param  Collection<int, AffiliateConversion>  $conversions
      * @param  Collection<int, Affiliate>  $affiliates
      * @param  Collection<string, User>  $users
-     * @return Collection<int, array<string, int|string|null>>
+     * @return list<ShareRecentOutcomeRow>
      */
-    private function recentOutcomes(Collection $conversions, Collection $affiliates, Collection $users, int $limit): Collection
+    private function recentOutcomes(Collection $conversions, Collection $affiliates, Collection $users, int $limit): array
     {
         $affiliatesById = $affiliates->keyBy('id');
 
@@ -334,11 +403,12 @@ final readonly class AdminShareAnalyticsService
                     'conversion_type' => str((string) $conversion->conversion_type)->replace('_', ' ')->headline()->toString(),
                     'subject_type' => str((string) ($conversion->subject_type ?: data_get($conversion->metadata, 'subject_type', 'page')))->headline()->toString(),
                     'title_snapshot' => (string) (data_get($conversion->metadata, 'link_title_snapshot') ?: $conversion->subject_title_snapshot ?: config('app.name')),
-                    'sharer_name' => $user?->name ?? $affiliate?->name,
+                    'sharer_name' => $user instanceof User ? $user->name : $affiliate?->name,
                     'occurred_at' => $conversion->occurred_at?->toDateTimeString(),
                 ];
             })
-            ->values();
+            ->values()
+            ->all();
     }
 
     private function userIdForAffiliate(Affiliate $affiliate): ?string

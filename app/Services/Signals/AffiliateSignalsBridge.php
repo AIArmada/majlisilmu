@@ -6,6 +6,7 @@ namespace App\Services\Signals;
 
 use AIArmada\Affiliates\Models\AffiliateAttribution;
 use AIArmada\Affiliates\Models\AffiliateConversion;
+use AIArmada\Signals\Models\TrackedProperty;
 
 class AffiliateSignalsBridge
 {
@@ -18,7 +19,7 @@ class AffiliateSignalsBridge
     {
         $trackedProperty = $this->signalsTracker->trackedPropertyForSurface('public');
 
-        if ($trackedProperty === null) {
+        if (! $trackedProperty instanceof TrackedProperty) {
             return;
         }
 
@@ -64,7 +65,7 @@ class AffiliateSignalsBridge
     {
         $trackedProperty = $this->signalsTracker->trackedPropertyForSurface('public');
 
-        if ($trackedProperty === null) {
+        if (! $trackedProperty instanceof TrackedProperty) {
             return;
         }
 

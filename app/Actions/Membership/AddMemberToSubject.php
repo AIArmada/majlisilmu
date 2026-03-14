@@ -11,13 +11,13 @@ use App\Models\User;
 use App\Support\Submission\PublicSubmissionLockService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-final class AddMemberToSubject
+final readonly class AddMemberToSubject
 {
     use AsAction;
 
     public function __construct(
-        private readonly ChangeSubjectMemberRole $changeSubjectMemberRole,
-        private readonly PublicSubmissionLockService $publicSubmissionLockService,
+        private ChangeSubjectMemberRole $changeSubjectMemberRole,
+        private PublicSubmissionLockService $publicSubmissionLockService,
     ) {}
 
     public function handle(Institution|Speaker|Event|Reference $subject, User $member, ?string $roleIdentifier = null): void

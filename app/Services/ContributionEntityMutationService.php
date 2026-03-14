@@ -463,7 +463,7 @@ class ContributionEntityMutationService
                 }
 
                 $category = ContactCategory::tryFrom((string) ($contact['category'] ?? ''));
-                $value = is_string($contact['value'] ?? null) ? trim((string) $contact['value']) : null;
+                $value = is_string($contact['value'] ?? null) ? trim($contact['value']) : null;
                 $type = ContactType::tryFrom((string) ($contact['type'] ?? '')) ?? ContactType::Main;
 
                 if ($category === null || $value === null || $value === '') {
@@ -497,9 +497,9 @@ class ContributionEntityMutationService
                     return null;
                 }
 
-                $platform = is_string($entry['platform'] ?? null) ? trim((string) $entry['platform']) : null;
-                $username = is_string($entry['username'] ?? null) ? trim((string) $entry['username']) : null;
-                $url = is_string($entry['url'] ?? null) ? trim((string) $entry['url']) : null;
+                $platform = is_string($entry['platform'] ?? null) ? trim($entry['platform']) : null;
+                $username = is_string($entry['username'] ?? null) ? trim($entry['username']) : null;
+                $url = is_string($entry['url'] ?? null) ? trim($entry['url']) : null;
 
                 if ($platform === null || $platform === '' || ($username === null || $username === '') && ($url === null || $url === '')) {
                     return null;
@@ -557,9 +557,9 @@ class ContributionEntityMutationService
                     return null;
                 }
 
-                $institution = is_string($entry['institution'] ?? null) ? trim((string) $entry['institution']) : null;
-                $degree = is_string($entry['degree'] ?? null) ? trim((string) $entry['degree']) : null;
-                $field = is_string($entry['field'] ?? null) ? trim((string) $entry['field']) : null;
+                $institution = is_string($entry['institution'] ?? null) ? trim($entry['institution']) : null;
+                $degree = is_string($entry['degree'] ?? null) ? trim($entry['degree']) : null;
+                $field = is_string($entry['field'] ?? null) ? trim($entry['field']) : null;
                 $year = is_scalar($entry['year'] ?? null) ? trim((string) $entry['year']) : null;
 
                 if (($institution === null || $institution === '') && ($degree === null || $degree === '')) {
@@ -610,10 +610,10 @@ class ContributionEntityMutationService
                     return null;
                 }
 
-                $role = is_string($entry['role'] ?? null) ? trim((string) $entry['role']) : null;
-                $speakerId = is_string($entry['speaker_id'] ?? null) && $entry['speaker_id'] !== '' ? (string) $entry['speaker_id'] : null;
-                $name = is_string($entry['name'] ?? null) ? trim((string) $entry['name']) : null;
-                $notes = is_string($entry['notes'] ?? null) ? trim((string) $entry['notes']) : null;
+                $role = is_string($entry['role'] ?? null) ? trim($entry['role']) : null;
+                $speakerId = is_string($entry['speaker_id'] ?? null) && $entry['speaker_id'] !== '' ? $entry['speaker_id'] : null;
+                $name = is_string($entry['name'] ?? null) ? trim($entry['name']) : null;
+                $notes = is_string($entry['notes'] ?? null) ? trim($entry['notes']) : null;
 
                 if ($role === null || $role === '' || ($speakerId === null && ($name === null || $name === ''))) {
                     return null;
@@ -685,7 +685,7 @@ class ContributionEntityMutationService
      */
     private function addressState(?Address $address): array
     {
-        if ($address === null) {
+        if (! $address instanceof Address) {
             return [
                 'country_id' => 132,
                 'state_id' => null,

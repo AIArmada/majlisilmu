@@ -13,14 +13,14 @@ use App\Support\Submission\PublicSubmissionLockService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
-final class RemoveMemberFromSubject
+final readonly class RemoveMemberFromSubject
 {
     use AsAction;
 
     public function __construct(
-        private readonly ChangeSubjectMemberRole $changeSubjectMemberRole,
-        private readonly MemberRoleCatalog $memberRoleCatalog,
-        private readonly PublicSubmissionLockService $publicSubmissionLockService,
+        private ChangeSubjectMemberRole $changeSubjectMemberRole,
+        private MemberRoleCatalog $memberRoleCatalog,
+        private PublicSubmissionLockService $publicSubmissionLockService,
     ) {}
 
     public function handle(Institution|Speaker|Event|Reference $subject, User $member): void
