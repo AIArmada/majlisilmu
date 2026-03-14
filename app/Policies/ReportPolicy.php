@@ -35,8 +35,7 @@ class ReportPolicy
      */
     public function create(?User $user): bool
     {
-        // Anyone can create a report (guests too with rate limiting)
-        return true;
+        return $user instanceof User && $user->canSubmitDirectoryFeedback();
     }
 
     /**

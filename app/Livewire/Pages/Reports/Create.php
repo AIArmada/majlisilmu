@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
+use App\Models\User;
 use App\Services\ReportService;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -38,6 +39,14 @@ class Create extends Component implements HasForms
         $this->subjectType = $subjectType;
         $this->entity = $this->resolveEntity($subjectType, $subjectId);
 
+        $user = auth()->user();
+
+        abort_unless($user instanceof User, 403);
+
+        if (! $user->canSubmitDirectoryFeedback()) {
+            abort(403, $user->directoryFeedbackBanMessage());
+        }
+
         $this->reportForm()->fill([
             'category' => array_key_first($this->categoryOptions()),
         ]);
@@ -67,6 +76,14 @@ class Create extends Component implements HasForms
 
     public function submit(ReportService $reportService): void
     {
+        $user = auth()->user();
+
+        abort_unless($user instanceof User, 403);
+
+        if (! $user->canSubmitDirectoryFeedback()) {
+            abort(403, $user->directoryFeedbackBanMessage());
+        }
+
         $state = $this->reportForm()->getState();
 
         if (($state['category'] ?? null) === 'other' && blank($state['description'] ?? null)) {
@@ -79,7 +96,7 @@ class Create extends Component implements HasForms
             $reportService->submit(
                 $this->entity,
                 $this->subjectType,
-                auth()->user(),
+                $user,
                 $this->resolveReporterFingerprint(),
                 (string) $state['category'],
                 filled($state['description'] ?? null) ? (string) $state['description'] : null,

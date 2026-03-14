@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
 use App\Notifications\NotificationCenterMessage;
@@ -117,6 +118,21 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             'phone_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function canSubmitDirectoryFeedback(): bool
+    {
+        return ! $this->isDirectoryFeedbackBlocked();
+    }
+
+    public function isDirectoryFeedbackBlocked(): bool
+    {
+        return Authz::withScope(null, fn (): bool => $this->hasDirectPermission('feedback.blocked'), $this);
+    }
+
+    public function directoryFeedbackBanMessage(): string
+    {
+        return __('Akaun anda tidak dibenarkan menghantar cadangan kemaskini atau laporan buat masa ini.');
     }
 
     /**

@@ -4329,3 +4329,23 @@
   - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php tests/Feature/SpeakerShowPageTimingTest.php` => **15 passed**
   - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php tests/Feature/EventShowPageTest.php tests/Feature/SpeakerShowPageTimingTest.php tests/Feature/InstitutionShowPageTest.php tests/Feature/DashboardPagesTest.php` => **68 passed**
   - `vendor/bin/phpstan analyse --ansi app/Services/DawahShare app/Http/Controllers/DawahShareController.php app/Http/Middleware/TrackDawahShareAttribution.php app/Livewire/Pages/Dashboard/DawahImpactIndex.php app/Livewire/Pages/Dashboard/DawahImpactLinkShow.php app/Livewire/Pages/Events/Show.php app/Livewire/Pages/SavedSearches/Index.php tests/Feature/DawahShareImpactTest.php tests/Feature/SpeakerShowPageTimingTest.php` => **No errors**
+
+# Feedback Blocking Permission
+
+- [x] Review the uncommitted feedback-blocking changes and existing authz patterns
+- [x] Replace dedicated feedback-ban user columns with a direct `feedback.blocked` permission
+- [x] Update focused tests and verification for the new permission-based blocking flow
+
+## Review
+
+- Root cause:
+  - the feedback-ban branch modeled a rare deny-list state with dedicated `users` columns, plus ban timestamp and reason fields, even though the app already has direct user permissions for exceptional cases
+  - API report submission also changed to authenticated-only but never actually enforced `ReportPolicy::create()`, so blocked users could still submit through the API path
+- Fix:
+  - removed the dedicated feedback-ban migration and user-form fields
+  - seeded a global `feedback.blocked` permission and changed `User::canSubmitDirectoryFeedback()` to reverse-check a direct global permission instead of reading columns
+  - kept the existing page-level feedback guards and added explicit API authorization in `ReportController`
+  - updated the feedback-related tests to ban users via direct permission assignment instead of user columns
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='(ContributionPagesTest|ReportApiModerationTest)'` => **16 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/ReportController.php app/Models/User.php database/seeders/PermissionSeeder.php tests/Feature/ContributionPagesTest.php tests/Feature/Api/ReportApiModerationTest.php` => **No errors**

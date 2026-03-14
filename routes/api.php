@@ -19,14 +19,15 @@ Route::prefix('v1')->group(function () {
     Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
     Route::get('/events/{event}', [EventController::class, 'show'])->name('api.events.show');
 
-    // Reports (per documentation B5b) - Rate limited
-    Route::post('/reports', [ReportController::class, 'store'])
-        ->middleware('throttle:reports')
-        ->name('api.reports.store');
 });
 
 // Authenticated API endpoints
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    // Reports (per documentation B5b) - Rate limited
+    Route::post('/reports', [ReportController::class, 'store'])
+        ->middleware('throttle:reports')
+        ->name('api.reports.store');
+
     // User
     Route::get('/user', fn (Request $request) => $request->user());
     Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
