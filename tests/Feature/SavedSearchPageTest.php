@@ -67,6 +67,24 @@ it('allows authenticated users to create and delete saved searches', function ()
     expect(SavedSearch::where('id', $savedSearch->id)->exists())->toBeFalse();
 });
 
+it('enforces the max 10 saved searches rule on the page', function () {
+    $user = User::factory()->create();
+
+    SavedSearch::factory()->count(10)->create([
+        'user_id' => $user->id,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SavedSearchesIndex::class)
+        ->set('name', 'Search Eleven')
+        ->set('notify', 'daily')
+        ->call('save')
+        ->assertHasErrors(['name']);
+
+    expect(SavedSearch::query()->where('user_id', $user->id)->count())->toBe(10);
+});
+
 it('prefills subdistrict filter from query string when saving searches', function () {
     $user = User::factory()->create();
 

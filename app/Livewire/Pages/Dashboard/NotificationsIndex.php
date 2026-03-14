@@ -2,9 +2,10 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
+use App\Actions\Notifications\MarkAllNotificationMessagesReadAction;
+use App\Actions\Notifications\MarkNotificationMessageReadAction;
 use App\Models\NotificationMessage;
 use App\Models\User;
-use App\Services\Signals\ProductSignalsService;
 use App\Support\Notifications\NotificationCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -45,34 +46,12 @@ class NotificationsIndex extends Component
 
     public function markAsRead(string $messageId): void
     {
-        $message = $this->currentUser()
-            ->notificationMessages()
-            ->visibleInInbox()
-            ->whereKey($messageId)
-            ->first();
-
-        if (! $message instanceof NotificationMessage) {
-            abort(404);
-        }
-
-        $wasUnread = $message->read_at === null;
-
-        $message->markAsRead();
-
-        if ($wasUnread) {
-            app(ProductSignalsService::class)->recordNotificationRead($message->fresh(), $this->currentUser(), request());
-        }
+        app(MarkNotificationMessageReadAction::class)->handle($this->currentUser(), $messageId, request());
     }
 
     public function markAllAsRead(): void
     {
-        $updated = $this->currentUser()
-            ->notificationMessages()
-            ->visibleInInbox()
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
-
-        app(ProductSignalsService::class)->recordNotificationsReadAll($this->currentUser(), $updated, request());
+        app(MarkAllNotificationMessagesReadAction::class)->handle($this->currentUser(), request());
     }
 
     /**
