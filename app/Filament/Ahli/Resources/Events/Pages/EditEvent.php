@@ -2,12 +2,12 @@
 
 namespace App\Filament\Ahli\Resources\Events\Pages;
 
+use App\Actions\Events\SyncEventResourceRelationsAction;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Models\Event;
-use App\Models\Tag;
 use App\Models\User;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
@@ -94,53 +94,12 @@ class EditEvent extends EditRecord
 
     protected function afterSave(): void
     {
-        $event = $this->eventRecord();
-        $requestedRegistrationMode = (string) ($this->form->getState()['registration_mode'] ?? RegistrationMode::Event->value);
-        $currentRegistrationMode = $this->resolveRegistrationMode($event)->value;
-        $modeToPersist = $requestedRegistrationMode;
-
-        if ($event->registrations()->exists() && $requestedRegistrationMode !== $currentRegistrationMode) {
-            $modeToPersist = $currentRegistrationMode;
-        }
-
-        $event->settings()->updateOrCreate(
-            ['event_id' => $event->id],
-            ['registration_mode' => $modeToPersist]
+        app(SyncEventResourceRelationsAction::class)->handle(
+            $this->eventRecord(),
+            $this->form->getState(),
+            lockRegistrationMode: true,
+            syncKeyPeople: true,
         );
-
-        $this->syncRelationState($event, $this->form->getState());
-    }
-
-    /**
-     * @param  array<string, mixed>  $state
-     */
-    protected function syncRelationState(Event $event, array $state): void
-    {
-        $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
-
-        $languageIds = collect($rawLanguageIds)
-            ->filter(fn (mixed $id): bool => filled($id))
-            ->map(fn (mixed $id): int => (int) $id)
-            ->values()
-            ->all();
-
-        $event->syncLanguages($languageIds);
-
-        $domainTagIds = is_array($state['domain_tags'] ?? null) ? $state['domain_tags'] : [];
-        $disciplineTagIds = is_array($state['discipline_tags'] ?? null) ? $state['discipline_tags'] : [];
-        $sourceTagIds = is_array($state['source_tags'] ?? null) ? $state['source_tags'] : [];
-        $issueTagIds = is_array($state['issue_tags'] ?? null) ? $state['issue_tags'] : [];
-
-        $tagIds = collect(array_merge($domainTagIds, $disciplineTagIds, $sourceTagIds, $issueTagIds))
-            ->filter(fn (mixed $id): bool => filled($id))
-            ->map(fn (mixed $id): string => (string) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        $tags = Tag::query()->whereKey($tagIds)->get();
-
-        $event->syncTags($tags);
     }
 
     /**

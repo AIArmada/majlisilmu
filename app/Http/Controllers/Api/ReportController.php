@@ -2,57 +2,47 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Reports\ResolveReportCategoryOptionsAction;
+use App\Actions\Reports\ResolveReportEntityMetadataAction;
+use App\Actions\Reports\ResolveReporterFingerprintAction;
+use App\Actions\Reports\SubmitReportAction;
 use App\Http\Controllers\Controller;
-use App\Models\DonationChannel;
-use App\Models\Event;
-use App\Models\Institution;
-use App\Models\Reference;
 use App\Models\Report;
-use App\Models\Speaker;
-use App\Services\ReportService;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use InvalidArgumentException;
 
 class ReportController extends Controller
 {
-    public function __construct(
-        private readonly ReportService $reportService,
-    ) {}
-
     /**
      * Store a newly created report.
      * Per documentation B5b - POST /reports
      */
-    public function store(Request $request): JsonResponse
-    {
+    public function store(
+        Request $request,
+        ResolveReportCategoryOptionsAction $resolveReportCategoryOptionsAction,
+        ResolveReportEntityMetadataAction $resolveReportEntityMetadataAction,
+        SubmitReportAction $submitReportAction,
+        ResolveReporterFingerprintAction $resolveReporterFingerprintAction,
+    ): JsonResponse {
         $this->authorize('create', Report::class);
 
-        $reporterFingerprint = $this->resolveReporterFingerprint($request);
+        $reporterFingerprint = $resolveReporterFingerprintAction->handle($request);
 
         $validated = $request->validate([
-            'entity_type' => ['required', Rule::in(['event', 'institution', 'speaker', 'reference', 'donation_channel'])],
+            'entity_type' => ['required', Rule::in($resolveReportEntityMetadataAction->validKeys())],
             'entity_id' => ['required', 'uuid'],
             'category' => [
                 'required',
-                Rule::in([
-                    'wrong_info',
-                    'cancelled_not_updated',
-                    'fake_speaker',
-                    'fake_institution',
-                    'fake_reference',
-                    'inappropriate_content',
-                    'donation_scam',
-                    'other',
-                ]),
+                Rule::in($resolveReportCategoryOptionsAction->validKeys()),
             ],
             'description' => ['required_if:category,other', 'nullable', 'string', 'max:2000'],
         ]);
 
         // Verify entity exists
-        $entityClass = $this->getEntityClass($validated['entity_type']);
+        $entityClass = $resolveReportEntityMetadataAction->handle($validated['entity_type'])['model_class'];
         $entity = $entityClass::query()->find($validated['entity_id']);
 
         if (! $entity) {
@@ -65,13 +55,17 @@ class ReportController extends Controller
         }
 
         try {
-            $report = $this->reportService->submit(
+            /** @var User|null $user */
+            $user = $request->user();
+
+            $report = $submitReportAction->handle(
                 $entity,
                 $validated['entity_type'],
-                $request->user(),
+                $user,
                 $reporterFingerprint,
                 $validated['category'],
                 $validated['description'] ?? null,
+                $request,
             );
         } catch (\RuntimeException $exception) {
             if ($exception->getMessage() !== 'duplicate_report') {
@@ -95,34 +89,5 @@ class ReportController extends Controller
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ], 201);
-    }
-
-    /**
-     * Get the model class for an entity type.
-     */
-    private function getEntityClass(string $entityType): string
-    {
-        return match ($entityType) {
-            'event' => Event::class,
-            'institution' => Institution::class,
-            'speaker' => Speaker::class,
-            'reference' => Reference::class,
-            'donation_channel' => DonationChannel::class,
-            default => throw new InvalidArgumentException("Unsupported entity type [{$entityType}]"),
-        };
-    }
-
-    private function resolveReporterFingerprint(Request $request): string
-    {
-        $userId = $request->user()?->id;
-
-        if (is_string($userId) && $userId !== '') {
-            return 'user:'.$userId;
-        }
-
-        $ipAddress = (string) ($request->ip() ?? 'unknown-ip');
-        $userAgent = trim((string) ($request->userAgent() ?? 'unknown-agent'));
-
-        return 'guest:'.hash('sha256', "{$ipAddress}|{$userAgent}");
     }
 }

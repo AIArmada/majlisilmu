@@ -2,11 +2,9 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
-use App\Enums\RegistrationMode;
+use App\Actions\Events\SyncEventResourceRelationsAction;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
-use App\Models\Tag;
-use App\Services\EventKeyPersonSyncService;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
@@ -38,50 +36,11 @@ class CreateEvent extends CreateRecord
 
     protected function afterCreate(): void
     {
-        $registrationMode = $this->form->getState()['registration_mode'] ?? RegistrationMode::Event->value;
-        $this->eventRecord()->settings()->updateOrCreate(
-            ['event_id' => $this->eventRecord()->id],
-            ['registration_mode' => (string) $registrationMode]
-        );
-
-        $this->syncRelationState($this->eventRecord(), $this->form->getState());
-    }
-
-    /**
-     * @param  array<string, mixed>  $state
-     */
-    protected function syncRelationState(Event $event, array $state): void
-    {
-        $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
-
-        $languageIds = collect($rawLanguageIds)
-            ->filter(fn (mixed $id): bool => filled($id))
-            ->map(fn (mixed $id): int => (int) $id)
-            ->values()
-            ->all();
-
-        $event->syncLanguages($languageIds);
-
-        $domainTagIds = is_array($state['domain_tags'] ?? null) ? $state['domain_tags'] : [];
-        $disciplineTagIds = is_array($state['discipline_tags'] ?? null) ? $state['discipline_tags'] : [];
-        $sourceTagIds = is_array($state['source_tags'] ?? null) ? $state['source_tags'] : [];
-        $issueTagIds = is_array($state['issue_tags'] ?? null) ? $state['issue_tags'] : [];
-
-        $tagIds = collect(array_merge($domainTagIds, $disciplineTagIds, $sourceTagIds, $issueTagIds))
-            ->filter(fn (mixed $id): bool => filled($id))
-            ->map(fn (mixed $id): string => (string) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        $tags = Tag::query()->whereKey($tagIds)->get();
-
-        $event->syncTags($tags);
-
-        app(EventKeyPersonSyncService::class)->sync(
-            $event,
-            is_array($state['speakers'] ?? null) ? $state['speakers'] : [],
-            is_array($state['other_key_people'] ?? null) ? $state['other_key_people'] : [],
+        app(SyncEventResourceRelationsAction::class)->handle(
+            $this->eventRecord(),
+            $this->form->getState(),
+            lockRegistrationMode: false,
+            syncKeyPeople: true,
         );
     }
 

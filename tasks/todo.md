@@ -1,4 +1,274 @@
+# Contribution Submission State Extraction
+
+- [x] Extract shared contribution submission-state normalization into a reusable Laravel Action
+- [x] Rewire staged create and update suggestion flows around the shared submission-state action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the submission-state batch
+
+## Contribution Submission State Extraction Review
+
+- Added `app/Actions/Contributions/ResolveContributionSubmissionStateAction.php` so proposer-note trimming and contribution form-state cleanup now live in one reusable Laravel Action instead of being duplicated between staged create and update suggestion flows.
+- Rewired `app/Actions/Contributions/SubmitStagedContributionCreateAction.php` and `app/Livewire/Pages/Contributions/SuggestUpdate.php` to consume that shared action, leaving each caller focused on entity mutation, diffing, authorization, and redirect flow.
+- Added direct action coverage in `tests/Feature/ContributionWorkflowActionsTest.php` proving the shared submission-state action strips `proposer_note` out of request state while preserving a trimmed note payload for downstream contribution request actions.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php` => 26 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionSubmissionStateAction.php app/Actions/Contributions/SubmitStagedContributionCreateAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+
+# Suggest Update Diff Extraction
+
+- [x] Extract shared contribution change-detection logic into a reusable Laravel Action
+- [x] Rewire `SuggestUpdate` around the shared changed-payload action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the diff extraction batch
+
+## Suggest Update Diff Extraction Review
+
+- Added `app/Actions/Contributions/ResolveContributionChangedPayloadAction.php` so contribution change detection, comparable normalization, and nested payload diffing no longer live inline inside `SuggestUpdate`.
+- Rewired `app/Livewire/Pages/Contributions/SuggestUpdate.php` to use that shared action during submission, leaving the component focused on auth, UI validation, redirect flow, and dispatching direct-edit or pending-request actions.
+- Added direct action coverage in `tests/Feature/ContributionWorkflowActionsTest.php` proving the shared diff action correctly ignores unchanged scalar/date/collection values while preserving real nested payload changes.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php` => 25 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionChangedPayloadAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+
+# Contribution Review Request Resolver Extraction
+
+- [x] Extract shared contribution review-request lookup and authorization into a reusable Laravel Action
+- [x] Rewire contribution inbox approve/reject flows around the shared review-request resolver
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the inbox resolver batch
+
+## Contribution Review Request Resolver Extraction Review
+
+- Added `app/Actions/Contributions/ResolveReviewableContributionRequestAction.php` so contribution review-request lookup and reviewer authorization now live in one reusable Laravel Action instead of being repeated inside both inbox approve and reject handlers.
+- Rewired `app/Livewire/Pages/Contributions/Index.php` to use that resolver for approve/reject flows, leaving the component focused on UI state and dispatching the final action once a reviewable request has been resolved.
+- Added direct action coverage in `tests/Feature/ContributionWorkflowActionsTest.php` for the new review-request resolver while keeping the page-level inbox approval and rejection regressions green.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php` => 24 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveReviewableContributionRequestAction.php app/Actions/Contributions/CanReviewContributionRequestAction.php app/Livewire/Pages/Contributions/Index.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+
+# Report Entity Metadata Extraction
+
+- [x] Extract shared report entity metadata into a reusable Laravel Action
+- [x] Rewire the API controller and Filament report resource around the shared entity metadata action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the entity metadata batch
+
+## Report Entity Metadata Extraction Review
+
+- Added `app/Actions/Reports/ResolveReportEntityMetadataAction.php` so reportable entity labels, model-class resolution, and valid entity-type keys now live in one reusable Laravel Action instead of being repeated between API validation, model resolution, and the Filament report resource.
+- Rewired `app/Http/Controllers/Api/ReportController.php` to use that shared metadata for entity-type validation and model lookup, which removed another inline `match` block from the controller.
+- Rewired `app/Filament/Resources/Reports/Schemas/ReportForm.php` and `app/Filament/Resources/Reports/Tables/ReportsTable.php` to use the same shared entity-type options, keeping the admin form/filter surface aligned with the API contract.
+- Added direct action coverage in `tests/Feature/ReportActionsTest.php` for the shared entity metadata action while keeping the report page and API regressions green.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ReportActionsTest.php`, `tests/Feature/ContributionPagesTest.php`, `tests/Feature/Api/ReportApiModerationTest.php` => 22 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Reports/ResolveReportCategoryOptionsAction.php app/Actions/Reports/ResolveReportEntityMetadataAction.php app/Actions/Reports/ResolveReportFormContextAction.php app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/ReportController.php app/Filament/Resources/Reports/Schemas/ReportForm.php app/Filament/Resources/Reports/Tables/ReportsTable.php tests/Feature/ReportActionsTest.php tests/Feature/ContributionPagesTest.php tests/Feature/Api/ReportApiModerationTest.php` => no errors
+
+# Report Category Catalog Extraction
+
+- [x] Extract a shared report category catalog into a reusable Laravel Action
+- [x] Rewire the public report flow, API controller, and Filament report resource around the shared category action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the report category batch
+
+## Report Category Catalog Extraction Review
+
+- Added `app/Actions/Reports/ResolveReportCategoryOptionsAction.php` so subject-specific report category labels and admin-wide category lists now live in one reusable Laravel Action instead of being duplicated across the public report page, API validation, and Filament resource definitions.
+- Rewired `app/Actions/Reports/ResolveReportFormContextAction.php` and `app/Http/Controllers/Api/ReportController.php` to consume that shared catalog, keeping the public report flow and API validation aligned on the same canonical category keys.
+- Rewired `app/Filament/Resources/Reports/Schemas/ReportForm.php` and `app/Filament/Resources/Reports/Tables/ReportsTable.php` to use the same shared admin category list, which also closes the previous admin drift where some valid categories were missing from the resource UI.
+- Added direct action coverage in `tests/Feature/ReportActionsTest.php` plus an API regression in `tests/Feature/Api/ReportApiModerationTest.php` proving shared reference-specific categories are accepted by the controller.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ReportActionsTest.php`, `tests/Feature/ContributionPagesTest.php`, `tests/Feature/Api/ReportApiModerationTest.php` => 21 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Reports/ResolveReportCategoryOptionsAction.php app/Actions/Reports/ResolveReportFormContextAction.php app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/ReportController.php app/Filament/Resources/Reports/Schemas/ReportForm.php app/Filament/Resources/Reports/Tables/ReportsTable.php tests/Feature/ReportActionsTest.php tests/Feature/ContributionPagesTest.php tests/Feature/Api/ReportApiModerationTest.php` => no errors
+
+# Shared Subject Presentation Extraction
+
+- [x] Extract shared contribution/report subject presentation metadata into a reusable Laravel Action
+- [x] Rewire `SuggestUpdate` and the report context action around the shared subject presentation action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the subject presentation batch
+
+## Shared Subject Presentation Extraction Review
+
+- Added `app/Actions/Contributions/ResolveContributionSubjectPresentationAction.php` so subject label and subject redirect URL mapping for events, institutions, speakers, and references now live in one reusable action.
+- Rewired `app/Livewire/Pages/Contributions/SuggestUpdate.php` to consume that presentation context instead of carrying its own `subjectLabel()` and `entityUrl()` helpers for direct-edit redirect and heading text.
+- Rewired `app/Actions/Reports/ResolveReportFormContextAction.php` to compose the shared subject presentation action instead of duplicating report-side label and redirect mapping.
+- Added direct regression coverage in `tests/Feature/ContributionWorkflowActionsTest.php` for the shared presentation action while keeping `SuggestUpdate` and report flow regressions green.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php`, `tests/Feature/ReportActionsTest.php` => 25 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionSubjectPresentationAction.php app/Actions/Reports/ResolveReportFormContextAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php tests/Feature/ReportActionsTest.php` => no errors
+
+# Staged Contribution Create Extraction
+
+- [x] Extract the shared staged institution/speaker create workflow into a reusable Laravel Action
+- [x] Rewire the public institution and speaker contribution pages around the staged create action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the staged create batch
+
+## Staged Contribution Create Extraction Review
+
+- Added `app/Actions/Contributions/SubmitStagedContributionCreateAction.php` so note extraction, staged entity creation, optional relationship persistence, and contribution-request submission now live in one reusable action for institution and speaker create flows.
+- Rewired `app/Livewire/Pages/Contributions/SubmitInstitution.php` and `app/Livewire/Pages/Contributions/SubmitSpeaker.php` to use that action, leaving each page focused on defaults, form rendering, success toast, and redirect flow.
+- Added direct regression coverage in `tests/Feature/ContributionWorkflowActionsTest.php` proving both staged institution and staged speaker submissions still create pending records and linked contribution requests.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php` => 22 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/SubmitStagedContributionCreateAction.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Livewire/Pages/Contributions/SubmitSpeaker.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+
+# Report Context And Fingerprint Extraction
+
+- [x] Extract report form context into a reusable Laravel Action
+- [x] Extract reporter fingerprint resolution into a reusable Laravel Action shared by web and API report flows
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the report extraction batch
+
+## Report Context And Fingerprint Extraction Review
+
+- Added `app/Actions/Reports/ResolveReportFormContextAction.php` so report subject labels, category options, default category selection, and post-submit redirect URLs no longer live inline inside the public report page.
+- Added `app/Actions/Reports/ResolveReporterFingerprintAction.php` so the public report page and `app/Http/Controllers/Api/ReportController.php` now share one reporter fingerprint implementation instead of maintaining duplicate user/IP/user-agent hashing logic.
+- Rewired `app/Livewire/Pages/Reports/Create.php` and `app/Http/Controllers/Api/ReportController.php` around those actions, leaving the page/controller focused on auth, validation, duplicate-report handling, and response/redirect flow.
+- Added direct action coverage in `tests/Feature/ReportActionsTest.php` for report form context and reporter fingerprint resolution while keeping the public page and API report regressions green.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ReportActionsTest.php`, `tests/Feature/ContributionPagesTest.php`, `tests/Feature/Api/ReportApiModerationTest.php` => 19 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Reports/ResolveReportFormContextAction.php app/Actions/Reports/ResolveReporterFingerprintAction.php app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/ReportController.php tests/Feature/ReportActionsTest.php tests/Feature/ContributionPagesTest.php tests/Feature/Api/ReportApiModerationTest.php` => no errors
+
+# Shared Contribution Subject Resolver Extraction
+
+- [x] Extract a generic contribution/report subject resolver into a reusable Laravel Action
+- [x] Rewire the contribution update context action and public report page to use the shared subject resolver
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the shared subject resolver batch
+
+## Shared Contribution Subject Resolver Extraction Review
+
+- Added `app/Actions/Contributions/ResolveContributionSubjectAction.php` so slug/UUID subject lookup for events, institutions, speakers, and references now lives in one reusable action.
+- Rewired `app/Actions/Contributions/ResolveContributionUpdateContextAction.php` to compose the shared subject resolver instead of carrying its own duplicate lookup methods.
+- Rewired `app/Livewire/Pages/Reports/Create.php` to use the same shared resolver during `mount()`, removing another copy of the slug/UUID entity resolution logic from the public reporting flow.
+- Added direct action coverage in `tests/Feature/ContributionWorkflowActionsTest.php` for the shared subject resolver while keeping the page-level report and suggestion regressions in `tests/Feature/ContributionPagesTest.php` green.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php` => 20 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionSubjectAction.php app/Actions/Contributions/ResolveContributionUpdateContextAction.php app/Livewire/Pages/Reports/Create.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+
+# Contribution Inbox Review Extraction
+
+- [x] Extract contribution inbox review authorization into a reusable Laravel Action
+- [x] Extract pending contribution approval queue resolution into a reusable Laravel Action
+- [x] Rewire the contributions inbox Livewire page around the extracted review actions
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the inbox review batch
+
+## Contribution Inbox Review Extraction Review
+
+- Added `app/Actions/Contributions/CanReviewContributionRequestAction.php` so the contribution inbox no longer owns the reviewer eligibility rules for privileged roles, create requests, and maintainer-owned update requests.
+- Added `app/Actions/Contributions/ResolvePendingContributionApprovalsAction.php` so pending approval queue filtering now lives in one reusable action instead of an inline `pendingApprovals()` query-and-filter loop in the Livewire page.
+- Rewired `app/Livewire/Pages/Contributions/Index.php` to use those actions for review authorization and pending queue resolution, leaving the component focused on UI state, notes/reason capture, and dispatching approve/reject/cancel flows.
+- Added direct action coverage in `tests/Feature/ContributionWorkflowActionsTest.php` for reviewer eligibility and pending approval resolution, while keeping the page-level approve/reject regressions in `tests/Feature/ContributionPagesTest.php` green.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/ContributionPagesTest.php` => 19 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/CanReviewContributionRequestAction.php app/Actions/Contributions/ResolvePendingContributionApprovalsAction.php app/Livewire/Pages/Contributions/Index.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionPagesTest.php` => no errors
+
+# Suggest Update Context And Builder Membership Extraction
+
+- [x] Extract `SuggestUpdate` entity resolution and initial-state loading into a reusable Laravel Action
+- [x] Consolidate advanced builder institution/speaker membership lookups behind a shared Laravel Action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the context and membership batch
+
+## Suggest Update Context And Builder Membership Extraction Review
+
+- Added `app/Actions/Contributions/ResolveContributionUpdateContextAction.php` so `SuggestUpdate` no longer owns slug/UUID subject lookup or initial-state loading for event, institution, speaker, and reference updates.
+- Added `app/Actions/Events/ResolveAdvancedBuilderMembershipOptionsAction.php` so the advanced builder context and submission-preparation actions reuse one membership query path for organizer/location options and ownership checks.
+- Rewired `app/Livewire/Pages/Contributions/SuggestUpdate.php`, `app/Actions/Events/ResolveAdvancedBuilderContextAction.php`, and `app/Actions/Events/PrepareAdvancedParentProgramSubmissionAction.php` around those actions, leaving the component/actions focused on diffing, validation, and redirect flow.
+- Added direct regression coverage for contribution update context resolution and shared advanced builder membership option filtering in `tests/Feature/ContributionWorkflowActionsTest.php` and `tests/Feature/EventActionsTest.php`.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionWorkflowActionsTest.php`, `tests/Feature/EventActionsTest.php`, `tests/Feature/ContributionPagesTest.php`, `tests/Feature/DashboardPagesTest.php` => 42 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionUpdateContextAction.php app/Actions/Events/ResolveAdvancedBuilderMembershipOptionsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php app/Actions/Events/PrepareAdvancedParentProgramSubmissionAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/EventActionsTest.php tests/Feature/ContributionPagesTest.php tests/Feature/DashboardPagesTest.php` => no errors
+
 # Contribution Workflow Correction
+
+# Direct Edit And Builder Context Extraction
+
+- [x] Extract the direct-edit contribution workflow into a reusable Laravel Action
+- [x] Extract advanced builder bootstrap/default-state resolution into a reusable Laravel Action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the direct-edit and builder-context batch
+
+## Direct Edit And Builder Context Extraction Review
+
+- Added `app/Actions/Contributions/ApplyDirectContributionUpdateAction.php` so `SuggestUpdate` no longer owns the direct-edit mutation and event re-moderation orchestration for maintainer edits.
+- Added `app/Actions/Events/ResolveAdvancedBuilderContextAction.php` so `CreateAdvanced` no longer builds its organizer/location option state and default form values inline during `mount()`.
+- Rewired `app/Livewire/Pages/Contributions/SuggestUpdate.php` and `app/Livewire/Pages/Dashboard/Events/CreateAdvanced.php` to call those actions directly, leaving the components focused on authorization, validation, and redirect/UI flow.
+- Extended focused coverage with direct action tests and page regressions proving sensitive direct event edits still re-moderate approved events and institution-prefilled advanced builder defaults still resolve correctly.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionPagesTest.php`, `tests/Feature/AdvancedEventCreationTest.php`, `tests/Feature/EventActionsTest.php` => 21 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ApplyDirectContributionUpdateAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Livewire/Pages/Dashboard/Events/CreateAdvanced.php tests/Feature/ContributionPagesTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/EventActionsTest.php` => no errors
+
+# Advanced Builder Preparation And Event Sync Extraction
+
+- [x] Extract advanced builder submission preparation into a reusable Laravel Action
+- [x] Extract shared event relation-sync persistence for Filament event pages into a reusable Laravel Action
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the builder preparation and event sync batch
+
+## Advanced Builder Preparation And Event Sync Extraction Review
+
+- Added `app/Actions/Events/PrepareAdvancedParentProgramSubmissionAction.php` so the advanced builder no longer owns timezone parsing, organizer ownership checks, location resolution, or parent-program time validation inside the Livewire submit handler.
+- Added `app/Actions/Events/SyncEventResourceRelationsAction.php` and rewired the admin create/edit pages plus the Ahli edit page to use one shared action for registration-mode persistence, tag syncing, language syncing, and key-person syncing.
+- This also closes the Ahli edit drift where the page prefilled `speakers` and `other_key_people` but did not persist speaker/key-person changes on save.
+- Added focused regressions in `tests/Feature/AdvancedEventCreationTest.php`, `tests/Feature/AhliEventFeaturedGuardTest.php`, and the new `tests/Feature/EventActionsTest.php` to cover the extracted builder preparation path, the Ahli speaker-sync behavior, and the shared event sync action directly.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/AdvancedEventCreationTest.php`, `tests/Feature/AhliEventFeaturedGuardTest.php`, `tests/Feature/EventActionsTest.php` => 13 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/PrepareAdvancedParentProgramSubmissionAction.php app/Actions/Events/SyncEventResourceRelationsAction.php app/Livewire/Pages/Dashboard/Events/CreateAdvanced.php app/Filament/Resources/Events/Pages/CreateEvent.php app/Filament/Resources/Events/Pages/EditEvent.php app/Filament/Ahli/Resources/Events/Pages/EditEvent.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/AhliEventFeaturedGuardTest.php tests/Feature/EventActionsTest.php` => no errors
+
+# Advanced Builder Action Extraction
+
+- [x] Move advanced parent-program creation into a reusable Laravel Action
+- [x] Remove the now-unused `ContributionWorkflowService` wrapper and keep contribution workflow coverage action-based
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the builder extraction and wrapper removal
+
+## Advanced Builder Action Extraction Review
+
+- Extracted the parent-program creation transaction from the Livewire builder into `app/Actions/Events/CreateAdvancedParentProgramAction.php`, leaving `CreateAdvanced` responsible for validation, membership checks, and redirect flow only.
+- Removed the now-unused `app/Services/ContributionWorkflowService.php` after confirming no application callers remained, and updated `tests/Feature/ContributionWorkflowServiceTest.php` to exercise the contribution actions directly so coverage stays intact without the compatibility layer.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/AdvancedEventCreationTest.php`, `tests/Feature/ContributionWorkflowServiceTest.php`, `tests/Feature/ContributionWorkflowActionsTest.php` => 17 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/CreateAdvancedParentProgramAction.php app/Actions/Contributions app/Livewire/Pages/Dashboard/Events/CreateAdvanced.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/ContributionWorkflowServiceTest.php tests/Feature/ContributionWorkflowActionsTest.php` => no errors
+
+# Laravel Actions Entry Point Migration
+
+- [x] Rewire contribution Livewire pages to call contribution action classes directly instead of routing through the compatibility service
+- [x] Extract report submission into a reusable Laravel Action and remove the obsolete `ReportService`
+- [x] Extract event save/unsave and interest/uninterest flows into reusable Laravel Actions behind the API controllers
+- [x] Re-run focused Pest coverage, Pint, and narrowed PHPStan for the direct-caller migration batch
+
+## Laravel Actions Entry Point Migration Review
+
+- Rewired the contribution entrypoints in `SubmitSpeaker`, `SubmitInstitution`, `SuggestUpdate`, and the contributions inbox to call the new `app/Actions/Contributions/*` classes directly. The temporary `ContributionWorkflowService` compatibility wrapper was removed in a later cleanup batch once no application callers remained.
+- Moved report submission orchestration into `app/Actions/Reports/SubmitReportAction.php`, updated both the API controller and the public Livewire report page to use that action directly, and removed the now-obsolete `app/Services/ReportService.php`.
+- Added reusable event engagement actions under `app/Actions/Events` for save, unsave, mark interest, and remove interest, then slimmed `EventSaveController` and `EventInterestController` down to validation and HTTP response mapping.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `runTests`: `tests/Feature/ContributionPagesTest.php`, `tests/Feature/Api/EventSaveTest.php`, `tests/Feature/EventPledgeTest.php`, `tests/Feature/Api/ReportApiModerationTest.php` => 39 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events app/Actions/Reports/SubmitReportAction.php app/Livewire/Pages/Contributions/SubmitSpeaker.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Livewire/Pages/Contributions/Index.php app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/EventSaveController.php app/Http/Controllers/Api/EventInterestController.php app/Http/Controllers/Api/ReportController.php tests/Feature/ContributionPagesTest.php tests/Feature/Api/EventSaveTest.php tests/Feature/EventPledgeTest.php tests/Feature/Api/ReportApiModerationTest.php` => no errors
+
+# Laravel Actions Contribution Migration
+
+- [x] Add first-wave `lorisleiva/laravel-actions` classes for contribution request workflows
+- [x] Delegate `ContributionWorkflowService` methods to the new action classes without breaking existing call sites
+- [x] Add focused Pest coverage proving the new actions work directly and the compatibility layer still passes
+- [x] Run focused tests and Pint for the migration batch
+
+## Laravel Actions Contribution Migration Review
+
+- Added first-wave contribution workflow actions under `app/Actions/Contributions` for create-request submission, update-request submission, approval, rejection, and cancellation using `lorisleiva/laravel-actions` via `AsAction`.
+- Converted `ContributionWorkflowService` into a temporary compatibility wrapper during the first migration batch, then removed it once the app no longer had direct callers and the tests were updated to exercise the action layer itself.
+- Added direct action coverage in `tests/Feature/ContributionWorkflowActionsTest.php` while keeping the existing service-level regression file in place.
+- Removed the temporary optional guard around `FilamentSignalsPlugin` and fixed the original environment issue the proper way with `composer install`, which restored `aiarmada/signals` and `aiarmada/filament-signals` into `vendor`.
+- Verification:
+  - `composer install` => installed `aiarmada/signals` and `aiarmada/filament-signals`, package discovery passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowServiceTest.php` => 9 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowActionsTest.php` => 4 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions app/Services/ContributionWorkflowService.php app/Providers/Filament/AdminPanelProvider.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionWorkflowServiceTest.php` => no errors
 
 - [x] Restore dedicated `/sumbangan/institusi/baru` and `/sumbangan/penceramah/baru` pages as the canonical create flow
 - [x] Remove the inaccurate inline institution and speaker submission forms from the public index pages
@@ -122,12 +392,12 @@
 
 - Added authenticated contribution pages for new institution and speaker submissions, plus a generic record update page that either saves immediately for maintainers or creates a pending contribution request for everyone else.
 - Added a contribution inbox page where contributors can track their own requests and maintainers can approve or reject pending updates for records they manage.
-- Added a public report page and shared `ReportService`, extended reports to support references, and wired the report flow into the existing API path so duplicate checks and moderation escalation logic stay consistent.
+- Added a public report page, later migrated its shared reporting logic into a dedicated Laravel Action, extended reports to support references, and wired the report flow into the existing API path so duplicate checks and moderation escalation logic stay consistent.
 - Linked the new workflow from the app layout, dashboard, and public event/institution/speaker/reference pages so the contribution/report actions are reachable from normal browsing flows.
 - Verification:
   - `runTests`: `tests/Feature/ContributionPagesTest.php`, `tests/Feature/EventShowPageTest.php`, `tests/Feature/InstitutionShowPageTest.php`, `tests/Feature/SpeakerFollowTest.php`, `tests/Feature/ReferenceAuthorizationTest.php` => 53 passed
   - `vendor/bin/pint --dirty --format agent` => pass
-  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/ReportController.php app/Services/ReportService.php app/Models/Reference.php tests/Feature/ContributionPagesTest.php routes/web.php` => no errors
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions app/Livewire/Pages/Reports/Create.php app/Http/Controllers/Api/ReportController.php app/Models/Reference.php tests/Feature/ContributionPagesTest.php routes/web.php` => no errors
 
 # Event Show Blaze Extraction
 

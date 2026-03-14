@@ -3,6 +3,7 @@
 - If the user says old URLs should be removed, do not keep them as redirects by default; delete the aliases and make tests prove they 404.
 - When a user asks to remove a path segment from a URL, change the canonical route path itself and leave the old URLs as redirects; do not only update labels or route names.
 - When a new feature throws `relation ... does not exist` in local development, check migration state first; do not default to adding runtime guards around a schema that simply has not been migrated yet.
+- When Composer already declares a missing runtime package class, verify/install the dependency first; do not patch around it with temporary `class_exists(...)` guards unless the user explicitly wants a fail-open code path.
 - For Spatie Package Tools packages, `discoversMigrations()` alone does not load vendor migrations into `artisan migrate`; packages that expect auto-run migrations must also call `runsMigrations()`, or app-level workarounds will mask the real package bug.
 - For digest jobs that honor user-local delivery times, never derive the source-message query window from a fixed UTC `subDay()` or `subWeek()` lookback; compute the earliest due local window first or DST transitions will silently drop edge-of-window notifications.
 - Inbox queries and unread badges must key off real delivered `in_app` deliveries, not every `notification_messages` row; delivery-accounting rows like digest-source markers otherwise leak into user-facing inbox counts.

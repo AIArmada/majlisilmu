@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Reports\Schemas;
 
+use App\Actions\Reports\ResolveReportCategoryOptionsAction;
+use App\Actions\Reports\ResolveReportEntityMetadataAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
@@ -18,25 +20,13 @@ class ReportForm
                 Section::make('Report')
                     ->components([
                         Select::make('entity_type')
-                            ->options([
-                                'event' => 'Event',
-                                'institution' => 'Institution',
-                                'speaker' => 'Speaker',
-                                'donation_channel' => 'Donation Channel',
-                            ])
+                            ->options(app(ResolveReportEntityMetadataAction::class)->options())
                             ->required(),
                         TextInput::make('entity_id')
                             ->required()
                             ->maxLength(36),
                         Select::make('category')
-                            ->options([
-                                'wrong_info' => 'Wrong info',
-                                'cancelled_not_updated' => 'Cancelled not updated',
-                                'fake_speaker' => 'Fake speaker',
-                                'inappropriate_content' => 'Inappropriate content',
-                                'donation_scam' => 'Donation channel scam',
-                                'other' => 'Other',
-                            ])
+                            ->options(app(ResolveReportCategoryOptionsAction::class)->handle())
                             ->required(),
                         Textarea::make('description')
                             ->columnSpanFull()
