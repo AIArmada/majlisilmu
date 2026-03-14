@@ -1,5 +1,6 @@
 # Lessons
 
+- After shipping new API endpoints or mobile-facing contract changes, audit the whole uncommitted diff and run the full Rector/PHPStan/Pest/Pint sweep before calling the batch done; focused checks alone can miss mixed-auth issues like Sanctum session vs bearer-token behavior.
 - If the user says old URLs should be removed, do not keep them as redirects by default; delete the aliases and make tests prove they 404.
 - When a user asks to remove a path segment from a URL, change the canonical route path itself and leave the old URLs as redirects; do not only update labels or route names.
 - When a new feature throws `relation ... does not exist` in local development, check migration state first; do not default to adding runtime guards around a schema that simply has not been migrated yet.

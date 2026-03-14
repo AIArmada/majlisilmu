@@ -1,3 +1,70 @@
+# Uncommitted Change Audit And Verification Sweep
+
+- [x] Review the full uncommitted working tree for regressions and contract drift
+- [x] Fix issues found in the new auth and mobile API changes
+- [x] Run Rector on the full working tree
+- [x] Run PHPStan on the full application
+- [x] Run Pest in parallel on the full suite
+- [x] Run Pint and final diff hygiene checks
+
+## Uncommitted Change Audit And Verification Sweep Review
+
+- Audited the current uncommitted work across the checklist/doc rewrites and the new mobile API surface instead of relying only on targeted checks.
+- Hardened API logout so `auth:sanctum` session-authenticated requests no longer risk null-token crashes; logout now safely no-ops when no personal access token is attached to the request.
+- Added regression coverage for the session-authenticated logout path so the Sanctum mixed-auth behavior stays protected.
+- Final verification:
+  - `vendor/bin/rector process` => pass
+  - `vendor/bin/phpstan analyse --ansi` => no errors
+  - `vendor/bin/pest --parallel` => 901 passed
+  - `vendor/bin/pint --format agent` => pass
+  - `git diff --check` => pass
+
+# Mobile API Audit And Expansion
+
+- [x] Audit every current API endpoint against the Action-class refactors and current routes/controllers
+- [x] Add missing native-client API endpoints for parity with existing web flows
+- [x] Add regression coverage for the new mobile-facing endpoints
+- [x] Publish an up-to-date mobile API reference for Android and iOS consumers
+
+## Mobile API Audit And Expansion Review
+
+- Added mobile bearer-token auth endpoints and documented Sanctum token usage for Android and iOS clients.
+- Filled the biggest native-client parity gaps by exposing action-backed APIs for event going, event registration, registration status, and check-in state/check-in creation.
+- Extracted shared check-in eligibility into `ResolveEventCheckInStateAction` so the API and event page now evaluate the same rules.
+- Published `docs/MAJLISILMU_MOBILE_API_REFERENCE.md` and added pointers from the older technical docs so mobile developers have a current contract source.
+- Verification:
+  - `php artisan route:list --path=api/v1 --except-vendor` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Auth app/Actions/Events/MarkEventGoingAction.php app/Actions/Events/RemoveEventGoingAction.php app/Actions/Events/ResolveEventCheckInStateAction.php app/Http/Controllers/Api/AuthController.php app/Http/Controllers/Api/EventGoingController.php app/Http/Controllers/Api/EventRegistrationController.php app/Http/Controllers/Api/EventCheckInController.php app/Livewire/Pages/Events/Show.php tests/Feature/Api/AuthApiTest.php tests/Feature/Api/EventGoingApiTest.php tests/Feature/Api/EventRegistrationApiTest.php tests/Feature/Api/EventCheckInApiTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(AuthApiTest|EventGoingApiTest|EventRegistrationApiTest|EventCheckInApiTest|EventSaveTest|EventPledgeTest|UserRegistrationsTest|RegistrationExportTest|NotificationCenterApiTest)'` => 50 passed
+
+# V2 Roadmap Draft
+
+- [x] Review the current MVP/v1 positioning and existing planning docs
+- [x] Define the v2 product thesis and priority tracks
+- [x] Write `V2_ROADMAP.md` with concrete `Now / Next / Later` sequencing
+
+## V2 Roadmap Draft Review
+
+- Reframed the next phase around organizer leverage instead of broadening the public product surface.
+- Prioritized recurring programs, institution operations, moderation productivity, and attendance workflows as the core of v2.
+- Kept retention and trust automation in the roadmap, but moved them behind stronger operator and reviewer tooling.
+- Verification:
+  - Documentation-only change; no test or static-analysis run was necessary.
+
+# MVP Checklist Cleanup
+
+- [x] Audit `MVP_CHECKLIST.md` against the live codebase
+- [x] Separate true MVP gaps from intentional policy decisions and superseded architecture
+- [x] Rewrite `MVP_CHECKLIST.md` so the remaining MVP tail is explicit and current
+
+## MVP Checklist Cleanup Review
+
+- Reclassified stale unchecked items such as member invitations and institution-scoped event workflows based on the implemented Ahli/dashboard flows.
+- Moved intentional route-policy and superseded-resource items out of the active MVP backlog so the checklist no longer treats them as missing features.
+- Reduced the true remaining MVP work to the small set that is still genuinely incomplete: institution self-service attendee export UX and moderation reviewer ergonomics.
+- Verification:
+  - Documentation-only change; no test or static-analysis run was necessary.
+
 # Invitation Audit Follow-Up
 
 - [x] Audit the full uncommitted invitation / Ahli panel batch end to end

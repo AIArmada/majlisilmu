@@ -238,17 +238,31 @@ Scheduled media maintenance:
 
 Defined in `routes/api.php` under `/api/v1`.
 
+Current source of truth for native clients:
+- `docs/MAJLISILMU_MOBILE_API_REFERENCE.md`
+
 Public:
+- `POST /auth/register`
+- `POST /auth/login`
 - `GET /events`
 - `GET /events/{event}`
-- `POST /reports` (reports throttle applied)
+- `POST /events/{event}/registrations`
 
 Authenticated (`auth:sanctum`):
+- `POST /auth/logout`
 - `GET /user`
 - `GET /user/registrations`
+- `GET /user/going-events`
+- `GET /events/{event}/registration-status`
+- `GET /events/{event}/check-in-state`
+- `POST /events/{event}/check-ins`
+- `GET/POST/DELETE /events/{event}/going`
 - Saved-search CRUD + execute
 - Event saves CRUD-like endpoints
 - Event interests endpoints
+- `POST /reports` (reports throttle applied)
+- Notifications inbox/settings endpoints
+- Push destination registration endpoints
 - Event registration export
 
 Controllers:

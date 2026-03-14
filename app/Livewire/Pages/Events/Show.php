@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Events;
 
 use App\Actions\Events\RecordEventCheckInAction;
+use App\Actions\Events\ResolveEventCheckInStateAction;
 use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
@@ -14,7 +15,6 @@ use App\Models\EventCheckin;
 use App\Models\EventKeyPerson;
 use App\Models\EventSubmission;
 use App\Models\Institution;
-use App\Models\Registration;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
@@ -552,80 +552,9 @@ class Show extends Component
      */
     protected function resolveCheckInState(User $user): array
     {
-        if (! $this->event->is_active || $this->event->visibility !== EventVisibility::Public || ! $this->isEngagementStatus($this->event)) {
-            return [
-                'available' => false,
-                'reason' => __('Majlis ini tidak tersedia untuk check-in.'),
-                'method' => 'self_reported',
-                'registration_id' => null,
-            ];
-        }
-
-        $startsAt = $this->event->starts_at;
-        if (! $startsAt instanceof CarbonInterface) {
-            return [
-                'available' => false,
-                'reason' => __('Masa majlis belum ditetapkan untuk check-in.'),
-                'method' => 'self_reported',
-                'registration_id' => null,
-            ];
-        }
-
-        $eventTimezone = $this->event->timezone ?: 'Asia/Kuala_Lumpur';
-        $windowStartsAt = $startsAt->copy()->setTimezone($eventTimezone)->subHours(2);
-        $windowEndsAt = $startsAt->copy()->setTimezone($eventTimezone)->addHours(8);
-        $now = now($eventTimezone);
-
-        if ($now->lt($windowStartsAt)) {
-            return [
-                'available' => false,
-                'reason' => __('Check-in dibuka 2 jam sebelum majlis bermula.'),
-                'method' => 'self_reported',
-                'registration_id' => null,
-            ];
-        }
-
-        if ($now->gt($windowEndsAt)) {
-            return [
-                'available' => false,
-                'reason' => __('Tempoh check-in telah tamat.'),
-                'method' => 'self_reported',
-                'registration_id' => null,
-            ];
-        }
-
-        $registrationRequired = (bool) data_get($this->event, 'settings.registration_required', false);
-        if (! $registrationRequired) {
-            return [
-                'available' => true,
-                'reason' => null,
-                'method' => 'self_reported',
-                'registration_id' => null,
-            ];
-        }
-
-        /** @var Registration|null $registration */
-        $registration = Registration::query()
-            ->where('event_id', $this->event->id)
-            ->where('user_id', $user->id)
-            ->where('status', '!=', 'cancelled')
-            ->latest('created_at')
-            ->first();
-
-        if (! $registration instanceof Registration) {
-            return [
-                'available' => false,
-                'reason' => __('Majlis ini memerlukan pendaftaran sebelum check-in.'),
-                'method' => 'registered_self_checkin',
-                'registration_id' => null,
-            ];
-        }
-
-        return [
-            'available' => true,
-            'reason' => null,
-            'method' => 'registered_self_checkin',
-            'registration_id' => $registration->id,
-        ];
+        return app(ResolveEventCheckInStateAction::class)->handle(
+            $this->event->loadMissing('settings'),
+            $user,
+        );
     }
 }

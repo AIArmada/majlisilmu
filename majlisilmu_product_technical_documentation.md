@@ -269,6 +269,9 @@ Donation accounts belong to institutions. Events reference `donation_account_id`
 - Cap results to 30 events per email to avoid overload.
 
 ## B5) Routes / APIs (REST)
+
+Current mobile-facing API contract lives in `docs/MAJLISILMU_MOBILE_API_REFERENCE.md`.
+
 Public:
 - `GET /events` search/list (+ geo)
 - `GET /events/{slug}`
