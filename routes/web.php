@@ -135,7 +135,6 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/contributions/speakers/create', SubmitSpeaker::class);
     Route::livewire('/contributions/{subjectType}/{subjectId}/suggest', SuggestContributionUpdate::class)
         ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference']);
+    Route::livewire('/report/{subjectType}/{subjectId}', CreateReportPage::class)
+        ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference']);
 });
-
-Route::livewire('/report/{subjectType}/{subjectId}', CreateReportPage::class)
-    ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference']);

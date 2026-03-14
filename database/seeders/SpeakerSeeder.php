@@ -2,9 +2,6 @@
 
 namespace Database\Seeders;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\Permission;
-use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Models\Speaker;
@@ -120,67 +117,5 @@ class SpeakerSeeder extends Seeder
         $suffix = str_pad((string) (abs(crc32($name)) % 100000000), 8, '0', STR_PAD_LEFT);
 
         return '01'.$suffix;
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    protected function getSpeakerRolePermissions(): array
-    {
-        return [
-            'owner' => [
-                'speaker.view',
-                'speaker.update',
-                'speaker.delete',
-                'speaker.manage-members',
-            ],
-            'admin' => [
-                'speaker.view',
-                'speaker.update',
-                'speaker.manage-members',
-            ],
-            'editor' => [
-                'speaker.view',
-                'speaker.update',
-            ],
-            'viewer' => [
-                'speaker.view',
-            ],
-        ];
-    }
-
-    /**
-     * @param  list<string>  $permissions
-     */
-    protected function ensurePermissions(array $permissions): void
-    {
-        foreach ($permissions as $permission) {
-            Permission::findOrCreate($permission, 'web');
-        }
-    }
-
-    protected function seedSpeakerRoles(Speaker $speaker): void
-    {
-        $rolePermissions = $this->getSpeakerRolePermissions();
-        $allPermissions = array_values(array_unique(array_merge(...array_values($rolePermissions))));
-
-        $this->ensurePermissions($allPermissions);
-
-        Authz::withScope($speaker, function () use ($rolePermissions): void {
-            foreach ($rolePermissions as $roleName => $permissions) {
-                $role = Role::findOrCreate($roleName, 'web');
-                $role->syncPermissions($permissions);
-            }
-        });
-    }
-
-    /**
-     * @param  list<string>  $roles
-     */
-    protected function syncMemberRoles(Speaker $speaker, User $user, array $roles): void
-    {
-        Authz::withScope($speaker, function () use ($user, $roles): void {
-            $user->syncRoles($roles);
-        }, $user);
     }
 }

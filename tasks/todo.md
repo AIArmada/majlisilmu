@@ -1,3 +1,85 @@
+# Authz User Index Global Roles Fix
+
+- [x] Restore authz user index search by global role name
+- [x] Remove the global role badge N+1 by switching back to a relationship-backed column
+- [x] Add focused regression coverage and rerun verification for the authz user resource
+
+## Authz User Index Global Roles Fix Review
+
+- Added a dedicated `globalRoles()` relation on `User` that only resolves global role assignments, even with scoped/team authz enabled.
+- Switched the authz user index back to a relationship-backed role column using `globalRoles.name`, which restores built-in role-name search and avoids per-row role queries for the badge state.
+- Added a focused authz user index regression test that proves searching by a global role name returns the expected user records.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => 7 passed
+  - `vendor/bin/phpstan analyse --ansi app/Models/User.php app/Filament/Resources/Authz/UserResource.php tests/Feature/AuthzUserResourceTest.php` => no errors
+
+# Protected Scoped Role Admin Surface
+
+- [x] Allow the central authz user edit page to override protected scoped owner roles explicitly
+- [x] Add a protected-role management section to the authz user edit page while keeping local membership UIs locked down
+- [x] Add focused regression coverage and verify the new central override path
+
+## Protected Scoped Role Admin Surface Review
+
+- Extended `ChangeSubjectMemberRole` so the authz user edit page can explicitly override protected shared member roles by subject type, while local membership flows remain blocked from changing them.
+- Added a dedicated `Protected Scoped Roles` section to the authz user edit page with per-type ownership cards, membership context, and a central replacement-role selector.
+- Reloaded the authz user edit record state after protected-role changes so the page and read-only membership summary stay in sync after a central override.
+- Added focused regression coverage for both the explicit action-level bypass and the authz user page workflow.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(MembershipActionsTest|AuthzUserResourceTest|MemberRoleModalHydrationTest|DashboardPagesTest)'` => 42 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Membership/ChangeSubjectMemberRole.php app/Filament/Resources/Authz/UserResource.php app/Filament/Resources/Authz/UserResource/Pages/EditUser.php tests/Feature/MembershipActionsTest.php tests/Feature/AuthzUserResourceTest.php` => no errors
+
+# Membership Audit Fixes
+
+- [x] Make shared member role resolution safe for UUID-backed PostgreSQL roles
+- [x] Fix add/remove membership actions so they do not clear shared scoped roles incorrectly
+- [x] Enforce that protected owner roles can only be changed from the global authz surface
+- [x] Align the legacy report alias with the authenticated report flow
+- [x] Add focused regression coverage and run verification for the touched paths
+
+## Membership Audit Fixes Review
+
+- Updated shared member role lookup to avoid UUID-casting failures on PostgreSQL when role names like `owner` or `admin` are passed through the Laravel Actions workflow.
+- Changed membership attach/remove semantics so adding a membership without an explicit role preserves the existing shared scoped role, non-protected removals clear roles only when no memberships of that type remain, and protected ownership memberships are blocked from local removal entirely.
+- Marked the event `organizer` role as protected alongside institution/speaker/reference `owner` roles, then blocked local role-edit/remove actions for those protected roles in the relation managers and institution dashboard while keeping global authz editing as the only removal path.
+- Moved the legacy `/report/{subjectType}/{subjectId}` alias into the authenticated route group so it now matches the canonical report page behavior and redirects guests to login instead of returning a component-level `403`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(MembershipActionsTest|MemberInvitationActionsTest|ContributionWorkflowServiceTest|ContributionPagesTest|DashboardPagesTest|MemberRoleModalHydrationTest)'` => 60 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Membership app/Enums/MemberSubjectType.php app/Support/Authz/MemberRoleCatalog.php app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php app/Filament/Resources/References/RelationManagers/MembersRelationManager.php app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php app/Livewire/Pages/Dashboard/InstitutionDashboard.php routes/web.php tests/Feature/MembershipActionsTest.php tests/Feature/MemberRoleModalHydrationTest.php tests/Feature/DashboardPagesTest.php tests/Feature/ContributionPagesTest.php` => no errors
+  - `vendor/bin/pint --dirty --format agent` => pass
+
+# Hard-Cut Authz And Membership Refactor
+
+- [x] Verify local `filament-authz` package changes with focused package tests
+- [x] Replace hard-coded scoped member role definitions with a central app role catalog
+- [x] Add Laravel Actions membership workflow layer and route active mutation paths through it
+- [x] Remove legacy model-specific authz scope usage from active models, seeders, and runtime paths
+- [x] Rebuild member-management UI to single-role workflows and add reference member management
+- [x] Rebuild admin authz UX around global role editing plus read-only membership summaries
+- [x] Add destructive cleanup migration for legacy model-backed authz scopes and assignments
+- [x] Add domain member invitation actions and persistence on top of the new workflow layer
+- [x] Update focused application tests for the new hard-cut model and run verification
+
+## Refactor Review
+
+- Switched Majlis Ilmu to the local path repository for `aiarmada/filament-authz` and verified Composer resolves `/Users/Saiffil/Herd/commerce/packages/filament-authz` during development.
+- Added generic `filament-authz` improvements in the Commerce package: configurable user role scope mode (`all`, `global_only`, `scoped_only`) and configurable role scope options for the role resource form/filter, with README and configuration docs updated.
+- Replaced hard-coded shared member role definitions with `App\Support\Authz\MemberRoleCatalog`, and updated `ScopedMemberRoleSeeder` plus `ScopedMemberRolesSeeder` to seed institution, speaker, event, and reference shared scopes from that catalog.
+- Added Laravel Actions membership workflows under `app/Actions/Membership` for add/change/remove/owner assignment, then routed contribution ownership and active admin/dashboard member mutations through those actions.
+- Hard-removed legacy model-specific authz scope usage from active app code by deleting `HasAuthzScope` usage and legacy scope labels from `Institution` and `Speaker`, removing dormant per-model scoped role seeding from seeders, and adding a destructive cleanup migration for old model-backed scope rows and assignments.
+- Rebuilt institution, speaker, event, and reference member management to use single-role assignment instead of multi-role selection, and added missing reference member management in the admin resource.
+- Reworked the authz user editor to keep editable global roles/direct permissions while showing memberships as a read-only summary with links back to the owning institution, speaker, event, and reference resources.
+- Added backend invitation support with `member_invitations`, `MemberInvitation`, and Laravel Actions for invite, accept, and revoke flows. Acceptance routes through the shared membership actions instead of duplicating attach/role logic.
+- Added focused regression coverage for membership actions, invitation actions, reference member management, single-role modal hydration, admin authz UX, dashboard flows, contribution ownership assignment, and the “no model-specific authz scopes” guarantee.
+- Verification:
+  - `composer show aiarmada/filament-authz -P` => `/Users/Saiffil/Herd/commerce/packages/filament-authz`
+  - `/Users/Saiffil/Herd/commerce/vendor/bin/pest --parallel tests/src/FilamentAuthzScoped/UserAuthzFormTest.php` => 3 passed
+  - `/Users/Saiffil/Herd/commerce/vendor/bin/phpstan analyse --ansi packages/filament-authz/src/FilamentAuthzPlugin.php packages/filament-authz/src/Resources/RoleResource.php packages/filament-authz/src/Support/UserAuthzForm.php tests/src/FilamentAuthz/FilamentAuthzTestCase.php tests/src/FilamentAuthzScoped/UserAuthzFormTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(MemberInvitationActionsTest|MembershipActionsTest|MemberRoleModalHydrationTest|PublicSubmissionLockActionsTest|AuthzUserResourceTest|AdminResourcesCoverageTest|DashboardPagesTest|AhliPanelInstitutionEditingTest|ContributionWorkflowServiceTest|MemberPermissionGateTest|ReferenceAuthorizationTest|FilamentPanelAccessTest|ContributionPagesTest|InstitutionSeederTest|ScopedMemberRoleSeederTest)'` => 104 passed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Membership app/Enums/MemberSubjectType.php app/Filament/Resources/Authz/UserResource.php app/Filament/Resources/Authz/UserResource/Pages/EditUser.php app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php app/Filament/Resources/Events/RelationManagers/EventUsersRelationManager.php app/Filament/Resources/Institutions/RelationManagers/MembersRelationManager.php app/Filament/Resources/References/ReferenceResource.php app/Filament/Resources/References/RelationManagers/MembersRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MembersRelationManager.php app/Forms/InstitutionFormSchema.php app/Forms/SpeakerFormSchema.php app/Livewire/Pages/Dashboard/InstitutionDashboard.php app/Models/Event.php app/Models/Institution.php app/Models/MemberInvitation.php app/Models/Speaker.php app/Providers/Filament/AdminPanelProvider.php app/Services/ContributionEntityMutationService.php app/Services/ContributionWorkflowService.php app/Support/Authz/MemberRoleCatalog.php app/Support/Authz/MemberRoleScopes.php app/Support/Authz/ScopedMemberRoleSeeder.php database/migrations/2026_03_14_120000_prune_legacy_model_authz_scopes.php database/migrations/2026_03_14_130000_create_member_invitations_table.php tests/Feature/MembershipActionsTest.php tests/Feature/MemberInvitationActionsTest.php tests/Feature/AuthzUserResourceTest.php tests/Feature/PublicSubmissionLockActionsTest.php tests/Feature/MemberRoleModalHydrationTest.php tests/Feature/AdminResourcesCoverageTest.php` => no errors
+
 # Contribution Workflow Correction
 
 - [x] Restore dedicated `/sumbangan/institusi/baru` and `/sumbangan/penceramah/baru` pages as the canonical create flow

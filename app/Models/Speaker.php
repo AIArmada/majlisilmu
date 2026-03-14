@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\Honorific;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasContacts;
+use App\Models\Concerns\HasDonationChannels;
+use App\Models\Concerns\HasFollowers;
+use App\Models\Concerns\HasLanguages;
 use Database\Factories\SpeakerFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,7 +37,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Speaker extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<SpeakerFactory> */
-    use \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasAuthzScope, HasContacts, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -313,11 +315,6 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ->height(232)
             ->sharpen(10)
             ->format('webp');
-    }
-
-    public function getAuthzScopeLabel(): string
-    {
-        return 'Speaker: '.$this->name;
     }
 
     /**

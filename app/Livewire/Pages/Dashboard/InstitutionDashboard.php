@@ -2,17 +2,17 @@
 
 namespace App\Livewire\Pages\Dashboard;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\AuthzScope;
-use AIArmada\FilamentAuthz\Models\Role;
+use App\Actions\Membership\AddMemberToSubject;
+use App\Actions\Membership\ChangeSubjectMemberRole;
+use App\Actions\Membership\RemoveMemberFromSubject;
 use App\Enums\EventVisibility;
+use App\Enums\MemberSubjectType;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\User;
-use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
-use App\Support\Submission\PublicSubmissionLockService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +24,6 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Spatie\Permission\PermissionRegistrar;
 
 #[Layout('layouts.app')]
 class InstitutionDashboard extends Component
@@ -161,10 +160,7 @@ class InstitutionDashboard extends Component
             ]);
         }
 
-        $institution->members()->syncWithoutDetaching([$member->id]);
-        $this->syncMemberRoles($member, $validated['newMemberRoleId']);
-
-        app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
+        app(AddMemberToSubject::class)->handle($institution, $member, $validated['newMemberRoleId']);
 
         $this->newMemberEmail = '';
         $this->newMemberRoleId = '';
@@ -180,6 +176,12 @@ class InstitutionDashboard extends Component
         $this->ensureCanManageMembers($institution);
 
         $member = $this->findInstitutionMember($memberId);
+
+        if ($this->memberHasProtectedRole($member)) {
+            $this->errorToast(__('Owner roles can only be changed from the global roles screen.'));
+
+            return;
+        }
 
         $this->editingMemberId = $member->id;
         $this->editingMemberRoleId = $this->getMemberRoleIds($member)[0] ?? '';
@@ -202,10 +204,16 @@ class InstitutionDashboard extends Component
 
         $member = $this->findInstitutionMember($this->editingMemberId);
 
+        if ($this->memberHasProtectedRole($member)) {
+            $this->resetMemberEditor();
+            $this->errorToast(__('Owner roles can only be changed from the global roles screen.'));
+
+            return;
+        }
+
         $validated = $this->validate($this->memberRoleRules());
 
-        $this->syncMemberRoles($member, $validated['editingMemberRoleId']);
-        app(PublicSubmissionLockService::class)->syncForUser($member);
+        app(ChangeSubjectMemberRole::class)->handle($institution, $member, $validated['editingMemberRoleId']);
 
         $this->resetMemberEditor();
 
@@ -226,9 +234,7 @@ class InstitutionDashboard extends Component
             return;
         }
 
-        $institution->members()->detach($member->id);
-        $this->syncMemberRoles($member, null);
-        app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
+        app(RemoveMemberFromSubject::class)->handle($institution, $member);
 
         if ($this->editingMemberId === $member->id) {
             $this->resetMemberEditor();
@@ -441,14 +447,7 @@ class InstitutionDashboard extends Component
     {
         app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
 
-        $teamsKey = app(PermissionRegistrar::class)->teamsKey;
-        $scope = $this->getRoleScope();
-
-        return Authz::withScope($scope, fn (): array => Role::query()
-            ->where($teamsKey, getPermissionsTeamId())
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all());
+        return app(MemberRoleCatalog::class)->roleOptionsFor(MemberSubjectType::Institution);
     }
 
     #[Computed]
@@ -585,7 +584,7 @@ class InstitutionDashboard extends Component
      */
     protected function getMemberRoleIds(User $user): array
     {
-        return Authz::withScope($this->getRoleScope(), fn (): array => $user->roles()->pluck('id')->all(), $user);
+        return app(MemberRoleCatalog::class)->roleIdsFor($user, MemberSubjectType::Institution);
     }
 
     /**
@@ -593,41 +592,22 @@ class InstitutionDashboard extends Component
      */
     protected function getMemberRoleNames(User $user): array
     {
-        return Authz::withScope($this->getRoleScope(), fn (): array => $user->getRoleNames()->values()->all(), $user);
+        return app(MemberRoleCatalog::class)->roleNamesFor($user, MemberSubjectType::Institution);
     }
 
     protected function userHasInstitutionManagementRole(User $user): bool
     {
-        return Authz::withScope(
-            $this->getRoleScope(),
-            fn (): bool => $user->hasAnyRole(['owner', 'admin']),
-            $user,
-        );
+        return app(MemberRoleCatalog::class)->userHasAnyRole($user, MemberSubjectType::Institution, ['owner', 'admin']);
     }
 
     protected function memberIsOwner(User $user): bool
     {
-        return Authz::withScope(
-            $this->getRoleScope(),
-            fn (): bool => $user->hasRole('owner'),
-            $user,
-        );
+        return app(MemberRoleCatalog::class)->userHasRole($user, MemberSubjectType::Institution, 'owner');
     }
 
-    protected function syncMemberRoles(User $user, ?string $roleId): void
+    protected function memberHasProtectedRole(User $user): bool
     {
-        $validRoleIds = $roleId !== null && $roleId !== '' && array_key_exists($roleId, $this->institutionRoleOptions())
-            ? [$roleId]
-            : [];
-
-        Authz::withScope($this->getRoleScope(), function () use ($user, $validRoleIds): void {
-            $user->syncRoles($validRoleIds);
-        }, $user);
-    }
-
-    protected function getRoleScope(): AuthzScope
-    {
-        return app(MemberRoleScopes::class)->institution();
+        return app(MemberRoleCatalog::class)->userHasProtectedRole($user, MemberSubjectType::Institution);
     }
 
     public function render(): View

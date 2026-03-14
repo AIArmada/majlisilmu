@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
+use App\Actions\Membership\AssignOwnerToNewSubject;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
@@ -12,8 +12,6 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
-use App\Support\Authz\MemberRoleScopes;
-use App\Support\Authz\ScopedMemberRoleSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -23,9 +21,8 @@ class ContributionWorkflowService
 {
     public function __construct(
         private readonly ModerationService $moderationService,
-        private readonly MemberRoleScopes $memberRoleScopes,
-        private readonly ScopedMemberRoleSeeder $scopedMemberRoleSeeder,
         private readonly ContributionEntityMutationService $entityMutationService,
+        private readonly AssignOwnerToNewSubject $assignOwnerToNewSubject,
     ) {}
 
     /**
@@ -250,19 +247,7 @@ class ContributionWorkflowService
 
     private function attachAsOwner(User $user, Institution|Speaker $entity): void
     {
-        if ($entity instanceof Institution) {
-            $this->scopedMemberRoleSeeder->ensureForInstitution();
-            $entity->members()->syncWithoutDetaching([$user->getKey()]);
-            $scope = $this->memberRoleScopes->institution();
-        } else {
-            $this->scopedMemberRoleSeeder->ensureForSpeaker();
-            $entity->members()->syncWithoutDetaching([$user->getKey()]);
-            $scope = $this->memberRoleScopes->speaker();
-        }
-
-        Authz::withScope($scope, function () use ($user): void {
-            $user->syncRoles(['owner']);
-        }, $user);
+        $this->assignOwnerToNewSubject->handle($entity, $user);
     }
 
     private function subjectTypeForModel(Model $entity): ContributionSubjectType

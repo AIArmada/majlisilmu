@@ -69,7 +69,7 @@
                 </div>
                 <div>
                     <div class="text-sm text-gray-500">Memberships</div>
-                    <div class="text-2xl font-semibold text-gray-950 dark:text-white">{{ $user->institutions->count() + $user->speakers->count() + $user->memberEvents->count() }}</div>
+                    <div class="text-2xl font-semibold text-gray-950 dark:text-white">{{ $user->institutions->count() + $user->speakers->count() + $user->memberEvents->count() + $user->references->count() }}</div>
                 </div>
                 <div>
                     <div class="text-sm text-gray-500">Saved Searches</div>

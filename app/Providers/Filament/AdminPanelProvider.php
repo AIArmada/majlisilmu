@@ -7,6 +7,7 @@ use AIArmada\FilamentSignals\FilamentSignalsPlugin;
 use App\Filament\Pages\AdminDashboard;
 use App\Providers\Filament\Concerns\ResolvesPanelDomain;
 use App\Providers\Filament\Concerns\TracksSignalsPanel;
+use App\Support\Authz\MemberRoleScopes;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -61,7 +62,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 FilamentSignalsPlugin::make(),
-                FilamentAuthzPlugin::make()->centralApp(),
+                FilamentAuthzPlugin::make()
+                    ->centralApp()
+                    ->userRoleScopeMode('global_only')
+                    ->roleScopeOptionsUsing(fn (): array => app(MemberRoleScopes::class)->roleResourceOptions()),
             ])
             ->middleware([
                 EncryptCookies::class,

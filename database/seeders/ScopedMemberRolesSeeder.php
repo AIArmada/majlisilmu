@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 class ScopedMemberRolesSeeder extends Seeder
 {
     /**
-     * Seed shared member role templates for institution, speaker, and event membership scopes.
+     * Seed shared member role templates for institution, speaker, event, and reference membership scopes.
      */
     public function run(): void
     {
@@ -18,5 +18,6 @@ class ScopedMemberRolesSeeder extends Seeder
         $scopedRoleSeeder->ensureForInstitution();
         $scopedRoleSeeder->ensureForSpeaker();
         $scopedRoleSeeder->ensureForEvent();
+        $scopedRoleSeeder->ensureForReference();
     }
 }

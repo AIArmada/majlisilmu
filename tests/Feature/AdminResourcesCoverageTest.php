@@ -9,6 +9,7 @@ use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager as InstitutionDonationChannelsRelationManager;
 use App\Filament\Resources\References\ReferenceResource;
 use App\Filament\Resources\References\RelationManagers\EventsRelationManager as ReferenceEventsRelationManager;
+use App\Filament\Resources\References\RelationManagers\MembersRelationManager as ReferenceMembersRelationManager;
 use App\Filament\Resources\Reports\ReportResource;
 use App\Filament\Resources\Series\RelationManagers\EventsRelationManager as SeriesEventsRelationManager;
 use App\Filament\Resources\Series\SeriesResource;
@@ -57,5 +58,6 @@ it('registers expected relation managers on core admin resources', function () {
     expect(SpeakerResource::getRelations())->toContain(SpeakerEventsRelationManager::class);
     expect(SpeakerResource::getRelations())->toContain(SpeakerFollowersRelationManager::class);
     expect(ReferenceResource::getRelations())->toContain(ReferenceEventsRelationManager::class);
+    expect(ReferenceResource::getRelations())->toContain(ReferenceMembersRelationManager::class);
     expect(InstitutionResource::getRelations())->toContain(InstitutionDonationChannelsRelationManager::class);
 });

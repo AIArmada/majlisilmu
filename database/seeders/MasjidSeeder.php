@@ -2,9 +2,6 @@
 
 namespace Database\Seeders;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\Permission;
-use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Models\Country;
@@ -225,84 +222,5 @@ class MasjidSeeder extends Seeder
         }
 
         return $cleaned;
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    protected function getInstitutionRolePermissions(): array
-    {
-        return [
-            'owner' => [
-                'institution.view',
-                'institution.update',
-                'institution.delete',
-                'institution.manage-members',
-                'institution.manage-donation-accounts',
-                'event.view',
-                'event.create',
-                'event.update',
-                'event.delete',
-                'event.view-registrations',
-                'event.export-registrations',
-            ],
-            'admin' => [
-                'institution.view',
-                'institution.update',
-                'institution.manage-members',
-                'institution.manage-donation-accounts',
-                'event.view',
-                'event.create',
-                'event.update',
-                'event.delete',
-                'event.view-registrations',
-                'event.export-registrations',
-            ],
-            'editor' => [
-                'institution.view',
-                'event.view',
-                'event.create',
-                'event.update',
-            ],
-            'viewer' => [
-                'institution.view',
-                'event.view',
-            ],
-        ];
-    }
-
-    /**
-     * @param  list<string>  $permissions
-     */
-    protected function ensurePermissions(array $permissions): void
-    {
-        foreach ($permissions as $permission) {
-            Permission::findOrCreate($permission, 'web');
-        }
-    }
-
-    protected function seedInstitutionRoles(Institution $institution): void
-    {
-        $rolePermissions = $this->getInstitutionRolePermissions();
-        $allPermissions = array_values(array_unique(array_merge(...array_values($rolePermissions))));
-
-        $this->ensurePermissions($allPermissions);
-
-        Authz::withScope($institution, function () use ($rolePermissions): void {
-            foreach ($rolePermissions as $roleName => $permissions) {
-                $role = Role::findOrCreate($roleName, 'web');
-                $role->syncPermissions($permissions);
-            }
-        });
-    }
-
-    /**
-     * @param  list<string>  $roles
-     */
-    protected function syncMemberRoles(Institution $institution, User $user, array $roles): void
-    {
-        Authz::withScope($institution, function () use ($user, $roles): void {
-            $user->syncRoles($roles);
-        }, $user);
     }
 }
