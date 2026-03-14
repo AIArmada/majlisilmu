@@ -243,6 +243,29 @@ final readonly class MemberRoleCatalog
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function invitationRoleSlugOptionsFor(MemberSubjectType $subjectType): array
+    {
+        $options = [];
+
+        foreach ($this->definitionsFor($subjectType) as $roleSlug => $definition) {
+            if ($definition['protected']) {
+                continue;
+            }
+
+            $options[$roleSlug] = $definition['label'];
+        }
+
+        return $options;
+    }
+
+    public function isInvitableRole(MemberSubjectType $subjectType, string $roleSlug): bool
+    {
+        return array_key_exists($roleSlug, $this->invitationRoleSlugOptionsFor($subjectType));
+    }
+
+    /**
      * @return list<string>
      */
     public function roleIdsFor(User $user, MemberSubjectType $subjectType): array
@@ -307,6 +330,15 @@ final readonly class MemberRoleCatalog
     public function isProtectedRole(MemberSubjectType $subjectType, string $roleName): bool
     {
         return (bool) Arr::get($this->definitionsFor($subjectType), "{$roleName}.protected", false);
+    }
+
+    public function roleLabel(MemberSubjectType $subjectType, string $roleName): string
+    {
+        return (string) Arr::get(
+            $this->definitionsFor($subjectType),
+            "{$roleName}.label",
+            Str::headline($roleName),
+        );
     }
 
     public function resolveRoleId(MemberSubjectType $subjectType, ?string $roleIdentifier): ?string

@@ -40,6 +40,11 @@ final readonly class InviteSubjectMember
 
         $subjectType = MemberSubjectType::forSubject($subject);
         $this->scopedMemberRoleSeeder->ensure($subjectType);
+
+        if (! $this->memberRoleCatalog->isInvitableRole($subjectType, $roleSlug)) {
+            throw new InvalidArgumentException("Role [{$roleSlug}] cannot be invited for {$subjectType->value} members.");
+        }
+
         $this->memberRoleCatalog->resolveRoleId($subjectType, $roleSlug);
 
         return MemberInvitation::create([

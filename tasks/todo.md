@@ -1,3 +1,62 @@
+# Invitation Audit Follow-Up
+
+- [x] Audit the full uncommitted invitation / Ahli panel batch end to end
+- [x] Harden invitation acceptance against stale protected-role rows and deleted subjects
+- [x] Re-run broad verification and fix any regressions before commit
+
+## Invitation Audit Follow-Up Review
+
+- Hardened invitation acceptance so stale or manually inserted protected-role invitations now fail with the same `This invitation is no longer valid.` validation path as the UI, instead of slipping through acceptance.
+- Hardened the frontend invitation page and action layer for this app's no-FK setup so invitations tied to deleted institutions, speakers, events, or references now render a safe invalid state and reject acceptance cleanly instead of failing with a missing-model exception.
+- Removed the unused `MemberRoleCatalog::roleSlugOptionsFor()` helper introduced during the invitation work to keep the catalog API lean.
+- Broad verification:
+  - `git diff --check` => pass
+  - `vendor/bin/rector process ...` on the touched invitation / Ahli files => pass
+  - `vendor/bin/phpstan analyse --ansi` => no errors
+  - `vendor/bin/pest --parallel --compact` => 880 passed, 1 brittle UI assertion failed and was fixed
+  - `vendor/bin/pest --parallel --compact --filter='(MemberInvitationUiTest|MemberInvitationActionsTest|AhliPanelInstitutionEditingTest|FilamentPanelAccessTest|AdminResourcesCoverageTest)'` => 43 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+
+# Scoped Invitation Permissions
+
+- [x] Split member invitation authorization away from generic `manageMembers` so only scoped subject managers can invite
+- [x] Add or expose Ahli subject surfaces for institution, speaker, event, and reference invitation workflows
+- [x] Prevent local invitation flows from assigning protected owner / organizer roles
+- [x] Add focused regression coverage for scoped-only invitation access and Ahli panel visibility
+- [x] Run focused Rector, PHPStan, Pest, and Pint verification for the invitation permission batch
+
+## Scoped Invitation Permissions Review
+
+- Replaced the invitation relation manager's `manageMembers` gate with a dedicated `MemberInvitationGate`, so global roles no longer inherit invitation access through Spatie's gate hook while scoped institution/speaker/event/reference managers still can.
+- Filtered local invitation role choices to non-protected roles only and hardened `InviteSubjectMember` so invite creation rejects protected `owner` / `organizer` targets even if called outside the UI.
+- Exposed invitation management on Ahli institution editing and added Ahli speaker/reference resources so scoped members now have real non-admin invitation surfaces across all four subject types.
+- Extended Ahli panel access to reference members and added focused regression coverage for scoped invitation creation, global-role exclusion, Ahli speaker/reference access, and reference Ahli visibility.
+- Verification:
+  - `vendor/bin/rector process app/Support/Authz/MemberRoleCatalog.php app/Support/Authz/MemberInvitationGate.php app/Actions/Membership/InviteSubjectMember.php app/Filament/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Ahli/Resources/Institutions/InstitutionResource.php app/Filament/Ahli/Resources/Speakers/SpeakerResource.php app/Filament/Ahli/Resources/Speakers/Pages/ListSpeakers.php app/Filament/Ahli/Resources/Speakers/Pages/ViewSpeaker.php app/Filament/Ahli/Resources/Speakers/Pages/EditSpeaker.php app/Filament/Ahli/Resources/References/ReferenceResource.php app/Filament/Ahli/Resources/References/Pages/ListReferences.php app/Filament/Ahli/Resources/References/Pages/EditReference.php app/Models/User.php tests/Feature/MemberInvitationActionsTest.php tests/Feature/MemberInvitationUiTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/FilamentPanelAccessTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Support/Authz/MemberRoleCatalog.php app/Support/Authz/MemberInvitationGate.php app/Actions/Membership/InviteSubjectMember.php app/Filament/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Ahli/Resources/Institutions/InstitutionResource.php app/Filament/Ahli/Resources/Speakers/SpeakerResource.php app/Filament/Ahli/Resources/Speakers/Pages/ListSpeakers.php app/Filament/Ahli/Resources/Speakers/Pages/ViewSpeaker.php app/Filament/Ahli/Resources/Speakers/Pages/EditSpeaker.php app/Filament/Ahli/Resources/References/ReferenceResource.php app/Filament/Ahli/Resources/References/Pages/ListReferences.php app/Filament/Ahli/Resources/References/Pages/EditReference.php app/Models/User.php tests/Feature/MemberInvitationActionsTest.php tests/Feature/MemberInvitationUiTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/FilamentPanelAccessTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(MemberInvitationActionsTest|MemberInvitationUiTest|AhliPanelInstitutionEditingTest|FilamentPanelAccessTest|AdminResourcesCoverageTest)'` => 39 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+
+# Member Invitation UI
+
+- [x] Add reusable admin invitation management UI on the existing subject member surfaces
+- [x] Add an authenticated invitation acceptance page backed by the existing invitation actions
+- [x] Add focused tests for admin invite/revoke flows and invitee acceptance flows
+- [x] Run focused Rector, PHPStan, Pest, and Pint verification for the invitation UI batch
+
+## Member Invitation UI Review
+
+- Added reusable `MemberInvitationsRelationManager` support and registered invitation management on institution, speaker, event, and reference resources so admins can create, inspect, copy, and revoke member invitations from the same subject-management surfaces as memberships.
+- Added subject-scoped `memberInvitations()` relations on institution, speaker, event, and reference models so invitation management now rides real owner-model relations instead of ad-hoc queries.
+- Added `ResolveMemberInvitationByTokenAction` plus a new authenticated `ShowInvitation` Livewire page at `member-invitations.show`, which makes invitation tokens usable from the frontend and routes acceptance back through the existing shared invitation and membership actions.
+- Hardened invitation acceptance for users without an email address so the action now returns a validation error instead of failing on a null email comparison.
+- Scope note: this batch ships end-to-end invitation management and acceptance UI, but delivery is still manual. Admins currently copy/share the invitation link from the relation manager; no outbound email notification has been added yet.
+- Verification:
+  - `vendor/bin/rector process app/Actions/Membership/AcceptSubjectMemberInvitation.php app/Actions/Membership/ResolveMemberInvitationByTokenAction.php app/Filament/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Institutions/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Events/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/References/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Institutions/InstitutionResource.php app/Filament/Resources/Speakers/SpeakerResource.php app/Filament/Resources/Events/EventResource.php app/Filament/Resources/References/ReferenceResource.php app/Filament/Ahli/Resources/Events/EventResource.php app/Models/Institution.php app/Models/Speaker.php app/Models/Event.php app/Models/Reference.php app/Livewire/Pages/Membership/ShowInvitation.php tests/Feature/MemberInvitationActionsTest.php tests/Feature/MemberInvitationUiTest.php tests/Feature/AdminResourcesCoverageTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Membership/AcceptSubjectMemberInvitation.php app/Actions/Membership/ResolveMemberInvitationByTokenAction.php app/Filament/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Institutions/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Speakers/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Events/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/References/RelationManagers/MemberInvitationsRelationManager.php app/Filament/Resources/Institutions/InstitutionResource.php app/Filament/Resources/Speakers/SpeakerResource.php app/Filament/Resources/Events/EventResource.php app/Filament/Resources/References/ReferenceResource.php app/Filament/Ahli/Resources/Events/EventResource.php app/Models/Institution.php app/Models/Speaker.php app/Models/Event.php app/Models/Reference.php app/Livewire/Pages/Membership/ShowInvitation.php tests/Feature/MemberInvitationActionsTest.php tests/Feature/MemberInvitationUiTest.php tests/Feature/AdminResourcesCoverageTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(MemberInvitationActionsTest|MemberInvitationUiTest|AdminResourcesCoverageTest|MemberRoleModalHydrationTest)'` => 16 passed
+  - `vendor/bin/pint --dirty --format agent` => fixed imports/formatting
+
 # Contribution Pending Lookup Extraction
 
 - [x] Reuse the shared contribution entity metadata action in create-request creation

@@ -9,6 +9,7 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\MemberSubjectType;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\ScheduleKind;
@@ -460,6 +461,15 @@ class Event extends Model implements AuditableContract, HasMedia
             ->using(EventUser::class)
             ->withPivot(['joined_at'])
             ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<MemberInvitation, $this>
+     */
+    public function memberInvitations(): HasMany
+    {
+        return $this->hasMany(MemberInvitation::class, 'subject_id')
+            ->where('subject_type', MemberSubjectType::Event->value);
     }
 
     /**

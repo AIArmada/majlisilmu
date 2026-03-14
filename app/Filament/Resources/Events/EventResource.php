@@ -9,6 +9,7 @@ use App\Filament\Resources\Events\Pages\ViewEvent;
 use App\Filament\Resources\Events\RelationManagers\ChildEventsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\MediaLinksRelationManager;
+use App\Filament\Resources\Events\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
 use App\Filament\Resources\Events\Schemas\EventForm;
@@ -78,6 +79,7 @@ class EventResource extends Resource
             ChildEventsRelationManager::class,
             MediaLinksRelationManager::class,
             EventUsersRelationManager::class,
+            MemberInvitationsRelationManager::class,
             ModerationReviewsRelationManager::class,
             RegistrationsRelationManager::class,
         ];

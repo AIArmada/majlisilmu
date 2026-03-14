@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Enums\InstitutionType;
+use App\Enums\MemberSubjectType;
 use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasContacts;
 use App\Models\Concerns\HasDonationChannels;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasLanguages;
+use App\Models\Concerns\HasSocialMedia;
 use Database\Factories\InstitutionFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,7 +30,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Institution extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<InstitutionFactory> */
-    use \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -95,6 +97,15 @@ class Institution extends Model implements AuditableContract, HasMedia
     {
         return $this->belongsToMany(User::class, 'institution_user')
             ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<MemberInvitation, $this>
+     */
+    public function memberInvitations(): HasMany
+    {
+        return $this->hasMany(MemberInvitation::class, 'subject_id')
+            ->where('subject_type', MemberSubjectType::Institution->value);
     }
 
     /**

@@ -4,6 +4,7 @@ use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use Filament\Panel;
@@ -17,7 +18,7 @@ beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
 
-it('denies ahli panel access to users without any institution, speaker, or event membership', function () {
+it('denies ahli panel access to users without any institution, speaker, reference, or event membership', function () {
     $user = User::factory()->create();
 
     expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeFalse();
@@ -37,6 +38,15 @@ it('allows ahli panel access to speaker members', function () {
     $speaker = Speaker::factory()->create();
 
     $speaker->members()->syncWithoutDetaching([$user->id]);
+
+    expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeTrue();
+});
+
+it('allows ahli panel access to reference members', function () {
+    $user = User::factory()->create();
+    $reference = Reference::factory()->create();
+
+    $reference->members()->syncWithoutDetaching([$user->id]);
 
     expect($user->canAccessPanel(Panel::make()->id('ahli')))->toBeTrue();
 });

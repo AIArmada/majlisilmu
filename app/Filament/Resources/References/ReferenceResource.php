@@ -6,6 +6,7 @@ use App\Filament\Resources\References\Pages\CreateReference;
 use App\Filament\Resources\References\Pages\EditReference;
 use App\Filament\Resources\References\Pages\ListReferences;
 use App\Filament\Resources\References\RelationManagers\EventsRelationManager;
+use App\Filament\Resources\References\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\References\RelationManagers\MembersRelationManager;
 use App\Filament\Resources\References\Schemas\ReferenceForm;
 use App\Filament\Resources\References\Tables\ReferencesTable;
@@ -45,6 +46,7 @@ class ReferenceResource extends Resource
         return [
             EventsRelationManager::class,
             MembersRelationManager::class,
+            MemberInvitationsRelationManager::class,
         ];
     }
 
