@@ -176,6 +176,39 @@ it('approves staged institution create requests through the action layer without
         ->and($institution->fresh()->status)->toBe('verified');
 });
 
+it('approves staged create requests when the proposer relation is missing', function () {
+    $proposer = User::factory()->create();
+    $reviewer = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Missing Proposer',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $request = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Create,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->id,
+        'proposer_id' => $proposer->id,
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'name' => $institution->name,
+            'type' => 'masjid',
+        ],
+    ]);
+
+    $proposer->delete();
+    $request->refresh();
+
+    expect($request->proposer)->toBeNull();
+
+    $approvedRequest = ApproveContributionRequestAction::run($request, $reviewer, 'Approved without proposer.');
+
+    expect($approvedRequest->status)->toBe(ContributionRequestStatus::Approved)
+        ->and($institution->fresh()->status)->toBe('verified');
+});
+
 it('cancels pending contribution requests through the action layer', function () {
     $proposer = User::factory()->create();
 

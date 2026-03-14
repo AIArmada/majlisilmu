@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Events;
 
+use App\Actions\Events\RecordEventCheckInAction;
 use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
@@ -18,7 +19,6 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\CalendarService;
-use App\Services\Notifications\EventNotificationService;
 use App\Services\ShareTrackingService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
@@ -321,12 +321,15 @@ class Show extends Component
             return;
         }
 
-        $alreadyCheckedIn = EventCheckin::query()
-            ->where('event_id', $this->event->id)
-            ->where('user_id', $user->id)
-            ->exists();
+        $checkinResult = app(RecordEventCheckInAction::class)->handle(
+            $this->event,
+            $user,
+            $state['registration_id'],
+            $state['method'],
+            request(),
+        );
 
-        if ($alreadyCheckedIn) {
+        if ($checkinResult['status'] === 'duplicate') {
             $this->isCheckedIn = true;
 
             FilamentNotification::make()
@@ -336,30 +339,6 @@ class Show extends Component
 
             return;
         }
-
-        $checkin = EventCheckin::query()->create([
-            'event_id' => $this->event->id,
-            'registration_id' => $state['registration_id'],
-            'user_id' => $user->id,
-            'method' => $state['method'],
-            'checked_in_at' => now(),
-        ]);
-
-        app(ShareTrackingService::class)->recordOutcome(
-            type: DawahShareOutcomeType::EventCheckin,
-            outcomeKey: 'event_checkin:checkin:'.$checkin->id,
-            subject: $this->event,
-            actor: $user,
-            request: request(),
-            metadata: [
-                'checkin_id' => $checkin->id,
-                'registration_id' => $checkin->registration_id,
-                'method' => $checkin->method,
-            ],
-        );
-
-        app(EventNotificationService::class)
-            ->notifyCheckinConfirmed($checkin);
 
         $this->isCheckedIn = true;
         unset($this->checkInState);

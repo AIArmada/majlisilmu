@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\DawahShareOutcomeType;
+use App\Actions\SavedSearches\CreateSavedSearchAction;
+use App\Actions\SavedSearches\ExecuteSavedSearchAction;
+use App\Actions\SavedSearches\UpdateSavedSearchAction;
 use App\Enums\EventKeyPersonRole;
+use App\Exceptions\SavedSearchLimitReachedException;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
-use App\Services\EventSearchService;
-use App\Services\ShareTrackingService;
-use App\Services\Signals\ProductSignalsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -18,12 +18,6 @@ use Illuminate\Validation\Rule;
 
 class SavedSearchController extends Controller
 {
-    public function __construct(
-        protected EventSearchService $searchService,
-        protected ShareTrackingService $shareTrackingService,
-        protected ProductSignalsService $productSignalsService,
-    ) {}
-
     /**
      * List all saved searches for the authenticated user.
      */
@@ -41,7 +35,7 @@ class SavedSearchController extends Controller
     /**
      * Create a new saved search.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, CreateSavedSearchAction $createSavedSearchAction): JsonResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:100',
@@ -81,42 +75,23 @@ class SavedSearchController extends Controller
             'notify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
         ]);
 
-        // Check limit (max 10 saved searches per user)
-        $count = SavedSearch::where('user_id', Auth::id())->count();
-        if ($count >= 10) {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        try {
+            $savedSearch = $createSavedSearchAction->handle($user, $validated, $request);
+        } catch (SavedSearchLimitReachedException $exception) {
             return response()->json([
-                'message' => 'Maximum saved searches limit reached (10).',
+                'message' => 'Maximum saved searches limit reached ('.$exception->maximum.').',
                 'error' => [
                     'code' => 'validation_error',
                     'message' => 'Limit reached',
                 ],
             ], 422);
         }
-
-        $savedSearch = SavedSearch::create([
-            'user_id' => Auth::id(),
-            'name' => $validated['name'],
-            'query' => $validated['query'] ?? null,
-            'filters' => $validated['filters'] ?? null,
-            'radius_km' => $validated['radius_km'] ?? null,
-            'lat' => $validated['lat'] ?? null,
-            'lng' => $validated['lng'] ?? null,
-            'notify' => $validated['notify'],
-        ]);
-
-        /** @var User $user */
-        $user = $request->user();
-
-        $this->shareTrackingService->recordOutcome(
-            type: DawahShareOutcomeType::SavedSearchCreated,
-            outcomeKey: 'saved_search_created:saved_search:'.$savedSearch->id,
-            subject: null,
-            actor: $user,
-            request: $request,
-            metadata: [
-                'saved_search_id' => $savedSearch->id,
-            ],
-        );
 
         return response()->json([
             'message' => 'Saved search created.',
@@ -139,8 +114,11 @@ class SavedSearchController extends Controller
     /**
      * Update a saved search.
      */
-    public function update(Request $request, SavedSearch $savedSearch): JsonResponse
-    {
+    public function update(
+        Request $request,
+        SavedSearch $savedSearch,
+        UpdateSavedSearchAction $updateSavedSearchAction,
+    ): JsonResponse {
         $this->authorize('update', $savedSearch);
 
         $validated = $request->validate([
@@ -178,14 +156,14 @@ class SavedSearchController extends Controller
             'radius_km' => 'nullable|integer|min:1|max:1000',
             'lat' => 'nullable|numeric|between:-90,90',
             'lng' => 'nullable|numeric|between:-180,180',
-            'notify' => ['nullable', Rule::in(['off', 'instant', 'daily', 'weekly'])],
+            'notify' => ['sometimes', 'required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
         ]);
 
-        $savedSearch->update($validated);
+        $savedSearch = $updateSavedSearchAction->handle($savedSearch, $validated);
 
         return response()->json([
             'message' => 'Saved search updated.',
-            'data' => $savedSearch->fresh(),
+            'data' => $savedSearch,
         ]);
     }
 
@@ -204,44 +182,11 @@ class SavedSearchController extends Controller
     /**
      * Execute a saved search and return results.
      */
-    public function execute(SavedSearch $savedSearch): JsonResponse
+    public function execute(SavedSearch $savedSearch, ExecuteSavedSearchAction $executeSavedSearchAction): JsonResponse
     {
         $this->authorize('view', $savedSearch);
 
-        $filters = $savedSearch->filters ?? [];
-
-        // Add geo if set
-        if ($savedSearch->lat && $savedSearch->lng && $savedSearch->radius_km) {
-            $events = $this->searchService->searchNearby(
-                lat: $savedSearch->lat,
-                lng: $savedSearch->lng,
-                radiusKm: $savedSearch->radius_km,
-                filters: $filters,
-                perPage: 20
-            );
-        } else {
-            $events = $this->searchService->search(
-                query: $savedSearch->query,
-                filters: $filters,
-                perPage: 20
-            );
-        }
-
-        $user = request()->user();
-
-        $this->productSignalsService->recordSearchExecuted(
-            user: $user instanceof User ? $user : null,
-            request: request(),
-            surface: 'saved_search.execute',
-            query: $savedSearch->query,
-            filters: array_merge($filters, array_filter([
-                'lat' => $savedSearch->lat,
-                'lng' => $savedSearch->lng,
-                'radius_km' => $savedSearch->radius_km,
-            ], static fn (mixed $value): bool => $value !== null)),
-            resultCount: $events->total(),
-            savedSearchId: (string) $savedSearch->getKey(),
-        );
+        $events = $executeSavedSearchAction->handle($savedSearch, request());
 
         return response()->json([
             'data' => $events->items(),

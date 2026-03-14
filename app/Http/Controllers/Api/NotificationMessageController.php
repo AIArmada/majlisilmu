@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Notifications\MarkAllNotificationMessagesReadAction;
+use App\Actions\Notifications\MarkNotificationMessageReadAction;
 use App\Enums\NotificationFamily;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationMessage;
 use App\Models\User;
-use App\Services\Signals\ProductSignalsService;
 use App\Support\Notifications\NotificationCatalog;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
@@ -16,10 +17,6 @@ use Illuminate\Http\Request;
 
 class NotificationMessageController extends Controller
 {
-    public function __construct(
-        private readonly ProductSignalsService $productSignalsService,
-    ) {}
-
     public function index(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -50,39 +47,22 @@ class NotificationMessageController extends Controller
         ]);
     }
 
-    public function read(Request $request, string $message): JsonResponse
-    {
-        $notification = $this->currentUser($request)
-            ->notificationMessages()
-            ->visibleInInbox()
-            ->whereKey($message)
-            ->firstOrFail();
-
-        $wasUnread = $notification->read_at === null;
-
-        $notification->markAsRead();
-
-        if ($wasUnread) {
-            $this->productSignalsService->recordNotificationRead($notification->fresh(), $this->currentUser($request), $request);
-        }
+    public function read(
+        Request $request,
+        string $message,
+        MarkNotificationMessageReadAction $markNotificationMessageReadAction,
+    ): JsonResponse {
+        $notification = $markNotificationMessageReadAction->handle($this->currentUser($request), $message, $request);
 
         return response()->json([
             'message' => __('notifications.api.read_success'),
-            'data' => $this->messageData($notification->fresh()),
+            'data' => $this->messageData($notification),
         ]);
     }
 
-    public function readAll(Request $request): JsonResponse
+    public function readAll(Request $request, MarkAllNotificationMessagesReadAction $markAllNotificationMessagesReadAction): JsonResponse
     {
-        $user = $this->currentUser($request);
-
-        $updated = $user
-            ->notificationMessages()
-            ->visibleInInbox()
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
-
-        $this->productSignalsService->recordNotificationsReadAll($user, $updated, $request);
+        $updated = $markAllNotificationMessagesReadAction->handle($this->currentUser($request), $request);
 
         return response()->json([
             'message' => __('notifications.api.read_all_success'),

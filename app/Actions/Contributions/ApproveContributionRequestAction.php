@@ -147,6 +147,10 @@ class ApproveContributionRequestAction
 
     private function attachAsOwner(?User $user, Institution|Speaker $entity): void
     {
+        if (! $user instanceof User) {
+            return;
+        }
+
         $this->assignOwnerToNewSubject->handle($entity, $user);
     }
 }

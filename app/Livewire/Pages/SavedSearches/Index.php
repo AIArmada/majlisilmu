@@ -2,7 +2,8 @@
 
 namespace App\Livewire\Pages\SavedSearches;
 
-use App\Enums\DawahShareOutcomeType;
+use App\Actions\SavedSearches\CreateSavedSearchAction;
+use App\Actions\SavedSearches\UpdateSavedSearchAction;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -11,6 +12,7 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\NotificationFrequency;
 use App\Enums\TimingMode;
+use App\Exceptions\SavedSearchLimitReachedException;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\District;
 use App\Models\Institution;
@@ -20,8 +22,8 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Venue;
-use App\Services\ShareTrackingService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -123,7 +125,7 @@ class Index extends Component
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             abort(403);
         }
 
@@ -136,32 +138,21 @@ class Index extends Component
             'lng' => ['nullable', 'required_with:radius_km', 'numeric', 'between:-180,180'],
         ]);
 
-        if ($user->savedSearches()->count() >= 10) {
+        try {
+            app(CreateSavedSearchAction::class)->handle($user, [
+                'name' => $validated['name'],
+                'query' => $validated['query'] ?? null,
+                'filters' => $this->filters,
+                'radius_km' => $validated['radius_km'] ?? null,
+                'lat' => $validated['lat'] ?? null,
+                'lng' => $validated['lng'] ?? null,
+                'notify' => $validated['notify'],
+            ], request());
+        } catch (SavedSearchLimitReachedException) {
             $this->addError('name', __('You can only keep up to 10 saved searches.'));
 
             return;
         }
-
-        $savedSearch = $user->savedSearches()->create([
-            'name' => $validated['name'],
-            'query' => $validated['query'] ?? null,
-            'filters' => $this->filters === [] ? null : $this->filters,
-            'radius_km' => $validated['radius_km'] ?? null,
-            'lat' => isset($validated['lat']) ? (float) $validated['lat'] : null,
-            'lng' => isset($validated['lng']) ? (float) $validated['lng'] : null,
-            'notify' => $validated['notify'],
-        ]);
-
-        app(ShareTrackingService::class)->recordOutcome(
-            type: DawahShareOutcomeType::SavedSearchCreated,
-            outcomeKey: 'saved_search_created:saved_search:'.$savedSearch->id,
-            subject: null,
-            actor: $user,
-            request: request(),
-            metadata: [
-                'saved_search_id' => $savedSearch->id,
-            ],
-        );
 
         $this->reset(['name', 'query', 'radius_km', 'lat', 'lng']);
         $this->notify = 'daily';
@@ -174,7 +165,7 @@ class Index extends Component
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             abort(403);
         }
 
@@ -188,7 +179,7 @@ class Index extends Component
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             abort(403);
         }
 
@@ -210,7 +201,7 @@ class Index extends Component
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             abort(403);
         }
 
@@ -220,7 +211,7 @@ class Index extends Component
         ]);
 
         $savedSearch = $user->savedSearches()->where('id', $savedSearchId)->firstOrFail();
-        $savedSearch->update([
+        app(UpdateSavedSearchAction::class)->handle($savedSearch, [
             'name' => $validated['editName'],
             'notify' => $validated['editNotify'],
         ]);

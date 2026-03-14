@@ -1,3 +1,65 @@
+# Contribution Approval and Registration Review Fixes
+
+- [x] Restore nullable-proposer safety in contribution approval owner assignment
+- [x] Restore registration availability for unlisted events when registration is enabled
+- [x] Add regression coverage for missing proposer approval and unlisted event registration
+- [x] Run focused Rector, PHPStan, Pest, and Pint verification for the touched paths
+
+## Contribution Approval and Registration Review Fixes Review
+
+- Restored the explicit nullable proposer guard in `ApproveContributionRequestAction` before delegating to `AssignOwnerToNewSubject`, so approving staged create requests still verifies the entity even when the proposer relation has gone missing.
+- Removed the accidental public-only visibility gate from `RegisterForEventAction`, which returns registration eligibility to the pre-action behavior for approved or pending events with registration enabled, including unlisted events.
+- Added a contribution workflow regression proving a staged create request can still be approved after the proposer user has been deleted, and added an event registration regression proving unlisted events can still accept registrations.
+- Verification:
+  - `vendor/bin/rector process app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Events/RegisterForEventAction.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/EventRegistrationSafetyTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Events/RegisterForEventAction.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/EventRegistrationSafetyTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(ContributionWorkflowActionsTest|EventRegistrationSafetyTest)'` => 20 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+
+# Workflow Action Extraction Batch
+
+- [x] Extract shared notification read and read-all mutations into reusable Laravel Actions
+- [x] Extract event self-check-in recording into a reusable Laravel Action
+- [x] Extract public event registration orchestration into a reusable Laravel Action
+- [x] Rewire the existing API controllers and Livewire pages around those actions
+- [x] Add focused regression coverage for authenticated registration without contact details
+- [x] Run focused Rector, PHPStan, Pest, and Pint verification for the workflow batch
+
+## Workflow Action Extraction Batch Review
+
+- Added `MarkNotificationMessageReadAction` and `MarkAllNotificationMessagesReadAction` so notification inbox mutations and product-signal side effects now live in shared actions used by both the API notification controller and the dashboard Livewire inbox page.
+- Added `RecordEventCheckInAction` so the event page no longer creates check-ins, records share outcomes, and dispatches confirmation notifications inline; the page now keeps only check-in eligibility and UI messaging.
+- Added `RegisterForEventAction` so public event registration now centralizes availability checks, guest contact requirements, capacity enforcement, duplicate detection, transactional registration creation, counter sync, share tracking, and confirmation notification dispatch.
+- Rewired `app/Http/Controllers/Api/NotificationMessageController.php`, `app/Livewire/Pages/Dashboard/NotificationsIndex.php`, `app/Livewire/Pages/Events/Show.php`, and `app/Http/Controllers/Public/EventsController.php` around the new actions, leaving those entrypoints focused on validation, authorization, redirects, and UI responses.
+- Added a regression in `tests/Feature/EventRegistrationSafetyTest.php` proving authenticated users can still register without email or phone after the registration workflow moved into an action.
+- I deliberately stopped short of actionizing the event page save/interest/going toggles in this batch. Save and interest already have API-side actions, but the page still carries slightly different product rules and local state updates, so forcing that unification now would be more ceremony than gain.
+- Verification:
+  - `vendor/bin/rector process app/Actions/Notifications app/Actions/Events/RecordEventCheckInAction.php app/Actions/Events/RegisterForEventAction.php app/Http/Controllers/Api/NotificationMessageController.php app/Livewire/Pages/Dashboard/NotificationsIndex.php app/Livewire/Pages/Events/Show.php app/Http/Controllers/Public/EventsController.php tests/Feature/EventRegistrationSafetyTest.php` => pass, 1 file changed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Notifications app/Actions/Events/RecordEventCheckInAction.php app/Actions/Events/RegisterForEventAction.php app/Http/Controllers/Api/NotificationMessageController.php app/Livewire/Pages/Dashboard/NotificationsIndex.php app/Livewire/Pages/Events/Show.php app/Http/Controllers/Public/EventsController.php tests/Feature/NotificationPreferencesTest.php tests/Feature/ProductSignalsTelemetryTest.php tests/Feature/EventCheckInTest.php tests/Feature/EventRegistrationSafetyTest.php tests/Feature/DawahShareImpactTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(NotificationPreferencesTest|ProductSignalsTelemetryTest|EventCheckInTest|EventRegistrationSafetyTest|DawahShareImpactTest)'` => 51 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+
+# Saved Search Action Extraction
+
+- [x] Audit the saved-search page and API for duplicated workflow that is worth turning into Laravel Actions
+- [x] Extract the saved-search create, update, and execute workflows into dedicated action classes
+- [x] Rewire the saved-search Livewire page and API controller around the new actions
+- [x] Add focused regression coverage for the shared max-10 rule on the Livewire page
+- [x] Run focused Rector, PHPStan, Pest, and Pint verification for the saved-search batch
+
+## Saved Search Action Extraction Review
+
+- Added `CreateSavedSearchAction`, `UpdateSavedSearchAction`, and `ExecuteSavedSearchAction` so saved-search mutation and execution workflows now live in reusable Laravel Actions instead of inline controller and Livewire orchestration.
+- Added `SavedSearchLimitReachedException` so the shared max-10 rule is enforced in one place while the Livewire page and API still keep their own user-facing error presentation.
+- Rewired `app/Livewire/Pages/SavedSearches/Index.php` to delegate create and update workflows to the new actions while keeping page-specific auth, validation, form state, and toast behavior local to the component.
+- Rewired `app/Http/Controllers/Api/SavedSearchController.php` so store, update, and execute now delegate to actions, leaving the controller focused on validation, authorization, and HTTP responses.
+- Added a Livewire regression in `tests/Feature/SavedSearchPageTest.php` to prove the shared max-10 rule still applies on the saved-search page after moving creation into an action.
+- Verification:
+  - `vendor/bin/rector process app/Actions/SavedSearches app/Exceptions/SavedSearchLimitReachedException.php app/Http/Controllers/Api/SavedSearchController.php app/Livewire/Pages/SavedSearches/Index.php tests/Feature/SavedSearchApiTest.php tests/Feature/SavedSearchPageTest.php tests/Feature/ProductSignalsTelemetryTest.php tests/Feature/UiFeedbackExperienceTest.php` => pass, 2 files changed
+  - `vendor/bin/phpstan analyse --ansi app/Actions/SavedSearches app/Exceptions/SavedSearchLimitReachedException.php app/Http/Controllers/Api/SavedSearchController.php app/Livewire/Pages/SavedSearches/Index.php tests/Feature/SavedSearchApiTest.php tests/Feature/SavedSearchPageTest.php tests/Feature/ProductSignalsTelemetryTest.php tests/Feature/UiFeedbackExperienceTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(SavedSearchApiTest|SavedSearchPageTest|ProductSignalsTelemetryTest|UiFeedbackExperienceTest)'` => 57 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+
 # Full Project Verification Sweep
 
 - [x] Run `php artisan migrate:fresh --seed`
