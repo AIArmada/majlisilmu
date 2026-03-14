@@ -2,6 +2,12 @@
 
 namespace App\Livewire\Pages\Contributions;
 
+use App\Actions\Contributions\ApplyDirectContributionUpdateAction;
+use App\Actions\Contributions\ResolveContributionChangedPayloadAction;
+use App\Actions\Contributions\ResolveContributionSubjectPresentationAction;
+use App\Actions\Contributions\ResolveContributionSubmissionStateAction;
+use App\Actions\Contributions\ResolveContributionUpdateContextAction;
+use App\Actions\Contributions\SubmitContributionUpdateRequestAction;
 use App\Enums\ContributionRequestStatus;
 use App\Forms\EventContributionFormSchema;
 use App\Forms\InstitutionContributionFormSchema;
@@ -14,18 +20,11 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
-use App\Services\ContributionEntityMutationService;
-use App\Services\ContributionWorkflowService;
-use App\Services\ModerationService;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Contracts\Support\Arrayable;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -44,10 +43,28 @@ class SuggestUpdate extends Component implements HasForms
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    public function mount(string $subjectType, string $subjectId): void
-    {
+    /** @var array<string, mixed> */
+    public array $originalData = [];
+
+    /** @var array{subject_label: string, redirect_url: string} */
+    public array $subjectPresentation = [
+        'subject_label' => '',
+        'redirect_url' => '',
+    ];
+
+    public function mount(
+        string $subjectType,
+        string $subjectId,
+        ResolveContributionUpdateContextAction $resolveContributionUpdateContextAction,
+        ResolveContributionSubjectPresentationAction $resolveContributionSubjectPresentationAction,
+    ): void {
         $this->subjectType = $subjectType;
-        $this->entity = $this->resolveEntity($subjectType, $subjectId);
+
+        $context = $resolveContributionUpdateContextAction->handle($subjectType, $subjectId);
+
+        $this->entity = $context['entity'];
+        $this->originalData = $context['initial_state'];
+        $this->subjectPresentation = $resolveContributionSubjectPresentationAction->handle($this->entity);
 
         $user = auth()->user();
 
@@ -58,7 +75,7 @@ class SuggestUpdate extends Component implements HasForms
             abort(403, $user->directoryFeedbackBanMessage());
         }
 
-        $this->contributionForm()->fill($this->initialState());
+        $this->contributionForm()->fill($this->originalData);
     }
 
     #[Computed]
@@ -108,9 +125,10 @@ class SuggestUpdate extends Component implements HasForms
     }
 
     public function submit(
-        ContributionWorkflowService $workflow,
-        ModerationService $moderationService,
-        ContributionEntityMutationService $entityMutationService,
+        ApplyDirectContributionUpdateAction $applyDirectContributionUpdateAction,
+        ResolveContributionChangedPayloadAction $resolveContributionChangedPayloadAction,
+        ResolveContributionSubmissionStateAction $resolveContributionSubmissionStateAction,
+        SubmitContributionUpdateRequestAction $submitContributionUpdateRequestAction,
     ): void {
         $user = auth()->user();
 
@@ -120,14 +138,10 @@ class SuggestUpdate extends Component implements HasForms
             abort(403, $user->directoryFeedbackBanMessage());
         }
 
-        $state = $this->contributionForm()->getState();
-        $note = isset($state['proposer_note']) && is_string($state['proposer_note'])
-            ? trim($state['proposer_note'])
-            : null;
+        $submissionState = $resolveContributionSubmissionStateAction->handle($this->contributionForm()->getState());
+        $state = $submissionState['state'];
 
-        unset($state['proposer_note']);
-
-        $changes = $this->changedPayload($state);
+        $changes = $resolveContributionChangedPayloadAction->handle($state, $this->originalData);
 
         if ($changes === []) {
             $this->addError('data', __('Make at least one change before continuing.'));
@@ -136,22 +150,18 @@ class SuggestUpdate extends Component implements HasForms
         }
 
         if ($this->canDirectEdit()) {
-            $dirtyBeforeSave = $entityMutationService->apply($this->entity, $changes);
+            $applyDirectContributionUpdateAction->handle($this->entity, $changes);
 
-            if ($this->entity instanceof Event && $dirtyBeforeSave !== []) {
-                $moderationService->handleSensitiveChange($this->entity, $dirtyBeforeSave);
-            }
-
-            $this->redirect($this->entityUrl(), navigate: true);
+            $this->redirect($this->subjectPresentation['redirect_url'], navigate: true);
 
             return;
         }
 
-        $workflow->submitUpdateRequest(
+        $submitContributionUpdateRequestAction->handle(
             $this->entity,
             $user,
             $changes,
-            $note !== '' ? $note : null,
+            $submissionState['proposer_note'],
         );
 
         $this->redirect(route('contributions.index'), navigate: true);
@@ -177,104 +187,11 @@ class SuggestUpdate extends Component implements HasForms
         };
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function initialState(): array
-    {
-        return app(ContributionEntityMutationService::class)->stateFor($this->entity);
-    }
-
-    /**
-     * @param  array<string, mixed>  $state
-     * @return array<string, mixed>
-     */
-    private function changedPayload(array $state): array
-    {
-        $original = $this->initialState();
-        $changes = [];
-
-        foreach ($state as $key => $value) {
-            if (! array_key_exists($key, $original)) {
-                continue;
-            }
-
-            if ($this->valuesEqual($value, $original[$key])) {
-                continue;
-            }
-
-            $changes[$key] = $value;
-        }
-
-        return $changes;
-    }
-
-    private function valuesEqual(mixed $left, mixed $right): bool
-    {
-        return json_encode($this->normalizeComparable($left)) === json_encode($this->normalizeComparable($right));
-    }
-
-    private function normalizeComparable(mixed $value): mixed
-    {
-        if ($value instanceof Carbon) {
-            return $value->toISOString();
-        }
-
-        if ($value instanceof \BackedEnum) {
-            return $value->value;
-        }
-
-        if ($value instanceof Arrayable) {
-            return $this->normalizeComparable($value->toArray());
-        }
-
-        if (is_array($value)) {
-            return array_map(fn (mixed $item): mixed => $this->normalizeComparable($item), $value);
-        }
-
-        return $value;
-    }
-
-    private function resolveEntity(string $subjectType, string $subjectId): Event|Institution|Reference|Speaker
-    {
-        return match ($subjectType) {
-            'event' => $this->resolveSlugOrUuid(Event::query(), 'events.slug', $subjectId),
-            'institution' => $this->resolveSlugOrUuid(Institution::query(), 'institutions.slug', $subjectId),
-            'speaker' => $this->resolveSlugOrUuid(Speaker::query(), 'speakers.slug', $subjectId),
-            'reference' => $this->resolveReference($subjectId),
-            default => abort(404),
-        };
-    }
-
-    /**
-     * @template TModel of Event|Institution|Speaker
-     *
-     * @param  Builder<TModel>  $query
-     * @return TModel
-     */
-    private function resolveSlugOrUuid($query, string $slugColumn, string $subjectId): Event|Institution|Speaker
-    {
-        $query->where($slugColumn, $subjectId);
-
-        if (Str::isUuid($subjectId)) {
-            $query->orWhere($query->getModel()->getQualifiedKeyName(), $subjectId);
-        }
-
-        return $query->firstOrFail();
-    }
-
-    private function resolveReference(string $subjectId): Reference
-    {
-        abort_unless(Str::isUuid($subjectId), 404);
-
-        return Reference::query()->whereKey($subjectId)->firstOrFail();
-    }
-
     private function pageHeading(): string
     {
         return $this->canDirectEdit()
-            ? __('Update :subject', ['subject' => $this->subjectLabel()])
-            : __('Suggest an Update for :subject', ['subject' => $this->subjectLabel()]);
+            ? __('Update :subject', ['subject' => $this->subjectPresentation['subject_label']])
+            : __('Suggest an Update for :subject', ['subject' => $this->subjectPresentation['subject_label']]);
     }
 
     private function pageDescription(): string
@@ -282,26 +199,6 @@ class SuggestUpdate extends Component implements HasForms
         return $this->canDirectEdit()
             ? __('Your changes will be applied immediately because you already have maintainer access for this record.')
             : __('Your edits will be stored as a pending contribution request for maintainers to review.');
-    }
-
-    private function subjectLabel(): string
-    {
-        return match (true) {
-            $this->entity instanceof Institution => __('Institution'),
-            $this->entity instanceof Speaker => __('Speaker'),
-            $this->entity instanceof Reference => __('Reference'),
-            default => __('Event'),
-        };
-    }
-
-    private function entityUrl(): string
-    {
-        return match (true) {
-            $this->entity instanceof Institution => route('institutions.show', $this->entity),
-            $this->entity instanceof Speaker => route('speakers.show', $this->entity),
-            $this->entity instanceof Reference => route('references.show', $this->entity),
-            default => route('events.show', $this->entity),
-        };
     }
 
     protected function contributionForm(): Schema

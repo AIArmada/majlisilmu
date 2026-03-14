@@ -1,27 +1,34 @@
 <?php
 
-namespace App\Services;
+namespace App\Actions\Reports;
 
 use App\Models\Event;
 use App\Models\Report;
 use App\Models\User;
+use App\Services\ModerationService;
 use App\Services\Signals\ProductSignalsService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Lorisleiva\Actions\Concerns\AsAction;
+use RuntimeException;
 
-class ReportService
+class SubmitReportAction
 {
+    use AsAction;
+
     public function __construct(
         private readonly ModerationService $moderationService,
         private readonly ProductSignalsService $productSignalsService,
     ) {}
 
-    public function submit(
+    public function handle(
         Model $entity,
         string $entityType,
         ?User $reporter,
         string $reporterFingerprint,
         string $category,
         ?string $description = null,
+        ?Request $request = null,
     ): Report {
         $existingReport = Report::query()
             ->where('entity_type', $entityType)
@@ -31,7 +38,7 @@ class ReportService
             ->exists();
 
         if ($existingReport) {
-            throw new \RuntimeException('duplicate_report');
+            throw new RuntimeException('duplicate_report');
         }
 
         $report = Report::create([
@@ -44,7 +51,7 @@ class ReportService
             'status' => 'open',
         ]);
 
-        $this->productSignalsService->recordReportSubmitted($report, request());
+        $this->productSignalsService->recordReportSubmitted($report, $request ?? request());
 
         if (in_array($category, ['donation_scam', 'fake_speaker', 'fake_institution', 'fake_reference'], true)) {
             $this->handleHighRiskReport($entity, $report);

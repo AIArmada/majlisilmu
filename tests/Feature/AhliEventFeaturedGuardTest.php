@@ -144,3 +144,16 @@ it('ignores crafted ahli payloads that try to set featured on save', function ()
     expect($event->fresh()->is_featured)->toBeFalse()
         ->and($event->fresh()->escalated_at)->toBeNull();
 });
+
+it('persists ahli speaker updates through the shared event sync action', function () {
+    [$member, $event] = createAhliInstitutionAdmin();
+    $replacementSpeaker = Speaker::factory()->create();
+
+    Livewire::actingAs($member)
+        ->test(AhliEditEvent::class, ['record' => $event->id])
+        ->set('data.speakers', [$replacementSpeaker->id])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()->speakers->pluck('id')->all())->toBe([$replacementSpeaker->id]);
+});

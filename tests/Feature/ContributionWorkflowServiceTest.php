@@ -1,5 +1,9 @@
 <?php
 
+use App\Actions\Contributions\ApproveContributionRequestAction;
+use App\Actions\Contributions\CancelContributionRequestAction;
+use App\Actions\Contributions\SubmitContributionCreateRequestAction;
+use App\Actions\Contributions\SubmitContributionUpdateRequestAction;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
@@ -10,13 +14,12 @@ use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
-use App\Services\ContributionWorkflowService;
 use App\Support\Authz\MemberPermissionGate;
 
 it('stores pending institution create requests for authenticated proposers', function () {
     $proposer = User::factory()->create();
 
-    $request = app(ContributionWorkflowService::class)->submitCreateRequest(
+    $request = app(SubmitContributionCreateRequestAction::class)->handle(
         ContributionSubjectType::Institution,
         $proposer,
         [
@@ -102,7 +105,7 @@ it('approves institution create requests and promotes the proposer to owner', fu
         'original_data' => null,
     ]);
 
-    $approvedRequest = app(ContributionWorkflowService::class)->approve($request, $reviewer, 'Looks legitimate.');
+    $approvedRequest = app(ApproveContributionRequestAction::class)->handle($request, $reviewer, 'Looks legitimate.');
     $institution = Institution::findOrFail($approvedRequest->entity_id);
 
     expect($approvedRequest->status)->toBe(ContributionRequestStatus::Approved)
@@ -136,7 +139,7 @@ it('approves staged institution create requests without creating a duplicate rec
         ],
     ]);
 
-    app(ContributionWorkflowService::class)->approve($request, $reviewer, 'Looks legitimate.');
+    app(ApproveContributionRequestAction::class)->handle($request, $reviewer, 'Looks legitimate.');
 
     expect(Institution::query()->where('name', 'Masjid Pending')->count())->toBe(1)
         ->and($institution->fresh()->status)->toBe('verified');
@@ -150,7 +153,7 @@ it('captures original data for update requests and applies approved reference up
         'description' => 'Original description',
     ]);
 
-    $request = app(ContributionWorkflowService::class)->submitUpdateRequest(
+    $request = app(SubmitContributionUpdateRequestAction::class)->handle(
         $reference,
         $proposer,
         [
@@ -165,7 +168,7 @@ it('captures original data for update requests and applies approved reference up
         'description' => 'Original description',
     ]);
 
-    app(ContributionWorkflowService::class)->approve($request, $reviewer, 'Approved update.');
+    app(ApproveContributionRequestAction::class)->handle($request, $reviewer, 'Approved update.');
 
     $reference->refresh();
     $request->refresh();
@@ -183,7 +186,7 @@ it('applies structured institution updates through approval', function () {
         'status' => 'verified',
     ]);
 
-    $request = app(ContributionWorkflowService::class)->submitUpdateRequest(
+    $request = app(SubmitContributionUpdateRequestAction::class)->handle(
         $institution,
         $proposer,
         [
@@ -205,7 +208,7 @@ it('applies structured institution updates through approval', function () {
         ],
     );
 
-    app(ContributionWorkflowService::class)->approve($request, $reviewer, 'Approved update.');
+    app(ApproveContributionRequestAction::class)->handle($request, $reviewer, 'Approved update.');
 
     $institution->refresh();
 
@@ -232,7 +235,7 @@ it('applies structured event participant and reference updates through approval'
         'is_active' => true,
     ]);
 
-    $request = app(ContributionWorkflowService::class)->submitUpdateRequest(
+    $request = app(SubmitContributionUpdateRequestAction::class)->handle(
         $event,
         $proposer,
         [
@@ -247,7 +250,7 @@ it('applies structured event participant and reference updates through approval'
         ],
     );
 
-    app(ContributionWorkflowService::class)->approve($request, $reviewer, 'Approved event update.');
+    app(ApproveContributionRequestAction::class)->handle($request, $reviewer, 'Approved event update.');
 
     $event->refresh();
 
@@ -265,7 +268,7 @@ it('allows proposers to cancel pending requests and stores cancellation time', f
         'status' => ContributionRequestStatus::Pending,
     ]);
 
-    app(ContributionWorkflowService::class)->cancel($request, $proposer);
+    app(CancelContributionRequestAction::class)->handle($request, $proposer);
 
     $request->refresh();
 

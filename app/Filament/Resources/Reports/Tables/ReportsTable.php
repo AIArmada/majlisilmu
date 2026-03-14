@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Reports\Tables;
 
+use App\Actions\Reports\ResolveReportCategoryOptionsAction;
+use App\Actions\Reports\ResolveReportEntityMetadataAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -43,21 +45,9 @@ class ReportsTable
             ])
             ->filters([
                 SelectFilter::make('entity_type')
-                    ->options([
-                        'event' => 'Event',
-                        'institution' => 'Institution',
-                        'speaker' => 'Speaker',
-                        'donation_channel' => 'Donation Channel',
-                    ]),
+                    ->options(app(ResolveReportEntityMetadataAction::class)->options()),
                 SelectFilter::make('category')
-                    ->options([
-                        'wrong_info' => 'Wrong info',
-                        'cancelled_not_updated' => 'Cancelled not updated',
-                        'fake_speaker' => 'Fake speaker',
-                        'inappropriate_content' => 'Inappropriate content',
-                        'donation_scam' => 'Donation channel scam',
-                        'other' => 'Other',
-                    ]),
+                    ->options(app(ResolveReportCategoryOptionsAction::class)->handle()),
                 SelectFilter::make('status')
                     ->options([
                         'open' => 'Open',

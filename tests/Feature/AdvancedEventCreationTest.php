@@ -106,3 +106,22 @@ it('prefills the institution when launched from the institution dashboard shortc
         ->and($component->get('form')['organizer_id'])->toBe($institution->id)
         ->and($component->get('form')['location_institution_id'])->toBe($institution->id);
 });
+
+it('shows a validation error when the parent program ends before it starts', function () {
+    $user = User::factory()->create(['name' => 'Validation Member']);
+    $institution = Institution::factory()->create(['name' => 'Masjid Validasi']);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    Livewire::actingAs($user)
+        ->test(CreateAdvanced::class)
+        ->set('form.title', 'Invalid Parent Program')
+        ->set('form.program_starts_at', now()->addDays(5)->setTime(20, 0)->format('Y-m-d\TH:i'))
+        ->set('form.program_ends_at', now()->addDays(4)->setTime(20, 0)->format('Y-m-d\TH:i'))
+        ->set('form.organizer_type', 'institution')
+        ->set('form.organizer_id', $institution->id)
+        ->call('submit')
+        ->assertHasErrors(['form.program_ends_at']);
+
+    expect(Event::query()->where('title', 'Invalid Parent Program')->exists())->toBeFalse();
+});

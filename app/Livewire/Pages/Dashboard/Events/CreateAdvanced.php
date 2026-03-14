@@ -2,22 +2,15 @@
 
 namespace App\Livewire\Pages\Dashboard\Events;
 
+use App\Actions\Events\CreateAdvancedParentProgramAction;
+use App\Actions\Events\PrepareAdvancedParentProgramSubmissionAction;
+use App\Actions\Events\ResolveAdvancedBuilderContextAction;
 use App\Enums\EventFormat;
-use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
-use App\Enums\ScheduleKind;
-use App\Enums\ScheduleState;
-use App\Models\Event;
-use App\Models\Institution;
-use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -33,39 +26,38 @@ class CreateAdvanced extends Component
      */
     public array $form = [];
 
+    /**
+     * @var array<string, string>
+     */
+    public array $institutionOptions = [];
+
+    /**
+     * @var array<string, string>
+     */
+    public array $speakerOptions = [];
+
     public int $activeStep = 1;
 
     public function mount(): void
     {
         abort_unless(auth()->check(), 403);
-        abort_unless($this->hasBuilderAccess(), 403);
+
+        $user = $this->currentUser();
+
+        abort_unless($user instanceof User, 403);
 
         $requestedInstitutionId = request()->query('institution');
-        $memberInstitutions = $this->memberInstitutions();
-        $preferredInstitutionId = is_string($requestedInstitutionId) && $requestedInstitutionId !== '' && $memberInstitutions->pluck('id')->contains($requestedInstitutionId)
-            ? $requestedInstitutionId
-            : null;
+        $builderContext = app(ResolveAdvancedBuilderContextAction::class)->handle(
+            $user,
+            is_string($requestedInstitutionId) ? $requestedInstitutionId : null,
+        );
 
-        $defaultOrganizerType = $memberInstitutions->isNotEmpty() ? 'institution' : 'speaker';
-        $defaultOrganizerId = $defaultOrganizerType === 'institution'
-            ? $preferredInstitutionId ?: $memberInstitutions->first()?->id
-            : $this->memberSpeakers()->first()?->id;
+        $this->institutionOptions = $builderContext['institution_options'];
+        $this->speakerOptions = $builderContext['speaker_options'];
 
-        $this->form = [
-            'title' => '',
-            'description' => '',
-            'timezone' => 'Asia/Kuala_Lumpur',
-            'program_starts_at' => now('Asia/Kuala_Lumpur')->addDays(2)->setTime(20, 0)->format('Y-m-d\TH:i'),
-            'program_ends_at' => now('Asia/Kuala_Lumpur')->addDays(30)->setTime(22, 0)->format('Y-m-d\TH:i'),
-            'organizer_type' => $defaultOrganizerType,
-            'organizer_id' => $defaultOrganizerId,
-            'location_institution_id' => $defaultOrganizerType === 'institution' ? $defaultOrganizerId : ($preferredInstitutionId ?: $memberInstitutions->first()?->id),
-            'default_event_type' => EventType::KuliahCeramah->value,
-            'default_event_format' => EventFormat::Physical->value,
-            'visibility' => EventVisibility::Public->value,
-            'registration_required' => true,
-            'registration_mode' => RegistrationMode::Event->value,
-        ];
+        abort_unless($this->hasBuilderAccess(), 403);
+
+        $this->form = $builderContext['default_form'];
     }
 
     public function goToStep(int $step): void
@@ -124,76 +116,43 @@ class CreateAdvanced extends Component
     public function updatedFormOrganizerType(string $value): void
     {
         if ($value === 'institution') {
-            $organizerId = $this->memberInstitutions()->first()?->id;
+            $organizerId = array_key_first($this->institutionOptions);
             $this->form['organizer_id'] = $organizerId;
             $this->form['location_institution_id'] = $organizerId;
 
             return;
         }
 
-        $this->form['organizer_id'] = $this->memberSpeakers()->first()?->id;
+        $this->form['organizer_id'] = array_key_first($this->speakerOptions);
 
         if (! filled($this->form['location_institution_id'] ?? null)) {
-            $this->form['location_institution_id'] = $this->memberInstitutions()->first()?->id;
+            $this->form['location_institution_id'] = array_key_first($this->institutionOptions);
         }
     }
 
-    public function submit(): mixed
-    {
+    public function submit(
+        CreateAdvancedParentProgramAction $createAdvancedParentProgramAction,
+        PrepareAdvancedParentProgramSubmissionAction $prepareAdvancedParentProgramSubmissionAction,
+    ): mixed {
         $validated = $this->validate($this->rules());
 
         $user = $this->currentUser();
 
         abort_unless($user instanceof User, 403);
 
-        $timezone = (string) $validated['form']['timezone'];
-        $organizerType = (string) $validated['form']['organizer_type'];
-        $organizerId = (string) $validated['form']['organizer_id'];
-        $programStartsAt = Carbon::parse((string) $validated['form']['program_starts_at'], $timezone)->utc();
-        $programEndsAt = Carbon::parse((string) $validated['form']['program_ends_at'], $timezone)->utc();
-
-        $this->ensureOrganizerIsMemberOwned($user, $organizerType, $organizerId);
-
-        $locationInstitutionId = $this->resolveLocationInstitutionId($user, $organizerType, $organizerId, $validated['form']['location_institution_id'] ?? null);
-
-        if ($programEndsAt->lessThanOrEqualTo($programStartsAt)) {
-            $this->addError('form.program_ends_at', __('The program end must be after the program start.'));
-
-            return null;
-        }
+        $preparedSubmission = $prepareAdvancedParentProgramSubmissionAction->handle($user, $validated['form']);
 
         try {
-            $parentEvent = DB::transaction(function () use ($user, $validated, $timezone, $organizerType, $organizerId, $locationInstitutionId, $programStartsAt, $programEndsAt): Event {
-                $parentEvent = Event::query()->create([
-                    'user_id' => $user->id,
-                    'submitter_id' => $user->id,
-                    'parent_event_id' => null,
-                    'event_structure' => EventStructure::ParentProgram->value,
-                    'title' => (string) $validated['form']['title'],
-                    'slug' => Str::slug((string) $validated['form']['title']).'-'.Str::lower(Str::random(7)),
-                    'description' => (string) ($validated['form']['description'] ?? ''),
-                    'starts_at' => $programStartsAt,
-                    'ends_at' => $programEndsAt,
-                    'timezone' => $timezone,
-                    'institution_id' => $locationInstitutionId,
-                    'organizer_type' => $this->organizerMorphClass($organizerType),
-                    'organizer_id' => $organizerId,
-                    'event_type' => [(string) $validated['form']['default_event_type']],
-                    'event_format' => (string) $validated['form']['default_event_format'],
-                    'visibility' => (string) $validated['form']['visibility'],
-                    'schedule_kind' => ScheduleKind::Single->value,
-                    'schedule_state' => ScheduleState::Active->value,
-                    'status' => 'draft',
-                    'is_active' => true,
-                ]);
-
-                $parentEvent->settings()->create([
-                    'registration_required' => (bool) $validated['form']['registration_required'],
-                    'registration_mode' => (string) $validated['form']['registration_mode'],
-                ]);
-
-                return $parentEvent;
-            });
+            $parentEvent = $createAdvancedParentProgramAction->handle(
+                $user,
+                $validated['form'],
+                $preparedSubmission['program_starts_at'],
+                $preparedSubmission['program_ends_at'],
+                $preparedSubmission['timezone'],
+                $preparedSubmission['organizer_type'],
+                $preparedSubmission['organizer_id'],
+                $preparedSubmission['location_institution_id'],
+            );
         } catch (Throwable $throwable) {
             report($throwable);
 
@@ -229,43 +188,7 @@ class CreateAdvanced extends Component
 
     protected function hasBuilderAccess(): bool
     {
-        return $this->memberInstitutions()->isNotEmpty() || $this->memberSpeakers()->isNotEmpty();
-    }
-
-    /**
-     * @return Collection<int, Institution>
-     */
-    protected function memberInstitutions(): Collection
-    {
-        $user = $this->currentUser();
-
-        if (! $user instanceof User) {
-            return collect();
-        }
-
-        return $user->institutions()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
-     * @return Collection<int, Speaker>
-     */
-    protected function memberSpeakers(): Collection
-    {
-        $user = $this->currentUser();
-
-        if (! $user instanceof User) {
-            return collect();
-        }
-
-        return $user->speakers()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
+        return $this->institutionOptions !== [] || $this->speakerOptions !== [];
     }
 
     protected function currentUser(): ?User
@@ -273,47 +196,6 @@ class CreateAdvanced extends Component
         $user = auth()->user();
 
         return $user instanceof User ? $user : null;
-    }
-
-    protected function ensureOrganizerIsMemberOwned(User $user, string $organizerType, string $organizerId): void
-    {
-        unset($user);
-
-        $allowed = match ($organizerType) {
-            'institution' => $this->memberInstitutions()->pluck('id')->contains($organizerId),
-            'speaker' => $this->memberSpeakers()->pluck('id')->contains($organizerId),
-            default => false,
-        };
-
-        if (! $allowed) {
-            abort(403);
-        }
-    }
-
-    protected function resolveLocationInstitutionId(User $user, string $organizerType, string $organizerId, mixed $locationInstitutionId): ?string
-    {
-        unset($user);
-
-        if ($organizerType === 'institution') {
-            return $organizerId;
-        }
-
-        if (! is_string($locationInstitutionId) || $locationInstitutionId === '') {
-            return null;
-        }
-
-        $allowedInstitutionIds = $this->memberInstitutions()->pluck('id');
-
-        if (! $allowedInstitutionIds->contains($locationInstitutionId)) {
-            abort(403);
-        }
-
-        return $locationInstitutionId;
-    }
-
-    protected function organizerMorphClass(string $organizerType): string
-    {
-        return $organizerType === 'institution' ? Institution::class : Speaker::class;
     }
 
     /**
@@ -343,8 +225,8 @@ class CreateAdvanced extends Component
     public function render(): View
     {
         return view('livewire.pages.dashboard.events.create-advanced', [
-            'institutionOptions' => $this->memberInstitutions()->pluck('name', 'id')->all(),
-            'speakerOptions' => $this->memberSpeakers()->pluck('name', 'id')->all(),
+            'institutionOptions' => $this->institutionOptions,
+            'speakerOptions' => $this->speakerOptions,
             'eventTypeOptions' => collect(EventType::cases())->mapWithKeys(fn (EventType $type): array => [$type->value => $type->getLabel()])->all(),
             'eventFormatOptions' => collect(EventFormat::cases())->mapWithKeys(fn (EventFormat $format): array => [$format->value => $format->label()])->all(),
             'visibilityOptions' => collect(EventVisibility::cases())->mapWithKeys(fn (EventVisibility $visibility): array => [$visibility->value => $visibility->getLabel()])->all(),
