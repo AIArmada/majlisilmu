@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Signals;
 
 use AIArmada\Signals\Models\SignalEvent;
+use AIArmada\Signals\Models\TrackedProperty;
 use App\Models\Event;
 use App\Models\NotificationMessage;
 use App\Models\Report;
@@ -102,7 +103,6 @@ final readonly class ProductSignalsService
             eventName: 'report.submitted',
             eventCategory: 'moderation',
             user: $user instanceof User ? $user : null,
-            anonymousId: (string) $report->reporter_fingerprint,
             properties: [
                 'report_id' => (string) $report->getKey(),
                 'entity_type' => (string) $report->entity_type,
@@ -110,6 +110,7 @@ final readonly class ProductSignalsService
                 'category' => (string) $report->category,
                 'status' => (string) $report->status,
             ],
+            anonymousId: (string) $report->reporter_fingerprint,
         );
     }
 
@@ -208,7 +209,7 @@ final readonly class ProductSignalsService
         try {
             $trackedProperty = $this->signalsTracker->defaultTrackedProperty();
 
-            if ($trackedProperty === null) {
+            if (! $trackedProperty instanceof TrackedProperty) {
                 return null;
             }
 

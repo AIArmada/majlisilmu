@@ -7,6 +7,7 @@ use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasContacts;
 use App\Models\Concerns\HasDonationChannels;
 use App\Models\Concerns\HasFollowers;
+use App\Models\Concerns\HasLanguages;
 use Database\Factories\InstitutionFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,7 +28,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Institution extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<InstitutionFactory> */
-    use \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 

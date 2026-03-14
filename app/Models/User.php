@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
@@ -130,7 +131,14 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
 
     public function isDirectoryFeedbackBlocked(): bool
     {
-        return Authz::withScope(null, fn (): bool => $this->hasDirectPermission('feedback.blocked'), $this);
+        return Authz::withScope(null, function (): bool {
+            $permission = Permission::query()
+                ->where('name', 'feedback.blocked')
+                ->where('guard_name', $this->getDefaultGuardName())
+                ->first();
+
+            return $permission instanceof Permission && $this->hasDirectPermission($permission);
+        }, $this);
     }
 
     public function directoryFeedbackBanMessage(): string
@@ -183,7 +191,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
             $registrar->pivotRole,
         )
             ->withPivot($teamsKey)
-            ->wherePivot($teamsKey, null)
+            ->wherePivot($teamsKey)
             ->whereNull("{$rolesTable}.{$teamsKey}");
     }
 

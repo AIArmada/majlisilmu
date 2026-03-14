@@ -36,7 +36,7 @@ return new class extends Migration
             ->first();
 
         $payload = [
-            'name' => (string) config('app.name', 'Application').' Admin',
+            'name' => config('app.name', 'Application').' Admin',
             'slug' => $slug,
             'domain' => $surfaceResolver->domainForSurface('admin'),
             'type' => (string) config('signals.defaults.property_type', 'website'),

@@ -7,10 +7,10 @@ namespace App\Services\Signals;
 use AIArmada\Signals\Models\TrackedProperty;
 use App\Support\Signals\ProductSignalsSurfaceResolver;
 
-final class SignalsTracker
+final readonly class SignalsTracker
 {
     public function __construct(
-        private readonly ProductSignalsSurfaceResolver $surfaceResolver,
+        private ProductSignalsSurfaceResolver $surfaceResolver,
     ) {}
 
     public function defaultTrackedProperty(): ?TrackedProperty

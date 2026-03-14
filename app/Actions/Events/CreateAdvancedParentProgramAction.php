@@ -3,6 +3,8 @@
 namespace App\Actions\Events;
 
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +63,6 @@ class CreateAdvancedParentProgramAction
 
     private function organizerMorphClass(string $organizerType): string
     {
-        return $organizerType === 'institution' ? 'App\\Models\\Institution' : 'App\\Models\\Speaker';
+        return $organizerType === 'institution' ? Institution::class : Speaker::class;
     }
 }

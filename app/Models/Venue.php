@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\VenueType;
 use App\Models\Concerns\HasAddress;
+use App\Models\Concerns\HasContacts;
 use Database\Factories\VenueFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,7 +21,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Venue extends Model implements HasMedia
 {
     /** @use HasFactory<VenueFactory> */
-    use \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasSocialMedia, HasAddress, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use \App\Models\Concerns\HasSocialMedia, HasAddress, HasContacts, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 

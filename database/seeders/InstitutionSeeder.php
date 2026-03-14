@@ -59,7 +59,6 @@ class InstitutionSeeder extends Seeder
         $countries = Country::query()->get();
         $malaysia = $countries->where('iso2', 'MY')->first() ?? $countries->first();
         $states = State::query()->where('country_id', $malaysia->id)->with(['districts', 'cities'])->get();
-        User::query()->get();
 
         $this->command->info('Seeding featured institutions with coordinates...');
 

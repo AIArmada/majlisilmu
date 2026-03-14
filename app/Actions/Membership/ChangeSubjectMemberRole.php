@@ -16,15 +16,15 @@ use App\Support\Submission\PublicSubmissionLockService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
-final class ChangeSubjectMemberRole
+final readonly class ChangeSubjectMemberRole
 {
     use AsAction;
 
     public function __construct(
-        private readonly MemberRoleCatalog $memberRoleCatalog,
-        private readonly MemberRoleScopes $memberRoleScopes,
-        private readonly ScopedMemberRoleSeeder $scopedMemberRoleSeeder,
-        private readonly PublicSubmissionLockService $publicSubmissionLockService,
+        private MemberRoleCatalog $memberRoleCatalog,
+        private MemberRoleScopes $memberRoleScopes,
+        private ScopedMemberRoleSeeder $scopedMemberRoleSeeder,
+        private PublicSubmissionLockService $publicSubmissionLockService,
     ) {}
 
     public function handle(

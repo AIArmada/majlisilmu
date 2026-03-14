@@ -54,7 +54,7 @@ class ResolveContributionChangedPayloadAction
         }
 
         if (is_array($value)) {
-            return array_map(fn (mixed $item): mixed => $this->normalizeComparable($item), $value);
+            return array_map($this->normalizeComparable(...), $value);
         }
 
         return $value;

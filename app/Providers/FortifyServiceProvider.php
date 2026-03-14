@@ -65,16 +65,14 @@ class FortifyServiceProvider extends ServiceProvider
 
     private function configureAuthenticationPipeline(): void
     {
-        Fortify::authenticateThrough(function (Request $request): array {
-            return array_values(array_filter([
-                config('fortify.limiters.login') ? null : EnsureLoginIsNotThrottled::class,
-                config('fortify.lowercase_usernames') ? CanonicalizeUsername::class : null,
-                Features::enabled(Features::twoFactorAuthentication()) ? RedirectIfTwoFactorAuthenticatable::class : null,
-                AttemptToAuthenticate::class,
-                PrepareAuthenticatedSession::class,
-                RecordSuccessfulLogin::class,
-            ]));
-        });
+        Fortify::authenticateThrough(fn (Request $request): array => array_values(array_filter([
+            config('fortify.limiters.login') ? null : EnsureLoginIsNotThrottled::class,
+            config('fortify.lowercase_usernames') ? CanonicalizeUsername::class : null,
+            Features::enabled(Features::twoFactorAuthentication()) ? RedirectIfTwoFactorAuthenticatable::class : null,
+            AttemptToAuthenticate::class,
+            PrepareAuthenticatedSession::class,
+            RecordSuccessfulLogin::class,
+        ])));
     }
 
     /**

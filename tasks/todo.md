@@ -1,3 +1,27 @@
+# Full Project Verification Sweep
+
+- [x] Run `php artisan migrate:fresh --seed`
+- [x] Run full-project `rector`
+- [x] Run full-project `phpstan`
+- [x] Run full-project `pest --parallel`
+- [x] Run full-project `pint`
+- [x] Fix any issues surfaced by the full-project sweep
+- [x] Re-run the failing checks until the project is clean
+
+## Full Project Verification Sweep Review
+
+- Removed an orphaned `User::query()->get();` call from `InstitutionSeeder`, which was breaking `migrate:fresh --seed` with a missing class error.
+- Accepted the full-project Rector pass, which mainly tightened readonly classes, class constants, first-class callables, and a few smaller modernizations across 17 files.
+- Fixed share analytics typing by giving the Filament page a real default report payload and making the analytics service return explicit typed list payloads instead of collection templates that PHPStan could not prove.
+- Hardened the reverse-permission feedback block check so missing `feedback.blocked` seed data no longer causes report submission to 500; the app now treats an absent permission row as “not blocked”.
+- Final verification:
+  - `php artisan migrate:fresh --seed` => pass
+  - `vendor/bin/rector process` => pass, 17 files changed
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pest --parallel` => 856 passed
+  - `vendor/bin/pint --format agent` => pass
+  - Post-Pint narrowed `phpstan` on Pint-touched files => pass
+
 # Authz User Index Global Roles Fix
 
 - [x] Restore authz user index search by global role name

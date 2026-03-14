@@ -17,7 +17,6 @@ it('registers the signals package migrations with the application', function () 
     $provider->register();
 
     $reflection = new ReflectionProperty($provider, 'package');
-    $reflection->setAccessible(true);
 
     $package = $reflection->getValue($provider);
 

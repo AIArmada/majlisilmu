@@ -9,12 +9,12 @@ use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
-final class AcceptSubjectMemberInvitation
+final readonly class AcceptSubjectMemberInvitation
 {
     use AsAction;
 
     public function __construct(
-        private readonly AddMemberToSubject $addMemberToSubject,
+        private AddMemberToSubject $addMemberToSubject,
     ) {}
 
     /**

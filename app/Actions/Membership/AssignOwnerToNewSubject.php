@@ -11,13 +11,13 @@ use App\Models\User;
 use App\Support\Authz\MemberRoleCatalog;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-final class AssignOwnerToNewSubject
+final readonly class AssignOwnerToNewSubject
 {
     use AsAction;
 
     public function __construct(
-        private readonly AddMemberToSubject $addMemberToSubject,
-        private readonly MemberRoleCatalog $memberRoleCatalog,
+        private AddMemberToSubject $addMemberToSubject,
+        private MemberRoleCatalog $memberRoleCatalog,
     ) {}
 
     public function handle(Institution|Speaker|Event|Reference $subject, User $member): void

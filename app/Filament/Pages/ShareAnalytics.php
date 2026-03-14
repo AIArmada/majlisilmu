@@ -10,6 +10,9 @@ use BackedEnum;
 use Filament\Pages\Page;
 use UnitEnum;
 
+/**
+ * @phpstan-import-type ShareAnalyticsDashboard from \App\Services\ShareTracking\AdminShareAnalyticsService
+ */
 final class ShareAnalytics extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-share';
@@ -22,17 +25,26 @@ final class ShareAnalytics extends Page
 
     protected string $view = 'filament.pages.share-analytics';
 
-    /**
-     * @var array{
-     *     summary: array<string, int>,
-     *     provider_breakdown: list<array<string, int|string>>,
-     *     top_sharers: list<array<string, int|string|null>>,
-     *     top_links: list<array<string, int|string|null>>,
-     *     recent_visits: list<array<string, int|string|null>>,
-     *     recent_outcomes: list<array<string, int|string|null>>
-     * }
-     */
-    public array $report = [];
+    /** @var ShareAnalyticsDashboard */
+    public array $report = [
+        'summary' => [
+            'affiliates' => 0,
+            'shared_links' => 0,
+            'outbound_shares' => 0,
+            'visits' => 0,
+            'unique_visitors' => 0,
+            'signups' => 0,
+            'event_registrations' => 0,
+            'event_checkins' => 0,
+            'event_submissions' => 0,
+            'total_outcomes' => 0,
+        ],
+        'provider_breakdown' => [],
+        'top_sharers' => [],
+        'top_links' => [],
+        'recent_visits' => [],
+        'recent_outcomes' => [],
+    ];
 
     public ?string $signalsReportUrl = null;
 

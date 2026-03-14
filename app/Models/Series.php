@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasFollowers;
+use App\Models\Concerns\HasLanguages;
 use Database\Factories\SeriesFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Series extends Model implements HasMedia
 {
     /** @use HasFactory<SeriesFactory> */
-    use \App\Models\Concerns\HasLanguages, HasFactory, HasFollowers, HasUuids, InteractsWithMedia;
+    use HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 
