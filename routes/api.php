@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EventCheckInController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\EventGoingController;
 use App\Http\Controllers\Api\EventInterestController;
+use App\Http\Controllers\Api\EventRegistrationController;
 use App\Http\Controllers\Api\EventSaveController;
 use App\Http\Controllers\Api\NotificationDestinationController;
 use App\Http\Controllers\Api\NotificationMessageController;
@@ -15,14 +19,21 @@ use Illuminate\Support\Facades\Route;
 
 // Public API endpoints
 Route::prefix('v1')->group(function () {
+    Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
+    Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
+
     // Events API with query builder
     Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
     Route::get('/events/{event}', [EventController::class, 'show'])->name('api.events.show');
-
+    Route::post('/events/{event}/registrations', [EventRegistrationController::class, 'store'])
+        ->middleware('throttle:registration')
+        ->name('api.events.registrations.store');
 });
 
 // Authenticated API endpoints
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
+
     // Reports (per documentation B5b) - Rate limited
     Route::post('/reports', [ReportController::class, 'store'])
         ->middleware('throttle:reports')
@@ -32,6 +43,21 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
     Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
         ->name('api.user.registrations.index');
+    Route::get('/user/going-events', [EventGoingController::class, 'index'])
+        ->name('api.user.going-events.index');
+
+    Route::get('/events/{event}/registration-status', [EventRegistrationController::class, 'status'])
+        ->name('api.events.registrations.status');
+    Route::get('/events/{event}/check-in-state', [EventCheckInController::class, 'show'])
+        ->name('api.events.check-in-state.show');
+    Route::post('/events/{event}/check-ins', [EventCheckInController::class, 'store'])
+        ->name('api.events.check-ins.store');
+    Route::get('/events/{event}/going', [EventGoingController::class, 'show'])
+        ->name('api.events.going.show');
+    Route::post('/events/{event}/going', [EventGoingController::class, 'store'])
+        ->name('api.events.going.store');
+    Route::delete('/events/{event}/going', [EventGoingController::class, 'destroy'])
+        ->name('api.events.going.destroy');
 
     // Saved Searches (per documentation B5a)
     Route::apiResource('saved-searches', SavedSearchController::class)
