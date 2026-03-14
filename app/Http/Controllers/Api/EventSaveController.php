@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\DawahShareOutcomeType;
+use App\Actions\Events\SaveEventAction;
+use App\Actions\Events\UnsaveEventAction;
 use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
-use App\Services\ShareTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,10 +15,6 @@ use Illuminate\Support\Str;
 
 class EventSaveController extends Controller
 {
-    public function __construct(
-        private readonly ShareTrackingService $shareTrackingService
-    ) {}
-
     /**
      * List all saved events for the authenticated user.
      */
@@ -48,7 +44,7 @@ class EventSaveController extends Controller
     /**
      * Save an event (bookmark).
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, SaveEventAction $saveEventAction): JsonResponse
     {
         $validated = $request->validate([
             'event_id' => ['required', 'uuid', 'exists:events,id'],
@@ -75,33 +71,11 @@ class EventSaveController extends Controller
             ], 403);
         }
 
-        $savedState = DB::transaction(function () use ($event, $request): string {
-            $lockedEvent = Event::query()
-                ->whereKey($event->id)
-                ->lockForUpdate()
-                ->first();
+        /** @var User $user */
+        $user = $request->user();
+        $savedState = $saveEventAction->handle($event, $user, $request);
 
-            if (! $lockedEvent) {
-                return 'not_found';
-            }
-
-            $inserted = DB::table('event_saves')->insertOrIgnore([
-                'user_id' => $request->user()->id,
-                'event_id' => $lockedEvent->id,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            if ($inserted === 0) {
-                return 'conflict';
-            }
-
-            $this->syncSavesCount($lockedEvent->id);
-
-            return 'created';
-        }, 3);
-
-        if ($savedState === 'not_found') {
+        if ($savedState['status'] === 'not_found') {
             return response()->json([
                 'error' => [
                     'code' => 'not_found',
@@ -110,7 +84,7 @@ class EventSaveController extends Controller
             ], 404);
         }
 
-        if ($savedState === 'conflict') {
+        if ($savedState['status'] === 'conflict') {
             return response()->json([
                 'error' => [
                     'code' => 'conflict',
@@ -118,20 +92,6 @@ class EventSaveController extends Controller
                 ],
             ], 409);
         }
-
-        /** @var User $user */
-        $user = $request->user();
-
-        $this->shareTrackingService->recordOutcome(
-            type: DawahShareOutcomeType::EventSave,
-            outcomeKey: 'event_save:user:'.$user->id.':event:'.$event->id,
-            subject: $event,
-            actor: $user,
-            request: $request,
-            metadata: [
-                'event_id' => $event->id,
-            ],
-        );
 
         return response()->json([
             'data' => [
@@ -146,31 +106,13 @@ class EventSaveController extends Controller
     /**
      * Remove a saved event (unbookmark).
      */
-    public function destroy(Request $request, string $eventId): JsonResponse
+    public function destroy(Request $request, string $eventId, UnsaveEventAction $unsaveEventAction): JsonResponse
     {
-        $deleted = DB::transaction(function () use ($eventId, $request): int {
-            $event = Event::query()
-                ->whereKey($eventId)
-                ->lockForUpdate()
-                ->first();
+        /** @var User $user */
+        $user = $request->user();
+        $result = $unsaveEventAction->handle($eventId, $user);
 
-            $deletedRows = DB::table('event_saves')
-                ->where('user_id', $request->user()->id)
-                ->where('event_id', $eventId)
-                ->delete();
-
-            if ($deletedRows === 0) {
-                return 0;
-            }
-
-            if ($event) {
-                $this->syncSavesCount($eventId);
-            }
-
-            return $deletedRows;
-        }, 3);
-
-        if (! $deleted) {
+        if (! $result['deleted']) {
             return response()->json([
                 'error' => [
                     'code' => 'not_found',
@@ -207,16 +149,5 @@ class EventSaveController extends Controller
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
         ]);
-    }
-
-    private function syncSavesCount(string $eventId): void
-    {
-        $savesCount = DB::table('event_saves')
-            ->where('event_id', $eventId)
-            ->count();
-
-        Event::query()
-            ->whereKey($eventId)
-            ->update(['saves_count' => $savesCount]);
     }
 }

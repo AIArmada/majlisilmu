@@ -2,14 +2,15 @@
 
 namespace App\Livewire\Pages\Contributions;
 
-use App\Enums\ContributionRequestStatus;
-use App\Enums\ContributionRequestType;
+use App\Actions\Contributions\ApproveContributionRequestAction;
+use App\Actions\Contributions\CancelContributionRequestAction;
+use App\Actions\Contributions\RejectContributionRequestAction;
+use App\Actions\Contributions\ResolvePendingContributionApprovalsAction;
+use App\Actions\Contributions\ResolveReviewableContributionRequestAction;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\ContributionRequest;
 use App\Models\User;
-use App\Services\ContributionWorkflowService;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -57,36 +58,34 @@ class Index extends Component
         /** @var User $user */
         $user = auth()->user();
 
-        return ContributionRequest::query()
-            ->where('status', ContributionRequestStatus::Pending)
-            ->with(['entity', 'proposer'])
-            ->latest('created_at')
-            ->get()
-            ->filter(fn (ContributionRequest $request): bool => $this->canReview($user, $request))
-            ->values();
+        return app(ResolvePendingContributionApprovalsAction::class)->handle($user);
     }
 
-    public function approve(string $requestId, ContributionWorkflowService $workflow): void
-    {
-        $request = ContributionRequest::query()->with('entity')->findOrFail($requestId);
+    public function approve(
+        string $requestId,
+        ApproveContributionRequestAction $approveContributionRequestAction,
+        ResolveReviewableContributionRequestAction $resolveReviewableContributionRequestAction,
+    ): void {
         /** @var User $user */
         $user = auth()->user();
 
-        abort_unless($this->canReview($user, $request), 403);
+        $request = $resolveReviewableContributionRequestAction->handle($user, $requestId);
 
-        $workflow->approve($request, $user, $this->reviewNotes[$requestId] ?? null);
+        $approveContributionRequestAction->handle($request, $user, $this->reviewNotes[$requestId] ?? null);
         unset($this->reviewNotes[$requestId], $this->rejectionReasons[$requestId]);
     }
 
-    public function reject(string $requestId, ContributionWorkflowService $workflow): void
-    {
-        $request = ContributionRequest::query()->with('entity')->findOrFail($requestId);
+    public function reject(
+        string $requestId,
+        RejectContributionRequestAction $rejectContributionRequestAction,
+        ResolveReviewableContributionRequestAction $resolveReviewableContributionRequestAction,
+    ): void {
         /** @var User $user */
         $user = auth()->user();
 
-        abort_unless($this->canReview($user, $request), 403);
+        $request = $resolveReviewableContributionRequestAction->handle($user, $requestId);
 
-        $workflow->reject(
+        $rejectContributionRequestAction->handle(
             $request,
             $user,
             $this->rejectionReasons[$requestId] ?: 'rejected_by_reviewer',
@@ -96,27 +95,13 @@ class Index extends Component
         unset($this->reviewNotes[$requestId], $this->rejectionReasons[$requestId]);
     }
 
-    public function cancel(string $requestId, ContributionWorkflowService $workflow): void
+    public function cancel(string $requestId, CancelContributionRequestAction $cancelContributionRequestAction): void
     {
         /** @var User $user */
         $user = auth()->user();
         $request = $user->contributionRequests()->findOrFail($requestId);
 
-        $workflow->cancel($request, $user);
-    }
-
-    private function canReview(User $user, ContributionRequest $request): bool
-    {
-        if ($user->hasAnyRole(['super_admin', 'admin', 'moderator'])) {
-            return true;
-        }
-
-        if ($request->type === ContributionRequestType::Create) {
-            return false;
-        }
-
-        return $request->entity instanceof Model
-            && $user->can('update', $request->entity);
+        $cancelContributionRequestAction->handle($request, $user);
     }
 
     public function render(): View

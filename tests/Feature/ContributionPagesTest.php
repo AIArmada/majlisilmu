@@ -9,6 +9,7 @@ use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
 use App\Livewire\Pages\Contributions\SuggestUpdate;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Models\ContributionRequest;
+use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
@@ -75,6 +76,33 @@ it('applies direct institution edits for owner maintainers from the suggest upda
         ->assertHasNoErrors();
 
     expect($institution->fresh()->name)->toBe('Masjid Baru')
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('re-moderates approved events when maintainers apply sensitive direct edits from the suggest update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Sensitif',
+        'status' => 'approved',
+        'starts_at' => now()->addDays(4),
+        'ends_at' => now()->addDays(4)->addHour(),
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => 'event',
+        'subjectId' => $event->slug,
+    ])
+        ->set('data.starts_at', now()->addDays(8)->toDateTimeString())
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect((string) $event->fresh()->status)->toBe('pending')
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
