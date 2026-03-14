@@ -155,16 +155,20 @@
             }
         },
         {
+            "name": "aiarmada-filament-authz",
+            "type": "path",
+            "url": "../commerce/packages/filament-authz",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
             "type": "vcs",
             "url": "https://github.com/sairiz/filament-language-switch"
         },
         {
             "type": "vcs",
             "url": "https://github.com/AIArmada/commerce-support.git"
-        },
-        {
-            "type": "vcs",
-            "url": "https://github.com/AIArmada/filament-authz.git"
         },
         {
             "name": "filament",

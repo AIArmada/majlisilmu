@@ -959,11 +959,6 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->morphTo();
     }
 
-    public function getAuthzScopeLabel(): string
-    {
-        return 'Event: '.$this->title;
-    }
-
     /**
      * Check if a user can manage this event.
      * Uses Authz scoped roles via event membership or organizer/institution scope.

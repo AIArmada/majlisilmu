@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
-use AIArmada\FilamentAuthz\Concerns\HasAuthzScope;
 use App\Enums\InstitutionType;
 use App\Models\Concerns\HasAddress;
+use App\Models\Concerns\HasContacts;
+use App\Models\Concerns\HasDonationChannels;
+use App\Models\Concerns\HasFollowers;
 use Database\Factories\InstitutionFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,7 +27,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Institution extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<InstitutionFactory> */
-    use \App\Models\Concerns\HasContacts, \App\Models\Concerns\HasDonationChannels, \App\Models\Concerns\HasFollowers, \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasAuthzScope, HasFactory, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use \App\Models\Concerns\HasLanguages, \App\Models\Concerns\HasSocialMedia, Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
@@ -149,11 +151,6 @@ class Institution extends Model implements AuditableContract, HasMedia
             ->height(232)
             ->sharpen(10)
             ->format('webp');
-    }
-
-    public function getAuthzScopeLabel(): string
-    {
-        return 'Institution: '.$this->name;
     }
 
     /**

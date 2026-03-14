@@ -122,7 +122,7 @@ it('dispatches an institution toggle refresh event after adding an eligible memb
         ])
         ->callTableAction('addMember', data: [
             'user_id' => $member->id,
-            'role_ids' => [$ownerRoleId],
+            'role_id' => $ownerRoleId,
         ])
         ->assertDispatchedTo(EditInstitution::class, PublicSubmissionUiEvents::REFRESH_TOGGLE);
 });

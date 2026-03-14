@@ -2,19 +2,19 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\AuthzScope;
-use AIArmada\FilamentAuthz\Models\Role;
+use App\Actions\Membership\AddMemberToSubject;
+use App\Actions\Membership\ChangeSubjectMemberRole;
+use App\Actions\Membership\RemoveMemberFromSubject;
+use App\Enums\MemberSubjectType;
 use App\Models\Event;
 use App\Models\User;
-use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Spatie\Permission\PermissionRegistrar;
 
 class EventUsersRelationManager extends RelationManager
 {
@@ -34,7 +34,7 @@ class EventUsersRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('roles')
                     ->label('Roles')
-                    ->getStateUsing(fn (User $record): string => Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—'),
+                    ->getStateUsing(fn (User $record): string => implode(', ', app(MemberRoleCatalog::class)->roleNamesFor($record, MemberSubjectType::Event)) ?: '—'),
                 TextColumn::make('pivot.joined_at')
                     ->label('Joined')
                     ->dateTime('d M Y')
@@ -60,38 +60,39 @@ class EventUsersRelationManager extends RelationManager
                         $this->makeRoleSelect(),
                     ])
                     ->action(function (array $data): void {
-                        $event = $this->getEventOwner();
-                        $user = User::findOrFail($data['user_id']);
-
-                        $event->members()->syncWithoutDetaching([$user->id => [
-                            'joined_at' => now(),
-                        ]]);
-                        $this->syncMemberRoles($user, $data['role_ids'] ?? []);
+                        app(AddMemberToSubject::class)->handle(
+                            $this->getEventOwner(),
+                            User::findOrFail($data['user_id']),
+                            $data['role_id'] ?? null,
+                        );
                     }),
             ])
             ->actions([
                 Action::make('manageRoles')
                     ->label('Roles')
                     ->icon('heroicon-o-pencil')
+                    ->hidden(fn (User $record): bool => $this->memberHasProtectedRole($record))
                     ->form([
                         $this->makeRoleSelect(),
                     ])
                     ->fillForm(fn (User $record): array => [
-                        'role_ids' => $this->getMemberRoleIds($record),
+                        'role_id' => $this->getMemberRoleId($record),
                     ])
                     ->action(function (array $data, User $record): void {
-                        $this->syncMemberRoles($record, $data['role_ids'] ?? []);
+                        app(ChangeSubjectMemberRole::class)->handle(
+                            $this->getEventOwner(),
+                            $record,
+                            $data['role_id'] ?? null,
+                        );
                     }),
                 Action::make('removeMember')
                     ->label('Remove')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
+                    ->hidden(fn (User $record): bool => $this->memberHasProtectedRole($record))
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $event = $this->getEventOwner();
-
-                        $event->members()->detach($record->id);
-                        $this->syncMemberRoles($record, []);
+                        app(RemoveMemberFromSubject::class)->handle($this->getEventOwner(), $record);
                     }),
             ]);
     }
@@ -102,32 +103,8 @@ class EventUsersRelationManager extends RelationManager
     protected function getScopedRoleOptions(): array
     {
         app(ScopedMemberRoleSeeder::class)->ensureForEvent();
-        $teamsKey = app(PermissionRegistrar::class)->teamsKey;
-        $scope = $this->getRoleScope();
 
-        return Authz::withScope($scope, fn (): array => Role::query()
-            ->where($teamsKey, getPermissionsTeamId())
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all());
-    }
-
-    /**
-     * @return list<string>
-     */
-    protected function getMemberRoleIds(User $user): array
-    {
-        return Authz::withScope($this->getRoleScope(), fn (): array => $user->roles()->pluck('id')->all(), $user);
-    }
-
-    /**
-     * @param  list<string>  $roleIds
-     */
-    protected function syncMemberRoles(User $user, array $roleIds): void
-    {
-        Authz::withScope($this->getRoleScope(), function () use ($user, $roleIds): void {
-            $user->syncRoles($roleIds);
-        }, $user);
+        return app(MemberRoleCatalog::class)->roleOptionsFor(MemberSubjectType::Event);
     }
 
     private function getEventOwner(): Event
@@ -138,17 +115,21 @@ class EventUsersRelationManager extends RelationManager
         return $event;
     }
 
+    private function getMemberRoleId(User $user): ?string
+    {
+        return app(MemberRoleCatalog::class)->roleIdsFor($user, MemberSubjectType::Event)[0] ?? null;
+    }
+
     private function makeRoleSelect(): Select
     {
-        return Select::make('role_ids')
-            ->label('Roles')
+        return Select::make('role_id')
+            ->label('Role')
             ->options(fn () => $this->getScopedRoleOptions())
-            ->multiple()
             ->required();
     }
 
-    private function getRoleScope(): AuthzScope
+    private function memberHasProtectedRole(User $user): bool
     {
-        return app(MemberRoleScopes::class)->event();
+        return app(MemberRoleCatalog::class)->userHasProtectedRole($user, MemberSubjectType::Event);
     }
 }

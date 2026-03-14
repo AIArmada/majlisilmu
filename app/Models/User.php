@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
 use App\Notifications\NotificationCenterMessage;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -26,6 +28,7 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, HasLocalePreference
@@ -151,6 +154,37 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
     {
         return $this->belongsToMany(Speaker::class, 'speaker_user')
             ->withTimestamps();
+    }
+
+    /**
+     * @return MorphToMany<Role, $this, MorphPivot, 'pivot'>
+     */
+    public function globalRoles(): MorphToMany
+    {
+        $registrar = app(PermissionRegistrar::class);
+
+        if (! $registrar->teams) {
+            /** @var MorphToMany<Role, $this, MorphPivot, 'pivot'> $relation */
+            $relation = $this->roles();
+
+            return $relation;
+        }
+
+        $teamsKey = $registrar->teamsKey;
+        $rolesTable = config('permission.table_names.roles', 'roles');
+        /** @var class-string<Role> $roleModel */
+        $roleModel = config('permission.models.role', Role::class);
+
+        return $this->morphToMany(
+            $roleModel,
+            'model',
+            config('permission.table_names.model_has_roles'),
+            config('permission.column_names.model_morph_key'),
+            $registrar->pivotRole,
+        )
+            ->withPivot($teamsKey)
+            ->wherePivot($teamsKey, null)
+            ->whereNull("{$rolesTable}.{$teamsKey}");
     }
 
     /**

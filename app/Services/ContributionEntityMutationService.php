@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventKeyPersonRole;
@@ -24,6 +25,7 @@ class ContributionEntityMutationService
 {
     public function __construct(
         private readonly EventKeyPersonSyncService $eventKeyPersonSyncService,
+        private readonly AddMemberToSubject $addMemberToSubject,
     ) {}
 
     /**
@@ -55,7 +57,7 @@ class ContributionEntityMutationService
             'allow_public_event_submission' => true,
         ]);
 
-        $institution->members()->syncWithoutDetaching([$proposer->getKey()]);
+        $this->addMemberToSubject->handle($institution, $proposer);
 
         $this->syncInstitutionRelations($institution, $payload);
 
@@ -83,7 +85,7 @@ class ContributionEntityMutationService
             'allow_public_event_submission' => true,
         ]);
 
-        $speaker->members()->syncWithoutDetaching([$proposer->getKey()]);
+        $this->addMemberToSubject->handle($speaker, $proposer);
 
         $this->syncSpeakerRelations($speaker, $payload);
 
@@ -92,6 +94,7 @@ class ContributionEntityMutationService
 
     /**
      * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
      */
     public function apply(Model $entity, array $payload): array
     {
@@ -461,7 +464,7 @@ class ContributionEntityMutationService
 
                 $category = ContactCategory::tryFrom((string) ($contact['category'] ?? ''));
                 $value = is_string($contact['value'] ?? null) ? trim((string) $contact['value']) : null;
-                $type = ContactType::tryFrom((string) ($contact['type'] ?? ContactType::Main->value));
+                $type = ContactType::tryFrom((string) ($contact['type'] ?? '')) ?? ContactType::Main;
 
                 if ($category === null || $value === null || $value === '') {
                     return null;
@@ -470,7 +473,7 @@ class ContributionEntityMutationService
                 return [
                     'category' => $category->value,
                     'value' => $value,
-                    'type' => $type?->value ?? ContactType::Main->value,
+                    'type' => $type->value,
                     'is_public' => (bool) ($contact['is_public'] ?? true),
                 ];
             })
@@ -630,7 +633,7 @@ class ContributionEntityMutationService
     }
 
     /**
-     * @param  Collection<int, Tag>  $tags
+     * @param  array<string, mixed>  $payload
      * @return list<Tag>
      */
     private function resolveEventTags(array $payload): array
@@ -682,16 +685,30 @@ class ContributionEntityMutationService
      */
     private function addressState(?Address $address): array
     {
+        if ($address === null) {
+            return [
+                'country_id' => 132,
+                'state_id' => null,
+                'district_id' => null,
+                'subdistrict_id' => null,
+                'line1' => null,
+                'line2' => null,
+                'postcode' => null,
+                'google_maps_url' => null,
+                'waze_url' => null,
+            ];
+        }
+
         return [
-            'country_id' => $address?->country_id ?? 132,
-            'state_id' => $address?->state_id,
-            'district_id' => $address?->district_id,
-            'subdistrict_id' => $address?->subdistrict_id,
-            'line1' => $address?->line1,
-            'line2' => $address?->line2,
-            'postcode' => $address?->postcode,
-            'google_maps_url' => $address?->google_maps_url,
-            'waze_url' => $address?->waze_url,
+            'country_id' => $address->country_id ?? 132,
+            'state_id' => $address->state_id,
+            'district_id' => $address->district_id,
+            'subdistrict_id' => $address->subdistrict_id,
+            'line1' => $address->line1,
+            'line2' => $address->line2,
+            'postcode' => $address->postcode,
+            'google_maps_url' => $address->google_maps_url,
+            'waze_url' => $address->waze_url,
         ];
     }
 

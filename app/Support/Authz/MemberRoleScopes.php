@@ -3,6 +3,7 @@
 namespace App\Support\Authz;
 
 use AIArmada\FilamentAuthz\Models\AuthzScope;
+use Illuminate\Support\Facades\Schema;
 
 final class MemberRoleScopes
 {
@@ -16,24 +17,74 @@ final class MemberRoleScopes
 
     private const string REFERENCE_SCOPEABLE_ID = '44444444-4444-4444-8444-444444444444';
 
+    public function institutionId(): string
+    {
+        return self::INSTITUTION_SCOPEABLE_ID;
+    }
+
+    public function speakerId(): string
+    {
+        return self::SPEAKER_SCOPEABLE_ID;
+    }
+
+    public function eventId(): string
+    {
+        return self::EVENT_SCOPEABLE_ID;
+    }
+
+    public function referenceId(): string
+    {
+        return self::REFERENCE_SCOPEABLE_ID;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function options(): array
+    {
+        return [
+            $this->institutionId() => 'Institution Members',
+            $this->speakerId() => 'Speaker Members',
+            $this->eventId() => 'Event Members',
+            $this->referenceId() => 'Reference Members',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function roleResourceOptions(): array
+    {
+        if (! Schema::hasTable('authz_scopes')) {
+            return [];
+        }
+
+        return [
+            (string) $this->institution()->getKey() => 'Institution Members',
+            (string) $this->speaker()->getKey() => 'Speaker Members',
+            (string) $this->event()->getKey() => 'Event Members',
+            (string) $this->reference()->getKey() => 'Reference Members',
+        ];
+    }
+
     public function institution(): AuthzScope
     {
-        return $this->ensure(self::INSTITUTION_SCOPEABLE_ID, 'Institution Members');
+        return $this->ensure($this->institutionId(), 'Institution Members');
     }
 
     public function speaker(): AuthzScope
     {
-        return $this->ensure(self::SPEAKER_SCOPEABLE_ID, 'Speaker Members');
+        return $this->ensure($this->speakerId(), 'Speaker Members');
     }
 
     public function event(): AuthzScope
     {
-        return $this->ensure(self::EVENT_SCOPEABLE_ID, 'Event Members');
+        return $this->ensure($this->eventId(), 'Event Members');
     }
 
     public function reference(): AuthzScope
     {
-        return $this->ensure(self::REFERENCE_SCOPEABLE_ID, 'Reference Members');
+        return $this->ensure($this->referenceId(), 'Reference Members');
     }
 
     private function ensure(string $scopeableId, string $label): AuthzScope

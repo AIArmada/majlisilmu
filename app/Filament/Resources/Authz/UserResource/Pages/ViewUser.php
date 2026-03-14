@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Authz\UserResource\Pages;
 
+use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Filament\Resources\Authz\UserResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
@@ -60,6 +61,7 @@ class ViewUser extends ViewRecord
             'memberEvents' => fn ($query) => $query
                 ->with(['institution:id,name', 'venue:id,name'])
                 ->orderByDesc('starts_at'),
+            'references' => fn ($query) => $query->orderBy('title'),
             'savedSearches' => fn ($query) => $query->latest(),
         ]);
     }
@@ -78,12 +80,11 @@ class ViewUser extends ViewRecord
     public function roleNames(): array
     {
         /** @var list<string> $roles */
-        $roles = $this->userRecord()->roles
-            ->pluck('name')
-            ->filter(fn (mixed $name): bool => filled($name))
-            ->sort()
-            ->values()
-            ->all();
+        $roles = Authz::withScope(
+            null,
+            fn (): array => $this->userRecord()->getRoleNames()->sort()->values()->all(),
+            $this->userRecord(),
+        );
 
         return $roles;
     }

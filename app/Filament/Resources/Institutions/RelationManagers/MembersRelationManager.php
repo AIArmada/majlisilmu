@@ -2,22 +2,21 @@
 
 namespace App\Filament\Resources\Institutions\RelationManagers;
 
-use AIArmada\FilamentAuthz\Facades\Authz;
-use AIArmada\FilamentAuthz\Models\AuthzScope;
-use AIArmada\FilamentAuthz\Models\Role;
+use App\Actions\Membership\AddMemberToSubject;
+use App\Actions\Membership\ChangeSubjectMemberRole;
+use App\Actions\Membership\RemoveMemberFromSubject;
+use App\Enums\MemberSubjectType;
 use App\Filament\Resources\Authz\UserResource as AuthzUserResource;
 use App\Models\Institution;
 use App\Models\User;
-use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
-use App\Support\Submission\PublicSubmissionLockService;
 use App\Support\Submission\PublicSubmissionUiEvents;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Spatie\Permission\PermissionRegistrar;
 
 class MembersRelationManager extends RelationManager
 {
@@ -40,7 +39,7 @@ class MembersRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('roles')
                     ->label('Roles')
-                    ->getStateUsing(fn (User $record): string => Authz::withScope($this->getRoleScope(), fn (): string => $record->getRoleNames()->implode(', '), $record) ?: '—'),
+                    ->getStateUsing(fn (User $record): string => implode(', ', app(MemberRoleCatalog::class)->roleNamesFor($record, MemberSubjectType::Institution)) ?: '—'),
             ])
             ->headerActions([
                 Action::make('addMember')
@@ -54,39 +53,42 @@ class MembersRelationManager extends RelationManager
                         $this->makeRoleSelect(),
                     ])
                     ->action(function (array $data): void {
-                        $institution = $this->getInstitutionOwner();
-                        $user = User::findOrFail($data['user_id']);
+                        app(AddMemberToSubject::class)->handle(
+                            $this->getInstitutionOwner(),
+                            User::findOrFail($data['user_id']),
+                            $data['role_id'] ?? null,
+                        );
 
-                        $institution->members()->syncWithoutDetaching([$user->id]);
-                        $this->syncMemberRoles($user, $data['role_ids'] ?? []);
-                        app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
                         $this->notifyOwnerEditPage();
                     }),
             ])
             ->actions([
                 Action::make('manageRoles')
                     ->label('Roles')
+                    ->hidden(fn (User $record): bool => $this->memberHasProtectedRole($record))
                     ->form([
                         $this->makeRoleSelect(),
                     ])
                     ->fillForm(fn (User $record): array => [
-                        'role_ids' => $this->getMemberRoleIds($record),
+                        'role_id' => $this->getMemberRoleId($record),
                     ])
                     ->action(function (array $data, User $record): void {
-                        $this->syncMemberRoles($record, $data['role_ids'] ?? []);
-                        app(PublicSubmissionLockService::class)->syncForUser($record);
+                        app(ChangeSubjectMemberRole::class)->handle(
+                            $this->getInstitutionOwner(),
+                            $record,
+                            $data['role_id'] ?? null,
+                        );
+
                         $this->notifyOwnerEditPage();
                     }),
                 Action::make('removeMember')
                     ->label('Remove')
                     ->color('danger')
+                    ->hidden(fn (User $record): bool => $this->memberHasProtectedRole($record))
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $institution = $this->getInstitutionOwner();
+                        app(RemoveMemberFromSubject::class)->handle($this->getInstitutionOwner(), $record);
 
-                        $institution->members()->detach($record->id);
-                        $this->syncMemberRoles($record, []);
-                        app(PublicSubmissionLockService::class)->ensureInstitutionUnlockedIfIneligible($institution->fresh());
                         $this->notifyOwnerEditPage();
                     }),
             ]);
@@ -98,32 +100,8 @@ class MembersRelationManager extends RelationManager
     protected function getScopedRoleOptions(): array
     {
         app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
-        $teamsKey = app(PermissionRegistrar::class)->teamsKey;
-        $scope = $this->getRoleScope();
 
-        return Authz::withScope($scope, fn (): array => Role::query()
-            ->where($teamsKey, getPermissionsTeamId())
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all());
-    }
-
-    /**
-     * @return list<string>
-     */
-    protected function getMemberRoleIds(User $user): array
-    {
-        return Authz::withScope($this->getRoleScope(), fn (): array => $user->roles()->pluck('id')->all(), $user);
-    }
-
-    /**
-     * @param  list<string>  $roleIds
-     */
-    protected function syncMemberRoles(User $user, array $roleIds): void
-    {
-        Authz::withScope($this->getRoleScope(), function () use ($user, $roleIds): void {
-            $user->syncRoles($roleIds);
-        }, $user);
+        return app(MemberRoleCatalog::class)->roleOptionsFor(MemberSubjectType::Institution);
     }
 
     private function getInstitutionOwner(): Institution
@@ -134,18 +112,22 @@ class MembersRelationManager extends RelationManager
         return $institution;
     }
 
+    private function getMemberRoleId(User $user): ?string
+    {
+        return app(MemberRoleCatalog::class)->roleIdsFor($user, MemberSubjectType::Institution)[0] ?? null;
+    }
+
     private function makeRoleSelect(): Select
     {
-        return Select::make('role_ids')
-            ->label('Roles')
+        return Select::make('role_id')
+            ->label('Role')
             ->options(fn () => $this->getScopedRoleOptions())
-            ->multiple()
             ->required();
     }
 
-    private function getRoleScope(): AuthzScope
+    private function memberHasProtectedRole(User $user): bool
     {
-        return app(MemberRoleScopes::class)->institution();
+        return app(MemberRoleCatalog::class)->userHasProtectedRole($user, MemberSubjectType::Institution);
     }
 
     private function notifyOwnerEditPage(): void

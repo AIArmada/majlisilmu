@@ -2,6 +2,7 @@
 
 namespace App\Forms;
 
+use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\Gender;
 use App\Enums\Honorific;
 use App\Enums\PostNominal;
@@ -202,7 +203,7 @@ class SpeakerFormSchema
         $creator = auth()->user();
 
         if ($creator instanceof User) {
-            $speaker->members()->syncWithoutDetaching([$creator->getKey()]);
+            app(AddMemberToSubject::class)->handle($speaker, $creator);
         }
 
         // Save media uploads (avatar/cover) via Filament's relationship-saving mechanism

@@ -486,14 +486,14 @@
                                                                 {{ __('Cancel') }}
                                                             </button>
                                                         @else
-                                                            <button
-                                                                type="button"
-                                                                wire:click="startEditingMemberRoles('{{ $member->id }}')"
-                                                                class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                                                            >
-                                                                {{ __('Edit Roles') }}
-                                                            </button>
                                                             @if(!$isProtectedOwner)
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="startEditingMemberRoles('{{ $member->id }}')"
+                                                                    class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                                                                >
+                                                                    {{ __('Edit Roles') }}
+                                                                </button>
                                                                 <button
                                                                     type="button"
                                                                     wire:click="removeMember('{{ $member->id }}')"
@@ -504,7 +504,7 @@
                                                                 </button>
                                                             @else
                                                                 <span class="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
-                                                                    {{ __('Owner cannot be removed') }}
+                                                                    {{ __('Owner role is managed globally') }}
                                                                 </span>
                                                             @endif
                                                         @endif

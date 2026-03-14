@@ -800,6 +800,13 @@ it('only lets institution owners and admins manage members and never removes own
     Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($adminUser)
         ->test(InstitutionDashboard::class)
+        ->call('startEditingMemberRoles', $ownerUser->id)
+        ->assertDispatched('app-toast')
+        ->assertSet('editingMemberId', null);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($adminUser)
+        ->test(InstitutionDashboard::class)
         ->call('removeMember', $ownerUser->id)
         ->assertDispatched('app-toast');
 

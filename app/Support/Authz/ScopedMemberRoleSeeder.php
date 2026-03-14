@@ -6,158 +6,42 @@ use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\AuthzScope;
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\MemberSubjectType;
 
 class ScopedMemberRoleSeeder
 {
     public function __construct(
         private readonly MemberRoleScopes $memberRoleScopes,
+        private readonly MemberRoleCatalog $memberRoleCatalog,
     ) {}
-
-    /**
-     * @var array<string, list<string>>
-     */
-    private const array INSTITUTION_ROLE_PERMISSIONS = [
-        'owner' => [
-            'institution.view',
-            'institution.update',
-            'institution.delete',
-            'institution.manage-members',
-            'institution.manage-donation-channels',
-            'event.view',
-            'event.approve',
-            'event.create',
-            'event.update',
-            'event.delete',
-            'event.manage-members',
-            'event.view-registrations',
-            'event.export-registrations',
-        ],
-        'admin' => [
-            'institution.view',
-            'institution.update',
-            'institution.manage-members',
-            'institution.manage-donation-channels',
-            'event.view',
-            'event.approve',
-            'event.create',
-            'event.update',
-            'event.delete',
-            'event.manage-members',
-            'event.view-registrations',
-            'event.export-registrations',
-        ],
-        'editor' => [
-            'institution.view',
-            'event.view',
-            'event.approve',
-            'event.create',
-            'event.update',
-        ],
-        'viewer' => [
-            'institution.view',
-            'event.view',
-        ],
-    ];
-
-    /**
-     * @var array<string, list<string>>
-     */
-    private const array SPEAKER_ROLE_PERMISSIONS = [
-        'owner' => [
-            'speaker.view',
-            'speaker.update',
-            'speaker.delete',
-            'speaker.manage-members',
-            'event.approve',
-        ],
-        'admin' => [
-            'speaker.view',
-            'speaker.update',
-            'speaker.manage-members',
-            'event.approve',
-        ],
-        'editor' => [
-            'speaker.view',
-            'speaker.update',
-            'event.approve',
-        ],
-        'viewer' => [
-            'speaker.view',
-        ],
-    ];
-
-    /**
-     * @var array<string, list<string>>
-     */
-    private const array EVENT_ROLE_PERMISSIONS = [
-        'organizer' => [
-            'event.view',
-            'event.update',
-            'event.delete',
-            'event.manage-members',
-            'event.view-registrations',
-            'event.export-registrations',
-        ],
-        'co-organizer' => [
-            'event.view',
-            'event.update',
-            'event.manage-members',
-            'event.view-registrations',
-            'event.export-registrations',
-        ],
-        'editor' => [
-            'event.view',
-            'event.update',
-        ],
-        'viewer' => [
-            'event.view',
-        ],
-    ];
-
-    /**
-     * @var array<string, list<string>>
-     */
-    private const array REFERENCE_ROLE_PERMISSIONS = [
-        'owner' => [
-            'reference.view',
-            'reference.update',
-            'reference.delete',
-            'reference.manage-members',
-            'reference.approve',
-        ],
-        'admin' => [
-            'reference.view',
-            'reference.update',
-            'reference.manage-members',
-            'reference.approve',
-        ],
-        'editor' => [
-            'reference.view',
-            'reference.update',
-        ],
-        'viewer' => [
-            'reference.view',
-        ],
-    ];
 
     public function ensureForInstitution(): void
     {
-        $this->seedRolesForScope($this->memberRoleScopes->institution(), self::INSTITUTION_ROLE_PERMISSIONS, false);
+        $this->ensure(MemberSubjectType::Institution);
     }
 
     public function ensureForSpeaker(): void
     {
-        $this->seedRolesForScope($this->memberRoleScopes->speaker(), self::SPEAKER_ROLE_PERMISSIONS, false);
+        $this->ensure(MemberSubjectType::Speaker);
     }
 
     public function ensureForEvent(): void
     {
-        $this->seedRolesForScope($this->memberRoleScopes->event(), self::EVENT_ROLE_PERMISSIONS, false);
+        $this->ensure(MemberSubjectType::Event);
     }
 
     public function ensureForReference(): void
     {
-        $this->seedRolesForScope($this->memberRoleScopes->reference(), self::REFERENCE_ROLE_PERMISSIONS, false);
+        $this->ensure(MemberSubjectType::Reference);
+    }
+
+    public function ensure(MemberSubjectType $subjectType): void
+    {
+        $this->seedRolesForScope(
+            $subjectType->authzScope($this->memberRoleScopes),
+            $this->memberRoleCatalog->permissionMapFor($subjectType),
+            false,
+        );
     }
 
     /**

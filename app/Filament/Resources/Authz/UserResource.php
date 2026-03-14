@@ -11,12 +11,14 @@ use App\Filament\Resources\Authz\UserResource\Pages\CreateUser;
 use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
 use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
 use App\Filament\Resources\Authz\UserResource\Pages\ViewUser;
+use App\Models\User;
 use DateTimeZone;
 use Filament\Actions;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -36,6 +38,19 @@ class UserResource extends BaseUserResource
                 ->schema(static::getConfiguredFormFields())
                 ->columns(2),
             ...UserAuthzForm::components(),
+            Section::make('Protected Scoped Roles')
+                ->description('Change protected institution, speaker, event, and reference ownership roles from this central admin surface.')
+                ->schema([
+                    View::make('filament.resources.authz.user-resource.components.protected-scoped-role-manager'),
+                ])
+                ->columnSpanFull()
+                ->visible(fn (?User $record): bool => $record instanceof User),
+            Section::make('Memberships')
+                ->schema([
+                    View::make('filament.resources.authz.user-resource.components.membership-summary'),
+                ])
+                ->columnSpanFull()
+                ->visible(fn (?User $record): bool => $record instanceof User),
         ]);
     }
 
@@ -56,8 +71,8 @@ class UserResource extends BaseUserResource
                     ->searchable()
                     ->copyable()
                     ->placeholder('-'),
-                TextColumn::make('roles.name')
-                    ->label('Roles')
+                TextColumn::make('globalRoles.name')
+                    ->label('Global Roles')
                     ->badge()
                     ->color('primary')
                     ->searchable(),

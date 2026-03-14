@@ -216,6 +216,9 @@ it('redirects guests to login before opening report and suggest update pages', f
 
     $this->get(route('reports.create', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
         ->assertRedirect(route('login'));
+
+    $this->get("/report/speaker/{$speaker->slug}")
+        ->assertRedirect(route('login'));
 });
 
 it('forbids users banned from directory feedback from opening update and report pages', function () {

@@ -1,6 +1,8 @@
 <?php
 
+use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\MemberSubjectType;
 use App\Filament\Resources\Authz\UserResource;
 use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
 use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
@@ -14,6 +16,9 @@ use App\Models\Registration;
 use App\Models\SavedSearch;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Authz\MemberRoleCatalog;
+use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\ScopedMemberRoleSeeder;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -39,6 +44,86 @@ it('shows timezone and verification timestamps on the authz user edit page', fun
         ->assertSee('Timezone')
         ->assertSee('Email Verified At')
         ->assertSee('Phone Verified At');
+});
+
+it('shows read only membership summaries on the authz user edit page', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $targetUser = User::factory()->create();
+
+    $institution = Institution::factory()->create(['name' => 'Edit Membership Institution']);
+    $speaker = Speaker::factory()->create(['name' => 'Edit Membership Speaker']);
+    $event = Event::factory()->create(['title' => 'Edit Membership Event']);
+    $reference = Reference::factory()->create(['title' => 'Edit Membership Reference']);
+
+    $institution->members()->syncWithoutDetaching([$targetUser->id]);
+    $speaker->members()->syncWithoutDetaching([$targetUser->id]);
+    $event->members()->syncWithoutDetaching([$targetUser->id => ['joined_at' => now()]]);
+    $reference->members()->syncWithoutDetaching([$targetUser->id]);
+
+    $this->actingAs($administrator)
+        ->get(UserResource::getUrl('edit', ['record' => $targetUser], panel: 'admin'))
+        ->assertSuccessful()
+        ->assertSee('Memberships')
+        ->assertSee('Edit Membership Institution')
+        ->assertSee('Edit Membership Speaker')
+        ->assertSee('Edit Membership Event')
+        ->assertSee('Edit Membership Reference')
+        ->assertSee('read-only', false);
+});
+
+it('shows and applies protected scoped role overrides from the authz user edit page', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $targetUser = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Protected Role Institution']);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+    $institution->members()->syncWithoutDetaching([$targetUser->id]);
+
+    $roleOptions = app(MemberRoleCatalog::class)->roleOptionsFor(MemberSubjectType::Institution);
+    $ownerRoleId = array_search('owner', $roleOptions, true);
+    $adminRoleId = array_search('admin', $roleOptions, true);
+
+    expect($ownerRoleId)->toBeString()
+        ->and($adminRoleId)->toBeString();
+
+    Authz::withScope(app(MemberRoleScopes::class)->institution(), function () use ($targetUser): void {
+        $targetUser->syncRoles(['owner']);
+    }, $targetUser);
+
+    $this->actingAs($administrator)
+        ->get(UserResource::getUrl('edit', ['record' => $targetUser], panel: 'admin'))
+        ->assertSuccessful()
+        ->assertSee('Protected Scoped Roles')
+        ->assertSee('Protected Role Institution')
+        ->assertSee('Current protected role: Owner')
+        ->assertSee('These changes apply to every membership of the selected type');
+
+    Livewire::actingAs($administrator)
+        ->test(EditUser::class, ['record' => $targetUser->getKey()])
+        ->assertSet('protectedRoleSelections.institution', $ownerRoleId)
+        ->set('protectedRoleSelections.institution', $adminRoleId)
+        ->call('applyProtectedScopedRole', 'institution')
+        ->assertHasNoErrors();
+
+    expect(app(MemberRoleCatalog::class)->roleNamesFor($targetUser->fresh(), MemberSubjectType::Institution))->toBe(['admin']);
 });
 
 it('saves authz user edits without mass assigning roles', function () {
@@ -112,6 +197,33 @@ it('opens authz user records on the view page from the users index', function ()
             fn ($action): bool => $action->getUrl() === UserResource::getUrl('view', ['record' => $targetUser], panel: 'admin'),
             $targetUser,
         );
+});
+
+it('allows searching the authz user index by global role name', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $targetUser = User::factory()->create([
+        'name' => 'Global Role Search Target',
+    ]);
+    $plainUser = User::factory()->create([
+        'name' => 'Plain User',
+    ]);
+
+    $targetUser->assignRole('super_admin');
+
+    Livewire::actingAs($administrator)
+        ->test(ListUsers::class)
+        ->searchTable('super_admin')
+        ->assertCanSeeTableRecords([$targetUser])
+        ->assertCanNotSeeTableRecords([$plainUser]);
 });
 
 it('shows authz user activity memberships follows submissions and saved searches on the view page', function () {
