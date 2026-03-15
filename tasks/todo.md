@@ -1,3 +1,27 @@
+# Institutions CTA Refresh
+
+- [x] Move the add-institution CTA to the bottom of the public institutions page
+- [x] Point the CTA to the dedicated institution contribution flow
+- [x] Refresh the CTA layout so it matches the stronger bottom-of-page contribution pattern
+- [x] Verify the rendered page locally
+
+## Review
+- Removed the old inline institution-submission form path from the public institutions index so the page stays focused on discovery and filtering.
+- Added a bottom contribution panel that links to `route('contributions.submit-institution')`, which resolves to `/sumbangan/institusi/baru`.
+- Verified the rendered page locally at `/institusi`; the CTA appears near the footer and, for logged-out users, the contribution route redirects to the login gate as expected.
+
+# Speakers CTA Refresh
+
+- [x] Move the add-speaker CTA to the bottom of the public speakers page
+- [x] Point the CTA to `/sumbangan/penceramah/baru`
+- [x] Refresh the CTA copy and styling so it feels more inviting and compelling
+- [x] Verify the rendered page locally
+
+## Review
+- Removed the old inline speaker-submission form path from the public speakers index and turned the page back into a focused directory/search experience.
+- Added a new bottom-of-page contribution panel that links to `route('contributions.submit-speaker')`, which resolves to `/sumbangan/penceramah/baru`.
+- Verified the rendered page locally and confirmed the CTA displays at the bottom of `/penceramah`; unauthenticated navigation lands on the login gate for the protected contribution flow.
+
 # Interest Removal Review Fixes
 
 - [x] Restore the historical event-interest migration file so migration history stays intact
