@@ -1,3 +1,44 @@
+# Registration Email Audit Fix
+
+- [x] Remove duplicate verification-email dispatch from the registered-user listener
+- [x] Add regression assertions that registration sends exactly one verification email
+- [x] Run focused verification for the auth email flow changes
+
+## Registration Email Audit Fix Review
+
+- Removed the explicit verification send from `SendRegisteredUserEmails` and left Laravel's built-in `Registered` listener as the single source of verification email dispatch.
+- Removed the manual `Registered`, `Verified`, `NotificationSent`, and `NotificationFailed` listener bindings from `AppServiceProvider` because those listeners already live under `app/Listeners` and were being auto-discovered, which doubled the welcome mail send and risked duplicate notification delivery logging/fallback handling.
+- Tightened the web and API registration lifecycle tests to assert welcome and verification notifications are each sent exactly once.
+- Verification:
+  - `vendor/bin/phpstan analyse --ansi app/Providers/AppServiceProvider.php app/Listeners/Auth/SendRegisteredUserEmails.php tests/Feature/Auth/EmailLifecycleTest.php tests/Feature/Api/AuthEmailApiTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/Auth/EmailLifecycleTest.php` => 1 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/AuthEmailApiTest.php` => 5 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationDeliveryFlowTest.php` => 13 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `git diff --check` => pass
+
+# Unified Email Surface Implementation
+
+- [x] Audit the exact auth, invitation, and notification hooks that will own outbound email
+- [x] Implement the shared account lifecycle email foundation across web and API registration
+- [x] Add invitation email delivery from the membership action layer
+- [x] Add API password recovery and verification resend endpoints
+- [x] Audit and standardize existing mail-capable notifications
+- [x] Document the email inventory and local `log` mailer workflow
+- [x] Run Rector, PHPStan, Pest, and Pint and fix anything they surface
+
+## Unified Email Surface Implementation Review
+
+- Made `User` a real email-verification notifiable, replaced the default verification and password-reset mail with branded queued notifications, and added a registered-user listener so welcome plus verification emails now fire consistently for both web and API signup.
+- API auth now includes forgot-password, reset-password, and resend-verification endpoints, all reusing the same broker and notification paths as the web lifecycle.
+- Member invitations now send queued routed email directly from `InviteSubjectMember`, so every invitation creation path delivers the same subject/role/link/expiry email without depending on Filament UI code.
+- Standardized the remaining mail-capable operational surface by bringing `ReportResolvedNotification` onto the same queued/localized/action-url shape as the existing moderation mail notifications, and documented the full email inventory plus the local `MAIL_MAILER=log` + queue-worker workflow in `docs/EMAIL_FEATURES.md`.
+- Verification:
+  - `vendor/bin/rector process` => pass
+  - `vendor/bin/phpstan analyse --ansi` => no errors
+  - `vendor/bin/pest --parallel` => 910 passed
+  - `vendor/bin/pint --format agent` => pass
+
 # Uncommitted Change Audit And Verification Sweep
 
 - [x] Review the full uncommitted working tree for regressions and contract drift

@@ -7,12 +7,15 @@ use App\Enums\MemberSubjectType;
 use App\Models\Institution;
 use App\Models\MemberInvitation;
 use App\Models\User;
+use App\Notifications\Membership\MemberInvitationNotification;
 use App\Support\Authz\MemberRoleCatalog;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Notification::fake();
 });
 
 it('creates a member invitation with the requested subject and role', function () {
@@ -34,6 +37,11 @@ it('creates a member invitation with the requested subject and role', function (
         ->and($invitation->role_slug)->toBe('admin')
         ->and($invitation->invited_by)->toBe($inviter->getKey())
         ->and($invitation->token)->not->toBe('');
+
+    Notification::assertSentOnDemand(MemberInvitationNotification::class, fn (MemberInvitationNotification $notification, array $channels, object $notifiable): bool => method_exists($notifiable, 'routeNotificationFor')
+        && $notifiable->routeNotificationFor('mail', $notification) === 'invitee@example.com'
+        && $notification->subjectName === $institution->name
+        && $notification->roleLabel === 'Admin');
 });
 
 it('rejects protected ownership roles for member invitations', function () {

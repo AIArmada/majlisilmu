@@ -3,9 +3,6 @@
 namespace App\Providers;
 
 use App\Ai\Listeners\RecordAiUsage;
-use App\Listeners\Auth\RecordVerifiedEmail;
-use App\Listeners\Notifications\HandleNotificationFailed;
-use App\Listeners\Notifications\RecordNotificationSent;
 use App\Models\ContributionRequest;
 use App\Models\DonationChannel;
 use App\Models\Event;
@@ -30,10 +27,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
-use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Notifications\Events\NotificationFailed;
-use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -55,10 +49,6 @@ class AppServiceProvider extends ServiceProvider
     protected static bool $mediaUploadConfigured = false;
 
     protected static bool $publicListingObserversRegistered = false;
-
-    protected static bool $notificationListenersRegistered = false;
-
-    protected static bool $authSignalListenersRegistered = false;
 
     /**
      * Register any application services.
@@ -119,17 +109,6 @@ class AppServiceProvider extends ServiceProvider
             EventFacade::listen(AudioGenerated::class, [RecordAiUsage::class, 'handle']);
 
             app()->instance('ai.usage.listeners.registered', true);
-        }
-
-        if (! self::$notificationListenersRegistered) {
-            EventFacade::listen(NotificationSent::class, RecordNotificationSent::class);
-            EventFacade::listen(NotificationFailed::class, HandleNotificationFailed::class);
-            self::$notificationListenersRegistered = true;
-        }
-
-        if (! self::$authSignalListenersRegistered) {
-            EventFacade::listen(Verified::class, RecordVerifiedEmail::class);
-            self::$authSignalListenersRegistered = true;
         }
 
         if (! self::$languageSwitchConfigured) {

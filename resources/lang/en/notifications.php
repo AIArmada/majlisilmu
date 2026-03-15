@@ -20,6 +20,42 @@ return [
         'occurred_at' => 'Occurred at: :datetime',
         'footer' => 'You are receiving this because your notification settings allow this update.',
     ],
+    'auth' => [
+        'actions' => [
+            'open_dashboard' => 'Open dashboard',
+            'reset_password' => 'Reset password',
+            'verify_email' => 'Verify email address',
+        ],
+        'verification' => [
+            'subject' => 'Verify your email address',
+            'intro' => 'Please verify your email address to finish setting up your account.',
+            'outro' => 'If you did not create an account, no further action is required.',
+        ],
+        'welcome' => [
+            'subject' => 'Welcome to :app',
+            'intro' => 'Welcome to :app.',
+            'body' => 'Your account is ready. You can now save events, follow speakers or institutions, and manage your own submissions.',
+            'verify_hint' => 'Please verify your email address so email-based notifications and account recovery stay available.',
+            'footer' => 'Thank you for joining :app.',
+        ],
+        'reset_password' => [
+            'subject' => 'Reset your password',
+            'intro' => 'We received a request to reset the password for your account.',
+            'expiry' => 'This password reset link will expire in :count minutes.',
+            'outro' => 'If you did not request a password reset, no further action is required.',
+        ],
+    ],
+    'membership' => [
+        'invitation' => [
+            'subject' => ':inviter invited you to join :subject',
+            'intro' => ':inviter invited you to join this :subject_label as :role.',
+            'subject_name' => 'Subject: :name',
+            'role' => 'Role: :role',
+            'expires' => 'Expires: :datetime',
+            'action' => 'Review invitation',
+            'footer' => 'Sign in with :email to review and accept this invitation.',
+        ],
+    ],
     'moderation' => [
         'greeting' => 'Assalamualaikum,',
         'not_scheduled' => 'Not scheduled yet',
@@ -57,6 +93,21 @@ return [
             ],
             'urgent_footer' => 'Please review this event soon so the status is resolved before it starts.',
             'priority_footer' => 'This event needs immediate action because it is very close to starting.',
+        ],
+    ],
+    'reports' => [
+        'resolved' => [
+            'subject_resolved' => 'Your report has been resolved',
+            'subject_dismissed' => 'Your report has been closed',
+            'intro' => 'Your report about this :entity has been reviewed by our moderation team.',
+            'status' => 'Status: :status',
+            'note' => 'Moderator note: :note',
+            'footer' => 'Thank you for helping us keep :app useful and accurate.',
+            'action' => 'View reported subject',
+            'statuses' => [
+                'resolved' => 'Resolved',
+                'dismissed' => 'Dismissed',
+            ],
         ],
     ],
     'destinations' => [

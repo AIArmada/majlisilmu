@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.auth.forgot-password');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
 
     // Events API with query builder
     Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
@@ -33,6 +35,8 @@ Route::prefix('v1')->group(function () {
 // Authenticated API endpoints
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
+    Route::post('/auth/email/verification-notification', [AuthController::class, 'resendVerificationEmail'])
+        ->name('api.auth.verification-notification');
 
     // Reports (per documentation B5b) - Rate limited
     Route::post('/reports', [ReportController::class, 'store'])
