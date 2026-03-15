@@ -386,7 +386,7 @@ class extends Component
                     {{ __('Centers of') }} <br class="hidden md:block" />
                     <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{{ __('Knowledge & Community') }}</span>
                 </h1>
-                <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto text-balance">
+                <p class="text-slate-600 text-lg md:text-xl max-w-2xl mx-auto text-balance">
                     {{ __('Connect with the mosques, suraus, and educational centers nurturing our community.') }}
                 </p>
                 
@@ -400,7 +400,7 @@ class extends Component
                             wire:model.live.debounce.300ms="search"
                             wire:keydown.escape="clearSearch"
                             placeholder="{{ __('Search institutions...') }}" 
-                            class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-white shadow-lg shadow-slate-200/50 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
+                            class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 bg-white shadow-lg shadow-slate-200/60 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
                         >
                         <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                          @if(filled($search))
@@ -508,12 +508,12 @@ class extends Component
                             $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
                             $cardInstitutionImageUrl = $coverUrl ?: $institution->getFirstMediaUrl('logo');
                         @endphp
-                        <a href="{{ route('institutions.show', $institution) }}" wire:navigate class="group relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden">
+                        <a href="{{ route('institutions.show', $institution) }}" wire:navigate class="group relative bg-white rounded-3xl border border-slate-200 shadow-md hover:shadow-xl hover:shadow-emerald-900/8 hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden">
                             <!-- Banner Area (16:9, cover-first) -->
                             <div class="aspect-video bg-slate-50 relative overflow-hidden">
                                 @if($cardInstitutionImageUrl)
                                     <img src="{{ $cardInstitutionImageUrl }}" alt="{{ $institution->name }}" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/35 via-slate-900/10 to-transparent"></div>
+                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/50 via-slate-900/15 to-transparent"></div>
                                 @else
                                     <div class="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-100 group-hover:opacity-90 transition-opacity"></div>
                                     <svg class="absolute right-0 bottom-0 text-emerald-100/50 w-32 h-32 transform translate-x-8 translate-y-8" fill="currentColor" viewBox="0 0 24 24">
@@ -531,14 +531,14 @@ class extends Component
                                     $address = $institution->addressModel;
                                     $locationDisplay = $formatInstitutionLocation($address);
                                 @endphp
-                                <p class="text-sm text-slate-500 flex items-start gap-1.5 mb-4 font-medium">
+                                <p class="text-sm text-slate-600 flex items-start gap-1.5 mb-4 font-medium">
                                     <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     <span class="line-clamp-2">{{ $locationDisplay }}</span>
                                 </p>
                                 
-                                <div class="mt-auto pt-5 border-t border-slate-50 flex items-center justify-between">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
-                                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg ring-1 ring-emerald-200">
+                                        <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                         {{ $institution->events_count }} {{ __('Events') }}
                                     </span>
                                     
@@ -589,9 +589,6 @@ class extends Component
                                         </svg>
                                     </a>
 
-                                    <p class="text-sm text-emerald-50/85">
-                                        {{ __('Terus ke halaman sumbangan institusi untuk hantar maklumat lengkap.') }}
-                                    </p>
                                 </div>
                             </div>
                         </div>

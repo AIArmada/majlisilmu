@@ -374,9 +374,6 @@ new
                             </svg>
                         </a>
 
-                        <p class="text-sm text-emerald-50/85">
-                            {{ __('Terus ke halaman sumbangan penceramah untuk hantar maklumat lengkap.') }}
-                        </p>
                     </div>
                 </div>
             </div>
