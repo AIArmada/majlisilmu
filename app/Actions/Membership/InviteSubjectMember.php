@@ -9,9 +9,11 @@ use App\Models\MemberInvitation;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Notifications\Membership\MemberInvitationNotification;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -47,7 +49,7 @@ final readonly class InviteSubjectMember
 
         $this->memberRoleCatalog->resolveRoleId($subjectType, $roleSlug);
 
-        return MemberInvitation::create([
+        $invitation = MemberInvitation::create([
             'subject_type' => $subjectType,
             'subject_id' => $subject->getKey(),
             'email' => $normalizedEmail,
@@ -56,5 +58,37 @@ final readonly class InviteSubjectMember
             'invited_by' => $inviter->getKey(),
             'expires_at' => $expiresAt,
         ]);
+
+        Notification::route('mail', $normalizedEmail)
+            ->notify(new MemberInvitationNotification(
+                inviterName: $inviter->name,
+                subjectLabel: $this->subjectLabel($subjectType),
+                subjectName: $this->subjectName($subject),
+                roleLabel: $this->memberRoleCatalog->roleLabel($subjectType, $roleSlug),
+                invitedEmail: $normalizedEmail,
+                acceptUrl: route('member-invitations.show', ['token' => $invitation->token]),
+                expiresAt: $expiresAt,
+            ));
+
+        return $invitation;
+    }
+
+    private function subjectLabel(MemberSubjectType $subjectType): string
+    {
+        return match ($subjectType) {
+            MemberSubjectType::Institution => __('Institution'),
+            MemberSubjectType::Speaker => __('Speaker'),
+            MemberSubjectType::Event => __('Event'),
+            MemberSubjectType::Reference => __('Reference'),
+        };
+    }
+
+    private function subjectName(Institution|Speaker|Event|Reference $subject): string
+    {
+        return match (true) {
+            $subject instanceof Event => $subject->title,
+            $subject instanceof Reference => $subject->title,
+            default => $subject->name,
+        };
     }
 }

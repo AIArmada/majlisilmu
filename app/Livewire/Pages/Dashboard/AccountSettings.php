@@ -223,6 +223,10 @@ class AccountSettings extends Component implements HasForms
         $freshUser = $user->fresh() ?? $user;
         $this->settingsManager()->syncProfileSettings($freshUser);
 
+        if ($emailChanged) {
+            $freshUser->sendEmailVerificationNotification();
+        }
+
         $this->successToast(__('Account settings updated.'));
         $this->hydrateNotificationCenter($freshUser);
     }

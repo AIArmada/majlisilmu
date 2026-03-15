@@ -5,6 +5,7 @@ namespace App\Actions\Auth;
 use App\Actions\Fortify\CreateNewUser;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -25,6 +26,8 @@ final readonly class RegisterApiUserAction
     {
         /** @var User $user */
         $user = $this->createNewUser->create($input);
+
+        event(new Registered($user));
 
         $accessToken = $user->createToken($deviceName)->plainTextToken;
 

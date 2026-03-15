@@ -3,8 +3,10 @@
 use App\Livewire\Pages\Dashboard\AccountSettings;
 use App\Models\NotificationDestination;
 use App\Models\User;
+use App\Notifications\Auth\VerifyEmailNotification;
 use App\Services\Notifications\NotificationSettingsManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -48,6 +50,8 @@ it('renders the notifications tab in Malay without leaking raw translation keys'
 });
 
 it('updates account settings and resets verification when contact details change', function () {
+    Notification::fake();
+
     $user = User::factory()->create([
         'name' => 'Old Name',
         'email' => 'old@example.test',
@@ -116,6 +120,8 @@ it('updates account settings and resets verification when contact details change
     $notificationState = app(NotificationSettingsManager::class)->stateFor($user->fresh());
 
     expect($notificationState['settings']['timezone'])->toBe('Asia/Jakarta');
+
+    Notification::assertSentTo($user->fresh(), VerifyEmailNotification::class);
 });
 
 it('saves trigger overrides and fallback channels from account settings', function () {

@@ -20,6 +20,42 @@ return [
         'occurred_at' => 'Berlaku pada: :datetime',
         'footer' => 'Anda menerima mesej ini kerana tetapan notifikasi anda membenarkan kemas kini ini.',
     ],
+    'auth' => [
+        'actions' => [
+            'open_dashboard' => 'Buka dashboard',
+            'reset_password' => 'Tetapkan semula kata laluan',
+            'verify_email' => 'Sahkan alamat e-mel',
+        ],
+        'verification' => [
+            'subject' => 'Sahkan alamat e-mel anda',
+            'intro' => 'Sila sahkan alamat e-mel anda untuk melengkapkan penyediaan akaun.',
+            'outro' => 'Jika anda tidak mencipta akaun ini, tiada tindakan lanjut diperlukan.',
+        ],
+        'welcome' => [
+            'subject' => 'Selamat datang ke :app',
+            'intro' => 'Selamat datang ke :app.',
+            'body' => 'Akaun anda sudah sedia digunakan. Anda kini boleh menyimpan majlis, mengikuti penceramah atau institusi, dan mengurus hantaran anda sendiri.',
+            'verify_hint' => 'Sila sahkan alamat e-mel anda supaya notifikasi e-mel dan pemulihan akaun terus tersedia.',
+            'footer' => 'Terima kasih kerana menyertai :app.',
+        ],
+        'reset_password' => [
+            'subject' => 'Tetapkan semula kata laluan anda',
+            'intro' => 'Kami menerima permintaan untuk menetapkan semula kata laluan akaun anda.',
+            'expiry' => 'Pautan penetapan semula kata laluan ini akan luput dalam masa :count minit.',
+            'outro' => 'Jika anda tidak meminta penetapan semula kata laluan, tiada tindakan lanjut diperlukan.',
+        ],
+    ],
+    'membership' => [
+        'invitation' => [
+            'subject' => ':inviter menjemput anda menyertai :subject',
+            'intro' => ':inviter menjemput anda menyertai :subject_label ini sebagai :role.',
+            'subject_name' => 'Subjek: :name',
+            'role' => 'Peranan: :role',
+            'expires' => 'Luput pada: :datetime',
+            'action' => 'Semak jemputan',
+            'footer' => 'Log masuk menggunakan :email untuk menyemak dan menerima jemputan ini.',
+        ],
+    ],
     'moderation' => [
         'greeting' => 'Assalamualaikum,',
         'not_scheduled' => 'Belum dijadualkan',
@@ -57,6 +93,21 @@ return [
             ],
             'urgent_footer' => 'Mohon semak majlis ini segera supaya statusnya dapat diputuskan sebelum ia bermula.',
             'priority_footer' => 'Majlis ini perlukan tindakan serta-merta kerana waktu mulanya sudah sangat hampir.',
+        ],
+    ],
+    'reports' => [
+        'resolved' => [
+            'subject_resolved' => 'Laporan anda telah diselesaikan',
+            'subject_dismissed' => 'Laporan anda telah ditutup',
+            'intro' => 'Laporan anda berkaitan :entity telah disemak oleh pasukan moderasi kami.',
+            'status' => 'Status: :status',
+            'note' => 'Nota moderator: :note',
+            'footer' => 'Terima kasih kerana membantu kami memastikan :app terus tepat dan berguna.',
+            'action' => 'Lihat subjek laporan',
+            'statuses' => [
+                'resolved' => 'Diselesaikan',
+                'dismissed' => 'Ditutup',
+            ],
         ],
     ],
     'destinations' => [

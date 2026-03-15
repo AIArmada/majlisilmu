@@ -7,12 +7,16 @@ use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
+use App\Notifications\Auth\ResetPasswordNotification;
+use App\Notifications\Auth\VerifyEmailNotification;
 use App\Notifications\NotificationCenterMessage;
 use App\Services\ShareTrackingService;
 use App\Support\Submission\PublicSubmissionLockService;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,10 +36,10 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser, HasLocalePreference
+class User extends Authenticatable implements FilamentUser, HasLocalePreference, MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, HasUuids, MustVerifyEmail, Notifiable;
 
     public $incrementing = false;
 
@@ -470,6 +474,26 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference
         return is_string($this->timezone) && $this->timezone !== ''
             ? $this->timezone
             : (string) config('app.timezone', 'UTC');
+    }
+
+    #[\Override]
+    public function sendEmailVerificationNotification(): void
+    {
+        if (! is_string($this->email) || trim($this->email) === '') {
+            return;
+        }
+
+        $this->notify(new VerifyEmailNotification);
+    }
+
+    #[\Override]
+    public function sendPasswordResetNotification($token): void
+    {
+        if (! is_string($this->email) || trim($this->email) === '') {
+            return;
+        }
+
+        $this->notify(new ResetPasswordNotification((string) $token));
     }
 
     /**
