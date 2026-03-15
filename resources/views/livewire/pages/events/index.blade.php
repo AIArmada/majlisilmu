@@ -302,7 +302,7 @@
                 <span
                     class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{{ __('Circle of Knowledge') }}</span>
             </h1>
-            <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto text-balance">
+            <p class="text-slate-600 text-lg md:text-xl max-w-2xl mx-auto text-balance">
                 {{ __('Discover classes, lectures, and community gatherings happening near you. Connect with knowledge seekers in your area.') }}
             </p>
         </div>
@@ -394,7 +394,7 @@
                             window.prompt('{{ __("Copy this link:") }}', shareData.url);
                         });
                     },
-                }" class="relative bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-6 md:p-8">
+                }" class="relative bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200 p-6 md:p-8">
 
             <div wire:loading.delay.short
                 wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort"
@@ -415,7 +415,7 @@
                         wire:model.live.debounce.300ms="filterData.search"
                         wire:keydown.escape="clearSearch"
                         placeholder="{{ __('Cari mengikut tajuk...') }}"
-                        class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-100 bg-white shadow-lg shadow-slate-200/50 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
+                        class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 bg-white shadow-lg shadow-slate-200/60 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
                     >
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -472,19 +472,19 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <span class="text-sm font-medium text-slate-500">{{ __('Sort:') }}</span>
+                    <span class="text-sm font-medium text-slate-600">{{ __('Sort:') }}</span>
                     <div class="flex bg-slate-100 p-1 rounded-xl">
                         <button type="button" wire:click="setSort('time')"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'time' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'time' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
                             {{ __('Latest') }}
                         </button>
                         <button type="button" wire:click="setSort('relevance')"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'relevance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'relevance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
                             {{ __('Relevance') }}
                         </button>
                         @if($lat)
                             <button type="button" wire:click="setSort('distance')"
-                                class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'distance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'distance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
                                 {{ __('Distance') }}
                             </button>
                         @endif
@@ -791,7 +791,7 @@
                 wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
                 <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                     @foreach(range(1, 6) as $index)
-                        <article class="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm animate-pulse">
+                        <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md animate-pulse">
                             <div class="relative aspect-[3/2] bg-slate-200">
                                 <div class="absolute left-4 top-4 h-14 w-14 rounded-xl bg-white/80"></div>
                                 <div class="absolute bottom-4 left-4 h-6 w-20 rounded-full bg-white/70"></div>
@@ -833,7 +833,7 @@
                         </svg>
                     </div>
                     <h3 class="font-heading text-xl font-bold text-slate-900 mb-2">{{ __('No events found') }}</h3>
-                    <p class="text-slate-500 max-w-md">
+                    <p class="text-slate-600 max-w-md">
                         {{ __('Try adjusting your search terms or filters to find what you\'re looking for.') }}
                     </p>
                     <button type="button" @click="window.location.href='{{ route('events.index') }}'"
@@ -884,7 +884,7 @@
                             }
                         @endphp
                         <article
-                            class="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 border border-slate-100">
+                            class="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-xl hover:shadow-emerald-900/8 hover:-translate-y-1 transition-all duration-300 border border-slate-200">
                             <!-- Image/Date -->
                             <a href="{{ route('events.show', $event) }}" wire:navigate
                                 class="relative overflow-hidden bg-slate-100 block {{ $eventPosterIsPortrait ? 'aspect-[4/5]' : 'aspect-[3/2]' }}">
@@ -900,7 +900,7 @@
                                 <div class="absolute top-4 left-4 z-20 flex flex-col gap-2">
                                     <div
                                         class="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 text-center shadow-sm border border-black/5 min-w-[3.5rem]">
-                                        <div class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <div class="text-xs font-bold uppercase tracking-wider text-slate-600">
                                             {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
                                         </div>
                                         <div class="text-xl font-bold font-heading text-slate-900 leading-none">

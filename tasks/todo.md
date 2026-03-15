@@ -1,3 +1,21 @@
+# Speakers CTA Copy Cleanup
+
+- [x] Remove the extra helper sentence below the public speakers CTA button
+- [x] Verify the public `/penceramah` page no longer renders the removed sentence
+
+## Review
+- Removed the helper sentence under the speaker contribution CTA while keeping the button label, link target, and CTA container unchanged.
+- Verified the rendered public page at `/penceramah`; the CTA still shows `Tambah ke direktori` and `Cadangkan penceramah baharu`, and the removed helper sentence no longer appears.
+
+# Institutions CTA Copy Cleanup
+
+- [x] Remove the extra helper sentence below the public institutions CTA button
+- [x] Verify the public `/institusi` page no longer renders the removed sentence
+
+## Review
+- Removed the helper sentence under the institution contribution CTA while keeping the button label, link target, and CTA container unchanged.
+- Verified the rendered public page at `/institusi`; the CTA still shows `Tambah ke direktori` and `Cadangkan institusi baharu`, and the removed helper sentence no longer appears.
+
 # Institutions CTA Refresh
 
 - [x] Move the add-institution CTA to the bottom of the public institutions page
