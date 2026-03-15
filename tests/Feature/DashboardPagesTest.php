@@ -62,13 +62,6 @@ it('renders the attendee-first planner dashboard without saved search or digest 
         'starts_at' => now()->addDays(2),
     ]);
 
-    $interestedEvent = Event::factory()->for($otherUser)->for($otherInstitution)->create([
-        'title' => 'Interested Dashboard Event',
-        'status' => 'approved',
-        'visibility' => 'public',
-        'starts_at' => now()->addDays(3),
-    ]);
-
     $goingEvent = Event::factory()->for($otherUser)->for($institution)->create([
         'title' => 'Going Dashboard Event',
         'status' => 'approved',
@@ -119,7 +112,6 @@ it('renders the attendee-first planner dashboard without saved search or digest 
     ]);
 
     $user->savedEvents()->attach($savedEvent->id);
-    $user->interestedEvents()->attach($interestedEvent->id);
     $user->goingEvents()->attach($goingEvent->id);
 
     EventCheckin::factory()->for($checkedInEvent)->for($user)->create([
@@ -154,7 +146,6 @@ it('renders the attendee-first planner dashboard without saved search or digest 
         ->assertDontSee('Going + Registered')
         ->assertSee('Saved Searches')
         ->assertSee('Saved Dashboard Event')
-        ->assertSee('Interested Dashboard Event')
         ->assertSee('Going Dashboard Event')
         ->assertSee('Registered Dashboard Event')
         ->assertSee('Submitted Dashboard Event')
@@ -417,7 +408,6 @@ it('merges overlapping planner relationships into one calendar entry', function 
     ]);
 
     $user->savedEvents()->attach($event->id);
-    $user->interestedEvents()->attach($event->id);
     $user->goingEvents()->attach($event->id);
 
     Registration::factory()->for($event)->for($user)->create([
@@ -433,7 +423,6 @@ it('merges overlapping planner relationships into one calendar entry', function 
         ->and($instance->calendarEntries[0]['roles'])->toBe([
             'going',
             'registered',
-            'interested',
             'saved',
         ])
         ->and($instance->upcomingAgenda)->toHaveCount(1);

@@ -247,7 +247,6 @@ it('shows authz user activity memberships follows submissions and saved searches
     ]);
 
     $savedEvent = Event::factory()->create(['title' => 'Saved Event']);
-    $interestedEvent = Event::factory()->create(['title' => 'Interested Event']);
     $goingEvent = Event::factory()->create(['title' => 'Going Event']);
     $registeredEvent = Event::factory()->create(['title' => 'Registered Event']);
     $checkedInEvent = Event::factory()->create(['title' => 'Checked In Event']);
@@ -261,7 +260,6 @@ it('shows authz user activity memberships follows submissions and saved searches
     $followedReference = Reference::factory()->create(['title' => 'Followed Reference']);
 
     $targetUser->savedEvents()->attach($savedEvent->id);
-    $targetUser->interestedEvents()->attach($interestedEvent->id);
     $targetUser->goingEvents()->attach($goingEvent->id);
     $targetUser->memberEvents()->attach($memberEvent->id, ['joined_at' => now()]);
     $memberInstitution->members()->syncWithoutDetaching([$targetUser->id]);
@@ -302,7 +300,6 @@ it('shows authz user activity memberships follows submissions and saved searches
         ->test(ViewUser::class, ['record' => $targetUser->getKey()])
         ->assertSee('Activity User')
         ->assertSee('Saved Event')
-        ->assertSee('Interested Event')
         ->assertSee('Going Event')
         ->assertSee('Registered Event')
         ->assertSee('Checked In Event')

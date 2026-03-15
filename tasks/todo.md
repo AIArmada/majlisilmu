@@ -1,3 +1,31 @@
+# Interest Removal Review Fixes
+
+- [x] Restore the historical event-interest migration file so migration history stays intact
+- [x] Add the updated planner copy to shipped locale JSON files and remove stale interest-only planner strings
+- [x] Clean stale event-interest references from review docs
+- [x] Re-run verification for the review-fix batch
+
+## Review
+- Restored `database/migrations/2026_01_16_213657_create_event_interests_table.php` so existing migration history remains reproducible while the new forward cleanup migration continues to remove the feature on upgraded installs.
+- Added the new planner strings to shipped JSON locales and removed stale interest-only planner copy that no longer matches the dashboard UI.
+- Trimmed the stale deleted-controller reference from `docs/MAJLISILMU_REVIEW_AND_ENHANCEMENT_PLAN.md`.
+- Verification: `vendor/bin/rector process`, `vendor/bin/phpstan analyse --ansi`, `vendor/bin/pest --parallel`, `vendor/bin/pint --dirty --format agent`, `git diff --check`.
+
+# Remove Event Interest
+
+- [x] Remove the stale pre-interest naming that still pointed at the old event-interest surface
+- [x] Remove event-interest runtime paths from API, Livewire, models, notifications, dashboard, and analytics
+- [x] Remove event-interest UI copy, docs, and admin references
+- [x] Remove event-interest tests and replace them with updated save/going expectations where needed
+- [x] Add schema cleanup for `event_interests` and `events.interests_count`
+- [x] Run Rector, PHPStan, Pest, and Pint verification for the removal batch
+
+## Review
+- Removed the event-interest feature end to end: API routes/controllers/actions, Livewire state, model relations, analytics outcomes, notifications, dashboard/admin views, and supporting tests.
+- Deleted the stale `EventPledgeTest` and cleaned the remaining pre-interest wording from repository docs and task notes.
+- Added `database/migrations/2026_03_15_120000_remove_event_interest_feature.php` to drop the legacy table/count column and purge `event_interest` affiliate conversions on upgraded installs.
+- Verification: `vendor/bin/rector process`, `vendor/bin/phpstan analyse --ansi`, `vendor/bin/pest --parallel`, `vendor/bin/pint --dirty --format agent`.
+
 # Registration Email Audit Fix
 
 - [x] Remove duplicate verification-email dispatch from the registered-user listener
@@ -4668,7 +4696,7 @@
   - header/summary cards
   - overview month calendar with role filters
   - upcoming agenda
-  - compact Going / Registered / Interested / Saved buckets
+  - compact Going / Registered / Saved buckets
   - Submitted Events section
   - Recent Check-ins history
   - removed saved-search and digest-preference panels from the dashboard body

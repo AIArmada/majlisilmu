@@ -86,7 +86,7 @@ class Event extends Model implements AuditableContract, HasMedia
     public const array PUBLIC_STATUSES = ['approved', 'pending', 'cancelled'];
 
     /**
-     * Statuses that still allow engagement actions (save/interest/going).
+     * Statuses that still allow engagement actions (save/going).
      *
      * @var list<string>
      */
@@ -108,7 +108,6 @@ class Event extends Model implements AuditableContract, HasMedia
             $event->keyPeople()->delete();
             $event->references()->detach();
             $event->savedBy()->detach();
-            $event->interestedBy()->detach();
             $event->goingBy()->detach();
 
             $event->registrations()->each(function (Registration $registration): void {
@@ -171,7 +170,6 @@ class Event extends Model implements AuditableContract, HasMedia
         'views_count',
         'saves_count',
         'registrations_count',
-        'interests_count',
         'going_count',
         'published_at',
         'escalated_at',
@@ -204,7 +202,6 @@ class Event extends Model implements AuditableContract, HasMedia
             'views_count' => 'integer',
             'saves_count' => 'integer',
             'registrations_count' => 'integer',
-            'interests_count' => 'integer',
             'going_count' => 'integer',
             'published_at' => 'datetime',
             'escalated_at' => 'datetime',
@@ -662,14 +659,6 @@ class Event extends Model implements AuditableContract, HasMedia
     public function savedBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_saves')->withTimestamps();
-    }
-
-    /**
-     * @return BelongsToMany<User, $this>
-     */
-    public function interestedBy(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'event_interests')->withTimestamps();
     }
 
     /**

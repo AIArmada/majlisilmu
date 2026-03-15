@@ -38,9 +38,6 @@ class ViewUser extends ViewRecord
             'savedEvents' => fn ($query) => $query
                 ->with(['institution:id,name', 'venue:id,name'])
                 ->orderBy('event_saves.created_at', 'desc'),
-            'interestedEvents' => fn ($query) => $query
-                ->with(['institution:id,name', 'venue:id,name'])
-                ->orderBy('event_interests.created_at', 'desc'),
             'goingEvents' => fn ($query) => $query
                 ->with(['institution:id,name', 'venue:id,name'])
                 ->orderBy('event_attendees.created_at', 'desc'),

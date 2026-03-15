@@ -54,7 +54,7 @@ class EventObserver
         $this->publicListingsCache->bustMajlisListing();
 
         $changedFields = collect(array_keys($event->getChanges()))
-            ->reject(static fn (string $field): bool => in_array($field, ['updated_at', 'saves_count', 'interests_count', 'going_count', 'registrations_count', 'published_at'], true))
+            ->reject(static fn (string $field): bool => in_array($field, ['updated_at', 'saves_count', 'going_count', 'registrations_count', 'published_at'], true))
             ->values()
             ->all();
 

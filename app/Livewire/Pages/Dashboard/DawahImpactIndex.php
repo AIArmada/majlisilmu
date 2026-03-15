@@ -121,7 +121,6 @@ class DawahImpactIndex extends Component
                 DawahShareOutcomeType::EventCheckin => __('Event check-ins'),
                 DawahShareOutcomeType::EventSubmission => __('Event submissions'),
                 DawahShareOutcomeType::EventSave => __('Event saves'),
-                DawahShareOutcomeType::EventInterest => __('Interested responses'),
                 DawahShareOutcomeType::EventGoing => __('Going responses'),
                 DawahShareOutcomeType::InstitutionFollow => __('Institution follows'),
                 DawahShareOutcomeType::SpeakerFollow => __('Speaker follows'),

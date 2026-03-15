@@ -501,21 +501,6 @@
                         {{ $isCheckedIn ? __('Sudah Check-in') : __('Check-in') }}
                     </button>
 
-                    <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
-                        {{ $isInterested
-        ? 'border-rose-200 bg-rose-50 text-rose-600'
-        : 'border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600' }}">
-                        <svg class="size-5 {{ $isInterested ? 'fill-rose-500' : '' }}" viewBox="0 0 24 24"
-                            fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        {{ __('Minat') }}
-                        @if($interestsCount > 0)
-                            <span class="text-xs opacity-75">{{ $interestsCount }}</span>
-                        @endif
-                    </button>
-
                     <button type="button" wire:click="toggleSave" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
                         {{ $isSaved
         ? 'border-blue-200 bg-blue-50 text-blue-600'
@@ -2213,16 +2198,6 @@ MOBILE BOTTOM ACTION BAR
                         <svg class="size-5 {{ $isCheckedIn ? 'text-emerald-600' : '' }}" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </button>
-
-                    <button type="button" wire:click="toggleInterest" wire:loading.attr="disabled"
-                        class="rounded-xl border-2 p-3 transition-all
-                                                                                                                                                            {{ $isInterested ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500' }}">
-                        <svg class="size-5 {{ $isInterested ? 'fill-current' : '' }}" viewBox="0 0 24 24"
-                            fill="{{ $isInterested ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
                     </button>
 

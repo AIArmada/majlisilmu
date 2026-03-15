@@ -396,7 +396,6 @@ class EventNotificationService
 
         return collect()
             ->merge($event->savedBy()->get())
-            ->merge($event->interestedBy()->get())
             ->merge($event->goingBy()->get())
             ->merge($registrations)
             ->filter(fn (mixed $user): bool => $user instanceof User)

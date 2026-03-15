@@ -192,11 +192,10 @@ it('renders queued notification content using the recipient locale and timezone 
         ->and(implode(' ', $introLines))->toContain('08:00 PM');
 });
 
-it('creates reminder notifications only for going and registered users, not saved or interested users', function () {
+it('creates reminder notifications only for going and registered users, not saved users', function () {
     Http::fake();
 
     $savedUser = User::factory()->create(['email' => 'saved@example.test']);
-    $interestedUser = User::factory()->create(['email' => 'interested@example.test']);
     $goingUser = User::factory()->create(['email' => 'going@example.test']);
     $registeredUser = User::factory()->create(['email' => 'registered@example.test']);
     $institution = Institution::factory()->create();
@@ -209,7 +208,6 @@ it('creates reminder notifications only for going and registered users, not save
     ]);
 
     $savedUser->savedEvents()->attach($event->id);
-    $interestedUser->interestedEvents()->attach($event->id);
     $goingUser->goingEvents()->attach($event->id);
     Registration::factory()->for($event)->for($registeredUser)->create([
         'status' => 'registered',
@@ -218,7 +216,6 @@ it('creates reminder notifications only for going and registered users, not save
     app(EventNotificationService::class)->dispatchDueReminderNotifications(now()->toImmutable());
 
     expect(PendingNotification::query()->where('user_id', $savedUser->id)->count())->toBe(0)
-        ->and(PendingNotification::query()->where('user_id', $interestedUser->id)->count())->toBe(0)
         ->and(PendingNotification::query()->where('user_id', $goingUser->id)->where('trigger', NotificationTrigger::Reminder24Hours->value)->count())->toBe(1)
         ->and(PendingNotification::query()->where('user_id', $registeredUser->id)->where('trigger', NotificationTrigger::Reminder24Hours->value)->count())->toBe(1);
 });

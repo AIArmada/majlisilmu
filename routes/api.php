@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EventCheckInController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventGoingController;
-use App\Http\Controllers\Api\EventInterestController;
 use App\Http\Controllers\Api\EventRegistrationController;
 use App\Http\Controllers\Api\EventSaveController;
 use App\Http\Controllers\Api\NotificationDestinationController;
@@ -74,12 +73,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/event-saves', [EventSaveController::class, 'store'])->name('api.event-saves.store');
     Route::get('/event-saves/{eventId}', [EventSaveController::class, 'show'])->name('api.event-saves.show');
     Route::delete('/event-saves/{eventId}', [EventSaveController::class, 'destroy'])->name('api.event-saves.destroy');
-
-    // Event Interests - Mark interest in events
-    Route::get('/event-interests', [EventInterestController::class, 'index'])->name('api.event-interests.index');
-    Route::post('/event-interests', [EventInterestController::class, 'store'])->name('api.event-interests.store');
-    Route::get('/event-interests/{eventId}', [EventInterestController::class, 'show'])->name('api.event-interests.show');
-    Route::delete('/event-interests/{eventId}', [EventInterestController::class, 'destroy'])->name('api.event-interests.destroy');
 
     // Registration Exports (per documentation B9d)
     Route::get('/events/{event}/registrations/export', [RegistrationExportController::class, 'export'])

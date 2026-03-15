@@ -27,7 +27,6 @@
         'event_checkin' => __('Checked in to an event'),
         'event_submission' => __('Submitted an event'),
         'event_save' => __('Saved an event'),
-        'event_interest' => __('Marked interest'),
         'event_going' => __('Planned to attend'),
         'institution_follow' => __('Followed an institution'),
         'speaker_follow' => __('Followed a speaker'),

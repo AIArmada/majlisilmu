@@ -78,8 +78,8 @@ it('records signals events when affiliate attribution and attributed outcomes oc
     $request->setUserResolver(fn (): User => $visitor);
 
     $shareService->recordOutcome(
-        DawahShareOutcomeType::EventInterest,
-        'signals-test:event-interest:'.$visitor->id.':'.$event->id,
+        DawahShareOutcomeType::EventSave,
+        'signals-test:event-save:'.$visitor->id.':'.$event->id,
         $event,
         $visitor,
         $request,
@@ -114,13 +114,13 @@ it('does not break affiliate-backed outcomes when signals ingestion fails', func
     $request->setUserResolver(fn (): User => $visitor);
 
     $outcome = $shareService->recordOutcome(
-        DawahShareOutcomeType::EventInterest,
-        'signals-test-safe:event-interest:'.$visitor->id.':'.$event->id,
+        DawahShareOutcomeType::EventSave,
+        'signals-test-safe:event-save:'.$visitor->id.':'.$event->id,
         $event,
         $visitor,
         $request,
     );
 
     expect($outcome)->not->toBeNull();
-    expect($outcome?->outcomeType)->toBe(DawahShareOutcomeType::EventInterest->value);
+    expect($outcome?->outcomeType)->toBe(DawahShareOutcomeType::EventSave->value);
 });
