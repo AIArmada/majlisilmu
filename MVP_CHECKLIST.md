@@ -152,7 +152,6 @@ Note: invitation delivery is still manual copy/share from the relation manager; 
 - [x] `POST /events/{slug}/register` - Event registration
 - [x] `POST /api/v1/event-saves` - Save event
 - [x] `DELETE /api/v1/event-saves/{id}` - Unsave event
-- [x] `GET/POST/DELETE /api/v1/event-interests` - Event interest (going / interested)
 - [x] Saved searches CRUD API (`/api/v1/saved-searches`)
 - [x] `GET /api/v1/events/{id}/registrations/export` - Export registrations (CSV)
 - [x] `GET /api/v1/user/registrations` - User registrations

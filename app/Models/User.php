@@ -63,7 +63,6 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             $user->references()->detach();
             $user->memberEvents()->detach();
             $user->savedEvents()->detach();
-            $user->interestedEvents()->detach();
             $user->goingEvents()->detach();
 
             $user->ownedEvents()->update(['user_id' => null]);
@@ -359,14 +358,6 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             ->where('followable_id', $followable->getKey())
             ->where('followable_type', $followable->getMorphClass())
             ->exists();
-    }
-
-    /**
-     * @return BelongsToMany<Event, $this>
-     */
-    public function interestedEvents(): BelongsToMany
-    {
-        return $this->belongsToMany(Event::class, 'event_interests')->withTimestamps();
     }
 
     /**

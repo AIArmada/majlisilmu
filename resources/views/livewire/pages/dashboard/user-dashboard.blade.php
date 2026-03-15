@@ -7,7 +7,6 @@
     $user = auth()->user();
     $summary = $this->summaryStats;
     $savedEvents = $this->savedEvents;
-    $interestedEvents = $this->interestedEvents;
     $goingEvents = $this->goingEvents;
     $registeredEvents = $this->registeredEvents;
     $submittedEvents = $this->submittedEvents;
@@ -17,7 +16,6 @@
     $paginatedAgenda = $this->paginatedAgenda;
     $paginatedGoingEvents = $this->paginatedGoingEvents;
     $paginatedRegisteredEvents = $this->paginatedRegisteredEvents;
-    $paginatedInterestedEvents = $this->paginatedInterestedEvents;
     $paginatedSavedEvents = $this->paginatedSavedEvents;
     $paginatedSubmittedEvents = $this->paginatedSubmittedEvents;
     $paginatedRecentCheckins = $this->paginatedRecentCheckins;
@@ -78,12 +76,6 @@
             'class' => 'border-sky-200 bg-white text-sky-700',
         ],
         [
-            'label' => __('Interested'),
-            'count' => $summary['interested_count'],
-            'href' => '#planner-interested',
-            'class' => 'border-rose-200 bg-white text-rose-700',
-        ],
-        [
             'label' => __('Saved'),
             'count' => $summary['saved_count'],
             'href' => '#planner-saved',
@@ -138,7 +130,7 @@
                             {{ __('Assalamualaikum, :name', ['name' => $firstName]) }}
                         </h1>
                         <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                            {{ __('Track what you saved, what you are interested in, what you plan to attend, and what you have already checked into. The calendar below is designed to help you plan your month without mixing in institution operations.') }}
+                            {{ __('Track what you saved, what you plan to attend, and what you have already checked into. The calendar below is designed to help you plan your month without mixing in institution operations.') }}
                         </p>
 
                         <div class="mt-6 flex flex-wrap gap-3">
@@ -353,7 +345,7 @@
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">{{ __('Overview Calendar') }}</p>
                                 <h2 class="mt-2 font-heading text-2xl font-bold text-slate-900">{{ __('See your month at a glance') }}</h2>
-                                <p class="mt-2 max-w-2xl text-sm text-slate-500">{{ __('Filter the calendar by saved, interested, going, registered, submitted, and check-in history. Events with multiple roles are merged into one calendar entry.') }}</p>
+                                <p class="mt-2 max-w-2xl text-sm text-slate-500">{{ __('Filter the calendar by saved, going, registered, submitted, and check-in history. Events with multiple roles are merged into one calendar entry.') }}</p>
                             </div>
 
                             <div class="flex flex-wrap gap-2">
@@ -564,48 +556,6 @@
                         @if($paginatedRegisteredEvents->hasPages())
                             <div class="mt-5">
                                 {{ $paginatedRegisteredEvents->links(data: ['scrollTo' => '#planner-registered']) }}
-                            </div>
-                        @endif
-                    @endif
-                </article>
-
-                <article id="planner-interested" class="rounded-[2rem] border border-rose-200/70 bg-white p-6 shadow-sm">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Interested') }}</h2>
-                            <p class="mt-2 text-sm text-slate-500">{{ __('Events that may still become part of your real plan.') }}</p>
-                        </div>
-                        <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700">{{ $interestedEvents->count() }}</span>
-                    </div>
-                    @if($interestedEvents->isEmpty())
-                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                            {{ __('No interested events yet.') }}
-                        </div>
-                    @else
-                        <div class="mt-6 space-y-3">
-                            @foreach($paginatedInterestedEvents as $event)
-                                <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-rose-200 hover:shadow-md">
-                                    <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <h3 class="font-semibold text-slate-900 transition group-hover:text-rose-700">{{ $event->title }}</h3>
-                                            @if($shouldShowEventStatusBadge((string) $event->status))
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $eventStatusClass((string) $event->status) }}">
-                                                    {{ $eventWorkflowStatusLabel((string) $event->status) }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <p class="mt-1 text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A') : __('Time to be confirmed') }}</p>
-                                        <p class="mt-1 text-sm text-slate-500">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online / TBD') }}</p>
-                                    </div>
-                                </a>
-                            @endforeach
-                        </div>
-                        @if($paginatedInterestedEvents->hasPages())
-                            <div class="mt-5">
-                                {{ $paginatedInterestedEvents->links(data: ['scrollTo' => '#planner-interested']) }}
                             </div>
                         @endif
                     @endif

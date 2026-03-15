@@ -254,7 +254,6 @@ describe('Event Cancellation', function () {
 
         $submitter = User::factory()->create();
         $goingUser = User::factory()->create();
-        $interestedUser = User::factory()->create();
         $savedUser = User::factory()->create();
 
         $event = Event::factory()->create([
@@ -264,7 +263,6 @@ describe('Event Cancellation', function () {
         ]);
 
         $event->goingBy()->attach($goingUser->id);
-        $event->interestedBy()->attach($interestedUser->id);
         $event->savedBy()->attach($savedUser->id);
 
         $this->service->cancel($event, $moderator, 'Venue emergency closure.');
@@ -283,10 +281,6 @@ describe('Event Cancellation', function () {
         ]);
         $this->assertDatabaseHas('notification_messages', [
             'user_id' => $goingUser->id,
-            'trigger' => 'event_cancelled',
-        ]);
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $interestedUser->id,
             'trigger' => 'event_cancelled',
         ]);
         $this->assertDatabaseHas('notification_messages', [

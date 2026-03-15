@@ -42,13 +42,9 @@ class Show extends Component
 
     public bool $isSaved = false;
 
-    public bool $isInterested = false;
-
     public bool $isGoing = false;
 
     public bool $isCheckedIn = false;
-
-    public int $interestsCount = 0;
 
     public int $goingCount = 0;
 
@@ -288,11 +284,6 @@ class Show extends Component
         $this->toggleEngagement('savedEvents', 'isSaved', 'saves_count');
     }
 
-    public function toggleInterest(): void
-    {
-        $this->toggleEngagement('interestedEvents', 'isInterested', 'interests_count', 'interestsCount');
-    }
-
     public function toggleGoing(): void
     {
         $this->toggleEngagement('goingEvents', 'isGoing', 'going_count', 'goingCount');
@@ -412,7 +403,6 @@ class Show extends Component
     {
         $type = match ($relation) {
             'savedEvents' => DawahShareOutcomeType::EventSave,
-            'interestedEvents' => DawahShareOutcomeType::EventInterest,
             'goingEvents' => DawahShareOutcomeType::EventGoing,
             default => null,
         };
@@ -435,14 +425,12 @@ class Show extends Component
 
     protected function syncEngagementStates(): void
     {
-        $this->interestsCount = max(0, (int) ($this->event->interests_count ?? 0));
         $this->goingCount = max(0, (int) ($this->event->going_count ?? 0));
 
         $user = auth()->user();
 
         if (! $user instanceof User) {
             $this->isSaved = false;
-            $this->isInterested = false;
             $this->isGoing = false;
             $this->isCheckedIn = false;
 
@@ -450,7 +438,6 @@ class Show extends Component
         }
 
         $this->isSaved = $user->savedEvents()->where('event_id', $this->event->id)->exists();
-        $this->isInterested = $user->interestedEvents()->where('event_id', $this->event->id)->exists();
         $this->isGoing = $user->goingEvents()->where('event_id', $this->event->id)->exists();
         $this->isCheckedIn = EventCheckin::query()
             ->where('event_id', $this->event->id)

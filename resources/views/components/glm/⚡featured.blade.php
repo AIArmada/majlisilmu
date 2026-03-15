@@ -15,7 +15,7 @@ new class extends Component {
             ->where('starts_at', '>=', $now)
             ->where('starts_at', '<=', $now->copy()->addDays(7))
             ->orderByDesc('is_featured')
-            ->orderByRaw('(going_count * 5 + interests_count * 3 + saves_count * 2 + views_count * 0.1) DESC')
+            ->orderByRaw('(going_count * 5 + saves_count * 2 + views_count * 0.1) DESC')
             ->orderBy('starts_at')
             ->with([
                 'media' => fn ($query) => $query

@@ -58,7 +58,6 @@ return new class extends Migration
             $table->unsignedInteger('views_count')->default(0);
             $table->unsignedInteger('saves_count')->default(0);
             $table->unsignedInteger('registrations_count')->default(0);
-            $table->unsignedInteger('interests_count')->default(0);
             $table->unsignedInteger('going_count')->default(0);
 
             $table->timestamp('published_at')->nullable();

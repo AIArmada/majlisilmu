@@ -160,7 +160,7 @@ return [
         ],
         'event_updates' => [
             'label' => 'Kemas Kini Majlis',
-            'description' => 'Perubahan penting untuk majlis yang anda simpan, minati, rancang untuk hadir, atau sudah daftar.',
+            'description' => 'Perubahan penting untuk majlis yang anda simpan, rancang untuk hadir, atau sudah daftar.',
         ],
         'event_reminders' => [
             'label' => 'Peringatan Majlis',

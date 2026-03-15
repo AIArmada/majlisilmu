@@ -100,14 +100,13 @@ it('does not create followed-speaker notifications when a followed profile is on
     ]);
 });
 
-it('sends update alerts to saved and interested users but no reminders for them', function () {
+it('sends update alerts to saved users but no reminders for them', function () {
     $now = CarbonImmutable::parse('2026-03-08 00:00:00', 'UTC');
     Carbon::setTestNow($now);
     CarbonImmutable::setTestNow($now);
 
     $institution = Institution::factory()->create();
     $savedUser = User::factory()->create();
-    $interestedUser = User::factory()->create();
 
     $event = Event::factory()->for($institution)->create([
         'title' => 'Tracked Update Event',
@@ -117,7 +116,6 @@ it('sends update alerts to saved and interested users but no reminders for them'
     ]);
 
     $savedUser->savedEvents()->attach($event->id);
-    $interestedUser->interestedEvents()->attach($event->id);
 
     try {
         $service = app(EventNotificationService::class);
@@ -129,19 +127,9 @@ it('sends update alerts to saved and interested users but no reminders for them'
             'trigger' => NotificationTrigger::EventScheduleChanged->value,
         ]);
 
-        $this->assertDatabaseHas('notification_messages', [
-            'user_id' => $interestedUser->id,
-            'trigger' => NotificationTrigger::EventScheduleChanged->value,
-        ]);
-
         $this->assertDatabaseMissing('notification_messages', [
             'user_id' => $savedUser->id,
             'trigger' => NotificationTrigger::Reminder2Hours->value,
-        ]);
-
-        $this->assertDatabaseMissing('notification_messages', [
-            'user_id' => $interestedUser->id,
-            'trigger' => NotificationTrigger::CheckinOpen->value,
         ]);
     } finally {
         Carbon::setTestNow();

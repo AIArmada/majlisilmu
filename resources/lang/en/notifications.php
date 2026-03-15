@@ -160,7 +160,7 @@ return [
         ],
         'event_updates' => [
             'label' => 'Event Updates',
-            'description' => 'Important changes to events you saved, marked interested, planned to attend, or registered for.',
+            'description' => 'Important changes to events you saved, planned to attend, or registered for.',
         ],
         'event_reminders' => [
             'label' => 'Event Reminders',

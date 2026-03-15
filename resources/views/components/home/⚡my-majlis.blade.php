@@ -91,13 +91,12 @@ new class extends Component {
         $user = auth()->user();
 
         if (!$user) {
-            return ['going' => 0, 'saved' => 0, 'interested' => 0, 'following' => 0];
+            return ['going' => 0, 'saved' => 0, 'following' => 0];
         }
 
         return [
             'going' => $user->goingEvents()->where('starts_at', '>=', now())->count(),
             'saved' => $user->savedEvents()->where('starts_at', '>=', now())->count(),
-            'interested' => $user->interestedEvents()->where('starts_at', '>=', now())->count(),
             'following' => $user->followingSpeakers()->count(),
         ];
     }

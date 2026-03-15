@@ -206,23 +206,6 @@ Request body for `POST /event-saves`:
 }
 ```
 
-### Interested events
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/event-interests` | List interested events for the authenticated user |
-| `POST` | `/event-interests` | Mark interest in an event |
-| `GET` | `/event-interests/{eventId}` | Check if the event is marked as interested |
-| `DELETE` | `/event-interests/{eventId}` | Remove interest |
-
-Request body for `POST /event-interests`:
-
-```json
-{
-  "event_id": "uuid"
-}
-```
-
 ### Going
 
 | Method | Path | Purpose |
@@ -403,7 +386,6 @@ Recommended event detail fetch sequence:
 1. `GET /events/{eventOrSlug}` with the includes required for the screen.
 2. If authenticated, fetch in parallel:
    - `GET /event-saves/{eventId}`
-   - `GET /event-interests/{eventId}`
    - `GET /events/{event}/going`
    - `GET /events/{event}/registration-status`
    - `GET /events/{event}/check-in-state`
@@ -419,6 +401,6 @@ Recommended auth flow:
 
 ## 10. Current Gaps To Be Aware Of
 
-- Event save and interest still use the older collection-style endpoints (`/event-saves`, `/event-interests`) rather than nested event routes.
+- Event saves still use the older collection-style endpoints (`/event-saves`) rather than nested event routes.
 - There is no single `/events/{event}/me` aggregate endpoint yet; current mobile clients should fetch per-feature state in parallel.
 - Registration export is CSV-only and intended for operator workflows rather than general attendee-facing mobile screens.

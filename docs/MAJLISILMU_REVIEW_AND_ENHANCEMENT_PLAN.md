@@ -152,11 +152,9 @@ These findings are the original audit baseline. Current resolution status is tra
 - Recommendation:
   - remove unreachable branch or reorder guards to preserve intended message path.
 
-6. Event save/interest endpoints are race-prone around duplicate insertion.
+6. Event save endpoints are race-prone around duplicate insertion.
 - File: `app/Http/Controllers/Api/EventSaveController.php:69`
 - File: `app/Http/Controllers/Api/EventSaveController.php:84`
-- File: `app/Http/Controllers/Api/EventInterestController.php:79`
-- File: `app/Http/Controllers/Api/EventInterestController.php:94`
 - Issue:
   - check-then-insert pattern is non-atomic on composite PK tables.
 - Impact:

@@ -48,10 +48,6 @@
                     <div class="text-2xl font-semibold text-gray-950 dark:text-white">{{ $user->savedEvents->count() }}</div>
                 </div>
                 <div>
-                    <div class="text-sm text-gray-500">Interested Events</div>
-                    <div class="text-2xl font-semibold text-gray-950 dark:text-white">{{ $user->interestedEvents->count() }}</div>
-                </div>
-                <div>
                     <div class="text-sm text-gray-500">Going Events</div>
                     <div class="text-2xl font-semibold text-gray-950 dark:text-white">{{ $user->goingEvents->count() }}</div>
                 </div>
@@ -79,32 +75,6 @@
         </x-filament::section>
 
         <div class="grid gap-6 xl:grid-cols-2">
-            <x-filament::section heading="Interested Events">
-                <div class="space-y-4">
-                    @forelse ($user->interestedEvents as $event)
-                        <div class="rounded-xl border border-gray-200 p-4 dark:border-white/10">
-                            <div class="flex items-start justify-between gap-3">
-                                <a href="{{ $this->eventUrl($event) }}" class="font-medium text-primary-600 hover:underline">
-                                    {{ $event->title }}
-                                </a>
-                                <x-filament::badge :color="$this->eventStatusBadgeColor($event->status)">{{ $this->humanLabel($event->status) }}</x-filament::badge>
-                            </div>
-                            <div class="mt-3 text-sm text-gray-500">
-                                Starts: {{ $event->starts_at?->format('d M Y H:i') ?: '-' }}
-                            </div>
-                            <div class="text-sm text-gray-500">
-                                Institution: {{ $event->institution?->name ?: '-' }}
-                            </div>
-                            <div class="text-sm text-gray-500">
-                                Venue: {{ $event->venue?->name ?: '-' }}
-                            </div>
-                        </div>
-                    @empty
-                        <div class="text-sm text-gray-500">No interested events.</div>
-                    @endforelse
-                </div>
-            </x-filament::section>
-
             <x-filament::section heading="Going Events">
                 <div class="space-y-4">
                     @forelse ($user->goingEvents as $event)

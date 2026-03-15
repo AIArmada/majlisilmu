@@ -304,7 +304,7 @@ class ModerationQueue extends Page implements HasTable
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalHeading('Cancel Event')
-                    ->modalDescription('This event will remain visible with a cancelled badge and notify users who saved, marked interest, or plan to attend.')
+                    ->modalDescription('This event will remain visible with a cancelled badge and notify users who saved or plan to attend.')
                     ->form([
                         Textarea::make('note')
                             ->label('Cancellation note (optional)')

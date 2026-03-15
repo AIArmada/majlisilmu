@@ -657,7 +657,6 @@ final readonly class AffiliatesShareTrackingAnalyticsService
             'event_checkin' => __('Event check-ins'),
             'event_submission' => __('Event submissions'),
             'event_save' => __('Event saves'),
-            'event_interest' => __('Interested responses'),
             'event_going' => __('Going responses'),
             'institution_follow' => __('Institution follows'),
             'speaker_follow' => __('Speaker follows'),

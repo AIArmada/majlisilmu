@@ -339,7 +339,7 @@ test('event registrations are attributed after a shared landing', function () {
     ]);
 });
 
-test('event saves and interests are attributed through authenticated api actions', function (string $routeName, string $outcomeType) {
+test('event saves and going actions are attributed through authenticated api actions', function (string $routeName, string $outcomeType) {
     $visitor = User::factory()->create();
     $event = Event::factory()->create([
         'status' => 'approved',
@@ -363,12 +363,20 @@ test('event saves and interests are attributed through authenticated api actions
 
     Sanctum::actingAs($visitor);
 
-    $this->withCredentials()
-        ->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue())
-        ->postJson(route($routeName), [
-            'event_id' => $event->id,
-        ])
-        ->assertCreated();
+    $response = $this->withCredentials()
+        ->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue());
+
+    if ($routeName === 'api.event-saves.store') {
+        $response
+            ->postJson(route($routeName), [
+                'event_id' => $event->id,
+            ])
+            ->assertCreated();
+    } else {
+        $response
+            ->postJson(route($routeName, $event))
+            ->assertCreated();
+    }
 
     $this->assertDatabaseHas('affiliate_conversions', [
         'conversion_type' => $outcomeType,
@@ -378,7 +386,7 @@ test('event saves and interests are attributed through authenticated api actions
     ]);
 })->with([
     'event save' => ['api.event-saves.store', 'event_save'],
-    'event interest' => ['api.event-interests.store', 'event_interest'],
+    'event going' => ['api.events.going.store', 'event_going'],
 ]);
 
 test('saved-search creation is attributed after a shared search landing', function () {

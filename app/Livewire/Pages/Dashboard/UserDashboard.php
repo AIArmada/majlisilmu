@@ -53,7 +53,6 @@ class UserDashboard extends Component
             'planning_count' => $upcomingAgenda->count(),
             'going_count' => $this->countCalendarEntriesForRole('going', futureOnly: true),
             'registered_count' => $this->countCalendarEntriesForRole('registered', futureOnly: true),
-            'interested_count' => $this->countCalendarEntriesForRole('interested', futureOnly: true),
             'saved_count' => $this->countCalendarEntriesForRole('saved', futureOnly: true),
             'submitted_count' => $submittedEvents->count(),
             'checkins_count' => EventCheckin::query()->where('user_id', $user->id)->count(),
@@ -84,19 +83,6 @@ class UserDashboard extends Component
     {
         return $this->sortEventsForPlanner(
             $this->savedEventsQuery($this->user())
-                ->with($this->plannerEventRelations())
-                ->get()
-        );
-    }
-
-    /**
-     * @return Collection<int, Event>
-     */
-    #[Computed]
-    public function interestedEvents(): Collection
-    {
-        return $this->sortEventsForPlanner(
-            $this->interestedEventsQuery($this->user())
                 ->with($this->plannerEventRelations())
                 ->get()
         );
@@ -219,7 +205,6 @@ class UserDashboard extends Component
         /** @var array<string, array<string, mixed>> $entries */
         $entries = [];
         $savedEvents = $this->savedEvents();
-        $interestedEvents = $this->interestedEvents();
         $goingEvents = $this->goingEvents();
         $registeredEvents = $this->registeredEvents();
         $submittedEvents = $this->submittedEvents();
@@ -227,10 +212,6 @@ class UserDashboard extends Component
 
         foreach ($savedEvents as $event) {
             $this->mergeEventIntoCalendarEntries($entries, $event, 'saved');
-        }
-
-        foreach ($interestedEvents as $event) {
-            $this->mergeEventIntoCalendarEntries($entries, $event, 'interested');
         }
 
         foreach ($goingEvents as $event) {
@@ -393,15 +374,6 @@ class UserDashboard extends Component
      * @return LengthAwarePaginator<int, Event>
      */
     #[Computed]
-    public function paginatedInterestedEvents(): LengthAwarePaginator
-    {
-        return $this->paginateCollection($this->interestedEvents(), self::PLANNER_BUCKET_PER_PAGE, 'interested_page');
-    }
-
-    /**
-     * @return LengthAwarePaginator<int, Event>
-     */
-    #[Computed]
     public function paginatedSavedEvents(): LengthAwarePaginator
     {
         return $this->paginateCollection($this->savedEvents(), self::PLANNER_BUCKET_PER_PAGE, 'saved_page');
@@ -446,16 +418,6 @@ class UserDashboard extends Component
     protected function savedEventsQuery(User $user): BelongsToMany
     {
         return $user->savedEvents()
-            ->active()
-            ->orderBy('starts_at');
-    }
-
-    /**
-     * @return BelongsToMany<Event, User>
-     */
-    protected function interestedEventsQuery(User $user): BelongsToMany
-    {
-        return $user->interestedEvents()
             ->active()
             ->orderBy('starts_at');
     }
@@ -773,12 +735,6 @@ class UserDashboard extends Component
                 'active_button_class' => 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-500/20',
                 'inactive_button_class' => 'border-sky-200 bg-white text-sky-700 hover:border-sky-300',
             ],
-            'interested' => [
-                'label' => __('Interested'),
-                'badge_class' => 'bg-rose-100 text-rose-700',
-                'active_button_class' => 'border-rose-500 bg-rose-600 text-white shadow-sm shadow-rose-500/20',
-                'inactive_button_class' => 'border-rose-200 bg-white text-rose-700 hover:border-rose-300',
-            ],
             'saved' => [
                 'label' => __('Saved'),
                 'badge_class' => 'bg-amber-100 text-amber-700',
@@ -805,10 +761,9 @@ class UserDashboard extends Component
         return match ($role) {
             'going' => 0,
             'registered' => 1,
-            'interested' => 2,
-            'saved' => 3,
-            'submitted' => 4,
-            'checkin' => 5,
+            'saved' => 2,
+            'submitted' => 3,
+            'checkin' => 4,
             default => 99,
         };
     }
@@ -841,7 +796,6 @@ class UserDashboard extends Component
         return match ($primaryRole) {
             'going' => 'border-emerald-300 bg-emerald-100 text-emerald-950 shadow-sm shadow-emerald-200/80',
             'registered' => 'border-sky-300 bg-sky-100 text-sky-950 shadow-sm shadow-sky-200/80',
-            'interested' => 'border-rose-300 bg-rose-100 text-rose-950 shadow-sm shadow-rose-200/80',
             'saved' => 'border-amber-300 bg-amber-100 text-amber-950 shadow-sm shadow-amber-200/80',
             'submitted' => 'border-violet-300 bg-violet-100 text-violet-950 shadow-sm shadow-violet-200/80',
             default => 'border-slate-300 bg-slate-100 text-slate-900 shadow-sm shadow-slate-200/80',
