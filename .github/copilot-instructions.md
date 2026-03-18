@@ -418,6 +418,12 @@ Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
 
+### 7. Laravel Actions Where Appropriate
+- Prefer Laravel Actions for reusable workflow orchestration that spans validation-adjacent normalization, transactions, side effects, or multiple entrypoints
+- Do not force every mutation into an action; trivial single-call controller or Livewire handlers can stay inline
+- Before adding a new action, check whether the behavior is already covered by an existing action and extend that path instead of duplicating orchestration
+- Keep controllers and Livewire components focused on HTTP/UI concerns when a workflow is substantial enough to extract
+
 ## Task Management
 
 1. *Plan First*: Write plan to 'tasks/todo.md' with checkable items
@@ -900,7 +906,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - Add useful array shape type definitions for arrays when appropriate.
 
 ## Enums
-- Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
+- That being said, keys in an Enum should follow existing application Enum conventions.
 
 === herd rules ===
 

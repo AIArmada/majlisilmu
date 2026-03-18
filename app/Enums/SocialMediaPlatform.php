@@ -16,6 +16,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
     case WhatsApp = 'whatsapp';
     case LinkedIn = 'linkedin';
     case Website = 'website';
+    case Threads = 'threads';
     case Other = 'other';
 
     public function getLabel(): string
@@ -30,6 +31,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
             self::WhatsApp => __('WhatsApp'),
             self::LinkedIn => __('LinkedIn'),
             self::Website => __('Laman Web'),
+            self::Threads => __('Threads'),
             self::Other => __('Lain-lain'),
         };
     }
@@ -37,7 +39,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
     public function getIcon(): string
     {
         return match ($this) {
-            self::Facebook => 'heroicon-m-globe-alt',
+            self::Facebook, self::Website => 'heroicon-m-globe-alt',
             self::Twitter => 'heroicon-m-chat-bubble-left',
             self::Instagram => 'heroicon-m-camera',
             self::YouTube => 'heroicon-m-play',
@@ -45,8 +47,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
             self::Telegram => 'heroicon-m-paper-airplane',
             self::WhatsApp => 'heroicon-m-phone',
             self::LinkedIn => 'heroicon-m-briefcase',
-            self::Website => 'heroicon-m-globe-alt',
-            self::Other => 'heroicon-m-link',
+            default => 'heroicon-m-link',
         };
     }
 
@@ -57,15 +58,15 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
     {
         return match ($this) {
             self::Facebook => 'https://*facebook.com/*',
-            self::Twitter => 'https://*twitter.com/*',
+            self::Twitter => 'https://x.com/*',
             self::Instagram => 'https://*instagram.com/*',
             self::YouTube => 'https://*youtube.com/*',
             self::TikTok => 'https://*tiktok.com/*',
             self::Telegram => 'https://t.me/*',
             self::WhatsApp => 'https://wa.me/*',
             self::LinkedIn => 'https://*linkedin.com/*',
-            self::Website => null,
-            self::Other => null,
+            self::Threads => 'https://*threads.net/*',
+            default => null,
         };
     }
 }

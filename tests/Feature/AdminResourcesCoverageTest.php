@@ -2,6 +2,7 @@
 
 use App\Filament\Resources\AiModelPricings\AiModelPricingResource;
 use App\Filament\Resources\AiUsageLogs\AiUsageLogResource;
+use App\Filament\Resources\ContributionRequests\ContributionRequestResource;
 use App\Filament\Resources\DonationChannels\DonationChannelResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Events\RelationManagers\MemberInvitationsRelationManager as EventMemberInvitationsRelationManager;
@@ -43,6 +44,7 @@ it('allows super admin to access all core admin resource index pages', function 
         ReferenceResource::class,
         DonationChannelResource::class,
         TagResource::class,
+        ContributionRequestResource::class,
         ReportResource::class,
         SpaceResource::class,
         AiUsageLogResource::class,

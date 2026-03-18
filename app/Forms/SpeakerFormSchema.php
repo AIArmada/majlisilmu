@@ -4,23 +4,13 @@ namespace App\Forms;
 
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\Gender;
-use App\Enums\Honorific;
-use App\Enums\PostNominal;
-use App\Enums\PreNominal;
 use App\Forms\Components\Select;
-use App\Models\District;
 use App\Models\Institution;
 use App\Models\Speaker;
-use App\Models\State;
-use App\Models\Subdistrict;
 use App\Models\User;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
@@ -34,150 +24,33 @@ class SpeakerFormSchema
      */
     public static function createOptionForm(): array
     {
-        return [
-            TextInput::make('name')
-                ->label(__('Speaker Name'))
-                ->required()
-                ->maxLength(255)
-                ->placeholder(__('e.g., Ustaz Ahmad bin Hassan')),
+        $components = SpeakerContributionFormSchema::components(includeMedia: true);
 
-            Radio::make('gender')
-                ->label(__('Gender'))
-                ->required()
-                ->options(Gender::class)
-                ->default(Gender::Male->value)
-                ->inline(),
+        array_splice($components, 2, 0, [
+            Section::make(__('Affiliated Institution'))
+                ->schema([
+                    Select::make('institution_id')
+                        ->label(__('Affiliated Institution'))
+                        ->options(fn () => Institution::query()
+                            ->whereIn('status', ['verified', 'pending'])
+                            ->orderBy('name')
+                            ->pluck('name', 'id'))
+                        ->searchable()
+                        ->preload()
+                        ->live()
+                        ->closeOnSelect()
+                        ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                        ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
+                    TextInput::make('institution_position')
+                        ->label(__('Position'))
+                        ->maxLength(255)
+                        ->placeholder(__('e.g., Imam, Mudir, Committee Member'))
+                        ->visible(fn (Get $get): bool => filled($get('institution_id'))),
+                ])
+                ->columns(2),
+        ]);
 
-            SpatieMediaLibraryFileUpload::make('avatar')
-                ->label(__('Avatar'))
-                ->collection('avatar')
-                ->avatar()
-                ->alignCenter()
-                ->imageEditor()
-                ->circleCropper()
-                ->image()
-                ->conversion('thumb')
-                ->belowContent(
-                    Schema::center([
-                        Text::make(__('Recommended: Square image, at least 400x400px'))
-                            ->extraAttributes(['class' => 'text-center']),
-                    ])
-                ),
-
-            SpatieMediaLibraryFileUpload::make('cover')
-                ->label(__('Cover Image'))
-                ->collection('cover')
-                ->image()
-                ->imageEditor()
-                ->imageAspectRatio('16:9')
-                ->automaticallyOpenImageEditorForAspectRatio()
-                ->imageEditorAspectRatioOptions(['16:9'])
-                ->automaticallyCropImagesToAspectRatio()
-                ->responsiveImages()
-                ->conversion('banner')
-                ->helperText(__('Cover image for speaker profile')),
-
-            RichEditor::make('bio')
-                ->label(__('Biography'))
-                ->json()
-                ->placeholder(__('Share a short biography of the speaker')),
-
-            Select::make('honorific')
-                ->label(__('Honorific'))
-                ->multiple()
-                ->options(Honorific::class)
-                ->searchable()
-                ->placeholder(__('Select honorifics')),
-
-            Select::make('pre_nominal')
-                ->label(__('Pre-nominal'))
-                ->multiple()
-                ->options(PreNominal::class)
-                ->searchable()
-                ->placeholder(__('Select pre-nominals')),
-
-            Select::make('post_nominal')
-                ->label(__('Post-nominal'))
-                ->multiple()
-                ->options(PostNominal::class)
-                ->searchable()
-                ->placeholder(__('Select post-nominals')),
-
-            TextInput::make('job_title')
-                ->label(__('Job Title'))
-                ->maxLength(255)
-                ->placeholder(__('e.g., Imam, Lecturer')),
-
-            Select::make('state_id')
-                ->label(__('Negeri'))
-                ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
-                ->searchable()
-                ->preload()
-                ->afterStateUpdatedJs(<<<'JS'
-                    $set('district_id', null)
-                    $set('subdistrict_id', null)
-                    JS),
-
-            Select::make('district_id')
-                ->label(__('Daerah'))
-                ->options(function (Get $get) {
-                    $stateId = $get('state_id');
-                    if (! $stateId) {
-                        return [];
-                    }
-
-                    return District::where('state_id', $stateId)
-                        ->orderBy('name')
-                        ->pluck('name', 'id');
-                })
-                ->searchable()
-                ->afterStateUpdatedJs(<<<'JS'
-                    $set('subdistrict_id', null)
-                    JS)
-                ->visibleJs(<<<'JS'
-                    $get('state_id') != null && $get('state_id') !== ''
-                    JS),
-
-            Select::make('subdistrict_id')
-                ->label(__('Bandar / Mukim / Zon'))
-                ->options(function (Get $get) {
-                    $districtId = $get('district_id');
-                    if (! $districtId) {
-                        return [];
-                    }
-
-                    return Subdistrict::where('district_id', $districtId)
-                        ->orderBy('name')
-                        ->pluck('name', 'id');
-                })
-                ->searchable()
-                ->visibleJs(<<<'JS'
-                    $get('district_id') != null && $get('district_id') !== ''
-                    JS),
-
-            Select::make('institution_id')
-                ->label(__('Affiliated Institution'))
-                ->options(fn () => Institution::query()
-                    ->whereIn('status', ['verified', 'pending'])
-                    ->orderBy('name')
-                    ->pluck('name', 'id'))
-                ->searchable()
-                ->preload()
-                ->live()
-                ->closeOnSelect()
-                ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
-
-            TextInput::make('institution_position')
-                ->label(__('Position'))
-                ->maxLength(255)
-                ->placeholder(__('e.g., Imam, Mudir, Committee Member'))
-                ->visible(fn (Get $get): bool => filled($get('institution_id'))),
-
-            Toggle::make('is_freelance')
-                ->label(__('Penceramah Bebas'))
-                ->default(false),
-        ];
+        return $components;
     }
 
     /**
@@ -195,6 +68,7 @@ class SpeakerFormSchema
             'post_nominal' => empty($data['post_nominal']) ? null : $data['post_nominal'],
             'job_title' => $data['job_title'] ?? null,
             'bio' => $data['bio'] ?? null,
+            'qualifications' => self::normalizeQualificationEntries($data['qualifications'] ?? []),
             'is_freelance' => (bool) ($data['is_freelance'] ?? false),
             'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
             'status' => 'pending',
@@ -209,13 +83,13 @@ class SpeakerFormSchema
         // Save media uploads (avatar/cover) via Filament's relationship-saving mechanism
         $schema?->model($speaker)->saveRelationships();
 
-        if (! empty($data['state_id'])) {
-            $speaker->address()->create([
-                'state_id' => $data['state_id'],
-                'district_id' => $data['district_id'] ?? null,
-                'subdistrict_id' => $data['subdistrict_id'] ?? null,
-            ]);
+        if (array_key_exists('language_ids', $data)) {
+            $speaker->languages()->sync(self::normalizeIntegerIds((array) $data['language_ids']));
         }
+
+        SharedFormSchema::createAddressFromData($speaker, $data);
+        SharedFormSchema::createContactsFromData($speaker, $data);
+        SharedFormSchema::createSocialMediaFromData($speaker, $data);
 
         $institutionIds = [];
 
@@ -244,5 +118,52 @@ class SpeakerFormSchema
         }
 
         return (string) $speaker->getKey();
+    }
+
+    /**
+     * @param  iterable<int, mixed>  $qualifications
+     * @return list<array{institution: string, degree: string, field: string|null, year: string|null}>
+     */
+    private static function normalizeQualificationEntries(iterable $qualifications): array
+    {
+        return collect($qualifications)
+            ->map(function (mixed $qualification): ?array {
+                if (! is_array($qualification)) {
+                    return null;
+                }
+
+                $institution = is_string($qualification['institution'] ?? null) ? trim($qualification['institution']) : null;
+                $degree = is_string($qualification['degree'] ?? null) ? trim($qualification['degree']) : null;
+                $field = is_string($qualification['field'] ?? null) ? trim($qualification['field']) : null;
+                $year = is_string($qualification['year'] ?? null) ? trim($qualification['year']) : null;
+
+                if (blank($institution) || blank($degree)) {
+                    return null;
+                }
+
+                return [
+                    'institution' => $institution,
+                    'degree' => $degree,
+                    'field' => filled($field) ? $field : null,
+                    'year' => filled($year) ? $year : null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  iterable<int, mixed>  $values
+     * @return list<int>
+     */
+    private static function normalizeIntegerIds(iterable $values): array
+    {
+        return collect($values)
+            ->map(fn (mixed $value): ?int => is_numeric($value) ? (int) $value : null)
+            ->filter(fn (?int $value): bool => $value !== null)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

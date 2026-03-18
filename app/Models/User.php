@@ -69,7 +69,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             $user->eventSubmissions()->update(['submitted_by' => null]);
             $user->contributionRequests()->update(['proposer_id' => null]);
             $user->reviewedContributionRequests()->update(['reviewer_id' => null]);
-            $user->moderationReviews()->update(['reviewer_id' => null]);
+            $user->moderationReviews()->update(['moderator_id' => null]);
             $user->reports()->update(['reporter_id' => null]);
             $user->handledReports()->update(['handled_by' => null]);
             $user->registrations()->each(fn ($reg) => $reg->delete());
@@ -236,7 +236,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
      */
     public function moderationReviews(): HasMany
     {
-        return $this->hasMany(ModerationReview::class, 'reviewer_id');
+        return $this->hasMany(ModerationReview::class, 'moderator_id');
     }
 
     /**

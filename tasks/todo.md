@@ -1,3 +1,253 @@
+# Contribution URL Canonicalization
+
+- [x] Change public event contribution/report URLs to use `majlis` instead of `event`
+- [x] Add slug-based public reference URLs so `rujukan` pages stop using UUIDs
+- [x] Keep old event/reference contribution URLs resolving while redirecting canonical public routes to the new segments and slugs
+- [x] Run focused verification for canonical route generation, slug resolution, and public page links
+
+## Review
+- Updated `ContributionSubjectType` so event contribution/report URLs now generate `/sumbangan/majlis/{slug}/kemas-kini` and `/lapor/majlis/{slug}` instead of the English `event` segment.
+- Added a real `slug` attribute for references directly in the base references migration and kept the runtime/model layer responsible for generating slugs on save for development data going forward.
+- Updated the `Reference` model to generate slugs automatically, use slug-based route keys, and continue resolving old UUID-based reference URLs through explicit route binding and slug-or-UUID subject resolution.
+- Canonicalized the public contribution/report routes for references so `/sumbangan/rujukan/{uuid}/kemas-kini` and `/lapor/rujukan/{uuid}` now redirect to the slug URL, while the public reference page, event page, and share-tracking reference targets all generate slug-based URLs going forward.
+- Verification:
+  - `php -l app/Enums/ContributionSubjectType.php`
+  - `php -l routes/web.php`
+  - `php -l database/migrations/2026_01_23_031834_create_references_table.php`
+  - `php -l database/factories/ReferenceFactory.php`
+  - `php -l app/Models/Reference.php`
+  - `php -l app/Actions/Contributions/ResolveContributionSubjectAction.php`
+  - `php -l app/Services/ShareTracking/ShareTrackingUrlService.php`
+  - `php -l app/Livewire/Pages/Contributions/SuggestUpdate.php`
+  - `php -l app/Livewire/Pages/Reports/Create.php`
+  - `php -l tests/Feature/PublicPagesTest.php`
+  - `php -l tests/Feature/ContributionPagesTest.php`
+  - `php -l tests/Feature/ContributionWorkflowActionsTest.php`
+  - `vendor/bin/pest --parallel --compact --filter='(renders reference contribution links with rujukan route segments|renders event contribution links with majlis route segments|stores reference reports from the public report page|redirects guests to login before opening report and suggest update pages|redirects uuid-based reference contribution and report pages to the canonical slug url|resolves contribution update context from slug and uuid subjects|resolves contribution subjects from slug and uuid identifiers through the action layer)'`
+  - `vendor/bin/phpstan analyse --ansi app/Enums/ContributionSubjectType.php routes/web.php app/Models/Reference.php app/Actions/Contributions/ResolveContributionSubjectAction.php app/Services/ShareTracking/ShareTrackingUrlService.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Livewire/Pages/Reports/Create.php tests/Feature/PublicPagesTest.php tests/Feature/ContributionPagesTest.php tests/Feature/ContributionWorkflowActionsTest.php`
+  - `php artisan tinker --execute='echo App\Enums\ContributionSubjectType::Event->publicRouteSegment(), PHP_EOL; echo App\Enums\ContributionSubjectType::Reference->publicRouteSegment(), PHP_EOL; $reference = App\Models\Reference::factory()->make(["slug" => "kitab-tafsir"]); echo route("references.show", $reference), PHP_EOL; echo route("contributions.suggest-update", ["subjectType" => App\Enums\ContributionSubjectType::Event->publicRouteSegment(), "subjectId" => "seminar-konvensyen-bersama-asatizah-uhblxgg"]), PHP_EOL; echo route("reports.create", ["subjectType" => App\Enums\ContributionSubjectType::Reference->publicRouteSegment(), "subjectId" => "kitab-tafsir"]), PHP_EOL;'`
+  - `vendor/bin/pint --format agent app/Enums/ContributionSubjectType.php routes/web.php database/migrations/2026_01_23_031834_create_references_table.php database/factories/ReferenceFactory.php app/Models/Reference.php app/Actions/Contributions/ResolveContributionSubjectAction.php app/Services/ShareTracking/ShareTrackingUrlService.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Livewire/Pages/Reports/Create.php resources/views/livewire/pages/events/show.blade.php resources/views/components/pages/references/⚡show.blade.php tests/Feature/PublicPagesTest.php tests/Feature/ContributionPagesTest.php tests/Feature/ContributionWorkflowActionsTest.php`
+  - `git diff --check`
+
+# Reference Route And Report Queue Clarity
+
+- [x] Localize public reference contribution/report URLs to use `rujukan`
+- [x] Make the admin reports queue show the reported subject clearly with a direct admin link
+- [x] Run focused verification for route generation, public pages, and admin report moderation surface
+
+## Review
+- Updated `ContributionSubjectType` so canonical public contribution/report URLs for references now use `/sumbangan/rujukan/{id}/kemas-kini` and `/lapor/rujukan/{id}`, while the old `/reference` variants redirect to the Malay path.
+- Updated the public reference page CTA links to generate the localized `rujukan` routes instead of leaking the English `reference` segment.
+- Kept the event moderation queue event-only, but completed the generic reports backend by adding a subject column and direct admin-record links in the reports resource so moderators can immediately open the reported reference, institution, speaker, event, or donation channel from `/admin/reports`.
+- Added focused regression coverage for the public reference links, the legacy redirect behavior, and the admin reports subject link.
+- Verification:
+  - `php -l app/Enums/ContributionSubjectType.php`
+  - `php -l routes/web.php`
+  - `php -l resources/views/components/pages/references/⚡show.blade.php`
+  - `php -l app/Filament/Resources/Reports/Support/ReportPresenter.php`
+  - `php -l app/Filament/Resources/Reports/ReportResource.php`
+  - `php -l app/Filament/Resources/Reports/Tables/ReportsTable.php`
+  - `php -l tests/Feature/PublicPagesTest.php`
+  - `php -l tests/Feature/ContributionPagesTest.php`
+  - `php -l tests/Feature/ReportAdminResourceTest.php`
+  - `vendor/bin/pest --parallel --compact --filter='(renders reference contribution links with rujukan route segments|stores reference reports from the public report page|redirects guests to login before opening report and suggest update pages|shows the reported subject title and admin link on the reports index)'`
+  - `vendor/bin/phpstan analyse --ansi app/Enums/ContributionSubjectType.php app/Filament/Resources/Reports/Support/ReportPresenter.php app/Filament/Resources/Reports/ReportResource.php app/Filament/Resources/Reports/Tables/ReportsTable.php tests/Feature/PublicPagesTest.php tests/Feature/ContributionPagesTest.php tests/Feature/ReportAdminResourceTest.php`
+  - `php artisan tinker --execute="echo route('contributions.suggest-update', ['subjectType' => App\\Enums\\ContributionSubjectType::Reference->publicRouteSegment(), 'subjectId' => '019cec11-e2d9-7356-b88a-98611b504687']); echo PHP_EOL; echo route('reports.create', ['subjectType' => App\\Enums\\ContributionSubjectType::Reference->publicRouteSegment(), 'subjectId' => '019cec11-e2d9-7356-b88a-98611b504687']); echo PHP_EOL;"`
+  - `git diff --check`
+
+# Admin Contribution Request Queue
+
+- [x] Add a dedicated admin Filament resource for `ContributionRequest` records under the moderation group
+- [x] Expose approve/reject review actions and readable request payload details for backend reviewers
+- [x] Add focused admin access and moderation-action coverage, then run targeted verification
+
+## Review
+- Added a dedicated admin moderation resource for `ContributionRequest` records with list and view pages, pending-count navigation badge, readable entity labels/links, request notes, and pretty-printed original/proposed payload previews.
+- Wired approve/reject moderation actions directly to the existing contribution workflow actions so admin moderation uses the same domain logic as the public contributions inbox instead of duplicating request-state transitions.
+- Registered the resource in admin coverage and added focused tests for moderator approve/reject flows plus the resource view-link behavior.
+- Verification:
+  - `php -l app/Filament/Resources/ContributionRequests/Support/ContributionRequestPresenter.php`
+  - `php -l app/Filament/Resources/ContributionRequests/Schemas/ContributionRequestInfolist.php`
+  - `php -l app/Filament/Resources/ContributionRequests/Tables/ContributionRequestsTable.php`
+  - `php -l app/Filament/Resources/ContributionRequests/Pages/ListContributionRequests.php`
+  - `php -l app/Filament/Resources/ContributionRequests/Pages/ViewContributionRequest.php`
+  - `php -l app/Filament/Resources/ContributionRequests/ContributionRequestResource.php`
+  - `php -l tests/Feature/ContributionRequestAdminResourceTest.php`
+  - `php -l tests/Feature/AdminResourcesCoverageTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/ContributionRequests app/Filament/Resources/ContributionRequests/ContributionRequestResource.php tests/Feature/ContributionRequestAdminResourceTest.php tests/Feature/AdminResourcesCoverageTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionRequestAdminResourceTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminResourcesCoverageTest.php`
+  - `vendor/bin/pint --format agent app/Filament/Resources/ContributionRequests tests/Feature/ContributionRequestAdminResourceTest.php tests/Feature/AdminResourcesCoverageTest.php`
+  - `git diff --check`
+
+# Report Page Subject Visibility
+
+- [x] Extend the shared public report-page context with concrete subject display data
+- [x] Render a visible subject summary on `/lapor/*` pages for speaker, institution, and event records
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Extended the shared contribution/report presentation payload so report pages now receive both the generic subject label and the concrete subject title/name for the resolved record.
+- Added a prominent summary panel near the top of the public report page that shows which record is being reported and links back to that record before submission.
+- Added focused regression coverage for the report context action and the public institution, speaker, and event report pages so the highlighted subject stays visible.
+- Verification:
+  - `php -l app/Actions/Contributions/ResolveContributionSubjectPresentationAction.php`
+  - `php -l app/Actions/Reports/ResolveReportFormContextAction.php`
+  - `php -l app/Livewire/Pages/Reports/Create.php`
+  - `php -l tests/Feature/ReportActionsTest.php`
+  - `php -l tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/ResolveContributionSubjectPresentationAction.php app/Actions/Reports/ResolveReportFormContextAction.php app/Livewire/Pages/Reports/Create.php tests/Feature/ReportActionsTest.php tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ReportActionsTest.php --filter='resolves report form context for public subjects through the action layer'`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='(shows the reported institution clearly on the public report page|shows the reported speaker clearly on the public report page|shows the reported event clearly on the public report page|resolves institution slugs on the report page without uuid casting errors|stores reference reports from the public report page)'`
+  - `git diff --check`
+
+# Speaker Create Parity
+
+- [x] Compare the dedicated speaker contribution page against the submit-event speaker quick-create form
+- [x] Align the shared speaker field set and required/optional behavior across both entry points
+- [x] Add focused regression coverage and verify in the browser
+
+## Review
+- The speaker pair had broader drift than the institution pair: the event quick-create modal only exposed a partial speaker profile while `/sumbangan/penceramah/baru` already included biography, languages, full base/location details, qualifications, gallery, contacts, and social links.
+- Updated `SpeakerFormSchema::createOptionForm()` to reuse the dedicated speaker contribution sections so both entry points now collect the same core speaker data and keep the same required/optional treatment for shared fields.
+- Kept the event quick-create-only affiliation convenience by appending the existing `Affiliated Institution` fields on top of the shared speaker sections instead of removing event-context functionality.
+- Extended `SpeakerFormSchema::createOptionUsing()` so the richer quick-create modal now persists qualifications, languages, address details, contacts, and social links in addition to the existing media and institution affiliation handling.
+- Verification:
+  - `php -l app/Forms/SpeakerContributionFormSchema.php`
+  - `php -l app/Forms/SpeakerFormSchema.php`
+  - `php -l tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SpeakerContributionFormSchema.php app/Forms/SpeakerFormSchema.php tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php`
+  - Browser check at `https://majlisilmu.test/hantar-majlis?step=form.penceramah-media%3A%3Adata%3A%3Awizard-step`: the `Cipta` speaker modal now includes `Biografi`, `Bahasa`, `Alamat Baris 1`, `URL Google Maps`, `Qualifications`, `Galeri`, `Contact Details`, and `Media Sosial`, matching the dedicated speaker contribution page’s core sections.
+
+# Institution Create Requiredness Alignment
+
+- [x] Compare the dedicated institution contribution page against the submit-event institution quick-create form
+- [x] Align the dedicated create page so `Google Maps URL` is required there as well
+- [x] Run focused verification and capture the result
+
+## Review
+- The actual mismatch was not the asterisk styling itself. Both surfaces already use Filament's default required-marker UI.
+- The mismatch was field requiredness: the submit-event institution quick-create modal required `Google Maps URL`, while `/sumbangan/institusi/baru` left it optional.
+- Kept the institution update/suggestion flow unchanged by making the dedicated create page opt into the stricter address schema instead of changing every caller of `InstitutionContributionFormSchema`.
+- Verification:
+  - `php -l app/Forms/InstitutionContributionFormSchema.php`
+  - `php -l app/Livewire/Pages/Contributions/SubmitInstitution.php`
+  - `php -l tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Forms/InstitutionContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php`
+  - Browser check at `https://majlisilmu.test/sumbangan/institusi/baru`: `URL Google Maps*` now renders as required, matching the submit-event institution quick-create modal.
+
+# Create Submission Note Cleanup And Approval Audit
+
+- [x] Remove create-time submission notes from dedicated institution and speaker submission forms
+- [x] Revert the event-side institution quick-create submission note wiring
+- [x] Add focused regression coverage that create forms omit reviewer-context fields while update forms keep them
+- [x] Audit the full event-approval side effects through the moderation service, state transition, observers, and notification pipeline
+
+## Review
+- Removed create-time submission note UI from the dedicated institution and speaker contribution forms, and removed the temporary event-side institution quick-create note/contribution-request wiring so new submissions rely on the submitted payload itself.
+- Kept reviewer context on update flows only: suggestion/update pages still expose `proposer_note` because that field is useful for explaining deltas rather than brand-new records.
+- Confirmed the dedicated institution contribution flow is not a draft-only staging model: it creates the real institution and related rows immediately with `status = pending`, then creates a `contribution_requests` row to moderate that live pending record.
+- Confirmed event approval side effects live primarily in `ApproveEvent`: it creates a moderation review, marks the event approved, sets `published_at`, auto-verifies pending related speaker/institution/venue/tag/reference records, indexes the event for Scout, dispatches submission/publication notifications, and then `ModerationService` records moderation telemetry. The event save also triggers `EventObserver::updated()`, which busts public-listing cache and checks for material change notifications.
+- Verification:
+  - `php -l app/Actions/Contributions/SubmitContributionCreateRequestAction.php`
+  - `php -l app/Forms/InstitutionFormSchema.php`
+  - `php -l app/Livewire/Pages/Contributions/SubmitInstitution.php`
+  - `php -l app/Livewire/Pages/Contributions/SubmitSpeaker.php`
+  - `php -l resources/views/components/pages/submit-event/create.blade.php`
+  - `php -l tests/Feature/SharedFormSchemaTest.php`
+  - `php -l tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Contributions/SubmitContributionCreateRequestAction.php app/Forms/InstitutionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Livewire/Pages/Contributions/SubmitSpeaker.php tests/Feature/SharedFormSchemaTest.php tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ModerationServiceTest.php --filter='Event Approval'`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='(renders the dedicated institution contribution page|renders the dedicated speaker contribution page|keeps reviewer context fields on update suggestion pages|exposes Filament action handlers required by public contribution media uploads)'`
+  - `vendor/bin/pint --dirty --format agent`
+  - `git diff --check`
+
+# Institution Form Alignment
+
+- [x] Align institution description fields in the public contribution form and event quick-create flow
+- [x] Remove the institution logo upload from the public contribution form
+- [x] Reuse the full institution contacts repeater and persistence in the event quick-create flow
+- [x] Add focused regression coverage for the shared form expectations
+
+## Review
+- Switched the institution description field to `RichEditor` in both the public contribution schema and the event wizard institution quick-create schema so the two flows expose the same editing surface.
+- Removed the public institution `logo` upload while keeping `cover` and `gallery` media support intact.
+- Extracted the institution contact-details repeater into `SharedFormSchema` and reused it in both flows, then added contact persistence to institution quick-create creation so the event wizard now stores the same structured contact data as the contribution form.
+- Verification:
+  - `php -l app/Forms/SharedFormSchema.php`
+  - `php -l app/Forms/InstitutionContributionFormSchema.php`
+  - `php -l app/Forms/InstitutionFormSchema.php`
+  - `php -l tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Forms/InstitutionFormSchema.php tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php`
+  - `vendor/bin/pint --dirty --format agent`
+  - `git diff --check`
+
+# Public Contribution Media Upload Action Wiring
+
+- [x] Inspect the failing public institution contribution page against the working media-upload host pattern
+- [x] Add Filament action and Livewire file-upload support to the public institution and speaker contribution components
+- [x] Add focused regression coverage for the missing `mountAction` surface and run targeted verification
+
+## Review
+- Matched the public institution and speaker contribution pages to the existing submit-event host pattern by adding `HasActions`, `InteractsWithActions`, and `WithFileUploads` to both Livewire page classes.
+- This restores the `mountAction` method expected by Filament media-upload/image-editor UI on `/sumbangan/institusi/baru` and prevents the internal Livewire `MethodNotFoundException`.
+- Added a focused regression test that asserts the public contribution components expose the Filament action handler surface required by their media-upload fields.
+- Verification:
+  - `php -l app/Livewire/Pages/Contributions/SubmitInstitution.php`
+  - `php -l app/Livewire/Pages/Contributions/SubmitSpeaker.php`
+  - `php -l tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions/SubmitInstitution.php app/Livewire/Pages/Contributions/SubmitSpeaker.php tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pint --dirty --format agent`
+  - `git diff --check`
+
+# Institution Contribution Route Consistency
+
+- [x] Map public institution contribution/report URLs to `institusi`
+- [x] Update institution-facing links and keep canonical subject handling as `institution`
+- [x] Add focused regression coverage for canonical and legacy institution contribution URLs
+
+## Review
+- Extended `ContributionSubjectType` public route-segment mapping so institution contribution and report URLs now generate `institusi` while request handling still normalizes back to canonical `institution`.
+- Updated the public institution profile page CTA links to use `/sumbangan/institusi/{slug}/kemas-kini` and `/lapor/institusi/{slug}`.
+- Added legacy redirects for `/sumbangan/institution/{slug}/kemas-kini` and `/lapor/institution/{slug}` so old English URLs land on the canonical Malay path.
+- Verification:
+  - `vendor/bin/phpstan analyse --ansi app/Enums/ContributionSubjectType.php tests/Feature/ContributionPagesTest.php tests/Feature/PublicPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php`
+  - `php artisan route:list --path=sumbangan`
+  - `php artisan route:list --path=lapor`
+  - `curl -I -s https://majlisilmu.test/lapor/institution/kompleks-islam-senawang-usx9tbl`
+  - `curl -I -s https://majlisilmu.test/sumbangan/institution/kompleks-islam-senawang-usx9tbl/kemas-kini`
+  - `vendor/bin/pint --dirty --format agent`
+  - `git diff --check`
+
+# Speaker Contribution Route Consistency
+
+- [x] Add a public route-segment alias so speaker contribution/report URLs use `penceramah`
+- [x] Update speaker-facing links and route resolution to keep internal subject handling canonical
+- [x] Add focused regression coverage for canonical and legacy speaker contribution URLs
+
+## Review
+- Added a small `ContributionSubjectType` route-segment mapping so speaker contribution/report URLs now generate `penceramah` while Livewire and subject resolution still normalize back to the canonical `speaker` type.
+- Updated the public speaker profile page to generate `/sumbangan/penceramah/{slug}/kemas-kini` and `/lapor/penceramah/{slug}`.
+- Added legacy redirects for `/sumbangan/speaker/{slug}/kemas-kini` and `/lapor/speaker/{slug}` so old links continue to work and land on the canonical Malay segment.
+- Verification:
+  - `vendor/bin/phpstan analyse --ansi app/Enums/ContributionSubjectType.php app/Actions/Contributions/ResolveContributionSubjectAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Livewire/Pages/Reports/Create.php tests/Feature/ContributionPagesTest.php tests/Feature/PublicPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php`
+  - `php artisan route:list --path=sumbangan`
+  - `php artisan route:list --path=lapor`
+  - `vendor/bin/pint --dirty --format agent`
+  - `git diff --check`
+
 # Speakers CTA Copy Cleanup
 
 - [x] Remove the extra helper sentence below the public speakers CTA button
@@ -5033,3 +5283,86 @@
 - Verification:
   - `vendor/bin/pest --parallel --compact --filter='(ContributionPagesTest|ReportApiModerationTest)'` => **16 passed**
   - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/ReportController.php app/Models/User.php database/seeders/PermissionSeeder.php tests/Feature/ContributionPagesTest.php tests/Feature/Api/ReportApiModerationTest.php` => **No errors**
+
+# Migration Consolidation
+
+- [x] Fold March notification/event follow-up schema changes into their base create migrations
+- [x] Remove obsolete March cleanup/refactor migrations that no longer define fresh schema
+- [x] Verify fresh migrations still expose the final tables/columns and omit removed legacy tables
+
+## Review
+
+- Root cause:
+  - the migration history had accumulated a set of March follow-up migrations that only renamed, added, or dropped schema already implied by the app’s current models and tests, which made the fresh-schema story harder to read and maintain
+  - the remaining March create migrations and data migrations also kept the schema timeline split across March files, plus extra backfill/compatibility logic, even though the desired end state is a clean fresh schema with no March migrations at all
+- Fix:
+  - updated `database/migrations/2026_01_10_000015_create_events_table.php` so the base `events` create includes `parent_event_id` and `event_structure`
+  - updated `database/migrations/2026_01_10_000016_create_event_speaker_table.php` so the original event-people migration now creates the final `event_key_people` table shape directly
+  - updated earlier migrations to absorb the remaining March table creates directly:
+    - `database/migrations/2026_01_10_000019_create_event_submissions_table.php` now also creates `contribution_requests`
+    - `database/migrations/2026_01_10_000024_create_registrations_table.php` now also creates `event_checkins`
+    - `database/migrations/2026_01_11_101956_create_permission_tables.php` now also creates `member_invitations`
+    - `database/migrations/2026_01_23_031834_create_references_table.php` now also creates `reference_user`
+    - `database/migrations/2026_02_09_190614_create_notifications_table.php` now creates the full notification-center schema (`notification_settings`, `notification_rules`, `notification_destinations`, `notification_messages`, `notification_deliveries`) without March follow-up files or table-exists guards
+  - removed the now-redundant cleanup/refactor/create/backfill migrations:
+    - `database/migrations/2026_01_16_213657_create_event_interests_table.php`
+    - `database/migrations/2026_02_09_190615_create_notification_endpoints_table.php`
+    - `database/migrations/2026_02_09_190615_create_notification_preferences_table.php`
+    - `database/migrations/2026_03_04_000100_create_event_checkins_table.php`
+    - `database/migrations/2026_03_08_120000_create_notification_center_tables.php`
+    - `database/migrations/2026_03_09_120000_refactor_notifications_for_laravel_channels.php`
+    - `database/migrations/2026_03_09_180000_add_dispatch_tracking_to_notification_messages_table.php`
+    - `database/migrations/2026_03_09_210000_drop_legacy_notification_tables.php`
+    - `database/migrations/2026_03_11_000000_migrate_event_speaker_to_event_participants_table.php`
+    - `database/migrations/2026_03_11_120000_add_event_hierarchy_to_events_table.php`
+    - `database/migrations/2026_03_11_121755_remove_recurrence_and_sessions_from_events_domain.php`
+    - `database/migrations/2026_03_12_000001_rename_event_participants_to_event_key_people.php`
+    - `database/migrations/2026_03_12_104922_drop_legacy_dawah_share_tables.php`
+    - `database/migrations/2026_03_12_170837_ensure_default_signals_tracked_property.php`
+    - `database/migrations/2026_03_13_000001_create_contribution_requests_table.php`
+    - `database/migrations/2026_03_13_000002_create_reference_user_table.php`
+    - `database/migrations/2026_03_13_120000_ensure_admin_signals_tracked_property.php`
+    - `database/migrations/2026_03_14_120000_prune_legacy_model_authz_scopes.php`
+    - `database/migrations/2026_03_14_130000_create_member_invitations_table.php`
+    - `database/migrations/2026_03_15_120000_remove_event_interest_feature.php`
+  - extended `tests/Feature/RefactorTest.php` with direct schema assertions for the consolidated tables and removed legacy tables
+  - removed the leftover table-exists/backfill migration behavior instead of preserving it, per the stricter “no backward compatibility or backfill” requirement
+- Verification:
+  - `rg --files database/migrations | sort | grep '2026_03_'` => **no output**
+  - `php -l database/migrations/2026_01_10_000015_create_events_table.php && php -l database/migrations/2026_01_10_000016_create_event_speaker_table.php && php -l database/migrations/2026_01_10_000019_create_event_submissions_table.php && php -l database/migrations/2026_01_10_000024_create_registrations_table.php && php -l database/migrations/2026_01_11_101956_create_permission_tables.php && php -l database/migrations/2026_01_23_031834_create_references_table.php && php -l database/migrations/2026_02_09_190614_create_notifications_table.php && php -l tests/Feature/RefactorTest.php` => **No syntax errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(RefactorTest|NotificationCenterApiTest|NotificationPreferencesTest|NotificationCenterTriggersTest|SubmitEventParentProgramTest|DawahShareImpactTest|ContributionWorkflowServiceTest|ContributionWorkflowActionsTest|MemberInvitationActionsTest|MemberInvitationUiTest)'` => **90 passed (459 assertions)**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/RefactorTest.php database/migrations/2026_01_10_000019_create_event_submissions_table.php database/migrations/2026_01_10_000024_create_registrations_table.php database/migrations/2026_01_11_101956_create_permission_tables.php database/migrations/2026_01_23_031834_create_references_table.php database/migrations/2026_02_09_190614_create_notifications_table.php` => **No errors**
+  - `git diff --check` => **No diff formatting issues**
+  - wider spot-check:
+    - `vendor/bin/pest --parallel --compact tests/Feature --filter='(RefactorTest|NotificationCenterApiTest|NotificationPreferencesTest|NotificationCenterTriggersTest|SubmitEventParentProgramTest|DawahShareImpactTest|ContributionWorkflowServiceTest|ContributionWorkflowActionsTest|ContributionPagesTest|MemberInvitationActionsTest|MemberInvitationUiTest)'` => **1 unrelated existing failure in `tests/Feature/ContributionPagesTest.php:163` (`proposed_data.address.line1` expected `No. 8, Jalan Baru`, got `null`)**
+
+# Migration Audit
+
+- [x] Convert remaining local migration `json(...)` columns to `jsonb(...)`
+- [x] Audit column usage for `event_submissions`, `moderation_reviews`, and `reports`
+- [x] Remove any verified-unused columns and re-run focused verification
+
+## Review
+
+- Root cause:
+  - the migration cleanup still left a mix of `json(...)` and `jsonb(...)` definitions across local migrations, which makes the schema inconsistent for PostgreSQL-first usage
+  - the older workflow tables had not been re-audited after the squash, so dead compatibility columns could survive even if runtime code no longer needed them
+- Fix:
+  - changed every remaining local `json(...)` migration column to `jsonb(...)`, including settings payloads, contribution request snapshots, media metadata, audits, tags, activity log properties, deleted-model snapshots, and AI metadata
+  - audited the columns in:
+    - `database/migrations/2026_01_10_000019_create_event_submissions_table.php`
+    - `database/migrations/2026_01_10_000020_create_moderation_reviews_table.php`
+    - `database/migrations/2026_01_10_000021_create_reports_table.php`
+  - kept all `event_submissions` columns because `event_id`, `submitted_by`, `submitter_name`, and `notes` are all exercised by the submission flows, dashboards, and display tests
+  - kept all `reports` columns because `reporter_id`, `reporter_fingerprint`, `handled_by`, `entity_type`, `entity_id`, `category`, `status`, and `resolution_note` are all used by report submission, moderation, notifications, and admin resources
+  - removed only `moderation_reviews.reviewer_id`, which had become dead compatibility state; runtime writes and reads use `moderator_id`, so I also updated:
+    - `app/Models/User.php`
+    - `app/Models/ModerationReview.php`
+    - `database/factories/ModerationReviewFactory.php`
+    - `database/seeders/ModerationReviewSeeder.php`
+    - `tests/Feature/RefactorTest.php`
+- Verification:
+  - `rg -n -- "->json\\(|json\\('" database/migrations` => **no output**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(RefactorTest|EventSubmissionDisplayTest|SubmitEventNotesTest|SubmitEventNotificationTest|ContributionWorkflowServiceTest|ContributionWorkflowActionsTest|ModerationServiceTest|ModerationQueueTest|EventModerationActionsTest|AhliEventApprovalTest|ReportActionsTest|ReportApiModerationTest|NotificationEmailRoutingTest)'` => **102 passed (469 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Models/ModerationReview.php app/Models/User.php database/factories/ModerationReviewFactory.php database/seeders/ModerationReviewSeeder.php tests/Feature/RefactorTest.php` => **No errors**
+  - `git diff --check` => **No diff formatting issues**

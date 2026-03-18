@@ -6,6 +6,8 @@ use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
 use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
+use App\Livewire\Pages\Contributions\SubmitInstitution;
+use App\Livewire\Pages\Contributions\SubmitSpeaker;
 use App\Livewire\Pages\Contributions\SuggestUpdate;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Models\ContributionRequest;
@@ -43,7 +45,8 @@ it('renders the dedicated institution contribution page', function () {
 
     $this->get(route('contributions.submit-institution'))
         ->assertOk()
-        ->assertSee(__('Add a New Institution'));
+        ->assertSee(__('Add a New Institution'))
+        ->assertDontSee(__('Submission Note'));
 });
 
 it('renders the dedicated speaker contribution page', function () {
@@ -53,7 +56,31 @@ it('renders the dedicated speaker contribution page', function () {
 
     $this->get(route('contributions.submit-speaker'))
         ->assertOk()
-        ->assertSee(__('Add a New Speaker'));
+        ->assertSee(__('Add a New Speaker'))
+        ->assertDontSee(__('Submission Note'));
+});
+
+it('keeps reviewer context fields on update suggestion pages', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', ['subjectType' => 'institusi', 'subjectId' => $institution->slug]))
+        ->assertOk()
+        ->assertSee(__('Context for reviewers'))
+        ->assertSee(__('Explain the change'));
+});
+
+it('exposes Filament action handlers required by public contribution media uploads', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    expect(method_exists(Livewire::test(SubmitInstitution::class)->instance(), 'mountAction'))->toBeTrue()
+        ->and(method_exists(Livewire::test(SubmitSpeaker::class)->instance(), 'mountAction'))->toBeTrue();
 });
 
 it('applies direct institution edits for owner maintainers from the suggest update page', function () {
@@ -95,7 +122,7 @@ it('re-moderates approved events when maintainers apply sensitive direct edits f
     $this->actingAs($user);
 
     Livewire::test(SuggestUpdate::class, [
-        'subjectType' => 'event',
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
         'subjectId' => $event->slug,
     ])
         ->set('data.starts_at', now()->addDays(8)->toDateTimeString())
@@ -250,12 +277,13 @@ it('stores reference reports from the public report page', function () {
         'status' => 'verified',
         'is_active' => true,
     ]);
+    $referenceRouteSegment = ContributionSubjectType::Reference->publicRouteSegment();
 
     $this->actingAs($user);
 
     Livewire::test(CreateReportPage::class, [
-        'subjectType' => 'reference',
-        'subjectId' => $reference->id,
+        'subjectType' => $referenceRouteSegment,
+        'subjectId' => $reference->slug,
     ])
         ->set('data.category', 'fake_reference')
         ->set('data.description', 'This listing points to a fabricated title.')
@@ -272,19 +300,65 @@ it('stores reference reports from the public report page', function () {
 });
 
 it('redirects guests to login before opening report and suggest update pages', function () {
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
     $speaker = Speaker::factory()->create([
         'status' => 'verified',
         'is_active' => true,
     ]);
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
 
-    $this->get(route('contributions.suggest-update', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+    $eventRouteSegment = ContributionSubjectType::Event->publicRouteSegment();
+    $institutionRouteSegment = ContributionSubjectType::Institution->publicRouteSegment();
+    $speakerRouteSegment = ContributionSubjectType::Speaker->publicRouteSegment();
+    $referenceRouteSegment = ContributionSubjectType::Reference->publicRouteSegment();
+
+    $this->get(route('contributions.suggest-update', ['subjectType' => $institutionRouteSegment, 'subjectId' => $institution->slug]))
         ->assertRedirect(route('login'));
 
-    $this->get(route('reports.create', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+    $this->get(route('reports.create', ['subjectType' => $institutionRouteSegment, 'subjectId' => $institution->slug]))
         ->assertRedirect(route('login'));
 
-    $this->get("/report/speaker/{$speaker->slug}")
+    $this->get(route('contributions.suggest-update', ['subjectType' => $speakerRouteSegment, 'subjectId' => $speaker->slug]))
         ->assertRedirect(route('login'));
+
+    $this->get(route('reports.create', ['subjectType' => $speakerRouteSegment, 'subjectId' => $speaker->slug]))
+        ->assertRedirect(route('login'));
+
+    $this->get("/sumbangan/speaker/{$speaker->slug}/kemas-kini")
+        ->assertRedirect("/sumbangan/{$speakerRouteSegment}/{$speaker->slug}/kemas-kini");
+
+    $this->get("/lapor/speaker/{$speaker->slug}")
+        ->assertRedirect("/lapor/{$speakerRouteSegment}/{$speaker->slug}");
+
+    $this->get("/sumbangan/institution/{$institution->slug}/kemas-kini")
+        ->assertRedirect("/sumbangan/{$institutionRouteSegment}/{$institution->slug}/kemas-kini");
+
+    $this->get("/lapor/institution/{$institution->slug}")
+        ->assertRedirect("/lapor/{$institutionRouteSegment}/{$institution->slug}");
+
+    $this->get("/sumbangan/event/{$event->slug}/kemas-kini")
+        ->assertRedirect("/sumbangan/{$eventRouteSegment}/{$event->slug}/kemas-kini");
+
+    $this->get("/lapor/event/{$event->slug}")
+        ->assertRedirect("/lapor/{$eventRouteSegment}/{$event->slug}");
+
+    $this->get("/sumbangan/reference/{$reference->slug}/kemas-kini")
+        ->assertRedirect("/sumbangan/{$referenceRouteSegment}/{$reference->slug}/kemas-kini");
+
+    $this->get("/lapor/reference/{$reference->slug}")
+        ->assertRedirect("/lapor/{$referenceRouteSegment}/{$reference->slug}");
 });
 
 it('forbids users banned from directory feedback from opening update and report pages', function () {
@@ -297,10 +371,10 @@ it('forbids users banned from directory feedback from opening update and report 
 
     $this->actingAs($user);
 
-    $this->get(route('contributions.suggest-update', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+    $this->get(route('contributions.suggest-update', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(), 'subjectId' => $speaker->slug]))
         ->assertForbidden();
 
-    $this->get(route('reports.create', ['subjectType' => 'speaker', 'subjectId' => $speaker->slug]))
+    $this->get(route('reports.create', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(), 'subjectId' => $speaker->slug]))
         ->assertForbidden();
 });
 
@@ -314,7 +388,7 @@ it('resolves speaker slugs on the update suggestion page without uuid casting er
     $this->actingAs($user);
 
     Livewire::test(SuggestUpdate::class, [
-        'subjectType' => 'speaker',
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
         'subjectId' => $speaker->slug,
     ])->assertSet('subjectType', 'speaker');
 });
@@ -329,7 +403,95 @@ it('resolves institution slugs on the report page without uuid casting errors', 
     $this->actingAs($user);
 
     Livewire::test(CreateReportPage::class, [
-        'subjectType' => 'institution',
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
         'subjectId' => $institution->slug,
     ])->assertSet('subjectType', 'institution');
+});
+
+it('shows the reported institution clearly on the public report page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Kompleks Islam Senawang',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $selectedInstitutionLabel = __('Selected :subject', ['subject' => strtolower(__('Institution'))]);
+    $viewInstitutionLabel = __('View this :subject', ['subject' => strtolower(__('Institution'))]);
+
+    $this->actingAs($user);
+
+    $this->get(route('reports.create', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertSeeText($selectedInstitutionLabel)
+        ->assertSeeText($institution->name)
+        ->assertSeeText($viewInstitutionLabel);
+});
+
+it('shows the reported speaker clearly on the public report page', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'name' => 'Amina binti Rashid',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $selectedSpeakerLabel = __('Selected :subject', ['subject' => strtolower(__('Speaker'))]);
+    $viewSpeakerLabel = __('View this :subject', ['subject' => strtolower(__('Speaker'))]);
+
+    $this->actingAs($user);
+
+    $this->get(route('reports.create', [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ]))
+        ->assertOk()
+        ->assertSeeText($selectedSpeakerLabel)
+        ->assertSeeText($speaker->formatted_name)
+        ->assertSeeText($viewSpeakerLabel);
+});
+
+it('shows the reported event clearly on the public report page', function () {
+    $user = User::factory()->create();
+    $event = Event::factory()->create([
+        'title' => 'Kelas Daurah Tafsir Ibnu Kathir',
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+    $selectedEventLabel = __('Selected :subject', ['subject' => strtolower(__('Event'))]);
+    $viewEventLabel = __('View this :subject', ['subject' => strtolower(__('Event'))]);
+
+    $this->actingAs($user);
+
+    $this->get(route('reports.create', [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ]))
+        ->assertOk()
+        ->assertSeeText($selectedEventLabel)
+        ->assertSeeText($event->title)
+        ->assertSeeText($viewEventLabel);
+});
+
+it('redirects uuid-based reference contribution and report pages to the canonical slug url', function () {
+    $user = User::factory()->create();
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get("/sumbangan/rujukan/{$reference->id}/kemas-kini")
+        ->assertRedirect(route('contributions.suggest-update', [
+            'subjectType' => ContributionSubjectType::Reference->publicRouteSegment(),
+            'subjectId' => $reference->slug,
+        ]));
+
+    $this->get("/lapor/rujukan/{$reference->id}")
+        ->assertRedirect(route('reports.create', [
+            'subjectType' => ContributionSubjectType::Reference->publicRouteSegment(),
+            'subjectId' => $reference->slug,
+        ]));
 });

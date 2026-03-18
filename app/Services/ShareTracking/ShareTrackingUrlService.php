@@ -521,19 +521,22 @@ final class ShareTrackingUrlService
      *     metadata: array<string, mixed>
      * }
      */
-    private function referenceTarget(string $referenceId): array
+    private function referenceTarget(string $referenceIdentifier): array
     {
-        $reference = Reference::query()->find($referenceId);
+        $reference = Reference::query()
+            ->where('slug', $referenceIdentifier)
+            ->orWhere((new Reference)->getQualifiedKeyName(), $referenceIdentifier)
+            ->first();
 
         if (! $reference instanceof Reference) {
             return $this->subjectResult(
                 DawahShareSubjectType::Page,
                 null,
-                'page:reference:'.$referenceId,
-                $this->buildAbsoluteUrl('/rujukan/'.$referenceId, []),
-                $this->buildAbsoluteUrl('/rujukan/'.$referenceId, []),
+                'page:reference:'.$referenceIdentifier,
+                $this->buildAbsoluteUrl('/rujukan/'.$referenceIdentifier, []),
+                $this->buildAbsoluteUrl('/rujukan/'.$referenceIdentifier, []),
                 config('app.name'),
-                ['reference' => $referenceId],
+                ['reference' => $referenceIdentifier],
             );
         }
 
@@ -544,7 +547,7 @@ final class ShareTrackingUrlService
             route('references.show', $reference),
             route('references.show', $reference),
             $reference->title,
-            ['reference' => $reference->id],
+            ['reference' => $reference->slug],
         );
     }
 

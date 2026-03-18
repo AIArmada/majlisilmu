@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignUuid('submitter_id')->nullable()->index();
             $table->foreignUuid('venue_id')->nullable();
             $table->foreignUuid('space_id')->nullable()->index();
+            $table->foreignUuid('parent_event_id')->nullable()->index();
             // Changes for EventType Refactor
             $table->foreignUuid('organizer_id')->nullable();
             $table->string('organizer_type')->nullable(); // Standard polymorphic columns if you want explicit control, but nullableUuidMorphs handles 'organizer_type' and 'organizer_id' usually. Wait, looking at current code it uses nullableUuidMorphs('organizer').
@@ -26,6 +27,7 @@ return new class extends Migration
 
             $table->string('title');
             $table->string('slug')->unique();
+            $table->string('event_structure')->default('standalone')->index();
             $table->jsonb('description')->nullable();
 
             $table->dateTime('starts_at');

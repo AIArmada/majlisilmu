@@ -21,7 +21,7 @@ class ModerationReviewFactory extends Factory
     {
         return [
             'event_id' => Event::factory(),
-            'reviewer_id' => User::factory(),
+            'moderator_id' => User::factory(),
             'decision' => fake()->randomElement(['approved', 'rejected', 'needs_changes']),
             'note' => fake()->optional()->sentence(),
             'reason_code' => fake()->optional()->randomElement([

@@ -21,6 +21,7 @@ class ResolveReportFormContextAction
     /**
      * @return array{
      *     subject_label: string,
+     *     subject_title: string,
      *     category_options: array<string, string>,
      *     redirect_url: string,
      *     default_category: string
@@ -33,6 +34,7 @@ class ResolveReportFormContextAction
 
         return [
             'subject_label' => $presentation['subject_label'],
+            'subject_title' => $presentation['subject_title'],
             'category_options' => $categoryOptions,
             'redirect_url' => $presentation['redirect_url'],
             'default_category' => (string) array_key_first($categoryOptions),

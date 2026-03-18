@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -27,11 +28,16 @@ class Reference extends Model implements HasMedia
     #[\Override]
     protected static function booted(): void
     {
-        //
+        static::saving(function (self $reference): void {
+            if (blank($reference->slug)) {
+                $reference->slug = self::generateUniqueSlug($reference->title, $reference->getKey());
+            }
+        });
     }
 
     protected $fillable = [
         'title',
+        'slug',
         'author',
         'type',
         'publication_year',
@@ -49,6 +55,23 @@ class Reference extends Model implements HasMedia
             'is_canonical' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    #[\Override]
+    public function getRouteKey(): mixed
+    {
+        if ($this->exists && blank($this->slug)) {
+            $this->forceFill([
+                'slug' => self::generateUniqueSlug($this->title, $this->getKey()),
+            ])->saveQuietly();
+        }
+
+        return parent::getRouteKey();
     }
 
     /**
@@ -140,5 +163,22 @@ class Reference extends Model implements HasMedia
             ->height(232)
             ->sharpen(10)
             ->format('webp');
+    }
+
+    private static function generateUniqueSlug(?string $title, mixed $ignoreId = null): string
+    {
+        $baseSlug = Str::slug((string) $title) ?: 'rujukan';
+        $candidate = $baseSlug;
+        $suffix = 2;
+
+        while (self::query()
+            ->when($ignoreId !== null, fn (Builder $query): Builder => $query->whereKeyNot($ignoreId))
+            ->where('slug', $candidate)
+            ->exists()) {
+            $candidate = $baseSlug.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $candidate;
     }
 }

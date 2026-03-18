@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ContributionSubjectType;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\LocaleController;
@@ -21,7 +22,13 @@ use App\Livewire\Pages\Home\GlmHome;
 use App\Livewire\Pages\Membership\ShowInvitation as ShowMemberInvitation;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
+use App\Models\Reference;
 use Illuminate\Support\Facades\Route;
+
+Route::bind('reference', fn (string $value): Reference => Reference::query()
+    ->where('slug', $value)
+    ->orWhere((new Reference)->getQualifiedKeyName(), $value)
+    ->firstOrFail());
 
 Route::livewire('/', 'pages.⚡home')->name('home');
 Route::livewire('/glm', GlmHome::class)->name('home.glm');
@@ -72,11 +79,11 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/sumbangan/institusi/baru', SubmitInstitution::class)->name('contributions.submit-institution');
     Route::livewire('/sumbangan/penceramah/baru', SubmitSpeaker::class)->name('contributions.submit-speaker');
     Route::livewire('/sumbangan/{subjectType}/{subjectId}/kemas-kini', SuggestContributionUpdate::class)
-        ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference'])
+        ->whereIn('subjectType', ContributionSubjectType::publicRouteSegments())
         ->name('contributions.suggest-update');
 
     Route::livewire('/lapor/{subjectType}/{subjectId}', CreateReportPage::class)
-        ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference'])
+        ->whereIn('subjectType', ContributionSubjectType::publicRouteSegments())
         ->name('reports.create');
 });
 
@@ -124,6 +131,14 @@ Route::livewire('/institutions/{institution:slug}', 'pages.institutions.show');
 Route::livewire('/speakers', 'pages.speakers.index')->middleware('throttle:search');
 Route::livewire('/speakers/{speaker:slug}', 'pages.speakers.show');
 Route::livewire('/series/{series:slug}', 'pages.series.show');
+Route::redirect('/sumbangan/institution/{subjectId}/kemas-kini', '/sumbangan/institusi/{subjectId}/kemas-kini', 301);
+Route::redirect('/lapor/institution/{subjectId}', '/lapor/institusi/{subjectId}', 301);
+Route::redirect('/sumbangan/speaker/{subjectId}/kemas-kini', '/sumbangan/penceramah/{subjectId}/kemas-kini', 301);
+Route::redirect('/lapor/speaker/{subjectId}', '/lapor/penceramah/{subjectId}', 301);
+Route::redirect('/sumbangan/event/{subjectId}/kemas-kini', '/sumbangan/majlis/{subjectId}/kemas-kini', 301);
+Route::redirect('/lapor/event/{subjectId}', '/lapor/majlis/{subjectId}', 301);
+Route::redirect('/sumbangan/reference/{subjectId}/kemas-kini', '/sumbangan/rujukan/{subjectId}/kemas-kini', 301);
+Route::redirect('/lapor/reference/{subjectId}', '/lapor/rujukan/{subjectId}', 301);
 Route::redirect('/sitemap.xml', '/peta-laman.xml', 301);
 Route::redirect('/sitemap-events.xml', '/peta-laman-majlis.xml', 301);
 Route::redirect('/sitemap-institutions.xml', '/peta-laman-institusi.xml', 301);

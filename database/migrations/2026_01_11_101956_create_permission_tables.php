@@ -94,6 +94,26 @@ return new class extends Migration
             $table->primary([$pivotPermission, $pivotRole], 'role_has_permissions_permission_id_role_id_primary');
         });
 
+        Schema::create('member_invitations', static function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('subject_type');
+            $table->foreignUuid('subject_id');
+            $table->string('email');
+            $table->string('role_slug');
+            $table->string('token');
+            $table->foreignUuid('invited_by');
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamp('accepted_at')->nullable();
+            $table->foreignUuid('accepted_by')->nullable();
+            $table->timestamp('revoked_at')->nullable();
+            $table->foreignUuid('revoked_by')->nullable();
+            $table->timestamps();
+
+            $table->index(['subject_type', 'subject_id'], 'member_invitations_subject_index');
+            $table->index('email');
+            $table->index('token');
+        });
+
         app('cache')
             ->store(config('permission.cache.store') != 'default' ? config('permission.cache.store') : null)
             ->forget(config('permission.cache.key'));
@@ -108,6 +128,7 @@ return new class extends Migration
 
         throw_if(empty($tableNames), Exception::class, 'Error: config/permission.php not found and defaults could not be merged. Please publish the package configuration before proceeding, or drop the tables manually.');
 
+        Schema::dropIfExists('member_invitations');
         Schema::drop($tableNames['role_has_permissions']);
         Schema::drop($tableNames['model_has_roles']);
         Schema::drop($tableNames['model_has_permissions']);

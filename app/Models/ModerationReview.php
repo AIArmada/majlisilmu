@@ -43,13 +43,4 @@ class ModerationReview extends Model
     {
         return $this->belongsTo(User::class, 'moderator_id');
     }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    #[\Deprecated(message: 'Use moderator() instead')]
-    public function reviewer(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'reviewer_id');
-    }
 }

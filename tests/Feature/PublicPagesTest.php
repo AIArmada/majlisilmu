@@ -2,6 +2,7 @@
 
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\ContactCategory;
+use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
@@ -53,6 +54,64 @@ it('loads public detail pages', function () {
         ->assertSuccessful()
         ->assertSee($series->title)
         ->assertSee($event->title);
+});
+
+it('renders speaker contribution links with penceramah route segments', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speakerRouteSegment = ContributionSubjectType::Speaker->publicRouteSegment();
+
+    $this->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee("/sumbangan/{$speakerRouteSegment}/{$speaker->slug}/kemas-kini", false)
+        ->assertSee("/lapor/{$speakerRouteSegment}/{$speaker->slug}", false);
+});
+
+it('renders institution contribution links with institusi route segments', function () {
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institutionRouteSegment = ContributionSubjectType::Institution->publicRouteSegment();
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee("/sumbangan/{$institutionRouteSegment}/{$institution->slug}/kemas-kini", false)
+        ->assertSee("/lapor/{$institutionRouteSegment}/{$institution->slug}", false);
+});
+
+it('renders reference contribution links with rujukan route segments', function () {
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $referenceRouteSegment = ContributionSubjectType::Reference->publicRouteSegment();
+
+    $this->get(route('references.show', $reference))
+        ->assertSuccessful()
+        ->assertSee("/sumbangan/{$referenceRouteSegment}/{$reference->slug}/kemas-kini", false)
+        ->assertSee("/lapor/{$referenceRouteSegment}/{$reference->slug}", false);
+});
+
+it('renders event contribution links with majlis route segments', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $eventRouteSegment = ContributionSubjectType::Event->publicRouteSegment();
+
+    $this->get(route('events.show', $event))
+        ->assertSuccessful()
+        ->assertSee("/sumbangan/{$eventRouteSegment}/{$event->slug}/kemas-kini", false)
+        ->assertSee("/lapor/{$eventRouteSegment}/{$event->slug}", false);
 });
 
 it('renders noindex robots metadata for moderation-only or non-public detail pages', function () {

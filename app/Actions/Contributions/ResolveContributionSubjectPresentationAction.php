@@ -13,7 +13,7 @@ class ResolveContributionSubjectPresentationAction
     use AsAction;
 
     /**
-     * @return array{subject_label: string, redirect_url: string}
+     * @return array{subject_label: string, subject_title: string, redirect_url: string}
      */
     public function handle(Event|Institution|Reference|Speaker $entity): array
     {
@@ -23,6 +23,12 @@ class ResolveContributionSubjectPresentationAction
                 $entity instanceof Speaker => __('Speaker'),
                 $entity instanceof Reference => __('Reference'),
                 default => __('Event'),
+            },
+            'subject_title' => match (true) {
+                $entity instanceof Institution => $entity->name,
+                $entity instanceof Speaker => $entity->formatted_name,
+                $entity instanceof Reference => $entity->title,
+                default => $entity->title,
             },
             'redirect_url' => match (true) {
                 $entity instanceof Institution => route('institutions.show', $entity),

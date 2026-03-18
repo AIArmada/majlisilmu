@@ -1941,11 +1941,12 @@
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('contributions.suggest-update', ['subjectType' => 'event', 'subjectId' => $event->slug]) }}" wire:navigate
+                    @php($eventContributionRouteSegment = \App\Enums\ContributionSubjectType::Event->publicRouteSegment())
+                    <a href="{{ route('contributions.suggest-update', ['subjectType' => $eventContributionRouteSegment, 'subjectId' => $event->slug]) }}" wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700">
                         {{ __('Cadang Kemaskini') }}
                     </a>
-                    <a href="{{ route('reports.create', ['subjectType' => 'event', 'subjectId' => $event->slug]) }}" wire:navigate
+                    <a href="{{ route('reports.create', ['subjectType' => $eventContributionRouteSegment, 'subjectId' => $event->slug]) }}" wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
                         {{ __('Lapor') }}
                     </a>

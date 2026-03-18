@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('references', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('title');
+            $table->string('slug')->unique();
             $table->string('author')->nullable();
             $table->string('type')->default('kitab')->index(); // e.g. book, kitab, article, video, etc.
             $table->string('publication_year')->nullable();
@@ -24,6 +25,15 @@ return new class extends Migration
             $table->boolean('is_active')->default(true)->index();
             $table->timestamps();
         });
+
+        Schema::create('reference_user', function (Blueprint $table): void {
+            $table->foreignUuid('reference_id')->index();
+            $table->foreignUuid('user_id')->index();
+            $table->timestamp('joined_at')->nullable();
+            $table->timestamps();
+
+            $table->primary(['reference_id', 'user_id']);
+        });
     }
 
     /**
@@ -31,6 +41,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('reference_user');
         Schema::dropIfExists('references');
     }
 };

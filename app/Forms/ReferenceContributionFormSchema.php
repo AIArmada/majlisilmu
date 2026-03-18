@@ -2,8 +2,6 @@
 
 namespace App\Forms;
 
-use App\Enums\SocialMediaPlatform;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
@@ -53,26 +51,7 @@ class ReferenceContributionFormSchema
                 ->columns(2),
             Section::make(__('Links'))
                 ->schema([
-                    Repeater::make('social_media')
-                        ->label(__('Social Media'))
-                        ->default([])
-                        ->schema([
-                            Select::make('platform')
-                                ->label(__('Platform'))
-                                ->options(SocialMediaPlatform::class)
-                                ->searchable()
-                                ->required(),
-                            TextInput::make('username')
-                                ->label(__('Username / Handle'))
-                                ->requiredWithout('url')
-                                ->maxLength(255),
-                            TextInput::make('url')
-                                ->label(__('URL'))
-                                ->requiredWithout('username')
-                                ->url()
-                                ->maxLength(255),
-                        ])
-                        ->columns(2),
+                    SharedFormSchema::socialMediaRepeater('Add relevant links for this reference (e.g. YouTube video, Blog article, etc.)'),
                 ]),
         ];
 

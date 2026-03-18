@@ -2,6 +2,8 @@
 
 namespace App\Forms;
 
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\SocialMediaPlatform;
 use App\Models\District;
 use App\Models\Event;
@@ -14,6 +16,7 @@ use App\Models\Venue;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 
@@ -133,6 +136,46 @@ class SharedFormSchema
             ->helperText(__($helperText));
     }
 
+    public static function contactsRepeater(?string $helperText = null): Repeater
+    {
+        $repeater = Repeater::make('contacts')
+            ->label(__('Contact Details'))
+            ->default([])
+            ->schema([
+                Select::make('category')
+                    ->label(__('Category'))
+                    ->options(ContactCategory::class)
+                    ->required()
+                    ->live(),
+                TextInput::make('value')
+                    ->label(fn (Get $get): string => match ($get('category')) {
+                        ContactCategory::Email, ContactCategory::Email->value => __('Email Address'),
+                        ContactCategory::Phone, ContactCategory::Phone->value => __('Phone Number'),
+                        ContactCategory::WhatsApp, ContactCategory::WhatsApp->value => __('WhatsApp Number'),
+                        default => __('Value'),
+                    })
+                    ->required()
+                    ->maxLength(255)
+                    ->email(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Email, ContactCategory::Email->value], true))
+                    ->tel(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Phone, ContactCategory::Phone->value, ContactCategory::WhatsApp, ContactCategory::WhatsApp->value], true)),
+                Select::make('type')
+                    ->label(__('Type'))
+                    ->options(ContactType::class)
+                    ->default(ContactType::Main->value)
+                    ->required(),
+                Toggle::make('is_public')
+                    ->label(__('Public'))
+                    ->default(true),
+            ])
+            ->columns(4);
+
+        if ($helperText !== null) {
+            $repeater->helperText(__($helperText));
+        }
+
+        return $repeater;
+    }
+
     /**
      * Create address record for a model that has an address() relationship.
      *
@@ -177,6 +220,36 @@ class SharedFormSchema
                     'username' => $social['username'] ?? null,
                 ]);
             }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function createContactsFromData(Institution|Speaker $model, array $data): void
+    {
+        if (! isset($data['contacts']) || ! is_array($data['contacts'])) {
+            return;
+        }
+
+        foreach ($data['contacts'] as $contact) {
+            if (! is_array($contact)) {
+                continue;
+            }
+
+            $category = $contact['category'] ?? null;
+            $value = $contact['value'] ?? null;
+
+            if (! filled($category) || ! filled($value)) {
+                continue;
+            }
+
+            $model->contacts()->create([
+                'category' => $category,
+                'value' => $value,
+                'type' => $contact['type'] ?? ContactType::Main->value,
+                'is_public' => (bool) ($contact['is_public'] ?? true),
+            ]);
         }
     }
 }
