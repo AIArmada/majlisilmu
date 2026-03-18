@@ -2,6 +2,7 @@
 
 namespace App\Actions\Contributions;
 
+use App\Enums\ContributionSubjectType;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
@@ -16,22 +17,24 @@ class ResolveContributionSubjectAction
 
     public function handle(string $subjectType, string $subjectId): Event|Institution|Reference|Speaker
     {
-        return match ($subjectType) {
-            'event' => $this->resolveSlugOrUuid(Event::query(), 'events.slug', $subjectId),
-            'institution' => $this->resolveSlugOrUuid(Institution::query(), 'institutions.slug', $subjectId),
-            'speaker' => $this->resolveSlugOrUuid(Speaker::query(), 'speakers.slug', $subjectId),
-            'reference' => $this->resolveReference($subjectId),
+        $resolvedSubjectType = ContributionSubjectType::fromRouteSegment($subjectType);
+
+        return match ($resolvedSubjectType) {
+            ContributionSubjectType::Event => $this->resolveSlugOrUuid(Event::query(), 'events.slug', $subjectId),
+            ContributionSubjectType::Institution => $this->resolveSlugOrUuid(Institution::query(), 'institutions.slug', $subjectId),
+            ContributionSubjectType::Speaker => $this->resolveSlugOrUuid(Speaker::query(), 'speakers.slug', $subjectId),
+            ContributionSubjectType::Reference => $this->resolveSlugOrUuid(Reference::query(), 'references.slug', $subjectId),
             default => abort(404),
         };
     }
 
     /**
-     * @template TModel of Event|Institution|Speaker
+     * @template TModel of Event|Institution|Reference|Speaker
      *
      * @param  Builder<TModel>  $query
      * @return TModel
      */
-    private function resolveSlugOrUuid(Builder $query, string $slugColumn, string $subjectId): Event|Institution|Speaker
+    private function resolveSlugOrUuid(Builder $query, string $slugColumn, string $subjectId): Event|Institution|Reference|Speaker
     {
         $query->where($slugColumn, $subjectId);
 
@@ -40,12 +43,5 @@ class ResolveContributionSubjectAction
         }
 
         return $query->firstOrFail();
-    }
-
-    private function resolveReference(string $subjectId): Reference
-    {
-        abort_unless(Str::isUuid($subjectId), 404);
-
-        return Reference::query()->whereKey($subjectId)->firstOrFail();
     }
 }

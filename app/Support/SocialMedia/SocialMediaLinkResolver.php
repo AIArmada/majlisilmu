@@ -105,6 +105,7 @@ final class SocialMediaLinkResolver
                 SocialMediaPlatform::Telegram->value,
                 SocialMediaPlatform::WhatsApp->value,
                 SocialMediaPlatform::LinkedIn->value,
+                SocialMediaPlatform::Threads->value,
             ],
             true,
         );
@@ -212,13 +213,32 @@ final class SocialMediaLinkResolver
             SocialMediaPlatform::WhatsApp->value => self::parseWhatsApp($host, $segments, $query),
             SocialMediaPlatform::LinkedIn->value => self::parseLinkedIn($host, $segments),
             SocialMediaPlatform::YouTube->value => self::parseYouTube($host, $segments),
+            SocialMediaPlatform::Threads->value => self::parseGeneric($platform, $host, ['threads.net'], $segments),
             default => null,
         };
     }
 
     /**
      * @param  list<string>  $segments
+     * @param  list<string>  $allowedHosts
      */
+    private static function parseGeneric(string $platform, string $host, array $allowedHosts, array $segments): ?string
+    {
+        $isAllowed = false;
+        foreach ($allowedHosts as $allowedHost) {
+            if ($host === $allowedHost || str_ends_with($host, '.'.$allowedHost)) {
+                $isAllowed = true;
+                break;
+            }
+        }
+
+        if (! $isAllowed || $segments === []) {
+            return null;
+        }
+
+        return self::sanitizeIdentifier($platform, $segments[0]);
+    }
+
     private static function parseInstagram(string $host, array $segments): ?string
     {
         if (! in_array($host, ['instagram.com', 'www.instagram.com'], true) || $segments === []) {
@@ -394,6 +414,7 @@ final class SocialMediaLinkResolver
             SocialMediaPlatform::Telegram->value => 'https://t.me/'.$username,
             SocialMediaPlatform::WhatsApp->value => 'https://wa.me/'.$username,
             SocialMediaPlatform::LinkedIn->value => self::buildLinkedinUrl($username),
+            SocialMediaPlatform::Threads->value => 'https://www.threads.net/@'.$username,
             default => null,
         };
     }

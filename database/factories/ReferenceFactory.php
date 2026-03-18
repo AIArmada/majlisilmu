@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Reference;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<Reference>
@@ -17,8 +18,11 @@ class ReferenceFactory extends Factory
      */
     public function definition(): array
     {
+        $title = $this->faker->sentence();
+
         return [
-            'title' => $this->faker->sentence(),
+            'title' => $title,
+            'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),
             'author' => $this->faker->name(),
             'type' => $this->faker->randomElement(['kitab', 'book', 'article']),
             'publication_year' => $this->faker->year(),

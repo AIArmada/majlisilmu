@@ -20,16 +20,16 @@ class ModerationReviewSeeder extends Seeder
             return;
         }
 
-        $reviewerIds = User::query()->pluck('id')->toArray();
+        $moderatorIds = User::query()->pluck('id')->toArray();
 
-        if (empty($reviewerIds)) {
+        if (empty($moderatorIds)) {
             return;
         }
 
         ModerationReview::unsetEventDispatcher();
 
         try {
-            DB::transaction(function () use ($reviewerIds): void {
+            DB::transaction(function () use ($moderatorIds): void {
                 $events = Event::query()
                     ->whereIn('status', ['approved', 'rejected', 'pending'])
                     ->select(['id', 'status'])
@@ -47,7 +47,7 @@ class ModerationReviewSeeder extends Seeder
                     $reviewsToInsert[] = array_merge(
                         ModerationReview::factory()->make([
                             'event_id' => $event->id,
-                            'reviewer_id' => $reviewerIds[array_rand($reviewerIds)],
+                            'moderator_id' => $moderatorIds[array_rand($moderatorIds)],
                             'decision' => $decision,
                         ])->toArray(),
                         [

@@ -11,8 +11,8 @@ return new class extends Migration
         Schema::create('tags', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->json('name');
-            $table->json('slug');
+            $table->jsonb('name');
+            $table->jsonb('slug');
             $table->string('type')->nullable();
             $table->string('status')->default('verified');
             $table->integer('order_column')->nullable();

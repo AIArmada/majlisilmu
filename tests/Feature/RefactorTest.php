@@ -16,6 +16,30 @@ class RefactorTest extends TestCase
     public function test_schema_changes()
     {
         $this->assertFalse(Schema::hasColumn('events', 'speaker_id'), 'speaker_id should not exist in events table');
+        $this->assertTrue(Schema::hasColumn('events', 'parent_event_id'));
+        $this->assertTrue(Schema::hasColumn('events', 'event_structure'));
+        $this->assertTrue(Schema::hasTable('event_key_people'));
+        $this->assertTrue(Schema::hasTable('event_checkins'));
+        $this->assertTrue(Schema::hasTable('contribution_requests'));
+        $this->assertTrue(Schema::hasTable('reference_user'));
+        $this->assertTrue(Schema::hasTable('member_invitations'));
+        $this->assertTrue(Schema::hasTable('notification_settings'));
+        $this->assertTrue(Schema::hasTable('notification_rules'));
+        $this->assertTrue(Schema::hasTable('notification_destinations'));
+        $this->assertTrue(Schema::hasTable('notification_deliveries'));
+        $this->assertFalse(Schema::hasColumn('moderation_reviews', 'reviewer_id'));
+        $this->assertFalse(Schema::hasTable('event_speaker'));
+        $this->assertFalse(Schema::hasTable('event_participants'));
+        $this->assertFalse(Schema::hasTable('notification_preferences'));
+        $this->assertFalse(Schema::hasTable('notification_endpoints'));
+        $this->assertFalse(Schema::hasTable('event_interests'));
+        $this->assertFalse(Schema::hasTable('dawah_share_links'));
+        $this->assertTrue(Schema::hasColumn('notifications', 'family'));
+        $this->assertTrue(Schema::hasColumn('notifications', 'inbox_visible'));
+        $this->assertTrue(Schema::hasColumn('notification_messages', 'delivery_cadence'));
+        $this->assertTrue(Schema::hasColumn('notification_messages', 'processed_at'));
+        $this->assertTrue(Schema::hasColumn('notification_messages', 'dispatched_at'));
+        $this->assertTrue(Schema::hasColumn('notification_messages', 'notification_id'));
     }
 
     public function test_speaker_post_nominal_logic()

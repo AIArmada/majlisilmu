@@ -8,22 +8,25 @@ use App\Forms\InstitutionContributionFormSchema;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Institution;
 use App\Models\User;
-use Filament\Forms\Components\Textarea;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use RuntimeException;
 
 #[Layout('layouts.app')]
 #[Title('Submit Institution')]
-class SubmitInstitution extends Component implements HasForms
+class SubmitInstitution extends Component implements HasActions, HasForms
 {
+    use InteractsWithActions;
     use InteractsWithForms;
     use InteractsWithToasts;
+    use WithFileUploads;
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];
@@ -32,9 +35,7 @@ class SubmitInstitution extends Component implements HasForms
     {
         $this->contributionForm()->fill([
             'type' => 'masjid',
-            'address' => [
-                'country_id' => 132,
-            ],
+            'state_id' => null,
         ]);
     }
 
@@ -43,16 +44,7 @@ class SubmitInstitution extends Component implements HasForms
         return $schema
             ->model(new Institution)
             ->statePath('data')
-            ->components([
-                ...InstitutionContributionFormSchema::components(includeMedia: true),
-                Section::make(__('Submission Note'))
-                    ->schema([
-                        Textarea::make('proposer_note')
-                            ->label(__('Anything the reviewer should know?'))
-                            ->rows(4)
-                            ->maxLength(2000),
-                    ]),
-            ]);
+            ->components(InstitutionContributionFormSchema::components(includeMedia: true, requireGoogleMaps: true));
     }
 
     public function submit(SubmitStagedContributionCreateAction $submitStagedContributionCreateAction): void

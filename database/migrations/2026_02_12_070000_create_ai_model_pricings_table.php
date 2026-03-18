@@ -32,7 +32,7 @@ return new class extends Migration
             $table->timestamp('starts_at')->nullable()->index();
             $table->timestamp('ends_at')->nullable()->index();
             $table->text('notes')->nullable();
-            $table->json('meta')->nullable();
+            $table->jsonb('meta')->nullable();
             $table->timestamps();
 
             $table->index(['provider', 'operation', 'tier'], 'ai_model_pricings_lookup_index');

@@ -261,8 +261,8 @@ it('resolves contribution update context from slug and uuid subjects', function 
         'slug' => 'action-event',
     ]);
 
-    $speakerContext = app(ResolveContributionUpdateContextAction::class)->handle('speaker', 'speaker-action-subject');
-    $eventContext = app(ResolveContributionUpdateContextAction::class)->handle('event', $event->id);
+    $speakerContext = app(ResolveContributionUpdateContextAction::class)->handle('penceramah', 'speaker-action-subject');
+    $eventContext = app(ResolveContributionUpdateContextAction::class)->handle('majlis', 'action-event');
 
     expect($speakerContext['entity']->is($speaker))->toBeTrue()
         ->and($speakerContext['initial_state'])->toHaveKey('name', 'Speaker Action Subject')
@@ -275,10 +275,12 @@ it('resolves contribution subjects from slug and uuid identifiers through the ac
         'slug' => 'institusi-tindakan',
         'name' => 'Institusi Tindakan',
     ]);
-    $reference = Reference::factory()->create();
+    $reference = Reference::factory()->create([
+        'slug' => 'tafsir-tindakan',
+    ]);
 
     $resolvedInstitution = app(ResolveContributionSubjectAction::class)->handle('institution', 'institusi-tindakan');
-    $resolvedReference = app(ResolveContributionSubjectAction::class)->handle('reference', $reference->id);
+    $resolvedReference = app(ResolveContributionSubjectAction::class)->handle('rujukan', 'tafsir-tindakan');
 
     expect($resolvedInstitution->is($institution))->toBeTrue()
         ->and($resolvedReference->is($reference))->toBeTrue();

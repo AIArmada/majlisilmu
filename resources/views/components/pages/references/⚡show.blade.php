@@ -1,142 +1,146 @@
 <?php
 
+use App\Enums\DawahShareOutcomeType;
+use App\Models\Event;
 use App\Models\Reference;
-use Illuminate\Support\Str;
-use Livewire\Component;
+use App\Services\ShareTrackingService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Component;
 
 new
     #[Layout('layouts.app')]
     #[Title('Reference')]
-    class extends Component {
-    public Reference $reference;
-
-    public bool $isFollowing = false;
-
-    public int $upcomingPerPage = 10;
-
-    public int $pastPerPage = 10;
-
-    public function mount(Reference $reference): void
+    class extends Component
     {
-        if (!$reference->is_active) {
-            abort(404);
+        public Reference $reference;
+
+        public bool $isFollowing = false;
+
+        public int $upcomingPerPage = 10;
+
+        public int $pastPerPage = 10;
+
+        public function mount(Reference $reference): void
+        {
+            if (! $reference->is_active) {
+                abort(404);
+            }
+
+            $reference->load(['media', 'socialMedia']);
+
+            $this->reference = $reference;
+            $this->isFollowing = Auth::user()?->isFollowing($reference) ?? false;
         }
 
-        $reference->load(['media', 'socialMedia']);
+        /**
+         * @return Collection<int, Event>
+         */
+        public function toggleFollow(): void
+        {
+            $user = Auth::user();
 
-        $this->reference = $reference;
-        $this->isFollowing = Auth::user()?->isFollowing($reference) ?? false;
-    }
+            if (! $user) {
+                $this->redirect(route('login'), navigate: true);
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
-     */
-    public function toggleFollow(): void
-    {
-        $user = Auth::user();
+                return;
+            }
 
-        if (!$user) {
-            $this->redirect(route('login'), navigate: true);
-
-            return;
+            if ($this->isFollowing) {
+                $user->unfollow($this->reference);
+                $this->isFollowing = false;
+            } else {
+                $user->follow($this->reference);
+                $this->isFollowing = true;
+                app(ShareTrackingService::class)->recordOutcome(
+                    type: DawahShareOutcomeType::ReferenceFollow,
+                    outcomeKey: 'reference_follow:user:'.$user->id.':reference:'.$this->reference->id,
+                    subject: $this->reference,
+                    actor: $user,
+                    request: request(),
+                    metadata: [
+                        'reference_id' => $this->reference->id,
+                    ],
+                );
+            }
         }
 
-        if ($this->isFollowing) {
-            $user->unfollow($this->reference);
-            $this->isFollowing = false;
-        } else {
-            $user->follow($this->reference);
-            $this->isFollowing = true;
-            app(\App\Services\ShareTrackingService::class)->recordOutcome(
-                type: \App\Enums\DawahShareOutcomeType::ReferenceFollow,
-                outcomeKey: 'reference_follow:user:'.$user->id.':reference:'.$this->reference->id,
-                subject: $this->reference,
-                actor: $user,
-                request: request(),
-                metadata: [
-                    'reference_id' => $this->reference->id,
-                ],
-            );
+        public function getUpcomingEventsProperty(): Collection
+        {
+            return $this->reference->events()
+                ->active()
+                ->where('starts_at', '>=', now())
+                ->with([
+                    'institution',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'venue.address.state',
+                    'venue.address.district',
+                    'venue.address.subdistrict',
+                    'media',
+                ])
+                ->orderBy('starts_at', 'asc')
+                ->take($this->upcomingPerPage)
+                ->get();
         }
-    }
 
-    public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
-    {
-        return $this->reference->events()
-            ->active()
-            ->where('starts_at', '>=', now())
-            ->with([
-                'institution',
-                'institution.address.state',
-                'institution.address.district',
-                'institution.address.subdistrict',
-                'venue.address.state',
-                'venue.address.district',
-                'venue.address.subdistrict',
-                'media',
-            ])
-            ->orderBy('starts_at', 'asc')
-            ->take($this->upcomingPerPage)
-            ->get();
-    }
+        public function getUpcomingTotalProperty(): int
+        {
+            return $this->reference->events()
+                ->active()
+                ->where('starts_at', '>=', now())
+                ->count();
+        }
 
-    public function getUpcomingTotalProperty(): int
-    {
-        return $this->reference->events()
-            ->active()
-            ->where('starts_at', '>=', now())
-            ->count();
-    }
+        /**
+         * @return Collection<int, Event>
+         */
+        public function getPastEventsProperty(): Collection
+        {
+            return $this->reference->events()
+                ->active()
+                ->where('starts_at', '<', now())
+                ->with([
+                    'institution',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'venue.address.state',
+                    'venue.address.district',
+                    'venue.address.subdistrict',
+                    'media',
+                ])
+                ->orderBy('starts_at', 'desc')
+                ->take($this->pastPerPage)
+                ->get();
+        }
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
-     */
-    public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
-    {
-        return $this->reference->events()
-            ->active()
-            ->where('starts_at', '<', now())
-            ->with([
-                'institution',
-                'institution.address.state',
-                'institution.address.district',
-                'institution.address.subdistrict',
-                'venue.address.state',
-                'venue.address.district',
-                'venue.address.subdistrict',
-                'media',
-            ])
-            ->orderBy('starts_at', 'desc')
-            ->take($this->pastPerPage)
-            ->get();
-    }
+        public function getPastTotalProperty(): int
+        {
+            return $this->reference->events()
+                ->active()
+                ->where('starts_at', '<', now())
+                ->count();
+        }
 
-    public function getPastTotalProperty(): int
-    {
-        return $this->reference->events()
-            ->active()
-            ->where('starts_at', '<', now())
-            ->count();
-    }
+        public function loadMoreUpcoming(): void
+        {
+            $this->upcomingPerPage += 10;
+        }
 
-    public function loadMoreUpcoming(): void
-    {
-        $this->upcomingPerPage += 10;
-    }
+        public function loadMorePast(): void
+        {
+            $this->pastPerPage += 10;
+        }
 
-    public function loadMorePast(): void
-    {
-        $this->pastPerPage += 10;
-    }
-
-    public function rendering($view): void
-    {
-        $view->title($this->reference->title . ' - ' . config('app.name'));
-    }
-};
+        public function rendering($view): void
+        {
+            $view->title($this->reference->title.' - '.config('app.name'));
+        }
+    };
 ?>
 
 @section('title', $this->reference->title . ' - ' . config('app.name'))
@@ -857,16 +861,17 @@ new
                     @endif
 
                     <div class="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 shadow-sm">
+                        @php($referenceContributionRouteSegment = \App\Enums\ContributionSubjectType::Reference->publicRouteSegment())
                         <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{{ __('Bantu Semak Rujukan') }}</p>
                         <p class="mt-2 text-sm leading-6 text-slate-600">
                             {{ __('Jumpa metadata yang salah atau rujukan yang meragukan?') }}
                         </p>
                         <div class="mt-3 flex flex-wrap gap-2">
-                            <a href="{{ route('contributions.suggest-update', ['subjectType' => 'reference', 'subjectId' => $reference->id]) }}" wire:navigate
+                            <a href="{{ route('contributions.suggest-update', ['subjectType' => $referenceContributionRouteSegment, 'subjectId' => $reference->slug]) }}" wire:navigate
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700">
                                 {{ __('Cadang Kemaskini') }}
                             </a>
-                            <a href="{{ route('reports.create', ['subjectType' => 'reference', 'subjectId' => $reference->id]) }}" wire:navigate
+                            <a href="{{ route('reports.create', ['subjectType' => $referenceContributionRouteSegment, 'subjectId' => $reference->slug]) }}" wire:navigate
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
                                 {{ __('Lapor') }}
                             </a>

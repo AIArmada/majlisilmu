@@ -13,7 +13,7 @@ return new class extends Migration
 
             $table->string('key', 40);
             $table->string('model');
-            $table->json('values');
+            $table->jsonb('values');
 
             $table->timestamps();
 

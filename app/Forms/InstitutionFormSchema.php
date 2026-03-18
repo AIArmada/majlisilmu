@@ -6,6 +6,7 @@ use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\InstitutionType;
 use App\Models\Institution;
 use App\Models\User;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
@@ -35,6 +36,9 @@ class InstitutionFormSchema
                 ->options(InstitutionType::class)
                 ->placeholder(__('Select type...')),
 
+            RichEditor::make('description')
+                ->label(__('Description')),
+
             SpatieMediaLibraryFileUpload::make('cover')
                 ->label(__('Cover Image'))
                 ->collection('cover')
@@ -59,6 +63,8 @@ class InstitutionFormSchema
                 ->maxFiles(10)
                 ->helperText(__('Up to 10 photos of the institution')),
 
+            SharedFormSchema::contactsRepeater(__('Add contact details for this institution')),
+
             ...SharedFormSchema::addressFields(requireGoogleMaps: true),
 
             SharedFormSchema::socialMediaRepeater('Add social media links for this institution'),
@@ -76,6 +82,7 @@ class InstitutionFormSchema
             'name' => $data['name'],
             'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
             'type' => $data['type'],
+            'description' => $data['description'] ?? null,
             'status' => 'pending',
         ]);
 
@@ -88,6 +95,7 @@ class InstitutionFormSchema
         // Save media uploads (cover, gallery) via Filament's relationship-saving mechanism
         $schema?->model($institution)->saveRelationships();
 
+        SharedFormSchema::createContactsFromData($institution, $data);
         SharedFormSchema::createAddressFromData($institution, $data);
         SharedFormSchema::createSocialMediaFromData($institution, $data);
 

@@ -6,6 +6,7 @@ use App\Actions\Contributions\ResolveContributionSubjectAction;
 use App\Actions\Reports\ResolveReporterFingerprintAction;
 use App\Actions\Reports\ResolveReportFormContextAction;
 use App\Actions\Reports\SubmitReportAction;
+use App\Enums\ContributionSubjectType;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Event;
 use App\Models\Institution;
@@ -35,9 +36,10 @@ class Create extends Component implements HasForms
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    /** @var array{subject_label: string, category_options: array<string, string>, redirect_url: string, default_category: string} */
+    /** @var array{subject_label: string, subject_title: string, category_options: array<string, string>, redirect_url: string, default_category: string} */
     public array $context = [
         'subject_label' => '',
+        'subject_title' => '',
         'category_options' => [],
         'redirect_url' => '',
         'default_category' => '',
@@ -49,9 +51,13 @@ class Create extends Component implements HasForms
         ResolveContributionSubjectAction $resolveContributionSubjectAction,
         ResolveReportFormContextAction $resolveReportFormContextAction,
     ): void {
-        $this->subjectType = $subjectType;
-        $this->entity = $resolveContributionSubjectAction->handle($subjectType, $subjectId);
-        $this->context = $resolveReportFormContextAction->handle($subjectType, $this->entity);
+        $resolvedSubjectType = ContributionSubjectType::fromRouteSegment($subjectType);
+
+        abort_unless($resolvedSubjectType instanceof ContributionSubjectType, 404);
+
+        $this->subjectType = $resolvedSubjectType->value;
+        $this->entity = $resolveContributionSubjectAction->handle($this->subjectType, $subjectId);
+        $this->context = $resolveReportFormContextAction->handle($this->subjectType, $this->entity);
 
         $user = auth()->user();
 
@@ -59,6 +65,15 @@ class Create extends Component implements HasForms
 
         if (! $user->canSubmitDirectoryFeedback()) {
             abort(403, $user->directoryFeedbackBanMessage());
+        }
+
+        if ($this->shouldRedirectToCanonicalSubjectUrl($resolvedSubjectType, $subjectId)) {
+            $this->redirectRoute('reports.create', [
+                'subjectType' => $resolvedSubjectType->publicRouteSegment(),
+                'subjectId' => $this->canonicalSubjectId(),
+            ], navigate: true);
+
+            return;
         }
 
         $this->reportForm()->fill([
@@ -141,5 +156,27 @@ class Create extends Component implements HasForms
     protected function reportForm(): Schema
     {
         return $this->getForm('form') ?? throw new RuntimeException('Report form is not available.');
+    }
+
+    private function canonicalSubjectId(): string
+    {
+        return match (true) {
+            $this->entity instanceof Institution => $this->entity->slug,
+            $this->entity instanceof Speaker => $this->entity->slug,
+            $this->entity instanceof Reference => $this->entity->slug,
+            default => $this->entity->slug,
+        };
+    }
+
+    private function shouldRedirectToCanonicalSubjectUrl(ContributionSubjectType $subjectType, string $subjectId): bool
+    {
+        $routeSubjectType = request()->route('subjectType');
+
+        if (! is_string($routeSubjectType) || $routeSubjectType === '') {
+            return false;
+        }
+
+        return $subjectType->publicRouteSegment() !== $routeSubjectType
+            || $this->canonicalSubjectId() !== $subjectId;
     }
 }

@@ -27,7 +27,7 @@ return new class extends Migration
             $table->decimal('cost_usd', 14, 8)->nullable();
             $table->string('currency', 3)->default('USD');
             $table->foreignUuid('user_id')->nullable()->index();
-            $table->json('meta')->nullable();
+            $table->jsonb('meta')->nullable();
             $table->timestamps();
 
             $table->index(['provider', 'model'], 'ai_usage_logs_provider_model_index');

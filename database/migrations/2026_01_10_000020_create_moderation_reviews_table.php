@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('moderation_reviews', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('event_id')->index();
-            $table->foreignUuid('reviewer_id')->nullable()->index();
             $table->foreignUuid('moderator_id')->nullable()->index();
 
             $table->string('decision')->index();

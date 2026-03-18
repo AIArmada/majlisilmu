@@ -26,6 +26,14 @@ class ReportResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Moderation';
 
     #[\Override]
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::getModel()::query()->where('status', 'open')->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return ReportForm::configure($schema);

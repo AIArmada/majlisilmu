@@ -9,6 +9,7 @@ use App\Actions\Contributions\ResolveContributionSubmissionStateAction;
 use App\Actions\Contributions\ResolveContributionUpdateContextAction;
 use App\Actions\Contributions\ResolveLatestPendingContributionRequestAction;
 use App\Actions\Contributions\SubmitContributionUpdateRequestAction;
+use App\Enums\ContributionSubjectType;
 use App\Forms\EventContributionFormSchema;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\ReferenceContributionFormSchema;
@@ -58,9 +59,13 @@ class SuggestUpdate extends Component implements HasForms
         ResolveContributionUpdateContextAction $resolveContributionUpdateContextAction,
         ResolveContributionSubjectPresentationAction $resolveContributionSubjectPresentationAction,
     ): void {
-        $this->subjectType = $subjectType;
+        $resolvedSubjectType = ContributionSubjectType::fromRouteSegment($subjectType);
 
-        $context = $resolveContributionUpdateContextAction->handle($subjectType, $subjectId);
+        abort_unless($resolvedSubjectType instanceof ContributionSubjectType, 404);
+
+        $this->subjectType = $resolvedSubjectType->value;
+
+        $context = $resolveContributionUpdateContextAction->handle($this->subjectType, $subjectId);
 
         $this->entity = $context['entity'];
         $this->originalData = $context['initial_state'];
@@ -73,6 +78,15 @@ class SuggestUpdate extends Component implements HasForms
 
         if (! $user->canSubmitDirectoryFeedback()) {
             abort(403, $user->directoryFeedbackBanMessage());
+        }
+
+        if ($this->shouldRedirectToCanonicalSubjectUrl($resolvedSubjectType, $subjectId)) {
+            $this->redirectRoute('contributions.suggest-update', [
+                'subjectType' => $resolvedSubjectType->publicRouteSegment(),
+                'subjectId' => $this->canonicalSubjectId(),
+            ], navigate: true);
+
+            return;
         }
 
         $this->contributionForm()->fill($this->originalData);
@@ -198,5 +212,27 @@ class SuggestUpdate extends Component implements HasForms
     protected function contributionForm(): Schema
     {
         return $this->getForm('form') ?? throw new RuntimeException('Contribution update form is not available.');
+    }
+
+    private function canonicalSubjectId(): string
+    {
+        return match (true) {
+            $this->entity instanceof Institution => $this->entity->slug,
+            $this->entity instanceof Speaker => $this->entity->slug,
+            $this->entity instanceof Reference => $this->entity->slug,
+            default => $this->entity->slug,
+        };
+    }
+
+    private function shouldRedirectToCanonicalSubjectUrl(ContributionSubjectType $subjectType, string $subjectId): bool
+    {
+        $routeSubjectType = request()->route('subjectType');
+
+        if (! is_string($routeSubjectType) || $routeSubjectType === '') {
+            return false;
+        }
+
+        return $subjectType->publicRouteSegment() !== $routeSubjectType
+            || $this->canonicalSubjectId() !== $subjectId;
     }
 }
