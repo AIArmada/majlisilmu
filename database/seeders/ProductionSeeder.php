@@ -21,7 +21,6 @@ class ProductionSeeder extends Seeder
             ScopedMemberRolesSeeder::class,
             TagSeeder::class,
             SpaceSeeder::class,
-            ReferenceSeeder::class,
             InspirationSeeder::class,
         ]);
     }
