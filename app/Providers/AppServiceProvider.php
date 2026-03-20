@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Inspiration;
 use App\Models\Institution;
+use App\Models\MembershipClaim;
 use App\Models\Reference;
 use App\Models\Report;
 use App\Models\Series;
@@ -123,6 +124,7 @@ class AppServiceProvider extends ServiceProvider
             'event' => Event::class,
             'event_submission' => EventSubmission::class,
             'contribution_request' => ContributionRequest::class,
+            'membership_claim' => MembershipClaim::class,
             'institution' => Institution::class,
             'speaker' => Speaker::class,
             'series' => Series::class,

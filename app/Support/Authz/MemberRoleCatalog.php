@@ -266,6 +266,29 @@ final readonly class MemberRoleCatalog
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function membershipClaimRoleSlugOptionsFor(MemberSubjectType $subjectType): array
+    {
+        $options = [];
+
+        foreach ($this->definitionsFor($subjectType) as $roleSlug => $definition) {
+            if (! in_array($roleSlug, ['editor', 'admin', 'owner'], true)) {
+                continue;
+            }
+
+            $options[$roleSlug] = $definition['label'];
+        }
+
+        return $options;
+    }
+
+    public function isMembershipClaimRole(MemberSubjectType $subjectType, string $roleSlug): bool
+    {
+        return array_key_exists($roleSlug, $this->membershipClaimRoleSlugOptionsFor($subjectType));
+    }
+
+    /**
      * @return list<string>
      */
     public function roleIdsFor(User $user, MemberSubjectType $subjectType): array

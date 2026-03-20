@@ -3,6 +3,7 @@
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\MembershipClaim;
 use App\Models\Reference;
 use App\Models\Report;
 use App\Models\Series;
@@ -258,6 +259,18 @@ it('registers media conversions for Report model', function () {
         ->toMediaCollection('evidence');
 
     $media = $report->getFirstMedia('evidence');
+
+    expect($media)->not->toBeNull();
+    expect($media->getMediaConversionNames())->toContain('thumb');
+});
+
+it('registers media conversions for MembershipClaim model', function () {
+    $claim = MembershipClaim::factory()->create();
+
+    $claim->addMedia(UploadedFile::fake()->image('claim-evidence.jpg', 800, 600))
+        ->toMediaCollection('evidence');
+
+    $media = $claim->getFirstMedia('evidence');
 
     expect($media)->not->toBeNull();
     expect($media->getMediaConversionNames())->toContain('thumb');

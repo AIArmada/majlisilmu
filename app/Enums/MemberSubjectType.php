@@ -18,6 +18,64 @@ enum MemberSubjectType: string
     case Event = 'event';
     case Reference = 'reference';
 
+    public function label(): string
+    {
+        return match ($this) {
+            self::Institution => __('Institution'),
+            self::Speaker => __('Speaker'),
+            self::Event => __('Event'),
+            self::Reference => __('Reference'),
+        };
+    }
+
+    public function publicRouteSegment(): string
+    {
+        return match ($this) {
+            self::Institution => 'institusi',
+            self::Speaker => 'penceramah',
+            self::Event => 'majlis',
+            self::Reference => 'rujukan',
+        };
+    }
+
+    public static function fromRouteSegment(string $routeSegment): ?self
+    {
+        return match ($routeSegment) {
+            'institution', 'institusi' => self::Institution,
+            'speaker', 'penceramah' => self::Speaker,
+            'event', 'majlis' => self::Event,
+            'reference', 'rujukan' => self::Reference,
+            default => null,
+        };
+    }
+
+    public function isClaimable(): bool
+    {
+        return in_array($this, self::claimableCases(), true);
+    }
+
+    /**
+     * @return list<self>
+     */
+    public static function claimableCases(): array
+    {
+        return [
+            self::Institution,
+            self::Speaker,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function claimableRouteSegments(): array
+    {
+        return array_map(
+            static fn (self $subjectType): string => $subjectType->publicRouteSegment(),
+            self::claimableCases(),
+        );
+    }
+
     public static function forSubject(Institution|Speaker|Event|Reference $subject): self
     {
         return match (true) {

@@ -21,6 +21,7 @@ class RefactorTest extends TestCase
         $this->assertTrue(Schema::hasTable('event_key_people'));
         $this->assertTrue(Schema::hasTable('event_checkins'));
         $this->assertTrue(Schema::hasTable('contribution_requests'));
+        $this->assertTrue(Schema::hasTable('membership_claims'));
         $this->assertTrue(Schema::hasTable('reference_user'));
         $this->assertTrue(Schema::hasTable('member_invitations'));
         $this->assertTrue(Schema::hasTable('notification_settings'));

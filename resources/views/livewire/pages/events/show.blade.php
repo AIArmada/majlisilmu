@@ -1928,15 +1928,12 @@
                 </div>
             </div>
         @endguest
-    </div>
-</aside>
-</div>
 
-        <section class="mt-10 rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 shadow-sm sm:p-6">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 shadow-sm">
+            <div class="flex flex-col gap-4">
                 <div>
                     <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{{ __('Bantu Semak Majlis') }}</p>
-                    <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                    <p class="mt-2 text-sm leading-6 text-slate-600">
                         {{ __('Jumpa maklumat yang perlu diperbetulkan atau majlis yang meragukan?') }}
                     </p>
                 </div>
@@ -1952,7 +1949,10 @@
                     </a>
                 </div>
             </div>
-        </section>
+        </div>
+    </div>
+</aside>
+</div>
 
 {{-- ==============================
 SHARE MODAL

@@ -109,6 +109,15 @@ class Institution extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * @return HasMany<MembershipClaim, $this>
+     */
+    public function membershipClaims(): HasMany
+    {
+        return $this->hasMany(MembershipClaim::class, 'subject_id')
+            ->where('subject_type', MemberSubjectType::Institution->value);
+    }
+
+    /**
      * @return MorphMany<Report, $this>
      */
     public function reports(): MorphMany

@@ -29,6 +29,10 @@
                         class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
                         {{ __('Submit Institution') }}
                     </a>
+                    <a href="{{ route('membership-claims.index') }}" wire:navigate
+                        class="inline-flex items-center justify-center rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50">
+                        {{ __('My Membership Claims') }}
+                    </a>
                     <a href="{{ route('contributions.submit-speaker') }}" wire:navigate
                         class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                         {{ __('Submit Speaker') }}

@@ -15,7 +15,11 @@ class InstitutionContributionFormSchema
     /**
      * @return array<int, Component>
      */
-    public static function components(bool $includeMedia = true, bool $requireGoogleMaps = false): array
+    public static function components(
+        bool $includeMedia = true,
+        bool $requireGoogleMaps = false,
+        ?string $addressStatePath = null,
+    ): array
     {
         $components = [
             Section::make(__('Profil Institusi'))
@@ -39,9 +43,14 @@ class InstitutionContributionFormSchema
                 ]),
             Section::make(__('Location'))
                 ->schema([
-                    ...SharedFormSchema::addressFields(requireGoogleMaps: $requireGoogleMaps),
+                    ...($addressStatePath === null
+                        ? SharedFormSchema::addressFields(requireGoogleMaps: $requireGoogleMaps)
+                        : [SharedFormSchema::addressGroup(
+                            requireGoogleMaps: $requireGoogleMaps,
+                            statePath: $addressStatePath,
+                        )]),
                 ])
-                ->columns(2),
+                ->columns($addressStatePath === null ? 2 : 1),
             Section::make(__('Social Media'))
                 ->schema([
                     SharedFormSchema::socialMediaRepeater(__('Add social media links for this institution')),

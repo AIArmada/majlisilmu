@@ -188,8 +188,14 @@ class SuggestUpdate extends Component implements HasForms
     private function subjectSchema(): array
     {
         return match (true) {
-            $this->entity instanceof Institution => InstitutionContributionFormSchema::components(includeMedia: false),
-            $this->entity instanceof Speaker => SpeakerContributionFormSchema::components(includeMedia: false),
+            $this->entity instanceof Institution => InstitutionContributionFormSchema::components(
+                includeMedia: false,
+                addressStatePath: 'address',
+            ),
+            $this->entity instanceof Speaker => SpeakerContributionFormSchema::components(
+                includeMedia: false,
+                addressStatePath: 'address',
+            ),
             $this->entity instanceof Reference => ReferenceContributionFormSchema::components(includeMedia: false),
             default => EventContributionFormSchema::components(),
         };

@@ -69,6 +69,8 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             $user->eventSubmissions()->update(['submitted_by' => null]);
             $user->contributionRequests()->update(['proposer_id' => null]);
             $user->reviewedContributionRequests()->update(['reviewer_id' => null]);
+            $user->membershipClaims()->update(['claimant_id' => null]);
+            $user->reviewedMembershipClaims()->update(['reviewer_id' => null]);
             $user->moderationReviews()->update(['moderator_id' => null]);
             $user->reports()->update(['reporter_id' => null]);
             $user->handledReports()->update(['handled_by' => null]);
@@ -146,7 +148,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
 
     public function directoryFeedbackBanMessage(): string
     {
-        return __('Akaun anda tidak dibenarkan menghantar cadangan kemaskini atau laporan buat masa ini.');
+        return __('Akaun anda tidak dibenarkan menghantar cadangan kemaskini, tuntutan keahlian, atau laporan buat masa ini.');
     }
 
     /**
@@ -229,6 +231,22 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     public function reviewedContributionRequests(): HasMany
     {
         return $this->hasMany(ContributionRequest::class, 'reviewer_id');
+    }
+
+    /**
+     * @return HasMany<MembershipClaim, $this>
+     */
+    public function membershipClaims(): HasMany
+    {
+        return $this->hasMany(MembershipClaim::class, 'claimant_id');
+    }
+
+    /**
+     * @return HasMany<MembershipClaim, $this>
+     */
+    public function reviewedMembershipClaims(): HasMany
+    {
+        return $this->hasMany(MembershipClaim::class, 'reviewer_id');
     }
 
     /**

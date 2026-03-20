@@ -106,6 +106,28 @@ it('applies direct institution edits for owner maintainers from the suggest upda
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
+it('applies direct institution address edits for owner maintainers from the suggest update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $institution->contacts()->delete();
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => 'institution',
+        'subjectId' => $institution->slug,
+    ])
+        ->set('data.address.line1', 'No. 21, Jalan Disemak')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($institution->fresh()->addressModel?->line1)->toBe('No. 21, Jalan Disemak')
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
 it('re-moderates approved events when maintainers apply sensitive direct edits from the suggest update page', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
