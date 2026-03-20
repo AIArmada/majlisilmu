@@ -9,10 +9,6 @@
         "opencode",
         "vscode"
     ],
-    "guidelines": [
-        "filament/filament",
-        "laravel/fortify",
-        "filament/blueprint"
-    ],
+    "guidelines": true,
     "herd_mcp": true
 }

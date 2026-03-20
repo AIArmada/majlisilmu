@@ -1,3 +1,33 @@
+# Laravel 13 Upgrade
+
+- [x] Audit and record the Laravel 13 framework, package, and skeleton deltas that apply to this app
+- [x] Upgrade Composer constraints and lock data to Laravel 13-compatible releases
+- [x] Apply the Laravel 13 config and structure deltas that matter here (`cache`, `session`, and related skeleton updates)
+- [x] Replace direct deprecated CSRF middleware references and address any other app-level Laravel 13 compatibility issues
+- [x] Verify Composer resolution, targeted runtime behavior, PHPStan, Pest, and diff hygiene
+
+## Review
+- Upgraded the app from Laravel 12 to Laravel 13.1.1 and refreshed the dependency graph to Laravel 13-compatible releases, including `laravel/ai`, `laravel/boost`, `laravel/tinker`, `spatie/eloquent-sortable`, and the Vite 8 / `laravel-vite-plugin` 3 frontend toolchain.
+- Compared the app against the Laravel 13 upgrade guide and a fresh `laravel/laravel` 13.x skeleton, then applied the relevant skeleton deltas here: `config/cache.php` now sets `serializable_classes` to `false`, `config/session.php` uses JSON session serialization, and deprecated CSRF middleware references were replaced with `PreventRequestForgery`.
+- Kept app-specific structure intact where it intentionally diverges from the stock skeleton, including the existing `bootstrap/app.php`, route setup, Filament providers, and custom frontend/build layout.
+- Added Composer repository metadata overrides for `akaunting/laravel-money` and `bezhansalleh/filament-language-switch` so their current upstream code can resolve cleanly on Laravel 13 until those packages publish explicit support metadata, while preserving the local `aiarmada/*` path packages on `dev-main`.
+- `phpseclib/phpseclib` was updated to 3.0.50 to clear the Composer security advisory chain pulled in through `laravel/socialite`, and `axios` was bumped to 1.13.6 to clear the frontend audit warning.
+- Verification:
+  - `composer update laravel/framework laravel/ai laravel/boost laravel/tinker spatie/eloquent-sortable akaunting/laravel-money bezhansalleh/filament-language-switch aiarmada/commerce-support aiarmada/filament-authz aiarmada/affiliates aiarmada/signals aiarmada/filament-signals --with-all-dependencies`
+  - `composer update phpseclib/phpseclib`
+  - `composer validate --no-check-publish`
+  - `composer audit`
+  - `npm install`
+  - `npm audit --json`
+  - `npm run build`
+  - `vendor/bin/pint --dirty --format=agent`
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pest --parallel --compact --stop-on-failure`
+  - `git diff --check -- . ':(exclude)AGENTS.md'`
+- Notes:
+  - `git diff --check` only reports pre-existing trailing whitespace in `AGENTS.md`; the upgrade changes themselves are clean.
+  - Vite build still warns about `/images/about/islamic_geometry.png` and `/images/pattern-bg.png` being resolved at runtime, but the production build completes successfully.
+
 # Full Suite Cleanup
 
 - [x] Capture the current dirty worktree and run the full Rector, Pest, Pint, and PHPStan suite
