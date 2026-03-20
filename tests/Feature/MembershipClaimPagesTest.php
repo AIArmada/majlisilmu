@@ -2,6 +2,7 @@
 
 use App\Enums\MembershipClaimStatus;
 use App\Enums\MemberSubjectType;
+use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
 use App\Livewire\Pages\MembershipClaims\Create as CreateMembershipClaimPage;
 use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
 use App\Models\Institution;
@@ -88,41 +89,55 @@ it('lets claimants cancel pending claims from the history page', function () {
     expect($claim->fresh()->status)->toBe(MembershipClaimStatus::Cancelled);
 });
 
-it('shows the institution membership claim call to action for eligible users and hides it for members', function () {
+it('starts a membership claim from the contributions page search form', function () {
     $user = User::factory()->create();
-    $institution = Institution::factory()->create(['status' => 'verified']);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
 
-    $claimUrl = route('membership-claims.create', [
+    Livewire::actingAs($user)
+        ->test(ContributionsIndex::class)
+        ->fillForm([
+            'subject_type' => MemberSubjectType::Speaker->value,
+            'subject_slug' => $speaker->slug,
+        ])
+        ->call('startMembershipClaim')
+        ->assertRedirect(route('membership-claims.create', [
+            'subjectType' => MemberSubjectType::Speaker->publicRouteSegment(),
+            'subjectId' => $speaker->slug,
+        ]));
+});
+
+it('does not show membership claim call to action on public institution and speaker pages', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institutionClaimUrl = route('membership-claims.create', [
         'subjectType' => MemberSubjectType::Institution->publicRouteSegment(),
         'subjectId' => $institution->slug,
+    ]);
+    $speakerClaimUrl = route('membership-claims.create', [
+        'subjectType' => MemberSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
     ]);
 
     $this->actingAs($user)
         ->get(route('institutions.show', $institution))
         ->assertSuccessful()
-        ->assertSee($claimUrl, false);
-
-    $institution->members()->attach($user);
-
-    $this->actingAs($user)
-        ->get(route('institutions.show', $institution))
-        ->assertSuccessful()
-        ->assertDontSee($claimUrl, false);
-});
-
-it('shows the pending-state label on speaker pages after a claim is submitted', function () {
-    $user = User::factory()->create();
-    $speaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
-
-    MembershipClaim::factory()
-        ->forSpeaker($speaker)
-        ->create([
-            'claimant_id' => $user->getKey(),
-            'status' => MembershipClaimStatus::Pending,
-        ]);
+        ->assertDontSee($institutionClaimUrl, false)
+        ->assertDontSee('Tuntut Keahlian');
 
     $this->actingAs($user)
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
-        ->assertSee('Tuntutan Keahlian Dihantar');
+        ->assertDontSee($speakerClaimUrl, false)
+        ->assertDontSee('Tuntut Keahlian');
 });
