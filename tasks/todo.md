@@ -1,3 +1,23 @@
+# Membership Claim Entry Point Rework
+
+- [x] Remove membership-claim CTAs from public institution and speaker pages
+- [x] Add a searchable membership-claim entry form on `/sumbangan`
+- [x] Update coverage for the new entry flow and re-verify affected pages
+
+## Review
+- Removed `Tuntut Keahlian` and pending-claim badges from the public institution and speaker detail sidebars so those pages now stay focused on broad public feedback actions: `Cadang Kemaskini` and `Lapor`.
+- Turned `/sumbangan` into the authenticated claim entry hub by adding a searchable Filament form on the contributions page. Users now pick `Institusi` or `Penceramah`, search by record name, and continue into the existing canonical claim form route.
+- Kept the existing claim form and claim-history pages intact; the change is purely about moving the entry point to a more appropriate authenticated surface.
+- Added regression coverage for starting a claim from `/sumbangan` and for ensuring the public institution/speaker pages no longer render claim CTAs.
+- Verification:
+  - `vendor/bin/pest --compact tests/Feature/MembershipClaimPagesTest.php tests/Feature/ContributionPagesTest.php tests/Feature/PublicPagesTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions/Index.php app/Livewire/Pages/MembershipClaims/Create.php tests/Feature/MembershipClaimPagesTest.php tests/Feature/ContributionPagesTest.php tests/Feature/PublicPagesTest.php`
+  - `vendor/bin/pint --format=agent app/Livewire/Pages/Contributions/Index.php tests/Feature/MembershipClaimPagesTest.php`
+  - `git diff --check`
+  - Browser snapshots:
+    - `https://majlisilmu.test/penceramah/amina-binti-rashid-bhiqccr`
+    - `https://majlisilmu.test/institusi/kompleks-islam-senawang-usx9tbl`
+
 # Audit Fixes For Uncommitted Changes
 
 - [x] Review the uncommitted membership-claim and public contribution/report changes against commit `d666ca998017848a17abb2f76531d9fb2ba6b106`

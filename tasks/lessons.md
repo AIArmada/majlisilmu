@@ -1,5 +1,6 @@
 # Lessons
 
+- Do not place a niche authenticated ownership workflow beside broad public-feedback CTAs on public record pages; if most visitors cannot use it, move the entry point into the authenticated hub and let users search for the target record there.
 - When reusing a create-form schema on an update flow, verify the persisted state shape matches exactly; nested relation payloads like `address.*` cannot safely share a flat field layout like `line1/state_id` without silently dropping edits.
 - When a new table-backed feature fails because its table is missing in development, fix the migration state first and keep the application code assuming the schema exists; do not add runtime `Schema::hasTable(...)` guards unless the user explicitly asks for rollout-skew tolerance.
 - For new moderation workflows, do not assume event scope or a single fixed approved role from the first draft; membership-claim requirements can narrow to a subset of subject types and still allow reviewer-selected roles like `editor`, `admin`, and `owner`.
