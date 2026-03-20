@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Pages\Contributions\SubmitInstitution;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
@@ -33,12 +34,12 @@ it('renders translated no-result copy on institution index', function () {
 it('shows add-missing-institution call to action on institution index', function () {
     get('/institusi')
         ->assertSuccessful()
-        ->assertSee('Tak jumpa institusi? Tambah institusi');
+        ->assertSee('Tak jumpa institusi yang anda cari? Cadangkan institusi baharu.')
+        ->assertSee('Cadangkan institusi baharu');
 });
 
 it('redirects guests to login when opening add institution form', function () {
-    Livewire::test('pages.institutions.index')
-        ->call('openInstitutionSubmissionForm')
+    get(route('contributions.submit-institution'))
         ->assertRedirect(route('login'));
 });
 
@@ -47,12 +48,11 @@ it('allows users to submit a missing institution from institution index with pen
     $institutionName = 'Institusi Cadangan Baru';
 
     Livewire::actingAs($user)
-        ->test('pages.institutions.index')
-        ->call('openInstitutionSubmissionForm')
-        ->set('institutionSubmissionData.name', $institutionName)
-        ->set('institutionSubmissionData.type', 'masjid')
-        ->set('institutionSubmissionData.google_maps_url', 'https://maps.google.com/?q=3.1390,101.6869')
-        ->call('submitInstitution')
+        ->test(SubmitInstitution::class)
+        ->set('data.name', $institutionName)
+        ->set('data.type', 'masjid')
+        ->set('data.google_maps_url', 'https://maps.google.com/?q=3.1390,101.6869')
+        ->call('submit')
         ->assertHasNoErrors();
 
     $institution = Institution::query()

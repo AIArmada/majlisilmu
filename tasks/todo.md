@@ -1,3 +1,53 @@
+# Full Suite Cleanup
+
+- [x] Capture the current dirty worktree and run the full Rector, Pest, Pint, and PHPStan suite
+- [x] Fix all issues reported by the repo-wide verification pass without reverting unrelated changes
+- [x] Re-run the full suite until Rector, Pest, Pint, and PHPStan all pass cleanly
+- [x] Document the final verification results and any notable residual notes here
+
+## Review
+- Fixed a late Ahli reference edit test mismatch by using the model route key instead of forcing the UUID into a slug-bound Filament page mount.
+- Applied the 7 repo-wide Rector fixes that were actually pending, then normalized formatting with Pint.
+- Fixed a PHPStan regression from the Rector cleanup by restoring the missing `@param list<string>` annotation on `parseInstagram()`.
+- Updated institution and speaker public-index tests to match the current CTA copy and the dedicated authenticated contribution pages instead of removed inline modal actions.
+- Fixed a real runtime bug in `ContributionEntityMutationService`: institution type and speaker gender submissions can now safely accept enum-backed form state, and enum arrays are normalized before persistence.
+- Fixed a real speaker persistence bug in `Speaker::booted()` so explicit `post_nominal` values are preserved when there are no qualifications to derive from, while qualification-derived post-nominals still work.
+- Updated the speaker create-option schema test to flatten nested Filament sections before asserting field presence, matching the current schema shape.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/rector process app bootstrap config database routes tests --dry-run --debug --ansi --no-progress-bar`
+  - `XDEBUG_MODE=off vendor/bin/rector process app/Filament/Resources/ContributionRequests/ContributionRequestResource.php app/Filament/Resources/ContributionRequests/Support/ContributionRequestPresenter.php app/Filament/Resources/MembershipClaims/MembershipClaimResource.php app/Forms/Components/Select.php app/Forms/InstitutionContributionFormSchema.php app/Models/Reference.php app/Models/Speaker.php app/Models/Venue.php app/Providers/AppServiceProvider.php app/Services/ContributionEntityMutationService.php app/Support/SocialMedia/SocialMediaLinkResolver.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/SpeakerCreateOptionSchemaTest.php tests/Feature/SpeakerIndexTest.php tests/Feature/QuickAddSelectTest.php --dry-run --debug --ansi --no-progress-bar`
+  - `XDEBUG_MODE=off vendor/bin/pint`
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi`
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact --stop-on-failure`
+  - `git diff --check`
+
+# Internalize Filament Quick Add Select
+
+- [x] Audit the current external quick-add dependency usage and preserve the required behavior in-app
+- [x] Implement the quick-add and close-on-select behavior inside the application's internal Filament select component
+- [x] Remove the external Composer package and delete dead bootstrapping/macro glue
+- [x] Add focused regression coverage for the internal quick-add behavior
+- [x] Re-run targeted verification, then document the outcome here
+
+## Review
+- Replaced the last remaining vendor `quickAdd()` dependency with an internal implementation inside `App\Forms\Components\Select`, while keeping `closeOnSelect()` as a concrete app-level method instead of a runtime macro.
+- The internal quick-add behavior now wraps Filament's existing search-results and option-label callbacks instead of replacing them blindly, so relationship selects keep their native query behavior while gaining the inline create option.
+- Removed the provider-level `Select` macro registration from `AppServiceProvider`, since the custom app select component now owns the custom behavior directly.
+- Removed `cocosmos/filament-quick-add-select` from `composer.json` and `composer.lock`, then regenerated Composer autoloading without PSR-4 warnings.
+- Added internal translation files for the quick-add label under `resources/lang/en/quick_add.php` and `resources/lang/ms/quick_add.php`, matching the application's actual `lang_path()`.
+- Added focused regression coverage proving the internal select prepends a quick-add option when needed, suppresses it on exact matches, and creates/selects the related record when chosen.
+- Verification:
+  - `rg -n -F "cocosmos/filament-quick-add-select" composer.json composer.lock app resources tests`
+  - `php -l app/Forms/Components/Select.php`
+  - `php -l app/Providers/AppServiceProvider.php`
+  - `php -l tests/Feature/QuickAddSelectTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/QuickAddSelectTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Forms/Components/Select.php app/Providers/AppServiceProvider.php tests/Feature/QuickAddSelectTest.php`
+  - `vendor/bin/pint --format=agent app/Forms/Components/Select.php app/Providers/AppServiceProvider.php tests/Feature/QuickAddSelectTest.php`
+  - `composer dump-autoload -o --no-scripts`
+  - `git diff --check`
+
 # Membership Claim Entry Point Rework
 
 - [x] Remove membership-claim CTAs from public institution and speaker pages

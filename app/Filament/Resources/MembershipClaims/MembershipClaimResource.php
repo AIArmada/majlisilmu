@@ -80,6 +80,7 @@ class MembershipClaimResource extends Resource
         return self::getNavigationBadge() !== null ? 'warning' : null;
     }
 
+    #[\Override]
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'moderator']) ?? false;

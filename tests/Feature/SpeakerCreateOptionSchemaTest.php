@@ -5,7 +5,41 @@ use App\Models\Institution;
 use App\Models\Speaker;
 
 it('includes biography, cover image, and institution position fields in speaker create option form', function () {
-    $components = collect(SpeakerFormSchema::createOptionForm())
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $components = collect($flatten(SpeakerFormSchema::createOptionForm()))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
     $fieldNames = $components

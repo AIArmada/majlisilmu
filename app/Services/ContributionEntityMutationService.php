@@ -6,6 +6,8 @@ use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\Gender;
+use App\Enums\InstitutionType;
 use App\Enums\TagType;
 use App\Models\Address;
 use App\Models\Contact;
@@ -16,6 +18,7 @@ use App\Models\SocialMedia;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -50,7 +53,7 @@ class ContributionEntityMutationService
         $institution = Institution::create([
             'name' => (string) ($payload['name'] ?? 'Institution'),
             'slug' => Str::slug((string) ($payload['name'] ?? 'institution')).'-'.Str::lower(Str::random(7)),
-            'type' => (string) ($payload['type'] ?? 'masjid'),
+            'type' => $this->normalizeInstitutionType($payload['type'] ?? null),
             'description' => $payload['description'] ?? null,
             'status' => 'pending',
             'is_active' => true,
@@ -71,7 +74,7 @@ class ContributionEntityMutationService
     {
         $speaker = Speaker::create([
             'name' => (string) ($payload['name'] ?? 'Speaker'),
-            'gender' => (string) ($payload['gender'] ?? 'male'),
+            'gender' => $this->normalizeGender($payload['gender'] ?? null),
             'honorific' => $this->normalizeStringArray($payload['honorific'] ?? []),
             'pre_nominal' => $this->normalizeStringArray($payload['pre_nominal'] ?? []),
             'post_nominal' => $this->normalizeStringArray($payload['post_nominal'] ?? []),
@@ -115,7 +118,9 @@ class ContributionEntityMutationService
     {
         $institution->fill([
             'name' => $payload['name'] ?? $institution->name,
-            'type' => $payload['type'] ?? ($institution->type instanceof \BackedEnum ? $institution->type->value : $institution->type),
+            'type' => array_key_exists('type', $payload)
+                ? $this->normalizeInstitutionType($payload['type'])
+                : ($institution->type instanceof BackedEnum ? $institution->type->value : $institution->type),
             'description' => $payload['description'] ?? $institution->description,
         ]);
 
@@ -135,7 +140,9 @@ class ContributionEntityMutationService
     {
         $speaker->fill([
             'name' => $payload['name'] ?? $speaker->name,
-            'gender' => $payload['gender'] ?? $speaker->gender,
+            'gender' => array_key_exists('gender', $payload)
+                ? $this->normalizeGender($payload['gender'])
+                : $speaker->gender,
             'honorific' => array_key_exists('honorific', $payload) ? $this->normalizeStringArray($payload['honorific']) : $speaker->honorific,
             'pre_nominal' => array_key_exists('pre_nominal', $payload) ? $this->normalizeStringArray($payload['pre_nominal']) : $speaker->pre_nominal,
             'post_nominal' => array_key_exists('post_nominal', $payload) ? $this->normalizeStringArray($payload['post_nominal']) : $speaker->post_nominal,
@@ -151,6 +158,32 @@ class ContributionEntityMutationService
         $this->syncSpeakerRelations($speaker, $payload);
 
         return $dirty;
+    }
+
+    private function normalizeInstitutionType(mixed $value): string
+    {
+        if ($value instanceof InstitutionType) {
+            return $value->value;
+        }
+
+        if (is_string($value) && InstitutionType::tryFrom($value) instanceof InstitutionType) {
+            return $value;
+        }
+
+        return InstitutionType::Masjid->value;
+    }
+
+    private function normalizeGender(mixed $value): string
+    {
+        if ($value instanceof Gender) {
+            return $value->value;
+        }
+
+        if (is_string($value) && Gender::tryFrom($value) instanceof Gender) {
+            return $value;
+        }
+
+        return Gender::Male->value;
     }
 
     /**
@@ -254,7 +287,7 @@ class ContributionEntityMutationService
 
         return [
             'name' => $institution->name,
-            'type' => $institution->type instanceof \BackedEnum ? $institution->type->value : (string) $institution->type,
+            'type' => $institution->type instanceof BackedEnum ? $institution->type->value : (string) $institution->type,
             'description' => $institution->description,
             'address' => $this->addressState($institution->addressModel),
             'contacts' => $this->contactsState($institution->contacts),
@@ -320,12 +353,12 @@ class ContributionEntityMutationService
             'ends_at' => $event->ends_at?->toDateTimeString(),
             'timezone' => $event->timezone,
             'event_type' => $this->enumCollectionValues($event->event_type),
-            'gender' => $event->gender instanceof \BackedEnum ? $event->gender->value : (string) $event->gender,
+            'gender' => $event->gender instanceof BackedEnum ? $event->gender->value : (string) $event->gender,
             'age_group' => $this->enumCollectionValues($event->age_group),
             'children_allowed' => (bool) $event->children_allowed,
             'is_muslim_only' => (bool) $event->is_muslim_only,
-            'event_format' => $event->event_format instanceof \BackedEnum ? $event->event_format->value : (string) $event->event_format,
-            'visibility' => $event->visibility instanceof \BackedEnum ? $event->visibility->value : (string) $event->visibility,
+            'event_format' => $event->event_format instanceof BackedEnum ? $event->event_format->value : (string) $event->event_format,
+            'visibility' => $event->visibility instanceof BackedEnum ? $event->visibility->value : (string) $event->visibility,
             'event_url' => $event->event_url,
             'live_url' => $event->live_url,
             'recording_url' => $event->recording_url,
@@ -350,7 +383,7 @@ class ContributionEntityMutationService
             'other_key_people' => $event->keyPeople
                 ->reject(fn ($keyPerson): bool => $keyPerson->role === EventKeyPersonRole::Speaker)
                 ->map(fn ($keyPerson): array => [
-                    'role' => $keyPerson->role instanceof \BackedEnum ? $keyPerson->role->value : (string) $keyPerson->role,
+                    'role' => $keyPerson->role instanceof BackedEnum ? $keyPerson->role->value : (string) $keyPerson->role,
                     'speaker_id' => $keyPerson->speaker_id,
                     'name' => $keyPerson->name,
                     'is_public' => (bool) $keyPerson->is_public,
@@ -526,7 +559,13 @@ class ContributionEntityMutationService
     private function normalizeStringArray(iterable $values): array
     {
         return collect($values)
-            ->map(fn (mixed $value): ?string => is_string($value) && trim($value) !== '' ? trim($value) : null)
+            ->map(function (mixed $value): ?string {
+                if ($value instanceof BackedEnum) {
+                    return trim((string) $value->value) ?: null;
+                }
+
+                return is_string($value) && trim($value) !== '' ? trim($value) : null;
+            })
             ->filter()
             ->values()
             ->all();
@@ -585,7 +624,7 @@ class ContributionEntityMutationService
     {
         if ($collection instanceof Collection) {
             return $collection
-                ->map(fn (mixed $value): ?string => $value instanceof \BackedEnum ? $value->value : (is_string($value) ? $value : null))
+                ->map(fn (mixed $value): ?string => $value instanceof BackedEnum ? $value->value : (is_string($value) ? $value : null))
                 ->filter()
                 ->values()
                 ->all();
@@ -721,9 +760,9 @@ class ContributionEntityMutationService
         return $contacts
             ->sortBy('created_at')
             ->map(fn (Contact $contact): array => [
-                'category' => $contact->category instanceof \BackedEnum ? $contact->category->value : (string) $contact->category,
+                'category' => $contact->category instanceof BackedEnum ? $contact->category->value : (string) $contact->category,
                 'value' => $contact->value,
-                'type' => $contact->type instanceof \BackedEnum ? $contact->type->value : (string) $contact->type,
+                'type' => $contact->type instanceof BackedEnum ? $contact->type->value : (string) $contact->type,
                 'is_public' => (bool) $contact->is_public,
             ])
             ->values()
@@ -739,7 +778,7 @@ class ContributionEntityMutationService
         return $entries
             ->sortBy('created_at')
             ->map(fn (SocialMedia $entry): array => [
-                'platform' => $entry->platform instanceof \BackedEnum ? $entry->platform->value : (string) $entry->platform,
+                'platform' => $entry->platform instanceof BackedEnum ? $entry->platform->value : (string) $entry->platform,
                 'username' => $entry->username,
                 'url' => $entry->url,
             ])

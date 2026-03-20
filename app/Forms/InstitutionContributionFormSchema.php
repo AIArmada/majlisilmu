@@ -19,8 +19,7 @@ class InstitutionContributionFormSchema
         bool $includeMedia = true,
         bool $requireGoogleMaps = false,
         ?string $addressStatePath = null,
-    ): array
-    {
+    ): array {
         $components = [
             Section::make(__('Profil Institusi'))
                 ->schema([

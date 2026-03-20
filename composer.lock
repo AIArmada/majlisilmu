@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8faed307288d64c4bf1f7a7e399c7dcd",
+    "content-hash": "c352db7e9c78c08e5b9e8c93683f746b",
     "packages": [
         {
             "name": "aiarmada/affiliates",
@@ -993,79 +993,6 @@
                 }
             ],
             "time": "2023-12-20T15:40:13+00:00"
-        },
-        {
-            "name": "cocosmos/filament-quick-add-select",
-            "version": "v1.1.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/cocosmos/filament-quick-add-select.git",
-                "reference": "c64153ea336e18b31f4897f2843ee65fda66c236"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/cocosmos/filament-quick-add-select/zipball/c64153ea336e18b31f4897f2843ee65fda66c236",
-                "reference": "c64153ea336e18b31f4897f2843ee65fda66c236",
-                "shasum": ""
-            },
-            "require": {
-                "filament/filament": "^4.0 || ^5.0",
-                "illuminate/contracts": "^11.0 || ^12.0",
-                "php": "^8.1",
-                "spatie/laravel-package-tools": "^1.14.0"
-            },
-            "require-dev": {
-                "laravel/pint": "^1.0",
-                "nunomaduro/collision": "^8.0",
-                "nunomaduro/larastan": "^2.0",
-                "orchestra/testbench": "^9.0 || ^10.0",
-                "pestphp/pest": "^3.0",
-                "pestphp/pest-plugin-arch": "^3.0",
-                "pestphp/pest-plugin-laravel": "^3.0",
-                "phpstan/extension-installer": "^1.1",
-                "phpstan/phpstan-deprecation-rules": "^1.0",
-                "phpstan/phpstan-phpunit": "^1.0",
-                "spatie/laravel-ray": "^1.26"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Cocosmos\\FilamentQuickAddSelect\\FilamentQuickAddServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Cocosmos\\FilamentQuickAddSelect\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Cocosmos",
-                    "email": "contact@mipam.ch",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Instantly create and select new options in Filament relationship selects without opening modals",
-            "homepage": "https://github.com/cocosmos/filament-quick-add-select",
-            "keywords": [
-                "Forms",
-                "filament",
-                "laravel",
-                "quick-add",
-                "relationship",
-                "select"
-            ],
-            "support": {
-                "issues": "https://github.com/cocosmos/filament-quick-add-select/issues",
-                "source": "https://github.com/cocosmos/filament-quick-add-select/tree/v1.1.0"
-            },
-            "time": "2026-02-03T01:13:12+00:00"
         },
         {
             "name": "composer/ca-bundle",
