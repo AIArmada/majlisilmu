@@ -2,7 +2,7 @@
 
 use AIArmada\Signals\Models\TrackedProperty;
 use App\Support\Signals\ProductSignalsSurfaceResolver;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -27,7 +27,7 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->beforeEach(function () {
-        VerifyCsrfToken::except('*');
+        PreventRequestForgery::except('*');
 
         if (! Schema::hasTable(config('affiliates.database.tables.affiliates', 'affiliate_affiliates'))) {
             Artisan::call('migrate', [
