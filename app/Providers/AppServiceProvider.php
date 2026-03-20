@@ -24,7 +24,6 @@ use App\Observers\TagObserver;
 use App\Observers\VenueObserver;
 use App\Support\Media\MediaFileNamer;
 use BezhanSalleh\LanguageSwitch\LanguageSwitch;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
@@ -134,21 +133,6 @@ class AppServiceProvider extends ServiceProvider
             'report' => Report::class,
             'inspiration' => Inspiration::class,
         ]);
-
-        if (! Select::hasMacro('closeOnSelect')) {
-            // Register closeOnSelect macro for Filament Select component
-            // This allows multi-select dropdowns to close after each selection
-            Select::macro('closeOnSelect', function (bool $condition = true): static {
-                if ($condition) {
-                    /** @phpstan-ignore-next-line */
-                    $this->extraAttributes([
-                        'x-close-on-select' => true,
-                    ]);
-                }
-
-                return $this;
-            });
-        }
 
         if (! self::$mediaUploadConfigured) {
             // Configure SpatieMediaLibraryFileUpload to use slug-based filenames globally.

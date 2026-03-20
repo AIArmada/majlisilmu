@@ -533,7 +533,7 @@ it('allows reference admins to open ahli reference edit pages with invitation ma
         ->assertOk();
 
     $component = Livewire::actingAs($user)
-        ->test(AhliEditReference::class, ['record' => $reference->id]);
+        ->test(AhliEditReference::class, ['record' => $reference->getRouteKey()]);
 
     expect($component->instance()->getRelationManagers())
         ->toContain(ReferenceMemberInvitationsRelationManager::class);

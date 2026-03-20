@@ -96,9 +96,12 @@ class Speaker extends Model implements AuditableContract, HasMedia
                     static fn (PostNominal $postNominal): string => $postNominal->value,
                     PostNominal::cases()
                 );
+                $explicitPostNominals = is_array($speaker->post_nominal)
+                    ? array_values(array_filter($speaker->post_nominal, static fn (string $value): bool => $value !== ''))
+                    : [];
 
                 if (! is_array($qualifications) || $qualifications === []) {
-                    $speaker->post_nominal = null;
+                    $speaker->post_nominal = $explicitPostNominals !== [] ? $explicitPostNominals : null;
 
                     return;
                 }

@@ -224,14 +224,7 @@ final class SocialMediaLinkResolver
      */
     private static function parseGeneric(string $platform, string $host, array $allowedHosts, array $segments): ?string
     {
-        $isAllowed = false;
-        foreach ($allowedHosts as $allowedHost) {
-            if ($host === $allowedHost || str_ends_with($host, '.'.$allowedHost)) {
-                $isAllowed = true;
-                break;
-            }
-        }
-
+        $isAllowed = array_any($allowedHosts, fn ($allowedHost) => $host === $allowedHost || str_ends_with($host, '.'.$allowedHost));
         if (! $isAllowed || $segments === []) {
             return null;
         }
@@ -239,6 +232,9 @@ final class SocialMediaLinkResolver
         return self::sanitizeIdentifier($platform, $segments[0]);
     }
 
+    /**
+     * @param  list<string>  $segments
+     */
     private static function parseInstagram(string $host, array $segments): ?string
     {
         if (! in_array($host, ['instagram.com', 'www.instagram.com'], true) || $segments === []) {

@@ -62,8 +62,8 @@ class ContributionRequestPresenter
             $entity instanceof Speaker => $entity->formatted_name,
             $entity instanceof Event => $entity->title,
             $entity instanceof Reference => $entity->title,
-            is_string(data_get($request->proposed_data, 'name')) && filled(data_get($request->proposed_data, 'name')) => (string) data_get($request->proposed_data, 'name'),
-            is_string(data_get($request->proposed_data, 'title')) && filled(data_get($request->proposed_data, 'title')) => (string) data_get($request->proposed_data, 'title'),
+            is_string(data_get($request->proposed_data, 'name')) && filled(data_get($request->proposed_data, 'name')) => data_get($request->proposed_data, 'name'),
+            is_string(data_get($request->proposed_data, 'title')) && filled(data_get($request->proposed_data, 'title')) => data_get($request->proposed_data, 'title'),
             default => self::labelForSubject($request->subject_type).' Request',
         };
     }

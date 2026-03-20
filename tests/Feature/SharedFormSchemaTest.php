@@ -67,7 +67,6 @@ it('requires google maps url on the dedicated institution contribution create fo
             }
 
             $childComponentsProperty = $reflection->getProperty('childComponents');
-            $childComponentsProperty->setAccessible(true);
             $childComponents = $childComponentsProperty->getValue($component);
 
             if (! is_array($childComponents)) {
@@ -145,7 +144,6 @@ it('uses rich description and no logo upload in the institution contribution for
             }
 
             $childComponentsProperty = $reflection->getProperty('childComponents');
-            $childComponentsProperty->setAccessible(true);
             $childComponents = $childComponentsProperty->getValue($component);
 
             if (! is_array($childComponents)) {
@@ -190,7 +188,6 @@ it('uses the same core speaker fields in the quick-create modal and dedicated co
             }
 
             $childComponentsProperty = $reflection->getProperty('childComponents');
-            $childComponentsProperty->setAccessible(true);
             $childComponents = $childComponentsProperty->getValue($component);
 
             if (! is_array($childComponents)) {

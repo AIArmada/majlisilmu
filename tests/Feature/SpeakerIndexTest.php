@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Pages\Contributions\SubmitSpeaker;
 use App\Models\Speaker;
 use App\Models\User;
 use Livewire\Livewire;
@@ -63,7 +64,8 @@ it('renders translated search placeholder on speaker index', function () {
 it('shows add-missing-speaker call to action on speaker index', function () {
     get('/penceramah')
         ->assertSuccessful()
-        ->assertSee('Tak jumpa penceramah? Tambah penceramah');
+        ->assertSee('Tak jumpa penceramah yang anda cari? Cadangkan profil baharu.')
+        ->assertSee('Cadangkan penceramah baharu');
 });
 
 it('supports fuzzy search with minor typos', function () {
@@ -109,11 +111,10 @@ it('allows users to submit a missing speaker from speaker index with pending sta
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
-        ->test('pages.speakers.index')
-        ->call('openSpeakerSubmissionForm')
-        ->set('speakerSubmissionData.name', $speakerName)
-        ->set('speakerSubmissionData.gender', 'male')
-        ->call('submitSpeaker')
+        ->test(SubmitSpeaker::class)
+        ->set('data.name', $speakerName)
+        ->set('data.gender', 'male')
+        ->call('submit')
         ->assertHasNoErrors();
 
     $speaker = Speaker::query()
@@ -126,7 +127,6 @@ it('allows users to submit a missing speaker from speaker index with pending sta
 });
 
 it('redirects guests to login when opening add speaker form', function () {
-    Livewire::test('pages.speakers.index')
-        ->call('openSpeakerSubmissionForm')
+    get(route('contributions.submit-speaker'))
         ->assertRedirect(route('login'));
 });

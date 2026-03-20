@@ -57,6 +57,7 @@ class Reference extends Model implements HasMedia
         ];
     }
 
+    #[\Override]
     public function getRouteKeyName(): string
     {
         return 'slug';
