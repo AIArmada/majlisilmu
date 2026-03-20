@@ -1,3 +1,105 @@
+# Audit Fixes For Uncommitted Changes
+
+- [x] Review the uncommitted membership-claim and public contribution/report changes against commit `d666ca998017848a17abb2f76531d9fb2ba6b106`
+- [x] Fix the broken nested address handling on contribution update pages
+- [x] Add regression coverage for direct maintainer address edits on the suggest-update flow
+- [x] Re-run targeted feature coverage, PHPStan, and diff checks
+
+## Review
+- The main regression in the uncommitted batch was not inside the new membership-claim workflow itself; it was in the reused contribution update schemas for institutions and speakers.
+- `SuggestUpdate` was filling and diffing nested `address` data from `ContributionEntityMutationService`, but the reused contribution form schemas still exposed flat address fields like `line1` and `state_id`. That mismatch meant update requests silently dropped address edits and owner direct-edit flows could not apply address changes either.
+- Fixed this by introducing a nested-address schema mode in `SharedFormSchema`, then opting `SuggestUpdate` into `address`-scoped address fields for institution and speaker update pages while leaving create/quick-create flows unchanged.
+- Added a regression test proving owner maintainers can now directly update institution addresses from the public suggest-update page again.
+- Verification:
+  - `vendor/bin/pest --compact tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/MembershipClaimActionsTest.php tests/Feature/MembershipClaimPagesTest.php tests/Feature/MembershipClaimAdminResourceTest.php tests/Feature/PublicPagesTest.php tests/Feature/ReportAdminResourceTest.php tests/Feature/AdminResourcesCoverageTest.php tests/Feature/RefactorTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Forms/SpeakerContributionFormSchema.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Actions/Membership app/Livewire/Pages/MembershipClaims app/Filament/Resources/MembershipClaims app/Models/MembershipClaim.php app/Support/Membership`
+  - `git diff --check`
+
+# Membership Claims Migration Fix
+
+- [x] Confirm whether the speaker page crash was caused by an unapplied `membership_claims` migration
+- [x] Apply the pending `membership_claims` migration to the local development database
+- [x] Remove the temporary membership-claims schema guards and return to the normal migrated-schema assumption
+- [x] Re-verify the affected speaker page and targeted membership-claim coverage
+
+## Review
+- The speaker page crash came from authenticated CTA rendering querying `membership_claims` before the new migration had been applied locally.
+- Applied `2026_03_19_000000_create_membership_claims_table` with `php artisan migrate --force`, which restored the missing table on the current database.
+- Removed the temporary `tableExists()` guard from the model, membership claim pages, admin resource, and public speaker/institution CTA blocks, as requested. The code now assumes the schema exists once the migration has been run.
+- Verification:
+  - `php artisan migrate:status | rg "2026_03_19_000000_create_membership_claims_table"`
+  - `php -l app/Models/MembershipClaim.php`
+  - `php -l app/Livewire/Pages/MembershipClaims/Create.php`
+  - `php -l app/Livewire/Pages/MembershipClaims/Index.php`
+  - `php -l app/Filament/Resources/MembershipClaims/MembershipClaimResource.php`
+  - `vendor/bin/phpstan analyse --ansi app/Models/MembershipClaim.php app/Livewire/Pages/MembershipClaims/Create.php app/Livewire/Pages/MembershipClaims/Index.php app/Filament/Resources/MembershipClaims/MembershipClaimResource.php`
+  - `vendor/bin/pest --parallel --compact --tmp-dir=storage/framework/testing/paratest tests/Feature/MembershipClaimPagesTest.php`
+  - Browser snapshot at `https://majlisilmu.test/penceramah/amina-binti-rashid-bhiqccr`
+  - `git diff --check`
+
+# Event Sidebar Review CTA Layout
+
+- [x] Inspect the event detail desktop layout and compare it with the speaker detail sidebar pattern
+- [x] Move the `Bantu Semak Majlis` CTA block into the desktop right-column sidebar stack
+- [x] Verify the change with a local browser snapshot and diff checks
+
+## Review
+- The event detail page had the `Bantu Semak Majlis` block rendered after the main grid, which forced it below the content instead of inside the sidebar on desktop.
+- Moved that CTA block into the existing sticky sidebar stack in `resources/views/livewire/pages/events/show.blade.php`, so it now sits in the right column beside the main content, matching the speaker page behavior more closely.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent`
+  - `git diff --check`
+  - Browser snapshot at `https://majlisilmu.test/majlis/kelas-daurah-riyadus-salihin-poivejj` showing `BANTU SEMAK MAJLIS` inside the `complementary` sidebar region on desktop
+
+# Membership Claim Moderation Flow
+
+- [x] Add a persisted `membership_claims` workflow for speaker and institution self-claims
+- [x] Add authenticated public claim submission and claim-history pages
+- [x] Add a dedicated admin moderation resource with approve/reject actions and reviewer-selected roles
+- [x] Surface claim CTAs on public speaker and institution pages
+- [x] Add focused coverage and run targeted verification
+
+## Review
+- Added a new `MembershipClaim` model, migration, factory, status enum, and media support so speaker and institution claims can store reviewer state plus uploaded evidence in the `evidence` collection.
+- Added shared membership-claim actions for resolving public subjects, submitting claims, approving with `editor`, `admin`, or `owner`, rejecting, and claimant-side cancellation. Approval reuses the existing membership attach/role flow and intentionally uses the central protected-role path so `owner` can be granted from the moderation surface.
+- Added authenticated public routes and Livewire pages for `/tuntut-keahlian/{subjectType}/{subjectId}` and `/tuntutan-keahlian`, then linked the flow from the public speaker and institution pages with CTA hiding for existing members and a pending-state label for already-submitted claims.
+- Added a new admin `MembershipClaimResource` under the `Moderation` group with a pending navigation badge, subject and evidence context, and approve/reject actions on both the index and record view pages.
+- Added focused tests for claim actions, public claim submission/history, public CTA visibility, admin moderation, admin resource coverage, the new schema table, and the new claim-specific media conversion.
+- Verification:
+  - `php -l app/Enums/MemberSubjectType.php`
+  - `php -l app/Enums/MembershipClaimStatus.php`
+  - `php -l app/Models/MembershipClaim.php`
+  - `php -l app/Support/Membership/MembershipClaimPresenter.php`
+  - `php -l app/Actions/Membership/ResolveMembershipClaimSubjectAction.php`
+  - `php -l app/Actions/Membership/ResolveMembershipClaimSubjectPresentationAction.php`
+  - `php -l app/Actions/Membership/SubmitMembershipClaimAction.php`
+  - `php -l app/Actions/Membership/ApproveMembershipClaimAction.php`
+  - `php -l app/Actions/Membership/RejectMembershipClaimAction.php`
+  - `php -l app/Actions/Membership/CancelMembershipClaimAction.php`
+  - `php -l app/Livewire/Pages/MembershipClaims/Create.php`
+  - `php -l app/Livewire/Pages/MembershipClaims/Index.php`
+  - `php -l app/Filament/Resources/MembershipClaims/MembershipClaimResource.php`
+  - `php -l app/Filament/Resources/MembershipClaims/Pages/ListMembershipClaims.php`
+  - `php -l app/Filament/Resources/MembershipClaims/Pages/ViewMembershipClaim.php`
+  - `php -l app/Filament/Resources/MembershipClaims/Tables/MembershipClaimsTable.php`
+  - `php -l app/Filament/Resources/MembershipClaims/Schemas/MembershipClaimInfolist.php`
+  - `php -l app/Providers/AppServiceProvider.php`
+  - `php -l routes/web.php`
+  - `php -l tests/Feature/MembershipClaimActionsTest.php`
+  - `php -l tests/Feature/MembershipClaimPagesTest.php`
+  - `php -l tests/Feature/MembershipClaimAdminResourceTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Enums/MemberSubjectType.php app/Enums/MembershipClaimStatus.php app/Models/MembershipClaim.php app/Support/Authz/MemberRoleCatalog.php app/Support/Membership/MembershipClaimPresenter.php app/Actions/Membership/ResolveMembershipClaimSubjectAction.php app/Actions/Membership/ResolveMembershipClaimSubjectPresentationAction.php app/Actions/Membership/SubmitMembershipClaimAction.php app/Actions/Membership/ApproveMembershipClaimAction.php app/Actions/Membership/RejectMembershipClaimAction.php app/Actions/Membership/CancelMembershipClaimAction.php app/Livewire/Pages/MembershipClaims/Create.php app/Livewire/Pages/MembershipClaims/Index.php app/Filament/Resources/MembershipClaims routes/web.php tests/Feature/MembershipClaimActionsTest.php tests/Feature/MembershipClaimPagesTest.php tests/Feature/MembershipClaimAdminResourceTest.php tests/Feature/AdminResourcesCoverageTest.php tests/Feature/MediaConversionsTest.php tests/Feature/RefactorTest.php`
+  - `vendor/bin/pint --dirty --format agent`
+  - `vendor/bin/pest --parallel --compact tests/Feature/MembershipClaimActionsTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/MembershipClaimPagesTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/MembershipClaimAdminResourceTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminResourcesCoverageTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php --filter='registers media conversions for MembershipClaim model'`
+  - `vendor/bin/pest --parallel --compact tests/Feature/RefactorTest.php`
+  - `git diff --check`
+- Note:
+  - Focused Pest runs were initially blocked by stale generated testing cache files in `bootstrap/cache/packages.testing.php` and `bootstrap/cache/services.testing.php` that referenced `RyanChandler\\BladeCaptureDirective\\BladeCaptureDirectiveServiceProvider`. Removing those generated caches restored normal test boot.
+
 # Contribution URL Canonicalization
 
 - [x] Change public event contribution/report URLs to use `majlis` instead of `event`

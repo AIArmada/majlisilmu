@@ -22,7 +22,7 @@ class SpeakerContributionFormSchema
     /**
      * @return array<int, Component>
      */
-    public static function components(bool $includeMedia = true): array
+    public static function components(bool $includeMedia = true, ?string $addressStatePath = null): array
     {
         $components = [
             Section::make(__('Profil Penceramah'))
@@ -76,9 +76,11 @@ class SpeakerContributionFormSchema
                 ->columns(2),
             Section::make(__('Location / Base'))
                 ->schema([
-                    ...SharedFormSchema::addressFields(),
+                    ...($addressStatePath === null
+                        ? SharedFormSchema::addressFields()
+                        : [SharedFormSchema::addressGroup(statePath: $addressStatePath)]),
                 ])
-                ->columns(2),
+                ->columns($addressStatePath === null ? 2 : 1),
             Section::make(__('Education'))
                 ->schema([
                     Repeater::make('qualifications')

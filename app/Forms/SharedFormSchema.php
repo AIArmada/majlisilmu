@@ -18,6 +18,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 
 class SharedFormSchema
@@ -103,6 +104,18 @@ class SharedFormSchema
                 ->maxLength(255)
                 ->placeholder(__('https://waze.com/ul/...')),
         ];
+    }
+
+    public static function addressGroup(bool $requireGoogleMaps = false, ?string $statePath = null): Group
+    {
+        $group = Group::make(self::addressFields(requireGoogleMaps: $requireGoogleMaps))
+            ->columns(2);
+
+        if ($statePath !== null) {
+            $group->statePath($statePath);
+        }
+
+        return $group;
     }
 
     /**

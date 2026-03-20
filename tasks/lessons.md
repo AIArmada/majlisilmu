@@ -1,5 +1,8 @@
 # Lessons
 
+- When reusing a create-form schema on an update flow, verify the persisted state shape matches exactly; nested relation payloads like `address.*` cannot safely share a flat field layout like `line1/state_id` without silently dropping edits.
+- When a new table-backed feature fails because its table is missing in development, fix the migration state first and keep the application code assuming the schema exists; do not add runtime `Schema::hasTable(...)` guards unless the user explicitly asks for rollout-skew tolerance.
+- For new moderation workflows, do not assume event scope or a single fixed approved role from the first draft; membership-claim requirements can narrow to a subset of subject types and still allow reviewer-selected roles like `editor`, `admin`, and `owner`.
 - When a user says two entry points should use the same "required/optional" behavior, verify schema requiredness parity directly; matching labels, sections, or field types is not enough if one flow still leaves a key field optional.
 - For localized contribution/report subject URLs, audit `reference -> rujukan` together with `institution -> institusi` and `speaker -> penceramah`; reference detail pages can still leak the English segment even after the other two are fixed.
 - For localized contribution/report subject URLs, include `event -> majlis` in the same sweep; event pages are easy to miss because the main public event show URL already lives under `/majlis` while the contribution/report links may still be hardcoded to `event`.

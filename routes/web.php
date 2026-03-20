@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ContributionSubjectType;
+use App\Enums\MemberSubjectType;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\LocaleController;
@@ -20,6 +21,8 @@ use App\Livewire\Pages\Dashboard\NotificationsIndex;
 use App\Livewire\Pages\Dashboard\UserDashboard;
 use App\Livewire\Pages\Home\GlmHome;
 use App\Livewire\Pages\Membership\ShowInvitation as ShowMemberInvitation;
+use App\Livewire\Pages\MembershipClaims\Create as CreateMembershipClaimPage;
+use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
 use App\Models\Reference;
@@ -78,6 +81,10 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/sumbangan', ContributionsIndex::class)->name('contributions.index');
     Route::livewire('/sumbangan/institusi/baru', SubmitInstitution::class)->name('contributions.submit-institution');
     Route::livewire('/sumbangan/penceramah/baru', SubmitSpeaker::class)->name('contributions.submit-speaker');
+    Route::livewire('/tuntutan-keahlian', MembershipClaimsIndex::class)->name('membership-claims.index');
+    Route::livewire('/tuntut-keahlian/{subjectType}/{subjectId}', CreateMembershipClaimPage::class)
+        ->whereIn('subjectType', MemberSubjectType::claimableRouteSegments())
+        ->name('membership-claims.create');
     Route::livewire('/sumbangan/{subjectType}/{subjectId}/kemas-kini', SuggestContributionUpdate::class)
         ->whereIn('subjectType', ContributionSubjectType::publicRouteSegments())
         ->name('contributions.suggest-update');
@@ -151,6 +158,9 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/contributions', ContributionsIndex::class);
     Route::livewire('/contributions/institutions/create', SubmitInstitution::class);
     Route::livewire('/contributions/speakers/create', SubmitSpeaker::class);
+    Route::livewire('/membership-claims', MembershipClaimsIndex::class);
+    Route::livewire('/claim-membership/{subjectType}/{subjectId}', CreateMembershipClaimPage::class)
+        ->whereIn('subjectType', ['institution', 'speaker']);
     Route::livewire('/contributions/{subjectType}/{subjectId}/suggest', SuggestContributionUpdate::class)
         ->whereIn('subjectType', ['event', 'institution', 'speaker', 'reference']);
     Route::livewire('/report/{subjectType}/{subjectId}', CreateReportPage::class)
