@@ -2,9 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Dashboard as BaseDashboard;
-
-class AdminDashboard extends BaseDashboard
+class AdminDashboard extends PanelDashboard
 {
     protected static bool $isDiscovered = false;
 

@@ -76,7 +76,14 @@ pest()->extend(TestCase::class)
         foreach (['domain', 'discipline', 'source', 'issue'] as $type) {
             Cache::forget("submit_tags_{$type}_ms");
             Cache::forget("submit_tags_{$type}_en");
+            Cache::forget("submit_tags_{$type}_ms_safe_v1");
+            Cache::forget("submit_tags_{$type}_en_safe_v1");
         }
+
+        Cache::forget('submit_languages_v2');
+        Cache::forget('submit_languages_safe_v1');
+        Cache::forget('submit_venues');
+        Cache::forget('submit_venues_safe_v1');
 
         // Seed common languages for tests that use the submit event form
         $languages = [

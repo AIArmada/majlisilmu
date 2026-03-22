@@ -498,7 +498,7 @@ new
                     @endif
 
                     {{-- ═══ EVENTS SECTION (Tabs: Upcoming / Past) ═══ --}}
-                    <section class="scroll-reveal reveal-up" x-data="{ tab: 'upcoming' }"
+                    <section class="scroll-reveal reveal-up revealed" x-data="{ tab: 'upcoming' }"
                         x-intersect.once="$el.classList.add('revealed')">
 
                         {{-- Section header --}}

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Inspiration;
 use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,26 @@ it('allows an authenticated user to unfollow a speaker', function () {
         ->assertSet('isFollowing', false);
 
     expect($user->isFollowing($speaker))->toBeFalse();
+});
+
+it('keeps the speaker detail sections revealed after following', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    Inspiration::factory()->locale(app()->getLocale())->create();
+
+    Livewire::actingAs($user)
+        ->test('pages.speakers.show', ['speaker' => $speaker])
+        ->assertSee('scroll-reveal reveal-up revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed" x-data="{ showComicModal: false, showMediaModal: false }"', false)
+        ->call('toggleFollow')
+        ->assertSet('isFollowing', true)
+        ->assertSee('scroll-reveal reveal-up revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed" x-data="{ showComicModal: false, showMediaModal: false }"', false);
 });
 
 it('redirects guest to login when trying to follow', function () {

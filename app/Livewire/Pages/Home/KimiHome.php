@@ -5,6 +5,7 @@ namespace App\Livewire\Pages\Home;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Support\Cache\SafeModelCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -54,22 +55,50 @@ class KimiHome extends Component
 
     private function loadFeaturedEvents(): void
     {
-        $this->featuredEvents = Cache::remember('kimi_featured_events', 300, fn () => Event::with(['institution', 'speakers', 'media'])
-            ->where('starts_at', '>=', now())
-            ->active()
-            ->orderBy('starts_at')
-            ->limit(6)
-            ->get());
+        /** @var list<string> $featuredEventIds */
+        $featuredEventIds = array_values(array_map(
+            static fn (mixed $eventId): string => (string) $eventId,
+            app(SafeModelCache::class)->rememberScalarList(
+                key: 'kimi_featured_events_v2',
+                ttl: 300,
+                resolver: fn (): array => Event::query()
+                    ->where('starts_at', '>=', now())
+                    ->active()
+                    ->orderBy('starts_at')
+                    ->limit(6)
+                    ->pluck('id')
+                    ->all(),
+            ),
+        ));
+
+        $this->featuredEvents = $this->orderedEvents(
+            eventIds: $featuredEventIds,
+            relationships: ['institution', 'speakers', 'media'],
+        );
     }
 
     private function loadUpcomingEvents(): void
     {
-        $this->upcomingEvents = Cache::remember('kimi_upcoming_events', 300, fn () => Event::with(['institution', 'speakers'])
-            ->where('starts_at', '>=', now())
-            ->active()
-            ->orderBy('starts_at')
-            ->limit(4)
-            ->get());
+        /** @var list<string> $upcomingEventIds */
+        $upcomingEventIds = array_values(array_map(
+            static fn (mixed $eventId): string => (string) $eventId,
+            app(SafeModelCache::class)->rememberScalarList(
+                key: 'kimi_upcoming_events_v2',
+                ttl: 300,
+                resolver: fn (): array => Event::query()
+                    ->where('starts_at', '>=', now())
+                    ->active()
+                    ->orderBy('starts_at')
+                    ->limit(4)
+                    ->pluck('id')
+                    ->all(),
+            ),
+        ));
+
+        $this->upcomingEvents = $this->orderedEvents(
+            eventIds: $upcomingEventIds,
+            relationships: ['institution', 'speakers'],
+        );
     }
 
     private function loadCategories(): void
@@ -87,5 +116,32 @@ class KimiHome extends Component
     public function render(): View
     {
         return view('livewire.pages.home.kimi-home');
+    }
+
+    /**
+     * @param  list<string>  $eventIds
+     * @param  array<int|string, mixed>  $relationships
+     * @return Collection<int, Event>
+     */
+    private function orderedEvents(array $eventIds, array $relationships): Collection
+    {
+        if ($eventIds === []) {
+            return new Collection;
+        }
+
+        /** @var Collection<int, Event> $events */
+        $events = Event::query()
+            ->with($relationships)
+            ->whereKey($eventIds)
+            ->get()
+            ->keyBy(fn (Event $event): string => (string) $event->getKey());
+
+        return new Collection(
+            collect($eventIds)
+                ->map(fn (string $eventId): ?Event => $events->get($eventId))
+                ->filter()
+                ->values()
+                ->all(),
+        );
     }
 }

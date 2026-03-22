@@ -3,9 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Ahli\Widgets\PendingApprovalEventsWidget;
-use Filament\Pages\Dashboard as BaseDashboard;
 
-class AhliDashboard extends BaseDashboard
+class AhliDashboard extends PanelDashboard
 {
     protected static bool $isDiscovered = false;
 

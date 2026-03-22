@@ -1,3 +1,108 @@
+# Speaker Follow Scroll Reveal Fix
+
+- [x] Reproduce the speaker follow rerender bug and identify which sections still drop out after `toggleFollow`
+- [x] Patch the shared scroll-reveal sidebar components to render in a revealed state across Livewire rerenders
+- [x] Re-run focused follow regressions and browser verification on the affected speaker page
+
+## Review
+- The speaker and institution show pages already rendered their main content sections with `revealed`, but the shared sidebar inspiration card and guest CTA still depended on `x-intersect.once` to add that class client-side.
+- Livewire follow toggles re-render those shared blocks from server HTML, which stripped the client-added class and left the sidebar content at `opacity: 0` under the hero on subsequent renders.
+- Updated `resources/views/components/sidebar-inspiration.blade.php` and `resources/views/components/join-majlisilmu-cta.blade.php` to server-render `revealed`, matching the safer pattern already used on the event page and the patched page-specific sections.
+- Tightened the speaker and institution follow regressions to seed an `Inspiration` record and assert the exact shared sidebar inspiration wrapper still renders with `scroll-reveal reveal-right revealed` before and after `toggleFollow`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(allows an authenticated user to follow a speaker|keeps the speaker detail sections revealed after following|allows an authenticated user to follow and unfollow an institution|keeps institution detail sections revealed after following)'`
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pint --format=agent tests/Feature/SpeakerFollowTest.php tests/Feature/InstitutionShowPageTest.php`
+  - `git diff --check`
+  - Browser check on `https://majlisilmu.test/penceramah/amina-binti-rashid-bhiqccr`: after clicking `Ikuti`, `main .scroll-reveal` had no hidden elements remaining
+
+# Cache Regression Fixes
+
+- [x] Restore safe public-listing/home/search caches using primitive payloads instead of raw Eloquent objects
+- [x] Expand cache busting to cover the restored v2 keys
+- [x] Replace the weak GET-only regression check with Livewire/update-path coverage
+
+## Review
+- Restored the hot-path caches removed during the Laravel 13 cache-serialization fix, but now they store only primitive payloads: filter lookups cache raw model attributes and rehydrate with `Model::hydrate()`, while featured/home/default-search caches store ordered event IDs or paginator snapshots instead of full Eloquent objects.
+- Added new `*_v2` cache keys for the restored caches so production can ignore any legacy object-serialized entries such as `states_my` or `default_events_search`, while `PublicListingsCache` now forgets both legacy and v2 keys.
+- Replaced the old GET-only state-cache regression with a Livewire component update test, and added coverage for the default search cache path under the database cache store.
+- Verification:
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Livewire/Pages/Home/KimiHome.php app/Services/EventSearchService.php app/Support/Cache/SafeModelCache.php app/Support/Cache/PublicListingsCache.php tests/Feature/Laravel13CacheSerializationTest.php tests/Feature/PublicListingCacheInvalidationTest.php`
+  - `vendor/bin/pest --parallel --compact tests --filter='(updates the events index livewire component even when legacy cached state collections exist|rehydrates the default events search cache safely from the database cache store|rehydrates cached prayer times safely from the database cache store|clears majlis listing cache)'`
+  - `composer validate --no-check-publish`
+  - `git diff --check`
+
+# Filament Dashboard Route Fix
+
+- [x] Trace the missing `filament.{panel}.pages.*-dashboard` route against Filament 5 panel routing
+- [x] Give the custom panel dashboards a real page route so navigation no longer points at a missing named route
+- [x] Add regression coverage for loading the admin event edit page with Filament navigation mounted
+
+## Review
+- Filament 5 keeps `/` as the panel home redirect (`filament.{panel}.home`), so the custom `AdminDashboard` and `AhliDashboard` pages no longer registered a concrete `pages.*-dashboard` route while navigation still tried to generate one.
+- Introduced a shared `App\Filament\Pages\PanelDashboard` base class that assigns both custom dashboards to `/dashboard`, which restores stable `filament.admin.pages.admin-dashboard` and `filament.ahli.pages.ahli-dashboard` routes without creating a `/ -> /` redirect loop.
+- Added a regression in `tests/Feature/AdminDashboardTest.php` that hits the actual admin event edit HTTP page to exercise Filament navigation rendering, and updated the existing dashboard test to assert the expected `/admin -> /dashboard` redirect before rendering the dashboard.
+- Verification:
+  - `php artisan route:list --name=filament.admin.pages.admin-dashboard --json`
+  - `php artisan route:list --name=filament.ahli.pages.ahli-dashboard --json`
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Pages/PanelDashboard.php app/Filament/Pages/AdminDashboard.php app/Filament/Pages/AhliDashboard.php tests/Feature/AdminDashboardTest.php tests/Feature/AhliDashboardTest.php tests/Feature/AhliNavigationTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(admin dashboard|missing dashboard navigation routes|ahli dashboard|ahli workspace wrapper)'`
+  - `vendor/bin/pint --format=agent app/Filament/Pages/PanelDashboard.php app/Filament/Pages/AdminDashboard.php app/Filament/Pages/AhliDashboard.php tests/Feature/AdminDashboardTest.php`
+  - `git diff --check`
+
+# Submit Event Cache Fixes
+
+- [x] Audit the submit-event Filament option caches for remaining object-serialized payloads
+- [x] Move submit-event option caches onto primitive-safe versioned keys
+- [x] Add a Livewire regression test for submit-event updates with legacy cache entries present
+
+## Review
+- The submit-event page still had several Filament `Select::options()` closures caching `Collection` objects or reusing legacy cache keys, especially for languages, domain/discipline/source/issue tags, and venues.
+- Converted those caches to array-only payloads and moved them onto `*_safe_v1` keys in `resources/views/components/pages/submit-event/create.blade.php`, so stale legacy cache entries like `submit_languages_v2` and `submit_tags_domain_ms` are ignored after deploy.
+- Added submit-event regression coverage to `tests/Feature/Laravel13CacheSerializationTest.php` and expanded `tests/Pest.php` cache cleanup for the new versioned submit caches.
+- Verification:
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Livewire/Pages/Home/KimiHome.php app/Services/EventSearchService.php app/Support/Cache/SafeModelCache.php app/Support/Cache/PublicListingsCache.php tests/Feature/Laravel13CacheSerializationTest.php tests/Feature/PublicListingCacheInvalidationTest.php`
+  - `vendor/bin/pest --parallel --compact tests --filter='(updates the events index livewire component even when legacy cached state collections exist|updates the submit event livewire component even when legacy select option caches exist|rehydrates the default events search cache safely from the database cache store|rehydrates cached prayer times safely from the database cache store|clears majlis listing cache)'`
+  - `git diff --check`
+
+# Dependency Refresh
+
+- [x] Audit current Composer and npm dependencies, including direct major-version candidates
+- [x] Upgrade all compatible dependencies to their latest available releases
+- [x] Verify dependency resolution and run focused validation after the updates
+
+## Review
+- `npm outdated --json` is clean, so no frontend dependency changes were needed.
+- Composer direct dependencies are now current on stable releases. The only meaningful stable upgrades available were `laravel/scout` `10.25.0 -> 11.1.0`, `spatie/laravel-query-builder` `6.4.4 -> 7.0.1`, and `typesense/typesense-php` `5.2.0 -> 6.0.0`; these were applied.
+- The remaining entries shown by `composer outdated --direct --major-only` are branch-head/dev-channel suggestions such as `dev-master`, `0.x-dev`, or `5.x-dev`, not stable releases that should be taken automatically in this app.
+- `spatie/laravel-query-builder` 7 tightened `allowedFilters()`, `allowedIncludes()`, and `allowedSorts()` to variadic signatures, so `app/Http/Controllers/Api/EventController.php` was updated to pass the same definitions via splats without changing runtime behavior.
+- Verification:
+  - `composer update --with-all-dependencies`
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/EventController.php app/Models/Event.php app/Services/EventSearchService.php app/Console/Commands/IndexEventsToTypesense.php tests/Unit/EventTest.php tests/Feature/EventSearchTypesenseFilterTest.php`
+  - `vendor/bin/pest --parallel --compact tests --filter='(toSearchableArray|shouldBeSearchable|buildTypesenseFilterParts)'`
+  - `composer validate --no-check-publish`
+  - `composer audit`
+  - `composer outdated --direct --format=json`
+  - `npm outdated --json`
+  - `git diff --check -- composer.json composer.lock app/Http/Controllers/Api/EventController.php tasks/todo.md tasks/lessons.md`
+
+# AIArmada Packagist Cleanup
+
+- [x] Verify Packagist metadata and identify which `aiarmada/*` packages can resolve without custom repository overrides
+- [x] Replace the custom `aiarmada/*` repository overrides with the smallest production-safe Composer setup
+- [x] Refresh lock data and verify Composer no longer depends on local `../commerce/packages` paths
+
+## Review
+- Verified that all five `aiarmada/*` package names are available on Packagist and that Composer can resolve the app’s `dev-main` requirements without any custom `aiarmada/*` repository entries once the existing `akaunting/laravel-money` compatibility override remains in place.
+- Removed the custom inline package definitions for `aiarmada/affiliates`, `aiarmada/signals`, `aiarmada/filament-signals`, and `aiarmada/filament-authz`, and then removed the temporary `aiarmada/commerce-support` `vcs` fallback as well, so the app now resolves all `aiarmada/*` packages through normal Packagist/Composer discovery.
+- Refreshed `composer.lock`; the app now locks `aiarmada/affiliates` to `f4278f1`, `aiarmada/commerce-support` to `ed64b11`, `aiarmada/filament-authz` to `626a6c8`, `aiarmada/filament-signals` to `aaae404`, and `aiarmada/signals` to `9040fae`.
+- Verification:
+  - `composer update aiarmada/affiliates aiarmada/commerce-support aiarmada/filament-authz aiarmada/filament-signals aiarmada/signals --with-all-dependencies`
+  - `composer update aiarmada/affiliates aiarmada/commerce-support aiarmada/filament-authz aiarmada/filament-signals aiarmada/signals --with-all-dependencies --dry-run --no-scripts` against a copy of the app manifest with no `aiarmada/commerce-support` `vcs` repository
+  - `composer validate --no-check-publish`
+  - `rg -n '\.\./commerce/packages|api\.github\.com/repos/AIArmada/commerce/zipball|"type": "path"' composer.json composer.lock`
+  - `git diff --check -- composer.json composer.lock tasks/todo.md tasks/lessons.md`
+
 # Laravel 13 Upgrade
 
 - [x] Audit and record the Laravel 13 framework, package, and skeleton deltas that apply to this app

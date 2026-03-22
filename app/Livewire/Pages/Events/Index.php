@@ -20,6 +20,7 @@ use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use App\Support\Cache\SafeModelCache;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -756,10 +757,12 @@ class Index extends Component implements HasForms
     #[Computed]
     public function states(): Collection
     {
-        return cache()->remember('states_my', 3600, fn () => State::query()
-            ->where('country_code', 'MY')
-            ->orderBy('name')
-            ->get()
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'states_my_v2',
+            ttl: 3600,
+            query: State::query()
+                ->where('country_code', 'MY')
+                ->orderBy('name'),
         );
     }
 
@@ -805,11 +808,13 @@ class Index extends Component implements HasForms
     #[Computed]
     public function disciplines(): Collection
     {
-        return cache()->remember('events_disciplines_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Discipline->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_disciplines_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Tag::query()
+                ->where('type', TagType::Discipline->value)
+                ->whereIn('status', ['verified', 'pending'])
+                ->ordered(),
         );
     }
 
@@ -819,11 +824,13 @@ class Index extends Component implements HasForms
     #[Computed]
     public function domains(): Collection
     {
-        return cache()->remember('events_domains_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Domain->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_domains_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Tag::query()
+                ->where('type', TagType::Domain->value)
+                ->whereIn('status', ['verified', 'pending'])
+                ->ordered(),
         );
     }
 
@@ -833,11 +840,13 @@ class Index extends Component implements HasForms
     #[Computed]
     public function sources(): Collection
     {
-        return cache()->remember('events_sources_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Source->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_sources_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Tag::query()
+                ->where('type', TagType::Source->value)
+                ->whereIn('status', ['verified', 'pending'])
+                ->ordered(),
         );
     }
 
@@ -847,11 +856,13 @@ class Index extends Component implements HasForms
     #[Computed]
     public function issues(): Collection
     {
-        return cache()->remember('events_issues_'.app()->getLocale(), 300, fn () => Tag::query()
-            ->where('type', TagType::Issue->value)
-            ->whereIn('status', ['verified', 'pending'])
-            ->ordered()
-            ->get()
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_issues_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Tag::query()
+                ->where('type', TagType::Issue->value)
+                ->whereIn('status', ['verified', 'pending'])
+                ->ordered(),
         );
     }
 
@@ -861,11 +872,14 @@ class Index extends Component implements HasForms
     #[Computed]
     public function references(): Collection
     {
-        return cache()->remember('events_references_'.app()->getLocale(), 300, fn () => Reference::query()
-            ->where('is_active', true)
-            ->orderBy('title')
-            ->limit(400)
-            ->get(['id', 'title'])
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_references_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Reference::query()
+                ->where('is_active', true)
+                ->orderBy('title')
+                ->limit(400)
+                ->select(['id', 'title']),
         );
     }
 
@@ -875,12 +889,15 @@ class Index extends Component implements HasForms
     #[Computed]
     public function institutions(): Collection
     {
-        return cache()->remember('events_institutions_'.app()->getLocale(), 300, fn () => Institution::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(400)
-            ->get(['id', 'name'])
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_institutions_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Institution::query()
+                ->whereIn('status', ['verified', 'pending'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(400)
+                ->select(['id', 'name']),
         );
     }
 
@@ -890,12 +907,15 @@ class Index extends Component implements HasForms
     #[Computed]
     public function venues(): Collection
     {
-        return cache()->remember('events_venues_'.app()->getLocale(), 300, fn () => Venue::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(500)
-            ->get(['id', 'name'])
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_venues_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Venue::query()
+                ->whereIn('status', ['verified', 'pending'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(500)
+                ->select(['id', 'name']),
         );
     }
 
@@ -1128,12 +1148,15 @@ class Index extends Component implements HasForms
     #[Computed]
     public function speakers(): Collection
     {
-        return cache()->remember('events_speakers_'.app()->getLocale(), 300, fn () => Speaker::query()
-            ->whereIn('status', ['verified', 'pending'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(500)
-            ->get(['id', 'name'])
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'events_speakers_'.app()->getLocale().'_v2',
+            ttl: 300,
+            query: Speaker::query()
+                ->whereIn('status', ['verified', 'pending'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(500)
+                ->select(['id', 'name']),
         );
     }
 

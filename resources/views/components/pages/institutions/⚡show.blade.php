@@ -597,7 +597,7 @@ new class extends Component {
             <div class="institution-main-column order-2 space-y-10 lg:order-1">
 
                 {{-- ─── EVENTS (Upcoming / Past) ─── --}}
-                <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')"
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')"
                     x-data="{ tab: 'upcoming', view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
                     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3">
@@ -1059,7 +1059,7 @@ new class extends Component {
 
                 {{-- ─── SPEAKERS ─── --}}
                 @if($speakers->isNotEmpty())
-                    <section class="scroll-reveal reveal-up" x-intersect.once="$el.classList.add('revealed')"
+                    <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')"
                         style="--reveal-d: 80ms">
                         <div class="mb-5 flex items-center gap-3">
                             <div
@@ -1130,7 +1130,7 @@ new class extends Component {
 
                 {{-- ─── ABOUT / DESCRIPTION ─── --}}
                 @if($institution->description)
-                    <section class="scroll-reveal reveal-scale" x-intersect.once="$el.classList.add('revealed')"
+                    <section class="scroll-reveal reveal-scale revealed" x-intersect.once="$el.classList.add('revealed')"
                         style="--reveal-d: 120ms">
                         <div class="mb-5 flex items-center gap-3">
                             <div
@@ -1162,7 +1162,7 @@ new class extends Component {
 
                 {{-- ─── GALLERY ─── --}}
                 @if($gallery->count() > 0)
-                    <section class="scroll-reveal reveal-blur" x-intersect.once="$el.classList.add('revealed')"
+                    <section class="scroll-reveal reveal-blur revealed" x-intersect.once="$el.classList.add('revealed')"
                         style="--reveal-d: 160ms">
                         <div class="mb-5 flex items-center gap-3">
                             <div
@@ -1210,7 +1210,7 @@ new class extends Component {
                 {{-- ─── SOCIAL MEDIA (Mobile: below inspiration) ─── --}}
                 @if($socialLinks->isNotEmpty())
                     <section
-                        class="scroll-reveal reveal-right rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-100/50"
+                        class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-100/50"
                         x-intersect.once="$el.classList.add('revealed')">
                         <div class="mb-4 flex items-center gap-3">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
@@ -1250,7 +1250,7 @@ new class extends Component {
 
                 {{-- ─── CONTACT & ADDRESS ─── --}}
                 @if($contacts->isNotEmpty() || $hasPhysicalAddress)
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm"
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-white shadow-sm"
                         x-intersect.once="$el.classList.add('revealed')">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
@@ -1375,7 +1375,7 @@ new class extends Component {
 
                 {{-- ─── SPACES / FACILITIES ─── --}}
                 @if($spaces->isNotEmpty())
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm"
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-white shadow-sm"
                         x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 100ms">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
@@ -1413,7 +1413,7 @@ new class extends Component {
 
                 {{-- ─── DONATION CHANNELS ─── --}}
                 @if($donationChannels->isNotEmpty())
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-gold-200/60 bg-gradient-to-b from-gold-50/50 to-white shadow-sm"
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-gold-200/60 bg-gradient-to-b from-gold-50/50 to-white shadow-sm"
                         x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 180ms">
                         <div class="border-b border-gold-200/40 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
@@ -1460,7 +1460,7 @@ new class extends Component {
                 @endif
 
                 @if($showPendingStatusNotice)
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm"
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm"
                         x-intersect.once="$el.classList.add('revealed')">
                         <p
                             class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-800">
@@ -1478,7 +1478,7 @@ new class extends Component {
 
                 <x-join-majlisilmu-cta />
 
-                <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 shadow-sm"
+                <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 shadow-sm"
                     x-intersect.once="$el.classList.add('revealed')">
                     @php($institutionContributionRouteSegment = \App\Enums\ContributionSubjectType::Institution->publicRouteSegment())
                     <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{{ __('Bantu Semak Rekod') }}</p>
