@@ -8,6 +8,7 @@ use App\Enums\InstitutionType;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Space;
 use App\Models\Speaker;
@@ -318,6 +319,23 @@ it('allows an authenticated user to follow and unfollow an institution', functio
         ->assertSet('isFollowing', false);
 
     expect($user->isFollowing($institution))->toBeFalse();
+});
+
+it('keeps institution detail sections revealed after following', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['status' => 'verified']);
+    Inspiration::factory()->locale(app()->getLocale())->create();
+
+    Livewire::actingAs($user)
+        ->test('pages.institutions.show', ['institution' => $institution])
+        ->assertSee('scroll-reveal reveal-up revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed" x-data="{ showComicModal: false, showMediaModal: false }"', false)
+        ->call('toggleFollow')
+        ->assertSet('isFollowing', true)
+        ->assertSee('scroll-reveal reveal-up revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed', false)
+        ->assertSee('scroll-reveal reveal-right revealed" x-data="{ showComicModal: false, showMediaModal: false }"', false);
 });
 
 it('redirects guest to login when trying to follow an institution', function () {

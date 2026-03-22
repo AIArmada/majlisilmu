@@ -28,7 +28,7 @@
         $colors = $colorMap[$category->color()] ?? $colorMap['emerald'];
     @endphp
 
-    <div class="scroll-reveal reveal-right" x-data="{ showComicModal: false, showMediaModal: false }" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 120ms">
+    <div class="scroll-reveal reveal-right revealed" x-data="{ showComicModal: false, showMediaModal: false }" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 120ms">
 
         <div class="rounded-3xl border {{ $colors['border'] }} {{ $colors['bg'] }} p-5 shadow-sm ring-1 {{ $colors['ring'] }}">
             {{-- Category badge --}}

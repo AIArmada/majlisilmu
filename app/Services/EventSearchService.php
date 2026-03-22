@@ -9,6 +9,7 @@ use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Venue;
+use App\Support\Cache\SafeModelCache;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -56,8 +57,8 @@ class EventSearchService
         int $perPage = 20,
         string $sort = 'time'
     ): LengthAwarePaginator {
-        if (in_array($query, [null, '', '0'], true) && $filters === [] && $perPage === 12 && $sort === 'time') {
-            return cache()->remember('default_events_search', 60, fn () => $this->performSearch($query, $filters, $perPage, $sort));
+        if ($this->usesDefaultSearchCache($query, $filters, $perPage, $sort)) {
+            return $this->cachedDefaultSearch($perPage);
         }
 
         return $this->performSearch($query, $filters, $perPage, $sort);
@@ -88,6 +89,75 @@ class EventSearchService
         }
 
         return $this->searchWithDatabase($query, $filters, $perPage, $sort);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function usesDefaultSearchCache(?string $query, array $filters, int $perPage, string $sort): bool
+    {
+        return in_array($query, [null, '', '0'], true)
+            && $filters === []
+            && $perPage === 12
+            && $sort === 'time'
+            && Paginator::resolveCurrentPage() === 1;
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Event>
+     */
+    private function cachedDefaultSearch(int $perPage): LengthAwarePaginator
+    {
+        /** @var array{ids: list<string>, total: int} $payload */
+        $payload = app(SafeModelCache::class)->rememberPayload(
+            key: 'default_events_search_v2',
+            ttl: 60,
+            resolver: function () use ($perPage): array {
+                $paginator = $this->performSearch(null, [], $perPage, 'time');
+
+                return [
+                    'ids' => array_values(array_map(static fn (Event $event): string => (string) $event->getKey(), $paginator->items())),
+                    'total' => $paginator->total(),
+                ];
+            },
+        );
+
+        if ($payload['ids'] === []) {
+            return new Paginator(
+                items: collect(),
+                total: $payload['total'],
+                perPage: $perPage,
+                currentPage: 1,
+                options: [
+                    'path' => Paginator::resolveCurrentPath(),
+                    'pageName' => 'page',
+                    'query' => request()->query(),
+                ],
+            );
+        }
+
+        $events = Event::query()
+            ->with($this->cardRelationships())
+            ->whereKey($payload['ids'])
+            ->get()
+            ->keyBy(fn (Event $event): string => (string) $event->getKey());
+
+        $orderedEvents = collect($payload['ids'])
+            ->map(fn (string $eventId): ?Event => $events->get($eventId))
+            ->filter()
+            ->values();
+
+        return new Paginator(
+            items: $orderedEvents,
+            total: $payload['total'],
+            perPage: $perPage,
+            currentPage: 1,
+            options: [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => 'page',
+                'query' => request()->query(),
+            ],
+        );
     }
 
     /**

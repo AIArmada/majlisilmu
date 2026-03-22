@@ -434,7 +434,7 @@ new
                     @endif
 
                     {{-- ═══ EVENTS SECTION (Tabs: Upcoming / Past) ═══ --}}
-                    <section class="scroll-reveal reveal-up" x-data="{ tab: 'upcoming' }"
+                    <section class="scroll-reveal reveal-up revealed" x-data="{ tab: 'upcoming' }"
                         x-intersect.once="$el.classList.add('revealed')">
 
                         {{-- Section header --}}
@@ -763,7 +763,7 @@ new
 
                     {{-- External links --}}
                     @if($hasSocialLinks)
-                        <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm"
+                        <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-white shadow-sm"
                             x-intersect.once="$el.classList.add('revealed')">
                             <div class="border-b border-slate-100 px-5 py-4">
                                 <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">

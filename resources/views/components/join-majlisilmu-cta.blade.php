@@ -3,7 +3,7 @@
      Shared component for event, speaker, and institution views
      ════════════════════════════════════════════════════════════════ --}}
 @guest
-    <div class="scroll-reveal reveal-right" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 240ms">
+    <div class="scroll-reveal reveal-right revealed" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 240ms">
         <div class="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-6 shadow-sm ring-1 ring-emerald-100/60">
             <div class="flex items-center gap-3">
                 <div class="rounded-xl bg-emerald-100 p-2">

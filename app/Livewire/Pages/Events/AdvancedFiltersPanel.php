@@ -18,6 +18,7 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
+use App\Support\Cache\SafeModelCache;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -486,10 +487,13 @@ class AdvancedFiltersPanel extends Component implements HasForms
     #[Computed]
     public function states(): Collection
     {
-        return cache()->remember('states_my', 3600, fn () => State::query()
-            ->where('country_code', 'MY')
-            ->orderBy('name')
-            ->get());
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'states_my_v2',
+            ttl: 3600,
+            query: State::query()
+                ->where('country_code', 'MY')
+                ->orderBy('name'),
+        );
     }
 
     /**

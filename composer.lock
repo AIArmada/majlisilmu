@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "60077744b41b2b0c51f4a9f93786413a",
+    "content-hash": "4293c79cab7222d268845b8af0a242d3",
     "packages": [
         {
             "name": "aiarmada/affiliates",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/affiliates.git",
+                "reference": "f4278f1561ba507780ab243eae8415feae918bab"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/affiliates",
-                "reference": "05c33092acb1c74c7d59ee12b895841c277d1fa1"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/affiliates/zipball/f4278f1561ba507780ab243eae8415feae918bab",
+                "reference": "f4278f1561ba507780ab243eae8415feae918bab",
+                "shasum": ""
             },
             "require": {
                 "aiarmada/commerce-support": "self.version"
@@ -21,15 +27,16 @@
                 "aiarmada/cart": "Enables cart level attribution helpers and conversion tracking",
                 "aiarmada/vouchers": "Auto associates affiliate codes with voucher campaigns"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
-                    "providers": [
-                        "AIArmada\\Affiliates\\AffiliatesServiceProvider"
-                    ],
                     "aliases": {
                         "Affiliate": "AIArmada\\Affiliates\\Facades\\Affiliate"
-                    }
+                    },
+                    "providers": [
+                        "AIArmada\\Affiliates\\AffiliatesServiceProvider"
+                    ]
                 }
             },
             "autoload": {
@@ -37,6 +44,7 @@
                     "AIArmada\\Affiliates\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -46,18 +54,21 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "time": "2026-03-18T16:30:01+00:00"
         },
         {
             "name": "aiarmada/commerce-support",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/commerce-support.git",
+                "reference": "ed64b1100af5cdfc978a69334572784b571cf444"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/commerce-support",
-                "reference": "2f11f88e576b74fd0b8bc5e98dbe047004765ab5"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/commerce-support/zipball/ed64b1100af5cdfc978a69334572784b571cf444",
+                "reference": "ed64b1100af5cdfc978a69334572784b571cf444",
+                "shasum": ""
             },
             "require": {
                 "akaunting/laravel-money": "^6.0",
@@ -82,6 +93,7 @@
             "suggest": {
                 "laravel/octane": "Required for high-performance Octane support"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -98,6 +110,7 @@
                     "AIArmada\\CommerceSupport\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -107,24 +120,28 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "time": "2026-03-20T14:42:44+00:00"
         },
         {
             "name": "aiarmada/filament-authz",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/filament-authz.git",
+                "reference": "626a6c8cc0c7d1e864cf4de7f974351e5a45756f"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/filament-authz",
-                "reference": "af989fd2c47c6089d88d9487c3734043c4774a0c"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/filament-authz/zipball/626a6c8cc0c7d1e864cf4de7f974351e5a45756f",
+                "reference": "626a6c8cc0c7d1e864cf4de7f974351e5a45756f",
+                "shasum": ""
             },
             "require": {
                 "aiarmada/commerce-support": "self.version",
                 "filament/filament": "^5.0",
                 "spatie/laravel-permission": "^7.2"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -134,15 +151,16 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "AIArmada\\FilamentAuthz\\": "src/",
-                    "AIArmada\\FilamentAuthz\\Database\\Factories\\": "database/factories/",
-                    "AIArmada\\FilamentAuthz\\Database\\Seeders\\": "database/seeders/"
-                },
                 "files": [
                     "src/helpers.php"
-                ]
+                ],
+                "psr-4": {
+                    "AIArmada\\FilamentAuthz\\": "src/",
+                    "AIArmada\\FilamentAuthz\\Database\\Seeders\\": "database/seeders/",
+                    "AIArmada\\FilamentAuthz\\Database\\Factories\\": "database/factories/"
+                }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -152,23 +170,27 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "time": "2026-03-20T14:42:12+00:00"
         },
         {
             "name": "aiarmada/filament-signals",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/filament-signals.git",
+                "reference": "aaae404a55134831f0406907d0bd871040bf1a38"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/filament-signals",
-                "reference": "262871e309eb10230395b7a1cf917fa919fe2e0a"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/filament-signals/zipball/aaae404a55134831f0406907d0bd871040bf1a38",
+                "reference": "aaae404a55134831f0406907d0bd871040bf1a38",
+                "shasum": ""
             },
             "require": {
                 "aiarmada/signals": "self.version",
                 "filament/filament": "^5.0"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -182,6 +204,7 @@
                     "AIArmada\\FilamentSignals\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -199,22 +222,30 @@
                 "product-analytics",
                 "signals"
             ],
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/AIArmada/filament-signals/issues",
+                "source": "https://github.com/AIArmada/filament-signals/tree/v1.0.0"
+            },
+            "time": "2026-03-21T04:27:58+00:00"
         },
         {
             "name": "aiarmada/signals",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AIArmada/signals.git",
+                "reference": "9040fae0b1f79b3de8c9d8ddbef3558a88e643b8"
+            },
             "dist": {
-                "type": "path",
-                "url": "../commerce/packages/signals",
-                "reference": "ea08c5448d69d2ce00306fa33a2994c753b26627"
+                "type": "zip",
+                "url": "https://api.github.com/repos/AIArmada/signals/zipball/9040fae0b1f79b3de8c9d8ddbef3558a88e643b8",
+                "reference": "9040fae0b1f79b3de8c9d8ddbef3558a88e643b8",
+                "shasum": ""
             },
             "require": {
                 "aiarmada/commerce-support": "self.version"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -228,6 +259,7 @@
                     "AIArmada\\Signals\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -245,10 +277,11 @@
                 "product-analytics",
                 "signals"
             ],
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/AIArmada/signals/issues",
+                "source": "https://github.com/AIArmada/signals/tree/v1.0.0"
+            },
+            "time": "2026-03-21T04:28:26+00:00"
         },
         {
             "name": "akaunting/laravel-money",
@@ -750,16 +783,16 @@
         },
         {
             "name": "chillerlan/php-settings-container",
-            "version": "3.2.1",
+            "version": "3.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/chillerlan/php-settings-container.git",
-                "reference": "95ed3e9676a1d47cab2e3174d19b43f5dbf52681"
+                "reference": "a0a487cbf5344f721eb504bf0f59bada40c381b7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/chillerlan/php-settings-container/zipball/95ed3e9676a1d47cab2e3174d19b43f5dbf52681",
-                "reference": "95ed3e9676a1d47cab2e3174d19b43f5dbf52681",
+                "url": "https://api.github.com/repos/chillerlan/php-settings-container/zipball/a0a487cbf5344f721eb504bf0f59bada40c381b7",
+                "reference": "a0a487cbf5344f721eb504bf0f59bada40c381b7",
                 "shasum": ""
             },
             "require": {
@@ -767,11 +800,13 @@
                 "php": "^8.1"
             },
             "require-dev": {
+                "phan/phan": "^5.5.2",
                 "phpmd/phpmd": "^2.15",
-                "phpstan/phpstan": "^1.11",
-                "phpstan/phpstan-deprecation-rules": "^1.2",
+                "phpstan/phpstan": "^2.1.31",
+                "phpstan/phpstan-deprecation-rules": "^2.0.3",
                 "phpunit/phpunit": "^10.5",
-                "squizlabs/php_codesniffer": "^3.10"
+                "slevomat/coding-standard": "^8.22",
+                "squizlabs/php_codesniffer": "^4.0"
             },
             "type": "library",
             "autoload": {
@@ -796,7 +831,8 @@
                 "Settings",
                 "configuration",
                 "container",
-                "helper"
+                "helper",
+                "property hook"
             ],
             "support": {
                 "issues": "https://github.com/chillerlan/php-settings-container/issues",
@@ -812,7 +848,7 @@
                     "type": "ko_fi"
                 }
             ],
-            "time": "2024-07-16T11:13:48+00:00"
+            "time": "2026-03-20T21:10:52+00:00"
         },
         {
             "name": "clue/stream-filter",
@@ -3853,16 +3889,16 @@
         },
         {
             "name": "laravel/scout",
-            "version": "v10.25.0",
+            "version": "v11.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/scout.git",
-                "reference": "f28630dca44a63d80c15e596bedc5af42c8985d5"
+                "reference": "9865fca4129d79c271da6a89afb44359e9ee9020"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/scout/zipball/f28630dca44a63d80c15e596bedc5af42c8985d5",
-                "reference": "f28630dca44a63d80c15e596bedc5af42c8985d5",
+                "url": "https://api.github.com/repos/laravel/scout/zipball/9865fca4129d79c271da6a89afb44359e9ee9020",
+                "reference": "9865fca4129d79c271da6a89afb44359e9ee9020",
                 "shasum": ""
             },
             "require": {
@@ -3901,7 +3937,7 @@
                     ]
                 },
                 "branch-alias": {
-                    "dev-master": "10.x-dev"
+                    "dev-master": "11.x-dev"
                 }
             },
             "autoload": {
@@ -3929,7 +3965,7 @@
                 "issues": "https://github.com/laravel/scout/issues",
                 "source": "https://github.com/laravel/scout"
             },
-            "time": "2026-03-10T16:16:46+00:00"
+            "time": "2026-03-18T14:50:59+00:00"
         },
         {
             "name": "laravel/serializable-closure",
@@ -9446,32 +9482,32 @@
         },
         {
             "name": "spatie/laravel-query-builder",
-            "version": "6.4.4",
+            "version": "7.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-query-builder.git",
-                "reference": "ab9c4c369fc913d6c020a0f6776f3c82f3e523fb"
+                "reference": "8ec7246a4c162499381a6e1ddb58a6f0debd8926"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-query-builder/zipball/ab9c4c369fc913d6c020a0f6776f3c82f3e523fb",
-                "reference": "ab9c4c369fc913d6c020a0f6776f3c82f3e523fb",
+                "url": "https://api.github.com/repos/spatie/laravel-query-builder/zipball/8ec7246a4c162499381a6e1ddb58a6f0debd8926",
+                "reference": "8ec7246a4c162499381a6e1ddb58a6f0debd8926",
                 "shasum": ""
             },
             "require": {
-                "illuminate/database": "^10.0|^11.0|^12.0|^13.0",
-                "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
-                "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
-                "php": "^8.2",
+                "illuminate/database": "^12.0|^13.0",
+                "illuminate/http": "^12.0|^13.0",
+                "illuminate/support": "^12.0|^13.0",
+                "php": "^8.3",
                 "spatie/laravel-package-tools": "^1.11"
             },
             "require-dev": {
                 "ext-json": "*",
-                "larastan/larastan": "^2.7 || ^3.3",
+                "larastan/larastan": "^3.3",
                 "mockery/mockery": "^1.4",
-                "orchestra/testbench": "^7.0|^8.0|^10.0|^11.0",
-                "pestphp/pest": "^2.0|^3.7|^4.0",
-                "phpunit/phpunit": "^10.0|^11.5.3|^12.0",
+                "orchestra/testbench": "^10.0|^11.0",
+                "pestphp/pest": "^4.0",
+                "phpunit/phpunit": "^12.0",
                 "spatie/invade": "^2.0"
             },
             "type": "library",
@@ -9516,7 +9552,7 @@
                     "type": "custom"
                 }
             ],
-            "time": "2026-03-08T13:45:05+00:00"
+            "time": "2026-03-16T10:22:07+00:00"
         },
         {
             "name": "spatie/laravel-settings",
@@ -12880,16 +12916,16 @@
         },
         {
             "name": "typesense/typesense-php",
-            "version": "v5.2.0",
+            "version": "v6.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/typesense/typesense-php.git",
-                "reference": "1fbf79e1c10a8fd4cc3df9c3cddbe158e93542f7"
+                "reference": "e113f90449e159316a433a5509205939f271c5e2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/typesense/typesense-php/zipball/1fbf79e1c10a8fd4cc3df9c3cddbe158e93542f7",
-                "reference": "1fbf79e1c10a8fd4cc3df9c3cddbe158e93542f7",
+                "url": "https://api.github.com/repos/typesense/typesense-php/zipball/e113f90449e159316a433a5509205939f271c5e2",
+                "reference": "e113f90449e159316a433a5509205939f271c5e2",
                 "shasum": ""
             },
             "require": {
@@ -12947,7 +12983,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-08-15T15:21:26+00:00"
+            "time": "2025-12-22T20:51:44+00:00"
         },
         {
             "name": "ueberdosis/tiptap-php",

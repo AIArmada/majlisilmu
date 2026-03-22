@@ -624,7 +624,7 @@ new class extends Component {
             <div class="speaker-main-column order-1 space-y-10">
 
                 {{-- ─── EVENTS SECTION (Tabs: Upcoming / Past) ─── --}}
-                <section class="scroll-reveal reveal-up"
+                <section class="scroll-reveal reveal-up revealed"
                          x-intersect.once="$el.classList.add('revealed')"
                          x-data="{ tab: 'upcoming', view: 'list', calendarMonth: new Date().getMonth(), calendarYear: new Date().getFullYear(), calendarEvents: {{ Js::from($calendarEvents) }} }">
                     {{-- Section header --}}
@@ -944,7 +944,7 @@ new class extends Component {
             </section>
 
             @if($hasOtherRoleParticipations)
-                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-6 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12M8.25 17.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75V12zm0 5.25h.008v.008H3.75v-.008z"/></svg>
@@ -1071,7 +1071,7 @@ new class extends Component {
 
             {{-- Cover image --}}
             @if($coverUrl)
-                <div class="scroll-reveal reveal-scale overflow-hidden rounded-2xl shadow-lg shadow-slate-900/5 ring-1 ring-slate-200/60"
+                <div class="scroll-reveal reveal-scale revealed overflow-hidden rounded-2xl shadow-lg shadow-slate-900/5 ring-1 ring-slate-200/60"
                      x-data x-intersect.once="$el.classList.add('revealed')">
                     <img src="{{ $coverUrl }}" alt="{{ $speaker->name }}" class="w-full object-cover" loading="lazy">
                 </div>
@@ -1079,7 +1079,7 @@ new class extends Component {
 
             {{-- ─── GALLERY ─── --}}
             @if($gallery->count() > 0)
-                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-lg shadow-slate-500/20">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25zm15-14.25a1.125 1.125 0 11-2.25 0 1.125 1.125 0 012.25 0z"/></svg>
@@ -1106,7 +1106,7 @@ new class extends Component {
 
             {{-- Qualifications — Timeline style (hidden for now) --}}
             @if(false && $qualifications !== [])
-                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-white shadow-lg shadow-gold-500/20">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342"/></svg>
@@ -1158,7 +1158,7 @@ new class extends Component {
 
             {{-- ─── BIODATA ─── --}}
             @if($isBioFilled)
-                <section class="scroll-reveal reveal-up" x-data x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-data x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/25">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
@@ -1190,7 +1190,7 @@ new class extends Component {
                 <x-sidebar-inspiration />
                 {{-- ─── SOCIAL MEDIA ─── --}}
                 @if($hasSocialLinks)
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
                                 <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
@@ -1225,7 +1225,7 @@ new class extends Component {
                 @endif
 
                 @if($hasPublicContacts)
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-white shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">
                                 <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
@@ -1283,7 +1283,7 @@ new class extends Component {
                 @endif
 
                 @if($speaker->is_freelance)
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-gold-200/60 bg-gold-50/70 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-gold-200/60 bg-gold-50/70 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                         <span class="inline-flex items-center gap-1.5 rounded-full border border-gold-500/20 bg-gold-500/10 px-3 py-1 text-xs font-semibold text-gold-700">
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
@@ -1294,7 +1294,7 @@ new class extends Component {
                 @endif
 
                 @if($showPendingStatusNotice)
-                    <div class="scroll-reveal reveal-right rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="scroll-reveal reveal-right revealed rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                         <p class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-800">
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -1310,7 +1310,7 @@ new class extends Component {
                 {{-- ─── JOIN MAJLISILMU CTA ─── --}}
                 <x-join-majlisilmu-cta />
 
-                <div class="scroll-reveal reveal-right rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
+                <div class="scroll-reveal reveal-right revealed rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 shadow-sm" x-intersect.once="$el.classList.add('revealed')">
                     @php($speakerContributionRouteSegment = \App\Enums\ContributionSubjectType::Speaker->publicRouteSegment())
                     <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{{ __('Bantu Semak Profil') }}</p>
                     <p class="mt-2 text-sm leading-6 text-slate-600">

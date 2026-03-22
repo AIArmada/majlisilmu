@@ -3,6 +3,7 @@
 use App\Enums\EventVisibility;
 use App\Filament\Pages\AdminDashboard;
 use App\Filament\Pages\ModerationQueue;
+use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Filament\Resources\References\ReferenceResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
@@ -45,6 +46,11 @@ it('renders the admin dashboard with moderation actions before event overview in
 
     $this->actingAs($administrator)
         ->get('/admin')
+        ->assertRedirect(AdminDashboard::getUrl(panel: 'admin'));
+
+    $this->actingAs($administrator)
+        ->followingRedirects()
+        ->get('/admin')
         ->assertSuccessful()
         ->assertSeeInOrder([
             'Needs Approval',
@@ -74,6 +80,17 @@ it('uses Dashboard as the admin dashboard label in Malay locale', function () {
         ->assertSuccessful()
         ->assertSee('Dashboard')
         ->assertDontSee('Papan pemuka');
+});
+
+it('renders the admin event edit page without missing dashboard navigation routes', function () {
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create();
+
+    $this->actingAs($administrator)
+        ->get(EditEvent::getUrl(['record' => $event->getKey()], panel: 'admin'))
+        ->assertSuccessful();
 });
 
 it('computes approval and event overview dashboard stats from the intended datasets', function () {

@@ -45,9 +45,10 @@ class PrayerTimeService
             $latitude,
             $longitude,
             strtolower($timezone),
-        );
+        ).':v2';
 
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($date, $latitude, $longitude, $timezone) {
+        /** @var array<string, string>|null $cachedPrayerTimes */
+        $cachedPrayerTimes = Cache::remember($cacheKey, self::CACHE_TTL, function () use ($date, $latitude, $longitude, $timezone): ?array {
             // Try Aladhan API first (more reliable globally)
             $times = $this->fetchFromAladhan($date, $latitude, $longitude, $timezone);
 
@@ -59,8 +60,10 @@ class PrayerTimeService
                 ]);
             }
 
-            return $times;
+            return $this->serializePrayerTimes($times);
         });
+
+        return $this->deserializePrayerTimes($cachedPrayerTimes);
     }
 
     /**
@@ -126,6 +129,44 @@ class PrayerTimeService
         return $date->copy()
             ->setTimezone($timezone)
             ->setTime((int) $hours, (int) $minutes, 0);
+    }
+
+    /**
+     * @param  array<string, Carbon>|null  $times
+     * @return array<string, string>|null
+     */
+    protected function serializePrayerTimes(?array $times): ?array
+    {
+        if ($times === null) {
+            return null;
+        }
+
+        $serialized = [];
+
+        foreach ($times as $prayer => $time) {
+            $serialized[$prayer] = $time->toIso8601String();
+        }
+
+        return $serialized;
+    }
+
+    /**
+     * @param  array<string, string>|null  $times
+     * @return array<string, Carbon>|null
+     */
+    protected function deserializePrayerTimes(?array $times): ?array
+    {
+        if ($times === null) {
+            return null;
+        }
+
+        $deserialized = [];
+
+        foreach ($times as $prayer => $time) {
+            $deserialized[$prayer] = Carbon::parse($time);
+        }
+
+        return $deserialized;
     }
 
     /**
