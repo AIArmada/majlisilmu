@@ -1,5 +1,7 @@
 # Lessons
 
+- When caching timezone-aware `Carbon` values as ISO strings, rehydrate them back into the requested region timezone instead of leaving them on the parsed fixed offset; otherwise warm-cache behavior diverges from cold-cache behavior around timezone names and DST rules.
+- When a package/plugin writes overrides into Laravel config during provider boot, never pass closures into that override path unless the package evaluates them before `config()->set(...)`; otherwise `php artisan config:cache` will fail on `Closure::__set_state()`.
 - On Livewire pages that use `.scroll-reveal`, any section or shared component that must stay visible after an action rerender needs the `revealed` class in the server-rendered markup; relying only on `x-intersect.once` lets follow/save updates hide already-viewed content again.
 - In Filament 5, do not leave custom panel dashboards on the base `Dashboard` root route when the panel already owns `/` as `filament.{panel}.home`; give custom dashboards their own real page route such as `/dashboard` so navigation items resolve to an existing `pages.*` route and the home redirect does not loop.
 - When fixing Laravel 13 cache deserialization issues, audit inline Blade/Volt/anonymous Livewire `Select::options()` caches as well as controller/service caches; Filament option closures can still pull stale `Collection` payloads from old keys and fail inside `getOptions()`.

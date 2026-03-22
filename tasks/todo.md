@@ -1,3 +1,36 @@
+# Review Findings Fixes
+
+- [x] Preserve requested region timezones when rehydrating cached prayer times
+- [x] Clear the actual verified submit-tag cache keys in the Pest bootstrap
+- [x] Re-run focused cache/prayer regression coverage and static checks
+
+## Review
+- Kept the existing primitive-safe prayer-time cache payload, but changed `PrayerTimeService` to rehydrate cached ISO timestamps back into the requested region timezone. That keeps warm-cache behavior aligned with cold-cache behavior for timezone identity and DST-sensitive regions like `America/New_York`.
+- Fixed the Pest bootstrap cache cleanup so it forgets the real verified submit-tag cache keys (`submit_tags_discipline_verified_*_safe_v1` and `submit_tags_issue_verified_*_safe_v1`) used by the submit-event page, removing the order-dependent stale-cache path from the test suite.
+- Strengthened the prayer cache regression in `tests/Feature/Laravel13CacheSerializationTest.php` to assert the cached `Maghrib` result retains the `America/New_York` timezone name after the second, warm-cache read.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(rehydrates cached prayer times safely from the database cache store|fetches prayer times from Aladhan API|calculates start time with offset|handles Immediately offset correctly|returns null on API failure)'`
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pint --format=agent app/Providers/Filament/AdminPanelProvider.php app/Services/PrayerTimeService.php tests/Pest.php tests/Feature/Laravel13CacheSerializationTest.php`
+  - `php artisan config:cache`
+  - `php artisan config:clear`
+  - `git diff --check`
+
+# Filament Authz Config Cache Fix
+
+- [x] Trace the `config:cache` failure caused by a non-serializable `filament-authz.role_resource.scope_options` value
+- [x] Keep dynamic role scope options for normal admin runtime while skipping the callback during config-serialization commands
+- [x] Verify `php artisan config:cache` succeeds and restore the local environment afterward
+
+## Review
+- The deployment failure came from `AdminPanelProvider` registering `roleScopeOptionsUsing()` with a closure. `aiarmada/filament-authz` stores that value straight into config during plugin registration, so `config:cache` tried to serialize a `Closure` at `filament-authz.role_resource.scope_options`.
+- Reworked `app/Providers/Filament/AdminPanelProvider.php` to build the authz plugin first, then register the dynamic scope-options callback only outside the `config:cache` / `optimize` serialization commands. Normal web/admin runtime still gets the lazy DB-backed scope filtering, but deployment config caching no longer receives a closure in config.
+- Verification:
+  - `php artisan config:cache`
+  - `php artisan config:clear`
+  - `vendor/bin/pint --format=agent app/Providers/Filament/AdminPanelProvider.php`
+  - `git diff --check`
+
 # Speaker Follow Scroll Reveal Fix
 
 - [x] Reproduce the speaker follow rerender bug and identify which sections still drop out after `toggleFollow`

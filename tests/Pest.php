@@ -80,6 +80,11 @@ pest()->extend(TestCase::class)
             Cache::forget("submit_tags_{$type}_en_safe_v1");
         }
 
+        foreach (['discipline', 'issue'] as $type) {
+            Cache::forget("submit_tags_{$type}_verified_ms_safe_v1");
+            Cache::forget("submit_tags_{$type}_verified_en_safe_v1");
+        }
+
         Cache::forget('submit_languages_v2');
         Cache::forget('submit_languages_safe_v1');
         Cache::forget('submit_venues');
