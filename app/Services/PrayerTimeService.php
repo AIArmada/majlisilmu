@@ -63,7 +63,7 @@ class PrayerTimeService
             return $this->serializePrayerTimes($times);
         });
 
-        return $this->deserializePrayerTimes($cachedPrayerTimes);
+        return $this->deserializePrayerTimes($cachedPrayerTimes, $timezone);
     }
 
     /**
@@ -154,7 +154,7 @@ class PrayerTimeService
      * @param  array<string, string>|null  $times
      * @return array<string, Carbon>|null
      */
-    protected function deserializePrayerTimes(?array $times): ?array
+    protected function deserializePrayerTimes(?array $times, string $timezone): ?array
     {
         if ($times === null) {
             return null;
@@ -163,7 +163,7 @@ class PrayerTimeService
         $deserialized = [];
 
         foreach ($times as $prayer => $time) {
-            $deserialized[$prayer] = Carbon::parse($time);
+            $deserialized[$prayer] = Carbon::parse($time)->setTimezone($timezone);
         }
 
         return $deserialized;

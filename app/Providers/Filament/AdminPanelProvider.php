@@ -32,6 +32,15 @@ class AdminPanelProvider extends PanelProvider
     public function panel(Panel $panel): Panel
     {
         $adminDomain = $this->resolvePanelDomain('admin');
+        $authzPlugin = FilamentAuthzPlugin::make()
+            ->centralApp()
+            ->userRoleScopeMode('global_only');
+
+        if ($this->shouldRegisterDynamicRoleScopeOptions()) {
+            $authzPlugin->roleScopeOptionsUsing(
+                fn (): array => app(MemberRoleScopes::class)->roleResourceOptions()
+            );
+        }
 
         config()->set('filament-signals.features.dashboard', false);
 
@@ -62,10 +71,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 FilamentSignalsPlugin::make(),
-                FilamentAuthzPlugin::make()
-                    ->centralApp()
-                    ->userRoleScopeMode('global_only')
-                    ->roleScopeOptionsUsing(fn (): array => app(MemberRoleScopes::class)->roleResourceOptions()),
+                $authzPlugin,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -82,5 +88,26 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+    }
+
+    private function shouldRegisterDynamicRoleScopeOptions(): bool
+    {
+        if (! app()->runningInConsole()) {
+            return true;
+        }
+
+        /** @var list<string> $arguments */
+        $arguments = array_values(array_map(
+            static fn (mixed $argument): string => (string) $argument,
+            is_array($_SERVER['argv'] ?? null) ? $_SERVER['argv'] : [],
+        ));
+
+        foreach ($arguments as $argument) {
+            if (in_array($argument, ['config:cache', 'optimize'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

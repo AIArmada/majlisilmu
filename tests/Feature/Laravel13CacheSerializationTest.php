@@ -118,7 +118,8 @@ it('rehydrates cached prayer times safely from the database cache store', functi
     app('cache')->setDefaultDriver('database');
     Cache::flush();
 
-    $date = Carbon::parse('2026-01-15');
+    $date = Carbon::parse('2026-07-15');
+    $timezone = 'America/New_York';
     $service = new PrayerTimeService;
 
     Http::fake([
@@ -135,19 +136,21 @@ it('rehydrates cached prayer times safely from the database cache store', functi
         ]),
     ]);
 
-    $first = $service->getPrayerTimes($date, 3.1390, 101.6869);
+    $first = $service->getPrayerTimes($date, 40.7128, -74.0060, $timezone);
 
     expect($first)->not->toBeNull()
         ->and($first['Maghrib'])->toBeInstanceOf(Carbon::class)
-        ->and($first['Maghrib']->format('H:i'))->toBe('19:20');
+        ->and($first['Maghrib']->format('H:i'))->toBe('19:20')
+        ->and($first['Maghrib']->timezoneName)->toBe($timezone);
 
     Http::fake([
         'api.aladhan.com/*' => Http::response(null, 500),
     ]);
 
-    $second = $service->getPrayerTimes($date, 3.1390, 101.6869);
+    $second = $service->getPrayerTimes($date, 40.7128, -74.0060, $timezone);
 
     expect($second)->not->toBeNull()
         ->and($second['Maghrib'])->toBeInstanceOf(Carbon::class)
-        ->and($second['Maghrib']->format('H:i'))->toBe('19:20');
+        ->and($second['Maghrib']->format('H:i'))->toBe('19:20')
+        ->and($second['Maghrib']->timezoneName)->toBe($timezone);
 });
