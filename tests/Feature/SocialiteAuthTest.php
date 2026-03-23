@@ -8,6 +8,51 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    config()->set('services.google.client_id', 'google-client-id');
+    config()->set('services.google.client_secret', 'google-client-secret');
+    config()->set('services.google.redirect', 'https://majlisilmu.test/oauth/google/callback');
+});
+
+it('redirects to google when the provider is configured', function () {
+    $response = $this->get(route('socialite.redirect', ['provider' => 'google']));
+
+    $response->assertRedirect();
+
+    $location = (string) $response->headers->get('Location');
+
+    expect($location)
+        ->toContain('https://accounts.google.com/o/oauth2/auth')
+        ->toContain('client_id=google-client-id')
+        ->toContain(rawurlencode('https://majlisilmu.test/oauth/google/callback'));
+});
+
+it('does not expose google sign-in when the provider is not configured', function () {
+    config()->set('services.google.client_id', '');
+    config()->set('services.google.client_secret', '');
+    config()->set('services.google.redirect', '');
+
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertDontSee('Sign in with Google');
+
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertDontSee('Sign up with Google');
+});
+
+it('redirects back to login when the provider is not configured', function () {
+    config()->set('services.google.client_id', '');
+    config()->set('services.google.client_secret', '');
+    config()->set('services.google.redirect', '');
+
+    $response = $this->get(route('socialite.redirect', ['provider' => 'google']));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHas('toast.type', 'error');
+    $response->assertSessionHas('toast.message', __('Google sign-in is not configured right now. Please use email and password instead.'));
+});
+
 it('creates a user and social account on callback', function () {
     Socialite::fake('google', (new SocialiteUser)->map([
         'id' => 'google-123',

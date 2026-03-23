@@ -1,3 +1,21 @@
+# Google OAuth Login Guard
+
+- [x] Trace why Google login can still reach Google with an unusable OAuth configuration
+- [x] Guard the Google OAuth entrypoint and auth UI so the button only appears when the provider is configured
+- [x] Remove the hard-coded local Google callback URL and verify the guarded/configured flows
+
+## Review
+- The immediate failure mode was that Google OAuth was always exposed in the auth UI and the Socialite controller always attempted the redirect, even when a runtime environment could be missing or serving stale Google credentials.
+- Added `App\Support\Auth\SocialiteProviderConfiguration` as the single capability check, then used it both in `SocialiteController` and in all login/register Blade views so Google sign-in is hidden unless `client_id`, `client_secret`, and `redirect` are all present.
+- Changed `config/services.php` to derive the Google callback URL from `GOOGLE_REDIRECT_URI` or `APP_URL` instead of the old hard-coded `https://majlisilmu.test/...` value, and documented those env vars in `.env.example`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialiteAuthTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Auth/SocialiteController.php app/Support/Auth/SocialiteProviderConfiguration.php tests/Feature/SocialiteAuthTest.php`
+  - `vendor/bin/pint --format=agent app/Http/Controllers/Auth/SocialiteController.php app/Support/Auth/SocialiteProviderConfiguration.php tests/Feature/SocialiteAuthTest.php resources/views/auth/login.blade.php resources/views/auth/register.blade.php resources/views/livewire/auth/login.blade.php resources/views/livewire/auth/register.blade.php config/services.php`
+  - `curl -skI https://majlisilmu.test/oauth/google/redirect`
+  - `php artisan tinker --execute="dump(config('services.google.redirect'));"`
+  - `git diff --check`
+
 # Review Findings Fixes
 
 - [x] Preserve requested region timezones when rehydrating cached prayer times

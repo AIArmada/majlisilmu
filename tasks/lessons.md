@@ -1,5 +1,6 @@
 # Lessons
 
+- For optional OAuth providers, never render the button unconditionally; centralize a provider-configured check and guard the redirect/callback routes too, otherwise users can be sent to the provider with broken or stale credentials.
 - When caching timezone-aware `Carbon` values as ISO strings, rehydrate them back into the requested region timezone instead of leaving them on the parsed fixed offset; otherwise warm-cache behavior diverges from cold-cache behavior around timezone names and DST rules.
 - When a package/plugin writes overrides into Laravel config during provider boot, never pass closures into that override path unless the package evaluates them before `config()->set(...)`; otherwise `php artisan config:cache` will fail on `Closure::__set_state()`.
 - On Livewire pages that use `.scroll-reveal`, any section or shared component that must stay visible after an action rerender needs the `revealed` class in the server-rendered markup; relying only on `x-intersect.once` lets follow/save updates hide already-viewed content again.
