@@ -7,6 +7,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\ShareTrackingService;
 use App\Services\Signals\ProductSignalsService;
+use App\Support\Auth\SocialiteProviderConfiguration;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -18,6 +19,13 @@ class SocialiteController extends Controller
      */
     public function redirect(string $provider): RedirectResponse
     {
+        if (! SocialiteProviderConfiguration::isConfigured($provider)) {
+            return redirect()->route('login')->with('toast', [
+                'type' => 'error',
+                'message' => __('Google sign-in is not configured right now. Please use email and password instead.'),
+            ]);
+        }
+
         return Socialite::driver($provider)->redirect();
     }
 
@@ -26,10 +34,20 @@ class SocialiteController extends Controller
      */
     public function callback(string $provider): RedirectResponse
     {
+        if (! SocialiteProviderConfiguration::isConfigured($provider)) {
+            return redirect()->route('login')->with('toast', [
+                'type' => 'error',
+                'message' => __('Google sign-in is not configured right now. Please use email and password instead.'),
+            ]);
+        }
+
         try {
             $socialUser = Socialite::driver($provider)->user();
-        } catch (\Exception) {
-            return redirect()->route('login')->with('error', __('Unable to authenticate. Please try again.'));
+        } catch (\Throwable) {
+            return redirect()->route('login')->with('toast', [
+                'type' => 'error',
+                'message' => __('Unable to authenticate. Please try again.'),
+            ]);
         }
 
         $account = SocialAccount::query()
