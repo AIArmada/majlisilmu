@@ -68,6 +68,8 @@ class Address extends Model
             return null;
         }
 
+        $trimmedUrl = self::unwrapGoogleConsentUrl($trimmedUrl);
+
         $host = parse_url($trimmedUrl, PHP_URL_HOST);
         $host = is_string($host) ? strtolower($host) : '';
 
@@ -98,8 +100,43 @@ class Address extends Model
         }
 
         $resolvedUrl = is_string($effectiveUrl) && $effectiveUrl !== '' ? $effectiveUrl : $trimmedUrl;
+        $resolvedUrl = self::unwrapGoogleConsentUrl($resolvedUrl);
 
         return self::normalizeGoogleMapsUrlLength($resolvedUrl);
+    }
+
+    private static function unwrapGoogleConsentUrl(string $url): string
+    {
+        $currentUrl = $url;
+
+        for ($redirectDepth = 0; $redirectDepth < 3; $redirectDepth++) {
+            $host = parse_url($currentUrl, PHP_URL_HOST);
+            $host = is_string($host) ? strtolower($host) : '';
+
+            if ($host !== 'consent.google.com') {
+                return $currentUrl;
+            }
+
+            $query = parse_url($currentUrl, PHP_URL_QUERY);
+
+            if (! is_string($query) || $query === '') {
+                return $currentUrl;
+            }
+
+            parse_str($query, $parameters);
+
+            $continueUrl = $parameters['continue'] ?? null;
+
+            if (! is_string($continueUrl) || trim($continueUrl) === '') {
+                return $currentUrl;
+            }
+
+            $currentUrl = str_starts_with($continueUrl, '/')
+                ? 'https://www.google.com'.$continueUrl
+                : $continueUrl;
+        }
+
+        return $currentUrl;
     }
 
     private static function normalizeGoogleMapsUrlLength(string $url): string

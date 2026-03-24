@@ -1,3 +1,18 @@
+# Google Consent Maps URL Unwrapping
+
+- [x] Detect and unwrap `https://consent.google.com/ml?continue=...` before saving Google Maps URLs
+- [x] Cover the consent redirect case in focused address normalization tests
+- [x] Verify the resolver and record the result
+
+## Review
+- Root cause: Google short-link expansion can stop on `https://consent.google.com/ml?continue=...`, and the resolver treated that as the final URL. That left the consent wrapper persisted instead of the underlying canonical Maps URL.
+- Fix: `Address::resolveGoogleMapsUrl()` now unwraps Google consent URLs before host detection and again after the `maps.app.goo.gl` HTTP resolution path, so both directly pasted consent URLs and short links that land on consent resolve to the real Maps URL before normalization/extracting coordinates.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/AddressGoogleMapsUrlNormalizationTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Models/Address.php tests/Unit/AddressGoogleMapsUrlNormalizationTest.php`
+  - `vendor/bin/pint --test app/Models/Address.php tests/Unit/AddressGoogleMapsUrlNormalizationTest.php tasks/lessons.md`
+  - `git diff --check`
+
 # Google Maps Place URL Preservation
 
 - [x] Trace why shortened Google Maps place links are being collapsed into `maps/search` URLs
