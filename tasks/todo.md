@@ -1,3 +1,23 @@
+# Google Maps Place URL Preservation
+
+- [x] Trace why shortened Google Maps place links are being collapsed into `maps/search` URLs
+- [x] Align the address schema and normalization limit so canonical place URLs up to 500 chars are preserved
+- [x] Add/update focused tests and record verification
+
+## Review
+- Root cause: `Address::resolveGoogleMapsUrl()` correctly resolves `maps.app.goo.gl` short links to the canonical Google place URL, but `normalizeGoogleMapsUrlLength()` still used the old 255-character ceiling from the original `addresses.google_maps_url` schema and collapsed anything longer into a `maps/search` query URL.
+- Fix:
+  - widened `addresses.google_maps_url` from the old 255-char default to 500 chars via a safe migration
+  - aligned `Address` normalization to preserve Google Maps URLs up to 500 chars before compacting
+  - updated the shared address form schema to allow 500-char Google Maps URLs, matching the admin institution and venue forms
+- Verification:
+  - `php artisan migrate --pretend --path=database/migrations/2026_03_25_201500_expand_google_maps_url_length_on_addresses_table.php`
+  - `vendor/bin/pest --parallel --compact tests/Unit/AddressGoogleMapsUrlNormalizationTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Models/Address.php app/Forms/SharedFormSchema.php tests/Unit/AddressGoogleMapsUrlNormalizationTest.php`
+  - `vendor/bin/pint --test app/Models/Address.php app/Forms/SharedFormSchema.php tests/Unit/AddressGoogleMapsUrlNormalizationTest.php database/migrations/2026_03_25_201500_expand_google_maps_url_length_on_addresses_table.php`
+  - `git diff --check`
+
 # S3 Public Media Access Fix
 
 - [x] Confirm why public S3 media URLs were returning `AccessDenied`

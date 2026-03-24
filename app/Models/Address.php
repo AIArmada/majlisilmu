@@ -13,6 +13,8 @@ class Address extends Model
 {
     use HasUuids;
 
+    private const GOOGLE_MAPS_URL_MAX_LENGTH = 500;
+
     protected $fillable = [
         'addressable_type',
         'addressable_id',
@@ -102,7 +104,7 @@ class Address extends Model
 
     private static function normalizeGoogleMapsUrlLength(string $url): string
     {
-        if (strlen($url) <= 255) {
+        if (strlen($url) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
             return $url;
         }
 
@@ -113,13 +115,13 @@ class Address extends Model
             $preciseQuery = trim($placeName !== '' ? $placeName.' '.$placeCoordinates : $placeCoordinates);
             $compactUrl = 'https://www.google.com/maps/search/?api=1&query='.urlencode($preciseQuery);
 
-            if (strlen($compactUrl) <= 255) {
+            if (strlen($compactUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
                 return $compactUrl;
             }
 
             $coordsOnlyCompactUrl = 'https://www.google.com/maps/search/?api=1&query='.$placeCoordinates;
 
-            if (strlen($coordsOnlyCompactUrl) <= 255) {
+            if (strlen($coordsOnlyCompactUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
                 return $coordsOnlyCompactUrl;
             }
         }
@@ -127,14 +129,14 @@ class Address extends Model
         if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches) === 1) {
             $compactUrl = 'https://www.google.com/maps/search/?api=1&query='.$matches[1].','.$matches[2];
 
-            if (strlen($compactUrl) <= 255) {
+            if (strlen($compactUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
                 return $compactUrl;
             }
         }
 
         $strippedUrl = preg_replace('/[?#].*$/', '', $url) ?? $url;
 
-        if (strlen($strippedUrl) <= 255) {
+        if (strlen($strippedUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
             return $strippedUrl;
         }
 
