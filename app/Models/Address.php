@@ -13,8 +13,6 @@ class Address extends Model
 {
     use HasUuids;
 
-    private const GOOGLE_MAPS_URL_MAX_LENGTH = 500;
-
     protected $fillable = [
         'addressable_type',
         'addressable_id',
@@ -74,7 +72,7 @@ class Address extends Model
         $host = is_string($host) ? strtolower($host) : '';
 
         if ($host !== 'maps.app.goo.gl') {
-            return self::normalizeGoogleMapsUrlLength($trimmedUrl);
+            return $trimmedUrl;
         }
 
         $effectiveUrl = null;
@@ -96,13 +94,13 @@ class Address extends Model
                 ->timeout(10)
                 ->get($trimmedUrl);
         } catch (\Throwable) {
-            return self::normalizeGoogleMapsUrlLength($trimmedUrl);
+            return $trimmedUrl;
         }
 
         $resolvedUrl = is_string($effectiveUrl) && $effectiveUrl !== '' ? $effectiveUrl : $trimmedUrl;
         $resolvedUrl = self::unwrapGoogleConsentUrl($resolvedUrl);
 
-        return self::normalizeGoogleMapsUrlLength($resolvedUrl);
+        return $resolvedUrl;
     }
 
     private static function unwrapGoogleConsentUrl(string $url): string
@@ -137,65 +135,6 @@ class Address extends Model
         }
 
         return $currentUrl;
-    }
-
-    private static function normalizeGoogleMapsUrlLength(string $url): string
-    {
-        if (strlen($url) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
-            return $url;
-        }
-
-        $placeName = self::extractGooglePlaceName($url);
-
-        if (preg_match('/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/', $url, $matches) === 1) {
-            $placeCoordinates = $matches[1].','.$matches[2];
-            $preciseQuery = trim($placeName !== '' ? $placeName.' '.$placeCoordinates : $placeCoordinates);
-            $compactUrl = 'https://www.google.com/maps/search/?api=1&query='.urlencode($preciseQuery);
-
-            if (strlen($compactUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
-                return $compactUrl;
-            }
-
-            $coordsOnlyCompactUrl = 'https://www.google.com/maps/search/?api=1&query='.$placeCoordinates;
-
-            if (strlen($coordsOnlyCompactUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
-                return $coordsOnlyCompactUrl;
-            }
-        }
-
-        if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches) === 1) {
-            $compactUrl = 'https://www.google.com/maps/search/?api=1&query='.$matches[1].','.$matches[2];
-
-            if (strlen($compactUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
-                return $compactUrl;
-            }
-        }
-
-        $strippedUrl = preg_replace('/[?#].*$/', '', $url) ?? $url;
-
-        if (strlen($strippedUrl) <= self::GOOGLE_MAPS_URL_MAX_LENGTH) {
-            return $strippedUrl;
-        }
-
-        return 'https://www.google.com/maps';
-    }
-
-    private static function extractGooglePlaceName(string $url): string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-
-        if (! is_string($path) || $path === '') {
-            return '';
-        }
-
-        if (preg_match('#/maps/place/([^/]+)#', $path, $matches) !== 1) {
-            return '';
-        }
-
-        $rawName = urldecode($matches[1]);
-        $normalizedName = str_replace('+', ' ', $rawName);
-
-        return trim($normalizedName);
     }
 
     /**

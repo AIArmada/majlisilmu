@@ -1,5 +1,6 @@
 # Lessons
 
+- For external canonical URLs like Google Maps place links, prefer a `text` column over arbitrary `string(N)` caps when the product expectation is to preserve the full resolved URL verbatim.
 - When expanding `maps.app.goo.gl` links, do not assume the effective redirect is already a canonical Maps URL; Google can stop on `consent.google.com/ml?continue=...`, so unwrap the `continue` target before normalizing or persisting the map link.
 - For optional OAuth providers, never render the button unconditionally; centralize a provider-configured check and guard the redirect/callback routes too, otherwise users can be sent to the provider with broken or stale credentials.
 - When caching timezone-aware `Carbon` values as ISO strings, rehydrate them back into the requested region timezone instead of leaving them on the parsed fixed offset; otherwise warm-cache behavior diverges from cold-cache behavior around timezone names and DST rules.
