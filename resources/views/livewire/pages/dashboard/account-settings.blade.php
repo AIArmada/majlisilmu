@@ -1,5 +1,9 @@
 @section('title', __('Account Settings') . ' - ' . config('app.name'))
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/schemas', 'filament/forms'],
+])
+
 @php
     $channelOptions = collect($this->notificationOptions['channels'] ?? [])
         ->mapWithKeys(fn (array $channel): array => [$channel['value'] => $channel['label']])

@@ -59,7 +59,6 @@
         })();
     </script>
     @livewireStyles
-    @filamentStyles
     @include('components.analytics.signals-tracker', ['surface' => 'public'])
     @stack('head')
 </head>
@@ -421,8 +420,6 @@
     </div>
 
     @livewireScripts
-    @fluxScripts
-    @filamentScripts
     @stack('scripts')
 </body>
 

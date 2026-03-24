@@ -2047,6 +2047,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
 @section('title', __('Hantar Majlis') . ' - ' . config('app.name'))
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/schemas', 'filament/forms', 'filament/actions', 'filament/notifications'],
+])
+
 <style>
     /* Ensure wizard stepper header doesn't clip */
     .fi-sc-wizard-header {

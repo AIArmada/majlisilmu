@@ -1,5 +1,9 @@
 @section('title', __('Claim Membership') . ' - ' . config('app.name'))
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/schemas', 'filament/forms'],
+])
+
 <div class="min-h-screen bg-slate-50 py-10 pb-28">
     <div class="container mx-auto max-w-4xl px-6 lg:px-8">
         <div class="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">

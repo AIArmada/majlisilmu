@@ -1194,7 +1194,7 @@ class Index extends Component implements HasForms
             'reference_ids' => $filters['reference_ids'],
             'starts_after' => $filters['starts_after'],
             'starts_before' => $filters['starts_before'],
-            'time_scope' => $filters['time_scope'],
+            'time_scope' => $filters['time_scope'] !== 'upcoming' ? $filters['time_scope'] : null,
             'prayer_time' => $filters['prayer_time'],
             'timing_mode' => $filters['timing_mode'],
             'starts_time_from' => $filters['starts_time_from'],

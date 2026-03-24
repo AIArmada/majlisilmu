@@ -1,5 +1,9 @@
 @section('title', __('Submit Speaker') . ' - ' . config('app.name'))
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/schemas', 'filament/forms', 'filament/actions'],
+])
+
 <div class="min-h-screen bg-slate-50 py-10 pb-28">
     <div class="container mx-auto max-w-7xl px-6 lg:px-8">
         <section class="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 lg:p-10">

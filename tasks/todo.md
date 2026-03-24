@@ -1,3 +1,56 @@
+# Filament Scoped Assets Follow-up
+
+- [x] Trace the scoped Filament asset helper against app-registered Filament assets
+- [x] Restore the custom public helper assets without reintroducing the full global Filament bundle
+- [x] Add regression coverage and rerun focused verification
+
+## Review
+- `resources/views/partials/filament-assets.blade.php` now renders the `app` Filament package separately before the page-specific package list, so public pages keep the custom helper scripts registered in `AppServiceProvider` (`close-on-select` and `user-timezone`) without falling back to the old global `@filamentScripts` behavior.
+- This keeps the scoped asset-loading strategy intact for `/majlis` and other public pages while restoring the runtime contract for custom Filament extensions on public forms such as `/submit-event`.
+- Added a focused regression test in `tests/Feature/SubmitEventReviewPreviewTest.php` that asserts the submit-event page ships both helper assets, which would have failed with the broken helper.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventReviewPreviewTest.php`
+  - `vendor/bin/pest --parallel --compact --filter='(displays the events index page|primes the default events search cache for the unfiltered first page|displays the homepage successfully)' tests/Feature`
+  - `vendor/bin/phpstan analyse --ansi resources/views/partials/filament-assets.blade.php tests/Feature/SubmitEventReviewPreviewTest.php`
+  - `vendor/bin/pint --test resources/views/partials/filament-assets.blade.php tests/Feature/SubmitEventReviewPreviewTest.php`
+  - Runtime spot-check via `curl` on `https://majlisilmu.test/submit-event` confirms both `close-on-select.js` and `user-timezone.js` are emitted again alongside `x-close-on-select`.
+
+# Majlis Page Performance Investigation
+
+- [x] Profile `https://majlisilmu.test/majlis` in the browser to capture network, rendering, and interaction bottlenecks
+- [x] Trace the Laravel/Livewire code path, queries, and caching for the `/majlis` page
+- [x] Apply the smallest justified changes to improve perceived and measured responsiveness
+- [x] Verify the impact with targeted performance checks, tests, and static analysis as needed
+
+## Review
+- The unfiltered first-page cache path was effectively bypassed because `Index::events()` always passed `time_scope=upcoming` into `EventSearchService`, so `usesDefaultSearchCache()` never saw an empty filter set. Normalizing the default upcoming scope back to `null` restored the existing `default_events_search_v2` hot path for the public `/majlis` landing state.
+- `EventSearchService::cardRelationships()` was eager-loading speaker avatar media for every event card even though the `/majlis` card UI never reads event speakers. Removing that relationship cut unnecessary queries and model hydration from both initial loads and Livewire search updates.
+- `layouts.app` was also shipping the Flux runtime on every public page even though the app layout does not render Flux components. Removing `@fluxScripts` eliminated one unused `flux.js` request from `/majlis`.
+- Session and cache were still backed by PostgreSQL, so every page load paid for session reads and cache I/O on the primary database. The app now defaults to non-database stores (`file` without Redis, `redis` when production Redis is configured), and the local environment now runs `SESSION_DRIVER=redis` plus `CACHE_STORE=redis`.
+- Filament assets are no longer injected globally from `layouts.app`. Public and mixed pages now opt in explicitly through a shared `partials.filament-assets` include, and `/majlis` only requests the packages it actually uses (`filament/support` and `filament/schemas` on first paint, with form component scripts lazy-loaded when the advanced filter panel opens).
+- Browser verification on `https://majlisilmu.test/majlis` after the changes:
+  - warm document response improved from about `580 ms app / 225 ms DB` to about `303 ms app / 52 ms DB`
+  - warm performance trace improved from about `LCP 1063 ms / TTFB 643 ms` to about `LCP 725 ms / TTFB 287 ms`
+  - Livewire search update for `fiqh` improved from about `513 ms app / 184 ms DB` to about `340 ms app / 68 ms DB`
+- Browser verification on `https://majlisilmu.test/majlis` after the second pass:
+  - warm document response improved again to about `281 ms app / 25 ms DB`
+  - reload trace improved to about `LCP 598 ms / TTFB 381 ms`
+  - Livewire search update for `fiqh` improved again to about `323 ms app / 40 ms DB`
+  - initial `/majlis` asset payload no longer includes `flux.js`, `filament/actions.js`, `filament/notifications.js`, or `filament/tables.js`
+  - homepage `/` now ships no Filament assets at all
+- Remaining bottlenecks are now mostly environmental and asset-level rather than page-specific code:
+  - render blocking is now mostly the font CSS chain (`fonts.googleapis.com` -> `fonts.gstatic.com`) plus Filament's shared stylesheet/font on pages that still use Filament UI
+  - `livewire.js` remains a meaningful fixed cost on public Livewire pages
+  - search itself is still database-backed because Scout remains on the `collection` driver instead of Typesense
+- Verification:
+  - `vendor/bin/pest --parallel --compact --filter='(displays the events index page|primes the default events search cache for the unfiltered first page|rehydrates the default events search cache safely from the database cache store)'`
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(displays the events index page|primes the default events search cache for the unfiltered first page|displays the homepage successfully|contains livewire components on the homepage)'`
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(shows a submission preview section on submit event page|renders the account settings page with profile and notifications tabs|renders the dedicated institution contribution page|renders the dedicated speaker contribution page|keeps reviewer context fields on update suggestion pages|shows the reported institution clearly on the public report page|redirects guests to login for membership claim routes)'`
+  - `php artisan view:cache`
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php tests/Feature/EventSearchTest.php tests/Feature/HomePageTest.php`
+  - `vendor/bin/pint --test config/cache.php config/session.php tests/Feature/EventSearchTest.php tests/Feature/HomePageTest.php`
+  - `git diff --check`
+
 # Account Prayer Institutions
 
 - [x] Inspect the current account-settings flow and existing institution-select patterns
