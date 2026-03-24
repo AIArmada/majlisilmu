@@ -5936,3 +5936,22 @@
   - `vendor/bin/pest --parallel --compact tests/Feature --filter='(RefactorTest|EventSubmissionDisplayTest|SubmitEventNotesTest|SubmitEventNotificationTest|ContributionWorkflowServiceTest|ContributionWorkflowActionsTest|ModerationServiceTest|ModerationQueueTest|EventModerationActionsTest|AhliEventApprovalTest|ReportActionsTest|ReportApiModerationTest|NotificationEmailRoutingTest)'` => **102 passed (469 assertions)**
   - `vendor/bin/phpstan analyse --ansi app/Models/ModerationReview.php app/Models/User.php database/factories/ModerationReviewFactory.php database/seeders/ModerationReviewSeeder.php tests/Feature/RefactorTest.php` => **No errors**
   - `git diff --check` => **No diff formatting issues**
+
+# Institution Card Location Order
+
+- [x] Trace the institution index card location formatter override
+- [x] Switch the public institution card hierarchy to subdistrict, district, state
+- [x] Update focused institution index assertions and verify the page behavior
+
+## Review
+
+- Root cause:
+  - the public `/institusi` card view was overriding `AddressHierarchyFormatter::parts()` with `['state', 'district', 'subdistrict']`, so cards rendered broad-to-specific order even though the shared formatter already defaults to `subdistrict, district, state`
+- Fix:
+  - removed the explicit override in `resources/views/components/pages/institutions/⚡index.blade.php` so institution cards now use the shared default order, producing location strings like `Bagan Sena, Kulim, Kedah`
+  - updated the focused institution index assertions to lock in the new public-card order and keep the duplicate-subdistrict behavior covered
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **13 passed (52 assertions)**
+  - `php -l tests/Feature/InstitutionIndexTest.php` => **No syntax errors**
+  - `git diff --check` => **No diff formatting issues**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/InstitutionIndexTest.php` => **tooling limitation: current PHPStan config reports `No files found to analyse` for this Pest target**

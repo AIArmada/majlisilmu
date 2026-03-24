@@ -171,7 +171,7 @@ it('shows location hierarchy values without labels on institution cards', functi
 
     get('/institusi?search=Hidayah')
         ->assertSuccessful()
-        ->assertSee('Selangor, Petaling, Shah Alam')
+        ->assertSee('Shah Alam, Petaling, Selangor')
         ->assertDontSee(__('Negeri').':')
         ->assertDontSee(__('Daerah').':')
         ->assertDontSee(__('Bandar / Mukim / Zon').':');
@@ -231,8 +231,8 @@ it('deduplicates matching district and subdistrict labels on institution cards',
 
     get('/institusi?search=Temerloh')
         ->assertSuccessful()
-        ->assertSee('Pahang, Temerloh')
-        ->assertDontSee('Pahang, Temerloh, Temerloh');
+        ->assertSee('Temerloh, Pahang')
+        ->assertDontSee('Temerloh, Temerloh, Pahang');
 });
 
 it('shows location scope controls on institution index', function () {

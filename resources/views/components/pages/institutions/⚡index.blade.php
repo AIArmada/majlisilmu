@@ -356,7 +356,7 @@ class extends Component
     $hasScopedFilters = filled($stateId) || filled($districtId) || filled($subdistrictId);
     $submitInstitutionUrl = route('contributions.submit-institution');
     $formatInstitutionLocation = static function ($addressModel): string {
-        $parts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel, ['state', 'district', 'subdistrict']);
+        $parts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
 
         return $parts === [] ? '-' : implode(', ', $parts);
     };
