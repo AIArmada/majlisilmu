@@ -41,6 +41,24 @@ it('preserves resolved google place urls that are longer than 255 characters but
         ->and($freshAddress->lng)->toBe(101.520698);
 });
 
+it('unwraps google consent redirect urls before saving the canonical google maps place url', function () {
+    $consentWrappedUrl = 'https://consent.google.com/ml?continue=https://www.google.com/maps/place/Sultan%2BSalahuddin%2BAbdul%2BAziz%2BShah%2BMasjid/@3.07853,101.5158324,17z/data%3D!3m1!4b1!4m6!3m5!1s0x31cc527ec7366823:0xd59cd5f00940bc42!8m2!3d3.07853!4d101.520698!16zL20vMGJ0ems3?entry%3Dtts%26g_ep%3DEgoyMDI2MDMyMi4wIPu8ASoASAFQAw%253D%253D%26skid%3D5d93d3b6-3fef-4b16-ac2d-00f11b5119af&gl=DE&m=0&pc=m&uxe=eomtm&cm=2&hl=de&src=1';
+    $expectedResolvedUrl = 'https://www.google.com/maps/place/Sultan+Salahuddin+Abdul+Aziz+Shah+Masjid/@3.07853,101.5158324,17z/data=!3m1!4b1!4m6!3m5!1s0x31cc527ec7366823:0xd59cd5f00940bc42!8m2!3d3.07853!4d101.520698!16zL20vMGJ0ems3?entry=tts&g_ep=EgoyMDI2MDMyMi4wIPu8ASoASAFQAw%3D%3D&skid=5d93d3b6-3fef-4b16-ac2d-00f11b5119af';
+
+    $address = Address::query()->create([
+        'addressable_type' => 'institution',
+        'addressable_id' => (string) Str::uuid(),
+        'google_maps_url' => $consentWrappedUrl,
+    ]);
+
+    $freshAddress = $address->fresh();
+
+    expect($freshAddress->google_maps_url)
+        ->toBe($expectedResolvedUrl)
+        ->and($freshAddress->lat)->toBe(3.07853)
+        ->and($freshAddress->lng)->toBe(101.520698);
+});
+
 it('extracts latitude and longitude from short google maps urls after redirect resolution', function () {
     $address = Address::query()->create([
         'addressable_type' => 'institution',
