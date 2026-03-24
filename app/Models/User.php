@@ -21,6 +21,7 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -99,6 +100,8 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
         'email',
         'phone',
         'timezone',
+        'daily_prayer_institution_id',
+        'friday_prayer_institution_id',
         'password',
         'email_verified_at',
         'phone_verified_at',
@@ -149,6 +152,22 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     public function directoryFeedbackBanMessage(): string
     {
         return __('Akaun anda tidak dibenarkan menghantar cadangan kemaskini, tuntutan keahlian, atau laporan buat masa ini.');
+    }
+
+    /**
+     * @return BelongsTo<Institution, $this>
+     */
+    public function dailyPrayerInstitution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class, 'daily_prayer_institution_id');
+    }
+
+    /**
+     * @return BelongsTo<Institution, $this>
+     */
+    public function fridayPrayerInstitution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class, 'friday_prayer_institution_id');
     }
 
     /**

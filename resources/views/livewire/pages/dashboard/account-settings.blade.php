@@ -53,6 +53,10 @@
                                 {{ __('Changes to email or phone reset their verification status until they are confirmed again.') }}
                             </div>
 
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                                {{ __('Prayer institution preferences are private and only saved to your account for now.') }}
+                            </div>
+
                             <div class="flex justify-end">
                                 <button type="submit"
                                     class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">

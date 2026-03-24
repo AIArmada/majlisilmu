@@ -1,10 +1,12 @@
 <?php
 
 use App\Livewire\Pages\Dashboard\AccountSettings;
+use App\Models\Institution;
 use App\Models\NotificationDestination;
 use App\Models\User;
 use App\Notifications\Auth\VerifyEmailNotification;
 use App\Services\Notifications\NotificationSettingsManager;
+use Filament\Forms\Components\Select as FormSelect;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
@@ -25,6 +27,9 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('Profile')
         ->assertSee('Notifications')
         ->assertSee('Profile Details')
+        ->assertSee('Prayer Institutions')
+        ->assertSee('Daily Prayer Institution')
+        ->assertSee('Friday Prayer Institution')
         ->assertSee('Save Account Settings')
         ->assertDontSee('Digest Preferences')
         ->assertDontSee('Save Preferences')
@@ -221,4 +226,208 @@ it('requires at least one contact method on account settings', function () {
             'formData.email' => 'required_without',
             'formData.phone' => 'required_without',
         ]);
+});
+
+it('searches both prayer institution selectors from the institution database', function () {
+    $dailyInstitution = Institution::factory()->create([
+        'name' => 'Masjid Searchable Daily',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $fridayInstitution = Institution::factory()->create([
+        'name' => 'Masjid Searchable Friday',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $inactiveInstitution = Institution::factory()->create([
+        'name' => 'Masjid Searchable Inactive',
+        'status' => 'verified',
+        'is_active' => false,
+    ]);
+    $pendingInstitution = Institution::factory()->create([
+        'name' => 'Masjid Searchable Pending',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create([
+        'email' => 'member@example.test',
+        'phone' => '+60113334444',
+    ]);
+
+    $component = Livewire::actingAs($user)->test(AccountSettings::class);
+
+    foreach (['daily_prayer_institution_id', 'friday_prayer_institution_id'] as $field) {
+        $component->assertFormFieldExists($field, function (FormSelect $select) use ($dailyInstitution, $fridayInstitution, $inactiveInstitution, $pendingInstitution): bool {
+            $results = $select->getSearchResults('searchable');
+
+            expect($select->isSearchable())->toBeTrue()
+                ->and($select->hasDynamicSearchResults())->toBeTrue()
+                ->and($results)->toHaveKey($dailyInstitution->id)
+                ->and($results[$dailyInstitution->id])->toBe('Masjid Searchable Daily')
+                ->and($results)->toHaveKey($fridayInstitution->id)
+                ->and($results[$fridayInstitution->id])->toBe('Masjid Searchable Friday')
+                ->and($results)->not->toHaveKey($inactiveInstitution->id)
+                ->and($results)->not->toHaveKey($pendingInstitution->id);
+
+            return true;
+        });
+    }
+});
+
+it('saves optional prayer institution preferences and preserves contact verification when contact details are unchanged', function () {
+    $dailyInstitution = Institution::factory()->create([
+        'name' => 'Masjid Harian',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $fridayInstitution = Institution::factory()->create([
+        'name' => 'Masjid Jumaat',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create([
+        'email' => 'member@example.test',
+        'phone' => '+60113334444',
+        'email_verified_at' => now(),
+        'phone_verified_at' => now(),
+    ]);
+
+    $component = Livewire::actingAs($user)->test(AccountSettings::class);
+
+    $component
+        ->set('formData.daily_prayer_institution_id', $dailyInstitution->id)
+        ->set('formData.friday_prayer_institution_id', '')
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->daily_prayer_institution_id)->toBe($dailyInstitution->id)
+        ->and($user->friday_prayer_institution_id)->toBeNull()
+        ->and($user->email_verified_at)->not->toBeNull()
+        ->and($user->phone_verified_at)->not->toBeNull();
+
+    $component
+        ->set('formData.daily_prayer_institution_id', '')
+        ->set('formData.friday_prayer_institution_id', $fridayInstitution->id)
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->daily_prayer_institution_id)->toBeNull()
+        ->and($user->friday_prayer_institution_id)->toBe($fridayInstitution->id);
+
+    $component
+        ->set('formData.daily_prayer_institution_id', $dailyInstitution->id)
+        ->set('formData.friday_prayer_institution_id', $dailyInstitution->id)
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->daily_prayer_institution_id)->toBe($dailyInstitution->id)
+        ->and($user->friday_prayer_institution_id)->toBe($dailyInstitution->id);
+
+    $component
+        ->set('formData.daily_prayer_institution_id', $dailyInstitution->id)
+        ->set('formData.friday_prayer_institution_id', $fridayInstitution->id)
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->daily_prayer_institution_id)->toBe($dailyInstitution->id)
+        ->and($user->friday_prayer_institution_id)->toBe($fridayInstitution->id);
+
+    $component
+        ->set('formData.daily_prayer_institution_id', '')
+        ->set('formData.friday_prayer_institution_id', '')
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->daily_prayer_institution_id)->toBeNull()
+        ->and($user->friday_prayer_institution_id)->toBeNull()
+        ->and($user->email_verified_at)->not->toBeNull()
+        ->and($user->phone_verified_at)->not->toBeNull();
+});
+
+it('rejects invalid prayer institution ids on account settings', function () {
+    $user = User::factory()->create([
+        'email' => 'member@example.test',
+        'phone' => '+60113334444',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->set('formData.daily_prayer_institution_id', (string) str()->uuid())
+        ->call('saveAccountSettings')
+        ->assertHasErrors(['formData.daily_prayer_institution_id']);
+});
+
+it('rejects inactive or unverified institutions for new prayer preferences', function () {
+    $inactiveInstitution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => false,
+    ]);
+    $pendingInstitution = Institution::factory()->create([
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create([
+        'email' => 'member@example.test',
+        'phone' => '+60113334444',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->set('formData.daily_prayer_institution_id', $inactiveInstitution->id)
+        ->call('saveAccountSettings')
+        ->assertHasErrors(['formData.daily_prayer_institution_id']);
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->set('formData.friday_prayer_institution_id', $pendingInstitution->id)
+        ->call('saveAccountSettings')
+        ->assertHasErrors(['formData.friday_prayer_institution_id']);
+});
+
+it('allows stale saved prayer institution preferences to remain while saving unrelated profile changes', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Lama',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create([
+        'name' => 'Original Name',
+        'email' => 'member@example.test',
+        'phone' => '+60113334444',
+        'daily_prayer_institution_id' => $institution->id,
+        'friday_prayer_institution_id' => $institution->id,
+    ]);
+
+    $institution->update([
+        'status' => 'pending',
+        'is_active' => false,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->assertSet('formData.daily_prayer_institution_id', $institution->id)
+        ->assertSet('formData.friday_prayer_institution_id', $institution->id)
+        ->set('formData.name', 'Updated Name')
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->name)->toBe('Updated Name')
+        ->and($user->daily_prayer_institution_id)->toBe($institution->id)
+        ->and($user->friday_prayer_institution_id)->toBe($institution->id);
 });

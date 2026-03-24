@@ -28,6 +28,10 @@ it('applies safe blaze optimization paths', function (): void {
 });
 
 it('renders fortify login page while blaze optimization is active', function (): void {
+    config()->set('services.google.client_id', 'google-client-id');
+    config()->set('services.google.client_secret', 'google-client-secret');
+    config()->set('services.google.redirect', 'https://majlisilmu.test/oauth/google/callback');
+
     $this->get(route('login'))
         ->assertOk()
         ->assertSee('/oauth/google/redirect', false);
