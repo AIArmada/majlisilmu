@@ -1,25 +1,3 @@
-# Temporary Media Upload Debug Logging
-
-- [x] Find the narrowest upload hook that captures production media save failures with context
-- [x] Add temporary structured logging around the media save boundary
-- [x] Verify the app still boots cleanly and note how to read the new logs
-
-## Review
-- Added temporary structured logging by overriding Filament's `SpatieMediaLibraryFileUpload::saveUploadedFileUsing()` callback inside `AppServiceProvider`, while preserving the package's default upload behavior and rethrowing the original exception after logging.
-- New log events:
-  - `temp_media_upload.start`
-  - `temp_media_upload.success`
-  - `temp_media_upload.temp_file_missing`
-  - `temp_media_upload.temp_file_unreadable`
-  - `temp_media_upload.missing_record_handler`
-  - `temp_media_upload.failed`
-- The logs include request URL/route/host, user ID, record type/ID, component state path, collection, disk, conversions disk, responsive-image flag, temp filename/path/original name/MIME/size, and on failure the exception plus previous exception class/message.
-- Verification:
-  - `php -l app/Providers/AppServiceProvider.php`
-  - `vendor/bin/phpstan analyse --ansi app/Providers/AppServiceProvider.php`
-  - `vendor/bin/pint --test app/Providers/AppServiceProvider.php`
-  - `php artisan tinker --execute='dump(Filament\\Forms\\Components\\SpatieMediaLibraryFileUpload::make("cover") instanceof Filament\\Forms\\Components\\SpatieMediaLibraryFileUpload);'`
-
 # S3 Public Media Access Fix
 
 - [x] Confirm why public S3 media URLs were returning `AccessDenied`
