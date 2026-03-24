@@ -206,20 +206,7 @@ new class extends Component {
     // Location
     $address = $institution->addressModel;
     $formatAddressHierarchy = static function ($addressModel): string {
-        $stateName = $addressModel?->state?->name;
-        $districtName = $addressModel?->district?->name;
-        $subdistrictName = $addressModel?->subdistrict?->name;
-
-        $stateHiddenDistricts = ['kuala lumpur', 'putrajaya', 'labuan'];
-        if (is_string($districtName) && in_array(mb_strtolower(trim($districtName)), $stateHiddenDistricts, true)) {
-            $stateName = null;
-        }
-
-        $parts = array_filter([
-            $subdistrictName,
-            $districtName,
-            $stateName,
-        ], fn (?string $value): bool => is_string($value) && trim($value) !== '');
+        $parts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
 
         return $parts === [] ? '-' : implode(', ', $parts);
     };

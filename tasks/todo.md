@@ -1,3 +1,115 @@
+# Postcode Institution Slugs
+
+- [x] Replace `generated-poskod-{row}` institution slugs with readable canonical slugs derived from the imported names
+- [x] Remove the legacy/backfill compatibility paths for the old postcode slugs
+- [x] Verify the importer and current database rewrite on the canonical slug path only
+
+## Review
+- Extracted the postcode import naming/slug rules into `App\Support\Institutions\GeneratedPoskodInstitutionData` so the dedicated seeder can normalize names, normalize address text, and generate deterministic canonical slugs like `abdul-rahman-putra-kariah-keladi-6809` from the CSV row data.
+- Simplified `GeneratedFileFinalFixedPoskodSeeder` back to a pure canonical import path: it now persists only the readable slug and no longer contains the temporary dual-lookup/backfill behavior for old `generated-poskod-{row}` records.
+- Removed the legacy runtime compatibility work for the old postcode slugs, including the public redirect routes and the extra institution subject-resolution/sharing fallback logic, so the codebase only resolves canonical institution slugs now.
+- Kept the focused regression coverage on the canonical importer path in `GeneratedFileFinalFixedPoskodSeederTest`; the temporary legacy-routing spec was removed along with the compatibility behavior it existed to prove.
+- Verification:
+  - `vendor/bin/pint --format=agent app/Support/Institutions/GeneratedPoskodInstitutionData.php app/Actions/Contributions/ResolveContributionSubjectAction.php app/Actions/Membership/ResolveMembershipClaimSubjectAction.php app/Services/ShareTracking/ShareTrackingUrlService.php database/seeders/GeneratedFileFinalFixedPoskodSeeder.php routes/web.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Support/Institutions/GeneratedPoskodInstitutionData.php app/Actions/Contributions/ResolveContributionSubjectAction.php app/Actions/Membership/ResolveMembershipClaimSubjectAction.php app/Services/ShareTracking/ShareTrackingUrlService.php database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/pest --compact tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `php artisan db:seed --class=Database\\Seeders\\GeneratedFileFinalFixedPoskodSeeder --ansi`
+  - Post-seed verification:
+    - DB row `Abdul Rahman Putra Kariah Keladi` now stores slug `abdul-rahman-putra-kariah-keladi-6809`
+    - canonical route `https://majlisilmu.test/institusi/abdul-rahman-putra-kariah-keladi-6809`
+
+# Postcode Sentence Case
+
+- [x] Normalize imported postcode institution names and address lines to sentence case through the seeder
+- [x] Rerun the dedicated postcode seeder so the imported postcode institutions are updated in the database
+- [x] Verify the rewritten rows and the seeder regression coverage
+
+## Review
+- Updated `GeneratedFileFinalFixedPoskodSeeder` to normalize imported postcode `Nama` and `Alamat` values to sentence case at import time instead of storing the source CSV's all-uppercase strings. The existing bracket-prefix stripping and `(ESTATE)` suffix move still run first, then the final text is title-cased with a small exception map for known acronyms like `UiTM`, `FELDA`, `PDRM`, and `ESTATE`.
+- Reran the dedicated postcode seeder against the current database, which rewrote the imported postcode institutions in place through `updateOrCreate` without touching unrelated data.
+- Extended the focused seeder test to assert sentence-cased storage on representative rows, including row `28 => Masjid Ajil / Ajil, Hulu Terengganu`, row `106 => Masjid Abu Bakar Temerloh / Bandar Temerloh`, row `5667 => Masjid Kampung Bukit Lada`, and row `6412 => Masjid Al-Muhajirin (ESTATE)`.
+- Verification:
+  - `vendor/bin/pint --format=agent database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/phpstan analyse --ansi database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/pest --compact tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `php artisan db:seed --class=Database\\Seeders\\GeneratedFileFinalFixedPoskodSeeder --ansi`
+  - Post-seed data checks via local PHP/tinker:
+    - row `28 => Masjid Ajil / Ajil, Hulu Terengganu / Hulu Terengganu / Ajil`
+    - row `106 => Masjid Abu Bakar Temerloh / Bandar Temerloh / Pahang / Temerloh / Temerloh`
+    - imported uppercase audit => `uppercase_name_rows=0`, `uppercase_line1_rows=1` where the lone remaining uppercase line is the acronym-only `P/S. 25`
+
+# Location Hierarchy Dedupe
+
+- [x] Dedupe identical subdistrict and district labels in public location displays
+- [x] Make postcode subdistrict matching prefer specific localities over same-name district subdistricts
+- [x] Verify the importer and institution pages against the duplicate-location regression
+
+## Review
+- Added `App\Support\Location\AddressHierarchyFormatter` as the shared public location formatter so institution, event, series, reference, and speaker pages all build address hierarchies with one rule set. It preserves the existing federal-territory state hiding and now removes identical adjacent hierarchy labels case-insensitively, so outputs like `Temerloh, Temerloh, Pahang` collapse to `Temerloh, Pahang`.
+- Updated `GeneratedFileFinalFixedPoskodSeeder` to treat same-name district subdistricts as a fallback instead of a first-choice match. When address text matches both a specific subdistrict and the district-name alias, the importer now prefers the specific locality, so `AJIL, HULU TERENGGANU` resolves to district `Hulu Terengganu` and subdistrict `Ajil`.
+- Extended regression coverage in `InstitutionShowPageTest`, `InstitutionIndexTest`, and `GeneratedFileFinalFixedPoskodSeederTest` to lock in both behaviors with real rendered pages and the production postcode import path.
+- Verification:
+  - `vendor/bin/pint --format=agent app/Support/Location/AddressHierarchyFormatter.php database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php tests/Feature/InstitutionShowPageTest.php tests/Feature/InstitutionIndexTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Support/Location/AddressHierarchyFormatter.php database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php tests/Feature/InstitutionShowPageTest.php tests/Feature/InstitutionIndexTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php`
+  - `vendor/bin/pest --compact tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+
+# Postcode Name Normalization
+
+- [x] Normalize bracketed numeric prefixes out of postcode CSV mosque names
+- [x] Move leading `(ESTATE)` markers to the end of postcode CSV mosque names
+- [x] Cover the new name normalization in the dedicated postcode seeder test and verify the import path
+
+## Review
+- Rewrote `database/seeders/Generated_File_Final_Fixed_Poskod.csv` so all 31 leading bracketed numeric prefixes were removed from `Nama` values and all 27 leading `(ESTATE)` markers were moved to the end of the name. Post-cleanup scan results are `remaining_bracket_prefixes=0` and `remaining_estate_prefixes=0`.
+- Updated `GeneratedFileFinalFixedPoskodSeeder` to normalize imported institution names with the same rules at seed time, so future CSV drift on those two patterns does not leak into stored institution names. The importer also now strips a UTF-8 BOM from CSV headers defensively.
+- Extended `tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php` to assert both normalization rules through the real import path: row `5667 => Masjid Kampung Bukit Lada` and row `6412 => Masjid Al-Muhajirin (ESTATE)`.
+- Verification:
+  - `python3` CSV audit: first row header still reads correctly as `No.`, `remaining_bracket_prefixes=0`, `remaining_estate_prefixes=0`
+  - `vendor/bin/pint --format=agent database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/phpstan analyse --ansi database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `php artisan db:seed --class=Database\\Seeders\\GeneratedFileFinalFixedPoskodSeeder --ansi`
+  - Post-seed `php -r` verification on the current database: `institutions=6935`, `name_5667=MASJID KAMPUNG BUKIT LADA`, `name_6412=MASJID AL-MUHAJIRIN (ESTATE)`
+
+# Dedicated Postcode CSV Seeder
+
+- [x] Add a dedicated seeder for `Generated_File_Final_Fixed_Poskod.csv`
+- [x] Resolve imported rows onto integer-backed state/district/subdistrict geography IDs without row skips
+- [x] Add focused coverage for the dedicated seeder
+- [x] Verify with `migrate:fresh`, `ProductionSeeder`, and the dedicated seeder until the import completes cleanly
+
+## Review
+- Added `GeneratedFileFinalFixedPoskodSeeder` as a deterministic, idempotent importer for `database/seeders/Generated_File_Final_Fixed_Poskod.csv`. It creates or updates one verified `masjid` institution per CSV row using deterministic canonical slugs derived from the imported names plus the row number, then writes a single `main` address per institution.
+- The importer resolves the CSV onto the app's actual geography schema, where `state_id`, `district_id`, and `subdistrict_id` are integer foreign IDs rather than UUIDs. It preloads the seeded Malaysia geography, normalizes state aliases, maps `PUSA` onto `Betong`, handles the ambiguous `JENGKA` cluster with deterministic district/subdistrict rules, and ensures the missing `Pusa` subdistrict exists under `Betong`.
+- Added `tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php` to seed `ProductionSeeder`, run the dedicated importer, assert all 6,935 rows import with 6,935 addresses, check the one intentionally unresolved junk row (`6082`), and lock in the trickiest mappings (`Jerantut/Bandar Pusat Jengka`, `Maran/Bandar Tun Abdul Razak`, `Betong/Pusa`, `Kuala Kangsar/Padang Rengas`).
+- Verification:
+  - `vendor/bin/pint --format=agent database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/phpstan analyse --ansi database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php`
+  - `php artisan migrate:fresh --ansi`
+  - `php artisan db:seed --class=Database\\Seeders\\ProductionSeeder --ansi`
+  - `php artisan db:seed --class=Database\\Seeders\\GeneratedFileFinalFixedPoskodSeeder --ansi`
+  - Post-seed Eloquent verification via `php -r`: `institutions=6935`, `addresses=6935`, `null_district_rows=1`, `subdistrict_rows=3537`; sampled rows confirmed `1880 => Jerantut / Bandar Pusat Jengka`, `1882 => Maran / Bandar Tun Abdul Razak`, `4437 => Betong / Pusa`, `6082 => Sarawak / null / null`
+
+# Production Seeder And Postcode CSV Cleanup
+
+- [x] Add `UserSeeder` to the production seeding pipeline
+- [x] Normalize high-confidence `Generated_File_Final_Fixed_Poskod.csv` issues using the app's canonical geography data
+- [x] Run focused verification and record the outcome
+
+## Review
+- Added `UserSeeder` to `ProductionSeeder` so production bootstrap seeding now creates the baseline user accounts after permissions and roles are in place, and updated the focused production seeder expectation to match the actual production seed list plus that new user batch.
+- Rewrote `database/seeders/Generated_File_Final_Fixed_Poskod.csv` with deterministic corrections only: fixed the single malformed 8-column row, filled the one blank state row that was recoverable from `BANDARAYA KUANTAN`, left-padded all 511 four-digit postcodes to five digits, normalized 2,141 district aliases to the app's canonical district names, and inferred 29 blank districts from unambiguous address tokens backed by the existing district/subdistrict data.
+- Post-cleanup CSV audit results: no malformed rows remain, no blank states remain, no four-digit or non-numeric postcodes remain, and the only unresolved non-canonical district labels left are `JENGKA` (30 rows) and `PUSA` (10 rows); 15 rows still have blank districts because the dataset did not provide enough unambiguous location detail to map them safely.
+- Verification:
+  - `vendor/bin/pint --format=agent database/seeders/ProductionSeeder.php tests/Feature/ProductionSeederTest.php tasks/todo.md`
+  - `vendor/bin/pest --parallel --compact tests/Feature/ProductionSeederTest.php`
+  - `vendor/bin/phpstan analyse --ansi database/seeders/ProductionSeeder.php tests/Feature/ProductionSeederTest.php`
+  - `git diff --check -- database/seeders/ProductionSeeder.php tests/Feature/ProductionSeederTest.php database/seeders/Generated_File_Final_Fixed_Poskod.csv tasks/todo.md`
+  - CSV integrity audit via local PHP scripts: `bad_length=0`, `blank_state=0`, `blank_district=15`, `four_digit_postcode=0`, remaining invalid districts limited to `JENGKA=30` and `PUSA=10`
+
 # Google OAuth Login Guard
 
 - [x] Trace why Google login can still reach Google with an unusable OAuth configuration

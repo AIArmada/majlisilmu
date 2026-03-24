@@ -339,24 +339,9 @@ new class extends Component {
         $primaryLocationName = $venueName ?: $institutionName;
         $address = $event->venue?->addressModel ?? $event->institution?->addressModel;
 
-        $districtName = $address?->district?->name;
-        $stateName = $address?->state?->name;
-
-        $stateHiddenDistricts = [
-            'kuala lumpur',
-            'putrajaya',
-            'labuan',
-        ];
-
-        if (is_string($districtName) && in_array(Str::lower(trim($districtName)), $stateHiddenDistricts, true)) {
-            $stateName = null;
-        }
-
         $parts = array_filter([
             $primaryLocationName,
-            $address?->subdistrict?->name,
-            $districtName,
-            $stateName,
+            ...\App\Support\Location\AddressHierarchyFormatter::parts($address),
         ]);
 
         if ($parts !== []) {

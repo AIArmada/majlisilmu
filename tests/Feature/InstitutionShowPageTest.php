@@ -12,6 +12,8 @@ use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Space;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Support\Carbon;
@@ -68,6 +70,64 @@ it('displays institution type badge', function () {
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
         ->assertSee(InstitutionType::Masjid->getLabel());
+});
+
+it('deduplicates matching district and subdistrict labels on institution show page', function () {
+    $state = State::query()
+        ->where('country_code', 'MY')
+        ->where('name', 'Pahang')
+        ->first();
+
+    if (! $state) {
+        $countryId = DB::table('countries')->insertGetId([
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Pahang',
+            'country_code' => 'MY',
+        ]);
+
+        $state = State::query()->findOrFail($stateId);
+    }
+
+    $district = District::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Temerloh',
+        'status' => 'verified',
+    ]);
+
+    $institution->address()->update([
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('Temerloh, Pahang')
+        ->assertDontSee('Temerloh, Temerloh, Pahang');
 });
 
 it('displays upcoming events for the institution', function () {
