@@ -852,20 +852,7 @@
                             $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
                             $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                             $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
-                            $subdistrictName = $addressModel?->subdistrict?->name;
-                            $districtName = $addressModel?->district?->name;
-                            $stateName = $addressModel?->state?->name;
-
-                            $stateHiddenDistricts = ['kuala lumpur', 'putrajaya', 'labuan'];
-                            if (is_string($districtName) && in_array(mb_strtolower(trim($districtName)), $stateHiddenDistricts, true)) {
-                                $stateName = null;
-                            }
-
-                            $hierarchyParts = array_values(array_filter([
-                                $subdistrictName,
-                                $districtName,
-                                $stateName,
-                            ], static fn (?string $part): bool => is_string($part) && $part !== ''));
+                            $hierarchyParts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
 
                             $hierarchyText = match (count($hierarchyParts)) {
                                 0 => '',

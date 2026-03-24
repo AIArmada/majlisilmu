@@ -356,20 +356,7 @@ class extends Component
     $hasScopedFilters = filled($stateId) || filled($districtId) || filled($subdistrictId);
     $submitInstitutionUrl = route('contributions.submit-institution');
     $formatInstitutionLocation = static function ($addressModel): string {
-        $stateName = $addressModel?->state?->name;
-        $districtName = $addressModel?->district?->name;
-        $subdistrictName = $addressModel?->subdistrict?->name;
-
-        $stateHiddenDistricts = ['kuala lumpur', 'putrajaya', 'labuan'];
-        if (is_string($districtName) && in_array(mb_strtolower(trim($districtName)), $stateHiddenDistricts, true)) {
-            $stateName = null;
-        }
-
-        $parts = array_values(array_filter([
-            $stateName,
-            $districtName,
-            $subdistrictName,
-        ], static fn (mixed $value): bool => is_string($value) && filled($value)));
+        $parts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel, ['state', 'district', 'subdistrict']);
 
         return $parts === [] ? '-' : implode(', ', $parts);
     };

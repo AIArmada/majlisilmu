@@ -7,12 +7,12 @@ use Database\Seeders\InspirationSeeder;
 use Database\Seeders\MalaysiaCitySeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\ProductionSeeder;
-use Database\Seeders\ReferenceSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\ScopedMemberRolesSeeder;
 use Database\Seeders\SpaceSeeder;
 use Database\Seeders\SubdistrictSeeder;
 use Database\Seeders\TagSeeder;
+use Database\Seeders\UserSeeder;
 use Database\Seeders\WorldSeeder;
 use Illuminate\Support\Arr;
 
@@ -77,8 +77,8 @@ it('production seeder only calls deterministic bootstrap seeders', function () {
         RoleSeeder::class,
         ScopedMemberRolesSeeder::class,
         TagSeeder::class,
+        UserSeeder::class,
         SpaceSeeder::class,
-        ReferenceSeeder::class,
         InspirationSeeder::class,
     ]);
 });

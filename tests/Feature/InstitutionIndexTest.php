@@ -177,6 +177,64 @@ it('shows location hierarchy values without labels on institution cards', functi
         ->assertDontSee(__('Bandar / Mukim / Zon').':');
 });
 
+it('deduplicates matching district and subdistrict labels on institution cards', function () {
+    $state = State::query()
+        ->where('country_code', 'MY')
+        ->where('name', 'Pahang')
+        ->first();
+
+    if (! $state) {
+        $countryId = DB::table('countries')->insertGetId([
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Pahang',
+            'country_code' => 'MY',
+        ]);
+
+        $state = State::query()->findOrFail($stateId);
+    }
+
+    $district = District::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Temerloh',
+        'status' => 'verified',
+    ]);
+
+    $institution->address()->update([
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    get('/institusi?search=Temerloh')
+        ->assertSuccessful()
+        ->assertSee('Pahang, Temerloh')
+        ->assertDontSee('Pahang, Temerloh, Temerloh');
+});
+
 it('shows location scope controls on institution index', function () {
     get('/institusi')
         ->assertSuccessful()
