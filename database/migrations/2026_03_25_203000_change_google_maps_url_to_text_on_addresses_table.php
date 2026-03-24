@@ -13,7 +13,7 @@ return new class extends Migration
         }
 
         Schema::table('addresses', function (Blueprint $table): void {
-            $table->string('google_maps_url', 500)->nullable()->change();
+            $table->text('google_maps_url')->nullable()->change();
         });
     }
 };

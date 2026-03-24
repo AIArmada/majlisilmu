@@ -95,7 +95,6 @@ class SharedFormSchema
                 ->label(__('Google Maps URL'))
                 ->url()
                 ->required($requireGoogleMaps)
-                ->maxLength(500)
                 ->placeholder(__('https://maps.google.com/...')),
 
             TextInput::make('waze_url')

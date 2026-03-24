@@ -24,7 +24,7 @@ it('preserves long google place urls and still extracts place coordinates instea
         ->and($freshAddress->lng)->toBe(101.4884755);
 });
 
-it('preserves resolved google place urls that are longer than 255 characters but within the 500 character field limit', function () {
+it('preserves resolved google place urls that are longer than 255 characters', function () {
     $resolvedPlaceUrl = 'https://www.google.com.my/maps/place/Sultan+Salahuddin+Abdul+Aziz+Shah+Masjid/@3.07853,101.520698,17z/data=!3m1!4b1!4m6!3m5!1s0x31cc527ec7366823:0xd59cd5f00940bc42!8m2!3d3.07853!4d101.520698!16zL20vMGJ0ems3?entry=ttu&g_ep=EgoyMDI2MDMyMi4wIKXMDSoASAFQAw%3D%3D';
 
     $address = Address::query()->create([
@@ -37,6 +37,27 @@ it('preserves resolved google place urls that are longer than 255 characters but
 
     expect($freshAddress->google_maps_url)
         ->toBe($resolvedPlaceUrl)
+        ->and($freshAddress->lat)->toBe(3.07853)
+        ->and($freshAddress->lng)->toBe(101.520698);
+});
+
+it('preserves google maps place urls longer than 500 characters when the column is text', function () {
+    $baseUrl = 'https://www.google.com/maps/place/Sultan+Salahuddin+Abdul+Aziz+Shah+Masjid/@3.07853,101.5158324,17z/data=!3m1!4b1!4m6!3m5!1s0x31cc527ec7366823:0xd59cd5f00940bc42!8m2!3d3.07853!4d101.520698!16zL20vMGJ0ems3?entry=tts';
+    $longQuery = '&debug='.str_repeat('a', 320);
+    $veryLongPlaceUrl = $baseUrl.$longQuery;
+
+    expect(strlen($veryLongPlaceUrl))->toBeGreaterThan(500);
+
+    $address = Address::query()->create([
+        'addressable_type' => 'institution',
+        'addressable_id' => (string) Str::uuid(),
+        'google_maps_url' => $veryLongPlaceUrl,
+    ]);
+
+    $freshAddress = $address->fresh();
+
+    expect($freshAddress->google_maps_url)
+        ->toBe($veryLongPlaceUrl)
         ->and($freshAddress->lat)->toBe(3.07853)
         ->and($freshAddress->lng)->toBe(101.520698);
 });

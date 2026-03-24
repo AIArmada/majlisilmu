@@ -148,7 +148,6 @@ class VenueForm
                         TextInput::make('google_maps_url')
                             ->label('Google Maps URL')
                             ->url()
-                            ->maxLength(500)
                             ->helperText('Paste the full Google Maps link from your browser'),
                         TextInput::make('google_place_id')
                             ->label('Google Place ID')
