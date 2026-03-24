@@ -488,13 +488,7 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
      */
     private function containsAny(string $haystack, array $needles): bool
     {
-        foreach ($needles as $needle) {
-            if (str_contains($haystack, $this->normalizeKey($needle))) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($needles, fn ($needle) => str_contains($haystack, $this->normalizeKey($needle)));
     }
 
     private function normalizeKey(?string $value): string

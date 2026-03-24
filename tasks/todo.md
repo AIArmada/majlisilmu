@@ -1,3 +1,50 @@
+# Account Prayer Institutions
+
+- [x] Inspect the current account-settings flow and existing institution-select patterns
+- [x] Add daily and Friday prayer institution preferences to the user model and account-settings page
+- [x] Extend account-settings coverage for optional saves, invalid picks, and stale saved preferences
+- [x] Run verification for migration safety, formatting, static analysis, and tests
+
+## Review
+- Added two nullable user-level institution preferences, `daily_prayer_institution_id` and `friday_prayer_institution_id`, to keep the data as first-class profile state rather than opaque notification metadata.
+- Extended the existing account-settings profile form to include a dedicated prayer-institutions section with async searchable institution selectors. Search is limited to active verified institutions, while saved-label resolution still works for historical IDs so the form can load even if an institution later becomes inactive or unverified.
+- Kept the behavior private and settings-only: the new preferences only save through the profile form and do not affect notification, event-builder, or public-directory behavior.
+- Added feature coverage for render, searchable institution lookup on both selectors, daily-only / Friday-only / same / different / clear flows, invalid selections, inactive or pending institutions, and stale saved selections surviving unrelated profile updates.
+- Verification:
+  - `php artisan migrate --pretend --path=database/migrations/2026_03_24_000000_add_prayer_institution_preferences_to_users_table.php`
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php`
+  - `vendor/bin/pest --parallel --compact`
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pint --test app/Livewire/Pages/Dashboard/AccountSettings.php app/Models/User.php tests/Feature/AccountSettingsPageTest.php database/migrations/2026_03_24_000000_add_prayer_institution_preferences_to_users_table.php resources/views/livewire/pages/dashboard/account-settings.blade.php`
+  - `git diff --check`
+- Result:
+  - migration SQL is clean: nullable UUID columns plus indexes only, with no DB-level constraints
+  - focused account-settings feature coverage passed
+  - full Pest suite passed: `955 passed (4184 assertions)`
+  - PHPStan passed with no errors
+  - Pint passed
+  - `git diff --check` passed
+
+# Verification Sweep
+
+- [x] Inspect the failing Blaze login assertion against the current conditional social-login view behavior
+- [x] Apply the minimal fixes for the failing Blaze test and Rector dry-run suggestion
+- [x] Re-run the targeted and full verification commands to confirm the suite state
+
+## Review
+- `BlazeIntegrationTest` was asserting the Google OAuth link unconditionally even though the login view only renders that CTA when `services.google` is fully configured. The test now seeds the Google config inline before asserting the link so it verifies the real runtime contract under Blaze.
+- Applied Rector's only reported dry-run change in `GeneratedFileFinalFixedPoskodSeeder` by replacing the small manual `foreach`/`return` helper with `array_any(...)`.
+- Verification:
+  - `vendor/bin/rector process --dry-run --no-progress-bar --debug --memory-limit=2G`
+  - `vendor/bin/pest --parallel --compact`
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pint --test`
+- Result:
+  - full Pest suite passed: `951 passed`
+  - PHPStan passed with no errors
+  - Pint passed
+  - Rector dry-run passed with no remaining changes
+
 # Postcode Institution Slugs
 
 - [x] Replace `generated-poskod-{row}` institution slugs with readable canonical slugs derived from the imported names

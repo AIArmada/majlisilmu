@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Dashboard;
 
 use App\Livewire\Concerns\InteractsWithToasts;
+use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationCatalog;
@@ -14,7 +15,9 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -34,13 +37,22 @@ class AccountSettings extends Component implements HasForms
     public string $tab = 'profile';
 
     /**
-     * @var array{name: string, email: string, phone: string, timezone: string}
+     * @var array{
+     *     name: string,
+     *     email: string,
+     *     phone: string,
+     *     timezone: string,
+     *     daily_prayer_institution_id: string,
+     *     friday_prayer_institution_id: string
+     * }
      */
     public array $formData = [
         'name' => '',
         'email' => '',
         'phone' => '',
         'timezone' => '',
+        'daily_prayer_institution_id' => '',
+        'friday_prayer_institution_id' => '',
     ];
 
     /**
@@ -185,6 +197,31 @@ class AccountSettings extends Component implements HasForms
                             ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalString($state))
                             ->rule(Rule::in($this->allowedTimezones())),
                     ]),
+                Section::make(__('Prayer Institutions'))
+                    ->description(__('Save the institutions you usually attend for daily prayers and Friday prayers. Friday can be the same as your daily institution.'))
+                    ->columns(2)
+                    ->schema([
+                        Select::make('daily_prayer_institution_id')
+                            ->label(__('Daily Prayer Institution'))
+                            ->placeholder(__('Search institution...'))
+                            ->searchable()
+                            ->native(false)
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchPrayerInstitutionOptions($search))
+                            ->getOptionLabelUsing(fn (mixed $value): ?string => $this->prayerInstitutionOptionLabel($value))
+                            ->helperText(__('Your usual mosque or surau for daily prayers.'))
+                            ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalString($state))
+                            ->rules(['nullable', 'uuid']),
+                        Select::make('friday_prayer_institution_id')
+                            ->label(__('Friday Prayer Institution'))
+                            ->placeholder(__('Search institution...'))
+                            ->searchable()
+                            ->native(false)
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchPrayerInstitutionOptions($search))
+                            ->getOptionLabelUsing(fn (mixed $value): ?string => $this->prayerInstitutionOptionLabel($value))
+                            ->helperText(__('Leave blank if you do not want to save a separate Friday location.'))
+                            ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalString($state))
+                            ->rules(['nullable', 'uuid']),
+                    ]),
             ]);
     }
 
@@ -197,15 +234,30 @@ class AccountSettings extends Component implements HasForms
         $normalizedEmail = $this->normalizeOptionalString($validated['email'] ?? null);
         $normalizedPhone = $this->normalizeOptionalPhone($validated['phone'] ?? null);
         $normalizedTimezone = $this->normalizeOptionalString($validated['timezone'] ?? null);
+        $dailyPrayerInstitutionId = $this->normalizeOptionalString($validated['daily_prayer_institution_id'] ?? null);
+        $fridayPrayerInstitutionId = $this->normalizeOptionalString($validated['friday_prayer_institution_id'] ?? null);
 
         $emailChanged = $normalizedEmail !== $user->email;
         $phoneChanged = $normalizedPhone !== $user->phone;
+
+        $this->assertPrayerInstitutionSelectionAllowed(
+            $dailyPrayerInstitutionId,
+            $user->daily_prayer_institution_id,
+            'formData.daily_prayer_institution_id',
+        );
+        $this->assertPrayerInstitutionSelectionAllowed(
+            $fridayPrayerInstitutionId,
+            $user->friday_prayer_institution_id,
+            'formData.friday_prayer_institution_id',
+        );
 
         $user->forceFill([
             'name' => $normalizedName,
             'email' => $normalizedEmail,
             'phone' => $normalizedPhone,
             'timezone' => $normalizedTimezone,
+            'daily_prayer_institution_id' => $dailyPrayerInstitutionId,
+            'friday_prayer_institution_id' => $fridayPrayerInstitutionId,
             'email_verified_at' => $emailChanged ? null : $user->email_verified_at,
             'phone_verified_at' => $phoneChanged ? null : $user->phone_verified_at,
         ])->save();
@@ -304,7 +356,14 @@ class AccountSettings extends Component implements HasForms
     }
 
     /**
-     * @return array{name: string, email: string, phone: string, timezone: string}
+     * @return array{
+     *     name: string,
+     *     email: string,
+     *     phone: string,
+     *     timezone: string,
+     *     daily_prayer_institution_id: string,
+     *     friday_prayer_institution_id: string
+     * }
      */
     protected function initialFormData(User $user): array
     {
@@ -313,7 +372,73 @@ class AccountSettings extends Component implements HasForms
             'email' => (string) ($user->email ?? ''),
             'phone' => (string) ($user->phone ?? ''),
             'timezone' => (string) ($user->timezone ?? ''),
+            'daily_prayer_institution_id' => (string) ($user->daily_prayer_institution_id ?? ''),
+            'friday_prayer_institution_id' => (string) ($user->friday_prayer_institution_id ?? ''),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function searchPrayerInstitutionOptions(string $search): array
+    {
+        $query = $this->selectablePrayerInstitutionQuery();
+        $search = trim($search);
+
+        if ($search !== '') {
+            $query->where('name', $this->databaseLikeOperator(), '%'.$search.'%');
+        }
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    protected function prayerInstitutionOptionLabel(mixed $value): ?string
+    {
+        $institutionId = $this->normalizeOptionalString($value);
+
+        if ($institutionId === null) {
+            return null;
+        }
+
+        return Institution::query()->whereKey($institutionId)->value('name');
+    }
+
+    protected function assertPrayerInstitutionSelectionAllowed(?string $selectedInstitutionId, ?string $currentInstitutionId, string $errorKey): void
+    {
+        if ($selectedInstitutionId === null) {
+            return;
+        }
+
+        if ($selectedInstitutionId === $currentInstitutionId) {
+            return;
+        }
+
+        if ($this->selectablePrayerInstitutionQuery()->whereKey($selectedInstitutionId)->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $errorKey => __('Please select a valid active institution.'),
+        ]);
+    }
+
+    /**
+     * @return Builder<Institution>
+     */
+    protected function selectablePrayerInstitutionQuery(): Builder
+    {
+        return Institution::query()
+            ->active()
+            ->where('status', 'verified');
+    }
+
+    protected function databaseLikeOperator(): string
+    {
+        return config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
     }
 
     protected function normalizeOptionalString(mixed $value): ?string
@@ -343,7 +468,11 @@ class AccountSettings extends Component implements HasForms
 
         abort_unless($user instanceof User, 403);
 
-        return $user;
+        $freshUser = User::query()->find($user->getKey());
+
+        abort_unless($freshUser instanceof User, 403);
+
+        return $freshUser;
     }
 
     protected function syncInheritedTriggerStates(): void
