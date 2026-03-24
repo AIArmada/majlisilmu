@@ -56,6 +56,8 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            // Public media is exposed via bucket policy. Leave object ACL visibility unset,
+            // because this bucket blocks public ACLs and S3 uploads would fail if we force them.
             'throw' => false,
             'report' => false,
         ],
