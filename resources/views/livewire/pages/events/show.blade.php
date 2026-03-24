@@ -6,6 +6,10 @@
 @section('og_image', $event->card_image_url)
 @section('og_image_alt', __('Poster untuk :title', ['title' => $event->title]))
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/notifications'],
+])
+
 @push('head')
     <x-event-json-ld :event="$this->event" />
     <link rel="canonical" href="{{ route('events.show', $event) }}">

@@ -6,6 +6,10 @@
 @section('og_image_width', '1024')
 @section('og_image_height', '1024')
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/schemas', 'filament/forms'],
+])
+
 @push('head')
 @endpush
 

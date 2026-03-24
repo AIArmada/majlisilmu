@@ -6,3 +6,10 @@ it('shows a submission preview section on submit event page', function () {
         ->assertSee(__('Pratonton Penghantaran'))
         ->assertSee(__('Semak ringkasan ini sebelum anda menghantar.'));
 });
+
+it('loads app-level filament helper scripts on submit event page', function () {
+    $this->get('/submit-event')
+        ->assertSuccessful()
+        ->assertSee('close-on-select.js', false)
+        ->assertSee('user-timezone.js', false);
+});

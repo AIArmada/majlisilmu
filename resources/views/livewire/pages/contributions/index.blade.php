@@ -12,6 +12,10 @@
 
 @section('title', __('My Contributions') . ' - ' . config('app.name'))
 
+@include('partials.filament-assets', [
+    'scripts' => ['filament/support', 'filament/schemas', 'filament/forms'],
+])
+
 <div class="min-h-screen bg-slate-50 py-10 pb-28">
     <div class="container mx-auto max-w-6xl px-6 lg:px-8">
         <section class="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">

@@ -23,6 +23,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -52,7 +53,33 @@ describe('Event Search Filters', function () {
 
         $response->assertOk()
             ->assertSee('Circle of')
-            ->assertSee('Advanced Filters');
+            ->assertSee('Advanced Filters')
+            ->assertDontSee('/flux/flux.js', false)
+            ->assertSee('/js/filament/schemas/schemas.js', false)
+            ->assertSee('/js/filament/support/support.js', false)
+            ->assertDontSee('/js/filament/tables/tables.js', false)
+            ->assertDontSee('/js/filament/notifications/notifications.js', false)
+            ->assertDontSee('/js/filament/actions/actions.js', false);
+    });
+
+    it('primes the default events search cache for the unfiltered first page', function () {
+        config()->set('cache.default', 'array');
+        app('cache')->setDefaultDriver('array');
+        Cache::flush();
+
+        Event::factory()->count(3)->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        Livewire::test(Index::class)
+            ->assertSee('Circle of');
+
+        expect(Cache::get('default_events_search_v2'))
+            ->toBeArray()
+            ->toMatchArray(['total' => 3]);
     });
 
     it('shows title-only search placeholder on events index', function () {

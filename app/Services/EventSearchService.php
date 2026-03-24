@@ -39,9 +39,6 @@ class EventSearchService
             'venue.address.state',
             'venue.address.district',
             'venue.address.subdistrict',
-            'speakers.media' => fn ($query) => $query
-                ->where('collection_name', 'avatar')
-                ->ordered(),
         ];
     }
 
