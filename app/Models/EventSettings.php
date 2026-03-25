@@ -3,16 +3,18 @@
 namespace App\Models;
 
 use App\Enums\RegistrationMode;
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\EventSettingsFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class EventSettings extends Model
+class EventSettings extends Model implements AuditableContract
 {
     /** @use HasFactory<EventSettingsFactory> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     public $incrementing = false;
 

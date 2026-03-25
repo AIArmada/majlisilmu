@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasLanguages;
 use Database\Factories\SeriesFactory;
@@ -11,14 +12,15 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Series extends Model implements HasMedia
+class Series extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<SeriesFactory> */
-    use HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia;
+    use AuditsModelChanges, HasFactory, HasFollowers, HasLanguages, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 

@@ -5,6 +5,7 @@ namespace App\Filament\Ahli\Resources\Speakers;
 use App\Filament\Ahli\Resources\Speakers\Pages\EditSpeaker;
 use App\Filament\Ahli\Resources\Speakers\Pages\ListSpeakers;
 use App\Filament\Ahli\Resources\Speakers\Pages\ViewSpeaker;
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Speakers\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\Speakers\SpeakerResource as AdminSpeakerResource;
 use App\Models\Speaker;
@@ -59,6 +60,7 @@ class SpeakerResource extends AdminSpeakerResource
     {
         return [
             MemberInvitationsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

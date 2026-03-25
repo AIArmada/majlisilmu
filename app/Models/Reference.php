@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\MemberSubjectType;
+use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasSocialMedia;
 use Database\Factories\ReferenceFactory;
@@ -15,15 +16,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Reference extends Model implements HasMedia
+class Reference extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<ReferenceFactory> */
-    use HasFactory, HasFollowers, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use AuditsModelChanges, HasFactory, HasFollowers, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     #[\Override]
     protected static function booted(): void

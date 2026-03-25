@@ -44,6 +44,7 @@
         "spatie/laravel-model-states": "^2.13",
         "spatie/laravel-query-builder": "^7.0",
         "spatie/laravel-sluggable": "^3.7",
+        "tapp/filament-auditing": "^4.0",
         "typesense/typesense-php": "^6.0",
         "ysfkaya/filament-phone-input": "^4.1"
     },

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ContributionRequests;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\ContributionRequests\Pages\ListContributionRequests;
 use App\Filament\Resources\ContributionRequests\Pages\ViewContributionRequest;
 use App\Filament\Resources\ContributionRequests\Schemas\ContributionRequestInfolist;
@@ -54,7 +55,9 @@ class ContributionRequestResource extends Resource
     #[\Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            AuditsRelationManager::class,
+        ];
     }
 
     #[\Override]

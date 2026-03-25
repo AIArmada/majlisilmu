@@ -3,16 +3,27 @@
 namespace App\Providers;
 
 use App\Ai\Listeners\RecordAiUsage;
+use App\Models\Address;
+use App\Models\AiModelPricing;
+use App\Models\Audit as FilamentAudit;
+use App\Models\Contact;
 use App\Models\ContributionRequest;
 use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\EventKeyPerson;
+use App\Models\EventSettings;
 use App\Models\EventSubmission;
 use App\Models\Inspiration;
 use App\Models\Institution;
+use App\Models\MediaLink;
+use App\Models\MemberInvitation;
 use App\Models\MembershipClaim;
 use App\Models\Reference;
+use App\Models\Registration;
 use App\Models\Report;
 use App\Models\Series;
+use App\Models\SocialMedia;
+use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
@@ -22,6 +33,7 @@ use App\Observers\InstitutionObserver;
 use App\Observers\SpeakerObserver;
 use App\Observers\TagObserver;
 use App\Observers\VenueObserver;
+use App\Policies\FilamentAuditPolicy;
 use App\Support\Media\MediaFileNamer;
 use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -29,6 +41,7 @@ use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event as EventFacade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Ai\Events\AgentPrompted;
@@ -56,7 +69,12 @@ class AppServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
+        $filamentAuditingViews = base_path('vendor/tapp/filament-auditing/resources/views');
         $filamentSignalsViews = base_path('../commerce/packages/filament-signals/resources/views');
+
+        if (is_dir($filamentAuditingViews)) {
+            $this->loadViewsFrom($filamentAuditingViews, 'filament-auditing');
+        }
 
         if (is_dir($filamentSignalsViews)) {
             $this->loadViewsFrom($filamentSignalsViews, 'filament-signals');
@@ -119,20 +137,38 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Relation::enforceMorphMap([
+            'address' => Address::class,
+            'ai_model_pricing' => AiModelPricing::class,
+            'contact' => Contact::class,
             'user' => User::class,
             'event' => Event::class,
+            'event_key_person' => EventKeyPerson::class,
             'event_submission' => EventSubmission::class,
+            'event_settings' => EventSettings::class,
             'contribution_request' => ContributionRequest::class,
             'membership_claim' => MembershipClaim::class,
             'institution' => Institution::class,
+            'media_link' => MediaLink::class,
+            'member_invitation' => MemberInvitation::class,
+            'registration' => Registration::class,
             'speaker' => Speaker::class,
             'series' => Series::class,
+            'social_media' => SocialMedia::class,
+            'space' => Space::class,
+            'tag' => Tag::class,
             'venue' => Venue::class,
             'donation_channel' => DonationChannel::class,
             'reference' => Reference::class,
             'report' => Report::class,
             'inspiration' => Inspiration::class,
         ]);
+
+        Gate::policy(FilamentAudit::class, FilamentAuditPolicy::class);
+
+        Gate::define('audit', static fn (mixed $user, mixed $resource): bool => $user instanceof User
+            && $user->hasAnyRole(['super_admin', 'admin', 'moderator']));
+
+        Gate::define('restoreAudit', static fn (mixed $user, mixed $resource): bool => false);
 
         if (! self::$mediaUploadConfigured) {
             // Configure SpatieMediaLibraryFileUpload to use slug-based filenames globally.

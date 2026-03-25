@@ -36,6 +36,7 @@ final readonly class ChangeSubjectMemberRole
         $subjectType = $subject instanceof MemberSubjectType
             ? $subject
             : MemberSubjectType::forSubject($subject);
+        $previousRoleName = $this->memberRoleCatalog->currentRoleName($member, $subjectType);
 
         $this->scopedMemberRoleSeeder->ensure($subjectType);
 
@@ -47,6 +48,28 @@ final readonly class ChangeSubjectMemberRole
         Authz::withScope($scope, function () use ($member, $resolvedRoleId): void {
             $member->syncRoles($resolvedRoleId === null ? [] : [$resolvedRoleId]);
         }, $member);
+
+        $currentRoleName = $this->memberRoleCatalog->currentRoleName($member, $subjectType);
+
+        if (! $subject instanceof MemberSubjectType) {
+            $subject->recordCustomAuditDifferences(
+                'member_role_changed',
+                [
+                    'member_role' => [
+                        'user_id' => $member->getKey(),
+                        'user_name' => $member->name,
+                        'role' => $previousRoleName,
+                    ],
+                ],
+                [
+                    'member_role' => [
+                        'user_id' => $member->getKey(),
+                        'user_name' => $member->name,
+                        'role' => $currentRoleName,
+                    ],
+                ],
+            );
+        }
 
         if ($subjectType->usesPublicSubmissionLocks()) {
             $this->publicSubmissionLockService->syncForUser($member);

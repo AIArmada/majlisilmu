@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Speakers;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Speakers\Pages\CreateSpeaker;
 use App\Filament\Resources\Speakers\Pages\EditSpeaker;
 use App\Filament\Resources\Speakers\Pages\ListSpeakers;
@@ -51,6 +52,7 @@ class SpeakerResource extends Resource
             FollowersRelationManager::class,
             RelationManagers\InstitutionsRelationManager::class,
             EventsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

@@ -1,5 +1,6 @@
 # Lessons
 
+- When a user says “audit is already installed”, confirm the exact package already present in the repo before designing the integration path; `owen-it/laravel-auditing` and `spatie/laravel-activitylog` imply different Filament integration choices.
 - For external canonical URLs like Google Maps place links, prefer a `text` column over arbitrary `string(N)` caps when the product expectation is to preserve the full resolved URL verbatim.
 - When expanding `maps.app.goo.gl` links, do not assume the effective redirect is already a canonical Maps URL; Google can stop on `consent.google.com/ml?continue=...`, so unwrap the `continue` target before normalizing or persisting the map link.
 - For optional OAuth providers, never render the button unconditionally; centralize a provider-configured check and guard the redirect/callback routes too, otherwise users can be sent to the provider with broken or stale credentials.

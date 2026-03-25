@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use App\Support\SocialMedia\SocialMediaLinkResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class SocialMedia extends Model
+class SocialMedia extends Model implements AuditableContract
 {
-    use HasUuids;
+    use AuditsModelChanges, HasUuids;
 
     protected $fillable = [
         'socialable_type',

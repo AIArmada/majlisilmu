@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use GuzzleHttp\TransferStats;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Http;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class Address extends Model
+class Address extends Model implements AuditableContract
 {
-    use HasUuids;
+    use AuditsModelChanges, HasUuids;
 
     protected $fillable = [
         'addressable_type',
@@ -98,9 +100,8 @@ class Address extends Model
         }
 
         $resolvedUrl = is_string($effectiveUrl) && $effectiveUrl !== '' ? $effectiveUrl : $trimmedUrl;
-        $resolvedUrl = self::unwrapGoogleConsentUrl($resolvedUrl);
 
-        return $resolvedUrl;
+        return self::unwrapGoogleConsentUrl($resolvedUrl);
     }
 
     private static function unwrapGoogleConsentUrl(string $url): string

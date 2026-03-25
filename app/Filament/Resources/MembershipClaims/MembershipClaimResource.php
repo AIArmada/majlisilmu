@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MembershipClaims;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\MembershipClaims\Pages\ListMembershipClaims;
 use App\Filament\Resources\MembershipClaims\Pages\ViewMembershipClaim;
 use App\Filament\Resources\MembershipClaims\Schemas\MembershipClaimInfolist;
@@ -54,7 +55,9 @@ class MembershipClaimResource extends Resource
     #[\Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            AuditsRelationManager::class,
+        ];
     }
 
     #[\Override]

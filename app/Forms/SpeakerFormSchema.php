@@ -14,6 +14,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 class SpeakerFormSchema
 {
@@ -114,7 +115,11 @@ class SpeakerFormSchema
                 ];
             }
 
-            $speaker->institutions()->attach($institutionData);
+            if ($speaker instanceof AuditableContract && method_exists($speaker, 'auditSync')) {
+                $speaker->auditSync('institutions', $institutionData, false, ['institutions.id', 'institutions.name']);
+            } else {
+                $speaker->institutions()->attach($institutionData);
+            }
         }
 
         return (string) $speaker->getKey();

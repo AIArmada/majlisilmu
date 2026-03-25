@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Inspirations;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Inspirations\Pages\CreateInspiration;
 use App\Filament\Resources\Inspirations\Pages\EditInspiration;
 use App\Filament\Resources\Inspirations\Pages\ListInspirations;
@@ -40,7 +41,9 @@ class InspirationResource extends Resource
     #[\Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            AuditsRelationManager::class,
+        ];
     }
 
     #[\Override]

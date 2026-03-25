@@ -7,6 +7,7 @@ use App\Enums\Honorific;
 use App\Enums\MemberSubjectType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasContacts;
 use App\Models\Concerns\HasDonationChannels;
@@ -22,7 +23,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -39,7 +39,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Speaker extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<SpeakerFactory> */
-    use Auditable, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 
