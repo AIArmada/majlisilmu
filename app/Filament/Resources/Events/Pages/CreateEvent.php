@@ -3,14 +3,20 @@
 namespace App\Filament\Resources\Events\Pages;
 
 use App\Actions\Events\SyncEventResourceRelationsAction;
+use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
+use App\Models\Reference;
+use App\Models\Series;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
+use Illuminate\Database\Eloquent\Model;
 
 class CreateEvent extends CreateRecord
 {
+    use AuditsRelatedStateChanges;
+
     protected static string $resource = EventResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -36,12 +42,16 @@ class CreateEvent extends CreateRecord
 
     protected function afterCreate(): void
     {
+        $event = $this->eventRecord();
+
         app(SyncEventResourceRelationsAction::class)->handle(
-            $this->eventRecord(),
+            $event,
             $this->form->getState(),
             lockRegistrationMode: false,
             syncKeyPeople: true,
         );
+
+        $this->auditRelatedStateChanges($event, 'relations_created');
     }
 
     protected function eventRecord(): Event
@@ -53,5 +63,36 @@ class CreateEvent extends CreateRecord
         }
 
         return $record;
+    }
+
+    /**
+     * @return array<string, list<array{id: string, title: string}>>
+     */
+    protected function getRelatedAuditSnapshot(Model $record): array
+    {
+        if (! $record instanceof Event) {
+            return [];
+        }
+
+        return [
+            'references' => $record->references()
+                ->orderBy('references.title')
+                ->get(['references.id', 'references.title'])
+                ->map(fn (Reference $reference): array => [
+                    'id' => (string) $reference->getKey(),
+                    'title' => $reference->title,
+                ])
+                ->values()
+                ->all(),
+            'series' => $record->series()
+                ->orderBy('series.title')
+                ->get(['series.id', 'series.title'])
+                ->map(fn (Series $series): array => [
+                    'id' => (string) $series->getKey(),
+                    'title' => $series->title,
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 }

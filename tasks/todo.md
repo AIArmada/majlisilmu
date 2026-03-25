@@ -1,3 +1,57 @@
+# Log Triage
+
+- [x] Inspect Laravel and browser logs for repeated runtime errors
+- [x] Trace the highest-signal errors back to current code paths
+- [x] Summarize confirmed or likely bugs with evidence and likely fixes
+
+## Review
+- Confirmed a current public-flow regression: navigating from the home page to the submit-event page with `wire:navigate` leaves Filament Alpine helpers undefined, breaking the wizard UI even though a direct page load works. The affected path is the header submit link in the public layout plus the page-scoped Filament asset include on the submit page.
+- Confirmed a current schema mismatch on addresses: long resolved Google Maps URLs can exceed the original `varchar(255)` column, and the widening migration to `text` exists but is still pending in this environment.
+- Browser logs also show a repeated Filament rich-editor crash on the submit flow (`domFromPos` on `null`) across multiple Filament patch versions, which points to a remaining submit-page editor lifecycle issue worth reproducing and isolating separately from the asset-loading regression.
+
+# Audit Follow-up Pass
+
+- [x] Cover the remaining admin audit blind spots for media changes and direct Filament relationship syncs
+- [x] Add focused regression coverage for media, Filament relationship syncs, and membership audit events
+- [x] Review the full uncommitted diff and fix any issues found
+- [x] Verify the admin audit flow in Chrome MCP
+- [x] Pass `vendor/bin/phpstan analyse --ansi`, `vendor/bin/rector process --dry-run --no-progress-bar --memory-limit=2G`, `vendor/bin/pest --parallel --compact`, and `vendor/bin/pint --test`
+
+## Review
+- Extended the audit follow-up to capture media collection mutations and direct Filament relationship syncs with explicit custom audit events instead of leaving those admin-side changes as blind spots.
+- Replaced the vendor audit UI surface with app-owned Filament audit resources/relation managers so the admin panel uses the app UUID audit model, keeps restore disabled, and renders predictable labels/routes.
+- Fixed the last browser-visible rough edges discovered in Chrome MCP: broken integer audit record URLs, raw plugin-facing labels, and unreadable relation snapshot presentation.
+- Stabilized the new media audit regression test under parallel Pest by preventing Media Library conversions from running inline in that audit-focused spec.
+- Verification:
+  - Chrome MCP on `https://admin.majlisilmu.test/audits` and a live audit record view
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pest --parallel --compact`
+  - `vendor/bin/pint --test`
+  - `vendor/bin/rector process --dry-run --no-progress-bar --memory-limit=2G app/Models/Concerns/AuditsModelChanges.php tests/Feature/AdminAuditFollowUpTest.php app/Filament/RelationManagers/AuditsRelationManager.php app/Filament/Resources/Audits/AuditResource.php app/Filament/Resources/Audits/Pages/ListAudits.php app/Filament/Resources/Audits/Pages/ViewAudit.php app/Observers/AuditedMediaObserver.php app/Support/Auditing/AuditValuePresenter.php app/Providers/AppServiceProvider.php`
+  - `git diff --check`
+
+# Filament Audit Integration
+
+- [x] Confirm the Tapp Network Filament auditing plugin is compatible with the current Filament and Laravel Auditing versions
+- [x] Install and configure the Filament auditing plugin for the admin UI
+- [x] Expand Laravel Auditing coverage to the admin-managed models that are currently not auditable
+- [x] Expose the audits relation manager on the relevant admin and ahli Filament resources
+- [x] Add focused regression coverage for audit recording and Filament audit visibility
+- [x] Run formatting, tests, static analysis, and command verification
+
+## Review
+- Installed and wired `tapp/filament-auditing` into the admin panel, registered the vendor theme source, and explicitly loaded the package views so the global Filament audit resource renders reliably in this app.
+- Standardized the audited model integration through `App\Models\Concerns\AuditsModelChanges`, enabled array payload auditing, added value redaction for sensitive fields, and attached Laravel Auditing to the admin-managed models that were previously missing coverage.
+- Added morph-map aliases for every newly auditable model so audit writes do not fail under the app's enforced morph-map policy, and overrode the plugin's permissive default `audit` / `restoreAudit` gates so audit access is restricted and restore stays disabled.
+- Added focused regression coverage for audit relation-manager registration, audit gate access, morph-map coverage, tag update auditing, and password redaction.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminAuditIntegrationTest.php`
+  - `vendor/bin/phpstan analyse --ansi`
+  - `vendor/bin/pint $(git diff --name-only --diff-filter=ACMR -- '*.php')`
+  - `git diff --check`
+  - `php artisan route:list --name=filament.admin.resources.audits.index`
+- Known limitation: this integration audits model mutations. Pivot-only changes and Spatie Media Library attachment rows are not yet first-class audit records under the current UUID-based `audits` schema, so those would need a separate follow-up if you want them captured with the same fidelity.
+
 # Google Consent Maps URL Unwrapping
 
 - [x] Detect and unwrap `https://consent.google.com/ml?continue=...` before saving Google Maps URLs

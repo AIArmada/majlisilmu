@@ -3,6 +3,7 @@
 namespace App\Filament\Ahli\Resources\Institutions;
 
 use App\Filament\Ahli\Resources\Institutions\Pages\EditInstitution;
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\DonationChannelsRelationManager;
 use App\Filament\Resources\Institutions\RelationManagers\MemberInvitationsRelationManager;
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm;
@@ -70,6 +71,7 @@ class InstitutionResource extends Resource
         return [
             'donation_channels' => DonationChannelsRelationManager::class,
             'member_invitations' => MemberInvitationsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class AiModelPricing extends Model
+class AiModelPricing extends Model implements AuditableContract
 {
     /** @use HasFactory<Factory<self>> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     public $incrementing = false;
 

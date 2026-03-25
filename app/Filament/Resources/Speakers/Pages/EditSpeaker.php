@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Speakers\Pages;
 
+use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Speaker;
 use App\Models\User;
@@ -9,11 +10,15 @@ use App\Support\Submission\PublicSubmissionLockService;
 use App\Support\Submission\PublicSubmissionUiEvents;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
+use Nnjeim\World\Models\Language;
 
 class EditSpeaker extends EditRecord
 {
+    use AuditsRelatedStateChanges;
+
     protected static string $resource = SpeakerResource::class;
 
     #[\Override]
@@ -22,6 +27,18 @@ class EditSpeaker extends EditRecord
         return [
             DeleteAction::make(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $this->captureRelatedAuditSnapshot($this->speakerRecord());
+
+        return $data;
     }
 
     /**
@@ -66,6 +83,11 @@ class EditSpeaker extends EditRecord
         return $data;
     }
 
+    protected function afterSave(): void
+    {
+        $this->auditRelatedStateChanges($this->speakerRecord(), 'relations_updated');
+    }
+
     #[On(PublicSubmissionUiEvents::REFRESH_TOGGLE)]
     public function refreshPublicSubmissionToggleState(): void
     {
@@ -89,5 +111,27 @@ class EditSpeaker extends EditRecord
         $user = auth()->user();
 
         return $user instanceof User ? $user : null;
+    }
+
+    /**
+     * @return array<string, list<array{id: int, name: string}>>
+     */
+    protected function getRelatedAuditSnapshot(Model $record): array
+    {
+        if (! $record instanceof Speaker) {
+            return [];
+        }
+
+        return [
+            'languages' => $record->languages()
+                ->orderBy('languages.name')
+                ->get(['languages.id', 'languages.name'])
+                ->map(fn (Language $language): array => [
+                    'id' => (int) $language->getKey(),
+                    'name' => $language->name,
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 }

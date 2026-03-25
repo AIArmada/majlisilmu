@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AiModelPricings;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\AiModelPricings\Pages\CreateAiModelPricing;
 use App\Filament\Resources\AiModelPricings\Pages\EditAiModelPricing;
 use App\Filament\Resources\AiModelPricings\Pages\ListAiModelPricings;
@@ -42,7 +43,9 @@ class AiModelPricingResource extends Resource
     #[\Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            AuditsRelationManager::class,
+        ];
     }
 
     #[\Override]

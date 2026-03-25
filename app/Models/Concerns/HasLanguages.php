@@ -5,6 +5,9 @@ namespace App\Models\Concerns;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Nnjeim\World\Models\Language;
 
+/**
+ * @method array<string, list<mixed>> auditSync(string $relationName, mixed $ids, bool $detaching = true, array<int, string> $columns = ['*'], mixed $callback = null)
+ */
 trait HasLanguages
 {
     /**
@@ -24,6 +27,6 @@ trait HasLanguages
      */
     public function syncLanguages(array|int $languages): void
     {
-        $this->languages()->sync($languages);
+        $this->auditSync('languages', $languages, true, ['languages.id', 'languages.name']);
     }
 }

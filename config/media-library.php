@@ -1,5 +1,6 @@
 <?php
 
+use App\Observers\AuditedMediaObserver;
 use App\Support\Media\MediaFileNamer;
 use App\Support\Media\MediaPathGenerator;
 use Spatie\ImageOptimizer\Optimizers\Avifenc;
@@ -18,7 +19,6 @@ use Spatie\MediaLibrary\Conversions\ImageGenerators\Webp;
 use Spatie\MediaLibrary\Conversions\Jobs\PerformConversionsJob;
 use Spatie\MediaLibrary\Downloaders\DefaultDownloader;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Spatie\MediaLibrary\MediaCollections\Models\Observers\MediaObserver;
 use Spatie\MediaLibrary\ResponsiveImages\Jobs\GenerateResponsiveImagesJob;
 use Spatie\MediaLibrary\ResponsiveImages\TinyPlaceholderGenerator\Blurred;
 use Spatie\MediaLibrary\ResponsiveImages\WidthCalculator\FileSizeOptimizedWidthCalculator;
@@ -69,7 +69,7 @@ return [
     /*
      * The fully qualified class name of the media observer.
      */
-    'media_observer' => MediaObserver::class,
+    'media_observer' => AuditedMediaObserver::class,
 
     /*
      * When enabled, media collections will be serialised using the default

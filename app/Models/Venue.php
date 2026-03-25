@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VenueType;
+use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasContacts;
 use App\Models\Concerns\HasSocialMedia;
@@ -13,16 +14,17 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Venue extends Model implements HasMedia
+class Venue extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<VenueFactory> */
-    use HasAddress, HasContacts, HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use AuditsModelChanges, HasAddress, HasContacts, HasFactory, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
     public $incrementing = false;
 

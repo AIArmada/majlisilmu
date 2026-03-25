@@ -244,15 +244,18 @@ class ContributionEntityMutationService
         $event->save();
 
         if (array_key_exists('language_ids', $payload)) {
-            $event->languages()->sync($this->normalizeIntegerArray($payload['language_ids']));
+            $languageIds = $this->normalizeIntegerArray($payload['language_ids']);
+            $event->auditSync('languages', $languageIds, true, ['languages.id', 'languages.name']);
         }
 
         if (array_key_exists('reference_ids', $payload)) {
-            $event->references()->sync($this->normalizeStringArray($payload['reference_ids']));
+            $referenceIds = $this->normalizeStringArray($payload['reference_ids']);
+            $event->auditSync('references', $referenceIds, true, ['references.id', 'references.title']);
         }
 
         if (array_key_exists('series_ids', $payload)) {
-            $event->series()->sync($this->normalizeStringArray($payload['series_ids']));
+            $seriesIds = $this->normalizeStringArray($payload['series_ids']);
+            $event->auditSync('series', $seriesIds, true, ['series.id', 'series.title']);
         }
 
         if (
@@ -272,7 +275,13 @@ class ContributionEntityMutationService
             || array_key_exists('source_tags', $payload)
             || array_key_exists('issue_tags', $payload)
         ) {
-            $event->syncTags($this->resolveEventTags($payload));
+            $tags = $this->resolveEventTags($payload);
+            $tagIds = array_map(
+                static fn (Tag $tag): string => (string) $tag->getKey(),
+                $tags,
+            );
+
+            $event->auditSync('tags', $tagIds, true, ['tags.id', 'tags.name', 'tags.type']);
         }
 
         return $dirty;
@@ -430,7 +439,7 @@ class ContributionEntityMutationService
         }
 
         if (array_key_exists('language_ids', $payload)) {
-            $speaker->languages()->sync($this->normalizeIntegerArray($payload['language_ids']));
+            $speaker->syncLanguages($this->normalizeIntegerArray($payload['language_ids']));
         }
     }
 

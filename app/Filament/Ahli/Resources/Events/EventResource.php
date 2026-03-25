@@ -5,6 +5,7 @@ namespace App\Filament\Ahli\Resources\Events;
 use App\Filament\Ahli\Resources\Events\Pages\EditEvent;
 use App\Filament\Ahli\Resources\Events\Pages\ListEvents;
 use App\Filament\Ahli\Resources\Events\Pages\ViewEvent;
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Events\EventResource as AdminEventResource;
 use App\Filament\Resources\Events\RelationManagers\ChildEventsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventUsersRelationManager;
@@ -128,6 +129,7 @@ class EventResource extends AdminEventResource
             'member_invitations' => MemberInvitationsRelationManager::class,
             'moderation_reviews' => ModerationReviewsRelationManager::class,
             'registrations' => RegistrationsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

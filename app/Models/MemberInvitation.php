@@ -3,14 +3,16 @@
 namespace App\Models;
 
 use App\Enums\MemberSubjectType;
+use App\Models\Concerns\AuditsModelChanges;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class MemberInvitation extends Model
+class MemberInvitation extends Model implements AuditableContract
 {
-    use HasUuids;
+    use AuditsModelChanges, HasUuids;
 
     public $incrementing = false;
 

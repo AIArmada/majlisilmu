@@ -4,7 +4,6 @@ namespace App\Actions\Events;
 
 use App\Enums\RegistrationMode;
 use App\Models\Event;
-use App\Models\Tag;
 use App\Services\EventKeyPersonSyncService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -64,9 +63,7 @@ class SyncEventResourceRelationsAction
             ->values()
             ->all();
 
-        $tags = Tag::query()->whereKey($tagIds)->get();
-
-        $event->syncTags($tags);
+        $event->auditSync('tags', $tagIds, true, ['tags.id', 'tags.name', 'tags.type']);
 
         if ($syncKeyPeople) {
             $this->eventKeyPersonSyncService->sync(

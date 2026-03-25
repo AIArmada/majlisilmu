@@ -3,19 +3,21 @@
 namespace App\Models;
 
 use App\Enums\TagType;
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\TagFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
 use Spatie\Tags\Tag as SpatieTag;
 
-class Tag extends SpatieTag implements Sortable
+class Tag extends SpatieTag implements AuditableContract, Sortable
 {
     /** @use HasFactory<TagFactory> */
-    use HasFactory, HasUuids, SortableTrait;
+    use AuditsModelChanges, HasFactory, HasUuids, SortableTrait;
 
     public $incrementing = false;
 

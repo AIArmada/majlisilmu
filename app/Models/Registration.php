@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\RegistrationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class Registration extends Model
+class Registration extends Model implements AuditableContract
 {
     /** @use HasFactory<RegistrationFactory> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     public $incrementing = false;
 

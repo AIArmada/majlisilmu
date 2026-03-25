@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\References;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\References\Pages\CreateReference;
 use App\Filament\Resources\References\Pages\EditReference;
 use App\Filament\Resources\References\Pages\ListReferences;
@@ -47,6 +48,7 @@ class ReferenceResource extends Resource
             EventsRelationManager::class,
             MembersRelationManager::class,
             MemberInvitationsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

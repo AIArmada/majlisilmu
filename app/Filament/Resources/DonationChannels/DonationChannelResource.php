@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\DonationChannels;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\DonationChannels\Pages\CreateDonationChannel;
 use App\Filament\Resources\DonationChannels\Pages\EditDonationChannel;
 use App\Filament\Resources\DonationChannels\Pages\ListDonationChannels;
@@ -38,7 +39,7 @@ class DonationChannelResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            AuditsRelationManager::class,
         ];
     }
 

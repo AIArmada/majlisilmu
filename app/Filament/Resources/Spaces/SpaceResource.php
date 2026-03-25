@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Spaces;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Spaces\Pages\CreateSpace;
 use App\Filament\Resources\Spaces\Pages\EditSpace;
 use App\Filament\Resources\Spaces\Pages\ListSpaces;
@@ -52,6 +53,7 @@ class SpaceResource extends Resource
         return [
             InstitutionsRelationManager::class,
             EventsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

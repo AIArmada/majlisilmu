@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Venues;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Venues\Pages\CreateVenue;
 use App\Filament\Resources\Venues\Pages\EditVenue;
 use App\Filament\Resources\Venues\Pages\ListVenues;
@@ -51,6 +52,7 @@ class VenueResource extends Resource
     {
         return [
             EventsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

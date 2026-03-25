@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\MembershipClaimStatus;
 use App\Enums\MemberSubjectType;
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\MembershipClaimFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,14 +12,15 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class MembershipClaim extends Model implements HasMedia
+class MembershipClaim extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<MembershipClaimFactory> */
-    use HasFactory, HasUuids, InteractsWithMedia;
+    use AuditsModelChanges, HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 

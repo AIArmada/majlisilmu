@@ -5,17 +5,19 @@ namespace App\Models;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\ContributionRequestFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class ContributionRequest extends Model
+class ContributionRequest extends Model implements AuditableContract
 {
     /** @use HasFactory<ContributionRequestFactory> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     public $incrementing = false;
 

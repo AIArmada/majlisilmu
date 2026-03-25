@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Series;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Series\Pages\CreateSeries;
 use App\Filament\Resources\Series\Pages\EditSeries;
 use App\Filament\Resources\Series\Pages\ListSeries;
@@ -43,6 +44,7 @@ class SeriesResource extends Resource
     {
         return [
             EventsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

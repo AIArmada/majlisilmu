@@ -16,6 +16,7 @@ use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasAddress;
 use App\Models\Concerns\HasDonationChannels;
 use App\Models\Concerns\HasLanguages;
@@ -41,7 +42,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Laravel\Scout\Searchable;
 use Nnjeim\World\Models\Language;
-use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -76,7 +76,7 @@ use Spatie\Tags\HasTags;
 class Event extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<EventFactory> */
-    use Auditable, HasAddress, HasDonationChannels, HasFactory, HasLanguages, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
+    use AuditsModelChanges, HasAddress, HasDonationChannels, HasFactory, HasLanguages, HasStates, HasTags, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     /**
      * Statuses visible on public listings and detail pages.

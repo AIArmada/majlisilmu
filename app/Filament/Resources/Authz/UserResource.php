@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Authz;
 use AIArmada\FilamentAuthz\Resources\UserResource as BaseUserResource;
 use AIArmada\FilamentAuthz\Support\UserAuthzForm;
 use AIArmada\FilamentAuthz\Tables\Actions\ImpersonateTableAction;
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Authz\UserResource\Pages\CreateUser;
 use App\Filament\Resources\Authz\UserResource\Pages\EditUser;
 use App\Filament\Resources\Authz\UserResource\Pages\ListUsers;
@@ -91,6 +92,14 @@ class UserResource extends BaseUserResource
                     ->url(fn (Model $record): string => static::getUrl('view', ['record' => $record])),
                 Actions\EditAction::make(),
             ]);
+    }
+
+    #[\Override]
+    public static function getRelations(): array
+    {
+        return [
+            AuditsRelationManager::class,
+        ];
     }
 
     #[\Override]

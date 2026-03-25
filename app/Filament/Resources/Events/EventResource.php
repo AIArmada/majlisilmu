@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
@@ -82,6 +83,7 @@ class EventResource extends Resource
             MemberInvitationsRelationManager::class,
             ModerationReviewsRelationManager::class,
             RegistrationsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

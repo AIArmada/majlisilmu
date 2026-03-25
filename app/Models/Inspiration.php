@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\InspirationCategory;
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\InspirationFactory;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -12,16 +13,17 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Inspiration extends Model implements HasMedia
+class Inspiration extends Model implements AuditableContract, HasMedia
 {
     /** @property array<string, mixed> $content */
     /** @use HasFactory<InspirationFactory> */
-    use HasFactory, HasUuids, InteractsWithMedia;
+    use AuditsModelChanges, HasFactory, HasUuids, InteractsWithMedia;
 
     public $incrementing = false;
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Institutions;
 
+use App\Filament\RelationManagers\AuditsRelationManager;
 use App\Filament\Resources\Institutions\Pages\CreateInstitution;
 use App\Filament\Resources\Institutions\Pages\EditInstitution;
 use App\Filament\Resources\Institutions\Pages\ListInstitutions;
@@ -57,6 +58,7 @@ class InstitutionResource extends Resource
             DonationChannelsRelationManager::class,
             MembersRelationManager::class,
             MemberInvitationsRelationManager::class,
+            AuditsRelationManager::class,
         ];
     }
 

@@ -7,7 +7,10 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Ahli\Resources\Events\EventResource;
+use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Models\Event;
+use App\Models\Reference;
+use App\Models\Series;
 use App\Models\User;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
@@ -24,9 +27,12 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Model;
 
 class EditEvent extends EditRecord
 {
+    use AuditsRelatedStateChanges;
+
     protected static string $resource = EventResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -35,6 +41,7 @@ class EditEvent extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $event = $this->eventRecord();
+        $this->captureRelatedAuditSnapshot($event);
         $event->loadMissing(['languages:id', 'tags:id,type']);
 
         $data['languages'] = $event->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
@@ -94,12 +101,47 @@ class EditEvent extends EditRecord
 
     protected function afterSave(): void
     {
+        $event = $this->eventRecord();
+
         app(SyncEventResourceRelationsAction::class)->handle(
-            $this->eventRecord(),
+            $event,
             $this->form->getState(),
             lockRegistrationMode: true,
             syncKeyPeople: true,
         );
+
+        $this->auditRelatedStateChanges($event, 'relations_updated');
+    }
+
+    /**
+     * @return array<string, list<array{id: string, title: string}>>
+     */
+    protected function getRelatedAuditSnapshot(Model $record): array
+    {
+        if (! $record instanceof Event) {
+            return [];
+        }
+
+        return [
+            'references' => $record->references()
+                ->orderBy('references.title')
+                ->get(['references.id', 'references.title'])
+                ->map(fn (Reference $reference): array => [
+                    'id' => (string) $reference->getKey(),
+                    'title' => $reference->title,
+                ])
+                ->values()
+                ->all(),
+            'series' => $record->series()
+                ->orderBy('series.title')
+                ->get(['series.id', 'series.title'])
+                ->map(fn (Series $series): array => [
+                    'id' => (string) $series->getKey(),
+                    'title' => $series->title,
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

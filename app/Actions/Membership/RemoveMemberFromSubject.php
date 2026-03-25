@@ -35,7 +35,7 @@ final readonly class RemoveMemberFromSubject
             throw new RuntimeException('Protected ownership roles can only be changed from the global authz surface.');
         }
 
-        $subject->members()->detach($member->getKey());
+        $subject->auditDetach('members', $member->getKey(), true, ['users.id', 'users.name']);
 
         if (
             $currentRoleName !== null &&

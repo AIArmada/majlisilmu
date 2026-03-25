@@ -3,16 +3,18 @@
 namespace App\Models;
 
 use App\Enums\EventKeyPersonRole;
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\EventKeyPersonFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class EventKeyPerson extends Model
+class EventKeyPerson extends Model implements AuditableContract
 {
     /** @use HasFactory<EventKeyPersonFactory> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     protected $table = 'event_key_people';
 

@@ -27,8 +27,8 @@ final readonly class AddMemberToSubject
         match ($subjectType) {
             MemberSubjectType::Institution,
             MemberSubjectType::Speaker,
-            MemberSubjectType::Reference => $subject->members()->syncWithoutDetaching([$member->getKey()]),
-            MemberSubjectType::Event => $subject->members()->syncWithoutDetaching([
+            MemberSubjectType::Reference => $this->syncMembersWithoutDetaching($subject, [$member->getKey()]),
+            MemberSubjectType::Event => $this->syncMembersWithoutDetaching($subject, [
                 $member->getKey() => ['joined_at' => now()],
             ]),
         };
@@ -44,5 +44,13 @@ final readonly class AddMemberToSubject
         if ($subject instanceof Speaker) {
             $this->publicSubmissionLockService->ensureSpeakerUnlockedIfIneligible($subject->fresh());
         }
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $members
+     */
+    private function syncMembersWithoutDetaching(Institution|Speaker|Event|Reference $subject, array $members): void
+    {
+        $subject->auditSync('members', $members, false, ['users.id', 'users.name']);
     }
 }

@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\MediaLinkFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class MediaLink extends Model
+class MediaLink extends Model implements AuditableContract
 {
     /** @use HasFactory<MediaLinkFactory> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     protected $table = 'media_links';
 

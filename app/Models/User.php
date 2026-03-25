@@ -7,6 +7,7 @@ use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
+use App\Models\Concerns\AuditsModelChanges;
 use App\Notifications\Auth\ResetPasswordNotification;
 use App\Notifications\Auth\VerifyEmailNotification;
 use App\Notifications\NotificationCenterMessage;
@@ -34,13 +35,14 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser, HasLocalePreference, MustVerifyEmailContract
+class User extends Authenticatable implements AuditableContract, FilamentUser, HasLocalePreference, MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, HasUuids, MustVerifyEmail, Notifiable;
+    use AuditsModelChanges, HasApiTokens, HasFactory, HasRoles, HasUuids, MustVerifyEmail, Notifiable;
 
     public $incrementing = false;
 
