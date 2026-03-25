@@ -40,7 +40,8 @@ class AddressHierarchyFormatter
                 continue;
             }
 
-            $previousPart = $parts[array_key_last($parts)] ?? null;
+            $lastKey = array_key_last($parts);
+            $previousPart = $lastKey !== null ? $parts[$lastKey] : null;
 
             if (is_string($previousPart) && mb_strtolower($previousPart) === mb_strtolower($part)) {
                 continue;
