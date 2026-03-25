@@ -18,7 +18,7 @@
         <div class="auth-animate-up auth-delay-2">
             <label for="email" class="block text-sm font-semibold text-slate-700 mb-1.5">{{ __('Email address') }}</label>
             <input id="email" type="email" name="email" value="{{ old('email', $request->email) }}"
-                required autofocus
+                required autofocus autocomplete="email"
                 class="auth-input block w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-emerald-500 focus:outline-none" />
             @error('email')
                 <p class="mt-1.5 text-xs font-medium text-red-500">{{ $message }}</p>

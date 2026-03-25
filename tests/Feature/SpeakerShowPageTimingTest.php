@@ -57,6 +57,26 @@ it('shows cancelled public events with cancelled badge on speaker page', functio
         ->assertSee('Dibatalkan');
 });
 
+it('shows a moderation note when speaker page lists pending public events', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+        'visibility' => 'public',
+        'starts_at' => now()->addDay()->setTime(17, 45),
+    ]);
+
+    $speaker->speakerEvents()->attach($event->id);
+
+    $this->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee($event->title)
+        ->assertSee('Menunggu Kelulusan')
+        ->assertSee('Semak lencana status pada setiap majlis sebelum hadir.');
+});
+
 it('uses stronger calendar event colors on speaker page', function () {
     $speaker = Speaker::factory()->create([
         'status' => 'verified',

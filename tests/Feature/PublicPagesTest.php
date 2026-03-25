@@ -29,6 +29,21 @@ it('loads public index pages', function () {
     $this->get('/submit-event/success')->assertSuccessful()->assertSee(__('Event Submitted!'));
 });
 
+it('renders accessible labels on the public submit-event form', function () {
+    $this->get('/submit-event')
+        ->assertSuccessful()
+        ->assertSee('Pilih poster, gambar, atau PDF majlis')
+        ->assertSee('submit-event-source-attachment', false)
+        ->assertSee('aria-label="Fizikal"', false)
+        ->assertSee('aria-label="Dalam talian"', false)
+        ->assertSee('aria-label="Hibrid"', false);
+});
+
+it('does not expose experimental AI homepage variants', function () {
+    $this->get('/glm')->assertNotFound();
+    $this->get('/kimi')->assertNotFound();
+});
+
 it('loads public detail pages', function () {
     $event = Event::factory()->create([
         'status' => 'approved',

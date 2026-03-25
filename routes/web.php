@@ -19,7 +19,6 @@ use App\Livewire\Pages\Dashboard\Events\CreateAdvanced;
 use App\Livewire\Pages\Dashboard\InstitutionDashboard;
 use App\Livewire\Pages\Dashboard\NotificationsIndex;
 use App\Livewire\Pages\Dashboard\UserDashboard;
-use App\Livewire\Pages\Home\GlmHome;
 use App\Livewire\Pages\Membership\ShowInvitation as ShowMemberInvitation;
 use App\Livewire\Pages\MembershipClaims\Create as CreateMembershipClaimPage;
 use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
@@ -27,14 +26,24 @@ use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
 use App\Models\Reference;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+
+Route::match(['GET', 'HEAD'], '/favicon.ico', function () {
+    return response()->file(public_path('images/favicon.ico'), [
+        'Content-Type' => 'image/x-icon',
+        'Cache-Control' => 'public, max-age=31536000, immutable',
+    ]);
+});
 
 Route::bind('reference', fn (string $value): Reference => Reference::query()
     ->where('slug', $value)
-    ->orWhere((new Reference)->getQualifiedKeyName(), $value)
+    ->when(
+        Str::isUuid($value),
+        fn ($query) => $query->orWhere((new Reference)->getQualifiedKeyName(), $value),
+    )
     ->firstOrFail());
 
 Route::livewire('/', 'pages.⚡home')->name('home');
-Route::livewire('/glm', GlmHome::class)->name('home.glm');
 Route::livewire('/tentang-kami', AboutPage::class)->name('about');
 Route::get('/bahasa/{locale}', LocaleController::class)->name('locale.switch');
 

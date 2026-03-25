@@ -48,7 +48,7 @@ new
             <div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-teal-900/30 blur-[100px] mix-blend-screen animate-float" style="animation-delay: -5s"></div>
 
             {{-- Noise Texture --}}
-            <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay"></div>
+            <div class="absolute inset-0 bg-[url('/images/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay"></div>
 
             {{-- Subtle Grid --}}
             <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)]"></div>
@@ -361,7 +361,7 @@ new
         <div class="absolute inset-0 bg-pattern-islamic opacity-5 mix-blend-overlay" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-900/20 rounded-full blur-[120px]"></div>
         <div class="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold-900/10 rounded-full blur-[100px]"></div>
-        <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+        <div class="absolute inset-0 bg-[url('/images/noise.svg')] opacity-20 mix-blend-overlay"></div>
 
         <div class="container relative z-10 px-6 mx-auto">
             <div class="max-w-4xl mx-auto overflow-hidden text-center border shadow-2xl bg-white/5 backdrop-blur-2xl rounded-3xl border-white/10 ring-1 ring-white/10">

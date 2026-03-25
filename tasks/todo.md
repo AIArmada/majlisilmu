@@ -3,11 +3,24 @@
 - [x] Inspect Laravel and browser logs for repeated runtime errors
 - [x] Trace the highest-signal errors back to current code paths
 - [x] Summarize confirmed or likely bugs with evidence and likely fixes
+- [ ] Sweep every public frontend route in Chrome MCP with real navigation and route-appropriate interaction
+- [ ] Fix any regressions found during the public-route sweep and rerun targeted verification
 
 ## Review
 - Confirmed a current public-flow regression: navigating from the home page to the submit-event page with `wire:navigate` leaves Filament Alpine helpers undefined, breaking the wizard UI even though a direct page load works. The affected path is the header submit link in the public layout plus the page-scoped Filament asset include on the submit page.
 - Confirmed a current schema mismatch on addresses: long resolved Google Maps URLs can exceed the original `varchar(255)` column, and the widening migration to `text` exists but is still pending in this environment.
 - Browser logs also show a repeated Filament rich-editor crash on the submit flow (`domFromPos` on `null`) across multiple Filament patch versions, which points to a remaining submit-page editor lifecycle issue worth reproducing and isolating separately from the asset-loading regression.
+- Fixes applied:
+  - moved the shared public Filament styles/scripts into the main public layout so Livewire navigation lands on already-bootstrapped pages
+  - made the page-scoped Filament asset partial subtract the now-global bundles instead of re-emitting duplicates
+  - hardened the submit-event rich editor by disabling the table toolbar button and floating toolbars on that public form
+  - ran the pending `google_maps_url` widening migration so the addresses column now uses `text`
+- Verification:
+  - Chrome MCP: opened `/`, clicked the header submit link, confirmed `/hantar-majlis` booted without Filament Alpine errors, typed into the rich editor, and rechecked the console with no JS errors
+  - `php artisan migrate --path=database/migrations/2026_03_25_203000_change_google_maps_url_to_text_on_addresses_table.php --force`
+  - `php artisan tinker --execute="dump(DB::table('information_schema.columns')->where('table_schema', 'public')->where('table_name', 'addresses')->where('column_name', 'google_maps_url')->value('data_type'));"`
+  - `vendor/bin/pest --parallel tests --filter='AddressGoogleMapsUrlNormalizationTest|SharedFormSchemaTest|SubmitEventMediaTest'`
+  - `git diff --check`
 
 # Audit Follow-up Pass
 

@@ -203,6 +203,9 @@ new class extends Component {
     ];
 
     $showPendingStatusNotice = $institution->status === 'pending';
+    $eventStatusNoticeEvents = $upcomingEvents->concat($pastEvents);
+    $showPendingEventStatusNotice = $eventStatusNoticeEvents->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Pending);
+    $showCancelledEventStatusNotice = $eventStatusNoticeEvents->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Cancelled);
     // Location
     $address = $institution->addressModel;
     $formatAddressHierarchy = static function ($addressModel): string {
@@ -662,6 +665,14 @@ new class extends Component {
                             @endif
                         </div>
                     </div>
+
+                    @if($showPendingEventStatusNotice || $showCancelledEventStatusNotice)
+                        <x-public.moderation-status-note
+                            :show-pending="$showPendingEventStatusNotice"
+                            :show-cancelled="$showCancelledEventStatusNotice"
+                            class="mb-6"
+                        />
+                    @endif
 
                     {{-- ═══ UPCOMING TAB ═══ --}}
                     <div x-show="tab === 'upcoming'" x-transition:enter="transition ease-out duration-200"
