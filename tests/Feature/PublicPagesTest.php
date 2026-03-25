@@ -29,6 +29,12 @@ it('loads public index pages', function () {
     $this->get('/submit-event/success')->assertSuccessful()->assertSee(__('Event Submitted!'));
 });
 
+it('serves the public favicon successfully', function () {
+    $this->get('/favicon.ico')
+        ->assertSuccessful()
+        ->assertHeader('Content-Type', 'image/x-icon');
+});
+
 it('renders accessible labels on the public submit-event form', function () {
     $this->get('/submit-event')
         ->assertSuccessful()
@@ -37,6 +43,16 @@ it('renders accessible labels on the public submit-event form', function () {
         ->assertSee('aria-label="Fizikal"', false)
         ->assertSee('aria-label="Dalam talian"', false)
         ->assertSee('aria-label="Hibrid"', false);
+});
+
+it('renders the submit-event upload copy in the selected locale', function () {
+    $this->withSession(['locale' => 'en'])
+        ->get('/hantar-majlis')
+        ->assertSuccessful()
+        ->assertSee('Choose an event poster, image, or PDF')
+        ->assertSee('PDF, JPEG, PNG, or WEBP files are allowed. We will try to read the event details from this file.')
+        ->assertDontSee('Pilih poster, gambar, atau PDF majlis')
+        ->assertDontSee('PDF, JPEG, PNG, atau WEBP dibenarkan. Kami akan cuba baca butiran majlis daripada fail ini.');
 });
 
 it('does not expose experimental AI homepage variants', function () {

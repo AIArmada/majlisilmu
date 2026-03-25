@@ -3,24 +3,34 @@
 - [x] Inspect Laravel and browser logs for repeated runtime errors
 - [x] Trace the highest-signal errors back to current code paths
 - [x] Summarize confirmed or likely bugs with evidence and likely fixes
-- [ ] Sweep every public frontend route in Chrome MCP with real navigation and route-appropriate interaction
-- [ ] Fix any regressions found during the public-route sweep and rerun targeted verification
+- [x] Sweep every public frontend route in Chrome MCP with real navigation and route-appropriate interaction
+- [x] Fix any regressions found during the public-route sweep and rerun targeted verification
 
 ## Review
 - Confirmed a current public-flow regression: navigating from the home page to the submit-event page with `wire:navigate` leaves Filament Alpine helpers undefined, breaking the wizard UI even though a direct page load works. The affected path is the header submit link in the public layout plus the page-scoped Filament asset include on the submit page.
 - Confirmed a current schema mismatch on addresses: long resolved Google Maps URLs can exceed the original `varchar(255)` column, and the widening migration to `text` exists but is still pending in this environment.
 - Browser logs also show a repeated Filament rich-editor crash on the submit flow (`domFromPos` on `null`) across multiple Filament patch versions, which points to a remaining submit-page editor lifecycle issue worth reproducing and isolating separately from the asset-loading regression.
+- Continued the public-route sweep in Chrome MCP across the canonical guest pages, legacy aliases, public auth pages, share/calendar utilities, and sitemap endpoints using live seeded records for event, institution, speaker, series, and reference detail routes.
+- Confirmed a current locale regression on the public submit page: the English route still leaked Malay copy in the AI upload block because two submit-upload strings were missing from the JSON locale files.
+- Confirmed a current public asset regression: browsers still issued a failing favicon request during the route sweep, creating avoidable 404 noise on public pages even though the visible page loads were otherwise healthy.
 - Fixes applied:
   - moved the shared public Filament styles/scripts into the main public layout so Livewire navigation lands on already-bootstrapped pages
   - made the page-scoped Filament asset partial subtract the now-global bundles instead of re-emitting duplicates
   - hardened the submit-event rich editor by disabling the table toolbar button and floating toolbars on that public form
   - ran the pending `google_maps_url` widening migration so the addresses column now uses `text`
+  - added the missing public submit-upload translation keys to the English and supported locale JSON files so `/hantar-majlis?lang=en` renders that upload helper block fully in English
+  - added focused coverage in `tests/Feature/PublicPagesTest.php` for the English submit-page upload copy and the public favicon route
+  - added a concrete root `public/favicon.ico` asset so public pages stop relying on the broken implicit fallback request path during browser navigation
 - Verification:
   - Chrome MCP: opened `/`, clicked the header submit link, confirmed `/hantar-majlis` booted without Filament Alpine errors, typed into the rich editor, and rechecked the console with no JS errors
+  - Chrome MCP: re-swept `/`, `/majlis`, `/majlis/{slug}`, `/institusi`, `/institusi/{slug}`, `/penceramah`, `/penceramah/{slug}`, `/siri/{slug}`, `/rujukan/{slug}`, `/tentang-kami`, `/hantar-majlis`, `/hantar-majlis?lang=en`, `/login`, `/register`, `/forgot-password`, `/submit-event`, `/submit-event/success`, `/events`, `/institutions`, `/speakers`, `/majlis/{slug}/kalendar.ics`, `/peta-laman.xml`, and `/kongsi/payload?...`
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php`
+  - `vendor/bin/pint --dirty --format agent`
   - `php artisan migrate --path=database/migrations/2026_03_25_203000_change_google_maps_url_to_text_on_addresses_table.php --force`
   - `php artisan tinker --execute="dump(DB::table('information_schema.columns')->where('table_schema', 'public')->where('table_name', 'addresses')->where('column_name', 'google_maps_url')->value('data_type'));"`
   - `vendor/bin/pest --parallel tests --filter='AddressGoogleMapsUrlNormalizationTest|SharedFormSchemaTest|SubmitEventMediaTest'`
   - `git diff --check`
+- Residual note: Chrome DevTools still reports a generic `No label associated with a form field (count: 9)` issue on the public submit form. The remaining offenders appear to come from internal Filament composite controls such as searchable selects/date widgets rather than the page-level upload block that was fixed here, so that accessibility audit needs a dedicated follow-up instead of another broad route-sweep patch.
 
 # Audit Follow-up Pass
 

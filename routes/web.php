@@ -28,13 +28,6 @@ use App\Models\Reference;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
-Route::match(['GET', 'HEAD'], '/favicon.ico', function () {
-    return response()->file(public_path('images/favicon.ico'), [
-        'Content-Type' => 'image/x-icon',
-        'Cache-Control' => 'public, max-age=31536000, immutable',
-    ]);
-});
-
 Route::bind('reference', fn (string $value): Reference => Reference::query()
     ->where('slug', $value)
     ->when(
