@@ -399,6 +399,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                             RichEditor::make('description')
                                 ->label(__('Keterangan'))
                                 ->maxLength(5000)
+                                ->disableToolbarButtons(['table'])
+                                ->floatingToolbars([])
                                 ->placeholder(__('Terangkan mengenai majlis, topik yang akan dikupas, dll.')),
 
                             Grid::make(['default' => 1, 'sm' => 2, 'md' => 6])
@@ -2128,8 +2130,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 </p>
 
                 <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
-                    <input type="file" wire:model="event_source_attachment"
+                    <label for="submit-event-source-attachment" class="sr-only">
+                        {{ __('Pilih poster, gambar, atau PDF majlis') }}
+                    </label>
+
+                    <input id="submit-event-source-attachment" type="file" wire:model="event_source_attachment"
                         accept=".pdf,image/jpeg,image/png,image/webp"
+                        aria-describedby="submit-event-source-attachment-help"
                         class="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200">
 
                     <x-filament::button type="button" wire:click="extractEventFromMedia" wire:loading.attr="disabled"
@@ -2141,6 +2148,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 @error('event_source_attachment')
                     <p class="mt-2 text-sm text-danger-600">{{ $message }}</p>
                 @enderror
+
+                <p id="submit-event-source-attachment-help" class="mt-2 text-xs text-slate-500">
+                    {{ __('PDF, JPEG, PNG, atau WEBP dibenarkan. Kami akan cuba baca butiran majlis daripada fail ini.') }}
+                </p>
 
                 <p wire:loading wire:target="extractEventFromMedia" class="mt-2 text-sm text-primary-600">
                     {{ __('Sedang mengekstrak maklumat daripada fail...') }}
@@ -2170,6 +2181,82 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         </div>
     </div>
 </div>
+
+@push('scripts')
+    <script>
+        (() => {
+            if (window.__submitEventA11yBooted) {
+                return;
+            }
+
+            window.__submitEventA11yBooted = true;
+
+            const normalizeText = (value) => (value ?? '').replace(/\s+/g, ' ').trim();
+
+            const applySubmitEventAccessibilityFixes = () => {
+                document.querySelectorAll('.fi-fo-rich-editor').forEach((field) => {
+                    const fieldWrapper = field.closest('[data-field-wrapper]');
+                    const label = normalizeText(fieldWrapper?.querySelector('.fi-fo-field-label')?.textContent)
+                        .replace(/\*$/, '')
+                        .trim();
+                    const editor = field.querySelector('.tiptap[contenteditable="true"]');
+
+                    if (editor && label) {
+                        editor.setAttribute('aria-label', label);
+                        editor.setAttribute('title', label);
+                    }
+                });
+
+                document.querySelectorAll('.fi-sc-wizard-header-step-btn[role="step"]').forEach((button) => {
+                    button.removeAttribute('role');
+
+                    const text = normalizeText(button.innerText);
+
+                    if (text) {
+                        button.setAttribute('aria-label', text);
+                    }
+                });
+
+                document.querySelectorAll('button.fi-select-input-btn').forEach((button) => {
+                    const valueText = normalizeText(button.innerText);
+                    const labelledByIds = (button.getAttribute('aria-labelledby') ?? '')
+                        .split(/\s+/)
+                        .filter(Boolean);
+                    const valueNode = button.querySelector('.fi-select-input-value-ctn > *')
+                        ?? button.querySelector('.fi-select-input-value-ctn');
+
+                    if (valueNode && valueText) {
+                        const valueNodeId = valueNode.id || `${button.id}-value`;
+                        valueNode.id = valueNodeId;
+
+                        if (! labelledByIds.includes(valueNodeId)) {
+                            labelledByIds.push(valueNodeId);
+                        }
+                    }
+
+                    if (labelledByIds.length > 0) {
+                        button.setAttribute('aria-labelledby', labelledByIds.join(' '));
+                    }
+
+                    button.removeAttribute('aria-label');
+                });
+            };
+
+            const boot = () => window.requestAnimationFrame(applySubmitEventAccessibilityFixes);
+
+            document.addEventListener('DOMContentLoaded', boot);
+            document.addEventListener('livewire:navigated', boot);
+
+            const observer = new MutationObserver(() => boot());
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+
+            boot();
+        })();
+    </script>
+@endpush
 
 @if(config('services.turnstile.enabled') && filled(config('services.turnstile.site_key')))
     @push('scripts')

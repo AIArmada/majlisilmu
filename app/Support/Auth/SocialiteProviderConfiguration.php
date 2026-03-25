@@ -12,8 +12,35 @@ final class SocialiteProviderConfiguration
             return false;
         }
 
-        return filled($config['client_id'] ?? null)
+        $isConfigured = filled($config['client_id'] ?? null)
             && filled($config['client_secret'] ?? null)
             && filled($config['redirect'] ?? null);
+
+        if (! $isConfigured) {
+            return false;
+        }
+
+        // Google OAuth does not accept arbitrary `.test` callback domains, so do not
+        // expose a broken social login CTA on local Herd-style environments.
+        if (app()->environment('local') && self::usesUnsupportedLocalRedirect($config['redirect'] ?? null)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function usesUnsupportedLocalRedirect(mixed $redirect): bool
+    {
+        if (! is_string($redirect) || $redirect === '') {
+            return false;
+        }
+
+        $host = parse_url($redirect, PHP_URL_HOST);
+
+        if (! is_string($host) || $host === '') {
+            return false;
+        }
+
+        return $host === '.test' || str_ends_with($host, '.test');
     }
 }

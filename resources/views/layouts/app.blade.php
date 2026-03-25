@@ -59,6 +59,8 @@
         })();
     </script>
     @livewireStyles
+    @filamentStyles(['app'])
+    @filamentStyles(['filament/filament'])
     @include('components.analytics.signals-tracker', ['surface' => 'public'])
     @stack('head')
 </head>
@@ -420,6 +422,8 @@
     </div>
 
     @livewireScripts
+    @filamentScripts(['app'])
+    @filamentScripts(['filament/support', 'filament/schemas', 'filament/forms', 'filament/actions', 'filament/notifications'])
     @stack('scripts')
 </body>
 

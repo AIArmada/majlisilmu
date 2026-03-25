@@ -5,7 +5,9 @@ use App\Models\User;
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
 
-    $response->assertStatus(200);
+    $response->assertStatus(200)
+        ->assertSee('autocomplete="email"', false)
+        ->assertSee('autocomplete="current-password"', false);
 });
 
 test('users can authenticate using the login screen', function () {
@@ -33,7 +35,10 @@ test('users can not authenticate with invalid password', function () {
 
 test('register screen can be rendered', function () {
     $response = $this->get('/register');
-    $response->assertStatus(200);
+    $response->assertStatus(200)
+        ->assertSee('autocomplete="name"', false)
+        ->assertSee('autocomplete="email"', false)
+        ->assertSee('autocomplete="new-password"', false);
 });
 
 test('new users can register', function () {
@@ -50,5 +55,6 @@ test('new users can register', function () {
 
 test('forgot password screen can be rendered', function () {
     $response = $this->get('/forgot-password');
-    $response->assertStatus(200);
+    $response->assertStatus(200)
+        ->assertSee('autocomplete="email"', false);
 });

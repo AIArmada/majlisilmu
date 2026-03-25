@@ -789,6 +789,8 @@
         <div class="mt-16 relative">
             @php
                 $events = $this->events;
+                $showPendingStatusNote = $events->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Pending);
+                $showCancelledStatusNote = $events->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Cancelled);
             @endphp
 
             <div wire:loading.delay.short
@@ -828,6 +830,14 @@
             </div>
 
             <div wire:loading.remove wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
+            @if($showPendingStatusNote || $showCancelledStatusNote)
+                <x-public.moderation-status-note
+                    :show-pending="$showPendingStatusNote"
+                    :show-cancelled="$showCancelledStatusNote"
+                    class="mb-6"
+                />
+            @endif
+
             @if($events->isEmpty())
                 <div class="flex flex-col items-center justify-center py-24 text-center">
                     <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">

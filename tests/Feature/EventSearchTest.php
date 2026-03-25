@@ -1264,6 +1264,7 @@ describe('Event Search Filters', function () {
             ->assertSee('Cancelled Event')
             ->assertSee('Pending Approval')
             ->assertSee('Dibatalkan')
+            ->assertSee('Semak lencana status pada setiap majlis sebelum hadir.')
             ->assertDontSee('Draft Event')
             ->assertDontSee('Private Event');
     });

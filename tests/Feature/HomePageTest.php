@@ -16,9 +16,8 @@ it('displays the homepage successfully', function () {
     $response->assertSee('Majlis');
     $response->assertSee('Ilmu');
     $response->assertSee('Berdekatan Saya');
-    $response->assertDontSee('/js/filament/', false);
-    $response->assertDontSee('/fonts/filament/', false);
     $response->assertDontSee('/flux/flux.js', false);
+    $response->assertDontSee('grainy-gradients.vercel.app', false);
 });
 
 it('contains livewire components on the homepage', function () {

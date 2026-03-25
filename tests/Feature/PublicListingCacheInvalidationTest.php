@@ -31,11 +31,6 @@ function primeMajlisListingCache(): array
     $keys = [
         'default_events_search',
         'default_events_search_v2',
-        'kimi_home_stats',
-        'kimi_featured_events',
-        'kimi_featured_events_v2',
-        'kimi_upcoming_events',
-        'kimi_upcoming_events_v2',
         'states_my',
         'states_my_v2',
     ];

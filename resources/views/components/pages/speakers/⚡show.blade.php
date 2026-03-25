@@ -301,6 +301,12 @@ new class extends Component {
     $showJoinCta = auth()->guest();
     $hasInspiration = \App\Models\Inspiration::query()->active()->forLocale()->exists();
     $useDesktopSidebar = $showJoinCta || $hasInspiration;
+    $eventStatusNoticeEvents = $upcomingEvents
+        ->concat($pastEvents)
+        ->concat($otherRoleUpcomingParticipations->pluck('event')->filter())
+        ->concat($otherRolePastParticipations->pluck('event')->filter());
+    $showPendingEventStatusNotice = $eventStatusNoticeEvents->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Pending);
+    $showCancelledEventStatusNotice = $eventStatusNoticeEvents->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Cancelled);
 
     // Institutions (primary first, max 3)
     $institutions = $speaker->institutions;
@@ -654,6 +660,14 @@ new class extends Component {
                             @endif
                         </div>
                     </div>
+
+                @if($showPendingEventStatusNotice || $showCancelledEventStatusNotice)
+                    <x-public.moderation-status-note
+                        :show-pending="$showPendingEventStatusNotice"
+                        :show-cancelled="$showCancelledEventStatusNotice"
+                        class="mb-6"
+                    />
+                @endif
 
                 {{-- ═══ UPCOMING TAB ═══ --}}
                 <div x-show="tab === 'upcoming'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">

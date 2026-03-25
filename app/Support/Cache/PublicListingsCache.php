@@ -10,11 +10,6 @@ class PublicListingsCache
     {
         Cache::forget('default_events_search');
         Cache::forget('default_events_search_v2');
-        Cache::forget('kimi_home_stats');
-        Cache::forget('kimi_featured_events');
-        Cache::forget('kimi_featured_events_v2');
-        Cache::forget('kimi_upcoming_events');
-        Cache::forget('kimi_upcoming_events_v2');
         Cache::forget('states_my');
         Cache::forget('states_my_v2');
 

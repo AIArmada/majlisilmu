@@ -55,7 +55,7 @@
                 <label for="email" class="block text-sm font-semibold text-slate-700">{{ __('Email address') }}</label>
                 <div class="relative">
                     <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
-                        autocomplete="username"
+                        autocomplete="email"
                         class="block h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                         placeholder="you@example.com" />
                 </div>

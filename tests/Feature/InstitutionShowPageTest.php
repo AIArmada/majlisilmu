@@ -316,7 +316,8 @@ it('shows pending public events', function () {
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
         ->assertSee('Pending Event ABC')
-        ->assertSee('Menunggu Kelulusan');
+        ->assertSee('Menunggu Kelulusan')
+        ->assertSee('Semak lencana status pada setiap majlis sebelum hadir.');
 });
 
 it('shows cancelled public events with cancelled badge', function () {
