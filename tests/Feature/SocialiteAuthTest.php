@@ -73,6 +73,7 @@ it('creates a user and social account on callback', function () {
     $user = User::query()->where('email', 'jane@example.com')->first();
 
     expect($user)->not->toBeNull();
+    expect($user?->email_verified_at)->not->toBeNull();
 
     $this->assertDatabaseHas('socialite', [
         'user_id' => $user->id,
@@ -86,6 +87,7 @@ it('links a social account to an existing user', function () {
     $user = User::factory()->create([
         'email' => 'existing@example.com',
         'name' => 'Existing User',
+        'email_verified_at' => null,
     ]);
 
     Socialite::fake('google', (new SocialiteUser)->map([
@@ -111,4 +113,39 @@ it('links a social account to an existing user', function () {
 
     expect(SocialAccount::query()->where('user_id', $user->id)->count())
         ->toBe(1);
+    expect($user->fresh()?->email_verified_at)->not->toBeNull();
+});
+
+it('verifies an existing user when signing in through an existing google social account', function () {
+    $user = User::factory()->unverified()->create([
+        'email' => 'linked@example.com',
+        'name' => 'Linked User',
+    ]);
+
+    SocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_id' => 'google-789',
+        'avatar_url' => 'https://example.com/old-avatar.jpg',
+    ]);
+
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => 'google-789',
+        'name' => 'Linked User',
+        'email' => 'linked@example.com',
+        'avatar' => 'https://example.com/new-avatar.jpg',
+    ]));
+
+    $response = $this->get(route('socialite.callback', ['provider' => 'google']));
+
+    $response->assertRedirect(route('home'));
+
+    expect($user->fresh()?->email_verified_at)->not->toBeNull();
+
+    $this->assertDatabaseHas('socialite', [
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_id' => 'google-789',
+        'avatar_url' => 'https://example.com/new-avatar.jpg',
+    ]);
 });

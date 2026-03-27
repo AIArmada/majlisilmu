@@ -84,6 +84,10 @@ class SocialiteController extends Controller
             ]);
         }
 
+        if (! $user->hasVerifiedEmail() && filled($socialUser->getEmail())) {
+            $user->markEmailAsVerified();
+        }
+
         Auth::login($user, remember: true);
         app(ProductSignalsService::class)->recordLogin($user, request(), $provider, $createdFromShare);
 

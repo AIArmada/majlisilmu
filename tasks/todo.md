@@ -6100,3 +6100,89 @@
   - `php -l tests/Feature/InstitutionIndexTest.php` => **No syntax errors**
   - `git diff --check` => **No diff formatting issues**
   - `vendor/bin/phpstan analyse --ansi tests/Feature/InstitutionIndexTest.php` => **tooling limitation: current PHPStan config reports `No files found to analyse` for this Pest target**
+
+# Google Social Email Verification
+
+- [x] Inspect the Google Socialite callback and current verification behavior
+- [x] Ensure Google sign-in marks matched existing users as email-verified when appropriate
+- [x] Add regression coverage for new and existing-user Google auth verification behavior
+- [x] Run focused verification for the Socialite auth flow
+
+## Review
+- Root cause:
+  - the Google Socialite callback only set `email_verified_at` during brand-new user creation
+  - users who already existed locally, or who already had a linked Google social account, could complete Google sign-in while still remaining unverified
+- Fix:
+  - moved the verification step to run after any successful Google account resolution in `app/Http/Controllers/Auth/SocialiteController.php`
+  - only call `markEmailAsVerified()` when the resolved user is still unverified and Google returned a non-empty email address
+  - extended `tests/Feature/SocialiteAuthTest.php` to assert verification for:
+    - newly created Google users
+    - existing local users linked by email
+    - existing linked Google social accounts
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialiteAuthTest.php` => **6 passed (28 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Auth/SocialiteController.php tests/Feature/SocialiteAuthTest.php` => **No errors**
+  - `git diff --check` => **No diff formatting issues**
+
+# Institution Address Comma Spacing
+
+- [x] Trace the institution detail address rendering path
+- [x] Normalize address line spacing so commas do not receive preceding spaces
+- [x] Add focused regression coverage for trimmed address access
+- [x] Run focused verification for the touched model and test
+
+## Review
+- Root cause:
+  - the institution detail page renders `line1` and `line2` directly, and address text was not normalized at the model layer
+  - when stored address data contained trailing or leading whitespace, joins like `{{ $address->line1 }}, {{ $address->line2 }}` produced visible output such as `Persiaran Masjid , Seksyen 14`
+- Fix:
+  - added trimmed `line1` and `line2` accessors/mutators on `app/Models/Address.php` so address lines are normalized on both read and write
+  - added a focused regression in `tests/Unit/HasAddressAccessorTest.php` to prove trailing and leading spaces are removed and the combined string renders as `Persiaran Masjid, Seksyen 14`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/HasAddressAccessorTest.php` => **2 passed (7 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Address.php tests/Unit/HasAddressAccessorTest.php` => **No errors**
+  - `git diff --check` => **No diff formatting issues**
+
+# Institution Address Hierarchy
+
+- [x] Inspect the institution show contact block and confirm why hierarchy fields are missing
+- [x] Patch the contact block to render subdistrict, district, and state cleanly
+- [x] Add focused institution show coverage for street plus hierarchy output
+- [x] Run focused verification for the institution show page change
+
+## Review
+- Root cause:
+  - the institution show contact block rendered only `line1`, `line2`, `postcode`, optional `city`, and `state`
+  - even though the page already computed the shared `locationString`, that block never used it, so `subdistrict` and `district` were omitted from the visible address
+- Fix:
+  - updated `resources/views/components/pages/institutions/⚡show.blade.php` to compose three address layers:
+    - street line from `line1` + `line2`
+    - postcode/city line
+    - hierarchy line from the shared formatter (`subdistrict, district, state`)
+  - added a focused regression in `tests/Feature/InstitutionShowPageTest.php` that proves an address with `Shah Alam` and `Petaling` renders in order with the street and postcode
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **24 passed (77 assertions)**
+  - `php -l tests/Feature/InstitutionShowPageTest.php` => **No syntax errors**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/InstitutionShowPageTest.php` => **tooling limitation: current PHPStan config reports `No files found to analyse` for this Pest target**
+  - `git diff --check` => **No diff formatting issues**
+
+# Composer AIArmada Repositories
+
+- [x] Inspect root composer manifest and lockfile for local AIArmada path repositories
+- [x] Remove local AIArmada path repository entries from composer.json
+- [x] Refresh the lockfile so AIArmada packages no longer resolve from local paths
+- [x] Verify composer manifests no longer reference local path repositories
+
+## Review
+- Root cause:
+  - the root `composer.json` still declared five local `path` repositories under `/Users/Saiffil/Herd/commerce/packages/...` for the `aiarmada/*` packages
+  - the lockfile was also pinned to `path` installs, which would keep production `composer install` pointing at a non-existent local filesystem path even after editing the manifest
+- Fix:
+  - removed the five local `path` repository entries from `composer.json`
+  - refreshed only the `aiarmada/*` packages in `composer.lock` via Composer so they now resolve from GitHub `git`/`zip` sources instead of local paths
+  - Composer also advanced `livewire/livewire` from `v4.2.1` to `v4.2.2` as part of the targeted dependency refresh
+- Verification:
+  - `composer update aiarmada/affiliates aiarmada/commerce-support aiarmada/filament-authz aiarmada/filament-signals aiarmada/signals --with-all-dependencies --no-scripts`
+  - `composer validate --no-check-publish` => **./composer.json is valid**
+  - `rg -n 'aiarmada/.+|"type": "path"|"type"\\s*:\\s*"path"' composer.json composer.lock` => **no remaining `path` entries**
+  - `git diff --check` => **No diff formatting issues**

@@ -214,6 +214,15 @@ new class extends Component {
         return $parts === [] ? '-' : implode(', ', $parts);
     };
     $locationString = $formatAddressHierarchy($address);
+    $streetAddressLine = implode(', ', array_filter([
+        $address?->line1,
+        $address?->line2,
+    ]));
+    $postalAddressLine = trim(implode(' ', array_filter([
+        $address?->postcode,
+        $address?->city?->name,
+    ])));
+    $locationHierarchyLine = $locationString !== '-' ? $locationString : '';
     $googleMapsApiKey = (string) config('services.google.maps_api_key', '');
     $mapQuery = implode(', ', array_filter([
         $institution->name,
@@ -1351,13 +1360,18 @@ new class extends Component {
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <p class="text-sm font-medium leading-snug text-slate-800">
-                                            @if($address->line1) {{ $address->line1 }} @endif
-                                            @if($address->line2), {{ $address->line2 }}@endif
-                                            @if($address->line1 || $address->line2) <br> @endif
-                                            @if($address->postcode) {{ $address->postcode }} @endif
-                                            @if($address->city?->name) {{ $address->city->name }} @endif
-                                            @if($address->state?->name)
-                                                <br>{{ $address->state->name }}
+                                            @if(filled($streetAddressLine))
+                                                {{ $streetAddressLine }}
+                                            @endif
+
+                                            @if(filled($postalAddressLine))
+                                                @if(filled($streetAddressLine)) <br> @endif
+                                                {{ $postalAddressLine }}
+                                            @endif
+
+                                            @if(filled($locationHierarchyLine))
+                                                @if(filled($streetAddressLine) || filled($postalAddressLine)) <br> @endif
+                                                {{ $locationHierarchyLine }}
                                             @endif
                                         </p>
                                     </div>
