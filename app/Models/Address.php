@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditsModelChanges;
 use GuzzleHttp\TransferStats;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,6 +39,28 @@ class Address extends Model implements AuditableContract
         'lat' => 'float',
         'lng' => 'float',
     ];
+
+    /**
+     * @return Attribute<string|null, string|null>
+     */
+    protected function line1(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (?string $value): ?string => self::normalizeTextValue($value),
+            set: static fn (?string $value): ?string => self::normalizeTextValue($value),
+        );
+    }
+
+    /**
+     * @return Attribute<string|null, string|null>
+     */
+    protected function line2(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (?string $value): ?string => self::normalizeTextValue($value),
+            set: static fn (?string $value): ?string => self::normalizeTextValue($value),
+        );
+    }
 
     #[\Override]
     protected static function booted(): void
@@ -136,6 +159,13 @@ class Address extends Model implements AuditableContract
         }
 
         return $currentUrl;
+    }
+
+    private static function normalizeTextValue(?string $value): ?string
+    {
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 
     /**

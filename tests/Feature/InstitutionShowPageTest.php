@@ -130,6 +130,70 @@ it('deduplicates matching district and subdistrict labels on institution show pa
         ->assertDontSee('Temerloh, Temerloh, Pahang');
 });
 
+it('displays subdistrict district and state in the institution contact address block', function () {
+    $state = State::query()
+        ->where('country_code', 'MY')
+        ->where('name', 'Selangor')
+        ->first();
+
+    if (! $state) {
+        $countryId = DB::table('countries')->insertGetId([
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Selangor',
+            'country_code' => 'MY',
+        ]);
+
+        $state = State::query()->findOrFail($stateId);
+    }
+
+    $district = District::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Petaling',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Shah Alam',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Shah Alam',
+        'status' => 'verified',
+    ]);
+
+    $institution->address()->update([
+        'line1' => 'Persiaran Masjid',
+        'line2' => 'Seksyen 14',
+        'postcode' => '40000',
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSeeInOrder([
+            'Persiaran Masjid, Seksyen 14',
+            '40000',
+            'Shah Alam, Petaling, Selangor',
+        ]);
+});
+
 it('displays upcoming events for the institution', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 

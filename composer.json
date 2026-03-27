@@ -132,31 +132,6 @@
     "prefer-stable": true,
     "repositories": [
         {
-            "type": "path",
-            "url": "/Users/Saiffil/Herd/commerce/packages/signals",
-            "options": { "symlink": true }
-        },
-        {
-            "type": "path",
-            "url": "/Users/Saiffil/Herd/commerce/packages/filament-signals",
-            "options": { "symlink": true }
-        },
-        {
-            "type": "path",
-            "url": "/Users/Saiffil/Herd/commerce/packages/affiliates",
-            "options": { "symlink": true }
-        },
-        {
-            "type": "path",
-            "url": "/Users/Saiffil/Herd/commerce/packages/commerce-support",
-            "options": { "symlink": true }
-        },
-        {
-            "type": "path",
-            "url": "/Users/Saiffil/Herd/commerce/packages/filament-authz",
-            "options": { "symlink": true }
-        },
-        {
             "type": "package",
             "package": {
                 "name": "akaunting/laravel-money",
