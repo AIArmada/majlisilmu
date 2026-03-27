@@ -317,6 +317,7 @@
                     locating: false,
                     copiedShareLink: false,
                     shareData: @js($searchShareData),
+                    trackEndpoint: @js(route('dawah-share.track')),
                     attributedShareData: null,
                     locate() {
                         if (this.locating) return;
@@ -361,9 +362,36 @@
                         this.attributedShareData = {
                             ...this.shareData,
                             url: payload.url,
+                            tracking_token: payload.tracking_token ?? null,
                         };
 
                         return this.attributedShareData;
+                    },
+                    async trackShare(provider) {
+                        const shareData = await this.resolveShareData();
+
+                        if (! shareData?.tracking_token) {
+                            return;
+                        }
+
+                        const csrfToken = document.querySelector('meta[name=csrf-token]')?.content;
+
+                        if (! csrfToken) {
+                            return;
+                        }
+
+                        await fetch(this.trackEndpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify({
+                                provider,
+                                tracking_token: shareData.tracking_token,
+                            }),
+                        });
                     },
                     async shareResults() {
                         const shareData = await this.resolveShareData();
@@ -372,14 +400,18 @@
                         }
 
                         if (navigator.share) {
-                            navigator.share(shareData);
+                            try {
+                                await navigator.share(shareData);
+                                await this.trackShare('native_share');
+                            } catch (error) {
+                            }
 
                             return;
                         }
 
-                        this.copyShareLink();
+                        await this.copyShareLink();
                     },
-                    async copyShareLink() {
+                    async copyShareLink(shouldTrack = true) {
                         const shareData = await this.resolveShareData();
                         if (!shareData) {
                             return;
@@ -388,14 +420,26 @@
                         if (! navigator.clipboard) {
                             window.prompt('{{ __("Copy this link:") }}', shareData.url);
 
+                            if (shouldTrack) {
+                                await this.trackShare('copy_link');
+                            }
+
                             return;
                         }
 
-                        navigator.clipboard.writeText(shareData.url).then(() => {
+                        navigator.clipboard.writeText(shareData.url).then(async () => {
+                            if (shouldTrack) {
+                                await this.trackShare('copy_link');
+                            }
+
                             this.copiedShareLink = true;
                             setTimeout(() => this.copiedShareLink = false, 2200);
-                        }, () => {
+                        }, async () => {
                             window.prompt('{{ __("Copy this link:") }}', shareData.url);
+
+                            if (shouldTrack) {
+                                await this.trackShare('copy_link');
+                            }
                         });
                     },
                 }" class="relative bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200 p-6 md:p-8">

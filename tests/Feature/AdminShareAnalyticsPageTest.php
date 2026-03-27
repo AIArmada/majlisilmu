@@ -4,6 +4,7 @@ use AIArmada\FilamentSignals\Pages\PageViewsReport;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
 use App\Filament\Pages\ShareAnalytics;
+use App\Models\Event;
 use App\Models\User;
 use App\Services\Signals\SignalsTracker;
 use Database\Seeders\PermissionSeeder;
@@ -51,6 +52,70 @@ it('renders the admin share analytics page', function () {
         ->assertSee('Provider Breakdown')
         ->assertSee('Top Sharers')
         ->assertSee('Top Links');
+});
+
+it('shows copy link activity on the admin share analytics page', function () {
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $sharer = User::factory()->create();
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $trackingToken = $this->actingAs($sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+        ]))
+        ->assertOk()
+        ->json('tracking_token');
+
+    $this->actingAs($sharer)
+        ->postJson(route('dawah-share.track'), [
+            'provider' => 'copy_link',
+            'tracking_token' => $trackingToken,
+        ])
+        ->assertNoContent();
+
+    $this->actingAs($administrator)
+        ->get(ShareAnalytics::getUrl(panel: 'admin'))
+        ->assertSuccessful()
+        ->assertSee('Copy Link');
+});
+
+it('shows threads activity on the admin share analytics page', function () {
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $sharer = User::factory()->create();
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $trackingToken = $this->actingAs($sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+        ]))
+        ->assertOk()
+        ->json('tracking_token');
+
+    $this->actingAs($sharer)
+        ->postJson(route('dawah-share.track'), [
+            'provider' => 'threads',
+            'tracking_token' => $trackingToken,
+        ])
+        ->assertNoContent();
+
+    $this->actingAs($administrator)
+        ->get(ShareAnalytics::getUrl(panel: 'admin'))
+        ->assertSuccessful()
+        ->assertSee('Threads');
 });
 
 it('injects a dedicated admin tracker by default', function () {

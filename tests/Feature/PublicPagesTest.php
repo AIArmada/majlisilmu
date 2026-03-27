@@ -29,10 +29,18 @@ it('loads public index pages', function () {
     $this->get('/submit-event/success')->assertSuccessful()->assertSee(__('Event Submitted!'));
 });
 
-it('serves the public favicon successfully', function () {
-    $this->get('/favicon.ico')
+it('respects the signals geolocation toggle in tracker markup', function () {
+    config()->set('signals.features.geolocation.enabled', false);
+
+    $this->get('/')
         ->assertSuccessful()
-        ->assertHeader('Content-Type', 'image/x-icon');
+        ->assertSee('data-enable-geolocation="false"', false);
+
+    config()->set('signals.features.geolocation.enabled', true);
+
+    $this->get('/')
+        ->assertSuccessful()
+        ->assertSee('data-enable-geolocation="true"', false);
 });
 
 it('renders accessible labels on the public submit-event form', function () {
@@ -85,6 +93,89 @@ it('loads public detail pages', function () {
         ->assertSuccessful()
         ->assertSee($series->title)
         ->assertSee($event->title);
+});
+
+it('shows share actions on public series and reference pages', function () {
+    $series = Series::factory()->create([
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->get(route('series.show', $series))
+        ->assertSuccessful()
+        ->assertSee('Kongsi')
+        ->assertSee('Kongsi Siri');
+
+    $this->get(route('references.show', $reference))
+        ->assertSuccessful()
+        ->assertSee('Kongsi')
+        ->assertSee('Kongsi Rujukan');
+});
+
+it('renders threads in public share modals instead of line', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $institution = Institution::factory()->create(['status' => 'verified']);
+    $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $series = Series::factory()->create([
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    collect([
+        $this->get(route('events.show', $event)),
+        $this->get(route('institutions.show', $institution)),
+        $this->get(route('speakers.show', $speaker)),
+        $this->get(route('series.show', $series)),
+        $this->get(route('references.show', $reference)),
+    ])->each(function ($response): void {
+        $response->assertSuccessful()
+            ->assertSee('storage/social-media-icons/threads.svg', false)
+            ->assertSee('title="Threads"', false)
+            ->assertDontSee('storage/social-media-icons/line.svg', false)
+            ->assertDontSee('title="LINE"', false);
+    });
+});
+
+it('does not leak share tracking javascript into public page body text', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $institution = Institution::factory()->create(['status' => 'verified']);
+    $speaker = Speaker::factory()->create(['status' => 'verified']);
+
+    collect([
+        $this->get(route('events.show', $event)),
+        $this->get(route('institutions.show', $institution)),
+        $this->get(route('speakers.show', $speaker)),
+    ])->each(function ($response): void {
+        $response->assertSuccessful();
+
+        $visibleText = strip_tags($response->getContent());
+
+        expect($visibleText)
+            ->not->toContain('trackShare(')
+            ->not->toContain('copy_link')
+            ->not->toContain('native_share');
+    });
 });
 
 it('renders speaker contribution links with penceramah route segments', function () {

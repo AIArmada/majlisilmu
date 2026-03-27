@@ -38,6 +38,23 @@ beforeEach(function (): void {
     $this->sharer = User::factory()->create();
 });
 
+function dawahShareTrackingToken(TestCase $testCase, User $sharer, string $url, ?string $title = null): string
+{
+    $payload = $testCase
+        ->actingAs($sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => $url,
+            'text' => 'Share this page',
+            'title' => $title ?? 'Shared Page',
+        ]))
+        ->assertOk()
+        ->json();
+
+    expect(data_get($payload, 'tracking_token'))->toBeString()->not->toBe('');
+
+    return (string) data_get($payload, 'tracking_token');
+}
+
 function dawahShareLandingCookie(TestCase $testCase, User $sharer, string $url, ?string $title = null): string
 {
     $payload = $testCase
@@ -158,6 +175,117 @@ test('viewing a shareable page does not create a share link until payload is req
         ->assertOk();
 
     expect(AffiliateLink::count())->toBe(1);
+});
+
+test('explicit copy-link and native-share actions record outbound share touchpoints for authenticated users', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $trackingToken = dawahShareTrackingToken($this, $this->sharer, route('events.show', $event), $event->title);
+
+    $this->actingAs($this->sharer)
+        ->postJson(route('dawah-share.track'), [
+            'provider' => 'copy_link',
+            'tracking_token' => $trackingToken,
+        ])
+        ->assertNoContent();
+
+    $this->actingAs($this->sharer)
+        ->postJson(route('dawah-share.track'), [
+            'provider' => 'native_share',
+            'tracking_token' => $trackingToken,
+        ])
+        ->assertNoContent();
+
+    expect(Affiliate::count())->toBe(1)
+        ->and(AffiliateLink::count())->toBe(1)
+        ->and(AffiliateTouchpoint::query()->where('metadata->event_type', 'outbound_share')->count())->toBe(2);
+
+    $providers = AffiliateTouchpoint::query()
+        ->where('metadata->event_type', 'outbound_share')
+        ->get()
+        ->map(fn (AffiliateTouchpoint $touchpoint): ?string => data_get($touchpoint->metadata, 'provider'))
+        ->filter()
+        ->values()
+        ->all();
+
+    expect($providers)->toContain('copy_link', 'native_share');
+});
+
+test('share payload includes a tracking token for authenticated sharers only', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $authenticatedPayload = $this->actingAs($this->sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+        ]))
+        ->assertOk()
+        ->json();
+
+    auth()->logout();
+
+    $guestPayload = $this->getJson(route('dawah-share.payload', [
+        'url' => route('events.show', $event),
+        'text' => 'Share this event',
+        'title' => $event->title,
+    ]))
+        ->assertOk()
+        ->json();
+
+    expect(data_get($authenticatedPayload, 'tracking_token'))->toBeString()->not->toBe('')
+        ->and(data_get($guestPayload, 'tracking_token'))->toBeNull();
+});
+
+test('share tracking rejects invalid tokens and unauthenticated callers', function () {
+    $this->postJson(route('dawah-share.track'), [
+        'provider' => 'copy_link',
+        'tracking_token' => 'invalid-token',
+    ])->assertUnauthorized();
+
+    $this->actingAs($this->sharer)
+        ->postJson(route('dawah-share.track'), [
+            'provider' => 'copy_link',
+            'tracking_token' => 'invalid-token',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('tracking_token');
+
+    expect(AffiliateTouchpoint::query()->where('metadata->event_type', 'outbound_share')->count())->toBe(0);
+});
+
+test('threads redirect records an outbound share touchpoint for authenticated users', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $response = $this->actingAs($this->sharer)
+        ->get(route('dawah-share.redirect', [
+            'provider' => 'threads',
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+        ]));
+
+    $response->assertRedirect();
+
+    expect(Affiliate::count())->toBe(1)
+        ->and(AffiliateLink::count())->toBe(1)
+        ->and(AffiliateTouchpoint::query()->where('metadata->event_type', 'outbound_share')->count())->toBe(1);
+
+    $touchpoint = AffiliateTouchpoint::query()
+        ->where('metadata->event_type', 'outbound_share')
+        ->first();
+
+    expect($touchpoint)->not->toBeNull()
+        ->and(data_get($touchpoint?->metadata, 'provider'))->toBe('threads');
 });
 
 test('equivalent filtered search urls reuse the same canonical share link', function () {

@@ -264,7 +264,7 @@ class Show extends Component
     }
 
     /**
-     * @return array{whatsapp: string, telegram: string, line: string, facebook: string, x: string, instagram: string, tiktok: string, email: string}
+     * @return array{whatsapp: string, telegram: string, threads: string, facebook: string, x: string, instagram: string, tiktok: string, email: string}
      */
     #[Computed]
     public function shareLinks(): array

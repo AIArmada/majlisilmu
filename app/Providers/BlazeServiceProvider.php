@@ -30,6 +30,7 @@ class BlazeServiceProvider extends ServiceProvider
         $configure = static function (BlazeConfig $config): void {
             $config
                 ->in(resource_path('views/components'))
+                ->in(resource_path('views/components/analytics'), compile: false)
                 ->in(resource_path('views/components/pages'), compile: false)
                 ->in(resource_path('views/components/home'), compile: false)
                 ->in(resource_path('views/components/event-json-ld.blade.php'), compile: false)

@@ -7,6 +7,8 @@ use App\Services\ShareTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class DawahShareController extends Controller
@@ -38,6 +40,26 @@ class DawahShareController extends Controller
         }
     }
 
+    public function track(Request $request, ShareTrackingService $shareTrackingService): Response
+    {
+        $data = $this->validatedTrackedData($request, $shareTrackingService);
+
+        try {
+            $shareTrackingService->recordShareAction(
+                provider: $data['provider'],
+                user: $this->authenticatedUser($request),
+                trackingToken: $data['tracking_token'],
+                request: $request,
+            );
+
+            return response()->noContent();
+        } catch (\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'tracking_token' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * @return array{url: string, text: string, title?: string}
      */
@@ -48,6 +70,22 @@ class DawahShareController extends Controller
             'url' => ['required', 'string', 'max:2048'],
             'text' => ['required', 'string', 'max:500'],
             'title' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return $validated;
+    }
+
+    /**
+     * @return array{provider:string,tracking_token:string}
+     */
+    protected function validatedTrackedData(Request $request, ShareTrackingService $shareTrackingService): array
+    {
+        $providers = array_merge($shareTrackingService->supportedProviders(), ['copy_link', 'native_share']);
+
+        /** @var array{provider:string,tracking_token:string} $validated */
+        $validated = $request->validate([
+            'provider' => ['required', 'string', Rule::in($providers)],
+            'tracking_token' => ['required', 'string'],
         ]);
 
         return $validated;

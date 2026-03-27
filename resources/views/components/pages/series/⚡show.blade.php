@@ -213,7 +213,7 @@ new
     };
 @endphp
 
-<div class="min-h-screen bg-slate-50/80">
+<div class="min-h-screen bg-slate-50/80" x-data="{ shareModalOpen: false }">
 
 
     {{-- ═══ HERO ═══ --}}
@@ -324,6 +324,15 @@ new
                                 @endif
                             </button>
 
+                            <button type="button" @click="shareModalOpen = true"
+                                class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-emerald-400/40 hover:bg-emerald-500/20 hover:text-emerald-200 backdrop-blur-sm">
+                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                                {{ __('Kongsi') }}
+                            </button>
+
                             @can('update', $series)
                                 <a href="{{ route('filament.admin.resources.series.edit', ['record' => $series]) }}"
                                     target="_blank" rel="noopener noreferrer"
@@ -337,16 +346,6 @@ new
                             @endcan
                         </div>
 
-                        <div class="mt-6 max-w-2xl">
-                            <x-dawah-share-panel
-                                :heading="__('Share This Series')"
-                                :description="__('Share this series with others and keep every visit and response on one tracked link.')"
-                                :preview-title="$series->title"
-                                :preview-subtitle="Str::limit((string) $series->description, 110)"
-                                :share-data="$seriesShareData"
-                                :share-links="$seriesShareLinks"
-                            />
-                        </div>
                     </div>
 
                     {{-- Right Poster --}}
@@ -435,6 +434,14 @@ new
                                 </svg>
                                 {{ __('Ikuti Siri') }}
                             @endif
+                        </button>
+                        <button type="button" @click="shareModalOpen = true"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:border-emerald-400/40 hover:bg-emerald-500/20 hover:text-emerald-200 backdrop-blur-sm">
+                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            {{ __('Kongsi') }}
                         </button>
                         @can('update', $series)
                             <a href="{{ route('filament.admin.resources.series.edit', ['record' => $series]) }}" target="_blank"
@@ -832,6 +839,41 @@ new
                     @endif
                 </aside>
 
+            </div>
+        </div>
+    </div>
+
+    <div x-show="shareModalOpen" x-cloak x-transition.opacity @keydown.escape.window="shareModalOpen = false"
+        class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm" aria-modal="true" role="dialog">
+        <div class="flex min-h-screen items-center justify-center p-4 sm:p-6">
+            <div @click.away="shareModalOpen = false" x-show="shareModalOpen"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-8 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 translate-y-8 scale-95"
+                class="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200/50">
+                <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-5">
+                    <h3 class="font-heading text-xl font-bold text-slate-900">{{ __('Kongsi Siri') }}</h3>
+                    <button type="button" @click="shareModalOpen = false"
+                        class="inline-flex size-10 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-700">
+                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 sm:p-8">
+                    <x-dawah-share-panel
+                        :heading="__('Share This Series')"
+                        :description="__('Share this series with others and keep every visit and response on one tracked link.')"
+                        :preview-title="$series->title"
+                        :preview-subtitle="Str::limit((string) $series->description, 110)"
+                        :share-data="$seriesShareData"
+                        :share-links="$seriesShareLinks"
+                    />
+                </div>
             </div>
         </div>
     </div>
