@@ -24,7 +24,7 @@ final class ShareTrackingUrlService
      */
     public function supportedProviders(): array
     {
-        return ['whatsapp', 'telegram', 'line', 'facebook', 'x', 'instagram', 'tiktok', 'email'];
+        return ['whatsapp', 'telegram', 'threads', 'facebook', 'x', 'instagram', 'tiktok', 'email'];
     }
 
     /**
@@ -48,7 +48,7 @@ final class ShareTrackingUrlService
         return match ($provider) {
             'whatsapp' => "https://wa.me/?text={$encodedText}%20{$encodedUrl}",
             'telegram' => "https://t.me/share/url?url={$encodedUrl}&text={$encodedText}",
-            'line' => "https://social-plugins.line.me/lineit/share?url={$encodedUrl}",
+            'threads' => "https://www.threads.net/intent/post?text={$encodedText}%20{$encodedUrl}",
             'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encodedUrl}",
             'x' => "https://x.com/intent/tweet?text={$encodedText}&url={$encodedUrl}",
             'instagram' => 'https://www.instagram.com/',

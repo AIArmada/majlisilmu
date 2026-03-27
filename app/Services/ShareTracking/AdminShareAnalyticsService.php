@@ -197,7 +197,7 @@ final readonly class AdminShareAnalyticsService
         Collection $landingAttributions,
         Collection $conversions,
     ): array {
-        return collect($this->shareTrackingService->supportedProviders())
+        return $this->providersForBreakdown($outboundShares, $visits, $landingAttributions, $conversions)
             ->map(function (string $provider) use ($outboundShares, $visits, $landingAttributions, $conversions): array {
                 $providerOutbound = $outboundShares->filter(fn (AffiliateTouchpoint $touchpoint): bool => data_get($touchpoint->metadata, 'provider') === $provider);
                 $providerVisits = $visits->filter(fn (AffiliateTouchpoint $touchpoint): bool => data_get($touchpoint->metadata, 'share_provider') === $provider);
@@ -206,7 +206,7 @@ final readonly class AdminShareAnalyticsService
 
                 return [
                     'provider' => $provider,
-                    'label' => str($provider)->replace('_', ' ')->headline()->toString(),
+                    'label' => $this->providerLabel($provider),
                     'outbound_shares' => $providerOutbound->count(),
                     'visits' => $providerVisits->count(),
                     'unique_visitors' => $providerAttributions->pluck('cookie_value')->filter()->unique()->count(),
@@ -226,6 +226,29 @@ final readonly class AdminShareAnalyticsService
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  Collection<int, AffiliateTouchpoint>  $outboundShares
+     * @param  Collection<int, AffiliateTouchpoint>  $visits
+     * @param  Collection<int, AffiliateAttribution>  $landingAttributions
+     * @param  Collection<int, AffiliateConversion>  $conversions
+     * @return Collection<int, string>
+     */
+    private function providersForBreakdown(
+        Collection $outboundShares,
+        Collection $visits,
+        Collection $landingAttributions,
+        Collection $conversions,
+    ): Collection {
+        return collect($this->shareTrackingService->supportedProviders())
+            ->merge($outboundShares->pluck('metadata.provider'))
+            ->merge($visits->pluck('metadata.share_provider'))
+            ->merge($landingAttributions->pluck('metadata.share_provider'))
+            ->merge($conversions->pluck('metadata.share_provider'))
+            ->filter(fn (mixed $provider): bool => is_string($provider) && $provider !== '')
+            ->unique()
+            ->values();
     }
 
     /**
@@ -372,7 +395,7 @@ final readonly class AdminShareAnalyticsService
 
                 return [
                     'visited_url' => (string) data_get($visit->metadata, 'visited_url', ''),
-                    'provider' => str((string) data_get($visit->metadata, 'share_provider', 'direct'))->replace('_', ' ')->headline()->toString(),
+                    'provider' => $this->providerLabel((string) data_get($visit->metadata, 'share_provider', 'direct')),
                     'visit_kind' => str((string) data_get($visit->metadata, 'visit_kind', 'visit'))->replace('_', ' ')->headline()->toString(),
                     'visitor_key' => data_get($visit->metadata, 'visitor_key'),
                     'sharer_name' => $user instanceof User ? $user->name : $affiliate?->name,
@@ -416,5 +439,13 @@ final readonly class AdminShareAnalyticsService
         $userId = data_get($affiliate->metadata, 'majlis_user_id');
 
         return is_string($userId) && $userId !== '' ? $userId : null;
+    }
+
+    private function providerLabel(string $provider): string
+    {
+        return match ($provider) {
+            'threads' => 'Threads',
+            default => str($provider)->replace('_', ' ')->headline()->toString(),
+        };
     }
 }

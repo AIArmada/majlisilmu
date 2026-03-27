@@ -49,8 +49,11 @@ Route::get('/oauth/{provider}/callback', [SocialiteController::class, 'callback'
     ->whereIn('provider', ['google']);
 
 Route::get('/kongsi/payload', [DawahShareController::class, 'payload'])->name('dawah-share.payload');
+Route::post('/kongsi/track', [DawahShareController::class, 'track'])
+    ->middleware(['auth', 'throttle:30,1'])
+    ->name('dawah-share.track');
 Route::get('/kongsi/{provider}', [DawahShareController::class, 'redirect'])
-    ->whereIn('provider', ['whatsapp', 'telegram', 'line', 'facebook', 'x', 'instagram', 'tiktok', 'email'])
+    ->whereIn('provider', ['whatsapp', 'telegram', 'threads', 'facebook', 'x', 'instagram', 'tiktok', 'email'])
     ->name('dawah-share.redirect');
 
 // Authentication is handled by Fortify

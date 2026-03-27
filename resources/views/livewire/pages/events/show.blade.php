@@ -242,6 +242,7 @@
         shareData: @json($shareData),
         copyMessage: @json($copyMessage),
         copyPrompt: @json($copyPrompt),
+        trackEndpoint: @json(route('dawah-share.track')),
         attributedShareData: null,
         async resolveShareData() {
             if (this.attributedShareData) {
@@ -267,28 +268,76 @@
             this.attributedShareData = {
                 ...this.shareData,
                 url: payload.url,
+                tracking_token: payload.tracking_token ?? null,
             };
 
             return this.attributedShareData;
         },
+        async trackShare(provider) {
+            const shareData = await this.resolveShareData();
+
+            if (! shareData?.tracking_token) {
+                return;
+            }
+
+            const csrfToken = document.querySelector("meta[name=csrf-token]")?.content;
+
+            if (! csrfToken) {
+                return;
+            }
+
+            await fetch(this.trackEndpoint, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": csrfToken,
+                },
+                body: JSON.stringify({
+                    provider,
+                    tracking_token: shareData.tracking_token,
+                }),
+            });
+        },
         async nativeShare() {
             const shareData = await this.resolveShareData();
             if (navigator.share) {
-                navigator.share(shareData);
+                try {
+                    await navigator.share(shareData);
+                    await this.trackShare("native_share");
+                } catch (error) {
+                }
+
                 return;
             }
-            this.copyLink();
+
+            await this.copyLink();
         },
-        async copyLink() {
+        async copyLink(shouldTrack = true) {
             const shareData = await this.resolveShareData();
             if (navigator.clipboard) {
-                navigator.clipboard.writeText(shareData.url).then(() => {
+                navigator.clipboard.writeText(shareData.url).then(async () => {
+                    if (shouldTrack) {
+                        await this.trackShare("copy_link");
+                    }
+
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 2000);
+                }, async () => {
+                    window.prompt(this.copyPrompt, shareData.url);
+
+                    if (shouldTrack) {
+                        await this.trackShare("copy_link");
+                    }
                 });
                 return;
             }
+
             window.prompt(this.copyPrompt, shareData.url);
+
+            if (shouldTrack) {
+                await this.trackShare("copy_link");
+            }
         },
         openShareModal() {
             this.shareModalOpen = true;
@@ -2061,9 +2110,9 @@ SHARE MODAL
                             <img src="{{ asset('storage/social-media-icons/telegram.svg') }}" alt="Telegram"
                                 class="h-6 w-6" loading="lazy">
                         </a>
-                        <a href="{{ $shareLinks['line'] }}" target="_blank" rel="noopener" title="LINE"
-                            class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#06C755] hover:bg-[#06C755]/10">
-                            <img src="{{ asset('storage/social-media-icons/line.svg') }}" alt="LINE" class="h-6 w-6"
+                        <a href="{{ $shareLinks['threads'] }}" target="_blank" rel="noopener" title="Threads"
+                            class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
+                            <img src="{{ asset('storage/social-media-icons/threads.svg') }}" alt="Threads" class="h-6 w-6"
                                 loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" title="Facebook"
@@ -2076,13 +2125,13 @@ SHARE MODAL
                             <img src="{{ asset('storage/social-media-icons/x.svg') }}" alt="X" class="h-6 w-6"
                                 loading="lazy">
                         </a>
-                        <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink()"
+                        <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink(false)"
                             title="Instagram"
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10">
                             <img src="{{ asset('storage/social-media-icons/instagram.svg') }}" alt="Instagram"
                                 class="h-6 w-6" loading="lazy">
                         </a>
-                        <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink()"
+                        <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink(false)"
                             title="TikTok"
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
                             <img src="{{ asset('storage/social-media-icons/tiktok.svg') }}" alt="TikTok" class="h-6 w-6"

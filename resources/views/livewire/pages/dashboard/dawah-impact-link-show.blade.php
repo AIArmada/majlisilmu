@@ -73,6 +73,7 @@
                                     'fallbackTitle' => $link->title_snapshot,
                                     'payloadEndpoint' => route('dawah-share.payload'),
                                 ]),
+                                trackEndpoint: @js(route('dawah-share.track')),
                                 attributedShareData: null,
                                 async resolveShareData() {
                                     if (this.attributedShareData) {
@@ -98,30 +99,76 @@
                                     this.attributedShareData = {
                                         ...this.shareData,
                                         url: payload.url,
+                                        tracking_token: payload.tracking_token ?? null,
                                     };
 
                                     return this.attributedShareData;
                                 },
-                                async nativeShare() {
+                                async trackShare(provider) {
                                     const shareData = await this.resolveShareData();
-                                    if (navigator.share) {
-                                        navigator.share(shareData);
-                                        return;
-                                    }
-                                    this.copyLink();
-                                },
-                                async copyLink() {
-                                    const shareData = await this.resolveShareData();
-                                    if (!navigator.clipboard) {
-                                        window.prompt(@js(__('Copy this link:')), shareData.url);
+
+                                    if (! shareData?.tracking_token) {
                                         return;
                                     }
 
-                                    navigator.clipboard.writeText(shareData.url).then(() => {
+                                    const csrfToken = document.querySelector('meta[name=csrf-token]')?.content;
+
+                                    if (! csrfToken) {
+                                        return;
+                                    }
+
+                                    await fetch(this.trackEndpoint, {
+                                        method: 'POST',
+                                        headers: {
+                                            Accept: 'application/json',
+                                            'Content-Type': 'application/json',
+                                            'X-CSRF-TOKEN': csrfToken,
+                                        },
+                                        body: JSON.stringify({
+                                            provider,
+                                            tracking_token: shareData.tracking_token,
+                                        }),
+                                    });
+                                },
+                                async nativeShare() {
+                                    const shareData = await this.resolveShareData();
+                                    if (navigator.share) {
+                                        try {
+                                            await navigator.share(shareData);
+                                            await this.trackShare('native_share');
+                                        } catch (error) {
+                                        }
+
+                                        return;
+                                    }
+
+                                    await this.copyLink();
+                                },
+                                async copyLink(shouldTrack = true) {
+                                    const shareData = await this.resolveShareData();
+                                    if (!navigator.clipboard) {
+                                        window.prompt(@js(__('Copy this link:')), shareData.url);
+
+                                        if (shouldTrack) {
+                                            await this.trackShare('copy_link');
+                                        }
+
+                                        return;
+                                    }
+
+                                    navigator.clipboard.writeText(shareData.url).then(async () => {
+                                        if (shouldTrack) {
+                                            await this.trackShare('copy_link');
+                                        }
+
                                         this.copied = true;
                                         setTimeout(() => this.copied = false, 2200);
-                                    }, () => {
+                                    }, async () => {
                                         window.prompt(@js(__('Copy this link:')), shareData.url);
+
+                                        if (shouldTrack) {
+                                            await this.trackShare('copy_link');
+                                        }
                                     });
                                 },
                             }">

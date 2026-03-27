@@ -4,21 +4,15 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "106dadbf1207ab9e2688ad29692c5048",
+    "content-hash": "a7ac58dceed05d81f9472da8c5e7212c",
     "packages": [
         {
             "name": "aiarmada/affiliates",
             "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/AIArmada/affiliates.git",
-                "reference": "f4278f1561ba507780ab243eae8415feae918bab"
-            },
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/AIArmada/affiliates/zipball/f4278f1561ba507780ab243eae8415feae918bab",
-                "reference": "f4278f1561ba507780ab243eae8415feae918bab",
-                "shasum": ""
+                "type": "path",
+                "url": "/Users/Saiffil/Herd/commerce/packages/affiliates",
+                "reference": "5f2c14250b65fb7dfec5ebb850be333c38d6575e"
             },
             "require": {
                 "aiarmada/commerce-support": "self.version"
@@ -27,16 +21,15 @@
                 "aiarmada/cart": "Enables cart level attribution helpers and conversion tracking",
                 "aiarmada/vouchers": "Auto associates affiliate codes with voucher campaigns"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
-                    "aliases": {
-                        "Affiliate": "AIArmada\\Affiliates\\Facades\\Affiliate"
-                    },
                     "providers": [
                         "AIArmada\\Affiliates\\AffiliatesServiceProvider"
-                    ]
+                    ],
+                    "aliases": {
+                        "Affiliate": "AIArmada\\Affiliates\\Facades\\Affiliate"
+                    }
                 }
             },
             "autoload": {
@@ -44,7 +37,6 @@
                     "AIArmada\\Affiliates\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -54,21 +46,18 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "time": "2026-03-18T16:30:01+00:00"
+            "transport-options": {
+                "symlink": true,
+                "relative": false
+            }
         },
         {
             "name": "aiarmada/commerce-support",
             "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/AIArmada/commerce-support.git",
-                "reference": "ed64b1100af5cdfc978a69334572784b571cf444"
-            },
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/AIArmada/commerce-support/zipball/ed64b1100af5cdfc978a69334572784b571cf444",
-                "reference": "ed64b1100af5cdfc978a69334572784b571cf444",
-                "shasum": ""
+                "type": "path",
+                "url": "/Users/Saiffil/Herd/commerce/packages/commerce-support",
+                "reference": "9360a678e2ac8069326d48c174e51e4addd8e604"
             },
             "require": {
                 "akaunting/laravel-money": "^6.0",
@@ -93,7 +82,6 @@
             "suggest": {
                 "laravel/octane": "Required for high-performance Octane support"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -110,7 +98,6 @@
                     "AIArmada\\CommerceSupport\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -120,28 +107,24 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "time": "2026-03-20T14:42:44+00:00"
+            "transport-options": {
+                "symlink": true,
+                "relative": false
+            }
         },
         {
             "name": "aiarmada/filament-authz",
             "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/AIArmada/filament-authz.git",
-                "reference": "626a6c8cc0c7d1e864cf4de7f974351e5a45756f"
-            },
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/AIArmada/filament-authz/zipball/626a6c8cc0c7d1e864cf4de7f974351e5a45756f",
-                "reference": "626a6c8cc0c7d1e864cf4de7f974351e5a45756f",
-                "shasum": ""
+                "type": "path",
+                "url": "/Users/Saiffil/Herd/commerce/packages/filament-authz",
+                "reference": "53e0c77dc70edc349a116cbd78bdd573b5df41bd"
             },
             "require": {
                 "aiarmada/commerce-support": "self.version",
                 "filament/filament": "^5.0",
                 "spatie/laravel-permission": "^7.2"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -151,16 +134,15 @@
                 }
             },
             "autoload": {
-                "files": [
-                    "src/helpers.php"
-                ],
                 "psr-4": {
                     "AIArmada\\FilamentAuthz\\": "src/",
-                    "AIArmada\\FilamentAuthz\\Database\\Seeders\\": "database/seeders/",
-                    "AIArmada\\FilamentAuthz\\Database\\Factories\\": "database/factories/"
-                }
+                    "AIArmada\\FilamentAuthz\\Database\\Factories\\": "database/factories/",
+                    "AIArmada\\FilamentAuthz\\Database\\Seeders\\": "database/seeders/"
+                },
+                "files": [
+                    "src/helpers.php"
+                ]
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -170,27 +152,23 @@
                 "issues": "https://github.com/aiarmada/commerce/issues",
                 "source": "https://github.com/aiarmada/commerce"
             },
-            "time": "2026-03-20T14:42:12+00:00"
+            "transport-options": {
+                "symlink": true,
+                "relative": false
+            }
         },
         {
             "name": "aiarmada/filament-signals",
             "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/AIArmada/filament-signals.git",
-                "reference": "aaae404a55134831f0406907d0bd871040bf1a38"
-            },
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/AIArmada/filament-signals/zipball/aaae404a55134831f0406907d0bd871040bf1a38",
-                "reference": "aaae404a55134831f0406907d0bd871040bf1a38",
-                "shasum": ""
+                "type": "path",
+                "url": "/Users/Saiffil/Herd/commerce/packages/filament-signals",
+                "reference": "e81547bb6e2f0caf95f11c60e858d37e3cbfd9a9"
             },
             "require": {
                 "aiarmada/signals": "self.version",
                 "filament/filament": "^5.0"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -204,7 +182,6 @@
                     "AIArmada\\FilamentSignals\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -222,30 +199,23 @@
                 "product-analytics",
                 "signals"
             ],
-            "support": {
-                "issues": "https://github.com/AIArmada/filament-signals/issues",
-                "source": "https://github.com/AIArmada/filament-signals/tree/v1.0.0"
-            },
-            "time": "2026-03-21T04:27:58+00:00"
+            "transport-options": {
+                "symlink": true,
+                "relative": false
+            }
         },
         {
             "name": "aiarmada/signals",
             "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/AIArmada/signals.git",
-                "reference": "9040fae0b1f79b3de8c9d8ddbef3558a88e643b8"
-            },
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/AIArmada/signals/zipball/9040fae0b1f79b3de8c9d8ddbef3558a88e643b8",
-                "reference": "9040fae0b1f79b3de8c9d8ddbef3558a88e643b8",
-                "shasum": ""
+                "type": "path",
+                "url": "/Users/Saiffil/Herd/commerce/packages/signals",
+                "reference": "366a2cc4bff9580dd459db959b3948a707162d81"
             },
             "require": {
-                "aiarmada/commerce-support": "self.version"
+                "aiarmada/commerce-support": "self.version",
+                "matomo/device-detector": "^6.4"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -259,7 +229,6 @@
                     "AIArmada\\Signals\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -277,11 +246,10 @@
                 "product-analytics",
                 "signals"
             ],
-            "support": {
-                "issues": "https://github.com/AIArmada/signals/issues",
-                "source": "https://github.com/AIArmada/signals/tree/v1.0.0"
-            },
-            "time": "2026-03-21T04:28:26+00:00"
+            "transport-options": {
+                "symlink": true,
+                "relative": false
+            }
         },
         {
             "name": "akaunting/laravel-money",
@@ -5612,6 +5580,75 @@
             "time": "2025-12-10T09:58:31+00:00"
         },
         {
+            "name": "matomo/device-detector",
+            "version": "6.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/matomo-org/device-detector.git",
+                "reference": "e0fff2309dad83eb3cfb2564e524be715cfcf3cf"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/matomo-org/device-detector/zipball/e0fff2309dad83eb3cfb2564e524be715cfcf3cf",
+                "reference": "e0fff2309dad83eb3cfb2564e524be715cfcf3cf",
+                "shasum": ""
+            },
+            "require": {
+                "mustangostang/spyc": "*",
+                "php": "^7.2|^8.0"
+            },
+            "replace": {
+                "piwik/device-detector": "self.version"
+            },
+            "require-dev": {
+                "matthiasmullie/scrapbook": "^1.4.7",
+                "mayflower/mo4-coding-standard": "^v9.0.0",
+                "phpstan/phpstan": "^1.10.44",
+                "phpunit/phpunit": "^8.5.2 || ^9 || ^10 || ^11 || ^12",
+                "psr/cache": "^1.0.1 || ^2.0 || ^3.0",
+                "psr/simple-cache": "^1.0.1 || ^2.0 || ^3.0",
+                "slevomat/coding-standard": "<8.16.0",
+                "symfony/yaml": "^5.1.7"
+            },
+            "suggest": {
+                "ext-yaml": "Necessary for using the Pecl YAML parser"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "DeviceDetector\\": ""
+                },
+                "exclude-from-classmap": [
+                    "Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "The Matomo Team",
+                    "email": "hello@matomo.org",
+                    "homepage": "https://matomo.org/team/"
+                }
+            ],
+            "description": "The Universal Device Detection library, that parses User Agents and detects devices (desktop, tablet, mobile, tv, cars, console, etc.), clients (browsers, media players, mobile apps, feed readers, libraries, etc), operating systems, devices, brands and models.",
+            "homepage": "https://matomo.org",
+            "keywords": [
+                "devicedetection",
+                "parser",
+                "useragent"
+            ],
+            "support": {
+                "forum": "https://forum.matomo.org/",
+                "issues": "https://github.com/matomo-org/device-detector/issues",
+                "source": "https://github.com/matomo-org/matomo",
+                "wiki": "https://dev.matomo.org/"
+            },
+            "time": "2026-01-21T07:53:39+00:00"
+        },
+        {
             "name": "maxmind-db/reader",
             "version": "v1.13.1",
             "source": {
@@ -5894,6 +5931,60 @@
                 "source": "https://github.com/jmespath/jmespath.php/tree/2.8.0"
             },
             "time": "2024-09-04T18:46:31+00:00"
+        },
+        {
+            "name": "mustangostang/spyc",
+            "version": "0.6.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mustangostang/spyc.git",
+                "reference": "4627c838b16550b666d15aeae1e5289dd5b77da0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mustangostang/spyc/zipball/4627c838b16550b666d15aeae1e5289dd5b77da0",
+                "reference": "4627c838b16550b666d15aeae1e5289dd5b77da0",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "4.3.*@dev"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.5.x-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "Spyc.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "mustangostang",
+                    "email": "vlad.andersen@gmail.com"
+                }
+            ],
+            "description": "A simple YAML loader/dumper class for PHP",
+            "homepage": "https://github.com/mustangostang/spyc/",
+            "keywords": [
+                "spyc",
+                "yaml",
+                "yml"
+            ],
+            "support": {
+                "issues": "https://github.com/mustangostang/spyc/issues",
+                "source": "https://github.com/mustangostang/spyc/tree/0.6.3"
+            },
+            "time": "2019-09-10T13:16:29+00:00"
         },
         {
             "name": "nesbot/carbon",

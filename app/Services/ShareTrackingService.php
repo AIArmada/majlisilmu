@@ -28,7 +28,7 @@ final readonly class ShareTrackingService
     }
 
     /**
-     * @return array{url: string, platform_links: array<string, string>}
+     * @return array{url: string, platform_links: array<string, string>, tracking_token?: string}
      */
     public function sharePayload(?User $user, string $url, string $shareText, ?string $fallbackTitle = null): array
     {
@@ -57,6 +57,15 @@ final readonly class ShareTrackingService
     public function attributedUrl(User $user, string $url, ?string $fallbackTitle = null): string
     {
         return $this->affiliatesShareTrackingService->attributedUrl($user, $url, $fallbackTitle);
+    }
+
+    public function recordShareAction(
+        string $provider,
+        ?User $user,
+        string $trackingToken,
+        ?Request $request = null,
+    ): void {
+        $this->affiliatesShareTrackingService->recordShareAction($provider, $user, $trackingToken, $request);
     }
 
     public function captureRequest(Request $request): ?string

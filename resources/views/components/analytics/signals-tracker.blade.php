@@ -17,5 +17,6 @@
             @if (filled($signalsUser->email))
                 data-email="{{ $signalsUser->email }}"
             @endif
-        @endif></script>
+        @endif
+        data-enable-geolocation="{{ config('signals.features.geolocation.enabled', true) ? 'true' : 'false' }}"></script>
 @endif

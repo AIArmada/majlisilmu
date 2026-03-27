@@ -47,7 +47,7 @@ final readonly class AffiliatesShareTrackingService
     }
 
     /**
-     * @return array{url: string, platform_links: array<string, string>}
+     * @return array{url: string, platform_links: array<string, string>, tracking_token?: string}
      */
     public function sharePayload(?User $user, string $url, string $shareText, ?string $fallbackTitle = null): array
     {
@@ -66,6 +66,7 @@ final readonly class AffiliatesShareTrackingService
         return [
             'url' => $shareUrl,
             'platform_links' => $this->shareTrackingUrlService->platformLinks($shareUrl, $shareText),
+            'tracking_token' => $this->trackingTokenForLink($link, $user),
         ];
     }
 
@@ -114,6 +115,25 @@ final readonly class AffiliatesShareTrackingService
     public function attributedUrl(User $user, string $url, ?string $fallbackTitle = null): string
     {
         return $this->sharedUrlForLink($this->createOrReuseAffiliateLink($user, $url, $fallbackTitle));
+    }
+
+    public function recordShareAction(
+        string $provider,
+        ?User $user,
+        string $trackingToken,
+        ?Request $request = null,
+    ): void {
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $link = $this->resolveLinkFromTrackingToken($trackingToken, $user);
+
+        if (! $link instanceof AffiliateLink) {
+            throw new \InvalidArgumentException('The share tracking token is invalid. Refresh the page and try sharing again.');
+        }
+
+        $this->recordOutboundShare($link, $user, $provider, $request);
     }
 
     public function captureRequest(Request $request): ?string
@@ -404,6 +424,13 @@ final readonly class AffiliatesShareTrackingService
         return $token.'.'.hash_hmac('sha256', $token, (string) config('dawah-share.signing_key'));
     }
 
+    private function trackingTokenForLink(AffiliateLink $link, User $user): string
+    {
+        $payload = base64_encode((string) $link->custom_slug.'|'.(string) $user->getAuthIdentifier());
+
+        return $payload.'.'.hash_hmac('sha256', $payload, (string) config('dawah-share.signing_key'));
+    }
+
     private function resolveLinkFromSignedToken(string $signedToken): ?AffiliateLink
     {
         $parts = explode('.', $signedToken, 2);
@@ -420,6 +447,45 @@ final readonly class AffiliatesShareTrackingService
         }
 
         return AffiliateLink::query()->where('custom_slug', $token)->first();
+    }
+
+    private function resolveLinkFromTrackingToken(string $trackingToken, User $user): ?AffiliateLink
+    {
+        $parts = explode('.', $trackingToken, 2);
+
+        if (count($parts) !== 2) {
+            return null;
+        }
+
+        [$payload, $signature] = $parts;
+        $expected = hash_hmac('sha256', $payload, (string) config('dawah-share.signing_key'));
+
+        if (! hash_equals($expected, $signature)) {
+            return null;
+        }
+
+        $decodedPayload = base64_decode($payload, true);
+
+        if (! is_string($decodedPayload) || $decodedPayload === '') {
+            return null;
+        }
+
+        $decodedParts = explode('|', $decodedPayload, 2);
+
+        if (count($decodedParts) !== 2) {
+            return null;
+        }
+
+        [$linkSlug, $userId] = $decodedParts;
+
+        if (! hash_equals((string) $user->getAuthIdentifier(), $userId)) {
+            return null;
+        }
+
+        return AffiliateLink::query()
+            ->where('custom_slug', $linkSlug)
+            ->whereHas('affiliate', fn ($query) => $query->where('metadata->majlis_user_id', $userId))
+            ->first();
     }
 
     private function upsertLandingAttribution(AffiliateLink $link, Request $request, string $visitorKey, ?string $shareProvider): AffiliateAttribution
