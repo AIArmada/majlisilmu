@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Country;
 use App\Models\State;
 use App\Models\Venue;
+use Database\Factories\Concerns\EnsuresMalaysiaCountry;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
  */
 class VenueFactory extends Factory
 {
+    use EnsuresMalaysiaCountry;
+
     /**
      * Define the model's default state.
      *
@@ -62,14 +65,14 @@ class VenueFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function (Venue $venue) {
-            $malaysia = Country::where('iso2', 'MY')->first();
-            $state = State::where('country_id', $malaysia?->id)->inRandomOrder()->first();
+            $malaysia = Country::where('iso2', 'MY')->first() ?? $this->ensureMalaysiaCountry();
+            $state = State::where('country_id', $malaysia->id)->inRandomOrder()->first();
 
             $venue->address()->create([
                 'line1' => fake()->streetAddress(),
                 'line2' => fake()->optional()->words(2, true),
                 'postcode' => fake()->postcode(),
-                'country_id' => $malaysia?->id,
+                'country_id' => $malaysia->id,
                 'state_id' => $state?->id,
                 'lat' => fake()->randomFloat(7, 1.0, 7.0),
                 'lng' => fake()->randomFloat(7, 99.0, 119.0),

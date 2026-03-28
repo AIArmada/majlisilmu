@@ -474,7 +474,7 @@ final readonly class AffiliatesShareTrackingAnalyticsService
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, AffiliateConversion>  $conversions
      * @param  Collection<int, AffiliateAttribution>  $attributions
-     * @return Collection<int, string>
+     * @return Collection<int, non-empty-string>
      */
     private function providersForBreakdown(Collection $outboundShares, Collection $visits, Collection $conversions, Collection $attributions): Collection
     {

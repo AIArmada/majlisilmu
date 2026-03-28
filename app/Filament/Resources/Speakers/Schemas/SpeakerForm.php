@@ -9,8 +9,10 @@ use App\Enums\Honorific;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Enums\SocialMediaPlatform;
+use App\Forms\SharedFormSchema;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
@@ -90,6 +92,9 @@ class SpeakerForm
                     ->columns(2),
                 Section::make(__('Location / Base'))
                     ->relationship('address')
+                    ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => SharedFormSchema::hydrateAddressFormState($data))
+                    ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => SharedFormSchema::prepareAddressPersistenceData($data))
+                    ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => SharedFormSchema::prepareAddressPersistenceData($data))
                     ->components([
                         Select::make('country_id')
                             ->label(__('Country'))
@@ -119,12 +124,14 @@ class SpeakerForm
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null)),
+                            ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null))
+                            ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id'))),
                         Select::make('subdistrict_id')
                             ->label(__('Bandar / Mukim / Zon'))
-                            ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
+                            ->options(fn (Get $get): array => SharedFormSchema::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->visible(fn (Get $get): bool => SharedFormSchema::shouldShowSubdistrictField($get('state_id'), $get('district_id'))),
                         TextInput::make('line1')
                             ->label(__('Address Line 1'))
                             ->maxLength(255),

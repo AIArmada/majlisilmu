@@ -17,6 +17,7 @@ use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Forms\Components\Select;
 use App\Forms\InstitutionFormSchema;
+use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerFormSchema;
 use App\Forms\VenueFormSchema;
 use App\Models\Event;
@@ -133,13 +134,14 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         array $selection,
         ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction,
     ): array {
-        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle($selection);
-
         $currentAddress = data_get($this, $statePath);
         $currentAddress = is_array($currentAddress) ? $currentAddress : [];
+        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle(array_merge($selection, [
+            'fallbackCountryId' => $currentAddress['country_id'] ?? null,
+        ]));
 
         data_set($this, $statePath, array_merge($currentAddress, $resolvedAddress, [
-            'cascade_reset_guard' => 2,
+            'cascade_reset_guard' => SharedFormSchema::publicLocationPickerCascadeResetGuard(),
         ]));
 
         return $resolvedAddress;

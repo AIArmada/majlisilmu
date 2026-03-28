@@ -3,6 +3,8 @@
 use App\Filament\Resources\AiModelPricings\AiModelPricingResource;
 use App\Filament\Resources\AiUsageLogs\AiUsageLogResource;
 use App\Filament\Resources\ContributionRequests\ContributionRequestResource;
+use App\Filament\Resources\Countries\CountryResource;
+use App\Filament\Resources\Districts\DistrictResource;
 use App\Filament\Resources\DonationChannels\DonationChannelResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Events\RelationManagers\MemberInvitationsRelationManager as EventMemberInvitationsRelationManager;
@@ -23,6 +25,8 @@ use App\Filament\Resources\Speakers\RelationManagers\EventsRelationManager as Sp
 use App\Filament\Resources\Speakers\RelationManagers\FollowersRelationManager as SpeakerFollowersRelationManager;
 use App\Filament\Resources\Speakers\RelationManagers\MemberInvitationsRelationManager as SpeakerMemberInvitationsRelationManager;
 use App\Filament\Resources\Speakers\SpeakerResource;
+use App\Filament\Resources\States\StateResource;
+use App\Filament\Resources\Subdistricts\SubdistrictResource;
 use App\Filament\Resources\Tags\TagResource;
 use App\Filament\Resources\Venues\VenueResource;
 use App\Models\User;
@@ -38,6 +42,10 @@ it('allows super admin to access all core admin resource index pages', function 
 
     $resources = [
         EventResource::class,
+        CountryResource::class,
+        StateResource::class,
+        DistrictResource::class,
+        SubdistrictResource::class,
         InstitutionResource::class,
         SpeakerResource::class,
         VenueResource::class,

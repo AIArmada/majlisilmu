@@ -51,11 +51,7 @@
             @php
                 $locationName = $event->venue?->name ?? $event->institution?->name;
                 $locationAddress = $event->venue?->addressModel ?? $event->institution?->addressModel;
-                $locationParts = array_filter([
-                    $locationAddress?->district?->name,
-                    $locationAddress?->state?->name,
-                ]);
-                $locationSubtitle = implode(', ', $locationParts);
+                $locationSubtitle = \App\Support\Location\AddressHierarchyFormatter::format($locationAddress);
             @endphp
 
             @if($locationName)

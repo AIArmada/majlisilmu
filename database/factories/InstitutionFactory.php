@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Models\Institution;
+use Database\Factories\Concerns\EnsuresMalaysiaCountry;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
  */
 class InstitutionFactory extends Factory
 {
+    use EnsuresMalaysiaCountry;
+
     /**
      * Define the model's default state.
      *
@@ -117,10 +120,13 @@ class InstitutionFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function (Institution $institution) {
+            $malaysia = $this->ensureMalaysiaCountry();
+
             $institution->address()->create([
                 'line1' => fake()->streetAddress(),
                 'line2' => fake()->optional()->words(2, true),
                 'postcode' => fake()->postcode(),
+                'country_id' => (int) $malaysia->getKey(),
                 'lat' => fake()->randomFloat(7, 1.0, 7.0),
                 'lng' => fake()->randomFloat(7, 99.0, 119.0),
             ]);

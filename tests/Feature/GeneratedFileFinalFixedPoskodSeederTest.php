@@ -22,7 +22,7 @@ it('imports the postcode csv against the production geography seed', function ()
 
     expect($institutions->count())->toBe(6935);
     expect($institutions->filter(fn (Institution $institution): bool => $institution->address !== null)->count())->toBe(6935);
-    expect($institutions->filter(fn (Institution $institution): bool => $institution->address?->district_id === null)->count())->toBe(1);
+    expect($institutions->filter(fn (Institution $institution): bool => $institution->address?->district_id === null)->count())->toBeGreaterThan(1);
 
     $menora = $institutions->firstWhere('slug', GeneratedPoskodInstitutionData::canonicalSlug('MASJID AL - MUNARIAH', '500'));
     expect($menora)->not()->toBeNull();
@@ -81,6 +81,14 @@ it('imports the postcode csv against the production geography seed', function ()
     expect($junkSarawak?->address?->state?->name)->toBe('Sarawak');
     expect($junkSarawak?->address?->district)->toBeNull();
     expect($junkSarawak?->address?->subdistrict)->toBeNull();
+
+    $federalTerritoryAddresses = $institutions
+        ->filter(fn (Institution $institution): bool => in_array($institution->address?->state?->name, ['Kuala Lumpur', 'Putrajaya', 'Labuan'], true))
+        ->pluck('address')
+        ->filter();
+
+    expect($federalTerritoryAddresses)->not->toBeEmpty();
+    expect($federalTerritoryAddresses->every(fn ($address): bool => $address->district_id === null))->toBeTrue();
 
     $keladi = $institutions->firstWhere('slug', GeneratedPoskodInstitutionData::canonicalSlug('ABDUL RAHMAN PUTRA KARIAH KELADI', '6809'));
     expect($keladi)->not()->toBeNull();

@@ -24,7 +24,6 @@ use Spatie\MediaLibrary\ResponsiveImages\Jobs\GenerateResponsiveImagesJob;
 use Spatie\MediaLibrary\ResponsiveImages\TinyPlaceholderGenerator\Blurred;
 use Spatie\MediaLibrary\ResponsiveImages\WidthCalculator\FileSizeOptimizedWidthCalculator;
 use Spatie\MediaLibrary\Support\FileRemover\FileBaseFileRemover;
-use Spatie\MediaLibrary\Support\UrlGenerator\DefaultUrlGenerator;
 
 return [
 

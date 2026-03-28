@@ -10,6 +10,8 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
+use App\Forms\SharedFormSchema;
+use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
@@ -21,6 +23,9 @@ use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
 use App\Support\Cache\SafeModelCache;
+use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -54,6 +59,9 @@ class Index extends Component implements HasForms
 
     #[Url]
     public ?string $search = null;
+
+    #[Url]
+    public ?string $country_id = null;
 
     #[Url]
     public ?string $state_id = null;
@@ -235,6 +243,11 @@ class Index extends Component implements HasForms
         $this->showAdvancedFiltersPanel = ! $this->showAdvancedFiltersPanel;
     }
 
+    public function showsCountryFilter(): bool
+    {
+        return app(PublicCountryFilterVisibility::class)->shouldShow();
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -342,6 +355,25 @@ class Index extends Component implements HasForms
                             ->description(__('Narrow events by geography, institution, and venue.'))
                             ->columns(['default' => 1, 'md' => 2, 'lg' => 3])
                             ->schema([
+                                Select::make('country_id')
+                                    ->label(__('Country'))
+                                    ->placeholder(__('All Countries'))
+                                    ->visible(fn (): bool => $this->showsCountryFilter())
+                                    ->options(fn (): array => $this->countries()
+                                        ->pluck('name', 'id')
+                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
+                                        ->all()
+                                    )
+                                    ->searchable()
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set): void {
+                                        $set('state_id', null);
+                                        $set('district_id', null);
+                                        $set('subdistrict_id', null);
+                                        $set('institution_id', null);
+                                        $set('venue_id', null);
+                                    }),
+
                                 Select::make('state_id')
                                     ->label(__('State'))
                                     ->placeholder(__('All States'))
@@ -351,6 +383,7 @@ class Index extends Component implements HasForms
                                         ->all()
                                     )
                                     ->searchable()
+                                    ->disabled(fn (Get $get): bool => ! filled($get('country_id')))
                                     ->live()
                                     ->afterStateUpdated(function (Set $set): void {
                                         $set('district_id', null);
@@ -362,21 +395,11 @@ class Index extends Component implements HasForms
                                 Select::make('district_id')
                                     ->label(__('District'))
                                     ->placeholder(__('All Districts'))
-                                    ->options(function (Get $get): array {
-                                        $stateId = $get('state_id');
-
-                                        if (! filled($stateId)) {
-                                            return [];
-                                        }
-
-                                        return District::query()
-                                            ->where('state_id', $stateId)
-                                            ->orderBy('name')
-                                            ->pluck('name', 'id')
-                                            ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                            ->all();
-                                    })
+                                    ->options(fn (Get $get): array => collect(SharedFormSchema::districtOptionsForState($get('state_id')))
+                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
+                                        ->all())
                                     ->disabled(fn (Get $get): bool => ! filled($get('state_id')))
+                                    ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id')))
                                     ->searchable()
                                     ->live()
                                     ->afterStateUpdated(function (Set $set): void {
@@ -388,21 +411,10 @@ class Index extends Component implements HasForms
                                 Select::make('subdistrict_id')
                                     ->label(__('Bandar / Mukim / Zon'))
                                     ->placeholder(__('All Subdistricts'))
-                                    ->options(function (Get $get): array {
-                                        $districtId = $get('district_id');
-
-                                        if (! filled($districtId)) {
-                                            return [];
-                                        }
-
-                                        return Subdistrict::query()
-                                            ->where('district_id', $districtId)
-                                            ->orderBy('name')
-                                            ->pluck('name', 'id')
-                                            ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                            ->all();
-                                    })
-                                    ->disabled(fn (Get $get): bool => ! filled($get('district_id')))
+                                    ->options(fn (Get $get): array => collect(SharedFormSchema::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
+                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
+                                        ->all())
+                                    ->disabled(fn (Get $get): bool => ! SharedFormSchema::shouldShowSubdistrictField($get('state_id'), $get('district_id')))
                                     ->searchable()
                                     ->live()
                                     ->afterStateUpdated(function (Set $set): void {
@@ -415,6 +427,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Institution'))
                                     ->searchable()
                                     ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchInstitutionOptions(
+                                        countryId: $this->normalizeNullableString($get('country_id')),
                                         stateId: $this->normalizeNullableString($get('state_id')),
                                         districtId: $this->normalizeNullableString($get('district_id')),
                                         subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
@@ -429,6 +442,7 @@ class Index extends Component implements HasForms
                                     ->placeholder(__('Any Venue'))
                                     ->searchable()
                                     ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchVenueOptions(
+                                        countryId: $this->normalizeNullableString($get('country_id')),
                                         stateId: $this->normalizeNullableString($get('state_id')),
                                         districtId: $this->normalizeNullableString($get('district_id')),
                                         subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
@@ -752,18 +766,38 @@ class Index extends Component implements HasForms
     }
 
     /**
+     * @return Collection<int, Country>
+     */
+    #[Computed]
+    public function countries(): Collection
+    {
+        return app(SafeModelCache::class)->rememberCollection(
+            key: 'countries_all_v1',
+            ttl: 3600,
+            query: Country::query()
+                ->orderBy('name')
+                ->select(['id', 'name', 'iso2']),
+        );
+    }
+
+    /**
      * @return Collection<int, State>
      */
     #[Computed]
     public function states(): Collection
     {
+        if (! filled($this->country_id)) {
+            return collect();
+        }
+
         return app(SafeModelCache::class)->rememberCollection(
-            key: 'states_my_v2',
+            key: 'states_all_v1',
             ttl: 3600,
             query: State::query()
-                ->where('country_code', 'MY')
                 ->orderBy('name'),
-        );
+        )
+            ->where('country_id', (int) $this->country_id)
+            ->values();
     }
 
     /**
@@ -774,7 +808,7 @@ class Index extends Component implements HasForms
     {
         $stateId = $this->state_id;
 
-        if (! filled($stateId)) {
+        if (! filled($stateId) || FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
             return collect();
         }
 
@@ -790,6 +824,14 @@ class Index extends Component implements HasForms
     #[Computed]
     public function subdistricts(): Collection
     {
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($this->state_id)) {
+            return Subdistrict::query()
+                ->where('state_id', $this->state_id)
+                ->whereNull('district_id')
+                ->orderBy('name')
+                ->get();
+        }
+
         $districtId = $this->district_id;
 
         if (! filled($districtId)) {
@@ -922,13 +964,13 @@ class Index extends Component implements HasForms
     /**
      * @return array<string, string>
      */
-    private function searchInstitutionOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
+    private function searchInstitutionOptions(?string $countryId, ?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
     {
         $query = Institution::query()
             ->whereIn('status', ['verified', 'pending'])
             ->where('is_active', true);
 
-        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
+        $this->applyAddressLocationFilters($query, $countryId, $stateId, $districtId, $subdistrictId);
         $this->applySearchConstraint($query, 'name', $search);
 
         return $this->pluckOptions($query->orderBy('name'), 'name', 50);
@@ -937,13 +979,13 @@ class Index extends Component implements HasForms
     /**
      * @return array<string, string>
      */
-    private function searchVenueOptions(?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
+    private function searchVenueOptions(?string $countryId, ?string $stateId, ?string $districtId, ?string $subdistrictId, string $search = ''): array
     {
         $query = Venue::query()
             ->whereIn('status', ['verified', 'pending'])
             ->where('is_active', true);
 
-        $this->applyAddressLocationFilters($query, $stateId, $districtId, $subdistrictId);
+        $this->applyAddressLocationFilters($query, $countryId, $stateId, $districtId, $subdistrictId);
         $this->applySearchConstraint($query, 'name', $search);
 
         return $this->pluckOptions($query->orderBy('name'), 'name', 50);
@@ -1119,15 +1161,20 @@ class Index extends Component implements HasForms
      */
     private function applyAddressLocationFilters(
         Builder $query,
+        ?string $countryId,
         ?string $stateId,
         ?string $districtId,
         ?string $subdistrictId
     ): void {
-        if (! filled($stateId) && ! filled($districtId) && ! filled($subdistrictId)) {
+        if (! filled($countryId) && ! filled($stateId) && ! filled($districtId) && ! filled($subdistrictId)) {
             return;
         }
 
-        $query->whereHas('address', function (Builder $addressQuery) use ($stateId, $districtId, $subdistrictId): void {
+        $query->whereHas('address', function (Builder $addressQuery) use ($countryId, $stateId, $districtId, $subdistrictId): void {
+            if (filled($countryId)) {
+                $addressQuery->where('country_id', $countryId);
+            }
+
             if (filled($stateId)) {
                 $addressQuery->where('state_id', $stateId);
             }
@@ -1169,6 +1216,7 @@ class Index extends Component implements HasForms
         $filters = $this->normalizedUrlState();
 
         $searchFilters = [
+            'country_id' => $filters['country_id'],
             'state_id' => $filters['state_id'],
             'district_id' => $filters['district_id'],
             'subdistrict_id' => $filters['subdistrict_id'],
@@ -1287,6 +1335,7 @@ class Index extends Component implements HasForms
 
         return [
             'search' => null,
+            'country_id' => (string) app(PreferredCountryResolver::class)->resolveId(),
             'state_id' => null,
             'district_id' => null,
             'subdistrict_id' => null,
@@ -1349,6 +1398,7 @@ class Index extends Component implements HasForms
 
         return [
             'search' => filled($this->search) ? trim($this->search) : null,
+            'country_id' => filled($this->country_id) ? $this->country_id : $defaults['country_id'],
             'state_id' => filled($this->state_id) ? $this->state_id : null,
             'district_id' => filled($this->district_id) ? $this->district_id : null,
             'subdistrict_id' => filled($this->subdistrict_id) ? $this->subdistrict_id : null,
@@ -1398,6 +1448,7 @@ class Index extends Component implements HasForms
     private function fillPublicPropertiesFromFilters(array $filters): void
     {
         $this->search = $filters['search'];
+        $this->country_id = $filters['country_id'];
         $this->state_id = $filters['state_id'];
         $this->district_id = $filters['district_id'];
         $this->subdistrict_id = $filters['subdistrict_id'];
@@ -1490,6 +1541,7 @@ class Index extends Component implements HasForms
 
         return [
             'search' => filled($normalized['search']) ? trim((string) $normalized['search']) : null,
+            'country_id' => filled($normalized['country_id']) ? (string) $normalized['country_id'] : $defaults['country_id'],
             'state_id' => filled($normalized['state_id']) ? (string) $normalized['state_id'] : null,
             'district_id' => filled($normalized['district_id']) ? (string) $normalized['district_id'] : null,
             'subdistrict_id' => filled($normalized['subdistrict_id']) ? (string) $normalized['subdistrict_id'] : null,

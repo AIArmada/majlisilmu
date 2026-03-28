@@ -237,7 +237,7 @@ class EventSeeder extends Seeder
         if (! $venue->address) {
             $venue->address()->create([
                 'line1' => $institution->address?->line1,
-                'country_id' => $institution->address?->country_id,
+                'country_id' => data_get($institution, 'address.country_id', 132),
                 'state_id' => $institution->address?->state_id,
                 'district_id' => $institution->address?->district_id,
                 'city_id' => $institution->address?->city_id,

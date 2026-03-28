@@ -296,12 +296,16 @@ class EventSearchService
             $filterParts[] = 'starts_at:<='.$startsBeforeTimestamp;
         }
 
-        if (! empty($filters['state_id'])) {
-            $filterParts[] = 'state_id:='.$filters['state_id'];
-        }
-
         if (! empty($filters['district_id'])) {
             $filterParts[] = 'district_id:='.$filters['district_id'];
+        }
+
+        if (! empty($filters['country_id'])) {
+            $filterParts[] = 'country_id:='.$filters['country_id'];
+        }
+
+        if (! empty($filters['state_id'])) {
+            $filterParts[] = 'state_id:='.$filters['state_id'];
         }
 
         if (! empty($filters['subdistrict_id'])) {
@@ -472,6 +476,10 @@ class EventSearchService
 
         if (filled($query)) {
             $this->applyDirectSearch($queryBuilder, $query);
+        }
+
+        if (! empty($filters['country_id'])) {
+            $this->applyLocationAddressFilter($queryBuilder, 'country_id', $filters['country_id']);
         }
 
         if (! empty($filters['state_id'])) {

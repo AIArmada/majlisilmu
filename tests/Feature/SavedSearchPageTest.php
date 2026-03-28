@@ -102,6 +102,17 @@ it('prefills subdistrict filter from query string when saving searches', functio
         ->assertSet('filters.subdistrict_id', '30');
 });
 
+it('prefills country filter from query string when saving searches', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams([
+        'country_id' => '132',
+    ])->test(SavedSearchesIndex::class)
+        ->assertSet('filters.country_id', '132');
+});
+
 it('prefills domain kategori filters from query string when saving searches', function () {
     $user = User::factory()->create();
     $domainTag = Tag::factory()->domain()->create([

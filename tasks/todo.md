@@ -1,3 +1,257 @@
+# Full Verification Gate
+
+- [x] Run full `phpstan`, `pest`, `rector`, and `pint` across the current worktree
+- [x] Fix every failure exposed by the gate, including unrelated residual regressions
+- [x] Re-run the full gate until all four tools pass
+- [x] Document the final verification and audit results
+
+## Review
+- Cleared the full verification gate after fixing the remaining runtime and test regressions:
+  - [database/seeders/EventSeeder.php](/Users/Saiffil/Herd/majlisilmu/database/seeders/EventSeeder.php) now reads the institution address `country_id` via `data_get(..., 132)` so phpstan sees a concrete integer fallback.
+  - [tests/Feature/GeographyFormCountryCodeTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/GeographyFormCountryCodeTest.php) now seeds Malaysia as `id = 132`, matching the Malaysia-only federal-territory rule used by the app.
+  - [resources/views/components/pages/speakers/⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/⚡show.blade.php) now imports `EventKeyPersonRole`, fixing the blade rendering failure caused by enum-string casting.
+  - [tests/Feature/Laravel13CacheSerializationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Laravel13CacheSerializationTest.php) now follows the live country-visibility cache path (`states_all_v1`) instead of the removed legacy key.
+  - [tests/Feature/SignalsPrecisionAndFunnelsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SignalsPrecisionAndFunnelsTest.php) now asserts against the current millisecond-based session duration field instead of the removed `duration_seconds` attribute.
+  - [tests/Feature/InstitutionShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionShowPageTest.php) and [tests/Feature/SpeakerShowPageTimingTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerShowPageTimingTest.php) now send the `user_timezone` cookie unencrypted, matching the current browser behavior after the raw-cookie exemption in [bootstrap/app.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/app.php).
+- Final full verification:
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi` => **pass**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact` => **1050 passed (5380 assertions)**
+  - `XDEBUG_MODE=off vendor/bin/rector process --ansi --clear-cache --no-progress-bar --output-format=console` => **pass**
+  - `XDEBUG_MODE=off vendor/bin/pint --test` => **pass**
+
+# Federal Territory Cleanup
+
+- [x] Verify the live database no longer contains dummy district rows or district references under Kuala Lumpur, Putrajaya, and Labuan
+- [x] Add a forward cleanup migration so already-migrated environments stay normalized to `state -> subdistrict`
+- [x] Sweep public location rendering for stale district-only assumptions and normalize remaining paths
+- [x] Re-run focused verification for the cleanup and document unrelated residual failures separately
+
+## Review
+- Verified the current local database is already clean for Malaysian federal territories: `districts = 0`, `subdistricts_with_districts = 0`, and `addresses_with_districts = 0` for Kuala Lumpur, Putrajaya, and Labuan.
+- Added [2026_03_29_090000_cleanup_federal_territory_district_rows.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_03_29_090000_cleanup_federal_territory_district_rows.php) as an idempotent forward migration so environments that had already applied the earlier hierarchy migration still get the federal-territory cleanup re-enforced without relying on edited migration history.
+- Normalized the last stale rendering paths to use the shared formatter:
+  - [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/⚡show.blade.php) now renders the speaker location badge through `AddressHierarchyFormatter`.
+  - [_event-card.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/series/_event-card.blade.php) now renders series event-card locations through `AddressHierarchyFormatter`, so federal-territory events show `subdistrict, state` instead of dropping subdistricts.
+- Added focused regressions in [PublicPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicPagesTest.php) and [SpeakerShowPageTimingTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerShowPageTimingTest.php) for the normalized location output.
+- Verification:
+  - `php artisan migrate --force` => **applied `2026_03_29_090000_cleanup_federal_territory_district_rows`**
+  - `php artisan tinker --execute="..."` cleanup audit => **districts: 0, subdistricts_with_districts: 0, addresses_with_districts: 0**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter="loads public detail pages|shows federal territory event cards on series pages with subdistrict and state|shows share actions on public series and reference pages"` => **3 passed (18 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php --filter="deduplicates matching speaker subdistrict and district labels in the speaker location badge|hides state when district is kuala lumpur putrajaya or labuan"` => **2 passed (6 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php --filter="loads subdistricts directly from federal territory states and clears district persistence|does not skip districts for non malaysian states with federal territory names"` => **2 passed (11 assertions)**
+  - `vendor/bin/pint resources/views/components/pages/speakers/⚡show.blade.php` => **pass after auto-fix**
+  - `git diff --check -- resources/views/components/pages/speakers/⚡show.blade.php resources/views/components/pages/series/_event-card.blade.php tests/Feature/PublicPagesTest.php tests/Feature/SpeakerShowPageTimingTest.php database/migrations/2026_03_29_090000_cleanup_federal_territory_district_rows.php` => **No diff formatting issues**
+- Residual unrelated failures:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php --filter="shows prayer-relative timing text on speaker page instead of absolute time|renders event end time in event timezone on speaker page"` still fails on pre-existing time-output expectations (`03:15 AM`, `8:40 PM`) and is not caused by the federal-territory cleanup.
+
+# Malaysia-Only Federal Territory Scope Audit
+
+- [x] Scope the federal-territory shortcut to Malaysia instead of matching same-named states globally
+- [x] Add a regression that proves non-Malaysian `Kuala Lumpur` / `Putrajaya` / `Labuan` states still require districts
+- [x] Run focused verification for the patched helper/schema behavior
+- [x] Review and audit the current uncommitted diff for remaining risks
+
+## Review
+- Tightened [FederalTerritoryLocation.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/FederalTerritoryLocation.php) so the special `state -> subdistrict` path only applies to states whose `country_id` is Malaysia (`132`), instead of any state record worldwide whose name happens to be Kuala Lumpur, Putrajaya, or Labuan.
+- Tightened [2026_03_28_140000_convert_federal_territories_to_state_subdistrict_hierarchy.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_03_28_140000_convert_federal_territories_to_state_subdistrict_hierarchy.php) with the same Malaysia scope so the one-off data migration cannot null out districts or delete rows for non-Malaysian states with those names.
+- Added cache-safe regression coverage in [SharedFormSchemaTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SharedFormSchemaTest.php) that flushes the helper cache per test and proves a non-Malaysian `Kuala Lumpur` still shows district options and only loads subdistricts after district selection.
+- Audit also found a performance regression in [EventSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/EventSearchService.php): the new always-present `country_id` default on `/majlis` was forcing every event search onto the database path even though Typesense already supports `country_id`. Removed that fallback trigger and added a regression in [EventSearchTypesenseFilterTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventSearchTypesenseFilterTest.php).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **23 passed (112 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **5 passed (33 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTypesenseFilterTest.php` => **7 passed (9 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page|filters events by country"` => **2 passed (11 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Location/FederalTerritoryLocation.php app/Services/EventSearchService.php tests/Feature/SharedFormSchemaTest.php tests/Feature/EventSearchTypesenseFilterTest.php app/Forms/SharedFormSchema.php app/Actions/Location/ResolveGooglePlaceSelectionAction.php database/migrations/2026_03_28_140000_convert_federal_territories_to_state_subdistrict_hierarchy.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/Location/FederalTerritoryLocation.php app/Services/EventSearchService.php tests/Feature/SharedFormSchemaTest.php tests/Feature/EventSearchTypesenseFilterTest.php tasks/todo.md tasks/lessons.md database/migrations/2026_03_28_140000_convert_federal_territories_to_state_subdistrict_hierarchy.php` => **pass**
+  - `git diff --check -- app/Support/Location/FederalTerritoryLocation.php app/Services/EventSearchService.php tests/Feature/SharedFormSchemaTest.php tests/Feature/EventSearchTypesenseFilterTest.php tasks/todo.md tasks/lessons.md database/migrations/2026_03_28_140000_convert_federal_territories_to_state_subdistrict_hierarchy.php` => **No diff formatting issues**
+
+# Public Submission Country Visibility
+
+- [x] Extend the public submission address schema so `country_id` is a real state input instead of a hard-coded Malaysia default
+- [x] Apply the device-only country selector visibility toggle to `/sumbangan/institusi/baru` and the public submit-event institution/venue quick-create flows
+- [x] Update picker/default-country behavior so those public flows keep `country_id` internally even when the selector is hidden
+- [x] Add focused regression coverage and rerun the live browser verification on the requested routes
+
+## Review
+- Extended [SharedFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/SharedFormSchema.php) with public-submission country helpers so the same cookie-backed visibility rule can drive standalone submission pages and the submit-event quick-create forms without reintroducing a writable Malaysia-only default.
+- Updated [InstitutionContributionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionContributionFormSchema.php), [InstitutionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionFormSchema.php), and [VenueFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/VenueFormSchema.php) so the country field is part of the public address state in both dedicated contribution pages and event-submission quick-create modals.
+- Updated [SubmitInstitution.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SubmitInstitution.php) and [create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/create.blade.php) so picker-applied addresses carry the current hidden `country_id` as a fallback and use the correct cascade reset depth for visible vs hidden country fields.
+- Generalized [ResolveGooglePlaceSelectionAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Location/ResolveGooglePlaceSelectionAction.php) to resolve country/state/district/subdistrict outside Malaysia, and removed the hard-coded Malaysia region lock from [institution-location-picker.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/filament/schemas/components/institution-location-picker.blade.php).
+- Added focused regressions in [InstitutionContributionLocationPickerTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionContributionLocationPickerTest.php), [SharedFormSchemaTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SharedFormSchemaTest.php), and [ResolveGooglePlaceSelectionActionTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Unit/ResolveGooglePlaceSelectionActionTest.php).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **8 passed (43 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php --filter="country fields in public location picker forms|defaults address country_id to malaysia when null is submitted directly to the model"` => **3 passed (8 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **5 passed (33 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Actions/Location/ResolveGooglePlaceSelectionAction.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Actions/Location/ResolveGooglePlaceSelectionAction.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **pass**
+  - `git diff --check -- app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Actions/Location/ResolveGooglePlaceSelectionAction.php resources/views/components/pages/submit-event/create.blade.php resources/views/filament/schemas/components/institution-location-picker.blade.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php tasks/todo.md tasks/lessons.md` => **No diff formatting issues**
+  - Chrome MCP live pass:
+    - with the device toggle enabled in `/tetapan-akaun`, `/sumbangan/institusi/baru` shows the `Country` selector and the `/hantar-majlis` institution quick-create modal shows it too
+    - after turning the toggle off and saving, `/sumbangan/institusi/baru` hides `Country`, and the `/hantar-majlis` institution quick-create modal hides it as well
+    - restored the browser toggle to its original enabled state after verification
+
+# Public Country Filter Visibility Preference
+
+- [x] Add a shared device-scoped cookie helper for the public country-filter visibility preference
+- [x] Expose the toggle on `/tetapan-akaun` without adding any database column
+- [x] Hide the country controls on `/majlis` and `/institusi` by default while preserving internal `country_id` defaults and filtering
+- [x] Add focused regression coverage and run targeted verification plus a live browser pass
+
+## Review
+- Added [PublicCountryFilterVisibility.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicCountryFilterVisibility.php) as the single device-scoped cookie helper for this preference and exempted its raw cookie in [app.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/app.php), matching the existing browser-managed timezone cookie pattern.
+- Updated [AccountSettings.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Dashboard/AccountSettings.php) to expose a device-only toggle in `/tetapan-akaun`, preload it from the cookie, and queue the cookie on save without adding any user column.
+- Updated [Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Events/Index.php), [AdvancedFiltersPanel.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Events/AdvancedFiltersPanel.php), [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/index.blade.php), and [⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡index.blade.php) so `/majlis` and `/institusi` hide the country selector by default, keep `country_id` internally resolved for query/filter logic, and still surface non-default country state when it is materially active.
+- Added focused regression coverage in [AccountSettingsPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AccountSettingsPageTest.php), [EventSearchTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventSearchTest.php), and [InstitutionIndexTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionIndexTest.php).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **14 passed (115 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php --filter="shows location scope controls on institution index|shows the institution country selector when the device preference cookie enables it|filters institutions by country|defaults institutions country filter from an unencrypted browser timezone cookie"` => **4 passed (12 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="defaults the majlis country filter from an unencrypted browser timezone cookie|hides the majlis country selector unless the device preference cookie enables it|filters events by country|displays the events index page"` => **4 passed (15 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Location/PublicCountryFilterVisibility.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php tests/Feature/AccountSettingsPageTest.php tests/Feature/EventSearchTest.php tests/Feature/InstitutionIndexTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/Location/PublicCountryFilterVisibility.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php bootstrap/app.php tests/Feature/AccountSettingsPageTest.php tests/Feature/EventSearchTest.php tests/Feature/InstitutionIndexTest.php "resources/views/components/pages/institutions/⚡index.blade.php" resources/views/livewire/pages/events/index.blade.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `git diff --check -- app/Support/Location/PublicCountryFilterVisibility.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php bootstrap/app.php tests/Feature/AccountSettingsPageTest.php tests/Feature/EventSearchTest.php tests/Feature/InstitutionIndexTest.php "resources/views/components/pages/institutions/⚡index.blade.php" resources/views/livewire/pages/events/index.blade.php tasks/todo.md tasks/lessons.md` => **No diff formatting issues**
+  - Chrome MCP live pass:
+    - signed into `/tetapan-akaun`, confirmed the toggle is off by default, then verified `/institusi` and `/majlis` hide the country selector
+    - enabled the toggle in `/tetapan-akaun`, saved it, then verified `/institusi` shows the country selector again and `/majlis` shows the country selector inside Advanced Filters
+    - removed the temporary local verification user after the browser pass
+
+# Event Filter Country Default
+
+- [x] Add `country_id` to the public `/majlis` location filters and thread it through search + saved-search handoff
+- [x] Auto-select the filter country from saved timezone, then `CF-IPCountry`, then Malaysia
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Added [PreferredCountryResolver.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PreferredCountryResolver.php) to resolve the default public country from the current request using user timezone first, Cloudflare `CF-IPCountry` second, and Malaysia (`132`) last.
+- Updated the public events page and advanced-filters panel so `country_id` is a first-class location filter, state options depend on the selected country, and institution/venue search options are constrained by country as well.
+- Updated [EventSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/EventSearchService.php) so `country_id` participates in both Typesense filter generation and the database fallback path, and forces the database path when used.
+- Updated [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/index.blade.php) and [SavedSearches/Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/SavedSearches/Index.php) so save-search handoff and captured filter labels preserve the selected country.
+- Added cache invalidation for the new `countries_all_v1` and `states_all_v1` keys in [PublicListingsCache.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Cache/PublicListingsCache.php).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/PreferredCountryResolverTest.php` => **3 passed (3 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTypesenseFilterTest.php` => **6 passed (8 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php --filter="prefills country filter from query string when saving searches"` => **1 passed (1 assertion)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="filters events by country"` => **1 passed (2 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Location/PreferredCountryResolver.php app/Support/Cache/PublicListingsCache.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Services/EventSearchService.php app/Livewire/Pages/SavedSearches/Index.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/EventSearchTest.php tests/Feature/EventSearchTypesenseFilterTest.php tests/Feature/SavedSearchPageTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/Location/PreferredCountryResolver.php app/Support/Cache/PublicListingsCache.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Services/EventSearchService.php app/Livewire/Pages/SavedSearches/Index.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/EventSearchTest.php tests/Feature/EventSearchTypesenseFilterTest.php tests/Feature/SavedSearchPageTest.php` => **pass**
+  - `git diff --check -- app/Support/Location/PreferredCountryResolver.php app/Support/Cache/PublicListingsCache.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Services/EventSearchService.php resources/views/livewire/pages/events/index.blade.php app/Livewire/Pages/SavedSearches/Index.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/EventSearchTest.php tests/Feature/EventSearchTypesenseFilterTest.php tests/Feature/SavedSearchPageTest.php tasks/lessons.md` => **No diff formatting issues**
+
+# Address Country Constraint
+
+- [x] Enforce `addresses.country_id` as `NOT NULL` with a safe backfill migration
+- [x] Harden address writes so null `country_id` input is normalized before persistence
+- [x] Add focused regression coverage and run verification
+
+## Review
+- Added [2026_03_28_210000_enforce_not_null_country_id_on_addresses_table.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_03_28_210000_enforce_not_null_country_id_on_addresses_table.php) to backfill existing null `addresses.country_id` values to Malaysia (`132`) and then enforce the column as `NOT NULL`.
+- Added a model-level safeguard in [Address.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Address.php) so normal model saves coerce a missing `country_id` to `132` before hitting the database.
+- Added [EnsuresMalaysiaCountry.php](/Users/Saiffil/Herd/majlisilmu/database/factories/Concerns/EnsuresMalaysiaCountry.php) and updated the institution, speaker, and venue factories so address-producing test fixtures always point at a real Malaysia row instead of leaving admin forms with invalid relationship values.
+- Reverted the accidental edit to the original [2026_01_21_114400_create_addresses_table.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_01_21_114400_create_addresses_table.php) migration and kept the constraint change only in the new forward migration.
+- Updated [EventSearchTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventSearchTest.php) to match the current page payload, which now legitimately includes Filament notifications and actions assets.
+- Verification:
+  - `php artisan migrate --force` => **both new migrations applied**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php --filter="defaults address country_id to malaysia when null is submitted directly to the model"` => **1 passed (2 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php --filter="creates an address when only a google maps url is provided"` => **1 passed (4 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicSubmissionLockActionsTest.php` => **9 passed (78 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="displays the events index page"` => **1 passed (9 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Address.php tests/Feature/SharedFormSchemaTest.php database/migrations/2026_03_28_210000_enforce_not_null_country_id_on_addresses_table.php database/factories/Concerns/EnsuresMalaysiaCountry.php database/factories/InstitutionFactory.php database/factories/SpeakerFactory.php database/factories/VenueFactory.php` => **No errors**
+  - `vendor/bin/pint --test tests/Feature/EventSearchTest.php database/migrations/2026_01_21_114400_create_addresses_table.php database/migrations/2026_03_28_210000_enforce_not_null_country_id_on_addresses_table.php database/factories/Concerns/EnsuresMalaysiaCountry.php database/factories/InstitutionFactory.php database/factories/SpeakerFactory.php database/factories/VenueFactory.php app/Models/Address.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+
+# Federal Territory Hierarchy
+
+- [x] Add a shared federal-territory location rule and use it across forms, filters, resolvers, and display helpers
+- [x] Migrate Kuala Lumpur, Putrajaya, and Labuan from `state -> district -> subdistrict` to `state -> subdistrict`
+- [x] Update seeders/importers and admin geography CRUD to support nullable `subdistrict.district_id` for those three states
+- [x] Update public/admin address entry, search/filter, and formatting behavior for federal territories
+- [x] Add focused migration, form, resolver, filter, and display regression coverage and run verification
+
+## Review
+- Added a shared `FederalTerritoryLocation` helper and applied it across shared forms, Filament address schemas, the public event filters, the public institution index, and Google place resolution so Kuala Lumpur, Putrajaya, and Labuan consistently bypass the district layer.
+- Added a migration to make `subdistricts.district_id` nullable, null out federal-territory district references on both `subdistricts` and `addresses`, and remove the placeholder districts after detaching them. The migration matches both plain state names and `Wilayah Persekutuan ...` state names.
+- Updated geography seeders and the generated postcode importer so federal-territory subdistricts attach directly to `state_id`, district seeding skips those three states, and postcode imports resolve subdistricts by state when no district should exist.
+- Updated admin/public address entry and filtering so district is hidden for federal territories, subdistrict options load directly from state, and saved address payloads forcibly clear `district_id` for those states.
+- Added focused regression coverage for resolver behavior, shared form helper behavior, admin federal-territory subdistrict creation, federal-territory event filtering, postcode import behavior, and the public location rendering cases.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **3 passed (24 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **19 passed (98 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/GeographyFormCountryCodeTest.php` => **3 passed (19 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **18 passed (51 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **24 passed (77 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php` => **10 passed (33 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php` => **1 passed (43 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="federal territory subdistricts without requiring a district"` => **1 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Location/FederalTerritoryLocation.php app/Forms/SharedFormSchema.php app/Actions/Location/ResolveGooglePlaceSelectionAction.php app/Filament/Resources/Institutions/Schemas/InstitutionForm.php app/Filament/Resources/Speakers/Schemas/SpeakerForm.php app/Filament/Resources/Venues/Schemas/VenueForm.php app/Filament/Resources/Subdistricts/Schemas/SubdistrictForm.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Models/State.php database/seeders/DistrictSeeder.php database/seeders/SubdistrictSeeder.php database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/GeographyFormCountryCodeTest.php tests/Feature/EventSearchTest.php tests/Feature/EventShowPageTest.php tests/Feature/InstitutionShowPageTest.php tests/Feature/SpeakerShowPageTimingTest.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/Location/FederalTerritoryLocation.php app/Forms/SharedFormSchema.php app/Actions/Location/ResolveGooglePlaceSelectionAction.php app/Filament/Resources/Institutions/Schemas/InstitutionForm.php app/Filament/Resources/Speakers/Schemas/SpeakerForm.php app/Filament/Resources/Venues/Schemas/VenueForm.php app/Filament/Resources/Subdistricts/Schemas/SubdistrictForm.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Models/State.php database/migrations/2026_03_28_140000_convert_federal_territories_to_state_subdistrict_hierarchy.php database/seeders/DistrictSeeder.php database/seeders/SubdistrictSeeder.php database/seeders/GeneratedFileFinalFixedPoskodSeeder.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/GeographyFormCountryCodeTest.php tests/Feature/EventSearchTest.php tests/Feature/EventShowPageTest.php tests/Feature/InstitutionShowPageTest.php tests/Feature/SpeakerShowPageTimingTest.php tests/Feature/GeneratedFileFinalFixedPoskodSeederTest.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` currently has an unrelated existing failure on the initial JS asset payload assertion (`/js/filament/notifications/notifications.js` is present in the response), so the new hierarchy-specific event filter was verified with a focused filter run instead of relying on the full file result.
+
+# Legacy Geography Cache Cleanup
+
+- [x] Remove the unused `states_my` cache key from runtime invalidation and tests
+- [x] Keep coverage focused on the active `states_my_v2` cache path
+- [x] Run targeted verification for the cache cleanup
+
+## Review
+- Removed the dead `states_my` cache key from [PublicListingsCache.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Cache/PublicListingsCache.php). No runtime code was reading it anymore; the public event filters already use only `states_my_v2`.
+- Updated [PublicListingCacheInvalidationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicListingCacheInvalidationTest.php) so the cache-busting assertions now track only active keys.
+- Tightened [Laravel13CacheSerializationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Laravel13CacheSerializationTest.php) to verify the current `states_my_v2` safe-cache path directly instead of keeping a legacy-key compatibility scenario for an unused key.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicListingCacheInvalidationTest.php` => **4 passed (1105 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Laravel13CacheSerializationTest.php` => **4 passed (18 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Cache/PublicListingsCache.php tests/Feature/PublicListingCacheInvalidationTest.php tests/Feature/Laravel13CacheSerializationTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/Cache/PublicListingsCache.php tests/Feature/PublicListingCacheInvalidationTest.php tests/Feature/Laravel13CacheSerializationTest.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+
+# Geography Cache Invalidation
+
+- [x] Bust frontend geography-related caches when countries, states, districts, or subdistricts are created, updated, or deleted in admin
+- [x] Reuse the existing public listings cache invalidation path instead of duplicating cache-key logic
+- [x] Add focused regression coverage and rerun targeted verification
+
+## Review
+- Added a shared `GeographyObserver` for `Country`, `State`, `District`, and `Subdistrict`, and registered it in [AppServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/AppServiceProvider.php) alongside the existing public-listing observers.
+- Reused the existing [PublicListingsCache.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Cache/PublicListingsCache.php) path instead of introducing new cache-key duplication, so geography edits now clear the same frontend listing/filter caches that already include `states_my` / `states_my_v2` and the related event listing payloads.
+- Extended [PublicListingCacheInvalidationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicListingCacheInvalidationTest.php) to prove create, update, and delete operations on geography records clear those frontend caches.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicListingCacheInvalidationTest.php` => **4 passed (1124 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Observers/GeographyObserver.php app/Providers/AppServiceProvider.php tests/Feature/PublicListingCacheInvalidationTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Observers/GeographyObserver.php app/Providers/AppServiceProvider.php tests/Feature/PublicListingCacheInvalidationTest.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+
+# Geography Country Code Hardening
+
+- [x] Remove manual `country_code` editing from the state, district, and subdistrict admin forms
+- [x] Ensure those forms still persist `country_code` from the selected country record
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Replaced the writable `country_code` text input in the state, district, and subdistrict admin schemas with a hidden dehydrated field derived from the selected `country_id`, so the user can no longer manipulate that value independently from the chosen country.
+- Kept the rest of the cascading geography behavior unchanged: selecting a country still drives the available state and district options, but `country_code` is now always written from the backing `countries.iso2` record during form dehydration.
+- Added `tests/Feature/GeographyFormCountryCodeTest.php` to verify both schema shape and actual create-page persistence, including a forged `country_code` payload being overridden by the selected country.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/GeographyFormCountryCodeTest.php` => **2 passed (15 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/States/Schemas/StateForm.php app/Filament/Resources/Districts/Schemas/DistrictForm.php app/Filament/Resources/Subdistricts/Schemas/SubdistrictForm.php tests/Feature/GeographyFormCountryCodeTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Filament/Resources/States/Schemas/StateForm.php app/Filament/Resources/Districts/Schemas/DistrictForm.php app/Filament/Resources/Subdistricts/Schemas/SubdistrictForm.php tests/Feature/GeographyFormCountryCodeTest.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+
+# Geography Admin Management
+
+- [x] Add admin resources for countries, states, districts, and subdistricts
+- [x] Add safe deletion rules so geography records cannot be removed while still depended on by lower-level geography or addresses
+- [x] Add targeted admin access and deletion-constraint tests, then run verification
+
+## Review
+- Added four new admin Filament resources under the admin panel for `Country`, `State`, `District`, and `Subdistrict`, each with create/list/edit pages, hierarchy-aware forms, and usage-count tables.
+- Added a reusable `GetGeographyDeletionBlockReasonAction` plus a shared Filament delete-guard trait so delete actions stay available for cleanup but are disabled with a reason when a record still has dependent geography or address usage.
+- Added direct `addresses()` relations on `Country`, `District`, and `Subdistrict` so usage counts and delete guards work without database foreign keys.
+- Protected the default Malaysia country record (`id = 132`) from deletion because current public-location flows still intentionally assume that default country.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminResourcesCoverageTest.php` => **2 passed (29 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/GeographyDeletionRulesTest.php` => **5 passed (5 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Location/GetGeographyDeletionBlockReasonAction.php app/Filament/Resources/Geography/Concerns/HasGeographyDeletionGuard.php app/Filament/Resources/Countries app/Filament/Resources/States app/Filament/Resources/Districts app/Filament/Resources/Subdistricts app/Models/Country.php app/Models/District.php app/Models/Subdistrict.php tests/Feature/AdminResourcesCoverageTest.php tests/Feature/GeographyDeletionRulesTest.php` => **No errors**
+  - `vendor/bin/pint app/Actions/Location/GetGeographyDeletionBlockReasonAction.php app/Filament/Resources/Geography/Concerns/HasGeographyDeletionGuard.php app/Filament/Resources/Countries app/Filament/Resources/States app/Filament/Resources/Districts app/Filament/Resources/Subdistricts app/Models/Country.php app/Models/District.php app/Models/Subdistrict.php tests/Feature/AdminResourcesCoverageTest.php tests/Feature/GeographyDeletionRulesTest.php` => **formatted**
+  - `git diff --check` => **No diff formatting issues**
+
 # Institution Media Layout
 
 - [x] Make the public institution `Imej Latar` uploader span the full row like `Galeri`
@@ -6346,3 +6600,50 @@
   - `vendor/bin/phpstan analyse --ansi app/Actions/Location/ResolveGooglePlaceSelectionAction.php app/Forms/InstitutionContributionFormSchema.php app/Forms/SharedFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Services/ContributionEntityMutationService.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **No errors**
   - `vendor/bin/pint --test app/Actions/Location/ResolveGooglePlaceSelectionAction.php app/Forms/InstitutionContributionFormSchema.php app/Forms/SharedFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Services/ContributionEntityMutationService.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **pass**
   - `git diff --check` => **No diff formatting issues**
+
+# Event Filter Country Default
+
+- [x] Reproduce the live `/majlis` default-country behavior with a browser-style timezone cookie
+- [x] Fix server-side handling of the browser-set `user_timezone` cookie
+- [x] Add an HTTP-level regression test for the default country selection path
+- [x] Re-verify the page through tests and a live browser pass
+
+## Review
+- Root cause:
+  - the new preferred-country resolver worked in isolation, but the browser-set `user_timezone` cookie was still going through Laravel's cookie encryption middleware
+  - because that cookie is written directly by frontend JavaScript, Laravel could not decrypt it on the next request and treated it as missing, so `/majlis` fell back to Malaysia
+- Fix:
+  - configured `bootstrap/app.php` to exclude `user_timezone` from cookie encryption so browser-written timezone cookies survive the request lifecycle
+  - added a focused HTTP regression in `tests/Feature/EventSearchTest.php` using `withUnencryptedCookie()` against `/majlis` to match real browser behavior instead of only testing the resolver in isolation
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter="defaults the majlis country filter from an unencrypted browser timezone cookie|filters events by country|displays the events index page"` => **3 passed (14 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Unit/PreferredCountryResolverTest.php` => **3 passed (3 assertions)**
+  - `vendor/bin/phpstan analyse --ansi bootstrap/app.php app/Support/Location/PreferredCountryResolver.php tests/Feature/EventSearchTest.php tests/Unit/PreferredCountryResolverTest.php` => **No errors**
+  - `vendor/bin/pint --test bootstrap/app.php tests/Feature/EventSearchTest.php tests/Unit/PreferredCountryResolverTest.php app/Support/Location/PreferredCountryResolver.php` => **pass**
+  - `curl -sk -H 'Cookie: user_timezone=Asia/Jakarta' https://majlisilmu.test/majlis` => **server response now emits `country_id=103` and `Indonesia`**
+  - live browser reload on `https://majlisilmu.test/majlis` with `user_timezone=Asia/Jakarta` => **active filter shows `Indonesia` and saved-search link uses `country_id=103`**
+
+# Institution Filter Country Default
+
+- [x] Inspect the public institutions index location filter flow and identify where country should slot in
+- [x] Add country selection plus preferred-country defaulting to the institutions index
+- [x] Add focused regression coverage for country filtering and browser-style timezone defaulting
+- [x] Verify with focused tests and a live browser pass on `/institusi`
+
+## Review
+- Root changes:
+  - added `country_id` as a first-class URL-backed filter on the public institutions Volt page in `resources/views/components/pages/institutions/⚡index.blade.php`
+  - defaulted that filter from `PreferredCountryResolver`, so `/institusi` now follows the same priority as `/majlis`: saved timezone, then `CF-IPCountry`, then Malaysia
+  - replaced the hard-coded Malaysia-only states query with cached country + state option lists using the existing `countries_all_v1` and `states_all_v1` cache keys
+  - made country changes reset `state_id`, `district_id`, and `subdistrict_id`, and threaded `country_id` into the institutions address scope query
+  - updated the institutions loading targets so changing country triggers the same loading state as the other search and location filters
+- Test coverage:
+  - added a country-filter regression in `tests/Feature/InstitutionIndexTest.php`
+  - added an HTTP-level browser-cookie regression for the timezone-derived default country on `/institusi`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php --filter="shows location scope controls on institution index|filters institutions by country|defaults institutions country filter from an unencrypted browser timezone cookie"` => **3 passed (10 assertions)**
+  - `php -l tests/Feature/InstitutionIndexTest.php` => **No syntax errors**
+  - `vendor/bin/pint --test resources/views/components/pages/institutions/⚡index.blade.php tests/Feature/InstitutionIndexTest.php` => **pass**
+  - `git diff --check -- resources/views/components/pages/institutions/⚡index.blade.php tests/Feature/InstitutionIndexTest.php tasks/todo.md` => **No diff formatting issues**
+  - `curl -sk -H 'Cookie: user_timezone=Asia/Jakarta' https://majlisilmu.test/institusi` => **Livewire snapshot now carries `country_id=103`**
+  - live browser reload on `https://majlisilmu.test/institusi` with `user_timezone=Asia/Jakarta` => **country select shows `Indonesia`, and the state dropdown is scoped to Indonesian states**

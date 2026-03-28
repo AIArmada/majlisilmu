@@ -77,9 +77,7 @@
                 google.maps.importLibrary('maps'),
             ])
 
-            const element = new PlaceAutocompleteElement({
-                includedRegionCodes: ['my'],
-            })
+            const element = new PlaceAutocompleteElement()
 
             element.placeholder = @js($pickerSearchLabel)
 

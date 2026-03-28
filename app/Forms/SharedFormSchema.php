@@ -6,6 +6,7 @@ use App\Actions\Location\NormalizeGoogleMapsInputAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\SocialMediaPlatform;
+use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
@@ -14,6 +15,9 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
+use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -37,7 +41,13 @@ class SharedFormSchema
         bool $showGoogleMapsUrlField = true,
         bool $enableGoogleMapsNormalization = true,
         bool $enableGoogleMapsRemoteLookup = true,
+        bool $includeCountryField = false,
+        ?bool $showCountryField = null,
+        ?int $defaultCountryId = null,
     ): array {
+        $defaultCountryId ??= PreferredCountryResolver::MALAYSIA_ID;
+        $showCountryField ??= true;
+
         return [
             TextInput::make('line1')
                 ->label(__('Address Line 1'))
@@ -53,6 +63,29 @@ class SharedFormSchema
                 ->label(__('Postcode'))
                 ->maxLength(16)
                 ->placeholder(__('e.g., 50000')),
+
+            ...($includeCountryField
+                ? [($showCountryField
+                    ? Select::make('country_id')
+                        ->label(__('Country'))
+                        ->options(fn (): array => Country::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->preload()
+                        ->live()
+                        ->default($defaultCountryId)
+                        ->afterStateUpdatedJs(<<<'JS'
+                            const guard = Number($get('cascade_reset_guard') ?? 0)
+
+                            if (guard > 0) {
+                                $set('cascade_reset_guard', guard - 1)
+                            } else {
+                                $set('state_id', null)
+                                $set('district_id', null)
+                                $set('subdistrict_id', null)
+                            }
+                            JS)
+                    : Hidden::make('country_id')->default($defaultCountryId))]
+                : [Hidden::make('country_id')->default($defaultCountryId)]),
 
             Hidden::make('lat'),
             Hidden::make('lng'),
@@ -72,10 +105,13 @@ class SharedFormSchema
 
             Select::make('state_id')
                 ->label(__('Negeri'))
-                ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
+                ->options(fn (Get $get): array => self::stateOptionsForCountry(
+                    $includeCountryField ? $get('country_id') : $defaultCountryId,
+                ))
                 ->searchable()
                 ->preload()
                 ->live()
+                ->disabled(fn (Get $get): bool => $includeCountryField && self::normalizeLocationId($get('country_id')) === null)
                 ->afterStateUpdatedJs(<<<'JS'
                     const guard = Number($get('cascade_reset_guard') ?? 0)
 
@@ -89,16 +125,7 @@ class SharedFormSchema
 
             Select::make('district_id')
                 ->label(__('Daerah'))
-                ->options(function (Get $get) {
-                    $stateId = $get('state_id');
-                    if (! $stateId) {
-                        return [];
-                    }
-
-                    return District::where('state_id', $stateId)
-                        ->orderBy('name')
-                        ->pluck('name', 'id');
-                })
+                ->options(fn (Get $get): array => self::districtOptionsForState($get('state_id')))
                 ->searchable()
                 ->live()
                 ->afterStateUpdatedJs(<<<'JS'
@@ -110,22 +137,13 @@ class SharedFormSchema
                         $set('subdistrict_id', null)
                     }
                     JS)
-                ->visible(fn (Get $get): bool => filled($get('state_id'))),
+                ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id'))),
 
             Select::make('subdistrict_id')
                 ->label(__('Bandar / Mukim / Zon'))
-                ->options(function (Get $get) {
-                    $districtId = $get('district_id');
-                    if (! $districtId) {
-                        return [];
-                    }
-
-                    return Subdistrict::where('district_id', $districtId)
-                        ->orderBy('name')
-                        ->pluck('name', 'id');
-                })
+                ->options(fn (Get $get): array => self::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
                 ->searchable()
-                ->visible(fn (Get $get): bool => filled($get('district_id'))),
+                ->visible(fn (Get $get): bool => self::shouldShowSubdistrictField($get('state_id'), $get('district_id'))),
 
             ...($showGoogleMapsUrlField
                 ? [self::googleMapsUrlField(required: $requireGoogleMaps)]
@@ -145,12 +163,18 @@ class SharedFormSchema
         bool $showGoogleMapsUrlField = true,
         bool $enableGoogleMapsNormalization = true,
         bool $enableGoogleMapsRemoteLookup = true,
+        bool $includeCountryField = false,
+        ?bool $showCountryField = null,
+        ?int $defaultCountryId = null,
     ): Group {
         $group = Group::make(self::addressFields(
             requireGoogleMaps: $requireGoogleMaps,
             showGoogleMapsUrlField: $showGoogleMapsUrlField,
             enableGoogleMapsNormalization: $enableGoogleMapsNormalization,
             enableGoogleMapsRemoteLookup: $enableGoogleMapsRemoteLookup,
+            includeCountryField: $includeCountryField,
+            showCountryField: $showCountryField,
+            defaultCountryId: $defaultCountryId,
         ))
             ->columns(2);
 
@@ -275,7 +299,7 @@ class SharedFormSchema
                 'line1' => $data['line1'] ?? null,
                 'line2' => $data['line2'] ?? null,
                 'postcode' => $data['postcode'] ?? null,
-                'country_id' => 132, // Malaysia
+                'country_id' => self::normalizeLocationId($data['country_id'] ?? null) ?? PreferredCountryResolver::MALAYSIA_ID,
                 'state_id' => $data['state_id'] ?? null,
                 'district_id' => $data['district_id'] ?? null,
                 'subdistrict_id' => $data['subdistrict_id'] ?? null,
@@ -324,7 +348,13 @@ class SharedFormSchema
      */
     public static function prepareAddressPersistenceData(array $data): array
     {
-        return Arr::only(self::normalizeAddressFormState($data), [
+        $normalized = self::normalizeAddressFormState($data);
+
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($normalized['state_id'] ?? null)) {
+            $normalized['district_id'] = null;
+        }
+
+        return Arr::only($normalized, [
             'country_id',
             'state_id',
             'district_id',
@@ -346,8 +376,8 @@ class SharedFormSchema
      */
     public static function hydrateAddressFormState(array $data): array
     {
-        $googleMapsUrl = is_string($data['google_maps_url'] ?? null) ? trim((string) $data['google_maps_url']) : null;
-        $googlePlaceId = is_string($data['google_place_id'] ?? null) ? trim((string) $data['google_place_id']) : null;
+        $googleMapsUrl = is_string($data['google_maps_url'] ?? null) ? trim($data['google_maps_url']) : null;
+        $googlePlaceId = is_string($data['google_place_id'] ?? null) ? trim($data['google_place_id']) : null;
         $lat = $data['lat'] ?? null;
         $lng = $data['lng'] ?? null;
 
@@ -487,5 +517,111 @@ class SharedFormSchema
                 'is_public' => (bool) ($contact['is_public'] ?? true),
             ]);
         }
+    }
+
+    /**
+     * @return array<int|string, string>
+     */
+    public static function districtOptionsForState(int|string|null $stateId): array
+    {
+        if (! filled($stateId) || FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
+            return [];
+        }
+
+        return District::query()
+            ->where('state_id', $stateId)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    /**
+     * @return array<int|string, string>
+     */
+    public static function stateOptionsForCountry(int|string|null $countryId): array
+    {
+        $countryId = self::normalizeLocationId($countryId);
+
+        if ($countryId === null) {
+            return [];
+        }
+
+        return State::query()
+            ->where('country_id', $countryId)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    /**
+     * @return array<int|string, string>
+     */
+    public static function subdistrictOptionsForSelection(int|string|null $stateId, int|string|null $districtId): array
+    {
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
+            if (! filled($stateId)) {
+                return [];
+            }
+
+            return Subdistrict::query()
+                ->where('state_id', $stateId)
+                ->whereNull('district_id')
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->all();
+        }
+
+        if (! filled($districtId)) {
+            return [];
+        }
+
+        return Subdistrict::query()
+            ->where('district_id', $districtId)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    public static function shouldShowSubdistrictField(int|string|null $stateId, int|string|null $districtId): bool
+    {
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
+            return filled($stateId);
+        }
+
+        return filled($districtId);
+    }
+
+    public static function preferredPublicCountryId(): int
+    {
+        return app(PreferredCountryResolver::class)->resolveId();
+    }
+
+    public static function shouldShowPublicCountryField(): bool
+    {
+        return app(PublicCountryFilterVisibility::class)->shouldShow();
+    }
+
+    public static function publicLocationPickerCascadeResetGuard(): int
+    {
+        return self::shouldShowPublicCountryField() ? 3 : 2;
+    }
+
+    public static function normalizeLocationId(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        if ($trimmed === '' || ! ctype_digit($trimmed)) {
+            return null;
+        }
+
+        return (int) $trimmed;
     }
 }

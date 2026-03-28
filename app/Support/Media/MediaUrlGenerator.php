@@ -2,11 +2,12 @@
 
 namespace App\Support\Media;
 
-use Throwable;
 use Spatie\MediaLibrary\Support\UrlGenerator\DefaultUrlGenerator;
+use Throwable;
 
 class MediaUrlGenerator extends DefaultUrlGenerator
 {
+    #[\Override]
     public function getUrl(): string
     {
         if ($this->mediaFileIsMissing()) {

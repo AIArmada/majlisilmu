@@ -9,6 +9,7 @@ use App\Models\Institution;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Support\Institutions\GeneratedPoskodInstitutionData;
+use App\Support\Location\FederalTerritoryLocation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
@@ -94,6 +95,11 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
      */
     private array $subdistrictsByDistrict = [];
 
+    /**
+     * @var array<int, array<string, Subdistrict>>
+     */
+    private array $subdistrictsByState = [];
+
     public function run(): void
     {
         $csvPath = database_path(self::CSV_PATH);
@@ -130,10 +136,10 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
             $record = $this->mapCsvRow($header, $row);
             $state = $this->resolveState($record['Negeri']);
             $district = $this->resolveDistrict($state, $record);
-            $subdistrict = $district instanceof District ? $this->resolveSubdistrict($district, $record) : null;
+            $subdistrict = $this->resolveSubdistrict($state, $district, $record);
             $slug = GeneratedPoskodInstitutionData::canonicalSlug($record['Nama'], $record['No.']);
 
-            if (! $district instanceof District) {
+            if (! $district instanceof District && ! FederalTerritoryLocation::isFederalTerritoryStateId($state->getKey())) {
                 $nullDistrictRows[] = $record['No.'];
             }
 
@@ -198,12 +204,13 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
         /** @var Collection<int, State> $states */
         $states = State::query()
             ->where('country_id', $malaysia->getKey())
-            ->with(['districts.subdistricts'])
+            ->with(['districts.subdistricts', 'subdistricts'])
             ->get();
 
         foreach ($states as $state) {
             $this->statesByKey[$this->normalizeKey($state->name)] = $state;
             $this->districtsByState[$state->getKey()] = [];
+            $this->subdistrictsByState[$state->getKey()] = [];
 
             foreach ($state->districts as $district) {
                 $this->districtsByState[$state->getKey()][$this->normalizeKey($district->name)] = $district;
@@ -212,6 +219,10 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
                 foreach ($district->subdistricts as $subdistrict) {
                     $this->subdistrictsByDistrict[$district->getKey()][$this->normalizeKey($subdistrict->name)] = $subdistrict;
                 }
+            }
+
+            foreach ($state->subdistricts()->whereNull('district_id')->get() as $subdistrict) {
+                $this->subdistrictsByState[$state->getKey()][$this->normalizeKey($subdistrict->name)] = $subdistrict;
             }
         }
 
@@ -268,6 +279,10 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
      */
     private function resolveDistrict(State $state, array $record): ?District
     {
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($state->getKey())) {
+            return null;
+        }
+
         $districtName = $this->resolveDistrictName($record);
 
         if ($districtName === null) {
@@ -336,8 +351,32 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
     /**
      * @phpstan-param CsvRecord $record
      */
-    private function resolveSubdistrict(District $district, array $record): ?Subdistrict
+    private function resolveSubdistrict(State $state, ?District $district, array $record): ?Subdistrict
     {
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($state->getKey())) {
+            $overrideName = self::SUBDISTRICT_OVERRIDES[$record['No.']] ?? null;
+
+            if (is_string($overrideName)) {
+                $subdistrict = $this->lookupSubdistrictByState($state, $overrideName);
+
+                if ($subdistrict instanceof Subdistrict) {
+                    return $subdistrict;
+                }
+            }
+
+            $searchText = $this->searchableText($record);
+
+            if ($searchText === '') {
+                return null;
+            }
+
+            return $this->matchSubdistrictFromState($state, $searchText);
+        }
+
+        if (! $district instanceof District) {
+            return null;
+        }
+
         $overrideName = self::SUBDISTRICT_OVERRIDES[$record['No.']] ?? $this->resolveSpecialSubdistrictName($district, $record);
 
         if (is_string($overrideName)) {
@@ -410,6 +449,11 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
         return $this->subdistrictsByDistrict[$district->getKey()][$this->normalizeKey($subdistrictName)] ?? null;
     }
 
+    private function lookupSubdistrictByState(State $state, string $subdistrictName): ?Subdistrict
+    {
+        return $this->subdistrictsByState[$state->getKey()][$this->normalizeKey($subdistrictName)] ?? null;
+    }
+
     private function matchSubdistrictFromText(District $district, string $searchText): ?Subdistrict
     {
         $districtKey = $this->normalizeKey($district->name);
@@ -442,6 +486,33 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
 
             return strlen($right['key']) <=> strlen($left['key']);
         });
+
+        return $matches[0]['subdistrict'];
+    }
+
+    private function matchSubdistrictFromState(State $state, string $searchText): ?Subdistrict
+    {
+        /** @var list<array{key: string, subdistrict: Subdistrict}> $matches */
+        $matches = [];
+
+        foreach ($this->subdistrictsByState[$state->getKey()] ?? [] as $key => $subdistrict) {
+            if ($key === '' || in_array($key, ['BANDAR', 'KAMPUNG', 'KOTA', 'KUALA', 'MUKIM', 'PEKAN', 'PRECINCT'], true)) {
+                continue;
+            }
+
+            if (str_contains($searchText, $key)) {
+                $matches[] = [
+                    'key' => $key,
+                    'subdistrict' => $subdistrict,
+                ];
+            }
+        }
+
+        if ($matches === []) {
+            return null;
+        }
+
+        usort($matches, static fn (array $left, array $right): int => strlen($right['key']) <=> strlen($left['key']));
 
         return $matches[0]['subdistrict'];
     }

@@ -60,9 +60,11 @@
 
 @php
     $search = $this->search;
+    $countryId = $this->country_id;
     $stateId = $this->state_id;
     $districtId = $this->district_id;
     $subdistrictId = $this->subdistrict_id;
+    $showCountryFilter = $this->showsCountryFilter();
     $institutionId = $this->institution_id;
     $venueId = $this->venue_id;
     $gender = $this->gender;
@@ -78,9 +80,11 @@
     $lat = $this->lat;
     $lng = $this->lng;
     $sort = $this->sort;
+    $countries = $this->countries;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
+    $defaultCountryId = (string) app(\App\Support\Location\PreferredCountryResolver::class)->resolveId();
     $languageOptions = $this->languageOptions();
     $selectedAgeGroups = array_values(array_filter((array) $this->age_group));
     $selectedTopicIds = array_values(array_filter((array) $this->topic_ids));
@@ -182,6 +186,7 @@
 
     $savedSearchQuery = array_filter([
         'search' => $search,
+        'country_id' => $countryId,
         'state_id' => $stateId,
         'district_id' => $districtId,
         'subdistrict_id' => $subdistrictId,
@@ -228,6 +233,7 @@
 
     $activeFilterCount = collect([
         filled($search),
+        filled($countryId) && $countryId !== $defaultCountryId,
         filled($stateId),
         filled($districtId),
         filled($subdistrictId),
@@ -585,6 +591,12 @@
                                     d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             </svg>
                             {{ __('Nearby') }}
+                        </span>
+                    @endif
+
+                    @if($countryId && ($showCountryFilter || $countryId !== $defaultCountryId))
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ $countries->firstWhere('id', (int) $countryId)?->name ?? __('Country') }}
                         </span>
                     @endif
 

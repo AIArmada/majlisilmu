@@ -95,7 +95,7 @@ class EventFactory extends Factory
         $recordingUrl = fake()->optional()->url();
 
         // Determine event format: 60% physical, 25% online, 15% hybrid
-        $eventFormat = fake()->randomElement([
+        $defaultEventFormat = fake()->randomElement([
             EventFormat::Physical,
             EventFormat::Physical,
             EventFormat::Physical,
@@ -110,36 +110,22 @@ class EventFactory extends Factory
             EventFormat::Hybrid,
         ]);
 
-        // Assign a single location target (institution OR venue) based on format.
-        $institutionId = Institution::factory();
-        $venueId = null;
-        $liveUrl = null;
-        $recordingUrlFinal = null;
-
-        if ($eventFormat === EventFormat::Physical) {
-            // Default physical events are institution-located.
-            $institutionId = Institution::factory();
-            $venueId = null;
-            $liveUrl = null;
-            $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
-        } elseif ($eventFormat === EventFormat::Online) {
-            // Online events do not have a physical location.
-            $institutionId = null;
-            $venueId = null;
-            $liveUrl = $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
-            $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
-        } else { // Hybrid
-            // Keep single-location invariant for hybrid events too.
-            $institutionId = Institution::factory();
-            $venueId = null;
-            $liveUrl = $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
-            $recordingUrlFinal = $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null;
-        }
-
         return [
             'parent_event_id' => null,
-            'institution_id' => $institutionId,
-            'venue_id' => $venueId,
+            'institution_id' => function (array $attributes) {
+                $eventFormat = $this->eventFormatFromAttributes($attributes);
+
+                if ($eventFormat === EventFormat::Online) {
+                    return null;
+                }
+
+                if (filled($attributes['venue_id'] ?? null)) {
+                    return null;
+                }
+
+                return Institution::factory();
+            },
+            'venue_id' => null,
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),
             'event_structure' => EventStructure::Standalone,
@@ -155,15 +141,23 @@ class EventFactory extends Factory
             'gender' => fake()->randomElement(EventGenderRestriction::cases()),
             'age_group' => [fake()->randomElement(EventAgeGroup::cases())],
             'children_allowed' => fake()->boolean(80), // 80% allow children
-            'event_format' => $eventFormat,
+            'event_format' => $defaultEventFormat,
             'visibility' => fake()->randomElement([
                 EventVisibility::Public,
                 EventVisibility::Public,
                 EventVisibility::Unlisted,
             ]),
             'status' => $status,
-            'live_url' => $liveUrl,
-            'recording_url' => $recordingUrlFinal,
+            'live_url' => function (array $attributes) use ($livestreamUrl): ?string {
+                $eventFormat = $this->eventFormatFromAttributes($attributes);
+
+                if ($eventFormat === EventFormat::Physical) {
+                    return null;
+                }
+
+                return $livestreamUrl ? Str::replaceFirst('http://', 'https://', $livestreamUrl) : 'https://meet.google.com/'.Str::random(10);
+            },
+            'recording_url' => $recordingUrl ? Str::replaceFirst('http://', 'https://', $recordingUrl) : null,
             'views_count' => fake()->numberBetween(0, 2000),
             'saves_count' => fake()->numberBetween(0, 500),
             'registrations_count' => fake()->numberBetween(0, 200),
@@ -283,5 +277,23 @@ class EventFactory extends Factory
             'parent_event_id' => $parentEvent instanceof Event ? $parentEvent->id : Event::factory()->parentProgram(),
             'event_structure' => EventStructure::ChildEvent,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function eventFormatFromAttributes(array $attributes): EventFormat
+    {
+        $eventFormat = $attributes['event_format'] ?? null;
+
+        if ($eventFormat instanceof EventFormat) {
+            return $eventFormat;
+        }
+
+        if (is_string($eventFormat) && $eventFormat !== '') {
+            return EventFormat::from($eventFormat);
+        }
+
+        return EventFormat::Physical;
     }
 }

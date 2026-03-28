@@ -11,11 +11,11 @@ class NormalizeGoogleMapsInputAction
 {
     use AsAction;
 
-    private const PartialStatus = 'partial';
+    private const string PartialStatus = 'partial';
 
-    private const ResolvedStatus = 'resolved';
+    private const string ResolvedStatus = 'resolved';
 
-    private const UnresolvedStatus = 'unresolved';
+    private const string UnresolvedStatus = 'unresolved';
 
     /**
      * @param  array<string, mixed>  $input
@@ -65,8 +65,8 @@ class NormalizeGoogleMapsInputAction
         $displayName ??= $parsed['display_name'];
 
         if (($lat === null) || ($lng === null)) {
-            $lat = $lat ?? $parsed['lat'];
-            $lng = $lng ?? $parsed['lng'];
+            $lat ??= $parsed['lat'];
+            $lng ??= $parsed['lng'];
         }
 
         $shouldSkipRemoteRetry = $currentFingerprint !== null
@@ -87,8 +87,8 @@ class NormalizeGoogleMapsInputAction
                 $currentFingerprint = $this->fingerprint($currentUrl);
                 $placeId ??= $parsed['place_id'];
                 $displayName ??= $parsed['display_name'];
-                $lat = $lat ?? $parsed['lat'];
-                $lng = $lng ?? $parsed['lng'];
+                $lat ??= $parsed['lat'];
+                $lng ??= $parsed['lng'];
             }
         }
 
@@ -103,8 +103,8 @@ class NormalizeGoogleMapsInputAction
 
             if ($resolvedPlace !== null) {
                 $placeId = $resolvedPlace['place_id'];
-                $lat = $lat ?? $resolvedPlace['lat'];
-                $lng = $lng ?? $resolvedPlace['lng'];
+                $lat ??= $resolvedPlace['lat'];
+                $lng ??= $resolvedPlace['lng'];
             }
         }
 
@@ -119,9 +119,9 @@ class NormalizeGoogleMapsInputAction
             $placeDetails = $this->fetchPlaceDetails($placeId);
 
             if ($placeDetails !== null) {
-                $displayName = $displayName ?? $placeDetails['display_name'];
-                $lat = $lat ?? $placeDetails['lat'];
-                $lng = $lng ?? $placeDetails['lng'];
+                $displayName ??= $placeDetails['display_name'];
+                $lat ??= $placeDetails['lat'];
+                $lng ??= $placeDetails['lng'];
             }
         }
 
@@ -553,7 +553,7 @@ class NormalizeGoogleMapsInputAction
         $basePath = is_string($baseParts['path'] ?? null) ? $baseParts['path'] : '/';
         $directory = rtrim((string) preg_replace('~/[^/]*$~', '/', $basePath), '/');
 
-        return $scheme.'://'.$host.$port.($directory === '' ? '' : $directory).'/'.$location;
+        return $scheme.'://'.$host.$port.($directory).'/'.$location;
     }
 
     private function isGoogleMapsHost(string $host): bool

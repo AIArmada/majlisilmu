@@ -10,8 +10,9 @@ class PublicListingsCache
     {
         Cache::forget('default_events_search');
         Cache::forget('default_events_search_v2');
-        Cache::forget('states_my');
         Cache::forget('states_my_v2');
+        Cache::forget('countries_all_v1');
+        Cache::forget('states_all_v1');
 
         foreach ($this->supportedLocales() as $locale) {
             Cache::forget("events_topics_{$locale}");

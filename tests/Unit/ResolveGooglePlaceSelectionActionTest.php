@@ -11,24 +11,31 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
+function ensureCountryForPlaceResolution(string $iso2, string $name, ?int $id = null): int
+{
+    $countryId = DB::table('countries')
+        ->when($id !== null, fn ($query) => $query->where('id', $id), fn ($query) => $query->where('iso2', $iso2))
+        ->value('id');
+
+    if (is_int($countryId)) {
+        return $countryId;
+    }
+
+    return DB::table('countries')->insertGetId(array_filter([
+        'id' => $id,
+        'iso2' => $iso2,
+        'name' => $name,
+        'status' => 1,
+        'phone_code' => $iso2 === 'ID' ? '62' : '60',
+        'iso3' => $iso2 === 'ID' ? 'IDN' : 'MYS',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ], static fn (mixed $value): bool => $value !== null));
+}
+
 function ensureMalaysiaStateForPlaceResolution(string $name = 'Selangor'): State
 {
-    $countryId = DB::table('countries')->where('id', 132)->value('id');
-
-    if (! is_int($countryId)) {
-        DB::table('countries')->insert([
-            'id' => 132,
-            'iso2' => 'MY',
-            'name' => 'Malaysia',
-            'status' => 1,
-            'phone_code' => '60',
-            'iso3' => 'MYS',
-            'region' => 'Asia',
-            'subregion' => 'South-Eastern Asia',
-        ]);
-
-        $countryId = 132;
-    }
+    $countryId = ensureCountryForPlaceResolution('MY', 'Malaysia', 132);
 
     $stateId = DB::table('states')
         ->where('country_id', $countryId)
@@ -40,6 +47,26 @@ function ensureMalaysiaStateForPlaceResolution(string $name = 'Selangor'): State
             'country_id' => $countryId,
             'name' => $name,
             'country_code' => 'MY',
+        ]);
+    }
+
+    return State::query()->findOrFail($stateId);
+}
+
+function ensureStateForPlaceResolution(string $countryIso2, string $countryName, string $stateName, ?int $countryId = null): State
+{
+    $countryId ??= ensureCountryForPlaceResolution($countryIso2, $countryName);
+
+    $stateId = DB::table('states')
+        ->where('country_id', $countryId)
+        ->where('name', $stateName)
+        ->value('id');
+
+    if (! is_int($stateId)) {
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => $stateName,
+            'country_code' => $countryIso2,
         ]);
     }
 
@@ -134,4 +161,114 @@ it('leaves ambiguous geography ids empty instead of guessing', function () {
     expect($payload['state_id'])->toBe((int) $state->id)
         ->and($payload['district_id'])->toBeNull()
         ->and($payload['subdistrict_id'])->toBeNull();
+});
+
+it('resolves federal territory subdistricts directly from the state without a district', function () {
+    $state = ensureMalaysiaStateForPlaceResolution('Kuala Lumpur');
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'district_id' => null,
+        'country_code' => 'MY',
+        'name' => 'Setiawangsa',
+    ]);
+
+    $payload = app(ResolveGooglePlaceSelectionAction::class)->handle([
+        'location' => [
+            'lat' => 3.1732,
+            'lng' => 101.7391,
+        ],
+        'addressComponents' => [
+            ['longText' => 'Jalan Setiawangsa', 'shortText' => 'Jalan Setiawangsa', 'types' => ['route']],
+            ['longText' => 'Taman Setiawangsa', 'shortText' => 'Taman Setiawangsa', 'types' => ['sublocality_level_1', 'sublocality', 'political']],
+            ['longText' => '54200', 'shortText' => '54200', 'types' => ['postal_code']],
+            ['longText' => 'Setiawangsa', 'shortText' => 'Setiawangsa', 'types' => ['locality', 'political']],
+            ['longText' => 'Kuala Lumpur', 'shortText' => 'Kuala Lumpur', 'types' => ['administrative_area_level_1', 'political']],
+        ],
+    ]);
+
+    expect($payload['state_id'])->toBe((int) $state->id)
+        ->and($payload['district_id'])->toBeNull()
+        ->and($payload['subdistrict_id'])->toBe((int) $subdistrict->id)
+        ->and($payload['line1'])->toBe('Jalan Setiawangsa')
+        ->and($payload['line2'])->toBe('Taman Setiawangsa')
+        ->and($payload['postcode'])->toBe('54200');
+});
+
+it('resolves non-malaysia geography using the picker country component', function () {
+    $countryId = ensureCountryForPlaceResolution('ID', 'Indonesia');
+    $state = ensureStateForPlaceResolution('ID', 'Indonesia', 'DKI Jakarta', $countryId);
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'country_code' => 'ID',
+        'name' => 'Jakarta Pusat',
+    ]);
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'ID',
+        'name' => 'Gambir',
+    ]);
+
+    $payload = app(ResolveGooglePlaceSelectionAction::class)->handle([
+        'location' => [
+            'lat' => -6.1754,
+            'lng' => 106.8272,
+        ],
+        'addressComponents' => [
+            ['longText' => 'Jalan Medan Merdeka Selatan', 'shortText' => 'Jalan Medan Merdeka Selatan', 'types' => ['route']],
+            ['longText' => 'Gambir', 'shortText' => 'Gambir', 'types' => ['locality', 'political']],
+            ['longText' => '10110', 'shortText' => '10110', 'types' => ['postal_code']],
+            ['longText' => 'Jakarta Pusat', 'shortText' => 'Jakarta Pusat', 'types' => ['administrative_area_level_2', 'political']],
+            ['longText' => 'DKI Jakarta', 'shortText' => 'DKI Jakarta', 'types' => ['administrative_area_level_1', 'political']],
+            ['longText' => 'Indonesia', 'shortText' => 'ID', 'types' => ['country', 'political']],
+        ],
+    ]);
+
+    expect($payload['country_id'])->toBe($countryId)
+        ->and($payload['state_id'])->toBe((int) $state->id)
+        ->and($payload['district_id'])->toBe((int) $district->id)
+        ->and($payload['subdistrict_id'])->toBe((int) $subdistrict->id)
+        ->and($payload['postcode'])->toBe('10110');
+});
+
+it('uses the current country fallback when the picker payload omits the country component', function () {
+    $countryId = ensureCountryForPlaceResolution('ID', 'Indonesia');
+    $state = ensureStateForPlaceResolution('ID', 'Indonesia', 'DKI Jakarta', $countryId);
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'country_code' => 'ID',
+        'name' => 'Jakarta Pusat',
+    ]);
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'ID',
+        'name' => 'Gambir',
+    ]);
+
+    $payload = app(ResolveGooglePlaceSelectionAction::class)->handle([
+        'fallbackCountryId' => (string) $countryId,
+        'location' => [
+            'lat' => -6.1754,
+            'lng' => 106.8272,
+        ],
+        'addressComponents' => [
+            ['longText' => 'Jalan Medan Merdeka Selatan', 'shortText' => 'Jalan Medan Merdeka Selatan', 'types' => ['route']],
+            ['longText' => 'Gambir', 'shortText' => 'Gambir', 'types' => ['locality', 'political']],
+            ['longText' => '10110', 'shortText' => '10110', 'types' => ['postal_code']],
+            ['longText' => 'Jakarta Pusat', 'shortText' => 'Jakarta Pusat', 'types' => ['administrative_area_level_2', 'political']],
+            ['longText' => 'DKI Jakarta', 'shortText' => 'DKI Jakarta', 'types' => ['administrative_area_level_1', 'political']],
+        ],
+    ]);
+
+    expect($payload['country_id'])->toBe($countryId)
+        ->and($payload['state_id'])->toBe((int) $state->id)
+        ->and($payload['district_id'])->toBe((int) $district->id)
+        ->and($payload['subdistrict_id'])->toBe((int) $subdistrict->id);
 });

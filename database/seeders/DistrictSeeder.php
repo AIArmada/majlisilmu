@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\District;
 use App\Models\State;
+use App\Support\Location\FederalTerritoryLocation;
 use Illuminate\Database\Seeder;
 use Nnjeim\World\Models\Country;
 
@@ -37,12 +38,13 @@ class DistrictSeeder extends Seeder
             'Sarawak' => ['Kuching', 'Miri', 'Sibu', 'Bintulu', 'Serian', 'Kota Samarahan', 'Sri Aman', 'Marudi', 'Betong', 'Sarikei', 'Kapit', 'Bau', 'Limbang', 'Saratok', 'Mukah', 'Simunjan', 'Lawas', 'Belaga', 'Lundu', 'Asajaya', 'Daro', 'Tatau', 'Meradong', 'Kanowit', 'Lubok Antu', 'Selangau', 'Song', 'Dalat', 'Matu', 'Julau', 'Pakan', 'Tanjung Manis', 'Bukit Mabong', 'Telang Usan', 'Tebedu', 'Subis', 'Sebauh', 'Beluru', 'Kabong', 'Gedong', 'Siburan', 'Pantu', 'Lingga', 'Sebuyau'],
             'Selangor' => ['Petaling', 'Hulu Langat', 'Klang', 'Gombak', 'Kuala Langat', 'Sepang', 'Kuala Selangor', 'Hulu Selangor', 'Sabak Bernam'],
             'Terengganu' => ['Kuala Terengganu', 'Kemaman', 'Dungun', 'Besut', 'Marang', 'Hulu Terengganu', 'Setiu', 'Kuala Nerus'],
-            'Kuala Lumpur' => ['Kuala Lumpur'],
-            'Putrajaya' => ['Putrajaya'],
-            'Labuan' => ['Labuan'],
         ];
 
         foreach ($districtsByState as $stateName => $districts) {
+            if (FederalTerritoryLocation::isFederalTerritoryStateName($stateName)) {
+                continue;
+            }
+
             $state = State::query()
                 ->where('country_id', $malaysia->id)
                 ->where('name', $stateName)
