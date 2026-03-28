@@ -283,6 +283,7 @@
             'payloadEndpoint' => route('dawah-share.payload'),
         ]
         : null;
+    $showsGeolocationControls = $this->showsGeolocationControls();
 @endphp
 
 <div class="relative min-h-screen pb-32">
@@ -320,24 +321,58 @@
 
     <div class="container mx-auto px-6 lg:px-12 -mt-8 relative z-10">
         <form wire:submit.prevent x-data="{
+                    ...window.majlisIlmu.geolocationPermission({
+                        initiallyGranted: @js($showsGeolocationControls),
+                        cookieName: @js(\App\Support\Location\PublicGeolocationPermission::COOKIE_NAME),
+                    }),
                     locating: false,
+                    locationNotice: null,
                     copiedShareLink: false,
                     shareData: @js($searchShareData),
                     trackEndpoint: @js(route('dawah-share.track')),
                     attributedShareData: null,
-                    locate() {
+                    setLocationNotice(message) {
+                        this.locationNotice = message;
+                    },
+                    clearLocationNotice() {
+                        this.locationNotice = null;
+                    },
+                    async locate() {
                         if (this.locating) return;
+                        this.clearLocationNotice();
                         if (! navigator.geolocation) {
-                            alert('{{ __("Geolocation is not supported by your browser.") }}');
+                            this.setGeolocationPermission(false);
+                            this.setLocationNotice('{{ __("Geolocation is not supported by your browser.") }}');
                             return;
                         }
+
+                        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+                            try {
+                                const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+
+                                if (permissionStatus.state === 'denied') {
+                                    this.setGeolocationPermission(false);
+                                }
+                            } catch (error) {
+                            }
+                        }
+
                         this.locating = true;
                         navigator.geolocation.getCurrentPosition((position) => {
+                            this.clearLocationNotice();
+                            this.setGeolocationPermission(true);
                             this.$wire.setLocation(position.coords.latitude, position.coords.longitude);
                             this.locating = false;
-                        }, () => {
+                        }, (error) => {
                             this.locating = false;
-                            alert('{{ __("Unable to get your location. Please enable location services.") }}');
+                            if (error?.code === 1) {
+                                this.setGeolocationPermission(false);
+                                this.setLocationNotice('{{ __("Allow location access in your browser settings to use nearby search.") }}');
+
+                                return;
+                            }
+
+                            this.setLocationNotice('{{ __("Unable to get your location. Please enable location services.") }}');
                         });
                     },
                     async resolveShareData() {
@@ -488,6 +523,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                 <div class="flex items-center gap-2">
                     <button type="button" @click="locate" :disabled="locating"
+                        data-testid="near-me-button"
                         class="h-11 px-4 rounded-xl border border-slate-200 bg-white font-semibold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" :class="locating ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
@@ -510,7 +546,14 @@
                         </button>
 
                         @if(! $showAdvancedFiltersPanel)
-                            <label class="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+                            <label
+                                data-testid="nearby-radius-inline"
+                                x-cloak
+                                x-bind:hidden="! geolocationPermitted"
+                                @if (! $showsGeolocationControls)
+                                    hidden
+                                @endif
+                                class="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
                                 <span>{{ __('Radius (km)') }}</span>
                                 <input
                                     type="number"
@@ -545,6 +588,9 @@
                     </div>
                 </div>
             </div>
+
+            <div x-show="locationNotice" x-cloak x-text="locationNotice"
+                class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"></div>
 
             <div class="mi-filter-shell space-y-4">
                 <button type="button" wire:click="toggleAdvancedFiltersPanel"

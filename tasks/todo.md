@@ -1,4 +1,80 @@
+# Uncommitted Audit
+
+- [x] Audit the current uncommitted diff for regressions across the touched public and dashboard flows
+- [x] Fix every actionable issue found during the audit
+- [x] Re-run focused verification and document the outcome
+
+## Review
+- Audit found one real dashboard regression in [institution-dashboard.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/dashboard/institution-dashboard.blade.php): the `Add Child Event` shortcut had been redirected through the new institution-scoped submit flow, which would have overridden parent-program defaults for speaker-organized parents. Restored that link to the original parent-aware public submit route and tightened [DashboardPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/DashboardPagesTest.php).
+- Audit also found one flaky public-pages regression in [PublicPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicPagesTest.php): the series-card location assertion depended on the factory's random `event_format`, but the view intentionally hides venue text for online events. Locked the test to `EventFormat::Physical` so it matches the page contract.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **22 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **20 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => **70 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php` => **5 passed**
+  - `git diff --check -- tests/Feature/PublicPagesTest.php resources/views/livewire/pages/dashboard/institution-dashboard.blade.php tests/Feature/DashboardPagesTest.php` => **clean**
+
+# Institution Dashboard Submission Flow
+
+- [x] Replace the institution dashboard "Create Advanced Program" shortcut with an institution-scoped submit-event entrypoint
+- [x] Lock the submit-event form to the selected institution in dashboard mode and auto-approve those submissions
+- [x] Update the success-state copy and focused tests, then run verification
+
+## Review
+- Added a dedicated authenticated route at [web.php](/Users/Saiffil/Herd/majlisilmu/routes/web.php) for institution-scoped event submission and rewired the institution dashboard CTA plus parent-program child-event links in [institution-dashboard.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/dashboard/institution-dashboard.blade.php).
+- Extended the shared submit-event page in [create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/create.blade.php) so an institution-scoped entry auto-locks the organizer institution, limits location choices, and finalizes through approval instead of the public moderation queue.
+- Updated the post-submit copy and return actions in [⚡success.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/⚡success.blade.php) to reflect immediate publication for institution-scoped submissions.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **20 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php` => **5 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **22 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/AdvancedEventCreationTest.php` => **5 passed**
+  - `vendor/bin/pint --test tests/Feature/SubmitEventEntityAccessTest.php resources/views/components/pages/submit-event/create.blade.php resources/views/components/pages/submit-event/⚡success.blade.php` => **pass**
+  - `git diff --check -- routes/web.php resources/views/livewire/pages/dashboard/institution-dashboard.blade.php resources/views/components/pages/submit-event/create.blade.php resources/views/components/pages/submit-event/⚡success.blade.php tests/Feature/DashboardPagesTest.php tests/Feature/SubmitEventEntityAccessTest.php tasks/todo.md` => **clean**
+
 # Full Verification Gate
+
+# Uncommitted Geolocation Audit
+
+- [x] Audit the current uncommitted geolocation-permission diff for behavioral regressions
+- [x] Fix the actionable issues found in the audit
+- [x] Re-run focused verification and document the result
+
+## Review
+- Audited the current public geolocation-permission work and fixed one concrete regression in [⚡home.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/⚡home.blade.php): the mobile `Berdekatan Saya` shortcut was calling `document.querySelector('[x-data]')`, which resolves to the header Alpine root instead of the hero search component once multiple Alpine roots exist on the page.
+- Replaced that brittle selector-based call with an Alpine event (`mi-home-nearby`) so the mobile shortcut triggers the same nearby flow as the desktop button without depending on internal `__x` state or DOM ordering.
+- Re-verified the homepage denied-permission behavior after the fix:
+  - mobile browser simulation on `https://majlisilmu.test/` with mocked denied geolocation now redirects to `/majlis`
+  - desktop browser simulation on `https://majlisilmu.test/` still redirects to `/majlis` on denied geolocation
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **22 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => **70 passed**
+  - `git diff --check -- resources/views/components/pages/⚡home.blade.php resources/views/livewire/pages/events/index.blade.php tasks/todo.md tasks/lessons.md` => **No diff formatting issues**
+
+# Public Nearby Permission Gate
+
+- [x] Add a device-scoped geolocation-permission helper and expose it to public pages
+- [x] Keep the nearby CTA visible on `/` and `/majlis`, but trigger the browser permission flow on click and show an inline note when access is denied
+- [x] Hide the `/majlis` radius controls unless browser geolocation permission is granted
+- [x] Run focused verification and document the result
+
+## Review
+- Added [PublicGeolocationPermission.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicGeolocationPermission.php) plus a raw-cookie exemption in [bootstrap/app.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/app.php) so public pages can persist browser geolocation permission server-side without pushing this preference into the database or cache.
+- Updated [app.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/layouts/app.blade.php), [⚡home.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/⚡home.blade.php), and [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/index.blade.php) so the `Berhampiran` CTA stays visible, attempts permission on click, and now falls back differently by surface: the homepage redirects into `/majlis` when location is denied, while `/majlis` itself keeps the inline localized note.
+- Updated the homepage and `/majlis` click handlers so they no longer stop at `PermissionStatus.state === 'denied'`; each button press now re-invokes `navigator.geolocation.getCurrentPosition(...)`, allowing browsers that support re-prompting on repeat user gestures to do so.
+- Gated the `/majlis` inline and advanced radius controls in [Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Events/Index.php) and [AdvancedFiltersPanel.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Events/AdvancedFiltersPanel.php) using the permission cookie and Alpine visibility hooks, while keeping the button itself available.
+- Added localized denial copy in [en.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/en.json), [ms.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms.json), and [ms_MY.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms_MY.json), and tightened the public regressions in [PublicPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicPagesTest.php) and [EventSearchTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventSearchTest.php).
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **22 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => **70 passed**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi app/Support/Location/PublicGeolocationPermission.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php tests/Feature/PublicPagesTest.php tests/Feature/EventSearchTest.php` => **No errors**
+  - `vendor/bin/pint --test tests/Feature/EventSearchTest.php` => **pass**
+  - `git diff --check -- app/Support/Location/PublicGeolocationPermission.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php resources/views/layouts/app.blade.php resources/views/components/pages/⚡home.blade.php resources/views/livewire/pages/events/index.blade.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json tests/Feature/PublicPagesTest.php tests/Feature/EventSearchTest.php bootstrap/app.php tasks/todo.md tasks/lessons.md` => **No diff formatting issues**
+  - Browser verification via Chrome DevTools:
+    - `https://majlisilmu.test/` with mocked denied geolocation kept the CTA visible and showed the inline Malay denial note
+    - `https://majlisilmu.test/majlis` with mocked denied geolocation kept `Berhampiran` visible, showed the inline note, and kept `Radius (km)` hidden
+    - `https://majlisilmu.test/majlis` with mocked granted geolocation redirected to `?lat=3.139&lng=101.6869&sort=distance` and revealed `Radius (km)`
+    - `https://majlisilmu.test/` and `https://majlisilmu.test/majlis` with mocked denied permission both recorded **2 geolocation API calls after 2 clicks**, proving repeat taps still reach the browser geolocation request path instead of being blocked by the app
+    - `https://majlisilmu.test/` with mocked denied geolocation now redirects to `https://majlisilmu.test/majlis` and does **not** leave the inline denial note behind on the homepage hero
 
 - [x] Run full `phpstan`, `pest`, `rector`, and `pint` across the current worktree
 - [x] Fix every failure exposed by the gate, including unrelated residual regressions

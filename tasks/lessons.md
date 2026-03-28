@@ -1,5 +1,9 @@
 # Lessons
 
+- When a user asks for permission-gated UI, confirm whether the primary CTA should stay visible and trigger the browser permission prompt while only secondary controls stay hidden; do not assume the button itself must disappear.
+- When a permission-gated CTA is meant to stay retryable, do not short-circuit on `navigator.permissions.query(...).state === 'denied'`; still call the underlying browser API on each click and let the browser decide whether to re-prompt or reject immediately.
+- When the same location CTA appears on the homepage and on `/majlis`, do not assume they share the same denied-permission fallback; the homepage can still redirect into the listing page while `/majlis` keeps the inline notice.
+- Do not trigger Alpine actions through `document.querySelector('[x-data]')`; pages often have multiple Alpine roots, so dispatch a scoped event or keep the trigger inside the same component instead.
 - When a location shortcut is country-specific, scope the helper by `country_id` as well as the place name; matching Kuala Lumpur, Putrajaya, or Labuan by name alone will incorrectly apply Malaysia-only behavior to foreign states with the same names.
 - When a user says “audit is already installed”, confirm the exact package already present in the repo before designing the integration path; `owen-it/laravel-auditing` and `spatie/laravel-activitylog` imply different Filament integration choices.
 - When fixing frontend runtime issues found via logs, do not stop at the route that emitted the error; sweep every public frontend route in Chrome MCP with real navigation before calling the work done.

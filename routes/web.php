@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
     Route::redirect('/papan-pemuka/notifikasi', '/dashboard/notifications', 301);
     Route::livewire('/tetapan-akaun', AccountSettings::class)->name('dashboard.account-settings');
     Route::livewire('/dashboard/institusi', InstitutionDashboard::class)->name('dashboard.institutions');
+    Route::livewire('/dashboard/institusi/hantar-majlis', 'pages.submit-event.create')->name('dashboard.institutions.submit-event');
     Route::livewire('/papan-pemuka/majlis/cipta-lanjutan', CreateAdvanced::class)->name('dashboard.events.create-advanced');
     Route::livewire('/carian-tersimpan', Index::class)->name('saved-searches.index');
     Route::livewire('/jemputan-ahli/{token}', ShowMemberInvitation::class)->name('member-invitations.show');
@@ -158,6 +159,7 @@ Route::redirect('/sitemap-speakers.xml', '/peta-laman-penceramah.xml', 301);
 
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard/events/create-advanced', CreateAdvanced::class);
+    Route::livewire('/dashboard/institutions/submit-event', 'pages.submit-event.create');
     Route::livewire('/saved-searches', Index::class);
     Route::livewire('/member-invitations/{token}', ShowMemberInvitation::class);
     Route::livewire('/contributions', ContributionsIndex::class);
