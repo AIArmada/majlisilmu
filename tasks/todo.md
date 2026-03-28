@@ -1,3 +1,63 @@
+# Canonical Google Maps Normalization
+
+- [x] Inspect the current Google Maps address write paths and consolidate the normalization plan
+- [x] Add a shared server-side normalizer for canonical URL generation and conservative Places API (New) recovery
+- [x] Wire the normalizer into picker selection, pasted-link blur/save, and admin/shared address persistence without duplicate lookups
+- [x] Add regression coverage for canonicalization, deduped lookups, and save-time persistence
+- [x] Run targeted tests, static analysis, formatting, and a browser sanity check if the UI flow changes materially
+
+## Review
+- Added `NormalizeGoogleMapsInputAction` as the single server-side normalizer for Google Maps inputs. It canonicalizes stored URLs, unwraps consent links, optionally resolves short/cid links, and only uses Places API (New) lookups when the current input still lacks enough structure.
+- Wired the normalizer through picker selection, shared address creation, contribution mutation saves, and the admin institution/venue address relationship sections. Existing picker-selected `place_id` + coordinates now skip redundant server lookups on blur and save.
+- Removed the old `Address` model hook that was still doing hidden URL mutation/network work on save, so Google link normalization is now explicit and testable instead of implicit in the model layer.
+- Added regression coverage for picker canonicalization, short-link recovery, cid-link recovery, coordinate-only links, unchanged unresolved retry suppression, and shared form/institution submission persistence.
+- Live browser sanity check on `https://majlisilmu.test/sumbangan/institusi/baru` confirmed blur-time canonicalization for direct coordinate links. Pasted short-link recovery stayed in graceful-warning mode until the server-side config is enabled, which matches the intended fallback behavior.
+
+# Location Mode Separation
+
+- [x] Separate institution submission location picker mode from manual fallback mode
+- [x] Hide the raw Google Maps URL input when picker mode is enabled
+- [x] Keep manual paste mode off the paid Places API while preserving local normalization
+- [x] Update targeted tests and rerun browser verification
+
+## Review
+- The dedicated institution submission form now treats picker mode and manual fallback mode as distinct states instead of exposing the raw Google Maps URL input in both.
+- When `services.google.places_enabled` is on for `/sumbangan/institusi/baru`, the page renders the Google Places picker, hides the editable `google_maps_url` input, and keeps the location requirement enforced through a hidden required field so submit still fails if no place was selected.
+- When the picker is unavailable or explicitly disabled, the manual `Google Maps URL` field is shown again and the form keeps local normalization on but disables Places API lookups for that page. Pasted links can still be canonicalized and short links can still be resolved via redirects, but the fallback flow no longer calls the paid `places.googleapis.com` endpoints or auto-fills the visible address fields from API results.
+- Added regression coverage for:
+  - enabled page rendering without the raw Google Maps URL field
+  - picker mode submit-time validation
+  - manual fallback mode saving a pasted short link with local canonicalization but without Places API calls
+  - schema-level picker/manual component switching and local-normalization-only persistence behavior
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **5 passed (31 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **12 passed (65 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Forms/SharedFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+  - Chrome MCP live check on `https://majlisilmu.test/sumbangan/institusi/baru` => **picker visible, raw Google Maps URL field hidden, Waze field still present**
+
+# Event Quick-Create Location Mode
+
+- [x] Apply the same picker/manual-fallback split to the event submission quick-create institution form
+- [x] Apply the same picker/manual-fallback split to the event submission quick-create venue form
+- [x] Support nested quick-create address payloads while preserving existing non-picker entry points
+- [x] Add focused schema and persistence tests plus a browser sanity check
+
+## Review
+- Extended `InstitutionFormSchema::createOptionForm()` and `VenueFormSchema::createOptionForm()` with an `includeLocationPicker` mode used only by `/hantar-majlis`, leaving existing admin and other quick-create entry points unchanged by default.
+- In picker mode, both quick-create forms now render the Google location picker and hide the editable `google_maps_url` field when `services.google.places_enabled` is on. In manual fallback mode they show the raw field again, keep local normalization on, and keep paid Places API lookups off.
+- Added a generic `applyLocationPickerSelection()` Livewire handler to the event submission page and updated the picker view to target whatever schema state path it is mounted under, so it works both on the dedicated institution page and inside Filament create-option modals.
+- Updated institution and venue quick-create persistence to accept nested `address` payloads, allowing the modal picker mode to save normalized address data without changing older flat payload callers.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **17 passed (88 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **5 passed (32 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Unit/NormalizeGoogleMapsInputActionTest.php` => **7 passed (33 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php resources/views/components/pages/submit-event/create.blade.php tests/Feature/SharedFormSchemaTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php tests/Feature/SharedFormSchemaTest.php` => **pass**
+  - `git diff --check` => **No diff formatting issues**
+  - Chrome MCP live check on `https://majlisilmu.test/hantar-majlis?step=form.penganjur-lokasi%3A%3Adata%3A%3Awizard-step` => **institution quick-create modal shows the picker and does not show the raw Google Maps URL field**
+
 # Log Triage
 
 - [x] Inspect Laravel and browser logs for repeated runtime errors
@@ -31,6 +91,24 @@
   - `vendor/bin/pest --parallel tests --filter='AddressGoogleMapsUrlNormalizationTest|SharedFormSchemaTest|SubmitEventMediaTest'`
   - `git diff --check`
 - Residual note: Chrome DevTools still reports a generic `No label associated with a form field (count: 9)` issue on the public submit form. The remaining offenders appear to come from internal Filament composite controls such as searchable selects/date widgets rather than the page-level upload block that was fixed here, so that accessibility audit needs a dedicated follow-up instead of another broad route-sweep patch.
+
+# Location Picker Browser Verification
+
+- [x] Run a live browser test against `/sumbangan/institusi/baru` with a real Google Maps key and Places API (New)
+- [x] Inspect the saved institution payload after submit to verify persisted geography IDs and coordinates
+- [x] Fix any browser-only regressions found in the picker flow
+- [x] Re-run targeted verification after the browser-driven fix
+
+## Review
+- Live browser testing confirmed the new Google picker loads correctly with the configured Maps JavaScript API key, returns Places API (New) predictions, renders the confirmation map, and submits the institution form end to end.
+- The first live submit exposed a browser-only regression: `ResolveGooglePlaceSelectionAction` correctly resolved `district_id` and `subdistrict_id`, but Filament's dependent `state_id -> district_id -> subdistrict_id` reset hooks treated the autofill as a manual state change and cleared both IDs before submit.
+- Fixed the issue by adding an internal non-dehydrated `cascade_reset_guard` field to the shared address schema and setting it during `applyPlaceSelection()`. The state and district reset hooks now skip exactly the two autofill-driven updates, while manual user changes still clear downstream selects as before.
+- Final verification:
+  - Chrome MCP: reran the live picker flow, confirmed the submit request preserved `district_id=144` and `subdistrict_id=1416`, and confirmed the saved address row persisted those IDs plus coordinates and `google_place_id`
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php`
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php`
+  - `vendor/bin/pint --test app/Forms/SharedFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php`
+  - `git diff --check`
 
 # Audit Follow-up Pass
 
@@ -6185,4 +6263,61 @@
   - `composer update aiarmada/affiliates aiarmada/commerce-support aiarmada/filament-authz aiarmada/filament-signals aiarmada/signals --with-all-dependencies --no-scripts`
   - `composer validate --no-check-publish` => **./composer.json is valid**
   - `rg -n 'aiarmada/.+|"type": "path"|"type"\\s*:\\s*"path"' composer.json composer.lock` => **no remaining `path` entries**
+  - `git diff --check` => **No diff formatting issues**
+
+# Institution Address Line Order
+
+- [x] Adjust the institution contact address block to the requested three-line order
+- [x] Update the focused institution show regression for locality + postcode on line two
+- [x] Run focused verification for the revised address order
+
+## Review
+- Root cause:
+  - the previous hierarchy patch put postcode on its own line and rendered the full hierarchy string on the next line
+  - the requested UI order is more specific: `street`, then `subdistrict/locality + postcode`, then `district + state`
+- Fix:
+  - updated `resources/views/components/pages/institutions/⚡show.blade.php` so the contact block now composes:
+    - `line1, line2`
+    - first hierarchy part (or city fallback) with postcode
+    - remaining hierarchy parts
+  - updated `tests/Feature/InstitutionShowPageTest.php` to lock the output to:
+    - `Persiaran Masjid, Seksyen 14`
+    - `Shah Alam, 40000`
+    - `Petaling, Selangor`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **24 passed (77 assertions)**
+  - `php -l tests/Feature/InstitutionShowPageTest.php` => **No syntax errors**
+  - `git diff --check` => **No diff formatting issues**
+
+# Institution Contribution Google Places Picker
+
+- [x] Normalize the dedicated institution create form to nested `data.address.*` state
+- [x] Add a config-gated Google Places search-and-preview picker with manual fail-open fallback
+- [x] Persist picker-derived `lat`, `lng`, and `google_place_id` through contribution address flows
+- [x] Add focused tests for picker gating, place mapping, and nested create submission
+- [x] Run targeted verification for the touched PHP, Livewire, and Blade paths
+
+## Review
+- Root changes:
+  - normalized `SubmitInstitution` to the same nested `data.address.*` payload shape already used by suggest-update flows, so address edits are persisted through the existing mutation service instead of being silently dropped on create
+  - added a config-gated institution-only location picker view powered by Google Maps JavaScript + Places API (New) that uses `PlaceAutocompleteElement`, shows a preview map, and auto-fills the nested address payload while keeping the manual address fields editable below it
+  - added a new `ResolveGooglePlaceSelectionAction` to map Google place details into local `state_id`, `district_id`, and `subdistrict_id` values without any server-side Google API call, leaving ambiguous matches empty instead of guessing
+  - extended the shared address creation/mutation paths to persist `lat`, `lng`, and `google_place_id` alongside the existing `google_maps_url`
+- Rollback/cost control:
+  - added `services.google.maps_api_key` and `services.google.places_enabled`, plus matching `.env.example` entries (`GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_ENABLED`)
+  - when the flag is off or the key is missing, the picker is not rendered and the page falls back to the existing manual address form
+  - when the Google script or place lookup fails at runtime, the picker disables itself for that page session and the manual form remains usable
+- Test coverage added/updated:
+  - `tests/Feature/InstitutionContributionLocationPickerTest.php`
+  - `tests/Unit/ResolveGooglePlaceSelectionActionTest.php`
+  - `tests/Feature/InstitutionIndexTest.php`
+  - `tests/Feature/SharedFormSchemaTest.php`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **21 passed (86 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **13 passed (56 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **3 passed (17 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **9 passed (52 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **2 passed (14 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Location/ResolveGooglePlaceSelectionAction.php app/Forms/InstitutionContributionFormSchema.php app/Forms/SharedFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Services/ContributionEntityMutationService.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Actions/Location/ResolveGooglePlaceSelectionAction.php app/Forms/InstitutionContributionFormSchema.php app/Forms/SharedFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Services/ContributionEntityMutationService.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tests/Unit/ResolveGooglePlaceSelectionActionTest.php` => **pass**
   - `git diff --check` => **No diff formatting issues**

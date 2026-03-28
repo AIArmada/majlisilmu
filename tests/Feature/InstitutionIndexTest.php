@@ -51,16 +51,24 @@ it('allows users to submit a missing institution from institution index with pen
         ->test(SubmitInstitution::class)
         ->set('data.name', $institutionName)
         ->set('data.type', 'masjid')
-        ->set('data.google_maps_url', 'https://maps.google.com/?q=3.1390,101.6869')
+        ->set('data.address.google_maps_url', 'https://maps.google.com/?q=3.1390,101.6869')
+        ->set('data.address.google_place_id', 'place_123')
+        ->set('data.address.lat', 3.1390)
+        ->set('data.address.lng', 101.6869)
         ->call('submit')
         ->assertHasNoErrors();
 
     $institution = Institution::query()
+        ->with('address')
         ->where('name', $institutionName)
         ->first();
 
     expect($institution)->not->toBeNull()
-        ->and($institution?->status)->toBe('pending');
+        ->and($institution?->status)->toBe('pending')
+        ->and($institution?->addressModel?->google_maps_url)->toBe('https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869&query_place_id=place_123')
+        ->and($institution?->addressModel?->google_place_id)->toBe('place_123')
+        ->and(abs(((float) $institution?->addressModel?->lat) - 3.1390))->toBeLessThan(0.000001)
+        ->and(abs(((float) $institution?->addressModel?->lng) - 101.6869))->toBeLessThan(0.000001);
 });
 
 it('supports fuzzy search with minor institution name typos', function () {

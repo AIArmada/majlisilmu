@@ -13,6 +13,7 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
+use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Forms\Components\Select;
 use App\Forms\InstitutionFormSchema;
@@ -121,6 +122,27 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         $this->eventForm()->fill($state);
+    }
+
+    /**
+     * @param  array<string, mixed>  $selection
+     * @return array<string, mixed>
+     */
+    public function applyLocationPickerSelection(
+        string $statePath,
+        array $selection,
+        ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction,
+    ): array {
+        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle($selection);
+
+        $currentAddress = data_get($this, $statePath);
+        $currentAddress = is_array($currentAddress) ? $currentAddress : [];
+
+        data_set($this, $statePath, array_merge($currentAddress, $resolvedAddress, [
+            'cascade_reset_guard' => 2,
+        ]));
+
+        return $resolvedAddress;
     }
 
     protected function submitCacheKey(string $key): string
@@ -1039,7 +1061,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             $get('organizer_type') === 'institution'
                                                             JS)
                                         ->required(fn (Get $get): bool => $get('organizer_type') === 'institution')
-                                        ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                                        ->createOptionForm(InstitutionFormSchema::createOptionForm(includeLocationPicker: true))
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('organizer_speaker_id')
@@ -1100,7 +1122,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution'
                                                             JS)
                                         ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('location_type') === 'institution')
-                                        ->createOptionForm(InstitutionFormSchema::createOptionForm())
+                                        ->createOptionForm(InstitutionFormSchema::createOptionForm(includeLocationPicker: true))
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('location_venue_id')
@@ -1112,7 +1134,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                                             ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue'
                                                             JS)
                                         ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('location_type') === 'venue')
-                                        ->createOptionForm(VenueFormSchema::createOptionForm())
+                                        ->createOptionForm(VenueFormSchema::createOptionForm(includeLocationPicker: true))
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => VenueFormSchema::createOptionUsing($data, $schema)),
 
                                     Select::make('space_id')

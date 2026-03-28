@@ -130,7 +130,7 @@ it('deduplicates matching district and subdistrict labels on institution show pa
         ->assertDontSee('Temerloh, Temerloh, Pahang');
 });
 
-it('displays subdistrict district and state in the institution contact address block', function () {
+it('displays the institution contact address block in street locality and regional lines', function () {
     $state = State::query()
         ->where('country_code', 'MY')
         ->where('name', 'Selangor')
@@ -189,8 +189,8 @@ it('displays subdistrict district and state in the institution contact address b
         ->assertSuccessful()
         ->assertSeeInOrder([
             'Persiaran Masjid, Seksyen 14',
-            '40000',
-            'Shah Alam, Petaling, Selangor',
+            'Shah Alam, 40000',
+            'Petaling, Selangor',
         ]);
 });
 
