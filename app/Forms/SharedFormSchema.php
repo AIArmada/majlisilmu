@@ -2,6 +2,7 @@
 
 namespace App\Forms;
 
+use App\Actions\Location\NormalizeGoogleMapsInputAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\SocialMediaPlatform;
@@ -13,6 +14,7 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -20,6 +22,8 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Arr;
 
 class SharedFormSchema
 {
@@ -28,8 +32,12 @@ class SharedFormSchema
      *
      * @return array<int, Component>
      */
-    public static function addressFields(bool $requireGoogleMaps = false): array
-    {
+    public static function addressFields(
+        bool $requireGoogleMaps = false,
+        bool $showGoogleMapsUrlField = true,
+        bool $enableGoogleMapsNormalization = true,
+        bool $enableGoogleMapsRemoteLookup = true,
+    ): array {
         return [
             TextInput::make('line1')
                 ->label(__('Address Line 1'))
@@ -46,6 +54,22 @@ class SharedFormSchema
                 ->maxLength(16)
                 ->placeholder(__('e.g., 50000')),
 
+            Hidden::make('lat'),
+            Hidden::make('lng'),
+            Hidden::make('google_place_id'),
+            Hidden::make('google_display_name'),
+            Hidden::make('google_resolution_source'),
+            Hidden::make('google_resolution_status'),
+            Hidden::make('google_resolution_fingerprint'),
+            Hidden::make('google_resolution_message'),
+            Hidden::make('google_maps_normalization_enabled')
+                ->default($enableGoogleMapsNormalization),
+            Hidden::make('google_maps_remote_lookup_enabled')
+                ->default($enableGoogleMapsRemoteLookup),
+            Hidden::make('cascade_reset_guard')
+                ->default(0)
+                ->dehydrated(false),
+
             Select::make('state_id')
                 ->label(__('Negeri'))
                 ->options(fn () => State::where('country_id', 132)->pluck('name', 'id'))
@@ -53,8 +77,14 @@ class SharedFormSchema
                 ->preload()
                 ->live()
                 ->afterStateUpdatedJs(<<<'JS'
-                    $set('district_id', null)
-                    $set('subdistrict_id', null)
+                    const guard = Number($get('cascade_reset_guard') ?? 0)
+
+                    if (guard > 0) {
+                        $set('cascade_reset_guard', guard - 1)
+                    } else {
+                        $set('district_id', null)
+                        $set('subdistrict_id', null)
+                    }
                     JS),
 
             Select::make('district_id')
@@ -72,7 +102,13 @@ class SharedFormSchema
                 ->searchable()
                 ->live()
                 ->afterStateUpdatedJs(<<<'JS'
-                    $set('subdistrict_id', null)
+                    const guard = Number($get('cascade_reset_guard') ?? 0)
+
+                    if (guard > 0) {
+                        $set('cascade_reset_guard', guard - 1)
+                    } else {
+                        $set('subdistrict_id', null)
+                    }
                     JS)
                 ->visible(fn (Get $get): bool => filled($get('state_id'))),
 
@@ -91,11 +127,9 @@ class SharedFormSchema
                 ->searchable()
                 ->visible(fn (Get $get): bool => filled($get('district_id'))),
 
-            TextInput::make('google_maps_url')
-                ->label(__('Google Maps URL'))
-                ->url()
-                ->required($requireGoogleMaps)
-                ->placeholder(__('https://maps.google.com/...')),
+            ...($showGoogleMapsUrlField
+                ? [self::googleMapsUrlField(required: $requireGoogleMaps)]
+                : [Hidden::make('google_maps_url')->required($requireGoogleMaps)]),
 
             TextInput::make('waze_url')
                 ->label(__('Waze URL'))
@@ -105,9 +139,19 @@ class SharedFormSchema
         ];
     }
 
-    public static function addressGroup(bool $requireGoogleMaps = false, ?string $statePath = null): Group
-    {
-        $group = Group::make(self::addressFields(requireGoogleMaps: $requireGoogleMaps))
+    public static function addressGroup(
+        bool $requireGoogleMaps = false,
+        ?string $statePath = null,
+        bool $showGoogleMapsUrlField = true,
+        bool $enableGoogleMapsNormalization = true,
+        bool $enableGoogleMapsRemoteLookup = true,
+    ): Group {
+        $group = Group::make(self::addressFields(
+            requireGoogleMaps: $requireGoogleMaps,
+            showGoogleMapsUrlField: $showGoogleMapsUrlField,
+            enableGoogleMapsNormalization: $enableGoogleMapsNormalization,
+            enableGoogleMapsRemoteLookup: $enableGoogleMapsRemoteLookup,
+        ))
             ->columns(2);
 
         if ($statePath !== null) {
@@ -115,6 +159,28 @@ class SharedFormSchema
         }
 
         return $group;
+    }
+
+    public static function googleMapsUrlField(bool $required = false, ?string $defaultHelperText = null): TextInput
+    {
+        return TextInput::make('google_maps_url')
+            ->label(__('Google Maps URL'))
+            ->url()
+            ->required($required)
+            ->live(onBlur: true)
+            ->afterStateUpdated(function (Get $get, Set $set, ?string $old, ?string $state): void {
+                self::normalizeGoogleMapsFieldState($get, $set, $state, $old);
+            })
+            ->placeholder(__('https://maps.google.com/...'))
+            ->helperText(function (Get $get) use ($defaultHelperText): string {
+                $message = $get('google_resolution_message');
+
+                if (is_string($message) && $message !== '') {
+                    return $message;
+                }
+
+                return $defaultHelperText ?? __('Paste the full Google Maps link from your browser');
+            });
     }
 
     /**
@@ -195,6 +261,8 @@ class SharedFormSchema
      */
     public static function createAddressFromData(Event|Institution|Speaker|Venue $model, array $data, string $type = 'main'): void
     {
+        $data = self::prepareAddressPersistenceData($data);
+
         if (
             ! empty($data['line1'])
             || ! empty($data['state_id'])
@@ -211,10 +279,166 @@ class SharedFormSchema
                 'state_id' => $data['state_id'] ?? null,
                 'district_id' => $data['district_id'] ?? null,
                 'subdistrict_id' => $data['subdistrict_id'] ?? null,
+                'lat' => isset($data['lat']) && $data['lat'] !== '' ? (float) $data['lat'] : null,
+                'lng' => isset($data['lng']) && $data['lng'] !== '' ? (float) $data['lng'] : null,
                 'google_maps_url' => $data['google_maps_url'] ?? null,
+                'google_place_id' => $data['google_place_id'] ?? null,
                 'waze_url' => $data['waze_url'] ?? null,
             ]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function normalizeAddressFormState(array $data): array
+    {
+        if (! self::shouldNormalizeGoogleMaps($data)) {
+            return array_merge($data, [
+                'google_place_id' => $data['google_place_id'] ?? null,
+                'google_display_name' => $data['google_display_name'] ?? null,
+                'google_resolution_source' => null,
+                'google_resolution_status' => null,
+                'google_resolution_fingerprint' => null,
+                'google_resolution_message' => null,
+            ]);
+        }
+
+        return array_merge($data, app(NormalizeGoogleMapsInputAction::class)->handle([
+            'google_maps_url' => $data['google_maps_url'] ?? null,
+            'google_place_id' => $data['google_place_id'] ?? null,
+            'google_display_name' => $data['google_display_name'] ?? null,
+            'lat' => $data['lat'] ?? null,
+            'lng' => $data['lng'] ?? null,
+            'google_maps_remote_lookup_enabled' => $data['google_maps_remote_lookup_enabled'] ?? null,
+            'google_resolution_source' => $data['google_resolution_source'] ?? null,
+            'google_resolution_status' => $data['google_resolution_status'] ?? null,
+            'google_resolution_fingerprint' => $data['google_resolution_fingerprint'] ?? null,
+        ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function prepareAddressPersistenceData(array $data): array
+    {
+        return Arr::only(self::normalizeAddressFormState($data), [
+            'country_id',
+            'state_id',
+            'district_id',
+            'subdistrict_id',
+            'line1',
+            'line2',
+            'postcode',
+            'lat',
+            'lng',
+            'google_maps_url',
+            'google_place_id',
+            'waze_url',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function hydrateAddressFormState(array $data): array
+    {
+        $googleMapsUrl = is_string($data['google_maps_url'] ?? null) ? trim((string) $data['google_maps_url']) : null;
+        $googlePlaceId = is_string($data['google_place_id'] ?? null) ? trim((string) $data['google_place_id']) : null;
+        $lat = $data['lat'] ?? null;
+        $lng = $data['lng'] ?? null;
+
+        $status = 'unresolved';
+
+        if ($googlePlaceId !== null && $googlePlaceId !== '') {
+            $status = 'resolved';
+        } elseif (($googleMapsUrl !== null && $googleMapsUrl !== '') || filled($lat) || filled($lng)) {
+            $status = 'partial';
+        }
+
+        return array_merge($data, [
+            'google_display_name' => $data['google_display_name'] ?? null,
+            'google_resolution_source' => $data['google_resolution_source'] ?? ($googleMapsUrl !== null ? 'manual' : null),
+            'google_resolution_status' => $data['google_resolution_status'] ?? $status,
+            'google_resolution_fingerprint' => $data['google_resolution_fingerprint'] ?? ($googleMapsUrl !== null && $googleMapsUrl !== '' ? sha1($googleMapsUrl) : null),
+            'google_resolution_message' => $data['google_resolution_message'] ?? null,
+        ]);
+    }
+
+    private static function normalizeGoogleMapsFieldState(Get $get, Set $set, ?string $state, ?string $old): void
+    {
+        $currentValue = is_string($state) ? trim($state) : null;
+        $oldValue = is_string($old) ? trim($old) : null;
+
+        if ($currentValue === $oldValue) {
+            return;
+        }
+
+        if (! self::shouldNormalizeGoogleMaps([
+            'google_maps_normalization_enabled' => $get('google_maps_normalization_enabled'),
+        ])) {
+            foreach ([
+                'google_place_id',
+                'google_display_name',
+                'lat',
+                'lng',
+                'google_resolution_source',
+                'google_resolution_status',
+                'google_resolution_fingerprint',
+                'google_resolution_message',
+            ] as $field) {
+                $set($field, null);
+            }
+
+            return;
+        }
+
+        $resolutionFingerprint = $get('google_resolution_fingerprint');
+
+        if (
+            (! is_string($resolutionFingerprint) || $resolutionFingerprint === '')
+            && is_string($oldValue)
+            && $oldValue !== ''
+        ) {
+            $resolutionFingerprint = sha1($oldValue);
+        }
+
+        $normalized = self::normalizeAddressFormState([
+            'google_maps_url' => $state,
+            'google_place_id' => $get('google_place_id'),
+            'google_display_name' => $get('google_display_name'),
+            'lat' => $get('lat'),
+            'lng' => $get('lng'),
+            'google_maps_remote_lookup_enabled' => $get('google_maps_remote_lookup_enabled'),
+            'google_resolution_source' => $get('google_resolution_source'),
+            'google_resolution_status' => $get('google_resolution_status'),
+            'google_resolution_fingerprint' => $resolutionFingerprint,
+        ]);
+
+        foreach ([
+            'google_maps_url',
+            'google_place_id',
+            'google_display_name',
+            'lat',
+            'lng',
+            'google_resolution_source',
+            'google_resolution_status',
+            'google_resolution_fingerprint',
+            'google_resolution_message',
+        ] as $field) {
+            $set($field, $normalized[$field] ?? null);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function shouldNormalizeGoogleMaps(array $data): bool
+    {
+        return filter_var($data['google_maps_normalization_enabled'] ?? true, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true;
     }
 
     /**

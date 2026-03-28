@@ -39,6 +39,10 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/oauth/google/callback'),
+        'maps_api_key' => env('GOOGLE_MAPS_API_KEY'),
+        'places_enabled' => (bool) env('GOOGLE_PLACES_ENABLED', false),
+        'places_server_api_key' => env('GOOGLE_PLACES_SERVER_API_KEY'),
+        'place_link_resolution_enabled' => (bool) env('GOOGLE_PLACE_LINK_RESOLUTION_ENABLED', false),
     ],
 
     'turnstile' => [

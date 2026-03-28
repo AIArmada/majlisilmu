@@ -9,6 +9,7 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\Gender;
 use App\Enums\InstitutionType;
 use App\Enums\TagType;
+use App\Forms\SharedFormSchema;
 use App\Models\Address;
 use App\Models\Contact;
 use App\Models\Event;
@@ -457,7 +458,10 @@ class ContributionEntityMutationService
             $payload['state_id'] ?? null,
             $payload['district_id'] ?? null,
             $payload['subdistrict_id'] ?? null,
+            $payload['lat'] ?? null,
+            $payload['lng'] ?? null,
             $payload['google_maps_url'] ?? null,
+            $payload['google_place_id'] ?? null,
             $payload['waze_url'] ?? null,
         ])->contains(fn (mixed $value): bool => filled($value));
 
@@ -470,6 +474,8 @@ class ContributionEntityMutationService
             return;
         }
 
+        $payload = SharedFormSchema::prepareAddressPersistenceData($payload);
+
         $attributes = [
             'type' => 'main',
             'country_id' => isset($payload['country_id']) ? (int) $payload['country_id'] : 132,
@@ -479,7 +485,10 @@ class ContributionEntityMutationService
             'line1' => $payload['line1'] ?? null,
             'line2' => $payload['line2'] ?? null,
             'postcode' => $payload['postcode'] ?? null,
+            'lat' => isset($payload['lat']) && $payload['lat'] !== '' ? (float) $payload['lat'] : null,
+            'lng' => isset($payload['lng']) && $payload['lng'] !== '' ? (float) $payload['lng'] : null,
             'google_maps_url' => $payload['google_maps_url'] ?? null,
+            'google_place_id' => $payload['google_place_id'] ?? null,
             'waze_url' => $payload['waze_url'] ?? null,
         ];
 
@@ -734,7 +743,7 @@ class ContributionEntityMutationService
     private function addressState(?Address $address): array
     {
         if (! $address instanceof Address) {
-            return [
+            return SharedFormSchema::hydrateAddressFormState([
                 'country_id' => 132,
                 'state_id' => null,
                 'district_id' => null,
@@ -742,12 +751,15 @@ class ContributionEntityMutationService
                 'line1' => null,
                 'line2' => null,
                 'postcode' => null,
+                'lat' => null,
+                'lng' => null,
                 'google_maps_url' => null,
+                'google_place_id' => null,
                 'waze_url' => null,
-            ];
+            ]);
         }
 
-        return [
+        return SharedFormSchema::hydrateAddressFormState([
             'country_id' => $address->country_id ?? 132,
             'state_id' => $address->state_id,
             'district_id' => $address->district_id,
@@ -755,9 +767,12 @@ class ContributionEntityMutationService
             'line1' => $address->line1,
             'line2' => $address->line2,
             'postcode' => $address->postcode,
+            'lat' => $address->lat,
+            'lng' => $address->lng,
             'google_maps_url' => $address->google_maps_url,
+            'google_place_id' => $address->google_place_id,
             'waze_url' => $address->waze_url,
-        ];
+        ]);
     }
 
     /**

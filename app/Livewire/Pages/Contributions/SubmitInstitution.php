@@ -3,11 +3,13 @@
 namespace App\Livewire\Pages\Contributions;
 
 use App\Actions\Contributions\SubmitStagedContributionCreateAction;
+use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Enums\ContributionSubjectType;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Institution;
 use App\Models\User;
+use App\Support\Location\GooglePlacesConfiguration;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -35,7 +37,28 @@ class SubmitInstitution extends Component implements HasActions, HasForms
     {
         $this->contributionForm()->fill([
             'type' => 'masjid',
-            'state_id' => null,
+            'address' => [
+                'country_id' => 132,
+                'state_id' => null,
+                'district_id' => null,
+                'subdistrict_id' => null,
+                'line1' => null,
+                'line2' => null,
+                'postcode' => null,
+                'lat' => null,
+                'lng' => null,
+                'google_maps_url' => null,
+                'google_place_id' => null,
+                'google_display_name' => null,
+                'google_resolution_source' => null,
+                'google_resolution_status' => null,
+                'google_resolution_fingerprint' => null,
+                'google_resolution_message' => null,
+                'google_maps_normalization_enabled' => true,
+                'google_maps_remote_lookup_enabled' => GooglePlacesConfiguration::isEnabled(),
+                'cascade_reset_guard' => 0,
+                'waze_url' => null,
+            ],
         ]);
     }
 
@@ -44,7 +67,42 @@ class SubmitInstitution extends Component implements HasActions, HasForms
         return $schema
             ->model(new Institution)
             ->statePath('data')
-            ->components(InstitutionContributionFormSchema::components(includeMedia: true, requireGoogleMaps: true));
+            ->components(InstitutionContributionFormSchema::components(
+                includeMedia: true,
+                requireGoogleMaps: true,
+                addressStatePath: 'address',
+                includeLocationPicker: true,
+            ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $selection
+     * @return array<string, mixed>
+     */
+    public function applyPlaceSelection(array $selection, ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction): array
+    {
+        return $this->applyLocationPickerSelection('data.address', $selection, $resolveGooglePlaceSelectionAction);
+    }
+
+    /**
+     * @param  array<string, mixed>  $selection
+     * @return array<string, mixed>
+     */
+    public function applyLocationPickerSelection(
+        string $statePath,
+        array $selection,
+        ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction,
+    ): array {
+        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle($selection);
+
+        $currentAddress = data_get($this, $statePath);
+        $currentAddress = is_array($currentAddress) ? $currentAddress : [];
+
+        data_set($this, $statePath, array_merge($currentAddress, $resolvedAddress, [
+            'cascade_reset_guard' => 2,
+        ]));
+
+        return $resolvedAddress;
     }
 
     public function submit(SubmitStagedContributionCreateAction $submitStagedContributionCreateAction): void

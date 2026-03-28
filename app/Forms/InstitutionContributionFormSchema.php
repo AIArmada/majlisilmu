@@ -3,12 +3,14 @@
 namespace App\Forms;
 
 use App\Enums\InstitutionType;
+use App\Support\Location\GooglePlacesConfiguration;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 
 class InstitutionContributionFormSchema
 {
@@ -19,7 +21,10 @@ class InstitutionContributionFormSchema
         bool $includeMedia = true,
         bool $requireGoogleMaps = false,
         ?string $addressStatePath = null,
+        bool $includeLocationPicker = false,
     ): array {
+        $shouldRenderLocationPicker = self::shouldRenderLocationPicker($includeLocationPicker, $addressStatePath);
+
         $components = [
             Section::make(__('Profil Institusi'))
                 ->schema([
@@ -42,11 +47,28 @@ class InstitutionContributionFormSchema
                 ]),
             Section::make(__('Location'))
                 ->schema([
+                    ...($shouldRenderLocationPicker
+                        ? [
+                            View::make('filament.schemas.components.institution-location-picker')
+                                ->statePath($addressStatePath)
+                                ->viewData([
+                                    'mapsApiKey' => GooglePlacesConfiguration::apiKey(),
+                                ]),
+                        ]
+                        : []),
                     ...($addressStatePath === null
-                        ? SharedFormSchema::addressFields(requireGoogleMaps: $requireGoogleMaps)
+                        ? SharedFormSchema::addressFields(
+                            requireGoogleMaps: $requireGoogleMaps,
+                            showGoogleMapsUrlField: ! $shouldRenderLocationPicker,
+                            enableGoogleMapsNormalization: true,
+                            enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
+                        )
                         : [SharedFormSchema::addressGroup(
                             requireGoogleMaps: $requireGoogleMaps,
                             statePath: $addressStatePath,
+                            showGoogleMapsUrlField: ! $shouldRenderLocationPicker,
+                            enableGoogleMapsNormalization: true,
+                            enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                         )]),
                 ])
                 ->columns($addressStatePath === null ? 2 : 1),
@@ -86,5 +108,12 @@ class InstitutionContributionFormSchema
         }
 
         return $components;
+    }
+
+    private static function shouldRenderLocationPicker(bool $includeLocationPicker, ?string $addressStatePath): bool
+    {
+        return $includeLocationPicker
+            && $addressStatePath !== null
+            && GooglePlacesConfiguration::isEnabled();
     }
 }

@@ -4,10 +4,13 @@ namespace App\Forms;
 
 use App\Enums\VenueType;
 use App\Models\Venue;
+use App\Support\Location\GooglePlacesConfiguration;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -18,7 +21,7 @@ class VenueFormSchema
      *
      * @return array<int, Component>
      */
-    public static function createOptionForm(): array
+    public static function createOptionForm(bool $includeLocationPicker = false): array
     {
         return [
             TextInput::make('name')
@@ -57,7 +60,7 @@ class VenueFormSchema
                 ->maxFiles(10)
                 ->helperText(__('Sehingga 10 gambar lokasi')),
 
-            ...SharedFormSchema::addressFields(requireGoogleMaps: true),
+            ...self::addressSchema(includeLocationPicker: $includeLocationPicker),
 
             SharedFormSchema::socialMediaRepeater('Add social media links for this venue'),
         ];
@@ -70,6 +73,8 @@ class VenueFormSchema
      */
     public static function createOptionUsing(array $data, ?Schema $schema = null): string
     {
+        $addressData = is_array($data['address'] ?? null) ? $data['address'] : $data;
+
         $venue = Venue::create([
             'name' => $data['name'],
             'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
@@ -80,9 +85,45 @@ class VenueFormSchema
         // Save media uploads (cover, gallery) via Filament's relationship-saving mechanism
         $schema?->model($venue)->saveRelationships();
 
-        SharedFormSchema::createAddressFromData($venue, $data);
+        SharedFormSchema::createAddressFromData($venue, $addressData);
         SharedFormSchema::createSocialMediaFromData($venue, $data);
 
         return (string) $venue->getKey();
+    }
+
+    /**
+     * @return array<int, Component>
+     */
+    private static function addressSchema(bool $includeLocationPicker): array
+    {
+        if (! $includeLocationPicker) {
+            return SharedFormSchema::addressFields(requireGoogleMaps: true);
+        }
+
+        $shouldRenderLocationPicker = GooglePlacesConfiguration::isEnabled();
+
+        return [
+            Group::make([
+                ...($shouldRenderLocationPicker
+                    ? [
+                        View::make('filament.schemas.components.institution-location-picker')
+                            ->viewData([
+                                'mapsApiKey' => GooglePlacesConfiguration::apiKey(),
+                                'title' => __('Find the venue location'),
+                                'description' => __('Search like a ride-hailing destination, pick the correct place, then confirm it on the map before saving.'),
+                                'searchLabel' => __('Search for a venue or address'),
+                            ]),
+                    ]
+                    : []),
+                ...SharedFormSchema::addressFields(
+                    requireGoogleMaps: true,
+                    showGoogleMapsUrlField: ! $shouldRenderLocationPicker,
+                    enableGoogleMapsNormalization: true,
+                    enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
+                ),
+            ])
+                ->statePath('address')
+                ->columns(2),
+        ];
     }
 }

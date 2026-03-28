@@ -6,7 +6,9 @@ use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\SocialMediaPlatform;
 use App\Enums\VenueType;
+use App\Forms\SharedFormSchema;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -97,6 +99,9 @@ class VenueForm
                     ]),
                 Section::make('Location')
                     ->relationship('address')
+                    ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => SharedFormSchema::hydrateAddressFormState($data))
+                    ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => SharedFormSchema::prepareAddressPersistenceData($data))
+                    ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => SharedFormSchema::prepareAddressPersistenceData($data))
                     ->components([
                         Select::make('country_id')
                             ->relationship('country', 'name')
@@ -137,6 +142,11 @@ class VenueForm
                             ->maxLength(255),
                         TextInput::make('postcode')
                             ->maxLength(16),
+                        Hidden::make('google_display_name'),
+                        Hidden::make('google_resolution_source'),
+                        Hidden::make('google_resolution_status'),
+                        Hidden::make('google_resolution_fingerprint'),
+                        Hidden::make('google_resolution_message'),
                         TextInput::make('lat')
                             ->numeric()
                             ->minValue(-90)
@@ -145,10 +155,7 @@ class VenueForm
                             ->numeric()
                             ->minValue(-180)
                             ->maxValue(180),
-                        TextInput::make('google_maps_url')
-                            ->label('Google Maps URL')
-                            ->url()
-                            ->helperText('Paste the full Google Maps link from your browser'),
+                        SharedFormSchema::googleMapsUrlField(defaultHelperText: 'Paste the full Google Maps link from your browser'),
                         TextInput::make('google_place_id')
                             ->label('Google Place ID')
                             ->maxLength(255)
