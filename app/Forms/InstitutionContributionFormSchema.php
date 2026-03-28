@@ -92,7 +92,8 @@ class InstitutionContributionFormSchema
                             ->imageEditorAspectRatioOptions(['16:9'])
                             ->automaticallyCropImagesToAspectRatio()
                             ->conversion('banner')
-                            ->responsiveImages(),
+                            ->responsiveImages()
+                            ->columnSpanFull(),
                         SpatieMediaLibraryFileUpload::make('gallery')
                             ->label(__('Gallery'))
                             ->collection('gallery')

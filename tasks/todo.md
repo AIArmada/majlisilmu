@@ -1,3 +1,28 @@
+# Institution Media Layout
+
+- [x] Make the public institution `Imej Latar` uploader span the full row like `Galeri`
+- [x] Verify the public institution contribution page renders the media section with both uploaders full width
+
+## Review
+- Updated `app/Forms/InstitutionContributionFormSchema.php` so the public `cover` upload uses `->columnSpanFull()`, matching the existing full-width `gallery` field while keeping the change scoped to `/sumbangan/institusi/baru`.
+- Browser verification on `https://majlisilmu.test/sumbangan/institusi/baru` shows both FilePond uploaders rendering at the same width (`1006px`).
+- `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **5 passed (32 assertions)**
+
+# Institution Cover Upload Regression
+
+- [x] Reproduce the broken `Imej Latar` uploader on `/sumbangan/institusi/baru` and compare it with the working `Galeri` uploader
+- [x] Trace the rendered uploader markup back to the institution contribution form schema and identify the regression source
+- [x] Implement the minimal fix and verify it with a browser check plus targeted tests/static analysis
+
+## Review
+- Confirmed the public institution cover uploader rendered a FilePond drop label whose `for` attribute no longer pointed to the real `.filepond--browser` input, while the gallery uploader still pointed correctly.
+- Traced the regression to `resources/js/filament/form-accessibility.js`: the shared label-repair helper was not prioritizing FilePond’s actual file input for the drop label and could let unrelated generated inputs inside the image editor steal the old target.
+- Updated the helper to repair only the actual FilePond drop label to the `.filepond--browser` input while keeping nested image-editor labels bound to their own controls.
+- Verification:
+  - `npm run build` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **5 passed (32 assertions)**
+  - Chrome MCP browser check on `https://majlisilmu.test/sumbangan/institusi/baru` => cover upload accepted `/var/folders/bt/sgc0xyln09v2t7by90v0tlhm0000gn/T/TemporaryItems/NSIRD_screencaptureui_vad2zD/Screenshot 2026-03-28 at 12.45.53 PM.png` after clicking the `Imej Latar` control
+
 # Canonical Google Maps Normalization
 
 - [x] Inspect the current Google Maps address write paths and consolidate the normalization plan
