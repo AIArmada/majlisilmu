@@ -24,6 +24,7 @@ return RectorConfig::configure()
         __DIR__.'/vendor/autoload.php',
         __DIR__.'/bootstrap/app.php',
     ])
+    ->withParallel(timeoutSeconds: 600)
     ->withSets([
         LaravelSetList::LARAVEL_120,
     ])

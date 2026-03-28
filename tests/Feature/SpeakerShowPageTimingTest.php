@@ -7,6 +7,8 @@ use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Venue;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -29,12 +31,12 @@ it('shows prayer-relative timing text on speaker page instead of absolute time',
 
     $expectedEndTime = $event->ends_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('h:i A');
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
-        ->assertSee('Selepas Asar')
-        ->assertSee($expectedEndTime)
-        ->assertDontSee($event->starts_at?->format('h:i A'));
+        ->assertSeeText('Selepas Asar')
+        ->assertSeeText((string) $expectedEndTime)
+        ->assertDontSeeText((string) $event->starts_at?->format('h:i A'));
 });
 
 it('shows cancelled public events with cancelled badge on speaker page', function () {
@@ -114,12 +116,14 @@ it('renders event end time in event timezone on speaker page', function () {
 
     $speaker->speakerEvents()->attach($event->id);
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $expectedEndTime = $event->ends_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('h:i A');
+
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
-        ->assertSee('Selepas Asar')
-        ->assertSee('8:40 PM')
-        ->assertDontSee('12:40 PM');
+        ->assertSeeText('Selepas Asar')
+        ->assertSeeText((string) $expectedEndTime)
+        ->assertDontSeeText('12:40 PM');
 });
 
 it('shows dedicated venue name for event location on speaker page when available', function () {
@@ -149,7 +153,7 @@ it('shows dedicated venue name for event location on speaker page when available
 
     $speaker->speakerEvents()->attach($event->id);
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertSee('Dewan Utama Test');
@@ -178,7 +182,7 @@ it('falls back to institution name for event location on speaker page when venue
 
     $speaker->speakerEvents()->attach($event->id);
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertSee('Masjid Al-Hidayah Test');
@@ -203,17 +207,18 @@ it('hides state when district is kuala lumpur putrajaya or labuan', function () 
         'country_code' => 'MY',
     ]);
 
-    $district = District::query()->create([
+    $subdistrict = Subdistrict::query()->create([
         'country_id' => 132,
         'state_id' => (int) $stateId,
+        'district_id' => null,
         'country_code' => 'MY',
-        'name' => 'Kuala Lumpur',
+        'name' => 'Setiawangsa',
     ]);
 
     $venue->address()->update([
         'state_id' => (int) $stateId,
-        'district_id' => $district->id,
-        'subdistrict_id' => null,
+        'district_id' => null,
+        'subdistrict_id' => $subdistrict->id,
     ]);
 
     $event = Event::factory()->create([
@@ -230,11 +235,49 @@ it('hides state when district is kuala lumpur putrajaya or labuan', function () 
 
     $speaker->speakerEvents()->attach($event->id);
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
-        ->assertSee('Dewan Utama Test, '.$district->name)
-        ->assertDontSee('Dewan Utama Test, '.$district->name.', Kuala Lumpur');
+        ->assertSee('Dewan Utama Test, '.$subdistrict->name.', Kuala Lumpur')
+        ->assertDontSee('Dewan Utama Test, Kuala Lumpur, Kuala Lumpur');
+});
+
+it('deduplicates matching speaker subdistrict and district labels in the speaker location badge', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $state = State::query()->create([
+        'country_id' => 132,
+        'name' => 'Pahang',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $speaker->address()->update([
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    $this->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee('Temerloh, Pahang')
+        ->assertDontSee('Temerloh, Temerloh, Pahang');
 });
 
 it('renders speaker page when linked event has online format and no location address', function () {
@@ -256,7 +299,7 @@ it('renders speaker page when linked event has online format and no location add
 
     $speaker->speakerEvents()->attach($event->id);
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertSee($event->title);

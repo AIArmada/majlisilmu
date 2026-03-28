@@ -1,12 +1,18 @@
 <?php
 
-use App\Models\Institution;
+use App\Models\Country;
 use App\Models\District;
+use App\Models\Institution;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Support\Cache\SafeModelCache;
+use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -25,6 +31,9 @@ class extends Component
     public ?string $search = null;
 
     #[Url]
+    public ?string $country_id = null;
+
+    #[Url]
     public ?string $state_id = null;
 
     #[Url]
@@ -32,6 +41,13 @@ class extends Component
 
     #[Url]
     public ?string $subdistrict_id = null;
+
+    public function mount(): void
+    {
+        if (! filled($this->country_id)) {
+            $this->country_id = $this->defaultCountryId();
+        }
+    }
 
     #[Computed]
     public function institutions(): LengthAwarePaginatorContract
@@ -178,11 +194,40 @@ class extends Component
     }
 
     #[Computed]
+    public function countries(): array
+    {
+        /** @var Collection<int, Country> $countries */
+        $countries = app(SafeModelCache::class)->rememberCollection(
+            key: 'countries_all_v1',
+            ttl: 3600,
+            query: Country::query()
+                ->orderBy('name')
+                ->select(['id', 'name', 'iso2']),
+        );
+
+        return $countries
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    #[Computed]
     public function states(): array
     {
-        return State::query()
-            ->where('country_id', 132)
-            ->orderBy('name')
+        $countryId = $this->normalizedLocationId($this->country_id);
+
+        if ($countryId === null) {
+            return [];
+        }
+
+        /** @var Collection<int, State> $states */
+        $states = app(SafeModelCache::class)->rememberCollection(
+            key: 'states_all_v1',
+            ttl: 3600,
+            query: State::query()->orderBy('name'),
+        );
+
+        return $states
+            ->where('country_id', $countryId)
             ->pluck('name', 'id')
             ->all();
     }
@@ -192,7 +237,7 @@ class extends Component
     {
         $stateId = $this->normalizedLocationId($this->state_id);
 
-        if ($stateId === null) {
+        if ($stateId === null || FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
             return [];
         }
 
@@ -206,6 +251,17 @@ class extends Component
     #[Computed]
     public function subdistricts(): array
     {
+        $stateId = $this->normalizedLocationId($this->state_id);
+
+        if ($stateId !== null && FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
+            return Subdistrict::query()
+                ->where('state_id', $stateId)
+                ->whereNull('district_id')
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->all();
+        }
+
         $districtId = $this->normalizedLocationId($this->district_id);
 
         if ($districtId === null) {
@@ -217,6 +273,16 @@ class extends Component
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    public function isFederalTerritoryStateSelected(): bool
+    {
+        return FederalTerritoryLocation::isFederalTerritoryStateId($this->normalizedLocationId($this->state_id));
+    }
+
+    public function showsCountryFilter(): bool
+    {
+        return app(PublicCountryFilterVisibility::class)->shouldShow();
     }
 
     private function normalizedSearch(): ?string
@@ -232,6 +298,14 @@ class extends Component
 
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatedCountryId(): void
+    {
+        $this->state_id = null;
+        $this->district_id = null;
+        $this->subdistrict_id = null;
         $this->resetPage();
     }
 
@@ -262,6 +336,7 @@ class extends Component
     public function clearFilters(): void
     {
         $this->search = null;
+        $this->country_id = $this->defaultCountryId();
         $this->state_id = null;
         $this->district_id = null;
         $this->subdistrict_id = null;
@@ -270,15 +345,20 @@ class extends Component
 
     private function applyLocationScope(Builder $query): Builder
     {
+        $countryId = $this->normalizedLocationId($this->country_id);
         $stateId = $this->normalizedLocationId($this->state_id);
         $districtId = $this->normalizedLocationId($this->district_id);
         $subdistrictId = $this->normalizedLocationId($this->subdistrict_id);
 
-        if ($stateId === null && $districtId === null && $subdistrictId === null) {
+        if ($countryId === null && $stateId === null && $districtId === null && $subdistrictId === null) {
             return $query;
         }
 
-        return $query->whereHas('address', function (Builder $addressQuery) use ($stateId, $districtId, $subdistrictId): void {
+        return $query->whereHas('address', function (Builder $addressQuery) use ($countryId, $stateId, $districtId, $subdistrictId): void {
+            if ($countryId !== null) {
+                $addressQuery->where('country_id', $countryId);
+            }
+
             if ($stateId !== null) {
                 $addressQuery->where('state_id', $stateId);
             }
@@ -306,6 +386,11 @@ class extends Component
         }
 
         return (int) $normalized;
+    }
+
+    private function defaultCountryId(): string
+    {
+        return (string) app(PreferredCountryResolver::class)->resolveId();
     }
 
     private function normalizeForSimilarity(string $value): string
@@ -347,13 +432,19 @@ class extends Component
 @php
     $institutions = $this->institutions;
     $search = $this->search;
+    $countries = $this->countries;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
+    $countryId = $this->country_id;
     $stateId = $this->state_id;
     $districtId = $this->district_id;
     $subdistrictId = $this->subdistrict_id;
-    $hasScopedFilters = filled($stateId) || filled($districtId) || filled($subdistrictId);
+    $showCountryFilter = $this->showsCountryFilter();
+    $isFederalTerritoryState = $this->isFederalTerritoryStateSelected();
+    $defaultCountryId = (string) app(\App\Support\Location\PreferredCountryResolver::class)->resolveId();
+    $hasScopedFilters = ($countryId !== null && $countryId !== $defaultCountryId) || filled($stateId) || filled($districtId) || filled($subdistrictId);
+    $locationFilterGridClass = $showCountryFilter ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 xl:grid-cols-3';
     $submitInstitutionUrl = route('contributions.submit-institution');
     $formatInstitutionLocation = static function ($addressModel): string {
         $parts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
@@ -397,7 +488,24 @@ class extends Component
                         @endif
                     </div>
 
-                    <div class="mt-4 grid grid-cols-1 gap-3 text-left md:grid-cols-3">
+                    <div class="mt-4 grid grid-cols-1 gap-3 text-left {{ $locationFilterGridClass }}">
+                        @if($showCountryFilter)
+                            <div>
+                                <label for="institution-country-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    {{ __('Country') }}
+                                </label>
+                                <select
+                                    id="institution-country-filter"
+                                    wire:model.live="country_id"
+                                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                                >
+                                    @foreach($countries as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
                         <div>
                             <label for="institution-state-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 {{ __('Negeri') }}
@@ -405,7 +513,8 @@ class extends Component
                             <select
                                 id="institution-state-filter"
                                 wire:model.live="state_id"
-                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                                @disabled(! filled($countryId))
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                             >
                                 <option value="">{{ __('Semua Negeri') }}</option>
                                 @foreach($states as $id => $name)
@@ -414,22 +523,24 @@ class extends Component
                             </select>
                         </div>
 
-                        <div>
-                            <label for="institution-district-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                {{ __('Daerah') }}
-                            </label>
-                            <select
-                                id="institution-district-filter"
-                                wire:model.live="district_id"
-                                @disabled(! filled($stateId))
-                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                            >
-                                <option value="">{{ __('Semua Daerah') }}</option>
-                                @foreach($districts as $id => $name)
-                                    <option value="{{ $id }}">{{ $name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        @unless($isFederalTerritoryState)
+                            <div>
+                                <label for="institution-district-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    {{ __('Daerah') }}
+                                </label>
+                                <select
+                                    id="institution-district-filter"
+                                    wire:model.live="district_id"
+                                    @disabled(! filled($stateId))
+                                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                    <option value="">{{ __('Semua Daerah') }}</option>
+                                    @foreach($districts as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endunless
 
                         <div>
                             <label for="institution-subdistrict-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -438,7 +549,7 @@ class extends Component
                             <select
                                 id="institution-subdistrict-filter"
                                 wire:model.live="subdistrict_id"
-                                @disabled(! filled($districtId))
+                                @disabled($isFederalTerritoryState ? ! filled($stateId) : ! filled($districtId))
                                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                             >
                                 <option value="">{{ __('Semua Bandar / Mukim / Zon') }}</option>
@@ -467,7 +578,7 @@ class extends Component
 
 	        <div class="container mx-auto px-6 lg:px-12 mt-12">
                 @php
-                    $institutionLoadingTarget = 'search,state_id,district_id,subdistrict_id,clearSearch,clearFilters';
+                    $institutionLoadingTarget = 'search,country_id,state_id,district_id,subdistrict_id,clearSearch,clearFilters';
                 @endphp
 
 	                <div wire:loading.delay.short wire:target="{{ $institutionLoadingTarget }}">

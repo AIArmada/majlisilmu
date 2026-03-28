@@ -1,15 +1,17 @@
 <?php
 
+use App\Enums\DawahShareOutcomeType;
 use App\Enums\EventKeyPersonRole;
+use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Speaker;
-use Filament\Forms\Components\RichEditor\RichContentRenderer;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
+use App\Services\ShareTrackingService;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new class extends Component {
+new class extends Component
+{
     use WithPagination;
 
     public Speaker $speaker;
@@ -69,8 +71,8 @@ new class extends Component {
         } else {
             $user->follow($this->speaker);
             $this->isFollowing = true;
-            app(\App\Services\ShareTrackingService::class)->recordOutcome(
-                type: \App\Enums\DawahShareOutcomeType::SpeakerFollow,
+            app(ShareTrackingService::class)->recordOutcome(
+                type: DawahShareOutcomeType::SpeakerFollow,
                 outcomeKey: 'speaker_follow:user:'.$user->id.':speaker:'.$this->speaker->id,
                 subject: $this->speaker,
                 actor: $user,
@@ -103,9 +105,9 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
+     * @return Illuminate\Database\Eloquent\Collection<int, Event>
      */
-    public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
+    public function getUpcomingEventsProperty(): Illuminate\Database\Eloquent\Collection
     {
         return $this->speaker->speakerEvents()
             ->active()
@@ -134,9 +136,9 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
+     * @return Illuminate\Database\Eloquent\Collection<int, Event>
      */
-    public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
+    public function getPastEventsProperty(): Illuminate\Database\Eloquent\Collection
     {
         return $this->speaker->speakerEvents()
             ->active()
@@ -165,9 +167,9 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, EventKeyPerson>
+     * @return Collection<int, EventKeyPerson>
      */
-    public function getOtherRoleUpcomingParticipationsProperty(): \Illuminate\Support\Collection
+    public function getOtherRoleUpcomingParticipationsProperty(): Collection
     {
         return $this->speaker->nonSpeakerEventKeyPeople()
             ->whereHas('event', function ($query): void {
@@ -199,9 +201,9 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, EventKeyPerson>
+     * @return Collection<int, EventKeyPerson>
      */
-    public function getOtherRolePastParticipationsProperty(): \Illuminate\Support\Collection
+    public function getOtherRolePastParticipationsProperty(): Collection
     {
         return $this->speaker->nonSpeakerEventKeyPeople()
             ->whereHas('event', function ($query): void {
@@ -234,13 +236,13 @@ new class extends Component {
 
     public function rendering($view): void
     {
-        $view->title($this->speaker->formatted_name . ' - ' . config('app.name'));
+        $view->title($this->speaker->formatted_name.' - '.config('app.name'));
     }
 };
 ?>
 
 @section('title', $this->speaker->formatted_name . ' - ' . config('app.name'))
-@section('meta_description', \Illuminate\Support\Str::limit((is_array($this->speaker->bio) ? Filament\Forms\Components\RichEditor\RichContentRenderer::make($this->speaker->bio)->toText() : trim(strip_tags((string) $this->speaker->bio))) ?: __('Lihat profil, biodata, dan jadual majlis oleh :name di :app.', ['name' => $this->speaker->formatted_name, 'app' => config('app.name')]), 160))
+@section('meta_description', \Illuminate\Support\Str::limit((is_array($this->speaker->bio) ? \Filament\Forms\Components\RichEditor\RichContentRenderer::make($this->speaker->bio)->toText() : trim(strip_tags((string) $this->speaker->bio))) ?: __('Lihat profil, biodata, dan jadual majlis oleh :name di :app.', ['name' => $this->speaker->formatted_name, 'app' => config('app.name')]), 160))
 @section('meta_robots', ($this->speaker->is_active && $this->speaker->status === 'verified') ? 'index, follow' : 'noindex, nofollow')
 @section('og_url', route('speakers.show', $this->speaker))
 @section('og_image', $this->speaker->getFirstMediaUrl('cover', 'banner') ?: ($this->speaker->getFirstMediaUrl('avatar', 'profile') ?: $this->speaker->default_avatar_url))
@@ -263,7 +265,7 @@ new class extends Component {
         : $speaker->default_avatar_url;
     $coverUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
     $gallery = $speaker->getMedia('gallery');
-    $bioRenderer = RichContentRenderer::make($speaker->bio);
+    $bioRenderer = \Filament\Forms\Components\RichEditor\RichContentRenderer::make($speaker->bio);
     $bioHtml = is_array($speaker->bio)
         ? $bioRenderer->toHtml()
         : $speaker->bio;
@@ -315,12 +317,7 @@ new class extends Component {
     $qualifications = is_array($speaker->qualifications) ? $speaker->qualifications : [];
 
     // Location
-    $locationParts = array_filter([
-        $speaker->addressModel?->subdistrict?->name,
-        $speaker->addressModel?->district?->name,
-        $speaker->addressModel?->state?->name,
-    ]);
-    $locationString = implode(', ', $locationParts);
+    $locationString = \App\Support\Location\AddressHierarchyFormatter::format($speaker->addressModel);
 
     // Event type label
     $resolveEventTypeLabel = static function (mixed $eventType): string {

@@ -16,6 +16,14 @@ class State extends WorldState
     }
 
     /**
+     * @return HasMany<Subdistrict, $this>
+     */
+    public function subdistricts(): HasMany
+    {
+        return $this->hasMany(Subdistrict::class);
+    }
+
+    /**
      * Get all addresses in this state.
      *
      * @return HasMany<Address, $this>

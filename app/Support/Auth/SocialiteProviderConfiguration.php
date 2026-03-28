@@ -22,11 +22,7 @@ final class SocialiteProviderConfiguration
 
         // Google OAuth does not accept arbitrary `.test` callback domains, so do not
         // expose a broken social login CTA on local Herd-style environments.
-        if (app()->environment('local') && self::usesUnsupportedLocalRedirect($config['redirect'] ?? null)) {
-            return false;
-        }
-
-        return true;
+        return ! (app()->environment('local') && self::usesUnsupportedLocalRedirect($config['redirect'] ?? null));
     }
 
     private static function usesUnsupportedLocalRedirect(mixed $redirect): bool

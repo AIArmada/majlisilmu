@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\District;
+use App\Models\State;
 use App\Models\Subdistrict;
+use App\Support\Location\FederalTerritoryLocation;
 use Illuminate\Database\Seeder;
 use Nnjeim\World\Models\Country;
 
@@ -25,15 +27,34 @@ class SubdistrictSeeder extends Seeder
 
         $subdistrictsByDistrict = $this->getSubdistrictsData();
 
-        foreach ($subdistrictsByDistrict as $districtName => $subdistricts) {
-            // Find the district
+        foreach ($subdistrictsByDistrict as $districtOrStateName => $subdistricts) {
+            $state = State::query()
+                ->where('country_id', $malaysia->id)
+                ->where('name', $districtOrStateName)
+                ->first();
+
+            if ($state instanceof State && FederalTerritoryLocation::isFederalTerritoryStateId($state->getKey())) {
+                foreach ($subdistricts as $subdistrictName) {
+                    Subdistrict::query()->updateOrCreate([
+                        'state_id' => $state->getKey(),
+                        'district_id' => null,
+                        'name' => $subdistrictName,
+                    ], [
+                        'country_id' => $malaysia->id,
+                        'country_code' => 'MY',
+                    ]);
+                }
+
+                continue;
+            }
+
             $district = District::query()
                 ->where('country_id', $malaysia->id)
-                ->where('name', $districtName)
+                ->where('name', $districtOrStateName)
                 ->first();
 
             if ($district === null) {
-                $this->command->warn("District not found: {$districtName}");
+                $this->command->warn("District not found: {$districtOrStateName}");
 
                 continue;
             }

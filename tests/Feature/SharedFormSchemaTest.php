@@ -6,12 +6,18 @@ use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerContributionFormSchema;
 use App\Forms\SpeakerFormSchema;
 use App\Forms\VenueFormSchema;
+use App\Models\District;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Venue;
+use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Select as FilamentSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\View as SchemaView;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +25,10 @@ use Illuminate\Support\Facades\Http;
 use Nnjeim\World\Models\Language;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    FederalTerritoryLocation::flushStateIdCache();
+});
 
 it('creates an address when only a google maps url is provided', function () {
     $institution = Institution::factory()->create();
@@ -116,7 +126,237 @@ it('still canonicalizes google maps urls locally when remote lookup is disabled'
     expect(abs(((float) $address?->lng) - 102.865462))->toBeLessThan(0.000001);
 
     Http::assertSentCount(1);
-    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://maps.app.goo.gl/'));
+    Http::assertSent(fn ($request) => str_starts_with((string) $request->url(), 'https://maps.app.goo.gl/'));
+});
+
+it('loads subdistricts directly from federal territory states and clears district persistence', function () {
+    $kualaLumpur = State::query()->create([
+        'country_id' => 132,
+        'name' => 'Kuala Lumpur',
+        'country_code' => 'MY',
+    ]);
+
+    $stateSubdistrict = Subdistrict::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $kualaLumpur->id,
+        'district_id' => null,
+        'country_code' => 'MY',
+        'name' => 'Setiawangsa',
+    ]);
+
+    $legacyDistrict = District::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $kualaLumpur->id,
+        'country_code' => 'MY',
+        'name' => 'Legacy Kuala Lumpur District',
+    ]);
+
+    expect(SharedFormSchema::districtOptionsForState($kualaLumpur->id))->toBe([]);
+    expect(SharedFormSchema::subdistrictOptionsForSelection($kualaLumpur->id, null))
+        ->toBe([(string) $stateSubdistrict->id => 'Setiawangsa']);
+    expect(SharedFormSchema::shouldShowSubdistrictField($kualaLumpur->id, null))->toBeTrue();
+
+    $prepared = SharedFormSchema::prepareAddressPersistenceData([
+        'state_id' => $kualaLumpur->id,
+        'district_id' => $legacyDistrict->id,
+        'subdistrict_id' => $stateSubdistrict->id,
+    ]);
+
+    expect($prepared['district_id'])->toBeNull()
+        ->and($prepared['subdistrict_id'])->toBe((int) $stateSubdistrict->id);
+});
+
+it('still requires districts for non federal territory subdistrict selection', function () {
+    $selangor = State::query()->create([
+        'country_id' => 132,
+        'name' => 'Selangor',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $selangor->id,
+        'country_code' => 'MY',
+        'name' => 'Petaling',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $selangor->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Shah Alam',
+    ]);
+
+    expect(SharedFormSchema::districtOptionsForState($selangor->id))
+        ->toBe([(string) $district->id => 'Petaling']);
+    expect(SharedFormSchema::subdistrictOptionsForSelection($selangor->id, null))->toBe([]);
+    expect(SharedFormSchema::subdistrictOptionsForSelection($selangor->id, $district->id))
+        ->toBe([(string) $subdistrict->id => 'Shah Alam']);
+    expect(SharedFormSchema::shouldShowSubdistrictField($selangor->id, null))->toBeFalse()
+        ->and(SharedFormSchema::shouldShowSubdistrictField($selangor->id, $district->id))->toBeTrue();
+});
+
+it('does not skip districts for non malaysian states with federal territory names', function () {
+    $jakartaKualaLumpur = State::query()->create([
+        'country_id' => 360,
+        'name' => 'Kuala Lumpur',
+        'country_code' => 'ID',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => 360,
+        'state_id' => (int) $jakartaKualaLumpur->id,
+        'country_code' => 'ID',
+        'name' => 'Kecamatan Example',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => 360,
+        'state_id' => (int) $jakartaKualaLumpur->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'ID',
+        'name' => 'Kelurahan Example',
+    ]);
+
+    expect(FederalTerritoryLocation::isFederalTerritoryStateId($jakartaKualaLumpur->id))->toBeFalse();
+    expect(SharedFormSchema::districtOptionsForState($jakartaKualaLumpur->id))
+        ->toBe([(string) $district->id => 'Kecamatan Example']);
+    expect(SharedFormSchema::subdistrictOptionsForSelection($jakartaKualaLumpur->id, null))->toBe([]);
+    expect(SharedFormSchema::subdistrictOptionsForSelection($jakartaKualaLumpur->id, $district->id))
+        ->toBe([(string) $subdistrict->id => 'Kelurahan Example']);
+    expect(SharedFormSchema::shouldShowSubdistrictField($jakartaKualaLumpur->id, null))->toBeFalse()
+        ->and(SharedFormSchema::shouldShowSubdistrictField($jakartaKualaLumpur->id, $district->id))->toBeTrue();
+});
+
+it('defaults address country_id to malaysia when null is submitted directly to the model', function () {
+    $institution = Institution::factory()->create();
+
+    $address = $institution->addressModel;
+
+    expect($address)->not->toBeNull();
+
+    $address?->fill([
+        'country_id' => null,
+    ])->save();
+
+    expect($institution->fresh()->addressModel?->country_id)->toBe(132);
+});
+
+it('hides country fields in public location picker forms by default', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponentsProperty = $reflection->getProperty('childComponents');
+            $childComponents = $childComponentsProperty->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    request()->cookies->set(PublicCountryFilterVisibility::COOKIE_NAME, '0');
+
+    $institutionCountry = collect($flatten(InstitutionFormSchema::createOptionForm(includeLocationPicker: true)))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+    $venueCountry = collect($flatten(VenueFormSchema::createOptionForm(includeLocationPicker: true)))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+    $contributionCountry = collect($flatten(InstitutionContributionFormSchema::components(
+        includeMedia: true,
+        requireGoogleMaps: true,
+        addressStatePath: 'address',
+        includeLocationPicker: true,
+    )))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+
+    expect($institutionCountry)->toBeInstanceOf(Hidden::class)
+        ->and($venueCountry)->toBeInstanceOf(Hidden::class)
+        ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
+});
+
+it('shows country fields in public location picker forms when the device cookie enables them', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponentsProperty = $reflection->getProperty('childComponents');
+            $childComponents = $childComponentsProperty->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    request()->cookies->set(PublicCountryFilterVisibility::COOKIE_NAME, '1');
+
+    $institutionCountry = collect($flatten(InstitutionFormSchema::createOptionForm(includeLocationPicker: true)))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+    $venueCountry = collect($flatten(VenueFormSchema::createOptionForm(includeLocationPicker: true)))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+    $contributionCountry = collect($flatten(InstitutionContributionFormSchema::components(
+        includeMedia: true,
+        requireGoogleMaps: true,
+        addressStatePath: 'address',
+        includeLocationPicker: true,
+    )))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+
+    expect($institutionCountry)->toBeInstanceOf(FilamentSelect::class)
+        ->and($venueCountry)->toBeInstanceOf(FilamentSelect::class)
+        ->and($contributionCountry)->toBeInstanceOf(FilamentSelect::class);
 });
 
 it('requires google maps url in institution and venue quick-create forms', function () {
@@ -193,7 +433,7 @@ it('hides raw google maps fields in institution and venue quick-create picker mo
 });
 
 it('shows raw google maps fields in institution and venue quick-create fallback mode', function () {
-    config()->set('services.google.maps_api_key', null);
+    config()->set('services.google.maps_api_key');
     config()->set('services.google.places_enabled', false);
 
     $flatten = function (array $components) use (&$flatten): array {
@@ -342,7 +582,7 @@ it('hides the raw google maps field in picker mode while keeping the location re
 });
 
 it('shows the raw google maps field in manual institution contribution mode', function () {
-    config()->set('services.google.maps_api_key', null);
+    config()->set('services.google.maps_api_key');
     config()->set('services.google.places_enabled', false);
 
     $flatten = function (array $components) use (&$flatten): array {

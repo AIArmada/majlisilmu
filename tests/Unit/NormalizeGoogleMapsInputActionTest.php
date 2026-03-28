@@ -110,7 +110,7 @@ it('keeps local normalization working while skipping places api lookups when rem
         ->and($normalized['google_resolution_status'])->toBe('partial');
 
     Http::assertSentCount(1);
-    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://maps.app.goo.gl/'));
+    Http::assertSent(fn ($request) => str_starts_with((string) $request->url(), 'https://maps.app.goo.gl/'));
 });
 
 it('resolves cid links through the redirect and search path', function () {

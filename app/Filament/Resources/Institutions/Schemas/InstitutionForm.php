@@ -9,6 +9,7 @@ use App\Enums\SocialMediaPlatform;
 use App\Forms\SharedFormSchema;
 use App\Models\Institution;
 use App\Models\User;
+use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
@@ -156,12 +157,14 @@ class InstitutionForm
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null)),
+                            ->afterStateUpdated(fn (Set $set) => $set('subdistrict_id', null))
+                            ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id'))),
                         Select::make('subdistrict_id')
                             ->label('Subdistrict / Mukim')
-                            ->relationship('subdistrict', 'name', fn ($query, $get) => $query->where('district_id', $get('district_id')))
+                            ->options(fn (Get $get): array => SharedFormSchema::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->visible(fn (Get $get): bool => SharedFormSchema::shouldShowSubdistrictField($get('state_id'), $get('district_id'))),
                         TextInput::make('line1')
                             ->maxLength(255),
                         TextInput::make('line2')

@@ -4,10 +4,10 @@ use App\Enums\EventAgeGroup;
 use App\Enums\TagType;
 use App\Livewire\Pages\Events\Index;
 use App\Models\Event;
-use App\Models\State;
 use App\Models\Tag;
 use App\Services\EventSearchService;
 use App\Services\PrayerTimeService;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Nnjeim\World\Models\Language;
 
-it('updates the events index livewire component even when legacy cached state collections exist', function () {
+it('hydrates the events index state cache into the current safe payload format', function () {
     config()->set('cache.default', 'database');
     app('cache')->setDefaultDriver('database');
     Cache::flush();
@@ -27,22 +27,14 @@ it('updates the events index livewire component even when legacy cached state co
         'country_code' => 'MY',
     ]);
 
-    Cache::put(
-        'states_my',
-        State::query()
-            ->where('country_code', 'MY')
-            ->orderBy('name')
-            ->get(),
-        now()->addHour(),
-    );
-
-    Livewire::test(Index::class)
+    Livewire::withCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
+        ->test(Index::class)
         ->call('toggleAdvancedFiltersPanel')
         ->assertSet('showAdvancedFiltersPanel', true);
 
-    expect(Cache::get('states_my_v2'))
+    expect(Cache::get('states_all_v1'))
         ->toBeArray()
-        ->and(Cache::get('states_my_v2'))
+        ->and(Cache::get('states_all_v1'))
         ->toHaveCount(1);
 });
 

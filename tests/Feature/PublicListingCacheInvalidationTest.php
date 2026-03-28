@@ -6,9 +6,13 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Models\Country;
+use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
 use Illuminate\Support\Facades\Cache;
@@ -31,7 +35,6 @@ function primeMajlisListingCache(): array
     $keys = [
         'default_events_search',
         'default_events_search_v2',
-        'states_my',
         'states_my_v2',
     ];
     $supportedLocales = array_keys(config('app.supported_locales', []));
@@ -137,4 +140,80 @@ it('clears majlis listing cache when admin-managed related records are created',
     $keysAfterVenuePrime = primeMajlisListingCache();
     Venue::factory()->create(['status' => 'verified']);
     assertMajlisCacheWasCleared($keysAfterVenuePrime);
+});
+
+it('clears majlis listing cache when geography records are created updated or deleted', function () {
+    $country = new Country;
+    $country->forceFill([
+        'name' => 'Testland',
+        'iso2' => 'TL',
+        'iso3' => 'TST',
+        'phone_code' => '999',
+        'region' => 'Test Region',
+        'subregion' => 'Test Subregion',
+        'status' => 1,
+    ]);
+
+    $keysAfterCountryCreate = primeMajlisListingCache();
+    $country->save();
+    assertMajlisCacheWasCleared($keysAfterCountryCreate);
+
+    $keysAfterCountryUpdate = primeMajlisListingCache();
+    $country->forceFill(['name' => 'Updated Testland'])->save();
+    assertMajlisCacheWasCleared($keysAfterCountryUpdate);
+
+    $keysAfterStateCreate = primeMajlisListingCache();
+    $state = State::query()->create([
+        'country_id' => $country->getKey(),
+        'name' => 'Alpha State',
+        'country_code' => 'TL',
+    ]);
+    assertMajlisCacheWasCleared($keysAfterStateCreate);
+
+    $keysAfterStateUpdate = primeMajlisListingCache();
+    $state->update(['name' => 'Updated Alpha State']);
+    assertMajlisCacheWasCleared($keysAfterStateUpdate);
+
+    $keysAfterDistrictCreate = primeMajlisListingCache();
+    $district = District::query()->create([
+        'country_id' => $country->getKey(),
+        'state_id' => $state->getKey(),
+        'name' => 'Alpha District',
+        'country_code' => 'TL',
+    ]);
+    assertMajlisCacheWasCleared($keysAfterDistrictCreate);
+
+    $keysAfterDistrictUpdate = primeMajlisListingCache();
+    $district->update(['name' => 'Updated Alpha District']);
+    assertMajlisCacheWasCleared($keysAfterDistrictUpdate);
+
+    $keysAfterSubdistrictCreate = primeMajlisListingCache();
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $country->getKey(),
+        'state_id' => $state->getKey(),
+        'district_id' => $district->getKey(),
+        'name' => 'Alpha Subdistrict',
+        'country_code' => 'TL',
+    ]);
+    assertMajlisCacheWasCleared($keysAfterSubdistrictCreate);
+
+    $keysAfterSubdistrictUpdate = primeMajlisListingCache();
+    $subdistrict->update(['name' => 'Updated Alpha Subdistrict']);
+    assertMajlisCacheWasCleared($keysAfterSubdistrictUpdate);
+
+    $keysAfterSubdistrictDelete = primeMajlisListingCache();
+    $subdistrict->delete();
+    assertMajlisCacheWasCleared($keysAfterSubdistrictDelete);
+
+    $keysAfterDistrictDelete = primeMajlisListingCache();
+    $district->delete();
+    assertMajlisCacheWasCleared($keysAfterDistrictDelete);
+
+    $keysAfterStateDelete = primeMajlisListingCache();
+    $state->delete();
+    assertMajlisCacheWasCleared($keysAfterStateDelete);
+
+    $keysAfterCountryDelete = primeMajlisListingCache();
+    $country->delete();
+    assertMajlisCacheWasCleared($keysAfterCountryDelete);
 });

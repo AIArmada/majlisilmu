@@ -1,11 +1,11 @@
 <?php
 
 use App\Enums\ContactCategory;
-use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
+use App\Models\Subdistrict;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Http\UploadedFile;
@@ -339,17 +339,18 @@ describe('Event Show Page Location & Contact Info', function () {
             'country_code' => 'MY',
         ]);
 
-        $district = District::query()->create([
+        $subdistrict = Subdistrict::query()->create([
             'country_id' => 132,
             'state_id' => (int) $stateId,
+            'district_id' => null,
             'country_code' => 'MY',
-            'name' => 'Kuala Lumpur',
+            'name' => 'Setiawangsa',
         ]);
 
         $venue->address()->update([
             'state_id' => (int) $stateId,
-            'district_id' => $district->id,
-            'subdistrict_id' => null,
+            'district_id' => null,
+            'subdistrict_id' => $subdistrict->id,
         ]);
 
         $event = Event::factory()->create([

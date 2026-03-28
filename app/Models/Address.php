@@ -14,6 +14,16 @@ class Address extends Model implements AuditableContract
 {
     use AuditsModelChanges, HasUuids;
 
+    #[\Override]
+    protected static function booted(): void
+    {
+        static::saving(function (self $address): void {
+            if ($address->country_id === null) {
+                $address->country_id = 132;
+            }
+        });
+    }
+
     protected $fillable = [
         'addressable_type',
         'addressable_id',

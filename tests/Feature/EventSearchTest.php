@@ -5,7 +5,9 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
+use App\Livewire\Pages\Events\AdvancedFiltersPanel;
 use App\Livewire\Pages\Events\Index;
+use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\EventSettings;
@@ -18,6 +20,7 @@ use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,6 +34,48 @@ use Nnjeim\World\Models\Language;
 
 uses(RefreshDatabase::class);
 
+function createVisibleEventForSearch(array $attributes = []): Event
+{
+    return Event::factory()->create(array_merge([
+        'institution_id' => Institution::factory(),
+        'venue_id' => null,
+        'event_format' => EventFormat::Physical,
+    ], $attributes));
+}
+
+function ensureMalaysiaStateForTests(string $name = 'Selangor'): State
+{
+    $country = Country::query()->find(132);
+
+    if (! $country instanceof Country) {
+        $country = new Country;
+        $country->forceFill([
+            'id' => 132,
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+        $country->save();
+    }
+
+    /** @var State $state */
+    $state = State::query()->firstOrCreate(
+        [
+            'country_id' => 132,
+            'name' => $name,
+        ],
+        [
+            'country_code' => 'MY',
+        ],
+    );
+
+    return $state;
+}
+
 describe('Event Search Filters', function () {
     beforeEach(function () {
         $this->seed(PermissionSeeder::class);
@@ -38,7 +83,7 @@ describe('Event Search Filters', function () {
         // Set locale to English for tests
         app()->setLocale('en');
         // Get an actual state for filtering
-        $this->state = State::where('country_code', 'MY')->first();
+        $this->state = ensureMalaysiaStateForTests();
     });
 
     it('displays the events index page', function () {
@@ -57,12 +102,12 @@ describe('Event Search Filters', function () {
             ->assertDontSee('/flux/flux.js', false)
             ->assertSee('/js/filament/schemas/schemas.js', false)
             ->assertSee('/js/filament/support/support.js', false)
-            ->assertDontSee('/js/filament/tables/tables.js', false)
-            ->assertDontSee('/js/filament/notifications/notifications.js', false)
-            ->assertDontSee('/js/filament/actions/actions.js', false);
+            ->assertSee('/js/filament/notifications/notifications.js', false)
+            ->assertSee('/js/filament/actions/actions.js', false)
+            ->assertDontSee('/js/filament/tables/tables.js', false);
     });
 
-    it('primes the default events search cache for the unfiltered first page', function () {
+    it('does not prime the global default events search cache when the implicit country filter is active', function () {
         config()->set('cache.default', 'array');
         app('cache')->setDefaultDriver('array');
         Cache::flush();
@@ -78,8 +123,7 @@ describe('Event Search Filters', function () {
             ->assertSee('Circle of');
 
         expect(Cache::get('default_events_search_v2'))
-            ->toBeArray()
-            ->toMatchArray(['total' => 3]);
+            ->toBeNull();
     });
 
     it('shows title-only search placeholder on events index', function () {
@@ -168,27 +212,7 @@ describe('Event Search Filters', function () {
     });
 
     it('shows event location with subdistrict, district, and state on cards', function () {
-        $state = State::where('country_code', 'MY')->first();
-
-        if (! $state) {
-            $countryId = DB::table('countries')->insertGetId([
-                'iso2' => 'MY',
-                'name' => 'Malaysia',
-                'status' => 1,
-                'phone_code' => '60',
-                'iso3' => 'MYS',
-                'region' => 'Asia',
-                'subregion' => 'South-Eastern Asia',
-            ]);
-
-            $stateId = DB::table('states')->insertGetId([
-                'country_id' => $countryId,
-                'name' => 'Selangor',
-                'country_code' => 'MY',
-            ]);
-
-            $state = State::query()->findOrFail($stateId);
-        }
+        $state = ensureMalaysiaStateForTests();
         $district = District::query()->create([
             'country_id' => (int) $state->country_id,
             'state_id' => (int) $state->id,
@@ -221,19 +245,20 @@ describe('Event Search Filters', function () {
                 'title' => 'Lokasi Hierarki Event',
                 'status' => 'approved',
                 'visibility' => 'public',
+                'event_format' => EventFormat::Physical,
                 'published_at' => now(),
                 'starts_at' => now()->addDays(1),
             ]);
 
-        $response = $this->get('/events');
+        $component = Livewire::test(Index::class);
 
-        $response->assertOk()
+        $component
             ->assertSee('Surau Taman Melawati')
             ->assertSee('Taman Melawati, Gombak & '.$state->name);
     });
 
     it('searches events by title', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Kuliah Maghrib Special',
             'status' => 'approved',
             'visibility' => 'public',
@@ -241,7 +266,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Ceramah Subuh',
             'status' => 'approved',
             'visibility' => 'public',
@@ -371,7 +396,7 @@ describe('Event Search Filters', function () {
             'is_active' => true,
         ]);
 
-        $matchEvent = Event::factory()->create([
+        $matchEvent = createVisibleEventForSearch([
             'title' => 'Kuliah Speaker A',
             'status' => 'approved',
             'visibility' => 'public',
@@ -380,7 +405,7 @@ describe('Event Search Filters', function () {
         ]);
         $matchEvent->speakers()->attach($matchSpeaker->id);
 
-        $otherEvent = Event::factory()->create([
+        $otherEvent = createVisibleEventForSearch([
             'title' => 'Kuliah Speaker B',
             'status' => 'approved',
             'visibility' => 'public',
@@ -477,7 +502,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by prayer_time enum value in advanced filters', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Enum Filter Match',
             'status' => 'approved',
             'visibility' => 'public',
@@ -488,7 +513,7 @@ describe('Event Search Filters', function () {
             'prayer_display_text' => 'Selepas Maghrib',
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Enum Filter No Match',
             'status' => 'approved',
             'visibility' => 'public',
@@ -564,7 +589,7 @@ describe('Event Search Filters', function () {
         $includedSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
         $excludedSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
 
-        $includedEvent = Event::factory()->create([
+        $includedEvent = createVisibleEventForSearch([
             'title' => 'Speaker Match Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -573,7 +598,7 @@ describe('Event Search Filters', function () {
         ]);
         $includedEvent->speakers()->attach($includedSpeaker->id);
 
-        $excludedEvent = Event::factory()->create([
+        $excludedEvent = createVisibleEventForSearch([
             'title' => 'Speaker Excluded Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -597,7 +622,7 @@ describe('Event Search Filters', function () {
         $malay = Language::where('code', 'ms')->first() ?? Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
         $english = Language::where('code', 'en')->first() ?? Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
 
-        $event1 = Event::factory()->create([
+        $event1 = createVisibleEventForSearch([
             'title' => 'Malay Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -606,7 +631,7 @@ describe('Event Search Filters', function () {
         ]);
         $event1->languages()->attach($malay);
 
-        $event2 = Event::factory()->create([
+        $event2 = createVisibleEventForSearch([
             'title' => 'English Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -626,7 +651,7 @@ describe('Event Search Filters', function () {
         $malay = Language::where('code', 'ms')->first() ?? Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
         $english = Language::where('code', 'en')->first() ?? Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
 
-        $englishEvent = Event::factory()->create([
+        $englishEvent = createVisibleEventForSearch([
             'title' => 'English Language Codes Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -635,7 +660,7 @@ describe('Event Search Filters', function () {
         ]);
         $englishEvent->languages()->sync([$english->id]);
 
-        $malayEvent = Event::factory()->create([
+        $malayEvent = createVisibleEventForSearch([
             'title' => 'Malay Language Codes Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -656,7 +681,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by event_format array filter', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Online Format Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -665,7 +690,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Physical Format Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -686,19 +711,27 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by is_muslim_only toggle', function () {
+        $institution = Institution::factory()->create();
+
         Event::factory()->create([
+            'institution_id' => $institution->getKey(),
+            'venue_id' => null,
             'title' => 'Muslim Only Event',
             'status' => 'approved',
             'visibility' => 'public',
+            'event_format' => EventFormat::Physical,
             'is_muslim_only' => true,
             'published_at' => now(),
             'starts_at' => now()->addDays(1),
         ]);
 
         Event::factory()->create([
+            'institution_id' => $institution->getKey(),
+            'venue_id' => null,
             'title' => 'Open Event',
             'status' => 'approved',
             'visibility' => 'public',
+            'event_format' => EventFormat::Physical,
             'is_muslim_only' => false,
             'published_at' => now(),
             'starts_at' => now()->addDays(1),
@@ -712,7 +745,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by link presence and timing mode', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Absolute With Links Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -724,7 +757,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Prayer Relative Without Links Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -752,7 +785,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters absolute timing events by selected start time range', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Evening Absolute Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -762,7 +795,7 @@ describe('Event Search Filters', function () {
             'ends_at' => null,
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Morning Absolute Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -772,7 +805,7 @@ describe('Event Search Filters', function () {
             'ends_at' => null,
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Evening Prayer Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -800,7 +833,7 @@ describe('Event Search Filters', function () {
     });
 
     it('applies absolute time range to event start time only, not event end time', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Start In Range Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -810,7 +843,7 @@ describe('Event Search Filters', function () {
             'ends_at' => now('UTC')->addDays(2)->setTime(22, 30),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Start Out Of Range But Ends In Range Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -836,27 +869,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by district', function () {
-        $state = State::where('country_code', 'MY')->first();
-
-        if (! $state) {
-            $countryId = DB::table('countries')->insertGetId([
-                'iso2' => 'MY',
-                'name' => 'Malaysia',
-                'status' => 1,
-                'phone_code' => '60',
-                'iso3' => 'MYS',
-                'region' => 'Asia',
-                'subregion' => 'South-Eastern Asia',
-            ]);
-
-            $stateId = DB::table('states')->insertGetId([
-                'country_id' => $countryId,
-                'name' => 'Selangor',
-                'country_code' => 'MY',
-            ]);
-
-            $state = State::query()->findOrFail($stateId);
-        }
+        $state = ensureMalaysiaStateForTests();
 
         $districtA = District::query()->create([
             'country_id' => $state->country_id,
@@ -925,11 +938,12 @@ describe('Event Search Filters', function () {
             ->assertDontSee('District Filter Non Match');
     });
 
-    it('filters events by subdistrict', function () {
-        $state = State::where('country_code', 'MY')->first();
+    it('filters events by country', function () {
+        $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
 
-        if (! $state) {
-            $countryId = DB::table('countries')->insertGetId([
+        if (! $malaysiaId) {
+            $malaysiaId = DB::table('countries')->insertGetId([
+                'id' => 132,
                 'iso2' => 'MY',
                 'name' => 'Malaysia',
                 'status' => 1,
@@ -938,15 +952,153 @@ describe('Event Search Filters', function () {
                 'region' => 'Asia',
                 'subregion' => 'South-Eastern Asia',
             ]);
-
-            $stateId = DB::table('states')->insertGetId([
-                'country_id' => $countryId,
-                'name' => 'Selangor',
-                'country_code' => 'MY',
-            ]);
-
-            $state = State::query()->findOrFail($stateId);
         }
+
+        $indonesiaId = DB::table('countries')->insertGetId([
+            'iso2' => 'ID',
+            'name' => 'Indonesia',
+            'status' => 1,
+            'phone_code' => '62',
+            'iso3' => 'IDN',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+
+        $malaysiaStateId = DB::table('states')->insertGetId([
+            'country_id' => $malaysiaId,
+            'name' => 'Selangor',
+            'country_code' => 'MY',
+        ]);
+
+        $indonesiaStateId = DB::table('states')->insertGetId([
+            'country_id' => $indonesiaId,
+            'name' => 'DKI Jakarta',
+            'country_code' => 'ID',
+        ]);
+
+        $malaysiaVenue = Venue::factory()->create();
+        $malaysiaVenue->address()->update([
+            'country_id' => (int) $malaysiaId,
+            'state_id' => (int) $malaysiaStateId,
+            'district_id' => null,
+            'subdistrict_id' => null,
+        ]);
+
+        $malaysiaInstitution = Institution::factory()->create([
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+        $malaysiaInstitution->address()->update([
+            'country_id' => (int) $malaysiaId,
+            'state_id' => (int) $malaysiaStateId,
+            'district_id' => null,
+            'subdistrict_id' => null,
+        ]);
+
+        $indonesiaVenue = Venue::factory()->create();
+        $indonesiaVenue->address()->update([
+            'country_id' => (int) $indonesiaId,
+            'state_id' => (int) $indonesiaStateId,
+            'district_id' => null,
+            'subdistrict_id' => null,
+        ]);
+
+        $indonesiaInstitution = Institution::factory()->create([
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+        $indonesiaInstitution->address()->update([
+            'country_id' => (int) $indonesiaId,
+            'state_id' => (int) $indonesiaStateId,
+            'district_id' => null,
+            'subdistrict_id' => null,
+        ]);
+
+        Event::factory()->for($malaysiaVenue)->for($malaysiaInstitution)->create([
+            'title' => 'Malaysia Country Filter Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->for($indonesiaVenue)->for($indonesiaInstitution)->create([
+            'title' => 'Indonesia Country Filter Non Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $component = Livewire::withQueryParams([
+            'country_id' => (string) $malaysiaId,
+        ])->test(Index::class);
+
+        $eventTitles = $component->instance()
+            ->events
+            ->getCollection()
+            ->pluck('title')
+            ->all();
+
+        expect($eventTitles)
+            ->toContain('Malaysia Country Filter Match')
+            ->not->toContain('Indonesia Country Filter Non Match');
+    });
+
+    it('defaults the majlis country filter from an unencrypted browser timezone cookie', function () {
+        $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
+
+        if (! $malaysiaId) {
+            $malaysiaId = DB::table('countries')->insertGetId([
+                'id' => 132,
+                'iso2' => 'MY',
+                'name' => 'Malaysia',
+                'status' => 1,
+                'phone_code' => '60',
+                'iso3' => 'MYS',
+                'region' => 'Asia',
+                'subregion' => 'South-Eastern Asia',
+            ]);
+        }
+
+        $indonesiaId = DB::table('countries')->where('iso2', 'ID')->value('id');
+
+        if (! $indonesiaId) {
+            $indonesiaId = DB::table('countries')->insertGetId([
+                'iso2' => 'ID',
+                'name' => 'Indonesia',
+                'status' => 1,
+                'phone_code' => '62',
+                'iso3' => 'IDN',
+                'region' => 'Asia',
+                'subregion' => 'South-Eastern Asia',
+            ]);
+        }
+
+        Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Livewire::withCookie('user_timezone', 'Asia/Jakarta')
+            ->test(Index::class)
+            ->assertSet('country_id', (string) $indonesiaId)
+            ->assertSet('state_id', null);
+    });
+
+    it('hides the majlis country selector unless the device preference cookie enables it', function () {
+        Livewire::test(AdvancedFiltersPanel::class)
+            ->assertDontSee('Country');
+
+        Livewire::withCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
+            ->test(AdvancedFiltersPanel::class)
+            ->assertSee('Country');
+    });
+
+    it('filters events by subdistrict', function () {
+        $state = ensureMalaysiaStateForTests();
 
         $district = District::query()->create([
             'country_id' => $state->country_id,
@@ -1008,8 +1160,68 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Subdistrict Filter Non Match');
     });
 
+    it('filters events by federal territory subdistricts without requiring a district', function () {
+        $state = State::query()->create([
+            'country_id' => 132,
+            'name' => 'Kuala Lumpur',
+            'country_code' => 'MY',
+        ]);
+
+        $subdistrictA = Subdistrict::query()->create([
+            'country_id' => 132,
+            'state_id' => (int) $state->id,
+            'district_id' => null,
+            'country_code' => 'MY',
+            'name' => 'Setiawangsa '.uniqid(),
+        ]);
+
+        $subdistrictB = Subdistrict::query()->create([
+            'country_id' => 132,
+            'state_id' => (int) $state->id,
+            'district_id' => null,
+            'country_code' => 'MY',
+            'name' => 'Segambut '.uniqid(),
+        ]);
+
+        $venueA = Venue::factory()->create();
+        $venueA->address()->update([
+            'state_id' => (int) $state->id,
+            'district_id' => null,
+            'subdistrict_id' => (int) $subdistrictA->id,
+        ]);
+
+        $venueB = Venue::factory()->create();
+        $venueB->address()->update([
+            'state_id' => (int) $state->id,
+            'district_id' => null,
+            'subdistrict_id' => (int) $subdistrictB->id,
+        ]);
+
+        Event::factory()->for($venueA)->create([
+            'title' => 'Federal Territory Subdistrict Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        Event::factory()->for($venueB)->create([
+            'title' => 'Federal Territory Subdistrict Non Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->get('/events?state_id='.$state->id.'&subdistrict_id='.$subdistrictA->id);
+
+        $response->assertOk()
+            ->assertSee('Federal Territory Subdistrict Match')
+            ->assertDontSee('Federal Territory Subdistrict Non Match');
+    });
+
     it('filters events by genre', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Kuliah Event',
             'event_type' => [EventType::KuliahCeramah],
             'status' => 'approved',
@@ -1018,7 +1230,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Forum Event',
             'event_type' => [EventType::Forum],
             'status' => 'approved',
@@ -1043,7 +1255,7 @@ describe('Event Search Filters', function () {
             'name' => ['en' => 'Fiqh', 'ms' => 'Fiqh'],
         ]);
 
-        $tafsirEvent = Event::factory()->create([
+        $tafsirEvent = createVisibleEventForSearch([
             'title' => 'Tafsir Session',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1052,7 +1264,7 @@ describe('Event Search Filters', function () {
         ]);
         $tafsirEvent->attachTag($tafsirTag);
 
-        $fiqhEvent = Event::factory()->create([
+        $fiqhEvent = createVisibleEventForSearch([
             'title' => 'Fiqh Session',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1080,7 +1292,7 @@ describe('Event Search Filters', function () {
             'name' => ['en' => 'Akhlak', 'ms' => 'Akhlak'],
         ]);
 
-        $aqidahEvent = Event::factory()->create([
+        $aqidahEvent = createVisibleEventForSearch([
             'title' => 'Aqidah Intensive',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1089,7 +1301,7 @@ describe('Event Search Filters', function () {
         ]);
         $aqidahEvent->attachTag($aqidahTag);
 
-        $akhlakEvent = Event::factory()->create([
+        $akhlakEvent = createVisibleEventForSearch([
             'title' => 'Akhlak Session',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1117,7 +1329,7 @@ describe('Event Search Filters', function () {
             'name' => ['en' => 'Hadith', 'ms' => 'Hadith'],
         ]);
 
-        $quranEvent = Event::factory()->create([
+        $quranEvent = createVisibleEventForSearch([
             'title' => 'Quran Study Circle',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1126,7 +1338,7 @@ describe('Event Search Filters', function () {
         ]);
         $quranEvent->attachTag($quranTag);
 
-        $hadithEvent = Event::factory()->create([
+        $hadithEvent = createVisibleEventForSearch([
             'title' => 'Hadith Workshop',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1153,7 +1365,7 @@ describe('Event Search Filters', function () {
             'name' => ['en' => 'Ekonomi', 'ms' => 'Ekonomi'],
         ]);
 
-        $familyEvent = Event::factory()->create([
+        $familyEvent = createVisibleEventForSearch([
             'title' => 'Isu Keluarga Semasa',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1162,7 +1374,7 @@ describe('Event Search Filters', function () {
         ]);
         $familyEvent->attachTag($familyTag);
 
-        $economyEvent = Event::factory()->create([
+        $economyEvent = createVisibleEventForSearch([
             'title' => 'Perbincangan Isu Ekonomi',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1191,7 +1403,7 @@ describe('Event Search Filters', function () {
             'is_active' => true,
         ]);
 
-        $riyadhEvent = Event::factory()->create([
+        $riyadhEvent = createVisibleEventForSearch([
             'title' => 'Riyadh Session',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1200,7 +1412,7 @@ describe('Event Search Filters', function () {
         ]);
         $riyadhEvent->references()->attach($riyadhRef->id);
 
-        $bulughEvent = Event::factory()->create([
+        $bulughEvent = createVisibleEventForSearch([
             'title' => 'Bulugh Session',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1219,7 +1431,7 @@ describe('Event Search Filters', function () {
     });
 
     it('shows approved, pending, and cancelled public events', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Approved Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1227,28 +1439,28 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Pending Event',
             'status' => 'pending',
             'visibility' => 'public',
             'starts_at' => now()->addDays(2),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Cancelled Event',
             'status' => 'cancelled',
             'visibility' => 'public',
             'starts_at' => now()->addDays(2),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Draft Event',
             'status' => 'draft',
             'visibility' => 'public',
             'starts_at' => now()->addDays(3),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Private Event',
             'status' => 'approved',
             'visibility' => 'private',
@@ -1272,6 +1484,9 @@ describe('Event Search Filters', function () {
     it('paginates results', function () {
         foreach (range(1, 13) as $index) {
             Event::factory()->create([
+                'institution_id' => Institution::factory(),
+                'venue_id' => null,
+                'event_format' => EventFormat::Physical,
                 'title' => 'Event '.$index,
                 'status' => 'approved',
                 'visibility' => 'public',
@@ -1331,6 +1546,9 @@ describe('Event Search Filters', function () {
 
     it('displays event count', function () {
         Event::factory()->count(5)->create([
+            'institution_id' => Institution::factory(),
+            'venue_id' => null,
+            'event_format' => EventFormat::Physical,
             'status' => 'approved',
             'visibility' => 'public',
             'published_at' => now(),
@@ -1345,7 +1563,7 @@ describe('Event Search Filters', function () {
     });
 
     it('ignores prayer time filter when timing mode is absolute', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Absolute Timing Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1354,7 +1572,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2)->setTime(20, 0),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Prayer Relative Timing Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1372,7 +1590,7 @@ describe('Event Search Filters', function () {
     });
 
     it('treats explicit false URL filter as active and keeps active filter chips visible', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'No URL Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1381,7 +1599,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Has URL Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1401,7 +1619,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by held date overlap range', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Overlap Via End Time',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1410,7 +1628,7 @@ describe('Event Search Filters', function () {
             'ends_at' => now()->addDays(5)->setTime(9, 0),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Within Held Range',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1419,7 +1637,7 @@ describe('Event Search Filters', function () {
             'ends_at' => null,
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Outside Before Range',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1428,7 +1646,7 @@ describe('Event Search Filters', function () {
             'ends_at' => now()->addDays(3)->setTime(10, 0),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Outside After Range',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1452,7 +1670,7 @@ describe('Event Search Filters', function () {
     });
 
     it('filters events by prayer_time keyword in advanced filters', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Kuliah Selepas Maghrib',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1463,7 +1681,7 @@ describe('Event Search Filters', function () {
             'prayer_display_text' => 'Selepas Maghrib',
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Kuliah Selepas Subuh',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1490,7 +1708,7 @@ describe('Event Search Filters', function () {
             ->subDay()
             ->setTimezone('UTC');
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Timezone Included Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1499,7 +1717,7 @@ describe('Event Search Filters', function () {
             'ends_at' => null,
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Timezone Excluded Event',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1508,17 +1726,23 @@ describe('Event Search Filters', function () {
             'ends_at' => null,
         ]);
 
-        $response = $this
-            ->withCookie('user_timezone', $userTimezone)
-            ->get('/events?starts_after='.$localFilterDate);
+        $component = Livewire::withCookie('user_timezone', $userTimezone)
+            ->test(Index::class)
+            ->set('starts_after', $localFilterDate);
 
-        $response->assertOk()
-            ->assertSee('Timezone Included Event')
-            ->assertDontSee('Timezone Excluded Event');
+        $eventTitles = $component->instance()
+            ->events
+            ->getCollection()
+            ->pluck('title')
+            ->all();
+
+        expect($eventTitles)
+            ->toContain('Timezone Included Event')
+            ->not->toContain('Timezone Excluded Event');
     });
 
     it('filters events to past only when time scope is past', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Past Scope Match',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1526,7 +1750,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->subDays(2),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'Past Scope Non Match',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1542,7 +1766,7 @@ describe('Event Search Filters', function () {
     });
 
     it('shows both past and upcoming events when time scope is all', function () {
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'All Scope Past',
             'status' => 'approved',
             'visibility' => 'public',
@@ -1550,7 +1774,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->subDays(2),
         ]);
 
-        Event::factory()->create([
+        createVisibleEventForSearch([
             'title' => 'All Scope Upcoming',
             'status' => 'approved',
             'visibility' => 'public',

@@ -1,5 +1,6 @@
 # Lessons
 
+- When a location shortcut is country-specific, scope the helper by `country_id` as well as the place name; matching Kuala Lumpur, Putrajaya, or Labuan by name alone will incorrectly apply Malaysia-only behavior to foreign states with the same names.
 - When a user says “audit is already installed”, confirm the exact package already present in the repo before designing the integration path; `owen-it/laravel-auditing` and `spatie/laravel-activitylog` imply different Filament integration choices.
 - When fixing frontend runtime issues found via logs, do not stop at the route that emitted the error; sweep every public frontend route in Chrome MCP with real navigation before calling the work done.
 - When the user confirms an AI-generated prototype route is disposable, remove the experimental surface and its dead hooks instead of spending time repairing it.
@@ -188,6 +189,9 @@
 - When squashing or consolidating migrations in this repo, do two explicit audits before calling it done: scan every local migration for lingering `json(...)` columns that should be `jsonb(...)`, and verify exact runtime references for each legacy workflow column before dropping it so only truly dead compatibility fields are removed.
 - When the user asks to normalize imported postcode data already owned by a dedicated seeder, prefer fixing the importer and reseeding over editing the CSV directly; it keeps the rewrite deterministic and updates the live database in one pass.
 - When a user asks for canonical imported slugs without mentioning redirects or migration support, do not add legacy redirect/backfill paths by default; switch the importer to the new canonical slug shape and keep the runtime resolution path simple unless backward compatibility is explicitly requested.
+- When adding new public filter dimensions, do not add legacy URL/state inference by default; keep the implementation forward-only unless the user explicitly asks for backward compatibility.
+- When a preference is explicitly device-only, do not design it as cache-or-database state by default; use a request-readable client persistence layer such as a cookie so server-rendered pages can honor it on first load.
+- When a user asks to extend a public filter preference to submission flows, verify whether those forms actually carry the same underlying field; public submission schemas can still be hard-coded to Malaysia even when listing pages already have country-aware filtering.
 - Do not mention internal runtime tools like task_complete to users as if they were product features or available commands; keep agent-only tooling details out of user-facing guidance.
 - When fixing public institution address rendering, verify both punctuation cleanup and hierarchy completeness in the actual contact block; that view can diverge from the shared `locationString` chip and omit `subdistrict, district, state` even when the data exists.
 - For the institution contact address block, do not assume postcode belongs on its own line; keep the line order aligned to the UI spec as `street`, then `locality + postcode`, then `district + state`.
@@ -196,3 +200,4 @@
 - When a user points to an existing resolver or normalization layer, verify its exact input coverage before answering; having a resolver in the codebase does not mean it handles the specific URL shape under discussion.
 - When a search-first maps picker is enabled on a public form, do not leave the raw Google Maps URL field active in the same UX; keep picker mode and manual fallback mode distinct so users do not get conflicting inputs or unexpected API-backed enrichment.
 - When a user wants a cost-safe manual fallback for Google Maps links, do not disable normalization entirely; keep local parsing/canonicalization and redirect-based short-link resolution working, and gate only the paid Places API lookups.
+- When adding admin-managed taxonomy or geography entities that feed public filters, audit existing frontend cache keys and hook invalidation into create, update, and delete flows in the same pass; stale option caches are part of the feature, not a follow-up.

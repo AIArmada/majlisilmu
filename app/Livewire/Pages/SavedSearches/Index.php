@@ -14,6 +14,7 @@ use App\Enums\NotificationFrequency;
 use App\Enums\TimingMode;
 use App\Exceptions\SavedSearchLimitReachedException;
 use App\Livewire\Concerns\InteractsWithToasts;
+use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\Reference;
@@ -61,6 +62,11 @@ class Index extends Component
     public string $editName = '';
 
     public string $editNotify = 'daily';
+
+    /**
+     * @var array<int, string|null>
+     */
+    private array $countryNames = [];
 
     /**
      * @var array<int, string|null>
@@ -327,6 +333,7 @@ class Index extends Component
     protected function extractRequestFilters(): array
     {
         $filterKeys = [
+            'country_id',
             'state_id',
             'district_id',
             'subdistrict_id',
@@ -467,6 +474,7 @@ class Index extends Component
     private function capturedFilterLabel(string $filterKey): string
     {
         return match ($filterKey) {
+            'country_id' => __('Country'),
             'state_id' => __('State'),
             'district_id' => __('District'),
             'subdistrict_id' => __('Subdistrict / Mukim / Zone'),
@@ -522,6 +530,7 @@ class Index extends Component
         }
 
         return match ($filterKey) {
+            'country_id' => $this->countryName($value) ?? $value,
             'state_id' => $this->stateName($value) ?? $value,
             'district_id' => $this->districtName($value) ?? $value,
             'subdistrict_id' => $this->subdistrictName($value) ?? $value,
@@ -565,6 +574,21 @@ class Index extends Component
         }
 
         return $this->stateNames[$stateId];
+    }
+
+    private function countryName(string $id): ?string
+    {
+        $countryId = (int) $id;
+
+        if ($countryId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($countryId, $this->countryNames)) {
+            $this->countryNames[$countryId] = Country::query()->whereKey($countryId)->value('name');
+        }
+
+        return $this->countryNames[$countryId];
     }
 
     private function districtName(string $id): ?string

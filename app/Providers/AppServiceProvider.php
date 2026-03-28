@@ -8,6 +8,8 @@ use App\Models\AiModelPricing;
 use App\Models\Audit as FilamentAudit;
 use App\Models\Contact;
 use App\Models\ContributionRequest;
+use App\Models\Country;
+use App\Models\District;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
@@ -25,10 +27,13 @@ use App\Models\Series;
 use App\Models\SocialMedia;
 use App\Models\Space;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Observers\EventObserver;
+use App\Observers\GeographyObserver;
 use App\Observers\InstitutionObserver;
 use App\Observers\SpeakerObserver;
 use App\Observers\TagObserver;
@@ -111,6 +116,10 @@ class AppServiceProvider extends ServiceProvider
             Speaker::observe(SpeakerObserver::class);
             Venue::observe(VenueObserver::class);
             Tag::observe(TagObserver::class);
+            Country::observe(GeographyObserver::class);
+            State::observe(GeographyObserver::class);
+            District::observe(GeographyObserver::class);
+            Subdistrict::observe(GeographyObserver::class);
 
             if (! app()->runningUnitTests()) {
                 self::$publicListingObserversRegistered = true;

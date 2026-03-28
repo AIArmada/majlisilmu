@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
+use App\Support\Location\PublicCountryFilterVisibility;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -246,9 +247,125 @@ it('deduplicates matching district and subdistrict labels on institution cards',
 it('shows location scope controls on institution index', function () {
     get('/institusi')
         ->assertSuccessful()
+        ->assertDontSee(__('Country'))
         ->assertSee(__('Semua Negeri'))
         ->assertSee(__('Semua Daerah'))
         ->assertSee(__('Semua Bandar / Mukim / Zon'));
+});
+
+it('shows the institution country selector when the device preference cookie enables it', function () {
+    $this->withUnencryptedCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
+        ->get('/institusi')
+        ->assertSuccessful()
+        ->assertSee(__('Country'));
+});
+
+it('filters institutions by country', function () {
+    $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
+
+    if (! $malaysiaId) {
+        $malaysiaId = DB::table('countries')->insertGetId([
+            'id' => 132,
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+    }
+
+    $indonesiaId = DB::table('countries')->where('iso2', 'ID')->value('id');
+
+    if (! $indonesiaId) {
+        $indonesiaId = DB::table('countries')->insertGetId([
+            'iso2' => 'ID',
+            'name' => 'Indonesia',
+            'status' => 1,
+            'phone_code' => '62',
+            'iso3' => 'IDN',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+    }
+
+    $malaysiaStateId = DB::table('states')->insertGetId([
+        'country_id' => $malaysiaId,
+        'name' => 'Selangor',
+        'country_code' => 'MY',
+    ]);
+
+    $indonesiaStateId = DB::table('states')->insertGetId([
+        'country_id' => $indonesiaId,
+        'name' => 'DKI Jakarta',
+        'country_code' => 'ID',
+    ]);
+
+    $malaysiaInstitution = Institution::factory()->create([
+        'name' => 'Institusi Malaysia',
+        'status' => 'verified',
+    ]);
+    $malaysiaInstitution->address()->update([
+        'country_id' => (int) $malaysiaId,
+        'state_id' => (int) $malaysiaStateId,
+        'district_id' => null,
+        'subdistrict_id' => null,
+    ]);
+
+    $indonesiaInstitution = Institution::factory()->create([
+        'name' => 'Institusi Indonesia',
+        'status' => 'verified',
+    ]);
+    $indonesiaInstitution->address()->update([
+        'country_id' => (int) $indonesiaId,
+        'state_id' => (int) $indonesiaStateId,
+        'district_id' => null,
+        'subdistrict_id' => null,
+    ]);
+
+    get('/institusi?country_id='.$malaysiaId)
+        ->assertSuccessful()
+        ->assertSee('Institusi Malaysia')
+        ->assertDontSee('Institusi Indonesia');
+});
+
+it('defaults institutions country filter from an unencrypted browser timezone cookie', function () {
+    $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
+
+    if (! $malaysiaId) {
+        $malaysiaId = DB::table('countries')->insertGetId([
+            'id' => 132,
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+    }
+
+    $indonesiaId = DB::table('countries')->where('iso2', 'ID')->value('id');
+
+    if (! $indonesiaId) {
+        $indonesiaId = DB::table('countries')->insertGetId([
+            'iso2' => 'ID',
+            'name' => 'Indonesia',
+            'status' => 1,
+            'phone_code' => '62',
+            'iso3' => 'IDN',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+    }
+
+    $response = $this
+        ->withUnencryptedCookie('user_timezone', 'Asia/Jakarta')
+        ->get('/institusi');
+
+    $response->assertSuccessful()
+        ->assertSee('&quot;country_id&quot;:&quot;'.$indonesiaId.'&quot;', false);
 });
 
 it('filters institutions by negeri, daerah, and subdistrict scopes', function () {

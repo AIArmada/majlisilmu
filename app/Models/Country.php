@@ -8,6 +8,14 @@ use Nnjeim\World\Models\Country as WorldCountry;
 class Country extends WorldCountry
 {
     /**
+     * @return HasMany<Address, $this>
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(Address::class);
+    }
+
+    /**
      * @return HasMany<State, $this>
      */
     #[\Override]

@@ -2,9 +2,12 @@
 
 namespace App\Actions\Location;
 
+use App\Models\Country;
 use App\Models\District;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Location\PreferredCountryResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -43,6 +46,10 @@ class ResolveGooglePlaceSelectionAction
     {
         /** @var list<array{longText: string|null, shortText: string|null, types: list<string>}> $components */
         $components = $this->normalizeAddressComponents($payload['addressComponents'] ?? []);
+        $country = $this->resolveCountry($components);
+        $countryId = ($country instanceof Country ? (int) $country->id : null)
+            ?? $this->locationIdValue($payload['fallbackCountryId'] ?? null)
+            ?? PreferredCountryResolver::MALAYSIA_ID;
 
         $stateName = $this->componentValue($components, ['administrative_area_level_1']);
         $districtName = $this->componentValue($components, ['administrative_area_level_2']);
@@ -52,17 +59,25 @@ class ResolveGooglePlaceSelectionAction
             $this->componentValue($components, ['administrative_area_level_3']),
         ]);
 
-        $state = $this->resolveState($stateName);
-        $district = $this->resolveDistrict($districtName, $state?->id);
-        $subdistrict = $this->resolveSubdistrict($subdistrictName, $district?->id, $state?->id);
+        $state = $this->resolveState($stateName, $countryId);
+        $district = $this->resolveDistrict($districtName, $state?->id, $countryId);
+        $subdistrict = $this->resolveSubdistrict($subdistrictName, $district?->id, $state?->id, $countryId);
 
         if ($subdistrict instanceof Subdistrict) {
-            $district ??= District::query()->find($subdistrict->district_id);
+            if ($subdistrict->district_id !== null) {
+                $district ??= District::query()->find($subdistrict->district_id);
+            }
             $state ??= State::query()->find($subdistrict->state_id);
+            $countryId = $this->locationIdValue($subdistrict->country_id) ?? $countryId;
         }
 
         if ($district instanceof District) {
             $state ??= State::query()->find($district->state_id);
+            $countryId = $this->locationIdValue($district->country_id) ?? $countryId;
+        }
+
+        if ($state instanceof State) {
+            $countryId = $this->locationIdValue($state->country_id) ?? $countryId;
         }
 
         if (
@@ -86,7 +101,7 @@ class ResolveGooglePlaceSelectionAction
         ]);
 
         return [
-            'country_id' => 132,
+            'country_id' => $countryId,
             'state_id' => $state?->id,
             'district_id' => $district?->id,
             'subdistrict_id' => $subdistrict?->id,
@@ -156,6 +171,26 @@ class ResolveGooglePlaceSelectionAction
 
     /**
      * @param  list<array{longText: string|null, shortText: string|null, types: list<string>}>  $components
+     * @param  list<string>  $types
+     * @return array{longText: string|null, shortText: string|null, types: list<string>}|null
+     */
+    private function component(array $components, array $types): ?array
+    {
+        foreach ($components as $component) {
+            foreach ($types as $type) {
+                if (! in_array($type, $component['types'], true)) {
+                    continue;
+                }
+
+                return $component;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<array{longText: string|null, shortText: string|null, types: list<string>}>  $components
      */
     private function resolveLine1(array $components): ?string
     {
@@ -184,7 +219,48 @@ class ResolveGooglePlaceSelectionAction
         ]);
     }
 
-    private function resolveState(?string $name): ?State
+    /**
+     * @param  list<array{longText: string|null, shortText: string|null, types: list<string>}>  $components
+     */
+    private function resolveCountry(array $components): ?Country
+    {
+        $countryComponent = $this->component($components, ['country']);
+
+        if (! is_array($countryComponent)) {
+            return null;
+        }
+
+        $shortCode = $this->stringValue($countryComponent['shortText'] ?? null);
+
+        if (is_string($shortCode) && strlen($shortCode) === 2) {
+            $country = Country::query()
+                ->where('iso2', Str::upper($shortCode))
+                ->first();
+
+            if ($country instanceof Country) {
+                return $country;
+            }
+        }
+
+        $countryName = $this->firstFilled([
+            $countryComponent['longText'] ?? null,
+            $countryComponent['shortText'] ?? null,
+        ]);
+
+        if (! filled($countryName)) {
+            return null;
+        }
+
+        /** @var Collection<int, Country> $matches */
+        $matches = Country::query()
+            ->get()
+            ->filter(fn (Country $country): bool => $this->normalizeLocationName((string) $country->name) === $this->normalizeLocationName($countryName))
+            ->values();
+
+        return $matches->count() === 1 ? $matches->first() : null;
+    }
+
+    private function resolveState(?string $name, ?int $countryId = null): ?State
     {
         if (! filled($name)) {
             return null;
@@ -192,7 +268,7 @@ class ResolveGooglePlaceSelectionAction
 
         /** @var Collection<int, State> $matches */
         $matches = State::query()
-            ->where('country_id', 132)
+            ->where('country_id', $countryId ?? PreferredCountryResolver::MALAYSIA_ID)
             ->get()
             ->filter(fn (State $state): bool => $this->normalizeLocationName($state->name) === $this->normalizeLocationName($name))
             ->values();
@@ -200,13 +276,17 @@ class ResolveGooglePlaceSelectionAction
         return $matches->count() === 1 ? $matches->first() : null;
     }
 
-    private function resolveDistrict(?string $name, ?int $stateId = null): ?District
+    private function resolveDistrict(?string $name, ?int $stateId = null, ?int $countryId = null): ?District
     {
         if (! filled($name)) {
             return null;
         }
 
-        $query = District::query()->where('country_id', 132);
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
+            return null;
+        }
+
+        $query = District::query()->where('country_id', $countryId ?? PreferredCountryResolver::MALAYSIA_ID);
 
         if ($stateId !== null) {
             $query->where('state_id', $stateId);
@@ -221,18 +301,22 @@ class ResolveGooglePlaceSelectionAction
         return $matches->count() === 1 ? $matches->first() : null;
     }
 
-    private function resolveSubdistrict(?string $name, ?int $districtId = null, ?int $stateId = null): ?Subdistrict
+    private function resolveSubdistrict(?string $name, ?int $districtId = null, ?int $stateId = null, ?int $countryId = null): ?Subdistrict
     {
         if (! filled($name)) {
             return null;
         }
 
-        $query = Subdistrict::query()->where('country_id', 132);
+        $query = Subdistrict::query()->where('country_id', $countryId ?? PreferredCountryResolver::MALAYSIA_ID);
 
         if ($districtId !== null) {
             $query->where('district_id', $districtId);
         } elseif ($stateId !== null) {
             $query->where('state_id', $stateId);
+
+            if (FederalTerritoryLocation::isFederalTerritoryStateId($stateId)) {
+                $query->whereNull('district_id');
+            }
         }
 
         /** @var Collection<int, Subdistrict> $matches */
@@ -277,7 +361,7 @@ class ResolveGooglePlaceSelectionAction
     private function joinParts(array $parts): ?string
     {
         $parts = array_values(array_filter(
-            array_map(fn (?string $part): ?string => $this->stringValue($part), $parts),
+            array_map($this->stringValue(...), $parts),
             static fn (?string $part): bool => $part !== null,
         ));
 
@@ -306,6 +390,21 @@ class ResolveGooglePlaceSelectionAction
         }
 
         return (float) $value;
+    }
+
+    private function locationIdValue(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+
+        if (! is_string($value) || ! ctype_digit(trim($value))) {
+            return null;
+        }
+
+        $locationId = (int) trim($value);
+
+        return $locationId > 0 ? $locationId : null;
     }
 
     private function normalizeLocationName(?string $value): string

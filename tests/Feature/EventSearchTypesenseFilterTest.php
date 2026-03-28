@@ -40,6 +40,43 @@ test('typesense filters include subdistrict constraint when provided', function 
     expect($filters)->toContain('subdistrict_id:=321');
 });
 
+test('typesense filters include country constraint when provided', function () {
+    $service = new class extends EventSearchService
+    {
+        /**
+         * @param  array<string, mixed>  $filters
+         * @return array<int, string>
+         */
+        public function exposedBuildTypesenseFilterParts(array $filters): array
+        {
+            return $this->buildTypesenseFilterParts($filters);
+        }
+    };
+
+    $filters = $service->exposedBuildTypesenseFilterParts([
+        'country_id' => 132,
+    ]);
+
+    expect($filters)->toContain('country_id:=132');
+});
+
+test('country filter alone does not force database fallback', function () {
+    $service = new class extends EventSearchService
+    {
+        /**
+         * @param  array<string, mixed>  $filters
+         */
+        public function exposedRequiresDatabaseFiltering(array $filters): bool
+        {
+            return $this->requiresDatabaseFiltering($filters);
+        }
+    };
+
+    expect($service->exposedRequiresDatabaseFiltering([
+        'country_id' => 132,
+    ]))->toBeFalse();
+});
+
 test('typesense filters include domain tag ids constraint when provided', function () {
     $service = new class extends EventSearchService
     {

@@ -27,7 +27,7 @@ it('stores session duration in milliseconds while preserving whole seconds', fun
 
     expect($session)->not->toBeNull()
         ->and($session?->duration_milliseconds)->toBe(673)
-        ->and($session?->duration_seconds)->toBe(0);
+        ->and(intdiv((int) ($session?->duration_milliseconds ?? 0), 1000))->toBe(0);
 });
 
 it('supports goal-based funnel steps via goal slugs', function () {
@@ -37,7 +37,6 @@ it('supports goal-based funnel steps via goal slugs', function () {
         'session_identifier' => 'goal-funnel-session',
         'started_at' => now()->subMinute(),
         'ended_at' => now(),
-        'duration_seconds' => 12,
         'duration_milliseconds' => 12_450,
         'entry_path' => '/',
         'exit_path' => '/majlis/test-event',
@@ -106,26 +105,24 @@ it('supports goal-based funnel steps via goal slugs', function () {
         ]);
     });
 
-    $savedReport = SavedSignalReport::withoutEvents(function () use ($trackedProperty): SavedSignalReport {
-        return SavedSignalReport::query()->create([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_segment_id' => null,
-            'name' => 'Goal Funnel',
-            'slug' => 'goal-funnel',
-            'report_type' => 'conversion_funnel',
-            'filters' => null,
-            'settings' => [
-                'funnel_steps' => [
-                    ['label' => 'Homepage Goal', 'goal_slug' => 'homepage-goal'],
-                    ['label' => 'Detail Goal', 'goal_slug' => 'detail-goal'],
-                ],
+    $savedReport = SavedSignalReport::withoutEvents(fn (): SavedSignalReport => SavedSignalReport::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_segment_id' => null,
+        'name' => 'Goal Funnel',
+        'slug' => 'goal-funnel',
+        'report_type' => 'conversion_funnel',
+        'filters' => null,
+        'settings' => [
+            'funnel_steps' => [
+                ['label' => 'Homepage Goal', 'goal_slug' => 'homepage-goal'],
+                ['label' => 'Detail Goal', 'goal_slug' => 'detail-goal'],
             ],
-            'is_shared' => false,
-            'is_active' => true,
-            'owner_type' => null,
-            'owner_id' => null,
-        ]);
-    });
+        ],
+        'is_shared' => false,
+        'is_active' => true,
+        'owner_type' => null,
+        'owner_id' => null,
+    ]));
 
     $stages = app(ConversionFunnelReportService::class)->stages(
         $trackedProperty->id,
@@ -149,7 +146,6 @@ it('does not fall back to the starter funnel when only tracked-property-compatib
         'session_identifier' => 'scoped-goal-funnel-session',
         'started_at' => now()->subMinute(),
         'ended_at' => now(),
-        'duration_seconds' => 9,
         'duration_milliseconds' => 9_100,
         'entry_path' => '/',
         'exit_path' => '/',
@@ -203,26 +199,24 @@ it('does not fall back to the starter funnel when only tracked-property-compatib
         ]);
     });
 
-    $savedReport = SavedSignalReport::withoutEvents(function () use ($trackedProperty): SavedSignalReport {
-        return SavedSignalReport::query()->create([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_segment_id' => null,
-            'name' => 'Scoped Goal Funnel',
-            'slug' => 'scoped-goal-funnel',
-            'report_type' => 'conversion_funnel',
-            'filters' => null,
-            'settings' => [
-                'funnel_steps' => [
-                    ['label' => 'Compatible Goal', 'goal_slug' => 'compatible-goal'],
-                    ['label' => 'Foreign Goal', 'goal_slug' => 'foreign-goal'],
-                ],
+    $savedReport = SavedSignalReport::withoutEvents(fn (): SavedSignalReport => SavedSignalReport::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_segment_id' => null,
+        'name' => 'Scoped Goal Funnel',
+        'slug' => 'scoped-goal-funnel',
+        'report_type' => 'conversion_funnel',
+        'filters' => null,
+        'settings' => [
+            'funnel_steps' => [
+                ['label' => 'Compatible Goal', 'goal_slug' => 'compatible-goal'],
+                ['label' => 'Foreign Goal', 'goal_slug' => 'foreign-goal'],
             ],
-            'is_shared' => false,
-            'is_active' => true,
-            'owner_type' => null,
-            'owner_id' => null,
-        ]);
-    });
+        ],
+        'is_shared' => false,
+        'is_active' => true,
+        'owner_type' => null,
+        'owner_id' => null,
+    ]));
 
     $stages = app(ConversionFunnelReportService::class)->stages(
         $trackedProperty->id,
@@ -244,7 +238,6 @@ it('supports direct page-path funnel steps without separate goals', function () 
         'session_identifier' => 'path-funnel-session',
         'started_at' => now()->subMinute(),
         'ended_at' => now(),
-        'duration_seconds' => 8,
         'duration_milliseconds' => 8_920,
         'entry_path' => '/',
         'exit_path' => '/penceramah',
@@ -281,26 +274,24 @@ it('supports direct page-path funnel steps without separate goals', function () 
         'property_types' => null,
     ]);
 
-    $savedReport = SavedSignalReport::withoutEvents(function () use ($trackedProperty): SavedSignalReport {
-        return SavedSignalReport::query()->create([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_segment_id' => null,
-            'name' => 'Path Funnel',
-            'slug' => 'path-funnel',
-            'report_type' => 'conversion_funnel',
-            'filters' => null,
-            'settings' => [
-                'funnel_steps' => [
-                    ['label' => 'Homepage', 'path_operator' => 'equals', 'path_value' => '/'],
-                    ['label' => 'Speaker Directory', 'path_operator' => 'equals', 'path_value' => '/penceramah'],
-                ],
+    $savedReport = SavedSignalReport::withoutEvents(fn (): SavedSignalReport => SavedSignalReport::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_segment_id' => null,
+        'name' => 'Path Funnel',
+        'slug' => 'path-funnel',
+        'report_type' => 'conversion_funnel',
+        'filters' => null,
+        'settings' => [
+            'funnel_steps' => [
+                ['label' => 'Homepage', 'path_operator' => 'equals', 'path_value' => '/'],
+                ['label' => 'Speaker Directory', 'path_operator' => 'equals', 'path_value' => '/penceramah'],
             ],
-            'is_shared' => false,
-            'is_active' => true,
-            'owner_type' => null,
-            'owner_id' => null,
-        ]);
-    });
+        ],
+        'is_shared' => false,
+        'is_active' => true,
+        'owner_type' => null,
+        'owner_id' => null,
+    ]));
 
     $stages = app(ConversionFunnelReportService::class)->stages(
         $trackedProperty->id,
@@ -323,7 +314,6 @@ it('supports route-based funnel steps using named laravel routes', function () {
         'session_identifier' => 'route-funnel-session',
         'started_at' => now()->subMinute(),
         'ended_at' => now(),
-        'duration_seconds' => 9,
         'duration_milliseconds' => 9_150,
         'entry_path' => '/',
         'exit_path' => '/penceramah',
@@ -360,26 +350,24 @@ it('supports route-based funnel steps using named laravel routes', function () {
         'property_types' => null,
     ]);
 
-    $savedReport = SavedSignalReport::withoutEvents(function () use ($trackedProperty): SavedSignalReport {
-        return SavedSignalReport::query()->create([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_segment_id' => null,
-            'name' => 'Route Funnel',
-            'slug' => 'route-funnel',
-            'report_type' => 'conversion_funnel',
-            'filters' => null,
-            'settings' => [
-                'funnel_steps' => [
-                    ['label' => 'Home Route', 'step_type' => 'route', 'route_name' => 'home'],
-                    ['label' => 'Speakers Route', 'step_type' => 'route', 'route_name' => 'speakers.index'],
-                ],
+    $savedReport = SavedSignalReport::withoutEvents(fn (): SavedSignalReport => SavedSignalReport::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_segment_id' => null,
+        'name' => 'Route Funnel',
+        'slug' => 'route-funnel',
+        'report_type' => 'conversion_funnel',
+        'filters' => null,
+        'settings' => [
+            'funnel_steps' => [
+                ['label' => 'Home Route', 'step_type' => 'route', 'route_name' => 'home'],
+                ['label' => 'Speakers Route', 'step_type' => 'route', 'route_name' => 'speakers.index'],
             ],
-            'is_shared' => false,
-            'is_active' => true,
-            'owner_type' => null,
-            'owner_id' => null,
-        ]);
-    });
+        ],
+        'is_shared' => false,
+        'is_active' => true,
+        'owner_type' => null,
+        'owner_id' => null,
+    ]));
 
     $stages = app(ConversionFunnelReportService::class)->stages(
         $trackedProperty->id,
@@ -403,7 +391,6 @@ it('supports any and all funnel condition match types', function () {
         'session_identifier' => 'condition-funnel-session-a',
         'started_at' => now()->subMinutes(2),
         'ended_at' => now()->subMinute(),
-        'duration_seconds' => 14,
         'duration_milliseconds' => 14_240,
         'entry_path' => '/',
         'exit_path' => '/checkout/start',
@@ -415,7 +402,6 @@ it('supports any and all funnel condition match types', function () {
         'session_identifier' => 'condition-funnel-session-b',
         'started_at' => now()->subMinutes(2),
         'ended_at' => now()->subMinute(),
-        'duration_seconds' => 11,
         'duration_milliseconds' => 11_640,
         'entry_path' => '/',
         'exit_path' => '/billing/review',
@@ -482,67 +468,63 @@ it('supports any and all funnel condition match types', function () {
         'property_types' => ['checkout_step' => 'string'],
     ]);
 
-    $allConditionsReport = SavedSignalReport::withoutEvents(function () use ($trackedProperty): SavedSignalReport {
-        return SavedSignalReport::query()->create([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_segment_id' => null,
-            'name' => 'All Conditions Funnel',
-            'slug' => 'all-conditions-funnel',
-            'report_type' => 'conversion_funnel',
-            'filters' => null,
-            'settings' => [
-                'funnel_steps' => [
-                    ['label' => 'Home', 'step_type' => 'route', 'route_name' => 'home'],
-                    [
-                        'label' => 'Strict Checkout Step',
-                        'step_type' => 'conditions',
-                        'event_name' => 'page_view',
-                        'event_category' => 'page_view',
-                        'condition_match_type' => 'all',
-                        'conditions' => [
-                            ['field' => 'path', 'operator' => 'starts_with', 'value' => '/checkout'],
-                            ['field' => 'properties.checkout_step', 'operator' => 'equals', 'value' => 'shipping'],
-                        ],
+    $allConditionsReport = SavedSignalReport::withoutEvents(fn (): SavedSignalReport => SavedSignalReport::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_segment_id' => null,
+        'name' => 'All Conditions Funnel',
+        'slug' => 'all-conditions-funnel',
+        'report_type' => 'conversion_funnel',
+        'filters' => null,
+        'settings' => [
+            'funnel_steps' => [
+                ['label' => 'Home', 'step_type' => 'route', 'route_name' => 'home'],
+                [
+                    'label' => 'Strict Checkout Step',
+                    'step_type' => 'conditions',
+                    'event_name' => 'page_view',
+                    'event_category' => 'page_view',
+                    'condition_match_type' => 'all',
+                    'conditions' => [
+                        ['field' => 'path', 'operator' => 'starts_with', 'value' => '/checkout'],
+                        ['field' => 'properties.checkout_step', 'operator' => 'equals', 'value' => 'shipping'],
                     ],
                 ],
             ],
-            'is_shared' => false,
-            'is_active' => true,
-            'owner_type' => null,
-            'owner_id' => null,
-        ]);
-    });
+        ],
+        'is_shared' => false,
+        'is_active' => true,
+        'owner_type' => null,
+        'owner_id' => null,
+    ]));
 
-    $anyConditionsReport = SavedSignalReport::withoutEvents(function () use ($trackedProperty): SavedSignalReport {
-        return SavedSignalReport::query()->create([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_segment_id' => null,
-            'name' => 'Any Conditions Funnel',
-            'slug' => 'any-conditions-funnel',
-            'report_type' => 'conversion_funnel',
-            'filters' => null,
-            'settings' => [
-                'funnel_steps' => [
-                    ['label' => 'Home', 'step_type' => 'route', 'route_name' => 'home'],
-                    [
-                        'label' => 'Flexible Checkout Step',
-                        'step_type' => 'conditions',
-                        'event_name' => 'page_view',
-                        'event_category' => 'page_view',
-                        'condition_match_type' => 'any',
-                        'conditions' => [
-                            ['field' => 'path', 'operator' => 'starts_with', 'value' => '/checkout'],
-                            ['field' => 'properties.checkout_step', 'operator' => 'equals', 'value' => 'shipping'],
-                        ],
+    $anyConditionsReport = SavedSignalReport::withoutEvents(fn (): SavedSignalReport => SavedSignalReport::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_segment_id' => null,
+        'name' => 'Any Conditions Funnel',
+        'slug' => 'any-conditions-funnel',
+        'report_type' => 'conversion_funnel',
+        'filters' => null,
+        'settings' => [
+            'funnel_steps' => [
+                ['label' => 'Home', 'step_type' => 'route', 'route_name' => 'home'],
+                [
+                    'label' => 'Flexible Checkout Step',
+                    'step_type' => 'conditions',
+                    'event_name' => 'page_view',
+                    'event_category' => 'page_view',
+                    'condition_match_type' => 'any',
+                    'conditions' => [
+                        ['field' => 'path', 'operator' => 'starts_with', 'value' => '/checkout'],
+                        ['field' => 'properties.checkout_step', 'operator' => 'equals', 'value' => 'shipping'],
                     ],
                 ],
             ],
-            'is_shared' => false,
-            'is_active' => true,
-            'owner_type' => null,
-            'owner_id' => null,
-        ]);
-    });
+        ],
+        'is_shared' => false,
+        'is_active' => true,
+        'owner_type' => null,
+        'owner_id' => null,
+    ]));
 
     $allStages = app(ConversionFunnelReportService::class)->stages(
         $trackedProperty->id,

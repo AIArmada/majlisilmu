@@ -42,6 +42,14 @@ class District extends Model
     }
 
     /**
+     * @return HasMany<Address, $this>
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(Address::class);
+    }
+
+    /**
      * @return HasMany<Subdistrict, $this>
      */
     public function subdistricts(): HasMany

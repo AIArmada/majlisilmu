@@ -101,6 +101,8 @@ class VenueFormSchema
         }
 
         $shouldRenderLocationPicker = GooglePlacesConfiguration::isEnabled();
+        $publicCountryId = SharedFormSchema::preferredPublicCountryId();
+        $showPublicCountryField = SharedFormSchema::shouldShowPublicCountryField();
 
         return [
             Group::make([
@@ -120,6 +122,9 @@ class VenueFormSchema
                     showGoogleMapsUrlField: ! $shouldRenderLocationPicker,
                     enableGoogleMapsNormalization: true,
                     enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
+                    includeCountryField: true,
+                    showCountryField: $showPublicCountryField,
+                    defaultCountryId: $publicCountryId,
                 ),
             ])
                 ->statePath('address')

@@ -7,6 +7,7 @@ use App\Enums\ContactType;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
+use Database\Factories\Concerns\EnsuresMalaysiaCountry;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use Nnjeim\World\Models\Language;
@@ -16,6 +17,8 @@ use Nnjeim\World\Models\Language;
  */
 class SpeakerFactory extends Factory
 {
+    use EnsuresMalaysiaCountry;
+
     /**
      * Define the model's default state.
      *
@@ -248,14 +251,15 @@ class SpeakerFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function (Speaker $speaker) {
+            $malaysia = $this->ensureMalaysiaCountry();
+
             // Create Address
             $state = State::inRandomOrder()->first();
-            if ($state) {
-                $speaker->address()->create([
-                    'state_id' => $state->id,
-                    'district_id' => $state->districts()->inRandomOrder()->first()?->id,
-                ]);
-            }
+            $speaker->address()->create([
+                'country_id' => (int) ($state->country_id ?? $malaysia->getKey()),
+                'state_id' => $state?->id,
+                'district_id' => $state?->districts()->inRandomOrder()->first()?->id,
+            ]);
 
             $speaker->contacts()->create([
                 'category' => ContactCategory::Email->value,

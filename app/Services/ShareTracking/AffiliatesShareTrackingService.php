@@ -426,7 +426,7 @@ final readonly class AffiliatesShareTrackingService
 
     private function trackingTokenForLink(AffiliateLink $link, User $user): string
     {
-        $payload = base64_encode((string) $link->custom_slug.'|'.(string) $user->getAuthIdentifier());
+        $payload = base64_encode($link->custom_slug.'|'.$user->getAuthIdentifier());
 
         return $payload.'.'.hash_hmac('sha256', $payload, (string) config('dawah-share.signing_key'));
     }

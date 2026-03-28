@@ -14,8 +14,11 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\User;
+use App\Models\Venue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -117,6 +120,55 @@ it('shows share actions on public series and reference pages', function () {
         ->assertSee('Kongsi Rujukan');
 });
 
+it('shows federal territory event cards on series pages with subdistrict and state', function () {
+    $series = Series::factory()->create([
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan Utama KL',
+    ]);
+
+    $state = State::query()->create([
+        'country_id' => 132,
+        'name' => 'Kuala Lumpur',
+        'country_code' => 'MY',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $state->id,
+        'district_id' => null,
+        'country_code' => 'MY',
+        'name' => 'Setiawangsa',
+    ]);
+
+    $venue->address()->update([
+        'state_id' => (int) $state->id,
+        'district_id' => null,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'starts_at' => now()->addDay(),
+        'venue_id' => $venue->id,
+    ]);
+
+    $series->events()->attach($event->id, [
+        'id' => (string) Str::uuid(),
+        'order_column' => 1,
+    ]);
+
+    $this->get(route('series.show', $series))
+        ->assertSuccessful()
+        ->assertSee('Dewan Utama KL, Setiawangsa, Kuala Lumpur')
+        ->assertDontSee('Dewan Utama KL, Kuala Lumpur, Kuala Lumpur');
+});
+
 it('renders threads in public share modals instead of line', function () {
     $event = Event::factory()->create([
         'status' => 'approved',
@@ -169,7 +221,7 @@ it('does not leak share tracking javascript into public page body text', functio
     ])->each(function ($response): void {
         $response->assertSuccessful();
 
-        $visibleText = strip_tags($response->getContent());
+        $visibleText = strip_tags((string) $response->getContent());
 
         expect($visibleText)
             ->not->toContain('trackShare(')

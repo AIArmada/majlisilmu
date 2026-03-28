@@ -233,7 +233,7 @@ final readonly class AdminShareAnalyticsService
      * @param  Collection<int, AffiliateTouchpoint>  $visits
      * @param  Collection<int, AffiliateAttribution>  $landingAttributions
      * @param  Collection<int, AffiliateConversion>  $conversions
-     * @return Collection<int, string>
+     * @return Collection<int, non-empty-string>
      */
     private function providersForBreakdown(
         Collection $outboundShares,

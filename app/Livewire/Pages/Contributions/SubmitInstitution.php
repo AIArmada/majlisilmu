@@ -6,6 +6,7 @@ use App\Actions\Contributions\SubmitStagedContributionCreateAction;
 use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Enums\ContributionSubjectType;
 use App\Forms\InstitutionContributionFormSchema;
+use App\Forms\SharedFormSchema;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Institution;
 use App\Models\User;
@@ -38,7 +39,7 @@ class SubmitInstitution extends Component implements HasActions, HasForms
         $this->contributionForm()->fill([
             'type' => 'masjid',
             'address' => [
-                'country_id' => 132,
+                'country_id' => SharedFormSchema::preferredPublicCountryId(),
                 'state_id' => null,
                 'district_id' => null,
                 'subdistrict_id' => null,
@@ -93,13 +94,14 @@ class SubmitInstitution extends Component implements HasActions, HasForms
         array $selection,
         ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction,
     ): array {
-        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle($selection);
-
         $currentAddress = data_get($this, $statePath);
         $currentAddress = is_array($currentAddress) ? $currentAddress : [];
+        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle(array_merge($selection, [
+            'fallbackCountryId' => $currentAddress['country_id'] ?? null,
+        ]));
 
         data_set($this, $statePath, array_merge($currentAddress, $resolvedAddress, [
-            'cascade_reset_guard' => 2,
+            'cascade_reset_guard' => SharedFormSchema::publicLocationPickerCascadeResetGuard(),
         ]));
 
         return $resolvedAddress;

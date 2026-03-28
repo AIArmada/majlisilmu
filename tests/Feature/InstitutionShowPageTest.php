@@ -496,7 +496,7 @@ it('does not render breadcrumb and removed hero/page summary actions', function 
 it('renders prayer-relative start time and event timezone end time in institution event list', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 
-    Event::factory()
+    $event = Event::factory()
         ->for($institution)
         ->create([
             'status' => 'approved',
@@ -509,13 +509,15 @@ it('renders prayer-relative start time and event timezone end time in institutio
             'title' => 'Kuliah Khas Timing',
         ]);
 
-    $this->withCookie('user_timezone', 'Asia/Kuala_Lumpur')
+    $expectedEndTime = $event->ends_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('h:i A');
+
+    $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
         ->get(route('institutions.show', $institution))
         ->assertSuccessful()
-        ->assertSee('Kuliah Khas Timing')
-        ->assertSee('Selepas Asar')
-        ->assertSee('8:40 PM')
-        ->assertDontSee('12:40 PM');
+        ->assertSeeText('Kuliah Khas Timing')
+        ->assertSeeText('Selepas Asar')
+        ->assertSeeText((string) $expectedEndTime)
+        ->assertDontSeeText('12:40 PM');
 });
 
 it('hides duplicated state for kuala lumpur putrajaya and labuan in institution event location list', function () {
@@ -528,17 +530,18 @@ it('hides duplicated state for kuala lumpur putrajaya and labuan in institution 
         'country_code' => 'MY',
     ]);
 
-    $district = District::query()->create([
+    $subdistrict = Subdistrict::query()->create([
         'country_id' => 132,
         'state_id' => (int) $stateId,
+        'district_id' => null,
         'country_code' => 'MY',
-        'name' => 'Kuala Lumpur',
+        'name' => 'Setiawangsa',
     ]);
 
     $venue->address()->update([
         'state_id' => (int) $stateId,
-        'district_id' => $district->id,
-        'subdistrict_id' => null,
+        'district_id' => null,
+        'subdistrict_id' => $subdistrict->id,
     ]);
 
     Event::factory()
@@ -554,7 +557,7 @@ it('hides duplicated state for kuala lumpur putrajaya and labuan in institution 
 
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
-        ->assertSee('Dewan Utama KL • Kuala Lumpur')
+        ->assertSee('Dewan Utama KL • Setiawangsa, Kuala Lumpur')
         ->assertDontSee('Dewan Utama KL • Negeri: - • Daerah: Kuala Lumpur • Bandar / Mukim / Zon: -')
         ->assertDontSee('Dewan Utama KL • Negeri: Kuala Lumpur • Daerah: Kuala Lumpur');
 });
