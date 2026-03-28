@@ -26,6 +26,7 @@ use App\Support\Cache\SafeModelCache;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryFilterVisibility;
+use App\Support\Location\PublicGeolocationPermission;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -248,6 +249,11 @@ class Index extends Component implements HasForms
         return app(PublicCountryFilterVisibility::class)->shouldShow();
     }
 
+    public function showsGeolocationControls(): bool
+    {
+        return app(PublicGeolocationPermission::class)->isGranted();
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -463,6 +469,12 @@ class Index extends Component implements HasForms
                                         'min' => 1,
                                         'max' => 1000,
                                         'step' => 1,
+                                    ])
+                                    ->extraFieldWrapperAttributes([
+                                        'data-testid' => 'advanced-nearby-radius',
+                                        'x-cloak' => true,
+                                        'x-bind:hidden' => '! geolocationPermitted',
+                                        ...(! app(PublicGeolocationPermission::class)->isGranted() ? ['hidden' => 'hidden'] : []),
                                     ])
                                     ->suffix(__('km'))
                                     ->visible(fn (Get $get): bool => filled($get('lat')) && filled($get('lng')))

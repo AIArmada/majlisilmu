@@ -2,11 +2,22 @@
 
 use Livewire\Component;
 
-new class extends Component {
-};
+new class extends Component {};
 ?>
 
 @section('title', __('Event Submitted') . ' - ' . config('app.name'))
+
+@php
+    $isAutoApproved = (bool) session('event_auto_approved', false);
+    $submitAnotherRoute = session('submission_institution_id')
+        ? route('dashboard.institutions.submit-event', array_filter([
+            'institution' => session('submission_institution_id'),
+            'parent' => session('parent_event_id'),
+        ]))
+        : (session('parent_event_id')
+            ? route('submit-event.create', ['parent' => session('parent_event_id')])
+            : route('submit-event.create'));
+@endphp
 
 <div class="bg-slate-50 min-h-screen py-20 pb-32">
     <div class="container mx-auto px-6 lg:px-12">
@@ -18,7 +29,9 @@ new class extends Component {
                 </svg>
             </div>
 
-            <h1 class="font-heading text-4xl font-bold text-slate-900 mb-4">{{ __('Event Submitted!') }}</h1>
+            <h1 class="font-heading text-4xl font-bold text-slate-900 mb-4">
+                {{ $isAutoApproved ? __('Event Published!') : __('Event Submitted!') }}
+            </h1>
 
             @if(session('event_title'))
                 <p class="text-xl text-slate-600 mb-4">
@@ -27,7 +40,9 @@ new class extends Component {
             @endif
 
             <p class="text-slate-500 text-lg mb-8 max-w-md mx-auto">
-                {{ __('Terima kasih atas perkongsian anda! Pasukan kami akan menyemak butirannya dalam masa 24-48 jam.') }}
+                {{ $isAutoApproved
+                    ? __('Majlis institusi anda telah diterbitkan terus dan kini sedia untuk diuruskan dari papan pemuka institusi.')
+                    : __('Terima kasih atas perkongsian anda! Pasukan kami akan menyemak butirannya dalam masa 24-48 jam.') }}
             </p>
 
             @if(session('parent_event_title'))
@@ -84,19 +99,23 @@ new class extends Component {
                         <span
                             class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 font-bold text-sm flex-shrink-0 mt-0.5">2</span>
                         <span
-                            class="text-slate-600">{{ __('Pasukan moderator kami akan menyemak butiran majlis dalam masa 24-48 jam untuk tujuan pengesahan.') }}</span>
+                            class="text-slate-600">{{ $isAutoApproved
+                                ? __('Anda boleh mengemas kini butiran majlis ini pada bila-bila masa dari papan pemuka institusi anda.')
+                                : __('Pasukan moderator kami akan menyemak butiran majlis dalam masa 24-48 jam untuk tujuan pengesahan.') }}</span>
                     </li>
                     <li class="flex items-start gap-3">
                         <span
                             class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 font-bold text-sm flex-shrink-0 mt-0.5">3</span>
                         <span
-                            class="text-slate-600">{{ __('Sekiranya terdapat keperluan, kami akan menghubungi anda melalui maklumat yang telah diberikan.') }}</span>
+                            class="text-slate-600">{{ $isAutoApproved
+                                ? __('Gunakan pautan majlis di bawah untuk kongsi terus kepada ahli kariah atau peserta.')
+                                : __('Sekiranya terdapat keperluan, kami akan menghubungi anda melalui maklumat yang telah diberikan.') }}</span>
                     </li>
                 </ul>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{{ session('parent_event_id') ? route('submit-event.create', ['parent' => session('parent_event_id')]) : route('submit-event.create') }}" wire:navigate
+                <a href="{{ $submitAnotherRoute }}" wire:navigate
                     class="inline-flex h-12 items-center justify-center rounded-xl bg-emerald-600 px-6 font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition-colors">
                     {{ session('parent_event_id') ? __('Add Another Child Event') : __('Submit Another Event') }}
                 </a>
@@ -104,6 +123,12 @@ new class extends Component {
                     <a href="{{ \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => session('parent_event_id')], panel: 'ahli') }}"
                         class="inline-flex h-12 items-center justify-center rounded-xl bg-white border border-emerald-200 px-6 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">
                         {{ __('Back to Parent Program') }}
+                    </a>
+                @endif
+                @if(session('submission_institution_id'))
+                    <a href="{{ route('dashboard.institutions', ['institution' => session('submission_institution_id')]) }}" wire:navigate
+                        class="inline-flex h-12 items-center justify-center rounded-xl bg-white border border-emerald-200 px-6 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">
+                        {{ __('Back to Institution Dashboard') }}
                     </a>
                 @endif
                 <a href="{{ route('events.index') }}" wire:navigate

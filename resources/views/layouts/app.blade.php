@@ -57,6 +57,53 @@
 
             document.cookie = `user_timezone=${encodeURIComponent(timezone)}; path=/; max-age=31536000; SameSite=Lax`;
         })();
+
+        window.majlisIlmu = window.majlisIlmu || {};
+        window.majlisIlmu.geolocationPermission = ({
+            initiallyGranted = false,
+            cookieName = 'public_geolocation_permission',
+        } = {}) => ({
+            geolocationPermitted: Boolean(initiallyGranted),
+            geolocationPermissionCookieName: cookieName,
+            init() {
+                this.syncGeolocationPermission();
+            },
+            persistGeolocationPermission(granted) {
+                document.cookie = `${this.geolocationPermissionCookieName}=${granted ? '1' : '0'}; path=/; max-age=31536000; SameSite=Lax`;
+            },
+            setGeolocationPermission(granted) {
+                this.geolocationPermitted = Boolean(granted);
+                this.persistGeolocationPermission(this.geolocationPermitted);
+            },
+            async syncGeolocationPermission() {
+                if (!('geolocation' in navigator)) {
+                    this.setGeolocationPermission(false);
+
+                    return;
+                }
+
+                if (!navigator.permissions || typeof navigator.permissions.query !== 'function') {
+                    return;
+                }
+
+                try {
+                    const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+                    const applyPermission = () => this.setGeolocationPermission(permissionStatus.state === 'granted');
+
+                    applyPermission();
+
+                    if (typeof permissionStatus.addEventListener === 'function') {
+                        permissionStatus.addEventListener('change', applyPermission);
+
+                        return;
+                    }
+
+                    permissionStatus.onchange = applyPermission;
+                } catch (error) {
+                    this.setGeolocationPermission(false);
+                }
+            },
+        });
     </script>
     @livewireStyles
     @filamentStyles(['app'])

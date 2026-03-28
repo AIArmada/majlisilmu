@@ -7,7 +7,8 @@ use Livewire\Component;
 
 new
     #[Title('Majlis Ilmu - Cari Kuliah & Majlis Ilmu di Malaysia')]
-    class extends Component {
+    class extends Component
+    {
         #[Computed]
         public function categoryTagIds(): array
         {
@@ -30,6 +31,10 @@ new
 
 @push('head')
 @endpush
+
+@php
+    $showsGeolocationControls = app(\App\Support\Location\PublicGeolocationPermission::class)->isGranted();
+@endphp
 
 <div>
     {{-- ═══════════════════════════════════════════════════════ --}}
@@ -55,7 +60,7 @@ new
         </div>
 
         <div class="container relative z-10 px-6 mx-auto">
-            <div class="flex flex-col items-center max-w-5xl mx-auto text-center stagger-children">
+            <div class="flex flex-col items-center max-w-5xl mx-auto text-center stagger-children" x-data="{}">
 
                 {{-- Eyebrow badge --}}
                 @guest
@@ -86,22 +91,63 @@ new
                 </p>
 
                 {{-- Search Interface --}}
-                <div class="w-full max-w-3xl relative group" x-data="{
+                <div class="w-full max-w-3xl relative group" x-on:mi-home-nearby.window="locate()" x-data="{
+                                ...window.majlisIlmu.geolocationPermission({
+                                    initiallyGranted: @js($showsGeolocationControls),
+                                    cookieName: @js(\App\Support\Location\PublicGeolocationPermission::COOKIE_NAME),
+                                }),
                                 locating: false,
-                                locate() {
+                                locationNotice: null,
+                                setLocationNotice(message) {
+                                    this.locationNotice = message;
+                                },
+                                clearLocationNotice() {
+                                    this.locationNotice = null;
+                                },
+                                submitSearchWithoutLocation() {
+                                    this.locating = false;
+                                    this.clearLocationNotice();
+                                    this.$refs.lat.value = '';
+                                    this.$refs.lng.value = '';
+                                    this.$refs.form.submit();
+                                },
+                                async locate() {
                                     if (this.locating) return;
+                                    this.clearLocationNotice();
                                     if (!navigator.geolocation) {
-                                        alert('{{ __("Pelayar anda tidak menyokong geolokasi.") }}');
+                                        this.setGeolocationPermission(false);
+                                        this.setLocationNotice('{{ __("Pelayar anda tidak menyokong geolokasi.") }}');
                                         return;
                                     }
+
+                                    if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+                                        try {
+                                            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+
+                                            if (permissionStatus.state === 'denied') {
+                                                this.setGeolocationPermission(false);
+                                            }
+                                        } catch (error) {
+                                        }
+                                    }
+
                                     this.locating = true;
                                     navigator.geolocation.getCurrentPosition((position) => {
+                                        this.clearLocationNotice();
+                                        this.setGeolocationPermission(true);
                                         this.$refs.lat.value = position.coords.latitude;
                                         this.$refs.lng.value = position.coords.longitude;
                                         this.$refs.form.submit();
-                                    }, () => {
+                                    }, (error) => {
                                         this.locating = false;
-                                        alert('{{ __("Tidak dapat mendapatkan lokasi anda. Sila aktifkan perkhidmatan lokasi.") }}');
+                                        if (error?.code === 1) {
+                                            this.setGeolocationPermission(false);
+                                            this.submitSearchWithoutLocation();
+
+                                            return;
+                                        }
+
+                                        this.setLocationNotice('{{ __("Tidak dapat mendapatkan lokasi anda. Sila aktifkan perkhidmatan lokasi.") }}');
                                     });
                                 }
                             }">
@@ -122,6 +168,7 @@ new
 
                         {{-- Locate Button --}}
                         <button type="button" @click="locate" :disabled="locating"
+                            data-testid="near-me-button"
                             title="{{ __('Cari majlis berdekatan anda') }}"
                             class="hidden sm:flex items-center justify-center w-14 h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-400 hover:text-emerald-400 transition-all">
                             <div x-show="!locating">
@@ -150,6 +197,9 @@ new
                         <input type="hidden" name="lat" x-ref="lat">
                         <input type="hidden" name="lng" x-ref="lng">
                     </form>
+
+                    <p x-show="locationNotice" x-cloak x-text="locationNotice"
+                        class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"></p>
                 </div>
 
                 {{-- Quick Links --}}
@@ -185,7 +235,7 @@ new
                         #Akhlak
                     </a>
 
-                    <button type="button" @click="document.querySelector('[x-data]').__x.$data.locate()"
+                    <button type="button" @click="$dispatch('mi-home-nearby')"
                         class="sm:hidden text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>

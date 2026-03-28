@@ -133,3 +133,55 @@ it('allows authenticated members to submit locked institution and speaker entiti
     expect($event?->organizer_id)->toBe($lockedSpeaker->id);
     expect($event?->institution_id)->toBe($lockedInstitution->id);
 });
+
+it('forbids the institution-scoped dashboard submit flow for non-members', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'allow_public_event_submission' => false,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard.institutions.submit-event', ['institution' => $institution->id]))
+        ->assertForbidden();
+});
+
+it('auto-approves institution-scoped dashboard submissions and locks the organizer institution', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'allow_public_event_submission' => false,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'allow_public_event_submission' => true,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    setSubmitEventFormState(
+        Livewire::withQueryParams(['institution' => $institution->id])->actingAs($user)->test('pages.submit-event.create'),
+        submitEventEntityAccessPayload($this->domainTag, $this->disciplineTag, [
+            'title' => 'Institution Dashboard Published Event',
+            'location_same_as_institution' => true,
+            'speakers' => [$speaker->id],
+        ]),
+    )
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('submit-event.success'));
+
+    $event = Event::query()->where('title', 'Institution Dashboard Published Event')->first();
+
+    expect($event)->not->toBeNull()
+        ->and((string) $event?->status)->toBe('approved')
+        ->and($event?->organizer_type)->toBe(Institution::class)
+        ->and($event?->organizer_id)->toBe($institution->id)
+        ->and($event?->institution_id)->toBe($institution->id)
+        ->and($event?->published_at)->not->toBeNull()
+        ->and($event?->submissions()->count())->toBe(1)
+        ->and($event?->moderationReviews()->where('decision', 'approved')->count())->toBe(1);
+});

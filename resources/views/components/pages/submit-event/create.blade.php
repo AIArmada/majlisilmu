@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\DawahShareOutcomeType;
@@ -13,7 +14,6 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
-use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Forms\Components\Select;
 use App\Forms\InstitutionFormSchema;
@@ -33,6 +33,7 @@ use App\Models\Venue;
 use App\Services\Ai\EventMediaExtractionService;
 use App\Services\Captcha\TurnstileVerifier;
 use App\Services\EventKeyPersonSyncService;
+use App\Services\ModerationService;
 use App\Services\ShareTrackingService;
 use App\States\EventStatus\Pending;
 use App\Support\Submission\EntitySubmissionAccess;
@@ -66,7 +67,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -89,7 +89,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public ?string $parentEventId = null;
 
+    public ?string $scopedInstitutionId = null;
+
     public ?TemporaryUploadedFile $event_source_attachment = null;
+
+    protected ?Institution $resolvedScopedInstitution = null;
 
     protected function eventForm(): Schema
     {
@@ -100,6 +104,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $timezone = $this->resolveUserTimezone();
         $this->parentEventId = request()->query('parent');
+        $scopedInstitution = $this->resolveScopedInstitution(request()->query('institution'));
+
+        if ($scopedInstitution instanceof Institution) {
+            $this->scopedInstitutionId = $scopedInstitution->id;
+            $this->resolvedScopedInstitution = $scopedInstitution;
+        }
 
         $state = [
             'submitter_name' => auth()->user()?->name,
@@ -122,7 +132,75 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $state = array_replace($state, $this->parentEventDefaults($parentEvent));
         }
 
+        if ($scopedInstitution instanceof Institution) {
+            $state = array_replace($state, $this->scopedInstitutionDefaults($scopedInstitution));
+        }
+
         $this->eventForm()->fill($state);
+    }
+
+    protected function resolveScopedInstitution(mixed $institutionId): ?Institution
+    {
+        if (! is_string($institutionId) || ! Str::isUuid($institutionId)) {
+            return null;
+        }
+
+        $user = $this->submitterUser();
+
+        abort_unless($user instanceof User, 403);
+
+        $institution = Institution::query()
+            ->whereKey($institutionId)
+            ->whereHas('members', fn (Builder $query) => $query->whereKey($user->getKey()))
+            ->first();
+
+        abort_unless($institution instanceof Institution, 403);
+
+        return $institution;
+    }
+
+    protected function scopedInstitution(): ?Institution
+    {
+        if ($this->resolvedScopedInstitution instanceof Institution) {
+            return $this->resolvedScopedInstitution;
+        }
+
+        $institutionId = $this->scopedInstitutionId;
+
+        if (! is_string($institutionId) || ! Str::isUuid($institutionId)) {
+            return null;
+        }
+
+        $institution = Institution::query()->find($institutionId);
+
+        if (! $institution instanceof Institution) {
+            return null;
+        }
+
+        $this->resolvedScopedInstitution = $institution;
+
+        return $institution;
+    }
+
+    protected function hasScopedInstitution(): bool
+    {
+        return $this->scopedInstitution() instanceof Institution;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function scopedInstitutionDefaults(Institution $institution): array
+    {
+        return [
+            'organizer_type' => 'institution',
+            'organizer_institution_id' => $institution->id,
+            'location_same_as_institution' => true,
+            'location_type' => 'institution',
+            'location_institution_id' => $institution->id,
+            'location_venue_id' => null,
+            'space_id' => null,
+        ];
     }
 
     /**
@@ -306,6 +384,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public function form(Schema $schema): Schema
     {
+        $hasScopedInstitution = $this->hasScopedInstitution();
+        $hasScopedInstitutionJs = $hasScopedInstitution ? 'true' : 'false';
+        $submitButtonLabel = $hasScopedInstitution
+            ? __('Publish Institution Event')
+            : __('Hantar Majlis untuk Semakan');
+
         return $schema
             ->model(new Event)
             ->schema([
@@ -1052,16 +1136,17 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             'speaker' => __('Penceramah'),
                                         ])
                                         ->default('institution')
-                                        ->inline(),
+                                        ->inline()
+                                        ->visible(! $hasScopedInstitution),
 
                                     Select::make('organizer_institution_id')
                                         ->label(__('Institusi'))
                                         ->options(fn (): array => $this->availableInstitutionOptions())
                                         ->searchable()
                                         ->preload()
-                                        ->visibleJs(<<<'JS'
-                                                            $get('organizer_type') === 'institution'
-                                                            JS)
+                                        ->disabled($hasScopedInstitution)
+                                        ->dehydrated()
+                                        ->visibleJs($hasScopedInstitutionJs." || \$get('organizer_type') === 'institution'")
                                         ->required(fn (Get $get): bool => $get('organizer_type') === 'institution')
                                         ->createOptionForm(InstitutionFormSchema::createOptionForm(includeLocationPicker: true))
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
@@ -1071,9 +1156,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(fn (): array => $this->availableSpeakerOptions())
                                         ->searchable()
                                         ->preload()
-                                        ->visibleJs(<<<'JS'
-                                                            $get('organizer_type') === 'speaker'
-                                                            JS)
+                                        ->visibleJs("! {$hasScopedInstitutionJs} && \$get('organizer_type') === 'speaker'")
                                         ->required(fn (Get $get): bool => $get('organizer_type') === 'speaker')
                                         ->afterStateUpdatedJs(<<<'JS'
                                                             if ($state) {
@@ -1098,9 +1181,21 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->label(__('Sama seperti institusi penganjur'))
                                         ->default(true)
                                         ->inline(false)
-                                        ->visibleJs(<<<'JS'
-                                                            $get('organizer_type') === 'institution'
-                                                            JS),
+                                        ->visibleJs($hasScopedInstitutionJs." || \$get('organizer_type') === 'institution'")
+                                        ->afterStateUpdatedJs("if (! {$hasScopedInstitutionJs}) {
+                                                return
+                                            }
+
+                                            if (\$state) {
+                                                \$set('location_type', 'institution')
+                                                \$set('location_institution_id', \$get('organizer_institution_id'))
+                                                \$set('location_venue_id', null)
+                                                return
+                                            }
+
+                                            \$set('location_type', 'venue')
+                                            \$set('location_institution_id', null)
+                                            \$set('space_id', null)"),
 
                                     Radio::make('location_type')
                                         ->label(__('Jenis Lokasi'))
@@ -1110,9 +1205,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ])
                                         ->inline()
                                         ->default('institution')
-                                        ->visibleJs(<<<'JS'
-                                                            $get('organizer_type') === 'speaker' || !$get('location_same_as_institution')
-                                                            JS)
+                                        ->visibleJs("! {$hasScopedInstitutionJs} && (\$get('organizer_type') === 'speaker' || !\$get('location_same_as_institution'))")
                                         ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('event_format') !== 'online'),
 
                                     Select::make('location_institution_id')
@@ -1120,9 +1213,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(fn (): array => $this->availableInstitutionOptions())
                                         ->searchable()
                                         ->preload()
-                                        ->visibleJs(<<<'JS'
-                                                            ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution'
-                                                            JS)
+                                        ->visibleJs("! {$hasScopedInstitutionJs} && (\$get('organizer_type') === 'speaker' || !\$get('location_same_as_institution')) && \$get('location_type') === 'institution'")
                                         ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('location_type') === 'institution')
                                         ->createOptionForm(InstitutionFormSchema::createOptionForm(includeLocationPicker: true))
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
@@ -1132,9 +1223,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->options(fn (): array => $this->cachedSubmitVenueOptions())
                                         ->searchable()
                                         ->preload()
-                                        ->visibleJs(<<<'JS'
-                                                            ($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'venue'
-                                                            JS)
+                                        ->visibleJs("({$hasScopedInstitutionJs} && !\$get('location_same_as_institution')) || (! {$hasScopedInstitutionJs} && (\$get('organizer_type') === 'speaker' || !\$get('location_same_as_institution')) && \$get('location_type') === 'venue')")
                                         ->required(fn (Get $get): bool => ($get('organizer_type') === 'speaker' || ! $get('location_same_as_institution')) && $get('location_type') === 'venue')
                                         ->createOptionForm(VenueFormSchema::createOptionForm(includeLocationPicker: true))
                                         ->createOptionUsing(fn (array $data, Schema $schema): string => VenueFormSchema::createOptionUsing($data, $schema)),
@@ -1145,11 +1234,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('Pilih ruang…'))
                                         ->searchable()
                                         ->preload()
-                                        ->visibleJs(<<<'JS'
-                                                            // Show space only for institution locations, not venues
-                                                            ($get('organizer_type') === 'institution' && ($get('location_same_as_institution') !== false)) || 
-                                                            (($get('organizer_type') === 'speaker' || !$get('location_same_as_institution')) && $get('location_type') === 'institution')
-                                                            JS)
+                                        ->visibleJs("({$hasScopedInstitutionJs} && (\$get('location_same_as_institution') !== false)) || (\$get('organizer_type') === 'institution' && (\$get('location_same_as_institution') !== false)) || ((\$get('organizer_type') === 'speaker' || !\$get('location_same_as_institution')) && \$get('location_type') === 'institution')")
                                         ->options(
                                             fn (): array => Space::query()
                                                 ->where('is_active', true)
@@ -1301,10 +1386,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->maxLength(1000)
                                         ->placeholder(__('cth: Keperluan khas, maklumat tambahan, atau apa sahaja yang perlu diketahui moderator...'))
                                         ->helperText(__('Maksimum 1000 aksara')),
-                                ]),
+                                ])
+                                ->visible(! $hasScopedInstitution),
 
-                            Callout::make(__('Semakan Moderator'))
-                                ->description(__('Majlis anda akan disemak oleh moderator kami dalam tempoh 24-48 jam. Anda akan dimaklumkan melalui e-mel setelah majlis diluluskan.'))
+                            Callout::make($hasScopedInstitution ? __('Terbit Serta-Merta') : __('Semakan Moderator'))
+                                ->description($hasScopedInstitution
+                                    ? __('Majlis institusi ini akan diterbitkan terus selepas dihantar dan tidak melalui giliran semakan moderator.')
+                                    : __('Majlis anda akan disemak oleh moderator kami dalam tempoh 24-48 jam. Anda akan dimaklumkan melalui e-mel setelah majlis diluluskan.'))
                                 ->info(),
                         ]),
                 ])
@@ -1343,9 +1431,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             color="success"
                                             class="w-full"
                                         >
-                                            {{ __('Hantar Majlis untuk Semakan') }}
+                                            {{ $label }}
                                         </x-filament::button>
-                                    BLADE))),
+                                    BLADE, ['label' => $submitButtonLabel]))),
             ])
             ->statePath('data');
     }
@@ -1353,6 +1441,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     public function submit(): mixed
     {
         $validated = $this->eventForm()->getState();
+        $validated = $this->normalizeScopedInstitutionState($validated);
         $this->assertCaptchaIsValid($validated['captcha_token'] ?? null);
 
         // Enforce children_allowed when AllAges or Children is selected
@@ -1410,11 +1499,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $organizerId = null;
         $targetInstitutionId = null;
         $targetVenueId = null;
-        $locationInstitutionId = null;
-
         $locationType = $validated['location_type'] ?? 'institution';
-        $locationInstitutionId = $this->data['location_institution_id'] ?? null;
-        $venueId = $this->data['location_venue_id'] ?? null;
+        $locationInstitutionId = $validated['location_institution_id'] ?? null;
+        $venueId = $validated['location_venue_id'] ?? null;
 
         // If it was institution, we check if it was pre-selected or created
         if ($locationType === 'institution' && $locationInstitutionId) {
@@ -1427,19 +1514,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $organizerType = Institution::class;
             $organizerId = $validated['organizer_institution_id'];
 
-            Log::info('Location logic check', [
-                'location_same_as_institution' => $validated['location_same_as_institution'] ?? 'not set',
-                'organizer_type' => $validated['organizer_type'] ?? 'not set',
-            ]);
             if (($validated['location_same_as_institution'] ?? true) == true) {
-                $targetInstitutionId = $this->data['organizer_institution_id'];
+                $targetInstitutionId = $validated['organizer_institution_id'];
                 $targetVenueId = null;
             } else {
                 if (($validated['location_type'] ?? null) === 'institution') {
-                    $targetInstitutionId = $this->data['location_institution_id'] ?? null;
+                    $targetInstitutionId = $validated['location_institution_id'] ?? null;
                     $targetVenueId = null;
                 } else {
-                    $targetVenueId = $this->data['location_venue_id'] ?? null;
+                    $targetVenueId = $validated['location_venue_id'] ?? null;
                     $targetInstitutionId = null;
                 }
             }
@@ -1477,7 +1560,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $parentEvent = $this->selectedParentEvent();
 
-        $event = Event::create([
+        $event = Event::create(array_merge([
             'title' => $validated['title'],
             'slug' => Str::slug($validated['title']).'-'.Str::random(7),
             'description' => $validated['description'] ?? null,
@@ -1505,7 +1588,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'live_url' => $validated['live_url'] ?? null,
             'visibility' => $validated['visibility'] ?? EventVisibility::Public,
             'submitter_id' => auth()->id(),
-        ]);
+        ], $this->shouldAutoApproveSubmission() ? ['status' => 'pending'] : []));
 
         // Attach selected space to institution if not already attached
         if (! empty($validated['space_id']) && ! empty($event->institution_id)) {
@@ -1618,11 +1701,16 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             );
         }
 
-        // Transition from Draft → Pending (notifies moderators)
-        $event->status->transitionTo(Pending::class);
+        if ($this->shouldAutoApproveSubmission()) {
+            app(ModerationService::class)->approve($event, null, 'Auto-approved from institution dashboard submission.');
+        } else {
+            $event->status->transitionTo(Pending::class);
+        }
 
         session()->flash('event_title', $event->title);
         session()->flash('event_slug', $event->slug);
+        session()->flash('event_auto_approved', $this->shouldAutoApproveSubmission());
+        session()->flash('submission_institution_id', $this->scopedInstitutionId);
         $eventVisibility = $event->visibility;
 
         session()->flash(
@@ -1640,6 +1728,55 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         return redirect()->route('submit-event.success');
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    protected function normalizeScopedInstitutionState(array $validated): array
+    {
+        $institution = $this->scopedInstitution();
+
+        if (! $institution instanceof Institution) {
+            return $validated;
+        }
+
+        $validated['organizer_type'] = 'institution';
+        $validated['organizer_institution_id'] = $institution->id;
+        $validated['location_same_as_institution'] = (bool) ($validated['location_same_as_institution'] ?? true);
+
+        if (($validated['event_format'] ?? EventFormat::Physical->value) === EventFormat::Online->value) {
+            $validated['location_type'] = 'institution';
+            $validated['location_institution_id'] = $institution->id;
+            $validated['location_venue_id'] = null;
+
+            return $validated;
+        }
+
+        if ($validated['location_same_as_institution'] === true) {
+            $validated['location_type'] = 'institution';
+            $validated['location_institution_id'] = $institution->id;
+            $validated['location_venue_id'] = null;
+
+            return $validated;
+        }
+
+        $validated['location_type'] = 'venue';
+        $validated['location_institution_id'] = null;
+
+        if (! filled($validated['location_venue_id'] ?? null)) {
+            throw ValidationException::withMessages([
+                'data.location_venue_id' => __('Sila pilih lokasi untuk majlis ini.'),
+            ]);
+        }
+
+        return $validated;
+    }
+
+    protected function shouldAutoApproveSubmission(): bool
+    {
+        return $this->hasScopedInstitution();
+    }
+
     protected function selectedParentEvent(): ?Event
     {
         $parentId = $this->parentEventId;
@@ -1652,9 +1789,29 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ->with(['institution:id,name', 'settings'])
             ->find($parentId);
 
+        $scopedInstitution = $this->scopedInstitution();
+
+        if (
+            $parentEvent instanceof Event
+            && $scopedInstitution instanceof Institution
+            && ! $this->parentEventMatchesScopedInstitution($parentEvent, $scopedInstitution)
+        ) {
+            abort(403);
+        }
+
         return $parentEvent instanceof Event && $parentEvent->isParentProgram()
             ? $parentEvent
             : null;
+    }
+
+    protected function parentEventMatchesScopedInstitution(Event $parentEvent, Institution $institution): bool
+    {
+        if ($parentEvent->institution_id === $institution->id) {
+            return true;
+        }
+
+        return $parentEvent->organizer_type === Institution::class
+            && $parentEvent->organizer_id === $institution->id;
     }
 
     /**
@@ -1744,6 +1901,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
      */
     protected function availableInstitutionOptions(): array
     {
+        if (($institution = $this->scopedInstitution()) instanceof Institution) {
+            return [$institution->id => $institution->name];
+        }
+
         $access = app(EntitySubmissionAccess::class);
         $submitter = $this->submitterUser();
 

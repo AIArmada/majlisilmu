@@ -34,8 +34,8 @@
     $ahliInstitutionInvitationsUrl = $selectedInstitution !== null && $canManageMembers
         ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution, 'relation' => 'member_invitations'], panel: 'ahli')
         : null;
-    $advancedCreateUrl = $selectedInstitution !== null
-        ? route('dashboard.events.create-advanced', ['institution' => $selectedInstitution->id])
+    $institutionSubmitUrl = $selectedInstitution !== null
+        ? route('dashboard.institutions.submit-event', ['institution' => $selectedInstitution->id])
         : null;
 @endphp
 
@@ -111,15 +111,19 @@
                         </div>
 
                         <div class="flex flex-col items-start gap-3 md:items-end">
-                            @if($advancedCreateUrl)
+                            @if($institutionSubmitUrl)
                                 <a
-                                    href="{{ $advancedCreateUrl }}"
+                                    href="{{ $institutionSubmitUrl }}"
                                     wire:navigate
                                     class="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
                                 >
-                                    {{ __('Create Advanced Program') }}
+                                    {{ __('Submit Event') }}
                                 </a>
                             @endif
+
+                            <p class="text-xs text-slate-500">
+                                {{ __('Advanced parent-program builder is temporarily unavailable on this dashboard.') }}
+                            </p>
 
                             <p class="text-sm font-medium text-slate-500">
                                 {{ __('Showing :count of :total events', ['count' => $events->count(), 'total' => $events->total()]) }}

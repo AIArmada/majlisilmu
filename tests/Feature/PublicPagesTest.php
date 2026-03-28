@@ -4,6 +4,7 @@ use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\ContactCategory;
 use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
@@ -44,6 +45,12 @@ it('respects the signals geolocation toggle in tracker markup', function () {
     $this->get('/')
         ->assertSuccessful()
         ->assertSee('data-enable-geolocation="true"', false);
+});
+
+it('keeps the homepage nearby button visible', function () {
+    $this->get(route('home'))
+        ->assertSuccessful()
+        ->assertSee('data-testid="near-me-button"', false);
 });
 
 it('renders accessible labels on the public submit-event form', function () {
@@ -155,6 +162,7 @@ it('shows federal territory event cards on series pages with subdistrict and sta
         'visibility' => 'public',
         'published_at' => now()->subMinute(),
         'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical,
         'venue_id' => $venue->id,
     ]);
 

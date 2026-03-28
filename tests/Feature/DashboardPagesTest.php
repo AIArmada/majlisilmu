@@ -477,7 +477,9 @@ it('shows institution profile and events for members without a separate registra
     $response->assertOk()
         ->assertSee('Masjid Al-Ikhlas')
         ->assertSee('Event List')
-        ->assertSee('Create Advanced Program')
+        ->assertSee('Submit Event')
+        ->assertSee('Advanced parent-program builder is temporarily unavailable on this dashboard.')
+        ->assertDontSee('Create Advanced Program')
         ->assertSee('Search by event title or venue')
         ->assertSee('Members & Roles')
         ->assertSee('Institution Dashboard Event')
@@ -489,7 +491,7 @@ it('shows institution profile and events for members without a separate registra
         ->assertDontSee('Outside Institution Event')
         ->assertDontSee('External Registrant');
 
-    $response->assertSee(route('dashboard.events.create-advanced', ['institution' => $institution->id]), false);
+    $response->assertSee(route('dashboard.institutions.submit-event', ['institution' => $institution->id]), false);
     $response->assertSee(route('submit-event.create', ['parent' => $parentProgram->id]), false);
 });
 

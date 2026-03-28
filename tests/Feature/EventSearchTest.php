@@ -21,6 +21,7 @@ use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
 use App\Support\Location\PublicCountryFilterVisibility;
+use App\Support\Location\PublicGeolocationPermission;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,6 +75,11 @@ function ensureMalaysiaStateForTests(string $name = 'Selangor'): State
     );
 
     return $state;
+}
+
+function hiddenAttributeRegexForTestId(string $testId): string
+{
+    return '/data-testid="'.preg_quote($testId, '/').'"[^>]*\shidden(?:=|(?=[\s>]))/';
 }
 
 describe('Event Search Filters', function () {
@@ -191,14 +197,41 @@ describe('Event Search Filters', function () {
             ->assertSee('/carian-tersimpan?search=halaqah', false);
     });
 
-    it('shows radius control only when a nearby location is available', function () {
-        $this->get('/events')
-            ->assertOk()
-            ->assertDontSee('Radius (km)');
+    it('keeps the nearby button visible while gating radius controls on geolocation permission', function () {
+        $defaultResponse = $this->get('/events?lat=3.1390&lng=101.6869');
 
-        $this->get('/events?lat=3.1390&lng=101.6869')
-            ->assertOk()
-            ->assertSee('Radius (km)');
+        $defaultResponse->assertOk();
+        expect($defaultResponse->getContent())->not->toMatch(hiddenAttributeRegexForTestId('near-me-button'));
+        expect($defaultResponse->getContent())->toMatch(hiddenAttributeRegexForTestId('nearby-radius-inline'));
+
+        $grantedResponse = $this
+            ->withUnencryptedCookie(PublicGeolocationPermission::COOKIE_NAME, '1')
+            ->get('/events?lat=3.1390&lng=101.6869');
+
+        $grantedResponse->assertOk();
+        expect($grantedResponse->getContent())->not->toMatch(hiddenAttributeRegexForTestId('near-me-button'));
+        expect($grantedResponse->getContent())->not->toMatch(hiddenAttributeRegexForTestId('nearby-radius-inline'));
+    });
+
+    it('hides the advanced nearby radius until geolocation permission is granted', function () {
+        $defaultHtml = Livewire::test(AdvancedFiltersPanel::class, [
+            'filters' => [
+                'lat' => '3.1390',
+                'lng' => '101.6869',
+            ],
+        ])->html();
+
+        expect($defaultHtml)->toMatch(hiddenAttributeRegexForTestId('advanced-nearby-radius'));
+
+        $grantedHtml = Livewire::withCookie(PublicGeolocationPermission::COOKIE_NAME, '1')
+            ->test(AdvancedFiltersPanel::class, [
+                'filters' => [
+                    'lat' => '3.1390',
+                    'lng' => '101.6869',
+                ],
+            ])->html();
+
+        expect($grantedHtml)->not->toMatch(hiddenAttributeRegexForTestId('advanced-nearby-radius'));
     });
 
     it('sets default nearby radius to 15 km when location is detected', function () {
