@@ -232,7 +232,6 @@ new class extends Component {
         ]));
         $regionalAddressLine = filled($address?->state?->name) ? (string) $address->state->name : '';
     }
-    $googleMapsApiKey = (string) config('services.google.maps_api_key', '');
     $mapQuery = implode(', ', array_filter([
         $institution->name,
         $address?->line1,
@@ -258,9 +257,7 @@ new class extends Component {
 
     $hasPhysicalAddress = $address && ($address->line1 || $address->city?->name || $address->state?->name);
     $googleMapsEmbedUrl = null;
-    if (filled($address?->google_maps_url) && filled($googleMapsApiKey) && filled($normalizedMapQuery)) {
-        $googleMapsEmbedUrl = 'https://www.google.com/maps/embed/v1/place?key=' . urlencode($googleMapsApiKey) . '&q=' . urlencode((string) $normalizedMapQuery);
-    } elseif (filled($address?->google_maps_url) && filled($normalizedMapQuery)) {
+    if (filled($address?->google_maps_url) && filled($normalizedMapQuery)) {
         $googleMapsEmbedUrl = 'https://www.google.com/maps?q=' . urlencode((string) $normalizedMapQuery) . '&output=embed';
     }
     $wazeUrl = filled($address?->waze_url) ? (string) $address->waze_url : null;
@@ -1415,15 +1412,6 @@ new class extends Component {
                                             <iframe src="{{ $googleMapsEmbedUrl }}" class="h-[220px] w-full" loading="lazy"
                                                 referrerpolicy="no-referrer-when-downgrade" allowfullscreen
                                                 title="{{ __('Peta Lokasi') }}"></iframe>
-                                        </div>
-                                    @elseif($address->lat && $address->lng && filled($googleMapsApiKey))
-                                        <div class="overflow-hidden rounded-xl border border-slate-200/70">
-                                            <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener" class="block">
-                                                <img src="https://maps.googleapis.com/maps/api/staticmap?center={{ $address->lat }},{{ $address->lng }}&zoom=15&size=340x180&scale=2&markers=color:0x059669%7C{{ $address->lat }},{{ $address->lng }}&style=feature:poi%7Cvisibility:off&key={{ $googleMapsApiKey }}"
-                                                    alt="{{ __('Peta') }}"
-                                                    class="h-[140px] w-full object-cover transition-opacity hover:opacity-90"
-                                                    loading="lazy" onerror="this.parentElement.parentElement.style.display='none'">
-                                            </a>
                                         </div>
                                     @else
                                         <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener"

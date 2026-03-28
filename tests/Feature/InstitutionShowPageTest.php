@@ -194,6 +194,28 @@ it('displays the institution contact address block in street locality and region
         ]);
 });
 
+it('uses a public google maps embed on institution show pages instead of platform api urls', function () {
+    config()->set('services.google.maps_api_key', 'test-maps-key');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Shah Alam',
+        'status' => 'verified',
+    ]);
+
+    $institution->address()->update([
+        'line1' => 'Persiaran Masjid',
+        'google_maps_url' => 'https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869&query_place_id=place_123',
+        'lat' => 3.139,
+        'lng' => 101.6869,
+    ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('https://www.google.com/maps?q=3.139%2C101.6869&amp;output=embed', false)
+        ->assertDontSee('https://www.google.com/maps/embed/v1/place?key=', false)
+        ->assertDontSee('https://maps.googleapis.com/maps/api/staticmap', false);
+});
+
 it('displays upcoming events for the institution', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 

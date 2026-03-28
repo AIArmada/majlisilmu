@@ -1,3 +1,18 @@
+# Institution Maps Embed Audit
+
+- [x] Trace the `/institusi/*` map rendering path and confirm why it is calling a Google Maps API surface
+- [x] Replace the institution-page map display with a non-API path if the page only needs outbound map navigation
+- [x] Verify the public institution page no longer shows the rejected API message
+
+## Review
+- The `/institusi/{slug}` page was not failing because of the visible Google Maps button. The failing surface was the inline preview block in [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡show.blade.php), which preferred `https://www.google.com/maps/embed/v1/place?...` whenever `services.google.maps_api_key` existed and then fell back to `maps.googleapis.com/maps/api/staticmap`.
+- That page does not need Google Maps Platform APIs. It now always uses the public embeddable URL form `https://www.google.com/maps?q=...&output=embed` when a normalized maps query is available, and otherwise falls back to the existing outbound Google Maps link. The API-backed embed and static map paths were removed from the institution page.
+- Added a regression in [InstitutionShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionShowPageTest.php) that sets a fake API key and proves the page still renders the non-API embed URL while not rendering Embed API or Static Maps API URLs.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **25 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='loads public detail pages|shows share actions on public series and reference pages'` => **2 passed**
+  - `git diff --check -- resources/views/components/pages/institutions/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php tasks/todo.md` => **clean**
+
 # Uncommitted Audit
 
 - [x] Audit the current uncommitted diff for regressions across the touched public and dashboard flows
