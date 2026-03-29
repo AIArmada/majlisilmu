@@ -1,3 +1,18 @@
+# Institution Submission Mobile Spacing
+
+- [x] Inspect the institution submission page shell and identify the mobile-specific border/spacing density
+- [x] Reduce the nested card feel on mobile without changing the desktop layout direction
+- [x] Verify the contribution page still renders and the Blade diff stays clean
+
+## Review
+- Tuned [submit-institution.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/contributions/submit-institution.blade.php) for mobile by flattening the outer shell spacing, reducing container padding, and making the action buttons full-width on small screens so the page no longer feels like a stack of tightly nested bordered cards.
+- Added a page-scoped mobile CSS block that softens the Filament form section chrome only on this route: smaller section radii, no shadow, tighter section spacing, and slightly rounder inputs/repeaters so the form reads as one mobile flow instead of several heavy card layers.
+- Tightened the lower helper cards for mobile too, with smaller gaps and lighter framing while keeping the desktop card treatment unchanged from `sm` upward.
+- Verification:
+  - `vendor/bin/pint --test resources/views/livewire/pages/contributions/submit-institution.blade.php` => **pass**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='renders the dedicated institution contribution page|exposes Filament action handlers required by public contribution media uploads'` => **2 passed**
+  - `git diff --check -- resources/views/livewire/pages/contributions/submit-institution.blade.php` => **clean**
+
 # Horizon Installation And Configuration
 
 - [x] Audit the current queue, Redis, scheduler, and admin access setup for Horizon readiness
