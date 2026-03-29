@@ -2,6 +2,7 @@
 
 namespace App\Forms;
 
+use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\InstitutionType;
 use App\Models\Institution;
@@ -15,7 +16,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Str;
 
 class InstitutionFormSchema
 {
@@ -85,7 +85,7 @@ class InstitutionFormSchema
 
         $institution = Institution::create([
             'name' => $data['name'],
-            'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
+            'slug' => app(GenerateInstitutionSlugAction::class)->handle((string) $data['name'], $addressData),
             'type' => $data['type'],
             'description' => $data['description'] ?? null,
             'status' => 'pending',

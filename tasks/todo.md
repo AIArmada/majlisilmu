@@ -1,3 +1,50 @@
+# Horizon Installation And Configuration
+
+- [x] Audit the current queue, Redis, scheduler, and admin access setup for Horizon readiness
+- [x] Install `laravel/horizon` and publish the package assets/configuration
+- [x] Switch queue runtime configuration to Redis-backed Horizon processing and align local/dev commands
+- [x] Wire Horizon dashboard authorization and scheduler/deploy integration for this app
+- [x] Run focused verification and document the result
+
+## Review
+- Installed `laravel/horizon` and published the Horizon scaffolding, then aligned the generated setup with Majlis Ilmu’s actual runtime instead of keeping the stock defaults. Queue execution now defaults to Redis in [queue.php](/Users/Saiffil/Herd/majlisilmu/config/queue.php), queued media conversions default to a dedicated `media` queue in [media-library.php](/Users/Saiffil/Herd/majlisilmu/config/media-library.php), and the local/example environment files now opt into Redis-backed queues with the matching retry and media queue variables.
+- Reworked [horizon.php](/Users/Saiffil/Herd/majlisilmu/config/horizon.php) into three supervisors: one for `default`, one for the app’s existing notification queues (`notifications-inbox`, `notifications-mail`, `notifications-push`, `notifications-whatsapp`), and one for queued media conversions. Added a wildcard environment fallback plus per-queue wait thresholds so Horizon can monitor each named queue cleanly.
+- Wired [HorizonServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/HorizonServiceProvider.php) to the app’s existing admin-access rule (`User::hasApplicationAdminAccess()`), added the provider in [providers.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/providers.php), and scheduled `horizon:snapshot` every five minutes in [console.php](/Users/Saiffil/Herd/majlisilmu/routes/console.php) so the dashboard throughput and wait-time graphs populate per the Laravel Horizon docs.
+- Updated the local developer flow to use Horizon instead of the old queue worker path: `composer dev` now runs `php artisan horizon:listen`, `package.json` includes `chokidar` for watch-mode restarts, and the internal runbooks in [EMAIL_FEATURES.md](/Users/Saiffil/Herd/majlisilmu/docs/EMAIL_FEATURES.md) and [MAJLISILMU_TECHNICAL_DOCUMENTATION.md](/Users/Saiffil/Herd/majlisilmu/docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md) now describe the Redis/Horizon path instead of `queue:work`.
+- Added a focused regression in [HorizonConfigurationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/HorizonConfigurationTest.php) covering the Horizon gate and the registered supervisor / snapshot configuration.
+- Verification:
+  - `vendor/bin/pint --test bootstrap/providers.php config/queue.php config/media-library.php config/horizon.php app/Providers/HorizonServiceProvider.php routes/console.php tests/Feature/HorizonConfigurationTest.php` => **pass**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/HorizonConfigurationTest.php` => **2 passed**
+  - `php artisan route:list --path=horizon` => **22 Horizon routes registered**
+  - `php artisan schedule:list | rg -n "horizon:snapshot|horizon-snapshot"` => **snapshot scheduled every 5 minutes**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `git diff --check` => **clean**
+
+# Institution Slug Normalization
+
+- [x] Add a shared institution slug generator that builds slugs from `name + subdistrict + district + state + country code` and scopes duplicate numbering to the same exact name within the same subdistrict
+- [x] Route all institution creation entrypoints through the shared slug generator, including public quick-create, public institution submission/contribution staging, contribution approval fallback creation, and Filament admin creation
+- [x] Add a queued backfill command/job to regenerate existing institution slugs in the new format
+- [x] Add focused regression coverage and run verification for the slug rules and backfill path
+
+## Review
+- Added [GenerateInstitutionSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Institutions/GenerateInstitutionSlugAction.php) to centralize the new institution slug rule. It resolves locality names from address IDs, builds `name[-sequence]-subdistrict-district-state-countrycode`, omits empty segments, starts duplicate numbering from exact-name matches in the same locality, and keeps regeneration stable for existing duplicates by assigning their sequence from a deterministic `created_at + id` order during backfill.
+- Wired that action into every institution creation path the user named:
+  - [InstitutionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionFormSchema.php) quick-create, which covers the submit-event organizer/location create-option flow
+  - [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php) staged public institution creation used by `/sumbangan/institusi/baru`
+  - [ApproveContributionRequestAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Contributions/ApproveContributionRequestAction.php) fallback institution creation during approval when a pending entity does not already exist
+  - [CreateInstitution.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Institutions/Pages/CreateInstitution.php) so Filament admin creation uses the geographic slug instead of any manually entered temporary value
+- Registered the queue command at the application bootstrap level in [app.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/app.php), and added queued backfill support with [BackfillInstitutionSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Jobs/BackfillInstitutionSlugs.php) and [QueueBackfillInstitutionSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/QueueBackfillInstitutionSlugs.php). Run `php artisan institutions:queue-slug-backfill` to enqueue the backfill job; it processes institutions serially in queue order, regenerates deterministic slugs, avoids touching `updated_at`, busts the public listings cache once at the end, and intentionally does not create aliases or redirects for old slugs.
+- Added focused coverage in [InstitutionSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionSlugGenerationTest.php) for quick-create, staged duplicate numbering, admin Filament create, the queued backfill logic, the runtime queueing command, null locality omission, and the uniqueness fallback when a literal numbered institution name already occupies the expected duplicate slot.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/InstitutionSlugGenerationTest.php` => **7 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php --filter='stores description and contacts when creating an institution via quick-create|stores nested institution quick-create address data when picker mode is used'` => **2 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowServiceTest.php --filter='creates staged pending institution records with structured relation data|approves institution create requests and promotes the proposer to owner'` => **2 passed**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi bootstrap/app.php app/Actions/Institutions/GenerateInstitutionSlugAction.php app/Jobs/BackfillInstitutionSlugs.php app/Console/Commands/QueueBackfillInstitutionSlugs.php app/Forms/InstitutionFormSchema.php app/Services/ContributionEntityMutationService.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Filament/Resources/Institutions/Pages/CreateInstitution.php tests/Feature/InstitutionSlugGenerationTest.php` => **No errors**
+  - `XDEBUG_MODE=off vendor/bin/pint --test bootstrap/app.php app/Actions/Institutions/GenerateInstitutionSlugAction.php app/Jobs/BackfillInstitutionSlugs.php app/Console/Commands/QueueBackfillInstitutionSlugs.php app/Forms/InstitutionFormSchema.php app/Services/ContributionEntityMutationService.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Filament/Resources/Institutions/Pages/CreateInstitution.php tests/Feature/InstitutionSlugGenerationTest.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `php artisan list --raw | rg institutions:queue-slug-backfill` => **command registered**
+  - `git diff --check -- bootstrap/app.php app/Actions/Institutions/GenerateInstitutionSlugAction.php app/Jobs/BackfillInstitutionSlugs.php app/Console/Commands/QueueBackfillInstitutionSlugs.php app/Forms/InstitutionFormSchema.php app/Services/ContributionEntityMutationService.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Filament/Resources/Institutions/Pages/CreateInstitution.php tests/Feature/InstitutionSlugGenerationTest.php tasks/todo.md tasks/lessons.md` => **clean**
+
 # Institution Maps Embed Audit
 
 - [x] Trace the `/institusi/*` map rendering path and confirm why it is calling a Google Maps API surface

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Contributions;
 
+use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Membership\AssignOwnerToNewSubject;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
@@ -27,6 +28,7 @@ class ApproveContributionRequestAction
         private readonly ModerationService $moderationService,
         private readonly ContributionEntityMutationService $entityMutationService,
         private readonly AssignOwnerToNewSubject $assignOwnerToNewSubject,
+        private readonly GenerateInstitutionSlugAction $generateInstitutionSlugAction,
     ) {}
 
     public function handle(ContributionRequest $request, User $reviewer, ?string $reviewerNote = null): ContributionRequest
@@ -107,7 +109,10 @@ class ApproveContributionRequestAction
     {
         $institution = Institution::create([
             'name' => (string) ($payload['name'] ?? 'Institution'),
-            'slug' => Str::slug((string) ($payload['name'] ?? 'institution')).'-'.Str::lower(Str::random(7)),
+            'slug' => $this->generateInstitutionSlugAction->handle(
+                (string) ($payload['name'] ?? 'Institution'),
+                is_array($payload['address'] ?? null) ? $payload['address'] : [],
+            ),
             'type' => (string) ($payload['type'] ?? 'masjid'),
             'description' => $payload['description'] ?? null,
             'status' => 'verified',

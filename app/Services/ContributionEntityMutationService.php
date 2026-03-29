@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
@@ -30,6 +31,7 @@ class ContributionEntityMutationService
     public function __construct(
         private readonly EventKeyPersonSyncService $eventKeyPersonSyncService,
         private readonly AddMemberToSubject $addMemberToSubject,
+        private readonly GenerateInstitutionSlugAction $generateInstitutionSlugAction,
     ) {}
 
     /**
@@ -53,7 +55,10 @@ class ContributionEntityMutationService
     {
         $institution = Institution::create([
             'name' => (string) ($payload['name'] ?? 'Institution'),
-            'slug' => Str::slug((string) ($payload['name'] ?? 'institution')).'-'.Str::lower(Str::random(7)),
+            'slug' => $this->generateInstitutionSlugAction->handle(
+                (string) ($payload['name'] ?? 'Institution'),
+                is_array($payload['address'] ?? null) ? $payload['address'] : [],
+            ),
             'type' => $this->normalizeInstitutionType($payload['type'] ?? null),
             'description' => $payload['description'] ?? null,
             'status' => 'pending',
