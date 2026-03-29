@@ -7,6 +7,7 @@ use App\Providers\BlazeServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\Filament\AhliPanelProvider;
 use App\Providers\FortifyServiceProvider;
+use App\Providers\HorizonServiceProvider;
 use App\Providers\RateLimitServiceProvider;
 use Ysfkaya\FilamentPhoneInput\FilamentPhoneInputServiceProvider;
 
@@ -20,4 +21,5 @@ return [
     AdminPanelProvider::class,
     RateLimitServiceProvider::class,
     FortifyServiceProvider::class,
+    HorizonServiceProvider::class,
 ];

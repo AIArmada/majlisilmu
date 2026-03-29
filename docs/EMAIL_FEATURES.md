@@ -6,8 +6,8 @@ Majlis Ilmu uses Laravel notifications for email delivery. In local development,
 
 - Mail transport: `MAIL_MAILER=log`
 - Queue behavior: queued emails stay on the `notifications-mail` queue
-- Queue connection: `QUEUE_CONNECTION=database`
-- To see email output locally, run a worker such as `php artisan queue:work`
+- Queue connection: `QUEUE_CONNECTION=redis`
+- To see email output locally, run Horizon, for example via `composer run dev` or `php artisan horizon`
 
 ## Supported Emails
 

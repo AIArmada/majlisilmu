@@ -381,7 +381,7 @@ composer run dev
 
 # Or run granular processes manually
 php artisan serve
-php artisan queue:work
+php artisan horizon
 npm run dev
 ```
 
@@ -395,6 +395,15 @@ php artisan optimize
 
 # Re-index search content
 php artisan search:index-events --fresh
+```
+
+## 16.4 Queue Operations
+```bash
+# Run Horizon under a process monitor in production
+php artisan horizon
+
+# Gracefully restart Horizon workers during deployment
+php artisan horizon:terminate
 ```
 
 ---

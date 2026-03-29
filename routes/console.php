@@ -64,3 +64,10 @@ Schedule::command('media-library:regenerate --only-missing --with-responsive-ima
     ->timezone('Asia/Kuala_Lumpur')
     ->name('media-library-regenerate-missing')
     ->withoutOverlapping();
+
+// Horizon metrics snapshots power the dashboard throughput and wait-time graphs.
+Schedule::command('horizon:snapshot')
+    ->everyFiveMinutes()
+    ->timezone('UTC')
+    ->name('horizon-snapshot')
+    ->withoutOverlapping();
