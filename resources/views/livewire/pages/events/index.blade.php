@@ -64,7 +64,6 @@
     $stateId = $this->state_id;
     $districtId = $this->district_id;
     $subdistrictId = $this->subdistrict_id;
-    $showCountryFilter = $this->showsCountryFilter();
     $institutionId = $this->institution_id;
     $venueId = $this->venue_id;
     $gender = $this->gender;
@@ -640,7 +639,7 @@
                         </span>
                     @endif
 
-                    @if($countryId && ($showCountryFilter || $countryId !== $defaultCountryId))
+                    @if($countryId && $countryId !== $defaultCountryId)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {{ $countries->firstWhere('id', (int) $countryId)?->name ?? __('Country') }}
                         </span>

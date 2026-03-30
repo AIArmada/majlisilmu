@@ -6,10 +6,8 @@ use App\Models\NotificationDestination;
 use App\Models\User;
 use App\Notifications\Auth\VerifyEmailNotification;
 use App\Services\Notifications\NotificationSettingsManager;
-use App\Support\Location\PublicCountryFilterVisibility;
 use Filament\Forms\Components\Select as FormSelect;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
@@ -29,8 +27,8 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('Profile')
         ->assertSee('Notifications')
         ->assertSee('Profile Details')
-        ->assertSee('Device Preferences')
-        ->assertSee('Show country selector on public search pages')
+        ->assertDontSee('Device Preferences')
+        ->assertDontSee('Show country selector on public search pages')
         ->assertSee('Prayer Institutions')
         ->assertSee('Daily Prayer Institution')
         ->assertSee('Friday Prayer Institution')
@@ -38,15 +36,6 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertDontSee('Digest Preferences')
         ->assertDontSee('Save Preferences')
         ->assertSee('fi-fo-phone-input', false);
-});
-
-it('loads the public country filter device preference from the cookie', function () {
-    $user = User::factory()->create();
-
-    Livewire::withCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
-        ->actingAs($user)
-        ->test(AccountSettings::class)
-        ->assertSet('formData.show_public_country_filters', true);
 });
 
 it('renders the notifications tab in Malay without leaking raw translation keys', function () {
@@ -140,29 +129,6 @@ it('updates account settings and resets verification when contact details change
     expect($notificationState['settings']['timezone'])->toBe('Asia/Jakarta');
 
     Notification::assertSentTo($user->fresh(), VerifyEmailNotification::class);
-});
-
-it('queues the public country filter visibility cookie when saving account settings', function () {
-    Cookie::flushQueuedCookies();
-
-    $user = User::factory()->create([
-        'name' => 'Cookie User',
-        'email' => 'cookie@example.test',
-        'phone' => '+60111111111',
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(AccountSettings::class)
-        ->set('formData.show_public_country_filters', true)
-        ->call('saveAccountSettings')
-        ->assertHasNoErrors();
-
-    $queuedCookie = Cookie::queued(PublicCountryFilterVisibility::COOKIE_NAME);
-
-    expect($queuedCookie)->not->toBeNull()
-        ->and($queuedCookie?->getValue())->toBe('1');
-
-    Cookie::flushQueuedCookies();
 });
 
 it('saves trigger overrides and fallback channels from account settings', function () {

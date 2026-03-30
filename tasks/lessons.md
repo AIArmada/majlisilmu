@@ -1,5 +1,6 @@
 # Lessons
 
+- When a user says a new selector must sit beside language but stay conceptually separate, do not overload Laravel's existing locale state; introduce a distinct market preference and keep translation language independent.
 - When a user asks for permission-gated UI, confirm whether the primary CTA should stay visible and trigger the browser permission prompt while only secondary controls stay hidden; do not assume the button itself must disappear.
 - When a permission-gated CTA is meant to stay retryable, do not short-circuit on `navigator.permissions.query(...).state === 'denied'`; still call the underlying browser API on each click and let the browser decide whether to re-prompt or reject immediately.
 - When the same location CTA appears on the homepage and on `/majlis`, do not assume they share the same denied-permission fallback; the homepage can still redirect into the listing page while `/majlis` keeps the inline notice.

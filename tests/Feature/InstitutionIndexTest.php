@@ -7,7 +7,6 @@ use App\Models\Institution;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
-use App\Support\Location\PublicCountryFilterVisibility;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -244,20 +243,13 @@ it('deduplicates matching district and subdistrict labels on institution cards',
         ->assertDontSee('Temerloh, Temerloh, Pahang');
 });
 
-it('shows location scope controls on institution index', function () {
+it('shows location scope controls on institution index without a country selector', function () {
     get('/institusi')
         ->assertSuccessful()
         ->assertDontSee(__('Country'))
         ->assertSee(__('Semua Negeri'))
         ->assertSee(__('Semua Daerah'))
         ->assertSee(__('Semua Bandar / Mukim / Zon'));
-});
-
-it('shows the institution country selector when the device preference cookie enables it', function () {
-    $this->withUnencryptedCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
-        ->get('/institusi')
-        ->assertSuccessful()
-        ->assertSee(__('Country'));
 });
 
 it('filters institutions by country', function () {
@@ -346,26 +338,12 @@ it('defaults institutions country filter from an unencrypted browser timezone co
         ]);
     }
 
-    $indonesiaId = DB::table('countries')->where('iso2', 'ID')->value('id');
-
-    if (! $indonesiaId) {
-        $indonesiaId = DB::table('countries')->insertGetId([
-            'iso2' => 'ID',
-            'name' => 'Indonesia',
-            'status' => 1,
-            'phone_code' => '62',
-            'iso3' => 'IDN',
-            'region' => 'Asia',
-            'subregion' => 'South-Eastern Asia',
-        ]);
-    }
-
     $response = $this
         ->withUnencryptedCookie('user_timezone', 'Asia/Jakarta')
         ->get('/institusi');
 
     $response->assertSuccessful()
-        ->assertSee('&quot;country_id&quot;:&quot;'.$indonesiaId.'&quot;', false);
+        ->assertSee('&quot;country_id&quot;:&quot;132&quot;', false);
 });
 
 it('filters institutions by negeri, daerah, and subdistrict scopes', function () {

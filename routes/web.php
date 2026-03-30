@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
+use App\Http\Controllers\PublicMarketController;
 use App\Http\Controllers\SitemapController;
 use App\Livewire\Pages\About\Show as AboutPage;
 use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
@@ -39,6 +40,7 @@ Route::bind('reference', fn (string $value): Reference => Reference::query()
 Route::livewire('/', 'pages.⚡home')->name('home');
 Route::livewire('/tentang-kami', AboutPage::class)->name('about');
 Route::get('/bahasa/{locale}', LocaleController::class)->name('locale.switch');
+Route::get('/pasaran/{market}', PublicMarketController::class)->name('market.switch');
 
 // Socialite OAuth Routes
 Route::get('/oauth/{provider}/redirect', [SocialiteController::class, 'redirect'])
@@ -131,6 +133,7 @@ Route::get('/peta-laman-penceramah.xml', [SitemapController::class, 'speakers'])
 
 // Legacy URI aliases (temporary backward compatibility)
 Route::get('/locale/{locale}', LocaleController::class);
+Route::get('/market/{market}', PublicMarketController::class);
 Route::livewire('/events', 'pages.events.index')->middleware('throttle:search');
 Route::livewire('/events/{event:slug}', 'pages.events.show');
 Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar']);

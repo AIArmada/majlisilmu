@@ -1,3 +1,50 @@
+# Public Market Audit Follow-Up
+
+- [x] Audit the uncommitted public-market and hidden-country diff for logic regressions beyond the initial focused implementation
+- [x] Fix any issues found in the new market preference and country inference flow
+- [x] Re-run targeted verification for the corrected market/resolver and public listing paths
+
+## Review
+- Audit found one real resolver-precedence bug in [PublicMarketPreference.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicMarketPreference.php): invalid or disabled saved market values were being coerced into an explicit Malaysia selection instead of being treated as absent. That could mask the later `CF-IPCountry` step in [PreferredCountryResolver.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PreferredCountryResolver.php), which breaks the intended `timezone -> selected market -> CF-IPCountry -> Malaysia` order once additional markets are enabled.
+- Fixed that by making `selectedKey()` return `null` for invalid or disabled persisted values, while still letting `currentKey()` display the enabled default market in the header. I also hardened [PublicMarketRegistry.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicMarketRegistry.php) so a disabled configured default no longer becomes the active default.
+- Added direct regression coverage in [PublicMarketPreferenceTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Unit/PublicMarketPreferenceTest.php) for stale/disabled saved market values and the `CF-IPCountry` fallback path.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/PublicMarketPreferenceTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Unit/PreferredCountryResolverTest.php` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicMarketSelectorTest.php` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **6 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **15 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => **69 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Support/Location/PublicMarketRegistry.php app/Support/Location/PublicMarketPreference.php app/Support/Location/PreferredCountryResolver.php app/Http/Controllers/PublicMarketController.php tests/Unit/PublicMarketPreferenceTest.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/PublicMarketSelectorTest.php` => **No errors**
+  - `vendor/bin/pint app/Support/Location/PublicMarketRegistry.php app/Support/Location/PublicMarketPreference.php app/Support/Location/PreferredCountryResolver.php app/Http/Controllers/PublicMarketController.php tests/Unit/PublicMarketPreferenceTest.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/PublicMarketSelectorTest.php` => **pass**
+  - `git diff --check` => **clean**
+
+# Public Market Selector And Country Inference
+
+- [x] Add a separate public market registry/preference flow and header-only selector beside the language switcher
+- [x] Update preferred-country resolution to `real timezone -> selected market -> CF-IPCountry -> Malaysia` with enabled-market gating
+- [x] Remove the legacy public country visibility toggle and keep public `country_id` fields hidden/internal everywhere
+- [x] Rewrite focused tests for Malaysia-only fallback, header market UI, and removed toggle behavior
+- [x] Run focused verification and document the result
+
+## Review
+- Added a dedicated public market layer with [public-markets.php](/Users/Saiffil/Herd/majlisilmu/config/public-markets.php), [PublicMarketRegistry.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicMarketRegistry.php), [PublicMarketPreference.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicMarketPreference.php), and [PublicMarketController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/PublicMarketController.php). The public header in [app.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/layouts/app.blade.php) now shows a separate market selector beside the existing language selector, with Malaysia selectable and Brunei, Singapore, and Indonesia rendered as disabled “Coming soon” placeholders.
+- Reworked [PreferredCountryResolver.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PreferredCountryResolver.php) so country inference now resolves in this order: real timezone, explicitly selected market, `CF-IPCountry`, then Malaysia. Every candidate is normalized through the four-country market whitelist and then filtered through the enabled-market set, so non-supported or disabled-market values currently collapse to Malaysia.
+- Removed the old country-visibility toggle path by deleting [PublicCountryFilterVisibility.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Location/PublicCountryFilterVisibility.php), stripping the dashboard setting from [AccountSettings.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Dashboard/AccountSettings.php), switching bootstrap cookie handling to the new market cookie in [app.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/app.php), and forcing public country fields to stay hidden in [SharedFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/SharedFormSchema.php), [InstitutionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionFormSchema.php), [VenueFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/VenueFormSchema.php), [InstitutionContributionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionContributionFormSchema.php), [Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Events/Index.php), [AdvancedFiltersPanel.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Events/AdvancedFiltersPanel.php), and [⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡index.blade.php). Explicit `country_id` deep links still work internally; the selector UI is just gone.
+- Added and updated focused regression coverage in [PublicMarketSelectorTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicMarketSelectorTest.php), [PreferredCountryResolverTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Unit/PreferredCountryResolverTest.php), [AccountSettingsPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AccountSettingsPageTest.php), [SharedFormSchemaTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SharedFormSchemaTest.php), [InstitutionContributionLocationPickerTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionContributionLocationPickerTest.php), [EventSearchTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventSearchTest.php), [InstitutionIndexTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionIndexTest.php), and [Laravel13CacheSerializationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Laravel13CacheSerializationTest.php), plus locale copy updates in [en.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/en.json), [ms.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms.json), and [ms_MY.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms_MY.json).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/PreferredCountryResolverTest.php` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicMarketSelectorTest.php` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **12 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **22 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **6 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => **69 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **15 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Laravel13CacheSerializationTest.php` => **4 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/PublicMarketController.php app/Support/Location/PublicMarketPreference.php app/Support/Location/PublicMarketRegistry.php app/Support/Location/PreferredCountryResolver.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Forms/SharedFormSchema.php app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Forms/InstitutionContributionFormSchema.php bootstrap/app.php routes/web.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/PublicMarketSelectorTest.php tests/Feature/AccountSettingsPageTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/EventSearchTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/Laravel13CacheSerializationTest.php` => **No errors**
+  - `vendor/bin/pint app/Http/Controllers/PublicMarketController.php app/Support/Location/PublicMarketPreference.php app/Support/Location/PublicMarketRegistry.php app/Support/Location/PreferredCountryResolver.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Forms/SharedFormSchema.php app/Forms/InstitutionFormSchema.php app/Forms/VenueFormSchema.php app/Forms/InstitutionContributionFormSchema.php bootstrap/app.php routes/web.php tests/Unit/PreferredCountryResolverTest.php tests/Feature/PublicMarketSelectorTest.php tests/Feature/AccountSettingsPageTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/EventSearchTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/Laravel13CacheSerializationTest.php` => **pass**
+  - `php artisan view:clear` => **compiled views cleared**
+
 # Institution Submission Mobile Spacing
 
 - [x] Inspect the institution submission page shell and identify the mobile-specific border/spacing density

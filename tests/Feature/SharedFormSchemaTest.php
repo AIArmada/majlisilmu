@@ -13,11 +13,9 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
 use App\Support\Location\FederalTerritoryLocation;
-use App\Support\Location\PublicCountryFilterVisibility;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\Select as FilamentSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\View as SchemaView;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -243,7 +241,7 @@ it('defaults address country_id to malaysia when null is submitted directly to t
     expect($institution->fresh()->addressModel?->country_id)->toBe(132);
 });
 
-it('hides country fields in public location picker forms by default', function () {
+it('always hides country fields in public location picker forms', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -278,8 +276,6 @@ it('hides country fields in public location picker forms by default', function (
 
         return $flattened;
     };
-
-    request()->cookies->set(PublicCountryFilterVisibility::COOKIE_NAME, '0');
 
     $institutionCountry = collect($flatten(InstitutionFormSchema::createOptionForm(includeLocationPicker: true)))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
@@ -299,64 +295,6 @@ it('hides country fields in public location picker forms by default', function (
     expect($institutionCountry)->toBeInstanceOf(Hidden::class)
         ->and($venueCountry)->toBeInstanceOf(Hidden::class)
         ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
-});
-
-it('shows country fields in public location picker forms when the device cookie enables them', function () {
-    $flatten = function (array $components) use (&$flatten): array {
-        $flattened = [];
-
-        foreach ($components as $component) {
-            $flattened[] = $component;
-
-            $reflection = new ReflectionObject($component);
-
-            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
-                $reflection = $parent;
-            }
-
-            if (! $reflection->hasProperty('childComponents')) {
-                continue;
-            }
-
-            $childComponentsProperty = $reflection->getProperty('childComponents');
-            $childComponents = $childComponentsProperty->getValue($component);
-
-            if (! is_array($childComponents)) {
-                continue;
-            }
-
-            $defaultChildComponents = $childComponents['default'] ?? null;
-
-            if (! is_array($defaultChildComponents)) {
-                continue;
-            }
-
-            array_push($flattened, ...$flatten($defaultChildComponents));
-        }
-
-        return $flattened;
-    };
-
-    request()->cookies->set(PublicCountryFilterVisibility::COOKIE_NAME, '1');
-
-    $institutionCountry = collect($flatten(InstitutionFormSchema::createOptionForm(includeLocationPicker: true)))
-        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
-        ->get('country_id');
-    $venueCountry = collect($flatten(VenueFormSchema::createOptionForm(includeLocationPicker: true)))
-        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
-        ->get('country_id');
-    $contributionCountry = collect($flatten(InstitutionContributionFormSchema::components(
-        includeMedia: true,
-        requireGoogleMaps: true,
-        addressStatePath: 'address',
-        includeLocationPicker: true,
-    )))
-        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
-        ->get('country_id');
-
-    expect($institutionCountry)->toBeInstanceOf(FilamentSelect::class)
-        ->and($venueCountry)->toBeInstanceOf(FilamentSelect::class)
-        ->and($contributionCountry)->toBeInstanceOf(FilamentSelect::class);
 });
 
 it('requires google maps url in institution and venue quick-create forms', function () {

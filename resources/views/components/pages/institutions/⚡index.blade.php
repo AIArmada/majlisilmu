@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\State;
@@ -8,7 +7,6 @@ use App\Models\Subdistrict;
 use App\Support\Cache\SafeModelCache;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
-use App\Support\Location\PublicCountryFilterVisibility;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -194,23 +192,6 @@ class extends Component
     }
 
     #[Computed]
-    public function countries(): array
-    {
-        /** @var Collection<int, Country> $countries */
-        $countries = app(SafeModelCache::class)->rememberCollection(
-            key: 'countries_all_v1',
-            ttl: 3600,
-            query: Country::query()
-                ->orderBy('name')
-                ->select(['id', 'name', 'iso2']),
-        );
-
-        return $countries
-            ->pluck('name', 'id')
-            ->all();
-    }
-
-    #[Computed]
     public function states(): array
     {
         $countryId = $this->normalizedLocationId($this->country_id);
@@ -278,11 +259,6 @@ class extends Component
     public function isFederalTerritoryStateSelected(): bool
     {
         return FederalTerritoryLocation::isFederalTerritoryStateId($this->normalizedLocationId($this->state_id));
-    }
-
-    public function showsCountryFilter(): bool
-    {
-        return app(PublicCountryFilterVisibility::class)->shouldShow();
     }
 
     private function normalizedSearch(): ?string
@@ -432,7 +408,6 @@ class extends Component
 @php
     $institutions = $this->institutions;
     $search = $this->search;
-    $countries = $this->countries;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
@@ -440,11 +415,9 @@ class extends Component
     $stateId = $this->state_id;
     $districtId = $this->district_id;
     $subdistrictId = $this->subdistrict_id;
-    $showCountryFilter = $this->showsCountryFilter();
     $isFederalTerritoryState = $this->isFederalTerritoryStateSelected();
     $defaultCountryId = (string) app(\App\Support\Location\PreferredCountryResolver::class)->resolveId();
     $hasScopedFilters = ($countryId !== null && $countryId !== $defaultCountryId) || filled($stateId) || filled($districtId) || filled($subdistrictId);
-    $locationFilterGridClass = $showCountryFilter ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 xl:grid-cols-3';
     $submitInstitutionUrl = route('contributions.submit-institution');
     $formatInstitutionLocation = static function ($addressModel): string {
         $parts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
@@ -488,24 +461,7 @@ class extends Component
                         @endif
                     </div>
 
-                    <div class="mt-4 grid grid-cols-1 gap-3 text-left {{ $locationFilterGridClass }}">
-                        @if($showCountryFilter)
-                            <div>
-                                <label for="institution-country-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    {{ __('Country') }}
-                                </label>
-                                <select
-                                    id="institution-country-filter"
-                                    wire:model.live="country_id"
-                                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
-                                >
-                                    @foreach($countries as $id => $name)
-                                        <option value="{{ $id }}">{{ $name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endif
-
+                    <div class="mt-4 grid grid-cols-1 gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <label for="institution-state-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 {{ __('Negeri') }}

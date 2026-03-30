@@ -6,12 +6,10 @@ use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
-use App\Support\Location\PublicCountryFilterVisibility;
 use App\Support\Notifications\NotificationCatalog;
 use DateTimeZone;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Components\Section;
@@ -44,7 +42,6 @@ class AccountSettings extends Component implements HasForms
      *     email: string,
      *     phone: string,
      *     timezone: string,
-     *     show_public_country_filters: bool,
      *     daily_prayer_institution_id: string,
      *     friday_prayer_institution_id: string
      * }
@@ -54,7 +51,6 @@ class AccountSettings extends Component implements HasForms
         'email' => '',
         'phone' => '',
         'timezone' => '',
-        'show_public_country_filters' => false,
         'daily_prayer_institution_id' => '',
         'friday_prayer_institution_id' => '',
     ];
@@ -201,14 +197,6 @@ class AccountSettings extends Component implements HasForms
                             ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalString($state))
                             ->rule(Rule::in($this->allowedTimezones())),
                     ]),
-                Section::make(__('Device Preferences'))
-                    ->description(__('These preferences are saved on this device only.'))
-                    ->schema([
-                        Toggle::make('show_public_country_filters')
-                            ->label(__('Show country selector on public search pages'))
-                            ->helperText(__('When off, Majlis Ilmu still applies your detected country internally on /majlis and /institusi, but hides the country selector on this device.'))
-                            ->default(false),
-                    ]),
                 Section::make(__('Prayer Institutions'))
                     ->description(__('Save the institutions you usually attend for daily prayers and Friday prayers. Friday can be the same as your daily institution.'))
                     ->columns(2)
@@ -246,7 +234,6 @@ class AccountSettings extends Component implements HasForms
         $normalizedEmail = $this->normalizeOptionalString($validated['email'] ?? null);
         $normalizedPhone = $this->normalizeOptionalPhone($validated['phone'] ?? null);
         $normalizedTimezone = $this->normalizeOptionalString($validated['timezone'] ?? null);
-        $showPublicCountryFilters = (bool) ($validated['show_public_country_filters'] ?? false);
         $dailyPrayerInstitutionId = $this->normalizeOptionalString($validated['daily_prayer_institution_id'] ?? null);
         $fridayPrayerInstitutionId = $this->normalizeOptionalString($validated['friday_prayer_institution_id'] ?? null);
 
@@ -275,8 +262,7 @@ class AccountSettings extends Component implements HasForms
             'phone_verified_at' => $phoneChanged ? null : $user->phone_verified_at,
         ])->save();
 
-        $this->countryFilterVisibility()->queue($showPublicCountryFilters);
-        $this->accountSettingsForm()->fill($this->initialFormData($user, $showPublicCountryFilters));
+        $this->accountSettingsForm()->fill($this->initialFormData($user));
 
         if (request()->hasSession()) {
             if ($normalizedTimezone !== null) {
@@ -375,19 +361,17 @@ class AccountSettings extends Component implements HasForms
      *     email: string,
      *     phone: string,
      *     timezone: string,
-     *     show_public_country_filters: bool,
      *     daily_prayer_institution_id: string,
      *     friday_prayer_institution_id: string
      * }
      */
-    protected function initialFormData(User $user, ?bool $showPublicCountryFilters = null): array
+    protected function initialFormData(User $user): array
     {
         return [
             'name' => $user->name,
             'email' => (string) ($user->email ?? ''),
             'phone' => (string) ($user->phone ?? ''),
             'timezone' => (string) ($user->timezone ?? ''),
-            'show_public_country_filters' => $showPublicCountryFilters ?? $this->countryFilterVisibility()->shouldShow(),
             'daily_prayer_institution_id' => (string) ($user->daily_prayer_institution_id ?? ''),
             'friday_prayer_institution_id' => (string) ($user->friday_prayer_institution_id ?? ''),
         ];
@@ -530,11 +514,6 @@ class AccountSettings extends Component implements HasForms
     protected function settingsManager(): NotificationSettingsManager
     {
         return app(NotificationSettingsManager::class);
-    }
-
-    protected function countryFilterVisibility(): PublicCountryFilterVisibility
-    {
-        return app(PublicCountryFilterVisibility::class);
     }
 
     protected function accountSettingsForm(): Schema

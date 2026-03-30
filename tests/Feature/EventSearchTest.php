@@ -20,7 +20,6 @@ use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\Venue;
 use App\Services\EventSearchService;
-use App\Support\Location\PublicCountryFilterVisibility;
 use App\Support\Location\PublicGeolocationPermission;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -1094,20 +1093,6 @@ describe('Event Search Filters', function () {
             ]);
         }
 
-        $indonesiaId = DB::table('countries')->where('iso2', 'ID')->value('id');
-
-        if (! $indonesiaId) {
-            $indonesiaId = DB::table('countries')->insertGetId([
-                'iso2' => 'ID',
-                'name' => 'Indonesia',
-                'status' => 1,
-                'phone_code' => '62',
-                'iso3' => 'IDN',
-                'region' => 'Asia',
-                'subregion' => 'South-Eastern Asia',
-            ]);
-        }
-
         Event::factory()->create([
             'status' => 'approved',
             'visibility' => 'public',
@@ -1117,17 +1102,11 @@ describe('Event Search Filters', function () {
 
         Livewire::withCookie('user_timezone', 'Asia/Jakarta')
             ->test(Index::class)
-            ->assertSet('country_id', (string) $indonesiaId)
+            ->assertSet('country_id', (string) 132)
             ->assertSet('state_id', null);
-    });
 
-    it('hides the majlis country selector unless the device preference cookie enables it', function () {
         Livewire::test(AdvancedFiltersPanel::class)
             ->assertDontSee('Country');
-
-        Livewire::withCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
-            ->test(AdvancedFiltersPanel::class)
-            ->assertSee('Country');
     });
 
     it('filters events by subdistrict', function () {
