@@ -25,7 +25,6 @@ class InstitutionContributionFormSchema
     ): array {
         $shouldRenderLocationPicker = self::shouldRenderLocationPicker($includeLocationPicker, $addressStatePath);
         $publicCountryId = SharedFormSchema::preferredPublicCountryId();
-        $showPublicCountryField = SharedFormSchema::shouldShowPublicCountryField();
 
         $components = [
             Section::make(__('Profil Institusi'))
@@ -65,7 +64,7 @@ class InstitutionContributionFormSchema
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
-                            showCountryField: $showPublicCountryField,
+                            showCountryField: false,
                             defaultCountryId: $publicCountryId,
                         )
                         : [SharedFormSchema::addressGroup(
@@ -75,7 +74,7 @@ class InstitutionContributionFormSchema
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
-                            showCountryField: $showPublicCountryField,
+                            showCountryField: false,
                             defaultCountryId: $publicCountryId,
                         )]),
                 ])

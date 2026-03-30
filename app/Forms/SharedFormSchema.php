@@ -17,7 +17,6 @@ use App\Models\Subdistrict;
 use App\Models\Venue;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
-use App\Support\Location\PublicCountryFilterVisibility;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -596,14 +595,9 @@ class SharedFormSchema
         return app(PreferredCountryResolver::class)->resolveId();
     }
 
-    public static function shouldShowPublicCountryField(): bool
-    {
-        return app(PublicCountryFilterVisibility::class)->shouldShow();
-    }
-
     public static function publicLocationPickerCascadeResetGuard(): int
     {
-        return self::shouldShowPublicCountryField() ? 3 : 2;
+        return 2;
     }
 
     public static function normalizeLocationId(mixed $value): ?int

@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicMarketPreference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +24,8 @@ beforeEach(function () {
     }
 });
 
-it('prefers the saved user timezone when it resolves to a known country', function () {
-    $indonesiaId = DB::table('countries')->insertGetId([
+it('falls back to Malaysia when the saved user timezone resolves to a disabled market country', function () {
+    DB::table('countries')->insertGetId([
         'iso2' => 'ID',
         'name' => 'Indonesia',
         'status' => 1,
@@ -39,11 +40,11 @@ it('prefers the saved user timezone when it resolves to a known country', functi
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
 
-    expect($resolved)->toBe($indonesiaId);
+    expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
 });
 
-it('falls back to CF-IPCountry when no user timezone country can be resolved', function () {
-    $indonesiaId = DB::table('countries')->insertGetId([
+it('falls back to Malaysia when CF-IPCountry resolves to a disabled market country', function () {
+    DB::table('countries')->insertGetId([
         'iso2' => 'ID',
         'name' => 'Indonesia',
         'status' => 1,
@@ -58,7 +59,25 @@ it('falls back to CF-IPCountry when no user timezone country can be resolved', f
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
 
-    expect($resolved)->toBe($indonesiaId);
+    expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
+});
+
+it('prefers the selected market when timezone is unavailable', function () {
+    $request = Request::create('/events', 'GET');
+    $request->cookies->set(PublicMarketPreference::COOKIE_NAME, 'malaysia');
+
+    $resolved = app(PreferredCountryResolver::class)->resolveId($request);
+
+    expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
+});
+
+it('falls back to Malaysia when the selected market is invalid', function () {
+    $request = Request::create('/events', 'GET');
+    $request->cookies->set(PublicMarketPreference::COOKIE_NAME, 'unsupported-market');
+
+    $resolved = app(PreferredCountryResolver::class)->resolveId($request);
+
+    expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
 });
 
 it('falls back to Malaysia when timezone and CF-IPCountry are unavailable', function () {

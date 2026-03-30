@@ -133,6 +133,8 @@
             @php
                 $supportedLocales = config('app.supported_locales', []);
                 $currentLocale = app()->getLocale();
+                $publicMarkets = app(\App\Support\Location\PublicMarketRegistry::class)->all();
+                $currentPublicMarket = app(\App\Support\Location\PublicMarketPreference::class)->current();
                 $authenticatedUser = auth()->user();
                 $hasInstitutionDashboardAccess = $authenticatedUser?->institutions()->exists() ?? false;
                 $notificationUnreadCount = $authenticatedUser
@@ -183,6 +185,43 @@
                                     stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+
+                        <!-- Market Switcher -->
+                        <div class="relative group z-50 hidden sm:block">
+                            <button
+                                class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold tracking-wider text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-all"
+                                aria-label="{{ __('Market') }}">
+                                <span class="text-sm" aria-hidden="true">{{ $currentPublicMarket['flag'] }}</span>
+                                <span>{{ $currentPublicMarket['label'] }}</span>
+                                <svg class="h-3 w-3 text-slate-400 group-hover:text-emerald-500" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div
+                                class="absolute right-0 top-full mt-2 w-44 origin-top-right scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
+                                @foreach ($publicMarkets as $marketKey => $market)
+                                    @if ($market['enabled'])
+                                        <a href="{{ route('market.switch', $marketKey) }}"
+                                            class="flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold tracking-wider {{ $marketKey === $currentPublicMarket['key'] ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                            <span class="flex items-center gap-2">
+                                                <span aria-hidden="true">{{ $market['flag'] }}</span>
+                                                <span>{{ $market['label'] }}</span>
+                                            </span>
+                                        </a>
+                                    @else
+                                        <span title="{{ __('Coming soon') }}"
+                                            class="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-slate-400">
+                                            <span class="flex items-center gap-2">
+                                                <span aria-hidden="true">{{ $market['flag'] }}</span>
+                                                <span>{{ $market['label'] }}</span>
+                                            </span>
+                                        </span>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
 
                         <!-- Language Switcher -->
                         <div class="relative group z-50 hidden sm:block">
@@ -377,6 +416,30 @@
                         </div>
                         <!-- Mobile Language Switcher -->
                         <div class="border-t border-slate-100 pt-4">
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                                {{ __('Market') }}
+                            </p>
+                            <div class="mb-4 flex flex-wrap gap-2">
+                                @foreach ($publicMarkets as $marketKey => $market)
+                                    @if ($market['enabled'])
+                                        <a href="{{ route('market.switch', $marketKey) }}"
+                                            class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium {{ $marketKey === $currentPublicMarket['key'] ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'border-slate-100 text-slate-600' }}">
+                                            <span aria-hidden="true">{{ $market['flag'] }}</span>
+                                            <span>{{ $market['label'] }}</span>
+                                        </a>
+                                    @else
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-full border border-slate-100 px-3 py-1.5 text-xs font-medium text-slate-400">
+                                            <span aria-hidden="true">{{ $market['flag'] }}</span>
+                                            <span>{{ $market['label'] }}</span>
+                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                                {{ __('Coming soon') }}
+                                            </span>
+                                        </span>
+                                    @endif
+                                @endforeach
+                            </div>
+
                             <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                                 {{ __('Language') }}
                             </p>

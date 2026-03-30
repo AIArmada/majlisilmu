@@ -889,5 +889,7 @@
     "Member removed successfully.": "Member removed successfully.",
     "We could not find a user with that email address.": "We could not find a user with that email address.",
     "Pending Approval": "Pending Approval",
-    "Select a role": "Select a role"
+    "Select a role": "Select a role",
+    "Market": "Market",
+    "Coming soon": "Coming soon"
 }

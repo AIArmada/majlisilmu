@@ -7,7 +7,6 @@ use App\Models\Event;
 use App\Models\Tag;
 use App\Services\EventSearchService;
 use App\Services\PrayerTimeService;
-use App\Support\Location\PublicCountryFilterVisibility;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,8 +26,7 @@ it('hydrates the events index state cache into the current safe payload format',
         'country_code' => 'MY',
     ]);
 
-    Livewire::withCookie(PublicCountryFilterVisibility::COOKIE_NAME, '1')
-        ->test(Index::class)
+    Livewire::test(Index::class)
         ->call('toggleAdvancedFiltersPanel')
         ->assertSet('showAdvancedFiltersPanel', true);
 

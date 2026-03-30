@@ -25,9 +25,9 @@ use App\Services\EventSearchService;
 use App\Support\Cache\SafeModelCache;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
-use App\Support\Location\PublicCountryFilterVisibility;
 use App\Support\Location\PublicGeolocationPermission;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -244,11 +244,6 @@ class Index extends Component implements HasForms
         $this->showAdvancedFiltersPanel = ! $this->showAdvancedFiltersPanel;
     }
 
-    public function showsCountryFilter(): bool
-    {
-        return app(PublicCountryFilterVisibility::class)->shouldShow();
-    }
-
     public function showsGeolocationControls(): bool
     {
         return app(PublicGeolocationPermission::class)->isGranted();
@@ -361,24 +356,7 @@ class Index extends Component implements HasForms
                             ->description(__('Narrow events by geography, institution, and venue.'))
                             ->columns(['default' => 1, 'md' => 2, 'lg' => 3])
                             ->schema([
-                                Select::make('country_id')
-                                    ->label(__('Country'))
-                                    ->placeholder(__('All Countries'))
-                                    ->visible(fn (): bool => $this->showsCountryFilter())
-                                    ->options(fn (): array => $this->countries()
-                                        ->pluck('name', 'id')
-                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                        ->all()
-                                    )
-                                    ->searchable()
-                                    ->live()
-                                    ->afterStateUpdated(function (Set $set): void {
-                                        $set('state_id', null);
-                                        $set('district_id', null);
-                                        $set('subdistrict_id', null);
-                                        $set('institution_id', null);
-                                        $set('venue_id', null);
-                                    }),
+                                Hidden::make('country_id'),
 
                                 Select::make('state_id')
                                     ->label(__('State'))
