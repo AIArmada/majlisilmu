@@ -1,3 +1,21 @@
+# Event Settings Default Audit Follow-Up
+
+- [x] Audit commit `d6f7b95eaa6d30de99b63511d448267f471de9ac` for root-cause gaps after the registration-default fix
+- [x] Fix the remaining unsafe `event_settings.registration_required` schema default at the database level
+- [x] Add focused regression coverage and rerun the relevant event-creation verification suite
+
+## Review
+- Audit found one remaining root-cause gap after the commit-level PHP fixes: the database schema in [2026_01_30_194223_create_event_settings_table.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_01_30_194223_create_event_settings_table.php) still defaults `event_settings.registration_required` to `true`. The touched app paths now explicitly persist `false`, but any uncaptured or future `EventSettings` creation that omits the flag could still silently recreate the original bug.
+- Added [2026_04_01_062532_set_event_settings_registration_required_default_false.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_04_01_062532_set_event_settings_registration_required_default_false.php) to change the column default to `false` for existing installs while keeping rollback symmetry.
+- Extended [EventActionsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventActionsTest.php) with a direct `EventSettings::create(...)` regression that proves a bare settings insert now hydrates `registration_required = false` instead of inheriting an unsafe truthy default.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/EventActionsTest.php` => **6 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/AdvancedEventCreationTest.php` => **5 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php` => **5 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/SubmitEventParentProgramTest.php` => **2 passed**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi database/migrations/2026_04_01_062532_set_event_settings_registration_required_default_false.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/CreateAdvancedParentProgramAction.php tests/Feature/EventActionsTest.php` => **No errors**
+  - `XDEBUG_MODE=off vendor/bin/pint --dirty --format agent` => **pass**
+
 # Institution Event Card Speaker Context
 
 - [x] Trace institution show-page event card rendering and its loaded event relations
