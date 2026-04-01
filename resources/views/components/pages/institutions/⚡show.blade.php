@@ -1,9 +1,14 @@
 <?php
 
+use App\Enums\DawahShareOutcomeType;
+use App\Models\Event;
 use App\Models\Institution;
+use App\Services\ShareTrackingService;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
 
-new class extends Component {
+new class extends Component
+{
     public Institution $institution;
 
     public int $upcomingPerPage = 6;
@@ -14,7 +19,7 @@ new class extends Component {
 
     public function mount(Institution $institution): void
     {
-        if ($institution->status !== 'verified' && !auth()->user()?->hasAnyRole(['super_admin', 'moderator'])) {
+        if ($institution->status !== 'verified' && ! auth()->user()?->hasAnyRole(['super_admin', 'moderator'])) {
             abort(404);
         }
 
@@ -28,9 +33,9 @@ new class extends Component {
             'contacts',
             'socialMedia',
             'donationChannels.media',
-            'speakers' => fn($q) => $q->where('status', 'verified')->orderByPivot('is_primary', 'desc')->limit(12),
+            'speakers' => fn ($q) => $q->where('status', 'verified')->orderByPivot('is_primary', 'desc')->limit(12),
             'speakers.media',
-            'spaces' => fn($q) => $q->where('is_active', true),
+            'spaces' => fn ($q) => $q->where('is_active', true),
             'languages',
         ]);
 
@@ -41,7 +46,7 @@ new class extends Component {
     {
         $user = auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             $this->redirect(route('login'), navigate: true);
 
             return;
@@ -53,8 +58,8 @@ new class extends Component {
         } else {
             $user->follow($this->institution);
             $this->isFollowing = true;
-            app(\App\Services\ShareTrackingService::class)->recordOutcome(
-                type: \App\Enums\DawahShareOutcomeType::InstitutionFollow,
+            app(ShareTrackingService::class)->recordOutcome(
+                type: DawahShareOutcomeType::InstitutionFollow,
                 outcomeKey: 'institution_follow:user:'.$user->id.':institution:'.$this->institution->id,
                 subject: $this->institution,
                 actor: $user,
@@ -77,9 +82,9 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
+     * @return Collection<int, Event>
      */
-    public function getUpcomingEventsProperty(): \Illuminate\Database\Eloquent\Collection
+    public function getUpcomingEventsProperty(): Collection
     {
         return $this->institution->events()
             ->active()
@@ -89,6 +94,7 @@ new class extends Component {
                 'venue.address.district',
                 'venue.address.subdistrict',
                 'speakers.media',
+                'keyPeople.speaker',
                 'media',
             ])
             ->orderBy('starts_at', 'asc')
@@ -105,9 +111,9 @@ new class extends Component {
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Event>
+     * @return Collection<int, Event>
      */
-    public function getPastEventsProperty(): \Illuminate\Database\Eloquent\Collection
+    public function getPastEventsProperty(): Collection
     {
         return $this->institution->events()
             ->active()
@@ -117,6 +123,7 @@ new class extends Component {
                 'venue.address.district',
                 'venue.address.subdistrict',
                 'speakers.media',
+                'keyPeople.speaker',
                 'media',
             ])
             ->orderBy('starts_at', 'desc')
@@ -134,7 +141,7 @@ new class extends Component {
 
     public function rendering($view): void
     {
-        $view->title($this->institution->name . ' - ' . config('app.name'));
+        $view->title($this->institution->name.' - '.config('app.name'));
     }
 };
 
@@ -288,19 +295,79 @@ new class extends Component {
         return __('Umum');
     };
 
-    // Event location helper — Venue/Institution plus labeled hierarchy (Negeri, Daerah, Bandar / Mukim / Zon)
+    // Event location helper — venue name when present, otherwise address hierarchy only.
     $resolveVenueLocation = static function (\App\Models\Event $event) use ($institution, $formatAddressHierarchy): string {
         $venueName = $event->venue?->name;
-        $institutionName = $event->institution?->name ?? $institution->name;
-        $primaryLocationName = $venueName ?: $institutionName;
-        $address = $event->venue?->addressModel ?? $event->institution?->addressModel ?? $institution->addressModel;
+        $address = $event->venue?->addressModel ?? $institution->addressModel;
         $hierarchy = $formatAddressHierarchy($address);
+        $hierarchy = $hierarchy === '-' ? '' : $hierarchy;
 
-        if (is_string($primaryLocationName) && $primaryLocationName !== '') {
-            return $primaryLocationName . ' • ' . $hierarchy;
+        if (is_string($venueName) && $venueName !== '') {
+            return $hierarchy !== ''
+                ? $venueName . ' • ' . $hierarchy
+                : $venueName;
         }
 
         return $hierarchy;
+    };
+
+    $joinEventPeopleNames = static function (\Illuminate\Support\Collection $names): string {
+        return $names->join(', ', ' dan ');
+    };
+
+    /**
+     * @return array{speakers: string, roles: string}
+     */
+    $resolveEventPeople = static function (\App\Models\Event $event) use ($joinEventPeopleNames): array {
+        $speakerSummary = $event->speakers
+            ->map(fn (\App\Models\Speaker $speaker): string => trim((string) ($speaker->formatted_name !== '' ? $speaker->formatted_name : $speaker->name)))
+            ->filter(fn (string $name): bool => $name !== '')
+            ->unique()
+            ->values();
+
+        $speakerSummary = $speakerSummary->isNotEmpty()
+            ? __('Penceramah: :names', ['names' => $joinEventPeopleNames($speakerSummary)])
+            : '';
+
+        $roleSummary = $event->keyPeople
+            ->filter(function (\App\Models\EventKeyPerson $keyPerson): bool {
+                $role = $keyPerson->role;
+                $role = $role instanceof \App\Enums\EventKeyPersonRole
+                    ? $role
+                    : \App\Enums\EventKeyPersonRole::tryFrom((string) $role);
+
+                return $keyPerson->is_public && $role !== \App\Enums\EventKeyPersonRole::Speaker;
+            })
+            ->groupBy(function (\App\Models\EventKeyPerson $keyPerson): string {
+                $role = $keyPerson->role;
+
+                return $role instanceof \App\Enums\EventKeyPersonRole
+                    ? $role->value
+                    : (string) $role;
+            })
+            ->map(function (\Illuminate\Support\Collection $keyPeople, string $role) use ($joinEventPeopleNames): ?string {
+                $names = $keyPeople
+                    ->map(fn (\App\Models\EventKeyPerson $keyPerson): string => trim((string) $keyPerson->display_name))
+                    ->filter(fn (string $name): bool => $name !== '')
+                    ->unique()
+                    ->values();
+
+                if ($names->isEmpty()) {
+                    return null;
+                }
+
+                $roleLabel = \App\Enums\EventKeyPersonRole::tryFrom($role)?->getLabel()
+                    ?? \Illuminate\Support\Str::headline($role);
+
+                return $roleLabel . ': ' . $joinEventPeopleNames($names);
+            })
+            ->filter()
+            ->implode(' • ');
+
+        return [
+            'speakers' => $speakerSummary,
+            'roles' => $roleSummary,
+        ];
     };
 
     $resolveEventTimeDisplay = static function (\App\Models\Event $event): string {
@@ -784,6 +851,7 @@ new class extends Component {
                                     @foreach($upcomingEvents as $event)
                                         @php
                                             $venueLocation = $resolveVenueLocation($event);
+                                            $eventPeople = $resolveEventPeople($event);
                                             $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                             $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                             $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -846,6 +914,28 @@ new class extends Component {
                                                             {{ $resolveEventEndTimeDisplay($event) }}
                                                         @endif
                                                     </div>
+                                                    @if($eventPeople['speakers'] !== '')
+                                                        <div class="flex items-start gap-1.5">
+                                                            <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
+                                                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    d="M18 18.72a9.094 9.094 0 003.742-.479 3 3 0 00-4.682-2.72m.94 3.198v.75c0 .414-.336.75-.75.75H4.75a.75.75 0 01-.75-.75v-.75a4.5 4.5 0 014.5-4.5h4.5a4.5 4.5 0 014.5 4.5z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    d="M15 7.5a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                                                            </svg>
+                                                            <span class="line-clamp-2">{{ $eventPeople['speakers'] }}</span>
+                                                        </div>
+                                                    @endif
+                                                    @if($eventPeople['roles'] !== '')
+                                                        <div class="flex items-start gap-1.5">
+                                                            <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
+                                                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75V12zm0 5.25h.008v.008H3.75v-.008z" />
+                                                            </svg>
+                                                            <span class="line-clamp-2">{{ $eventPeople['roles'] }}</span>
+                                                        </div>
+                                                    @endif
                                                     @if($venueLocation && $eventFormatValue !== 'online')
                                                         <div class="flex items-center gap-1.5">
                                                             <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
@@ -853,18 +943,9 @@ new class extends Component {
                                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                                     d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                                                                 <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                                                                d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                                                             </svg>
                                                             <span class="line-clamp-1">{{ $venueLocation }}</span>
-                                                        </div>
-                                                    @elseif($event->institution && $eventFormatValue !== 'online')
-                                                        <div class="flex items-center gap-1.5">
-                                                            <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
-                                                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75" />
-                                                            </svg>
-                                                            {{ $event->institution->name }}
                                                         </div>
                                                     @endif
                                                 </div>
@@ -1011,6 +1092,7 @@ new class extends Component {
                                 @foreach($pastEvents as $event)
                                     @php
                                         $pastVenueLocation = $resolveVenueLocation($event);
+                                        $eventPeople = $resolveEventPeople($event);
                                         $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                         $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                         $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -1076,6 +1158,28 @@ new class extends Component {
                                                         {{ $resolveEventEndTimeDisplay($event) }}
                                                     @endif
                                                 </div>
+                                                @if($eventPeople['speakers'] !== '')
+                                                    <div class="flex items-start gap-1.5">
+                                                        <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
+                                                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                d="M18 18.72a9.094 9.094 0 003.742-.479 3 3 0 00-4.682-2.72m.94 3.198v.75c0 .414-.336.75-.75.75H4.75a.75.75 0 01-.75-.75v-.75a4.5 4.5 0 014.5-4.5h4.5a4.5 4.5 0 014.5 4.5z" />
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                d="M15 7.5a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                                                        </svg>
+                                                        <span class="line-clamp-2">{{ $eventPeople['speakers'] }}</span>
+                                                    </div>
+                                                @endif
+                                                @if($eventPeople['roles'] !== '')
+                                                    <div class="flex items-start gap-1.5">
+                                                        <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
+                                                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75V12zm0 5.25h.008v.008H3.75v-.008z" />
+                                                        </svg>
+                                                        <span class="line-clamp-2">{{ $eventPeople['roles'] }}</span>
+                                                    </div>
+                                                @endif
                                                 @if($pastVenueLocation && $eventFormatValue !== 'online')
                                                     <div class="flex items-center gap-1.5">
                                                         <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
@@ -1086,15 +1190,6 @@ new class extends Component {
                                                                 d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                                                         </svg>
                                                         <span class="line-clamp-1">{{ $pastVenueLocation }}</span>
-                                                    </div>
-                                                @elseif($event->institution && $eventFormatValue !== 'online')
-                                                    <div class="flex items-center gap-1.5">
-                                                        <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6M4.5 9.75v10.5h15V9.75" />
-                                                        </svg>
-                                                        {{ $event->institution->name }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -1511,7 +1606,7 @@ new class extends Component {
                                         @if($thumbUrl)
                                             <button type="button"
                                                 @click="openQr('{{ $fullUrl }}', '{{ $displayLabel }}')"
-                                                class="group relative shrink-0 overflow-hidden rounded-xl border-2 border-gold-200/60 bg-white p-1 shadow-sm transition-all hover:border-gold-400 hover:shadow-md active:scale-95">
+                                                class="group relative shrink-0 transition-transform active:scale-95">
                                                 <img src="{{ $thumbUrl }}" alt="{{ __('Kod QR') }}"
                                                     class="h-16 w-16 object-contain" loading="lazy">
                                                 <div

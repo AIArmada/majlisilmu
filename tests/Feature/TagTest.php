@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TagType;
+use App\Filament\Resources\Tags\Schemas\TagForm;
 use App\Models\Event;
 use App\Models\Tag;
 
@@ -73,6 +74,13 @@ it('tag type enum has expected metadata', function () {
         ->and(TagType::Domain->color())->toBe('primary')
         ->and(TagType::Domain->icon())->toBe('heroicon-o-academic-cap')
         ->and(TagType::Domain->order())->toBe(10);
+});
+
+it('resolves tag type helper descriptions for both raw and hydrated form state', function () {
+    expect(TagForm::typeDescription(TagType::Domain))->toBe(TagType::Domain->description())
+        ->and(TagForm::typeDescription(TagType::Issue->value))->toBe(TagType::Issue->description())
+        ->and(TagForm::typeDescription(null))->toBeNull()
+        ->and(TagForm::typeDescription('unknown'))->toBeNull();
 });
 
 it('orders tags within type separately', function () {

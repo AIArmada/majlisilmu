@@ -1589,7 +1589,6 @@
                 {{-- Navigation Buttons (Waze / Google Maps) --}}
                 @if($wazeNavUrl || $googleMapsNavUrl)
                     @php
-                        $mapGoogleApiKey = (string) config('services.google.maps_api_key', '');
                         $mapAddress = $primaryAddress;
                         $mapQuery = implode(', ', array_filter([
                             $event->venue?->name ?? $event->institution?->name,
@@ -1613,9 +1612,7 @@
                             $normalizedMapQuery = $mapQuery;
                         }
                         $sidebarMapEmbedUrl = null;
-                        if (filled($mapAddress?->google_maps_url) && filled($mapGoogleApiKey) && filled($normalizedMapQuery)) {
-                            $sidebarMapEmbedUrl = 'https://www.google.com/maps/embed/v1/place?key=' . urlencode($mapGoogleApiKey) . '&q=' . urlencode((string) $normalizedMapQuery);
-                        } elseif (filled($mapAddress?->google_maps_url) && filled($normalizedMapQuery)) {
+                        if (filled($normalizedMapQuery)) {
                             $sidebarMapEmbedUrl = 'https://www.google.com/maps?q=' . urlencode((string) $normalizedMapQuery) . '&output=embed';
                         }
                     @endphp
@@ -1624,15 +1621,6 @@
                             <iframe src="{{ $sidebarMapEmbedUrl }}" class="h-[220px] w-full" loading="lazy"
                                 referrerpolicy="no-referrer-when-downgrade" allowfullscreen
                                 title="{{ __('Peta Lokasi') }}"></iframe>
-                        </div>
-                    @elseif($lat && $lng && filled($mapGoogleApiKey))
-                        <div class="overflow-hidden rounded-xl border border-slate-200/70">
-                            <a href="{{ $googleMapsNavUrl }}" target="_blank" rel="noopener" class="block">
-                                <img src="https://maps.googleapis.com/maps/api/staticmap?center={{ $lat }},{{ $lng }}&zoom=15&size=340x180&scale=2&markers=color:0x059669%7C{{ $lat }},{{ $lng }}&style=feature:poi%7Cvisibility:off&key={{ $mapGoogleApiKey }}"
-                                    alt="{{ __('Peta') }}"
-                                    class="h-[140px] w-full object-cover transition-opacity hover:opacity-90" loading="lazy"
-                                    onerror="this.parentElement.parentElement.style.display='none'">
-                            </a>
                         </div>
                     @endif
                     <div class="flex gap-3 pt-2">

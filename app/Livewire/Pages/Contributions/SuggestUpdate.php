@@ -21,6 +21,9 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -29,13 +32,16 @@ use Filament\Schemas\Schema;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use RuntimeException;
 
 #[Layout('layouts.app')]
-class SuggestUpdate extends Component implements HasForms
+class SuggestUpdate extends Component implements HasActions, HasForms
 {
+    use InteractsWithActions;
     use InteractsWithForms;
     use InteractsWithToasts;
+    use WithFileUploads;
 
     public Event|Institution|Reference|Speaker $entity;
 
@@ -148,17 +154,23 @@ class SuggestUpdate extends Component implements HasForms
 
         $submissionState = $resolveContributionSubmissionStateAction->handle($this->contributionForm()->getState());
         $state = $submissionState['state'];
-
         $changes = $resolveContributionChangedPayloadAction->handle($state, $this->originalData);
+        $hasInstitutionCoverChange = $this->canDirectEdit() && $this->hasInstitutionCoverChange();
 
-        if ($changes === []) {
+        if ($changes === [] && ! $hasInstitutionCoverChange) {
             $this->addError('data', __('Make at least one change before continuing.'));
 
             return;
         }
 
         if ($this->canDirectEdit()) {
-            $applyDirectContributionUpdateAction->handle($this->entity, $changes);
+            if ($changes !== []) {
+                $applyDirectContributionUpdateAction->handle($this->entity, $changes);
+            }
+
+            if ($hasInstitutionCoverChange) {
+                $this->saveInstitutionCoverChanges($this->entity);
+            }
 
             $this->redirect($this->subjectPresentation['redirect_url'], navigate: true);
 
@@ -188,10 +200,7 @@ class SuggestUpdate extends Component implements HasForms
     private function subjectSchema(): array
     {
         return match (true) {
-            $this->entity instanceof Institution => InstitutionContributionFormSchema::components(
-                includeMedia: false,
-                addressStatePath: 'address',
-            ),
+            $this->entity instanceof Institution => $this->institutionSubjectSchema(),
             $this->entity instanceof Speaker => SpeakerContributionFormSchema::components(
                 includeMedia: false,
                 addressStatePath: 'address',
@@ -240,5 +249,92 @@ class SuggestUpdate extends Component implements HasForms
 
         return $subjectType->publicRouteSegment() !== $routeSubjectType
             || $this->canonicalSubjectId() !== $subjectId;
+    }
+
+    /**
+     * @return array<int, \Filament\Schemas\Components\Component>
+     */
+    private function institutionSubjectSchema(): array
+    {
+        $components = InstitutionContributionFormSchema::components(
+            includeMedia: false,
+            addressStatePath: 'address',
+        );
+
+        if ($this->canDirectEdit()) {
+            array_splice($components, 1, 0, [$this->institutionCoverSection()]);
+        }
+
+        return $components;
+    }
+
+    private function institutionCoverSection(): Section
+    {
+        return Section::make(__('Media'))
+            ->schema([
+                SpatieMediaLibraryFileUpload::make('cover')
+                    ->label(__('Cover Image'))
+                    ->collection('cover')
+                    ->image()
+                    ->imageEditor()
+                    ->imageAspectRatio('16:9')
+                    ->automaticallyOpenImageEditorForAspectRatio()
+                    ->imageEditorAspectRatioOptions(['16:9'])
+                    ->automaticallyCropImagesToAspectRatio()
+                    ->conversion('banner')
+                    ->responsiveImages()
+                    ->deletable(false)
+                    ->columnSpanFull(),
+            ]);
+    }
+
+    private function hasInstitutionCoverChange(): bool
+    {
+        if (! $this->entity instanceof Institution) {
+            return false;
+        }
+
+        $coverField = $this->institutionCoverField();
+
+        if (! $coverField instanceof SpatieMediaLibraryFileUpload) {
+            return false;
+        }
+
+        $currentState = array_keys($this->currentInstitutionCoverState());
+        $submittedState = array_keys(is_array($coverField->getRawState()) ? $coverField->getRawState() : []);
+
+        sort($currentState);
+        sort($submittedState);
+
+        return $currentState !== $submittedState;
+    }
+
+    private function institutionCoverField(): ?SpatieMediaLibraryFileUpload
+    {
+        $field = $this->contributionForm()->getFlatFields(withHidden: true)['cover'] ?? null;
+
+        return $field instanceof SpatieMediaLibraryFileUpload ? $field : null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function currentInstitutionCoverState(): array
+    {
+        if (! $this->entity instanceof Institution) {
+            return [];
+        }
+
+        return $this->entity
+            ->load('media')
+            ->getMedia('cover')
+            ->take(1)
+            ->mapWithKeys(static fn ($media): array => [$media->uuid => $media->uuid])
+            ->all();
+    }
+
+    private function saveInstitutionCoverChanges(Institution $record): void
+    {
+        $this->contributionForm()->model($record)->saveRelationships();
     }
 }

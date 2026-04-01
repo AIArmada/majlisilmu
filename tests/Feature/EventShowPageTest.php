@@ -283,6 +283,32 @@ describe('Event Show Page Location & Contact Info', function () {
         $response->assertSee('Google Maps');
     });
 
+    it('uses a public google maps embed on event show pages instead of platform api urls', function () {
+        config()->set('services.google.maps_api_key', 'test-maps-key');
+
+        $venue = Venue::factory()->create();
+        $venue->address()->update([
+            'line1' => 'Persiaran Masjid',
+            'google_maps_url' => 'https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869&query_place_id=place_123',
+            'lat' => 3.139,
+            'lng' => 101.6869,
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'venue_id' => $venue->id,
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('https://www.google.com/maps?q=3.139%2C101.6869&amp;output=embed', false)
+            ->assertDontSee('https://www.google.com/maps/embed/v1/place?key=', false)
+            ->assertDontSee('https://maps.googleapis.com/maps/api/staticmap', false);
+    });
+
     it('displays institution contact info on event page', function () {
         $institution = Institution::factory()->create();
         $emailContact = $institution->contacts()->where('category', ContactCategory::Email->value)->first();

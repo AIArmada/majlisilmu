@@ -21,15 +21,7 @@ class TagForm
                             ->enum(TagType::class)
                             ->required()
                             ->native(false)
-                            ->helperText(function ($state) {
-                                if (! $state) {
-                                    return null;
-                                }
-
-                                $type = TagType::tryFrom($state);
-
-                                return $type ? $type->description() : null;
-                            }),
+                            ->helperText(fn ($state): ?string => self::typeDescription($state)),
 
                         TextInput::make('name.ms')
                             ->label('Name (Malay)')
@@ -59,5 +51,25 @@ class TagForm
                             ->helperText('Lower numbers appear first within the same type'),
                     ])->columns(2),
             ]);
+    }
+
+    public static function typeDescription(mixed $state): ?string
+    {
+        $type = self::normalizeTagType($state);
+
+        return $type?->description();
+    }
+
+    private static function normalizeTagType(mixed $state): ?TagType
+    {
+        if ($state instanceof TagType) {
+            return $state;
+        }
+
+        if (is_string($state) || is_int($state)) {
+            return TagType::tryFrom($state);
+        }
+
+        return null;
     }
 }

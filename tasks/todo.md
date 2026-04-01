@@ -1,3 +1,82 @@
+# Institution Event Card Speaker Context
+
+- [x] Trace institution show-page event card rendering and its loaded event relations
+- [x] Update the institution event card to show speaker and role names while omitting redundant institution location text
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Updated [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡show.blade.php) so institution event cards now eager-load `keyPeople.speaker`, render a `Penceramah: ...` summary line plus a compact non-speaker role summary like `Moderator: ...`, and stop repeating the current institution name in the location line when the event is hosted at that same institution.
+- Tightened the institution-page location helper so cards only show the venue name when a separate venue exists; otherwise they fall back to the address hierarchy only. This removes redundant output like `Masjid ... • Shah Alam, Petaling, Selangor` inside `/institusi/*` while preserving venue-specific cards.
+- Added focused regression coverage in [InstitutionShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionShowPageTest.php) to prove institution event cards show speaker and moderator names from `event_key_people` and no longer emit the self-referential institution-name location string.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **27 passed**
+  - `XDEBUG_MODE=off vendor/bin/pint --test resources/views/components/pages/institutions/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php tasks/todo.md` => **pass**
+  - `git diff --check -- resources/views/components/pages/institutions/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php tasks/todo.md` => **clean**
+
+# Event Map Display Without Google API
+
+- [x] Trace the current `/majlis/*` map rendering path and compare it with `/institusi/*`
+- [x] Replace the event-page API-backed map display with the same non-API rendering approach used by institutions
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Traced the difference between [show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/show.blade.php) and [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡show.blade.php). Institutions already render a public Google Maps iframe via `https://www.google.com/maps?q=...&output=embed`, while the event page still preferred `https://www.google.com/maps/embed/v1/place?key=...` and an API-backed static map image.
+- Updated [show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/show.blade.php) so the `/majlis/*` sidebar map preview now uses the same public non-API embed style as institutions. The keyed Embed API branch and the keyed Static Maps fallback were both removed.
+- Added focused regression coverage in [EventShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventShowPageTest.php) to prove event pages render the public embed URL and do not emit either `maps/embed/v1` or `maps.googleapis.com/maps/api/staticmap`, even when a Google Maps API key is configured.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php --filter='uses a public google maps embed on event show pages instead of platform api urls|displays waze and google maps navigation buttons when coordinates exist'` => **2 passed**
+  - `XDEBUG_MODE=off vendor/bin/pint --test resources/views/livewire/pages/events/show.blade.php tests/Feature/EventShowPageTest.php tasks/todo.md` => **pass**
+  - `git diff --check -- resources/views/livewire/pages/events/show.blade.php tests/Feature/EventShowPageTest.php tasks/todo.md` => **clean**
+
+
+# Tag Form Enum Crash Fix
+
+- [x] Confirm the tag form enum hydration path and the exact crash condition
+- [x] Patch the tag form helper text to handle both raw strings and hydrated TagType enums
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Confirmed the crash came from [TagForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Tags/Schemas/TagForm.php): the `type` select uses `->enum(TagType::class)`, so Filament can pass a hydrated `TagType` instance into the helper-text closure. The old code then called `TagType::tryFrom($state)` unconditionally, which throws when `$state` is already a `TagType`.
+- Fixed the form by adding a narrow normalization path in [TagForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Tags/Schemas/TagForm.php) and routing the helper text through `TagForm::typeDescription(...)`, which safely accepts either a hydrated enum, a raw backing value, or empty/unknown state.
+- Added focused regression coverage in [TagTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/TagTest.php) to prove the tag-form helper description resolves correctly for both hydrated enum state and raw string state without throwing.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/TagTest.php` => **9 passed**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi app/Filament/Resources/Tags/Schemas/TagForm.php tests/Feature/TagTest.php` => **No errors**
+  - `XDEBUG_MODE=off vendor/bin/pint --test app/Filament/Resources/Tags/Schemas/TagForm.php tests/Feature/TagTest.php tasks/todo.md` => **pass**
+  - `git diff --check -- app/Filament/Resources/Tags/Schemas/TagForm.php tests/Feature/TagTest.php tasks/todo.md` => **clean**
+
+# Institution QR Thumbnail Cleanup
+
+- [x] Trace the QR thumbnail wrapper on the public institution page
+- [x] Remove the rounded border shell around the QR thumbnail trigger
+- [x] Run focused verification for the institution donation-channel UI
+
+## Review
+- Updated [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡show.blade.php) so the `/institusi/*` donation-channel QR trigger no longer renders the decorative rounded gold border and shadow shell around the thumbnail; the QR image and click-to-open modal behavior stay unchanged.
+- Added a focused regression in [InstitutionShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionShowPageTest.php) that renders an institution donation channel with QR media and asserts the old rounded-border class string is gone.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php --filter='displays donation channels|renders donation qr thumbnails without the rounded border shell'` => **2 passed**
+  - `XDEBUG_MODE=off vendor/bin/pint --test resources/views/components/pages/institutions/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php tasks/todo.md` => **pass**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `git diff --check -- resources/views/components/pages/institutions/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php tasks/todo.md` => **clean**
+
+# Institution Update Cover Upload
+
+- [x] Trace the `/sumbangan/institusi/*/kemas-kini` institution update flow and confirm why the cover uploader is missing
+- [x] Add the missing institution cover upload for safe direct-maintainer edits on the public institution update page
+- [x] Add focused regression coverage and run targeted verification for the updated institution cover workflow
+
+## Review
+- Traced the public update page to [SuggestUpdate.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SuggestUpdate.php) and confirmed the missing upload came from the institution branch forcing `includeMedia: false`, so the `cover` uploader never rendered on `/sumbangan/institusi/*/kemas-kini`.
+- Updated [SuggestUpdate.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SuggestUpdate.php) to support Filament media actions/uploads, inject an institution-only `cover` uploader into the maintainer/direct-edit form, detect cover-only changes, and persist them with `saveRelationships()` so owners can update the institution cover from the public edit route.
+- Kept the community suggestion path unchanged on purpose. During debugging, the shared form proved that `getState()` eagerly stores a Spatie media upload onto the bound live institution record before the contribution request is created, so exposing cover uploads to non-maintainers on this page would bypass review. The field is therefore shown only when the user already has direct edit access.
+- Added focused regression coverage in [ContributionPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ContributionPagesTest.php) to prove the cover uploader is hidden for non-maintainers, visible for maintainers, that the update page exposes the required Filament action handlers, and that a maintainer can upload a cover image directly from the public update page.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **23 passed**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi app/Models/ContributionRequest.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => **No errors**
+  - `XDEBUG_MODE=off vendor/bin/pint --test app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Models/ContributionRequest.php tasks/todo.md` => **pass**
+  - `git diff --check -- app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Models/ContributionRequest.php tasks/todo.md` => **clean**
+
 # Uncommitted Slug Audit Follow-Up
 
 - [x] Audit the current uncommitted speaker/country slug diff for real regressions
