@@ -1494,28 +1494,6 @@ new class extends Component
                                     </div>
                                 </div>
 
-                                {{-- Navigation buttons --}}
-                                @if($wazeUrl || $address->google_maps_url)
-                                    <div class="flex gap-2 pl-11">
-                                        @if($wazeUrl)
-                                            <a href="{{ $wazeUrl }}" target="_blank" rel="noopener"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 transition-colors hover:bg-cyan-100">
-                                                <img src="{{ asset('images/waze-app-icon-seeklogo.svg') }}" alt="Waze"
-                                                    class="h-3.5 w-3.5" loading="lazy">
-                                                Waze
-                                            </a>
-                                        @endif
-                                        @if($address->google_maps_url)
-                                            <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100">
-                                                <img src="{{ asset('images/google-maps.svg') }}" alt="Google Maps" class="h-3.5 w-3.5"
-                                                    loading="lazy">
-                                                Google Maps
-                                            </a>
-                                        @endif
-                                    </div>
-                                @endif
-
                                 {{-- Mini map preview --}}
                                 @if($address->google_maps_url)
                                     @if($googleMapsEmbedUrl)
@@ -1536,6 +1514,28 @@ new class extends Component
                                             {{ __('Buka di Google Maps') }}
                                         </a>
                                     @endif
+                                @endif
+
+                                {{-- Navigation buttons --}}
+                                @if($wazeUrl || $address->google_maps_url)
+                                    <div class="flex flex-wrap gap-2 pl-11">
+                                        @if($wazeUrl)
+                                            <a href="{{ $wazeUrl }}" target="_blank" rel="noopener"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 transition-colors hover:bg-cyan-100">
+                                                <img src="{{ asset('images/waze-app-icon-seeklogo.svg') }}" alt="Waze"
+                                                    class="h-3.5 w-3.5" loading="lazy">
+                                                Waze
+                                            </a>
+                                        @endif
+                                        @if($address->google_maps_url)
+                                            <a href="{{ $address->google_maps_url }}" target="_blank" rel="noopener"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100">
+                                                <img src="{{ asset('images/google-maps.svg') }}" alt="Google Maps" class="h-3.5 w-3.5"
+                                                    loading="lazy">
+                                                Google Maps
+                                            </a>
+                                        @endif
+                                    </div>
                                 @endif
                             @endif
                         </div>
