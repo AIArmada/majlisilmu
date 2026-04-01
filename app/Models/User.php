@@ -592,6 +592,13 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         return $this->hasGlobalRoleAssignment();
     }
 
+    public function hasGlobalAdminAccess(): bool
+    {
+        return $this->globalRoles()
+            ->whereIn('name', ['super_admin', 'admin'])
+            ->exists();
+    }
+
     private function hasGlobalRoleAssignment(): bool
     {
         $modelHasRolesTable = (string) (config('permission.table_names.model_has_roles') ?? 'model_has_roles');

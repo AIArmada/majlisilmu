@@ -1,3 +1,19 @@
+# Horizon Global Admin Authorization
+
+- [x] Narrow the Horizon dashboard gate from any global role to global admin roles only
+- [x] Update focused Horizon coverage so admin-level roles pass while moderator/member roles fail
+- [x] Run targeted verification for the Horizon authorization change
+
+## Review
+- Updated [app/Models/User.php](/Users/Saiffil/Herd/majlisilmu/app/Models/User.php) with a dedicated `hasGlobalAdminAccess()` helper that only accepts the globally scoped `super_admin` and `admin` roles.
+- Updated [app/Providers/HorizonServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/HorizonServiceProvider.php) so the `viewHorizon` gate now uses that narrower global-admin helper instead of the broader any-global-role application-admin check.
+- Updated [tests/Feature/HorizonConfigurationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/HorizonConfigurationTest.php) to prove `super_admin` and `admin` can access Horizon while `moderator` and a plain member cannot.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/HorizonConfigurationTest.php` => **2 passed**
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi app/Models/User.php app/Providers/HorizonServiceProvider.php tests/Feature/HorizonConfigurationTest.php` => **No errors**
+  - `XDEBUG_MODE=off vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check -- app/Models/User.php app/Providers/HorizonServiceProvider.php tests/Feature/HorizonConfigurationTest.php tasks/todo.md` => **clean**
+
 # Event Settings Default Audit Follow-Up
 
 - [x] Audit commit `d6f7b95eaa6d30de99b63511d448267f471de9ac` for root-cause gaps after the registration-default fix
