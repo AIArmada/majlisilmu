@@ -62,7 +62,6 @@
     $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
     $eventPosterPreviewUrl = $eventHasPoster ? $event->getFirstMedia('poster')?->getAvailableUrl(['preview', 'card', 'thumb']) : null;
     $eventPosterOriginalUrl = $eventHasPoster ? $event->getFirstMediaUrl('poster') : null;
-
     // Hero atmospheric background:
     // institution cover -> venue cover/main -> organizer institution cover -> gradient fallback.
     // The event poster is NEVER used as background — it is a factual flyer and must be displayed clearly.

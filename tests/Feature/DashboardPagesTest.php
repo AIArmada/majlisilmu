@@ -435,7 +435,15 @@ it('shows institution profile and events for members without a separate registra
     $institution = Institution::factory()->create(['name' => 'Masjid Al-Ikhlas']);
     $otherInstitution = Institution::factory()->create(['name' => 'Masjid Al-Istiqamah']);
 
-    $user->institutions()->attach($institution->id);
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
 
     $eventInInstitution = Event::factory()->for($institution)->create([
         'title' => 'Institution Dashboard Event',
@@ -484,6 +492,7 @@ it('shows institution profile and events for members without a separate registra
         ->assertSee('Members & Roles')
         ->assertSee('Institution Dashboard Event')
         ->assertSee('Institution Parent Program')
+        ->assertSee('Duplicate Event')
         ->assertSee('Add Child Event')
         ->assertDontSee('Event Registrations')
         ->assertDontSee('Registrations (All)')
@@ -491,8 +500,51 @@ it('shows institution profile and events for members without a separate registra
         ->assertDontSee('Outside Institution Event')
         ->assertDontSee('External Registrant');
 
-    $response->assertSee(route('dashboard.institutions.submit-event', ['institution' => $institution->id]), false);
-    $response->assertSee(route('submit-event.create', ['parent' => $parentProgram->id]), false);
+    $response->assertSee(e(route('dashboard.institutions.submit-event', ['institution' => $institution->id])), false);
+    $response->assertSee(e(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $eventInInstitution->id])), false);
+    $response->assertSee(e(route('submit-event.create', ['parent' => $parentProgram->id])), false);
+});
+
+it('only shows duplicate event links on the institution dashboard to users who can update the event', function () {
+    $adminUser = User::factory()->create();
+    $viewerUser = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Kebenaran Majlis']);
+
+    $institution->members()->syncWithoutDetaching([
+        $adminUser->id,
+        $viewerUser->id,
+    ]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($adminUser, $viewerUser): void {
+        $adminUser->syncRoles(['admin']);
+        $viewerUser->syncRoles(['viewer']);
+    }, $adminUser);
+
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Permission Scoped Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(4),
+    ]);
+
+    $duplicateEventUrl = e(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $event->id]));
+
+    $this->withSession(['locale' => 'en'])
+        ->actingAs($adminUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertSee('Duplicate Event')
+        ->assertSee($duplicateEventUrl, false);
+
+    $this->withSession(['locale' => 'en'])
+        ->actingAs($viewerUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertDontSee($duplicateEventUrl, false);
 });
 
 it('highlights institution events that are waiting approval', function () {

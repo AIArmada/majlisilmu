@@ -25,6 +25,9 @@ class ViewEvent extends ViewRecord
                 ->icon(Heroicon::OutlinedPlus)
                 ->url(fn (): string => route('submit-event.create', ['parent' => $this->eventRecord()->getKey()]))
                 ->visible(fn (): bool => $this->eventRecord()->isParentProgram()),
+            Action::make('duplicate_event')
+                ->label('Duplicate Event')
+                ->url(fn (): string => route('submit-event.create', ['duplicate' => $this->eventRecord()->getKey()])),
             EditAction::make(),
             Action::make('view_public')
                 ->label('View Public Page')

@@ -268,6 +268,9 @@
                                             $ahliEventEditUrl = $canEditEvent
                                                 ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $event], panel: 'ahli')
                                                 : null;
+                                            $duplicateEventUrl = $canEditEvent && $selectedInstitution !== null
+                                                ? route('dashboard.institutions.submit-event', ['institution' => $selectedInstitution->id, 'duplicate' => $event->id])
+                                                : null;
                                             $createChildEventUrl = $event->isParentProgram()
                                                 ? route('submit-event.create', ['parent' => $event->id])
                                                 : null;
@@ -299,6 +302,13 @@
                                                     <div class="mt-1">
                                                         <a href="{{ $ahliEventEditUrl }}" class="text-xs font-semibold text-emerald-700 hover:underline">
                                                             {{ $isAwaitingApproval ? __('Review') : __('Edit') }}
+                                                        </a>
+                                                    </div>
+                                                @endif
+                                                @if($duplicateEventUrl)
+                                                    <div class="mt-1">
+                                                        <a href="{{ $duplicateEventUrl }}" wire:navigate class="text-xs font-semibold text-amber-700 hover:underline">
+                                                            {{ __('Duplicate Event') }}
                                                         </a>
                                                     </div>
                                                 @endif

@@ -103,6 +103,20 @@ describe('Event Show Page Going Feature', function () {
             ->assertSee(__('Akan Hadir')); // Button always visible, redirects guests to login
     });
 
+    it('does not show a duplicate event link on public event pages', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertDontSee(__('Duplikasi Majlis'))
+            ->assertDontSee(route('submit-event.create', ['duplicate' => $event]), false);
+    });
+
     it('does not show the going button for past events', function () {
         $event = Event::factory()->create([
             'status' => 'approved',

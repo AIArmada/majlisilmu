@@ -10,6 +10,7 @@ use App\Enums\RegistrationMode;
 use App\Enums\TimingMode;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
+use App\Filament\Resources\Events\Pages\ViewEvent;
 use App\Models\Event;
 use App\Models\EventSettings;
 use App\Models\Institution;
@@ -199,6 +200,29 @@ it('renders the admin event view page with infolist tabs', function () {
         ->assertSee('Penganjur & Lokasi')
         ->assertSee('Penceramah & Media')
         ->assertSee('Semak & Moderasi');
+});
+
+it('shows a duplicate event action on the admin event view page', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(ViewEvent::class, ['record' => $event->id])
+        ->assertActionVisible('duplicate_event');
+
+    $this->actingAs($administrator)
+        ->get("/admin/events/{$event->id}")
+        ->assertSuccessful()
+        ->assertSee('Duplicate Event')
+        ->assertSee(route('submit-event.create', ['duplicate' => $event]), false);
 });
 
 it('sanitizes description and uses full-width layout on admin event view page', function () {

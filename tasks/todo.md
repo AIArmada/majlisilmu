@@ -1,3 +1,26 @@
+# Event Duplication Prefill
+
+- [x] Add a duplicate-event query flow to the submit-event page
+- [x] Prefill the new submission from an existing event while filtering inaccessible organizer and speaker defaults
+- [x] Add Ahli/admin duplicate-event entrypoints and focused regression coverage
+
+## Review
+- Updated `resources/views/components/pages/submit-event/create.blade.php` so `/hantar-majlis?duplicate=<event-id>` can reuse an existing event as the starting form state. The duplicate mapping copies title, description, timing, tags, references, languages, visibility, organizer/location context, and visible people fields, while stripping organizer or speaker IDs that the current submitter is not allowed to reuse.
+- Audit follow-up: the duplicate-source access check now also honors normal event update authorization, so institution/admin managers can actually open the prefilled duplicate flow for managed non-public events instead of hitting a 404 after clicking the new Ahli/dashboard actions.
+- Updated `app/Filament/Ahli/Resources/Events/Pages/ViewEvent.php` and `app/Filament/Resources/Events/Pages/ViewEvent.php` so the Ahli and admin event resource pages now expose a `Duplicate Event` header action that routes directly into the prefilled submit-event flow, and removed the temporary duplicate CTA from `resources/views/livewire/pages/events/show.blade.php` and `resources/views/livewire/pages/events/show-parent-program.blade.php`.
+- Added focused regression coverage in `tests/Feature/SubmitEventDuplicatePrefillTest.php` for both the happy-path prefill and the access-filtering case, extended `tests/Feature/AhliPanelInstitutionEditingTest.php` and `tests/Feature/AdminEventsResourceTest.php` to assert the Filament duplicate actions are rendered, and updated `tests/Feature/EventShowPageTest.php` to assert the public duplicate link is no longer shown.
+- Extended `tests/Feature/DashboardPagesTest.php` to assert the institution dashboard duplicate link is only rendered for users who can update the event, using scoped institution roles rather than a super-admin shortcut.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventDuplicatePrefillTest.php` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **22 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php --filter='opens the ahli view public page action in a new tab|shows a duplicate event action on the ahli event view page'` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php --filter='shows a duplicate event action on the admin event view page'` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Ahli/Resources/Events/Pages/ViewEvent.php app/Filament/Resources/Events/Pages/ViewEvent.php app/Livewire/Pages/Events/Show.php tests/Feature/EventShowPageTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/AdminEventsResourceTest.php` => **No errors**
+  - `vendor/bin/pest --parallel tests/Feature/SubmitEventDuplicatePrefillTest.php tests/Feature/DashboardPagesTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/AdminEventsResourceTest.php tests/Feature/EventShowPageTest.php` => **73 passed**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/SubmitEventDuplicatePrefillTest.php tests/Feature/DashboardPagesTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/AdminEventsResourceTest.php app/Filament/Ahli/Resources/Events/Pages/ViewEvent.php app/Filament/Resources/Events/Pages/ViewEvent.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+
 # Institution Map Buttons Below Embed
 
 - [x] Trace the institution show-page map and navigation button layout

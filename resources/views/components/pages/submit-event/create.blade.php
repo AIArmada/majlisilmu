@@ -37,6 +37,9 @@ use App\Services\Captcha\TurnstileVerifier;
 use App\Services\EventKeyPersonSyncService;
 use App\Services\ModerationService;
 use App\Services\ShareTrackingService;
+use App\States\EventStatus\Approved;
+use App\States\EventStatus\Cancelled;
+use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
 use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserTimezoneResolver;
@@ -64,6 +67,7 @@ use Filament\Schemas\Components\View as SchemaView;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -91,6 +95,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public ?string $parentEventId = null;
 
+    public ?string $duplicateEventId = null;
+
     public ?string $scopedInstitutionId = null;
 
     public ?TemporaryUploadedFile $event_source_attachment = null;
@@ -106,6 +112,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $timezone = $this->resolveUserTimezone();
         $this->parentEventId = request()->query('parent');
+        $this->duplicateEventId = request()->query('duplicate');
         $scopedInstitution = $this->resolveScopedInstitution(request()->query('institution'));
 
         if ($scopedInstitution instanceof Institution) {
@@ -132,6 +139,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         if ($parentEvent = $this->selectedParentEvent()) {
             $state = array_replace($state, $this->parentEventDefaults($parentEvent));
+        }
+
+        if ($duplicateEvent = $this->selectedDuplicateEvent()) {
+            $state = array_replace($state, $this->duplicateEventDefaults($duplicateEvent));
         }
 
         if ($scopedInstitution instanceof Institution) {
@@ -1869,6 +1880,305 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 $defaults['location_same_as_institution'] = false;
                 $defaults['location_venue_id'] = $parentEvent->venue_id;
             }
+        }
+
+        return $defaults;
+    }
+
+    protected function selectedDuplicateEvent(): ?Event
+    {
+        $duplicateId = $this->duplicateEventId;
+
+        if (! is_string($duplicateId) || ! Str::isUuid($duplicateId)) {
+            return null;
+        }
+
+        $duplicateEvent = Event::query()
+            ->with([
+                'tags:id,type,status',
+                'references:id,title',
+                'languages:id',
+                'speakers',
+                'keyPeople.speaker',
+            ])
+            ->find($duplicateId);
+
+        abort_unless($duplicateEvent instanceof Event && $this->canDuplicateSourceEvent($duplicateEvent), 404);
+
+        return $duplicateEvent;
+    }
+
+    protected function canDuplicateSourceEvent(Event $event): bool
+    {
+        $user = $this->submitterUser();
+
+        if ($user instanceof User) {
+            if ($user->can('update', $event) || $this->isDuplicateEventOwner($event)) {
+                return true;
+            }
+        }
+
+        return $event->is_active
+            && $this->isPubliclyVisibleDuplicateStatus($event)
+            && in_array($event->visibility?->value ?? $event->visibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true);
+    }
+
+    protected function isDuplicateEventOwner(Event $event): bool
+    {
+        $user = $this->submitterUser();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($event->user_id === $user->id || $event->submitter_id === $user->id) {
+            return true;
+        }
+
+        return EventSubmission::query()
+            ->where('event_id', $event->id)
+            ->where('submitted_by', $user->id)
+            ->exists();
+    }
+
+    protected function isPubliclyVisibleDuplicateStatus(Event $event): bool
+    {
+        $status = $event->status;
+
+        if ($status instanceof EventStatus) {
+            return $status->equals(Approved::class)
+                || $status->equals(Pending::class)
+                || $status->equals(Cancelled::class);
+        }
+
+        return in_array((string) $status, Event::PUBLIC_STATUSES, true);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function duplicateEventDefaults(Event $duplicateEvent): array
+    {
+        $timezone = $this->resolveUserTimezone((string) ($this->data['timezone'] ?? null));
+        $defaults = [
+            'title' => $duplicateEvent->title,
+            'description' => $this->duplicateEventDescription($duplicateEvent),
+            'event_type' => $this->normalizeEventTypeState($duplicateEvent->event_type),
+            'event_format' => $duplicateEvent->event_format?->value ?? $duplicateEvent->event_format ?? EventFormat::Physical->value,
+            'visibility' => $duplicateEvent->visibility?->value ?? $duplicateEvent->visibility ?? EventVisibility::Public->value,
+            'gender' => $duplicateEvent->gender?->value ?? $duplicateEvent->gender ?? EventGenderRestriction::All->value,
+            'age_group' => $this->normalizeAgeGroupState($duplicateEvent->age_group),
+            'children_allowed' => (bool) $duplicateEvent->children_allowed,
+            'is_muslim_only' => (bool) $duplicateEvent->is_muslim_only,
+            'event_url' => $duplicateEvent->event_url,
+            'live_url' => $duplicateEvent->live_url,
+            'domain_tags' => $duplicateEvent->tags->where('type', TagType::Domain->value)->pluck('id')->values()->all(),
+            'discipline_tags' => $duplicateEvent->tags->where('type', TagType::Discipline->value)->pluck('id')->values()->all(),
+            'source_tags' => $duplicateEvent->tags->where('type', TagType::Source->value)->pluck('id')->values()->all(),
+            'issue_tags' => $duplicateEvent->tags->where('type', TagType::Issue->value)->pluck('id')->values()->all(),
+            'references' => $duplicateEvent->references->pluck('id')->values()->all(),
+            'speakers' => $this->duplicateSpeakerState($duplicateEvent),
+            'other_key_people' => $this->duplicateOtherKeyPeopleState($duplicateEvent),
+        ];
+
+        if ($duplicateEvent->languages->isNotEmpty()) {
+            $defaults['languages'] = $duplicateEvent->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+        }
+
+        if ($duplicateEvent->starts_at instanceof CarbonInterface) {
+            $startsAt = $duplicateEvent->starts_at->copy()->timezone($timezone);
+            $prayerTime = $this->duplicateEventPrayerTime($duplicateEvent);
+
+            $defaults['event_date'] = $startsAt->toDateString();
+            $defaults['prayer_time'] = $prayerTime->value;
+
+            if ($prayerTime->isCustomTime()) {
+                $defaults['custom_time'] = $startsAt->format('H:i');
+            }
+        }
+
+        if ($duplicateEvent->ends_at instanceof CarbonInterface) {
+            $defaults['end_time'] = $duplicateEvent->ends_at->copy()->timezone($timezone)->format('H:i');
+        }
+
+        return array_replace($defaults, $this->duplicateOrganizerAndLocationDefaults($duplicateEvent));
+    }
+
+    protected function duplicateEventDescription(Event $duplicateEvent): string
+    {
+        $description = $duplicateEvent->description;
+
+        if (is_string($description)) {
+            return $description;
+        }
+
+        $html = data_get($description, 'html');
+
+        if (is_string($html) && $html !== '') {
+            return $html;
+        }
+
+        $content = data_get($description, 'content');
+
+        if (is_string($content) && $content !== '') {
+            return $content;
+        }
+
+        return $duplicateEvent->description_text;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function normalizeEventTypeState(mixed $state): array
+    {
+        if ($state instanceof Collection) {
+            return $state
+                ->map(fn (EventType|string $eventType): string => $eventType instanceof EventType ? $eventType->value : (string) $eventType)
+                ->filter(fn (string $eventType): bool => $eventType !== '')
+                ->values()
+                ->all();
+        }
+
+        if (is_array($state)) {
+            return collect($state)
+                ->map(fn (mixed $eventType): string => $eventType instanceof EventType ? $eventType->value : (string) $eventType)
+                ->filter(fn (string $eventType): bool => $eventType !== '')
+                ->values()
+                ->all();
+        }
+
+        if ($state instanceof EventType) {
+            return [$state->value];
+        }
+
+        if (is_string($state) && $state !== '') {
+            return [$state];
+        }
+
+        return [];
+    }
+
+    protected function duplicateEventPrayerTime(Event $duplicateEvent): EventPrayerTime
+    {
+        $prayerDisplayText = $duplicateEvent->prayer_display_text;
+
+        if (is_string($prayerDisplayText) && $prayerDisplayText !== '') {
+            foreach (EventPrayerTime::cases() as $prayerTime) {
+                if ($prayerTime->getLabel() === $prayerDisplayText) {
+                    return $prayerTime;
+                }
+            }
+        }
+
+        $prayerReference = $duplicateEvent->prayer_reference?->value ?? $duplicateEvent->prayer_reference;
+        $prayerOffset = $duplicateEvent->prayer_offset?->value ?? $duplicateEvent->prayer_offset;
+
+        if (is_string($prayerReference) && $prayerReference !== '') {
+            foreach (EventPrayerTime::cases() as $prayerTime) {
+                if ($prayerTime->isCustomTime()) {
+                    continue;
+                }
+
+                if (
+                    $prayerTime->toPrayerReference()?->value === $prayerReference
+                    && $prayerTime->getDefaultOffset()?->value === $prayerOffset
+                ) {
+                    return $prayerTime;
+                }
+            }
+        }
+
+        return EventPrayerTime::LainWaktu;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function duplicateSpeakerState(Event $duplicateEvent): array
+    {
+        $access = app(EntitySubmissionAccess::class);
+        $submitter = $this->submitterUser();
+
+        return $duplicateEvent->speakers
+            ->pluck('id')
+            ->map(fn (mixed $speakerId): ?string => is_string($speakerId) && $access->canUseSpeaker($submitter, $speakerId) ? $speakerId : null)
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{role: string, speaker_id: ?string, name: ?string, is_public: bool, notes: ?string}>
+     */
+    protected function duplicateOtherKeyPeopleState(Event $duplicateEvent): array
+    {
+        $access = app(EntitySubmissionAccess::class);
+        $submitter = $this->submitterUser();
+
+        return $duplicateEvent->keyPeople
+            ->filter(fn (mixed $keyPerson): bool => $keyPerson instanceof \App\Models\EventKeyPerson && $keyPerson->role !== EventKeyPersonRole::Speaker)
+            ->map(function (\App\Models\EventKeyPerson $keyPerson) use ($access, $submitter): array {
+                $speakerId = is_string($keyPerson->speaker_id) && $access->canUseSpeaker($submitter, $keyPerson->speaker_id)
+                    ? $keyPerson->speaker_id
+                    : null;
+
+                $fallbackName = $speakerId === null
+                    ? (filled($keyPerson->name) ? (string) $keyPerson->name : $keyPerson->display_name)
+                    : null;
+
+                return [
+                    'role' => $keyPerson->role instanceof EventKeyPersonRole ? $keyPerson->role->value : (string) $keyPerson->role,
+                    'speaker_id' => $speakerId,
+                    'name' => filled($fallbackName) ? (string) $fallbackName : null,
+                    'is_public' => (bool) $keyPerson->is_public,
+                    'notes' => filled($keyPerson->notes) ? (string) $keyPerson->notes : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function duplicateOrganizerAndLocationDefaults(Event $duplicateEvent): array
+    {
+        $access = app(EntitySubmissionAccess::class);
+        $submitter = $this->submitterUser();
+        $defaults = [];
+        $eventFormat = $duplicateEvent->event_format?->value ?? $duplicateEvent->event_format;
+        $organizerId = is_string($duplicateEvent->organizer_id) ? $duplicateEvent->organizer_id : null;
+        $institutionId = is_string($duplicateEvent->institution_id) ? $duplicateEvent->institution_id : null;
+
+        if ($duplicateEvent->organizer_type === Institution::class && $organizerId !== null && $access->canUseInstitution($submitter, $organizerId)) {
+            $defaults['organizer_type'] = 'institution';
+            $defaults['organizer_institution_id'] = $organizerId;
+        }
+
+        if ($duplicateEvent->organizer_type === Speaker::class && $organizerId !== null && $access->canUseSpeaker($submitter, $organizerId)) {
+            $defaults['organizer_type'] = 'speaker';
+            $defaults['organizer_speaker_id'] = $organizerId;
+        }
+
+        if ($eventFormat === EventFormat::Online->value) {
+            return $defaults;
+        }
+
+        if (filled($duplicateEvent->venue_id)) {
+            $defaults['location_same_as_institution'] = false;
+            $defaults['location_type'] = 'venue';
+            $defaults['location_venue_id'] = $duplicateEvent->venue_id;
+            $defaults['location_institution_id'] = null;
+
+            return $defaults;
+        }
+
+        if ($institutionId !== null && $access->canUseInstitution($submitter, $institutionId)) {
+            $defaults['location_type'] = 'institution';
+            $defaults['location_institution_id'] = $institutionId;
+            $defaults['location_same_as_institution'] = ($defaults['organizer_type'] ?? null) === 'institution'
+                && ($defaults['organizer_institution_id'] ?? null) === $institutionId;
         }
 
         return $defaults;
