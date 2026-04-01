@@ -79,6 +79,8 @@ class VenueFactory extends Factory
                 'google_place_id' => fake()->optional()->numerify('ChI###########'),
                 'waze_url' => fake()->optional()->url(),
             ]);
+
+            $venue->refresh();
         });
     }
 }

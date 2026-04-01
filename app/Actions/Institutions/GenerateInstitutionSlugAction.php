@@ -2,6 +2,7 @@
 
 namespace App\Actions\Institutions;
 
+use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
@@ -14,6 +15,10 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GenerateInstitutionSlugAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+    ) {}
 
     public function syncInstitutionSlugsForName(string $name): bool
     {
@@ -50,11 +55,15 @@ class GenerateInstitutionSlugAction
             return false;
         }
 
+        $previousSlug = is_string($institution->slug) ? $institution->slug : null;
+
         Institution::withoutTimestamps(function () use ($institution, $slug): void {
             $institution->forceFill([
                 'slug' => $slug,
             ])->saveQuietly();
         });
+
+        $this->syncSlugRedirectAction->handle($institution, $previousSlug);
 
         return true;
     }

@@ -294,6 +294,8 @@ class SpeakerFactory extends Factory
                     'job_title' => fake()->randomElement(['Freelance Da\'i', 'Independent Scholar', 'Religious Columnist', 'Motivation Speaker']),
                 ]);
             }
+
+            $speaker->refresh();
         });
     }
 }

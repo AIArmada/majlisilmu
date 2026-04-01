@@ -179,6 +179,7 @@
         $locationCover = $locationEntity->getFirstMedia('main')?->getAvailableUrl(['banner'])
             ?? $locationEntity->getFirstMedia('cover')?->getAvailableUrl(['banner'])
             ?? null;
+        $locationHref = route('venues.show', $locationEntity);
     }
 
     // Single context card below speakers:
@@ -230,6 +231,7 @@
         $contextThumb = $contextEntity->getFirstMediaUrl('avatar', 'thumb');
         $contextCover = $contextEntity->getFirstMediaUrl('cover', 'banner');
     } elseif ($contextEntity instanceof \App\Models\Venue) {
+        $contextHref = route('venues.show', $contextEntity);
         $contextThumb = $contextEntity->getFirstMediaUrl('cover', 'thumb');
         $contextCover = $contextEntity->getFirstMediaUrl('cover', 'banner');
     }

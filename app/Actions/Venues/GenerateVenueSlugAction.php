@@ -2,6 +2,7 @@
 
 namespace App\Actions\Venues;
 
+use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\State;
@@ -14,6 +15,58 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GenerateVenueSlugAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+    ) {}
+
+    public function syncVenueSlugsForName(string $name): bool
+    {
+        $normalizedName = trim($name);
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        $venues = Venue::query()
+            ->where('venues.name', $normalizedName)
+            ->with([
+                'address.country',
+                'address.state',
+                'address.district',
+                'address.subdistrict',
+            ])
+            ->get();
+
+        $didChange = false;
+
+        foreach ($this->orderedVenues($venues) as $venue) {
+            $didChange = $this->syncVenueSlug($venue) || $didChange;
+        }
+
+        return $didChange;
+    }
+
+    public function syncVenueSlug(Venue $venue): bool
+    {
+        $slug = $this->forVenue($venue);
+
+        if ($venue->slug === $slug) {
+            return false;
+        }
+
+        $previousSlug = is_string($venue->slug) ? $venue->slug : null;
+
+        Venue::withoutTimestamps(function () use ($venue, $slug): void {
+            $venue->forceFill([
+                'slug' => $slug,
+            ])->saveQuietly();
+        });
+
+        $this->syncSlugRedirectAction->handle($venue, $previousSlug);
+
+        return true;
+    }
 
     /**
      * @param  array<string, mixed>  $address
@@ -116,7 +169,26 @@ class GenerateVenueSlugAction
      */
     private function existingVenueSequence(Collection $matchingVenues, string $venueId): ?int
     {
-        $orderedVenues = $matchingVenues
+        $orderedVenues = $this->orderedVenues($matchingVenues);
+
+        $existingIndex = $orderedVenues->search(
+            fn (Venue $venue): bool => (string) $venue->getKey() === $venueId,
+        );
+
+        if (! is_int($existingIndex)) {
+            return null;
+        }
+
+        return $existingIndex + 1;
+    }
+
+    /**
+     * @param  Collection<int, Venue>  $venues
+     * @return Collection<int, Venue>
+     */
+    private function orderedVenues(Collection $venues): Collection
+    {
+        return $venues
             ->sort(function (Venue $left, Venue $right): int {
                 $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
                 $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
@@ -128,16 +200,6 @@ class GenerateVenueSlugAction
                 return strcmp((string) $left->getKey(), (string) $right->getKey());
             })
             ->values();
-
-        $existingIndex = $orderedVenues->search(
-            fn (Venue $venue): bool => (string) $venue->getKey() === $venueId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
     }
 
     /**
