@@ -15,6 +15,7 @@ it('renders a separate market selector beside the language selector with coming 
         ->assertDontSee(route('market.switch', 'brunei'), false)
         ->assertDontSee(route('market.switch', 'singapore'), false)
         ->assertDontSee(route('market.switch', 'indonesia'), false)
+        ->assertSee('Country')
         ->assertSee('Malaysia')
         ->assertSee('Brunei')
         ->assertSee('Singapore')

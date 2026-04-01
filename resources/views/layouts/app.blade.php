@@ -417,7 +417,7 @@
                         <!-- Mobile Language Switcher -->
                         <div class="border-t border-slate-100 pt-4">
                             <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                                {{ __('Market') }}
+                                {{ __('Country') }}
                             </p>
                             <div class="mb-4 flex flex-wrap gap-2">
                                 @foreach ($publicMarkets as $marketKey => $market)

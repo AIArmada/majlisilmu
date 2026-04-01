@@ -1,5 +1,7 @@
 # Lessons
 
+- When a user explicitly asks for proof on the current live local database, do not retreat to an isolated sandbox run; use the configured connection with disposable records, verify the real queue/job path there, and clean the proof data up afterward.
+- When a wording change is explicitly scoped to mobile only, do not rename the shared desktop label or translation key globally; patch the mobile-specific template branch and add coverage for that exact surface.
 - When a user says a new selector must sit beside language but stay conceptually separate, do not overload Laravel's existing locale state; introduce a distinct market preference and keep translation language independent.
 - When a user asks for permission-gated UI, confirm whether the primary CTA should stay visible and trigger the browser permission prompt while only secondary controls stay hidden; do not assume the button itself must disappear.
 - When a permission-gated CTA is meant to stay retryable, do not short-circuit on `navigator.permissions.query(...).state === 'denied'`; still call the underlying browser API on each click and let the browser decide whether to re-prompt or reject immediately.
