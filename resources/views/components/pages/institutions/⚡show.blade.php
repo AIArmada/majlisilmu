@@ -166,6 +166,14 @@ new class extends Component {
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
 
+    $qrModalChannels = $institution->donationChannels->filter(fn($channel) => $channel->hasMedia('qr'))->map(function($channel) {
+        return [
+            'id' => $channel->id,
+            'label' => $channel->label ?: $channel->recipient,
+            'original_url' => $channel->getFirstMediaUrl('qr'),
+        ];
+    })->values();
+
     $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
     $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
     $heroInstitutionImageUrl = $coverUrl ?: $institution->getFirstMediaUrl('logo');
@@ -327,6 +335,14 @@ new class extends Component {
 
 <div class="min-h-screen bg-slate-50/80" x-data='{
         shareModalOpen: false,
+        qrModalOpen: false,
+        qrActiveUrl: null,
+        qrActiveLabel: null,
+        openQr(url, label) {
+            this.qrActiveUrl = url;
+            this.qrActiveLabel = label;
+            this.qrModalOpen = true;
+        },
         copied: false,
         shareData: @json($shareData),
         copyPrompt: @json(__('Copy this link:')),
@@ -1486,14 +1502,27 @@ new class extends Component {
                         <div class="divide-y divide-gold-100/50 p-2">
                             @foreach($donationChannels as $channel)
                                 <div class="rounded-xl p-4 transition-colors hover:bg-gold-50/50">
-                                    <div class="flex items-start gap-3">
-                                        @php $qrUrl = $channel->getFirstMediaUrl('qr', 'thumb'); @endphp
-                                        @if($qrUrl)
-                                            <div
-                                                class="shrink-0 overflow-hidden rounded-lg border border-gold-200/60 bg-white p-1 shadow-sm">
-                                                <img src="{{ $qrUrl }}" alt="{{ __('Kod QR') }}" class="h-16 w-16 object-contain"
-                                                    loading="lazy">
-                                            </div>
+                                    <div class="flex items-start gap-4">
+                                        @php
+                                            $thumbUrl = $channel->getFirstMediaUrl('qr', 'thumb');
+                                            $fullUrl = $channel->getFirstMediaUrl('qr');
+                                            $displayLabel = $channel->label ?: $channel->recipient;
+                                        @endphp
+                                        @if($thumbUrl)
+                                            <button type="button"
+                                                @click="openQr('{{ $fullUrl }}', '{{ $displayLabel }}')"
+                                                class="group relative shrink-0 overflow-hidden rounded-xl border-2 border-gold-200/60 bg-white p-1 shadow-sm transition-all hover:border-gold-400 hover:shadow-md active:scale-95">
+                                                <img src="{{ $thumbUrl }}" alt="{{ __('Kod QR') }}"
+                                                    class="h-16 w-16 object-contain" loading="lazy">
+                                                <div
+                                                    class="absolute inset-0 flex items-center justify-center bg-gold-900/5 opacity-0 transition group-hover:opacity-100">
+                                                    <svg class="h-5 w-5 text-gold-600" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor" stroke-width="2.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                                                    </svg>
+                                                </div>
+                                            </button>
                                         @endif
                                         <div class="min-w-0 flex-1">
                                             @if($channel->label)
@@ -1693,6 +1722,36 @@ new class extends Component {
                             </a>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─── QR MODAL ─── --}}
+    <div x-show="qrModalOpen" x-cloak x-transition.opacity @keydown.escape.window="qrModalOpen = false"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-md"
+        aria-modal="true" role="dialog">
+        <div class="relative w-full max-w-lg p-4" @click.away="qrModalOpen = false">
+            <div x-show="qrModalOpen" x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                class="overflow-hidden rounded-3xl bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                    <h3 class="text-sm font-bold text-slate-900" x-text="qrActiveLabel"></h3>
+                    <button type="button" @click="qrModalOpen = false"
+                        class="inline-flex size-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700">
+                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex items-center justify-center bg-slate-50 p-6 sm:p-10">
+                    <img :src="qrActiveUrl" :alt="qrActiveLabel"
+                        class="aspect-square w-full max-w-xs rounded-2xl border-4 border-white bg-white object-contain shadow-xl"
+                        loading="lazy">
+                </div>
+                <div class="bg-white p-4 text-center">
+                    <p class="text-xs font-medium text-slate-500">{{ __('Imbas kod QR ini untuk membuat sumbangan.') }}
+                    </p>
                 </div>
             </div>
         </div>
