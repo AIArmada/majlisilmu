@@ -71,6 +71,7 @@ class ContributionEntityMutationService
         $this->addMemberToSubject->handle($institution, $proposer);
 
         $this->syncInstitutionRelations($institution, $payload);
+        $this->generateInstitutionSlugAction->syncInstitutionSlug($institution);
 
         return $institution;
     }
@@ -139,6 +140,7 @@ class ContributionEntityMutationService
         $institution->save();
 
         $this->syncInstitutionRelations($institution, $payload);
+        $this->generateInstitutionSlugAction->syncInstitutionSlug($institution);
 
         return $dirty;
     }

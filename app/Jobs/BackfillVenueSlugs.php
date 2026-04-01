@@ -4,24 +4,24 @@ namespace App\Jobs;
 
 use App\Actions\Venues\GenerateVenueSlugAction;
 use App\Models\Venue;
-use App\Support\Cache\PublicListingsCache;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Collection;
 
-class BackfillVenueSlugs implements ShouldBeUnique, ShouldQueue
+class BackfillVenueSlugs implements ShouldQueue
 {
     use Queueable;
 
     public int $tries = 1;
 
-    public int $uniqueFor = 3600;
+    /**
+     * @param  list<string>  $venueIds
+     */
+    public function __construct(public array $venueIds = []) {}
 
-    public function handle(
-        GenerateVenueSlugAction $generateVenueSlugAction,
-        PublicListingsCache $publicListingsCache,
-    ): void {
-        Venue::query()
+    public function handle(GenerateVenueSlugAction $generateVenueSlugAction): void
+    {
+        $query = Venue::query()
             ->with([
                 'address.country',
                 'address.state',
@@ -29,28 +29,27 @@ class BackfillVenueSlugs implements ShouldBeUnique, ShouldQueue
                 'address.subdistrict',
             ])
             ->orderBy('name')
-            ->orderBy('id')
-            ->chunk(100, function ($venues) use ($generateVenueSlugAction): void {
-                foreach ($venues as $venue) {
-                    $slug = $generateVenueSlugAction->forVenue($venue);
+            ->orderBy('id');
 
-                    if ($venue->slug === $slug) {
-                        continue;
-                    }
+        if ($this->venueIds !== []) {
+            $query->whereIn('id', $this->venueIds);
+        }
 
-                    Venue::withoutTimestamps(function () use ($venue, $slug): void {
-                        $venue->forceFill([
-                            'slug' => $slug,
-                        ])->saveQuietly();
-                    });
-                }
+        /** @var Collection<int, Venue> $venues */
+        $venues = $query->get();
+
+        foreach ($venues as $venue) {
+            $slug = $generateVenueSlugAction->forVenue($venue);
+
+            if ($venue->slug === $slug) {
+                continue;
+            }
+
+            Venue::withoutTimestamps(function () use ($venue, $slug): void {
+                $venue->forceFill([
+                    'slug' => $slug,
+                ])->saveQuietly();
             });
-
-        $publicListingsCache->bustMajlisListing();
-    }
-
-    public function uniqueId(): string
-    {
-        return 'venue-slug-backfill';
+        }
     }
 }

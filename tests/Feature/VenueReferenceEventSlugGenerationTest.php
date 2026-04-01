@@ -3,6 +3,7 @@
 use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\References\GenerateReferenceSlugAction;
 use App\Actions\Venues\GenerateVenueSlugAction;
+use App\Console\Commands\QueueBackfillVenueSlugs;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -31,8 +32,11 @@ use App\Support\Cache\PublicListingsCache;
 use Carbon\CarbonInterface;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -123,23 +127,144 @@ it('backfills existing venue slugs through the queued job logic', function () {
         geography: $geography,
     );
 
-    app(BackfillVenueSlugs::class)->handle(
-        app(GenerateVenueSlugAction::class),
-        app(PublicListingsCache::class),
-    );
+    app(BackfillVenueSlugs::class)->handle(app(GenerateVenueSlugAction::class));
 
     expect($first->fresh()?->slug)->toBe('dewan-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my')
         ->and($second->fresh()?->slug)->toBe('dewan-sultan-salahudin-abdul-aziz-shah-2-shah-alam-petaling-selangor-my');
 });
 
-it('queues the venue slug backfill command', function () {
-    Queue::fake();
+it('queues the venue slug backfill command in a single batch', function () {
+    $geography = createVenueSlugGeography();
+
+    $first = createVenueForSlugBackfill(
+        id: '00000000-0000-0000-0000-000000000023',
+        name: 'Dewan Integrasi 1',
+        slug: 'legacy-venue-3',
+        geography: $geography,
+    );
+
+    $second = createVenueForSlugBackfill(
+        id: '00000000-0000-0000-0000-000000000024',
+        name: 'Dewan Integrasi 2',
+        slug: 'legacy-venue-4',
+        geography: $geography,
+    );
+
+    Bus::fake();
 
     $this->artisan('venues:queue-slug-backfill')
-        ->expectsOutput('Queued venue slug backfill job.')
+        ->expectsOutput('Queued venue slug backfill batch with 1 jobs for 2 venues.')
         ->assertSuccessful();
 
-    Queue::assertPushed(BackfillVenueSlugs::class);
+    Bus::assertBatched(function (PendingBatch $batch) use ($first, $second): bool {
+        if ($batch->name !== 'venue-slug-backfill' || $batch->jobs->count() !== 1) {
+            return false;
+        }
+
+        $job = $batch->jobs->first();
+
+        return $job instanceof BackfillVenueSlugs
+            && $job->venueIds === [(string) $first->getKey(), (string) $second->getKey()];
+    });
+});
+
+it('does not queue overlapping venue slug backfill batches', function () {
+    Bus::fake();
+
+    $lock = Cache::lock(QueueBackfillVenueSlugs::LOCK_KEY, 3600);
+    expect($lock->get())->toBeTrue();
+
+    try {
+        $this->artisan('venues:queue-slug-backfill')
+            ->expectsOutput('Venue slug backfill is already queued or running.')
+            ->assertSuccessful();
+
+        Bus::assertNothingBatched();
+    } finally {
+        $lock->forceRelease();
+    }
+});
+
+it('splits venue slug backfill batches by chunk size without overlapping ids', function () {
+    Bus::fake();
+
+    $totalVenues = QueueBackfillVenueSlugs::CHUNK_SIZE + 1;
+    $createdIds = collect(range(1, $totalVenues))
+        ->map(function (int $index): string {
+            $venue = Venue::unguarded(fn () => Venue::query()->create([
+                'name' => "Venue {$index}",
+                'slug' => "legacy-venue-{$index}",
+                'type' => 'dewan',
+                'status' => 'verified',
+                'is_active' => true,
+            ]));
+
+            return (string) $venue->getKey();
+        })
+        ->sort()
+        ->values();
+
+    $this->artisan('venues:queue-slug-backfill')
+        ->expectsOutput("Queued venue slug backfill batch with 2 jobs for {$totalVenues} venues.")
+        ->assertSuccessful();
+
+    Bus::assertBatched(function (PendingBatch $batch) use ($createdIds, $totalVenues): bool {
+        if ($batch->name !== 'venue-slug-backfill' || $batch->jobs->count() !== 2) {
+            return false;
+        }
+
+        $queuedIds = collect($batch->jobs)
+            ->flatMap(function (mixed $job): array {
+                return $job instanceof BackfillVenueSlugs ? $job->venueIds : [];
+            })
+            ->sort()
+            ->values();
+
+        $firstJob = $batch->jobs[0] ?? null;
+        $secondJob = $batch->jobs[1] ?? null;
+
+        if (! $firstJob instanceof BackfillVenueSlugs || ! $secondJob instanceof BackfillVenueSlugs) {
+            return false;
+        }
+
+        return $queuedIds->all() === $createdIds->all()
+            && count($firstJob->venueIds) === QueueBackfillVenueSlugs::CHUNK_SIZE
+            && count($secondJob->venueIds) === 1
+            && count(array_intersect($firstJob->venueIds, $secondJob->venueIds)) === 0
+            && $queuedIds->count() === $totalVenues;
+    });
+});
+
+it('only backfills the venues assigned to a chunk job', function () {
+    $geography = createVenueSlugGeography();
+
+    $first = createVenueForSlugBackfill(
+        id: '00000000-0000-0000-0000-000000000025',
+        name: 'Dewan Subset 1',
+        slug: 'legacy-subset-1',
+        geography: $geography,
+    );
+
+    $second = createVenueForSlugBackfill(
+        id: '00000000-0000-0000-0000-000000000026',
+        name: 'Dewan Subset 2',
+        slug: 'legacy-subset-2',
+        geography: $geography,
+    );
+
+    $third = createVenueForSlugBackfill(
+        id: '00000000-0000-0000-0000-000000000027',
+        name: 'Dewan Subset 3',
+        slug: 'legacy-subset-3',
+        geography: $geography,
+    );
+
+    (new BackfillVenueSlugs([(string) $first->getKey(), (string) $second->getKey()]))
+        ->handle(app(GenerateVenueSlugAction::class));
+
+    expect($first->fresh()?->slug)->not->toBe('legacy-subset-1')
+        ->and($second->fresh()?->slug)->not->toBe('legacy-subset-2')
+        ->and($third->fresh()?->slug)->toBe('legacy-subset-3');
 });
 
 it('generates sequential slugs for references with duplicate titles', function () {

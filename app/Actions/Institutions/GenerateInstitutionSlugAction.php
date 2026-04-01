@@ -15,6 +15,50 @@ class GenerateInstitutionSlugAction
 {
     use AsAction;
 
+    public function syncInstitutionSlugsForName(string $name): bool
+    {
+        $normalizedName = trim($name);
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        $institutions = Institution::query()
+            ->where('institutions.name', $normalizedName)
+            ->with([
+                'address.country',
+                'address.state',
+                'address.district',
+                'address.subdistrict',
+            ])
+            ->get();
+
+        $didChange = false;
+
+        foreach ($this->orderedInstitutions($institutions) as $institution) {
+            $didChange = $this->syncInstitutionSlug($institution) || $didChange;
+        }
+
+        return $didChange;
+    }
+
+    public function syncInstitutionSlug(Institution $institution): bool
+    {
+        $slug = $this->forInstitution($institution);
+
+        if ($institution->slug === $slug) {
+            return false;
+        }
+
+        Institution::withoutTimestamps(function () use ($institution, $slug): void {
+            $institution->forceFill([
+                'slug' => $slug,
+            ])->saveQuietly();
+        });
+
+        return true;
+    }
+
     /**
      * @param  array<string, mixed>  $address
      */
@@ -119,7 +163,26 @@ class GenerateInstitutionSlugAction
      */
     private function existingInstitutionSequence(Collection $matchingInstitutions, string $institutionId): ?int
     {
-        $orderedInstitutions = $matchingInstitutions
+        $orderedInstitutions = $this->orderedInstitutions($matchingInstitutions);
+
+        $existingIndex = $orderedInstitutions->search(
+            fn (Institution $institution): bool => (string) $institution->getKey() === $institutionId,
+        );
+
+        if (! is_int($existingIndex)) {
+            return null;
+        }
+
+        return $existingIndex + 1;
+    }
+
+    /**
+     * @param  Collection<int, Institution>  $institutions
+     * @return Collection<int, Institution>
+     */
+    private function orderedInstitutions(Collection $institutions): Collection
+    {
+        return $institutions
             ->sort(function (Institution $left, Institution $right): int {
                 $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
                 $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
@@ -131,16 +194,6 @@ class GenerateInstitutionSlugAction
                 return strcmp((string) $left->getKey(), (string) $right->getKey());
             })
             ->values();
-
-        $existingIndex = $orderedInstitutions->search(
-            fn (Institution $institution): bool => (string) $institution->getKey() === $institutionId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
     }
 
     /**

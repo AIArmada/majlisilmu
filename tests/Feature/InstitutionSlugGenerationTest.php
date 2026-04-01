@@ -80,6 +80,47 @@ it('adds duplicate numbering only when the same institution name reuses the same
         ->and($third->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-subang-jaya-petaling-selangor-my');
 });
 
+it('recomputes duplicate institution slugs when locality is added after creation', function () {
+    $proposer = User::factory()->create();
+    $geography = createInstitutionSlugGeography();
+
+    $first = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
+        'type' => 'masjid',
+    ], $proposer);
+
+    $second = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
+        'type' => 'masjid',
+    ], $proposer);
+
+    expect($first->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah')
+        ->and($second->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-2');
+
+    $first->address()->create([
+        'type' => 'main',
+        'country_id' => (int) $geography['country']->getKey(),
+        'state_id' => (int) $geography['state']->getKey(),
+        'district_id' => (int) $geography['district']->getKey(),
+        'subdistrict_id' => (int) $geography['subdistrict']->getKey(),
+        'line1' => 'Persiaran Masjid',
+        'google_maps_url' => 'https://maps.google.com/?q=3.0738,101.5183',
+    ]);
+
+    $second->address()->create([
+        'type' => 'main',
+        'country_id' => (int) $geography['country']->getKey(),
+        'state_id' => (int) $geography['state']->getKey(),
+        'district_id' => (int) $geography['district']->getKey(),
+        'subdistrict_id' => (int) $geography['subdistrict']->getKey(),
+        'line1' => 'Persiaran Masjid',
+        'google_maps_url' => 'https://maps.google.com/?q=3.0738,101.5183',
+    ]);
+
+    expect($first->fresh()?->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my')
+        ->and($second->fresh()?->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-2-shah-alam-petaling-selangor-my');
+});
+
 it('keeps slugs unique when a literal numbered name already occupies the expected duplicate slot', function () {
     $proposer = User::factory()->create();
     $geography = createInstitutionSlugGeography();
@@ -105,6 +146,73 @@ it('keeps slugs unique when a literal numbered name already occupies the expecte
     expect($first->slug)->toBe('masjid-example-shah-alam-petaling-selangor-my')
         ->and($numberedName->slug)->toBe('masjid-example-2-shah-alam-petaling-selangor-my')
         ->and($duplicate->slug)->toBe('masjid-example-3-shah-alam-petaling-selangor-my');
+});
+
+it('recomputes institution slugs when the institution name changes', function () {
+    $proposer = User::factory()->create();
+    $geography = createInstitutionSlugGeography();
+
+    $institution = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Lama',
+        'type' => 'masjid',
+        'address' => geographyAddressPayload($geography),
+    ], $proposer);
+
+    $institution->update([
+        'name' => 'Masjid Baru',
+    ]);
+
+    expect($institution->fresh()?->slug)->toBe('masjid-baru-shah-alam-petaling-selangor-my');
+});
+
+it('renumbers remaining duplicates when a peer is renamed out of the group', function () {
+    $proposer = User::factory()->create();
+    $geography = createInstitutionSlugGeography();
+
+    $first = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
+        'type' => 'masjid',
+        'address' => geographyAddressPayload($geography),
+    ], $proposer);
+
+    $second = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
+        'type' => 'masjid',
+        'address' => geographyAddressPayload($geography),
+    ], $proposer);
+
+    expect($first->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my')
+        ->and($second->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-2-shah-alam-petaling-selangor-my');
+
+    $first->update([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah Induk',
+    ]);
+
+    expect($first->fresh()?->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-induk-shah-alam-petaling-selangor-my')
+        ->and($second->fresh()?->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my');
+});
+
+it('renumbers remaining duplicates when a peer is deleted', function () {
+    $proposer = User::factory()->create();
+    $geography = createInstitutionSlugGeography();
+
+    $first = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Warisan',
+        'type' => 'masjid',
+        'address' => geographyAddressPayload($geography),
+    ], $proposer);
+
+    $second = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Warisan',
+        'type' => 'masjid',
+        'address' => geographyAddressPayload($geography),
+    ], $proposer);
+
+    expect($second->slug)->toBe('masjid-warisan-2-shah-alam-petaling-selangor-my');
+
+    $first->delete();
+
+    expect($second->fresh()?->slug)->toBe('masjid-warisan-shah-alam-petaling-selangor-my');
 });
 
 it('uses the generated geographic slug when admins create institutions in filament', function () {
