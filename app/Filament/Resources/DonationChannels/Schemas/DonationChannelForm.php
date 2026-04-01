@@ -73,8 +73,7 @@ class DonationChannelForm
                     ->visible(fn (Get $get) => $get('method') === 'bank_account')
                     ->required(fn (Get $get) => $get('method') === 'bank_account'),
                 TextInput::make('bank_code')
-                    ->visible(fn (Get $get) => $get('method') === 'bank_account')
-                    ->required(fn (Get $get) => $get('method') === 'bank_account'),
+                    ->visible(fn (Get $get) => $get('method') === 'bank_account'),
                 TextInput::make('account_number')
                     ->visible(fn (Get $get) => $get('method') === 'bank_account')
                     ->required(fn (Get $get) => $get('method') === 'bank_account'),
@@ -104,7 +103,6 @@ class DonationChannelForm
                     ->collection('qr')
                     ->image()
                     ->imageEditor()
-                    ->avatar()
                     ->conversion('thumb')
                     ->helperText('Upload an official payment QR image.'),
             ]);
