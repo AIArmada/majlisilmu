@@ -14,13 +14,21 @@ beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
 
-it('allows only application admins through the horizon gate', function () {
+it('allows only global admins through the horizon gate', function () {
+    $superAdmin = User::factory()->create();
+    $superAdmin->assignRole('super_admin');
+
+    $admin = User::factory()->create();
+    $admin->assignRole('admin');
+
     $moderator = User::factory()->create();
     $moderator->assignRole('moderator');
 
     $member = User::factory()->create();
 
-    expect(Gate::forUser($moderator)->check('viewHorizon'))->toBeTrue()
+    expect(Gate::forUser($superAdmin)->check('viewHorizon'))->toBeTrue()
+        ->and(Gate::forUser($admin)->check('viewHorizon'))->toBeTrue()
+        ->and(Gate::forUser($moderator)->check('viewHorizon'))->toBeFalse()
         ->and(Gate::forUser($member)->check('viewHorizon'))->toBeFalse();
 });
 
