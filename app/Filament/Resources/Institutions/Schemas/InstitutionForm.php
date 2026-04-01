@@ -38,7 +38,8 @@ class InstitutionForm
                             ->required()
                             ->maxLength(255),
                         TextInput::make('slug')
-                            ->required()
+                            ->required(fn (string $operation): bool => $operation !== 'create')
+                            ->hidden(fn (string $operation): bool => $operation === 'create')
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
                         Textarea::make('description')

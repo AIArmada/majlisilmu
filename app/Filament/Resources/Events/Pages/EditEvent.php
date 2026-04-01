@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Events\SyncEventResourceRelationsAction;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\RegistrationMode;
@@ -75,6 +76,14 @@ class EditEvent extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
+        $data['slug'] = app(GenerateEventSlugAction::class)->handle(
+            (string) ($data['title'] ?? $this->eventRecord()->title ?? 'Event'),
+            $data['event_date'] ?? $data['starts_at'] ?? $this->eventRecord()->starts_at,
+            is_string($data['timezone'] ?? null)
+                ? $data['timezone']
+                : (is_string($this->eventRecord()->timezone) ? $this->eventRecord()->timezone : null),
+            (string) $this->eventRecord()->getKey(),
+        );
 
         unset(
             $data['languages'],

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Events\SyncEventResourceRelationsAction;
 use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Filament\Resources\Events\EventResource;
@@ -25,6 +26,11 @@ class CreateEvent extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
+        $data['slug'] = app(GenerateEventSlugAction::class)->handle(
+            (string) ($data['title'] ?? 'Event'),
+            $data['event_date'] ?? $data['starts_at'] ?? null,
+            is_string($data['timezone'] ?? null) ? $data['timezone'] : null,
+        );
 
         unset(
             $data['languages'],

@@ -8,7 +8,6 @@ use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class CreateAdvancedParentProgramAction
@@ -35,7 +34,11 @@ class CreateAdvancedParentProgramAction
                 'parent_event_id' => null,
                 'event_structure' => 'parent_program',
                 'title' => (string) $form['title'],
-                'slug' => Str::slug((string) $form['title']).'-'.Str::lower(Str::random(7)),
+                'slug' => app(GenerateEventSlugAction::class)->handle(
+                    (string) $form['title'],
+                    $programStartsAt,
+                    $timezone,
+                ),
                 'description' => (string) ($form['description'] ?? ''),
                 'starts_at' => $programStartsAt,
                 'ends_at' => $programEndsAt,

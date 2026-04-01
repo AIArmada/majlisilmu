@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -44,7 +45,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 use Nnjeim\World\Models\Language;
 
 class EventForm
@@ -67,24 +67,22 @@ class EventForm
                                             ->required()
                                             ->maxLength(255)
                                             ->live(onBlur: true)
-                                            ->afterStateUpdated(fn (Set $set, ?string $state): mixed => $set('slug', Str::slug($state))),
+                                            ->afterStateUpdated(function (Get $get, Set $set, ?Event $record, ?string $state): void {
+                                                self::regenerateSlug($get, $set, $record, $state);
+                                            }),
                                         TextInput::make('slug')
                                             ->label('Slug')
-                                            ->required()
+                                            ->required(fn (string $operation): bool => $operation !== 'create')
+                                            ->hidden(fn (string $operation): bool => $operation === 'create')
                                             ->maxLength(255)
                                             ->unique(ignoreRecord: true)
                                             ->suffixAction(
                                                 Action::make('generateSlug')
                                                     ->icon(Heroicon::ArrowPath)
                                                     ->tooltip('Jana semula slug daripada tajuk')
-                                                    ->actionJs(<<<'JS'
-                                                        const title = $get('title') || '';
-                                                        $set('slug', title.toLowerCase()
-                                                            .replace(/[^\w\s-]/g, '')
-                                                            .replace(/\s+/g, '-')
-                                                            .replace(/-+/g, '-')
-                                                            .replace(/^-|-$/g, ''))
-                                                    JS),
+                                                    ->action(function (Get $get, Set $set, ?Event $record): void {
+                                                        self::regenerateSlug($get, $set, $record);
+                                                    }),
                                             ),
                                         RichEditor::make('description')
                                             ->label('Keterangan')
@@ -99,7 +97,10 @@ class EventForm
                                             ->label('Tarikh')
                                             ->native()
                                             ->required()
-                                            ->live(),
+                                            ->live()
+                                            ->afterStateUpdated(function (Get $get, Set $set, ?Event $record): void {
+                                                self::regenerateSlug($get, $set, $record);
+                                            }),
                                         Select::make('prayer_time')
                                             ->label('Waktu')
                                             ->options(
@@ -132,7 +133,11 @@ class EventForm
                                             ->label('Timezone')
                                             ->default('Asia/Kuala_Lumpur')
                                             ->required()
-                                            ->maxLength(64),
+                                            ->maxLength(64)
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(function (Get $get, Set $set, ?Event $record): void {
+                                                self::regenerateSlug($get, $set, $record);
+                                            }),
                                         Select::make('event_format')
                                             ->label('Format Majlis')
                                             ->options(
@@ -742,6 +747,24 @@ class EventForm
         }
 
         return false;
+    }
+
+    private static function regenerateSlug(Get $get, Set $set, ?Event $record, ?string $title = null): void
+    {
+        $resolvedTitle = trim($title ?? (string) ($get('title') ?? ''));
+
+        if ($resolvedTitle === '') {
+            $set('slug', null);
+
+            return;
+        }
+
+        $set('slug', app(GenerateEventSlugAction::class)->handle(
+            $resolvedTitle,
+            $get('event_date') ?? $get('starts_at') ?? null,
+            is_string($get('timezone')) ? $get('timezone') : null,
+            $record?->getKey() !== null ? (string) $record->getKey() : null,
+        ));
     }
 
     private static function canManageFeaturedFlag(): bool
