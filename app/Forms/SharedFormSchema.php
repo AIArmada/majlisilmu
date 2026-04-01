@@ -43,6 +43,7 @@ class SharedFormSchema
         bool $includeCountryField = false,
         ?bool $showCountryField = null,
         ?int $defaultCountryId = null,
+        bool $requireCountryField = false,
     ): array {
         $defaultCountryId ??= PreferredCountryResolver::MALAYSIA_ID;
         $showCountryField ??= true;
@@ -71,6 +72,7 @@ class SharedFormSchema
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->required($requireCountryField)
                         ->default($defaultCountryId)
                         ->afterStateUpdatedJs(<<<'JS'
                             const guard = Number($get('cascade_reset_guard') ?? 0)
@@ -165,6 +167,7 @@ class SharedFormSchema
         bool $includeCountryField = false,
         ?bool $showCountryField = null,
         ?int $defaultCountryId = null,
+        bool $requireCountryField = false,
     ): Group {
         $group = Group::make(self::addressFields(
             requireGoogleMaps: $requireGoogleMaps,
@@ -174,6 +177,7 @@ class SharedFormSchema
             includeCountryField: $includeCountryField,
             showCountryField: $showCountryField,
             defaultCountryId: $defaultCountryId,
+            requireCountryField: $requireCountryField,
         ))
             ->columns(2);
 
@@ -282,9 +286,14 @@ class SharedFormSchema
      *
      * @param  array<string, mixed>  $data
      */
-    public static function createAddressFromData(Event|Institution|Speaker|Venue $model, array $data, string $type = 'main'): void
-    {
+    public static function createAddressFromData(
+        Event|Institution|Speaker|Venue $model,
+        array $data,
+        string $type = 'main',
+        bool $allowCountryOnly = false,
+    ): void {
         $data = self::prepareAddressPersistenceData($data);
+        $countryId = self::normalizeLocationId($data['country_id'] ?? null);
 
         if (
             ! empty($data['line1'])
@@ -292,13 +301,14 @@ class SharedFormSchema
             || ! empty($data['google_maps_url'])
             || ! empty($data['lat'])
             || ! empty($data['lng'])
+            || ($allowCountryOnly && $countryId !== null)
         ) {
             $model->address()->create([
                 'type' => $type,
                 'line1' => $data['line1'] ?? null,
                 'line2' => $data['line2'] ?? null,
                 'postcode' => $data['postcode'] ?? null,
-                'country_id' => self::normalizeLocationId($data['country_id'] ?? null) ?? PreferredCountryResolver::MALAYSIA_ID,
+                'country_id' => $countryId ?? PreferredCountryResolver::MALAYSIA_ID,
                 'state_id' => $data['state_id'] ?? null,
                 'district_id' => $data['district_id'] ?? null,
                 'subdistrict_id' => $data['subdistrict_id'] ?? null,

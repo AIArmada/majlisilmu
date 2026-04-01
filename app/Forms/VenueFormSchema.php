@@ -85,7 +85,7 @@ class VenueFormSchema
         // Save media uploads (cover, gallery) via Filament's relationship-saving mechanism
         $schema?->model($venue)->saveRelationships();
 
-        SharedFormSchema::createAddressFromData($venue, $addressData);
+        SharedFormSchema::createAddressFromData($venue, $addressData, allowCountryOnly: true);
         SharedFormSchema::createSocialMediaFromData($venue, $data);
 
         return (string) $venue->getKey();
@@ -96,12 +96,19 @@ class VenueFormSchema
      */
     private static function addressSchema(bool $includeLocationPicker): array
     {
+        $publicCountryId = SharedFormSchema::preferredPublicCountryId();
+
         if (! $includeLocationPicker) {
-            return SharedFormSchema::addressFields(requireGoogleMaps: true);
+            return SharedFormSchema::addressFields(
+                requireGoogleMaps: true,
+                includeCountryField: true,
+                showCountryField: true,
+                defaultCountryId: $publicCountryId,
+                requireCountryField: true,
+            );
         }
 
         $shouldRenderLocationPicker = GooglePlacesConfiguration::isEnabled();
-        $publicCountryId = SharedFormSchema::preferredPublicCountryId();
 
         return [
             Group::make([
@@ -122,8 +129,9 @@ class VenueFormSchema
                     enableGoogleMapsNormalization: true,
                     enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                     includeCountryField: true,
-                    showCountryField: false,
+                    showCountryField: true,
                     defaultCountryId: $publicCountryId,
+                    requireCountryField: true,
                 ),
             ])
                 ->statePath('address')
