@@ -101,7 +101,7 @@ class InstitutionFormSchema
         $schema?->model($institution)->saveRelationships();
 
         SharedFormSchema::createContactsFromData($institution, $data);
-        SharedFormSchema::createAddressFromData($institution, $addressData);
+        SharedFormSchema::createAddressFromData($institution, $addressData, allowCountryOnly: true);
         SharedFormSchema::createSocialMediaFromData($institution, $data);
 
         return (string) $institution->getKey();
@@ -112,12 +112,19 @@ class InstitutionFormSchema
      */
     private static function addressSchema(bool $includeLocationPicker): array
     {
+        $publicCountryId = SharedFormSchema::preferredPublicCountryId();
+
         if (! $includeLocationPicker) {
-            return SharedFormSchema::addressFields(requireGoogleMaps: true);
+            return SharedFormSchema::addressFields(
+                requireGoogleMaps: true,
+                includeCountryField: true,
+                showCountryField: true,
+                defaultCountryId: $publicCountryId,
+                requireCountryField: true,
+            );
         }
 
         $shouldRenderLocationPicker = GooglePlacesConfiguration::isEnabled();
-        $publicCountryId = SharedFormSchema::preferredPublicCountryId();
 
         return [
             Group::make([
@@ -138,8 +145,9 @@ class InstitutionFormSchema
                     enableGoogleMapsNormalization: true,
                     enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                     includeCountryField: true,
-                    showCountryField: false,
+                    showCountryField: true,
                     defaultCountryId: $publicCountryId,
+                    requireCountryField: true,
                 ),
             ])
                 ->statePath('address')

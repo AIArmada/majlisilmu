@@ -34,6 +34,22 @@ it('generates geographic slugs for institution quick-create flows', function () 
     expect($institution->slug)->toBe('masjid-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my');
 });
 
+it('persists country-only address data for staged institution creation', function () {
+    $proposer = User::factory()->create();
+    $geography = createInstitutionSlugGeography();
+
+    $institution = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Negara Sahaja',
+        'type' => 'masjid',
+        'address' => [
+            'country_id' => (string) $geography['country']->getKey(),
+        ],
+    ], $proposer);
+
+    expect($institution->slug)->toBe('masjid-negara-sahaja-my')
+        ->and($institution->fresh()?->addressModel?->country_id)->toBe((int) $geography['country']->getKey());
+});
+
 it('adds duplicate numbering only when the same institution name reuses the same locality suffix', function () {
     $proposer = User::factory()->create();
     $primaryGeography = createInstitutionSlugGeography();

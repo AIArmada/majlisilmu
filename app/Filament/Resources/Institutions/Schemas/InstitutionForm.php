@@ -133,6 +133,7 @@ class InstitutionForm
                         Select::make('country_id')
                             ->relationship('country', 'name')
                             ->default(132) // Malaysia
+                            ->required()
                             ->searchable()
                             ->preload()
                             ->live()

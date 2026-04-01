@@ -100,6 +100,7 @@ class SpeakerForm
                             ->label(__('Country'))
                             ->relationship('country', 'name')
                             ->default(132) // Malaysia
+                            ->required()
                             ->searchable()
                             ->preload()
                             ->live()

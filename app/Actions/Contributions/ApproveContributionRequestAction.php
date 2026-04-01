@@ -4,9 +4,11 @@ namespace App\Actions\Contributions;
 
 use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Membership\AssignOwnerToNewSubject;
+use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
+use App\Forms\SharedFormSchema;
 use App\Models\ContributionRequest;
 use App\Models\Event;
 use App\Models\Institution;
@@ -16,7 +18,6 @@ use App\Services\ContributionEntityMutationService;
 use App\Services\ModerationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
@@ -29,6 +30,7 @@ class ApproveContributionRequestAction
         private readonly ContributionEntityMutationService $entityMutationService,
         private readonly AssignOwnerToNewSubject $assignOwnerToNewSubject,
         private readonly GenerateInstitutionSlugAction $generateInstitutionSlugAction,
+        private readonly GenerateSpeakerSlugAction $generateSpeakerSlugAction,
     ) {}
 
     public function handle(ContributionRequest $request, User $reviewer, ?string $reviewerNote = null): ContributionRequest
@@ -107,11 +109,13 @@ class ApproveContributionRequestAction
      */
     private function createInstitutionFromRequest(ContributionRequest $request, array $payload): Institution
     {
+        $address = $this->addressPayload($payload);
+
         $institution = Institution::create([
             'name' => (string) ($payload['name'] ?? 'Institution'),
             'slug' => $this->generateInstitutionSlugAction->handle(
                 (string) ($payload['name'] ?? 'Institution'),
-                is_array($payload['address'] ?? null) ? $payload['address'] : [],
+                $address,
             ),
             'type' => (string) ($payload['type'] ?? 'masjid'),
             'description' => $payload['description'] ?? null,
@@ -120,6 +124,7 @@ class ApproveContributionRequestAction
             'allow_public_event_submission' => true,
         ]);
 
+        SharedFormSchema::createAddressFromData($institution, $address, allowCountryOnly: true);
         $this->attachAsOwner($request->proposer, $institution);
 
         return $institution;
@@ -130,6 +135,8 @@ class ApproveContributionRequestAction
      */
     private function createSpeakerFromRequest(ContributionRequest $request, array $payload): Speaker
     {
+        $address = $this->addressPayload($payload);
+
         $speaker = Speaker::create([
             'name' => (string) ($payload['name'] ?? 'Speaker'),
             'gender' => (string) ($payload['gender'] ?? 'male'),
@@ -139,15 +146,52 @@ class ApproveContributionRequestAction
             'job_title' => $payload['job_title'] ?? null,
             'bio' => $payload['bio'] ?? null,
             'is_freelance' => (bool) ($payload['is_freelance'] ?? false),
-            'slug' => Str::slug((string) ($payload['name'] ?? 'speaker')).'-'.Str::lower(Str::random(7)),
+            'slug' => $this->generateSpeakerSlugAction->handle((string) ($payload['name'] ?? 'Speaker'), $address),
             'status' => 'verified',
             'is_active' => true,
             'allow_public_event_submission' => true,
         ]);
 
+        SharedFormSchema::createAddressFromData($speaker, $address, allowCountryOnly: true);
         $this->attachAsOwner($request->proposer, $speaker);
 
         return $speaker;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function addressPayload(array $payload): array
+    {
+        if (is_array($payload['address'] ?? null)) {
+            return $payload['address'];
+        }
+
+        $addressKeys = [
+            'country_id',
+            'state_id',
+            'district_id',
+            'subdistrict_id',
+            'line1',
+            'line2',
+            'postcode',
+            'lat',
+            'lng',
+            'google_maps_url',
+            'google_place_id',
+            'waze_url',
+        ];
+
+        $address = [];
+
+        foreach ($addressKeys as $key) {
+            if (array_key_exists($key, $payload)) {
+                $address[$key] = $payload[$key];
+            }
+        }
+
+        return $address;
     }
 
     private function attachAsOwner(?User $user, Institution|Speaker $entity): void

@@ -24,6 +24,8 @@ class SpeakerContributionFormSchema
      */
     public static function components(bool $includeMedia = true, ?string $addressStatePath = null): array
     {
+        $publicCountryId = SharedFormSchema::preferredPublicCountryId();
+
         $components = [
             Section::make(__('Profil Penceramah'))
                 ->schema([
@@ -77,8 +79,19 @@ class SpeakerContributionFormSchema
             Section::make(__('Location / Base'))
                 ->schema([
                     ...($addressStatePath === null
-                        ? SharedFormSchema::addressFields()
-                        : [SharedFormSchema::addressGroup(statePath: $addressStatePath)]),
+                        ? SharedFormSchema::addressFields(
+                            includeCountryField: true,
+                            showCountryField: true,
+                            defaultCountryId: $publicCountryId,
+                            requireCountryField: true,
+                        )
+                        : [SharedFormSchema::addressGroup(
+                            statePath: $addressStatePath,
+                            includeCountryField: true,
+                            showCountryField: true,
+                            defaultCountryId: $publicCountryId,
+                            requireCountryField: true,
+                        )]),
                 ])
                 ->columns($addressStatePath === null ? 2 : 1),
             Section::make(__('Education'))

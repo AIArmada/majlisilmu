@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Membership\AddMemberToSubject;
+use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventKeyPersonRole;
@@ -32,6 +33,7 @@ class ContributionEntityMutationService
         private readonly EventKeyPersonSyncService $eventKeyPersonSyncService,
         private readonly AddMemberToSubject $addMemberToSubject,
         private readonly GenerateInstitutionSlugAction $generateInstitutionSlugAction,
+        private readonly GenerateSpeakerSlugAction $generateSpeakerSlugAction,
     ) {}
 
     /**
@@ -88,7 +90,10 @@ class ContributionEntityMutationService
             'qualifications' => $this->normalizeQualificationEntries($payload['qualifications'] ?? []),
             'is_freelance' => (bool) ($payload['is_freelance'] ?? false),
             'job_title' => $payload['job_title'] ?? null,
-            'slug' => Str::slug((string) ($payload['name'] ?? 'speaker')).'-'.Str::lower(Str::random(7)),
+            'slug' => $this->generateSpeakerSlugAction->handle(
+                (string) ($payload['name'] ?? 'Speaker'),
+                $this->speakerSlugPayload($payload),
+            ),
             'status' => 'pending',
             'is_active' => true,
             'allow_public_event_submission' => true,
@@ -415,7 +420,7 @@ class ContributionEntityMutationService
     private function syncInstitutionRelations(Institution $institution, array $payload): void
     {
         if (array_key_exists('address', $payload)) {
-            $this->syncAddress($institution, $payload['address']);
+            $this->syncAddress($institution, $payload['address'], allowCountryOnly: true);
         }
 
         if (array_key_exists('contacts', $payload)) {
@@ -432,8 +437,10 @@ class ContributionEntityMutationService
      */
     private function syncSpeakerRelations(Speaker $speaker, array $payload): void
     {
-        if (array_key_exists('address', $payload)) {
-            $this->syncAddress($speaker, $payload['address']);
+        $addressPayload = $this->speakerAddressPayload($payload);
+
+        if (is_array($addressPayload)) {
+            $this->syncAddress($speaker, $addressPayload, allowCountryOnly: true);
         }
 
         if (array_key_exists('contacts', $payload)) {
@@ -449,7 +456,7 @@ class ContributionEntityMutationService
         }
     }
 
-    private function syncAddress(Model $model, mixed $addressPayload): void
+    private function syncAddress(Model $model, mixed $addressPayload, bool $allowCountryOnly = false): void
     {
         if (! method_exists($model, 'address')) {
             return;
@@ -468,6 +475,7 @@ class ContributionEntityMutationService
             $payload['google_maps_url'] ?? null,
             $payload['google_place_id'] ?? null,
             $payload['waze_url'] ?? null,
+            $allowCountryOnly ? ($payload['country_id'] ?? null) : null,
         ])->contains(fn (mixed $value): bool => filled($value));
 
         /** @var Address|null $existingAddress */
@@ -504,6 +512,55 @@ class ContributionEntityMutationService
         }
 
         $model->address()->create($attributes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|null
+     */
+    private function speakerAddressPayload(array $payload): ?array
+    {
+        if (array_key_exists('address', $payload)) {
+            return is_array($payload['address']) ? $payload['address'] : [];
+        }
+
+        $addressKeys = [
+            'country_id',
+            'state_id',
+            'district_id',
+            'subdistrict_id',
+            'line1',
+            'line2',
+            'postcode',
+            'lat',
+            'lng',
+            'google_maps_url',
+            'google_place_id',
+            'waze_url',
+        ];
+
+        if (! collect($addressKeys)->contains(fn (string $key): bool => array_key_exists($key, $payload))) {
+            return null;
+        }
+
+        $address = [];
+
+        foreach ($addressKeys as $key) {
+            if (array_key_exists($key, $payload)) {
+                $address[$key] = $payload[$key];
+            }
+        }
+
+        return $address;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function speakerSlugPayload(array $payload): array
+    {
+        return $this->speakerAddressPayload($payload) ?? [];
     }
 
     private function syncContacts(Model $model, mixed $contactPayload): void

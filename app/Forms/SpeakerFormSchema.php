@@ -3,6 +3,7 @@
 namespace App\Forms;
 
 use App\Actions\Membership\AddMemberToSubject;
+use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\Gender;
 use App\Forms\Components\Select;
 use App\Models\Institution;
@@ -13,7 +14,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Str;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 class SpeakerFormSchema
@@ -71,7 +71,7 @@ class SpeakerFormSchema
             'bio' => $data['bio'] ?? null,
             'qualifications' => self::normalizeQualificationEntries($data['qualifications'] ?? []),
             'is_freelance' => (bool) ($data['is_freelance'] ?? false),
-            'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
+            'slug' => app(GenerateSpeakerSlugAction::class)->handle((string) ($data['name'] ?? 'Speaker'), $data),
             'status' => 'pending',
         ]);
 
@@ -88,7 +88,7 @@ class SpeakerFormSchema
             $speaker->languages()->sync(self::normalizeIntegerIds((array) $data['language_ids']));
         }
 
-        SharedFormSchema::createAddressFromData($speaker, $data);
+        SharedFormSchema::createAddressFromData($speaker, $data, allowCountryOnly: true);
         SharedFormSchema::createContactsFromData($speaker, $data);
         SharedFormSchema::createSocialMediaFromData($speaker, $data);
 

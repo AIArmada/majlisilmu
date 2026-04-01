@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Speakers\Pages;
 
+use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Speaker;
@@ -14,6 +15,18 @@ class CreateSpeaker extends CreateRecord
     use AuditsRelatedStateChanges;
 
     protected static string $resource = SpeakerResource::class;
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    #[\Override]
+    protected function handleRecordCreation(array $data): Model
+    {
+        $address = is_array($this->data['address'] ?? null) ? $this->data['address'] : [];
+        $data['slug'] = app(GenerateSpeakerSlugAction::class)->handle((string) ($data['name'] ?? 'Speaker'), $address);
+
+        return parent::handleRecordCreation($data);
+    }
 
     protected function afterCreate(): void
     {

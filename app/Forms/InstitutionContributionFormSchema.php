@@ -64,8 +64,9 @@ class InstitutionContributionFormSchema
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
-                            showCountryField: false,
+                            showCountryField: true,
                             defaultCountryId: $publicCountryId,
+                            requireCountryField: true,
                         )
                         : [SharedFormSchema::addressGroup(
                             requireGoogleMaps: $requireGoogleMaps,
@@ -74,8 +75,9 @@ class InstitutionContributionFormSchema
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
-                            showCountryField: false,
+                            showCountryField: true,
                             defaultCountryId: $publicCountryId,
+                            requireCountryField: true,
                         )]),
                 ])
                 ->columns($addressStatePath === null ? 2 : 1),

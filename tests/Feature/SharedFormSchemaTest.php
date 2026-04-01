@@ -1,11 +1,15 @@
 <?php
 
+use App\Filament\Resources\Institutions\Schemas\InstitutionForm as AdminInstitutionForm;
+use App\Filament\Resources\Speakers\Schemas\SpeakerForm as AdminSpeakerForm;
+use App\Filament\Resources\Venues\Schemas\VenueForm as AdminVenueForm;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\InstitutionFormSchema;
 use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerContributionFormSchema;
 use App\Forms\SpeakerFormSchema;
 use App\Forms\VenueFormSchema;
+use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -16,8 +20,10 @@ use App\Support\Location\FederalTerritoryLocation;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\View as SchemaView;
+use Filament\Schemas\Schema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Nnjeim\World\Models\Language;
@@ -241,7 +247,7 @@ it('defaults address country_id to malaysia when null is submitted directly to t
     expect($institution->fresh()->addressModel?->country_id)->toBe(132);
 });
 
-it('always hides country fields in public location picker forms', function () {
+it('requires country fields in institution and venue public creation forms', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -292,9 +298,15 @@ it('always hides country fields in public location picker forms', function () {
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
         ->get('country_id');
 
-    expect($institutionCountry)->toBeInstanceOf(Hidden::class)
-        ->and($venueCountry)->toBeInstanceOf(Hidden::class)
-        ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
+    expect($institutionCountry)->toBeInstanceOf(Select::class)
+        ->and($venueCountry)->toBeInstanceOf(Select::class)
+        ->and($contributionCountry)->toBeInstanceOf(Select::class);
+    expect(method_exists($institutionCountry, 'isRequired'))->toBeTrue();
+    expect(method_exists($venueCountry, 'isRequired'))->toBeTrue();
+    expect(method_exists($contributionCountry, 'isRequired'))->toBeTrue();
+    expect($institutionCountry?->isRequired())->toBeTrue();
+    expect($venueCountry?->isRequired())->toBeTrue();
+    expect($contributionCountry?->isRequired())->toBeTrue();
 });
 
 it('requires google maps url in institution and venue quick-create forms', function () {
@@ -665,6 +677,51 @@ it('stores nested venue quick-create address data when picker mode is used', fun
     Http::assertSentCount(1);
 });
 
+it('stores country-only address data in institution and venue quick-create flows', function () {
+    $country = Country::query()->find(132);
+
+    if (! $country instanceof Country) {
+        $country = new Country;
+        $country->forceFill([
+            'id' => 132,
+            'name' => 'Malaysia',
+            'iso2' => 'MY',
+            'iso3' => 'MYS',
+            'phone_code' => '60',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+            'status' => 1,
+        ]);
+        $country->save();
+    }
+
+    $institutionId = InstitutionFormSchema::createOptionUsing([
+        'name' => 'Masjid Country Only',
+        'type' => 'masjid',
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ]);
+
+    $venueId = VenueFormSchema::createOptionUsing([
+        'name' => 'Dewan Country Only',
+        'type' => 'dewan',
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ]);
+
+    $institution = Institution::query()
+        ->with('address')
+        ->findOrFail($institutionId);
+    $venue = Venue::query()
+        ->with('address')
+        ->findOrFail($venueId);
+
+    expect($institution->addressModel?->country_id)->toBe((int) $country->getKey())
+        ->and($venue->addressModel?->country_id)->toBe((int) $country->getKey());
+});
+
 it('uses rich description and no logo upload in the institution contribution form', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
@@ -801,4 +858,148 @@ it('stores structured speaker quick-create details when creating a speaker via q
         ->and($speaker->contacts->pluck('value')->all())->toContain('0123456789')
         ->and($speaker->socialMedia->pluck('platform')->all())->toContain('facebook')
         ->and($speaker->languages->pluck('id')->all())->toContain($language->id);
+});
+
+it('requires country fields in speaker public creation forms', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $quickCreateCountry = collect($flatten(SpeakerFormSchema::createOptionForm()))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+    $contributionCountry = collect($flatten(SpeakerContributionFormSchema::components(includeMedia: true)))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+
+    expect($quickCreateCountry)->toBeInstanceOf(Select::class)
+        ->and($contributionCountry)->toBeInstanceOf(Select::class);
+    expect(method_exists($quickCreateCountry, 'isRequired'))->toBeTrue();
+    expect(method_exists($contributionCountry, 'isRequired'))->toBeTrue();
+    expect($quickCreateCountry?->isRequired())->toBeTrue();
+    expect($contributionCountry?->isRequired())->toBeTrue();
+});
+
+it('requires country fields in the admin speaker form', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $country = collect($flatten(AdminSpeakerForm::configure(Schema::make())->getComponents()))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+
+    expect($country)->toBeInstanceOf(Select::class);
+    expect(method_exists($country, 'isRequired'))->toBeTrue();
+    expect($country?->isRequired())->toBeTrue();
+});
+
+it('requires country fields in the admin institution and venue forms', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $institutionCountry = collect($flatten(AdminInstitutionForm::configure(Schema::make())->getComponents()))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+    $venueCountry = collect($flatten(AdminVenueForm::configure(Schema::make())->getComponents()))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
+        ->get('country_id');
+
+    expect($institutionCountry)->toBeInstanceOf(Select::class)
+        ->and($venueCountry)->toBeInstanceOf(Select::class);
+    expect(method_exists($institutionCountry, 'isRequired'))->toBeTrue();
+    expect(method_exists($venueCountry, 'isRequired'))->toBeTrue();
+    expect($institutionCountry?->isRequired())->toBeTrue();
+    expect($venueCountry?->isRequired())->toBeTrue();
 });
