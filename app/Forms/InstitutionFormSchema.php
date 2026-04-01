@@ -103,6 +103,7 @@ class InstitutionFormSchema
         SharedFormSchema::createContactsFromData($institution, $data);
         SharedFormSchema::createAddressFromData($institution, $addressData, allowCountryOnly: true);
         SharedFormSchema::createSocialMediaFromData($institution, $data);
+        app(GenerateInstitutionSlugAction::class)->syncInstitutionSlug($institution);
 
         return (string) $institution->getKey();
     }

@@ -125,6 +125,7 @@ class ApproveContributionRequestAction
         ]);
 
         SharedFormSchema::createAddressFromData($institution, $address, allowCountryOnly: true);
+        $this->generateInstitutionSlugAction->syncInstitutionSlug($institution);
         $this->attachAsOwner($request->proposer, $institution);
 
         return $institution;
