@@ -8,6 +8,7 @@ use App\Actions\Events\SyncEventResourceRelationsAction;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Models\Event;
+use App\Models\EventSettings;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
@@ -101,6 +102,19 @@ it('syncs event resource relations and persists the requested registration mode'
         ->and($event->settings?->registration_mode)->toBe(RegistrationMode::Event)
         ->and($event->tags->pluck('id')->sort()->values()->all())->toBe([$domainTag->id, $issueTag->id])
         ->and($event->speakers->pluck('id')->all())->toBe([$speaker->id]);
+});
+
+it('uses a safe database default when creating event settings without an explicit registration flag', function () {
+    $event = Event::factory()->create();
+    $event->settings()->delete();
+
+    $settings = EventSettings::query()->create([
+        'event_id' => $event->id,
+        'registration_mode' => RegistrationMode::Event->value,
+    ]);
+
+    expect($settings->fresh()?->registration_required)->toBeFalse()
+        ->and($settings->fresh()?->registration_mode)->toBe(RegistrationMode::Event);
 });
 
 it('applies direct contribution edits and re-moderates approved events for sensitive changes', function () {
