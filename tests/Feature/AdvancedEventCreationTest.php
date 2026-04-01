@@ -50,7 +50,7 @@ it('creates a parent program draft then redirects into child-event submission', 
         ->and($parentEvent?->isParentProgram())->toBeTrue()
         ->and((string) $parentEvent?->status)->toBe('draft')
         ->and($parentEvent?->childEvents()->count())->toBe(0)
-        ->and($parentEvent?->settings?->registration_required)->toBeTrue();
+        ->and($parentEvent?->settings?->registration_required)->toBeFalse();
 
     $redirectComponent = Livewire::actingAs($user)
         ->test(CreateAdvanced::class)
@@ -104,7 +104,8 @@ it('prefills the institution when launched from the institution dashboard shortc
 
     expect($component->get('form')['organizer_type'])->toBe('institution')
         ->and($component->get('form')['organizer_id'])->toBe($institution->id)
-        ->and($component->get('form')['location_institution_id'])->toBe($institution->id);
+        ->and($component->get('form')['location_institution_id'])->toBe($institution->id)
+        ->and($component->get('form')['registration_required'])->toBeFalse();
 });
 
 it('shows a validation error when the parent program ends before it starts', function () {

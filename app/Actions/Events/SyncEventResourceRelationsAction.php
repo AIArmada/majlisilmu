@@ -4,6 +4,7 @@ namespace App\Actions\Events;
 
 use App\Enums\RegistrationMode;
 use App\Models\Event;
+use App\Models\EventSettings;
 use App\Services\EventKeyPersonSyncService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -30,6 +31,7 @@ class SyncEventResourceRelationsAction
             : RegistrationMode::Event->value;
 
         $currentRegistrationMode = $this->resolveRegistrationMode($event)->value;
+        $currentRegistrationRequired = $this->resolveRegistrationRequired($event);
         $registrationModeLocked = $lockRegistrationMode
             && $event->registrations()->exists()
             && $requestedRegistrationMode !== $currentRegistrationMode;
@@ -38,7 +40,10 @@ class SyncEventResourceRelationsAction
 
         $event->settings()->updateOrCreate(
             ['event_id' => $event->id],
-            ['registration_mode' => $modeToPersist]
+            [
+                'registration_required' => $currentRegistrationRequired,
+                'registration_mode' => $modeToPersist,
+            ]
         );
 
         $rawLanguageIds = is_array($state['languages'] ?? null) ? $state['languages'] : [];
@@ -92,5 +97,16 @@ class SyncEventResourceRelationsAction
         }
 
         return RegistrationMode::Event;
+    }
+
+    protected function resolveRegistrationRequired(Event $event): bool
+    {
+        $settings = $event->settings;
+
+        if (! $settings instanceof EventSettings) {
+            return false;
+        }
+
+        return (bool) $settings->registration_required;
     }
 }

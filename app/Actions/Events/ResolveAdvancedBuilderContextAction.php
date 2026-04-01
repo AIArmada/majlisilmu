@@ -58,7 +58,7 @@ class ResolveAdvancedBuilderContextAction
                 'default_event_type' => EventType::KuliahCeramah->value,
                 'default_event_format' => EventFormat::Physical->value,
                 'visibility' => EventVisibility::Public->value,
-                'registration_required' => true,
+                'registration_required' => false,
                 'registration_mode' => RegistrationMode::Event->value,
             ],
         ];

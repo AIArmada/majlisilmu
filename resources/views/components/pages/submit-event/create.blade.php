@@ -1686,20 +1686,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             $this->storeSubmitterContacts($submission, $validated);
         }
 
-        if (($parentEvent = $this->selectedParentEvent()) instanceof Event && $parentEvent->settings !== null) {
-            $registrationMode = $parentEvent->settings->registration_mode;
-            $resolvedRegistrationMode = $registrationMode instanceof RegistrationMode
-                ? $registrationMode->value
-                : (is_string($registrationMode) && $registrationMode !== '' ? $registrationMode : 'event');
-
-            EventSettings::query()->updateOrCreate(
-                ['event_id' => $event->id],
-                [
-                    'registration_required' => (bool) $parentEvent->settings->registration_required,
-                    'registration_mode' => $resolvedRegistrationMode,
-                ]
-            );
-        }
+        $this->persistRegistrationSettings($event);
 
         if ($this->shouldAutoApproveSubmission()) {
             app(ModerationService::class)->approve($event, null, 'Auto-approved from institution dashboard submission.');
@@ -1770,6 +1757,36 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         }
 
         return $validated;
+    }
+
+    protected function persistRegistrationSettings(Event $event): void
+    {
+        $parentEvent = $this->selectedParentEvent();
+
+        if ($parentEvent instanceof Event && $parentEvent->settings !== null) {
+            $registrationMode = $parentEvent->settings->registration_mode;
+            $resolvedRegistrationMode = $registrationMode instanceof RegistrationMode
+                ? $registrationMode->value
+                : (is_string($registrationMode) && $registrationMode !== '' ? $registrationMode : RegistrationMode::Event->value);
+
+            EventSettings::query()->updateOrCreate(
+                ['event_id' => $event->id],
+                [
+                    'registration_required' => (bool) $parentEvent->settings->registration_required,
+                    'registration_mode' => $resolvedRegistrationMode,
+                ]
+            );
+
+            return;
+        }
+
+        EventSettings::query()->updateOrCreate(
+            ['event_id' => $event->id],
+            [
+                'registration_required' => false,
+                'registration_mode' => RegistrationMode::Event->value,
+            ]
+        );
     }
 
     protected function shouldAutoApproveSubmission(): bool

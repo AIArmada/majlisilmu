@@ -181,7 +181,15 @@ it('auto-approves institution-scoped dashboard submissions and locks the organiz
         ->and($event?->organizer_type)->toBe(Institution::class)
         ->and($event?->organizer_id)->toBe($institution->id)
         ->and($event?->institution_id)->toBe($institution->id)
+        ->and($event?->settings)->not->toBeNull()
+        ->and($event?->settings?->registration_required)->toBeFalse()
+        ->and($event?->settings?->registration_mode?->value)->toBe('event')
         ->and($event?->published_at)->not->toBeNull()
         ->and($event?->submissions()->count())->toBe(1)
         ->and($event?->moderationReviews()->where('decision', 'approved')->count())->toBe(1);
+
+    $this->get(route('events.show', $event))
+        ->assertOk()
+        ->assertDontSee('Registration Required')
+        ->assertDontSee('Register for this Event');
 });
