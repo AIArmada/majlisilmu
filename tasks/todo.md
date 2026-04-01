@@ -1,3 +1,30 @@
+# Queued Slug Backfill On Current PostgreSQL
+
+- [x] Confirm the current app connection is the live local PostgreSQL database and the queue backend is Redis
+- [x] Run `institutions:queue-slug-backfill` on the current PostgreSQL database with a disposable proof institution
+- [x] Prove the real Redis queue/job/worker path and clean up the proof record afterward
+
+## Review
+- Confirmed the current app is using PostgreSQL (`database.default = pgsql`, database `majlisilmu`) and Redis queues (`queue.default = redis`, queue `default`) in the live local environment.
+- Verified the live Redis queue started empty and no unique backfill lock was present, then inserted a disposable proof institution directly on the current PostgreSQL database with ID `7dbde508-5a17-429b-88f5-820505d0eb69` and legacy slug `legacy-proof-slug-current-pg`.
+- Ran `php artisan institutions:queue-slug-backfill` on the current app. It printed `Queued institution slug backfill job.`, the live Redis `queues:default` length moved from `0` to `1`, and the queued payload showed `displayName: App\\Jobs\\BackfillInstitutionSlugs`.
+- Ran `php artisan queue:work redis --queue=default --once --tries=1` on the same live app. The worker processed `App\Jobs\BackfillInstitutionSlugs` on the real dataset and completed in `1 minit 54 saat`.
+- After completion, the live Redis queue length returned to `0`, and the proof institution slug on PostgreSQL changed from `legacy-proof-slug-current-pg` to `queue-backfill-proof-current-pg-20260331`.
+- Cleaned up the disposable proof address and institution row afterward so the current PostgreSQL database does not keep the audit fixture.
+
+# Queued Slug Backfill Proof
+
+- [x] Trace `institutions:queue-slug-backfill` and confirm it dispatches the queued backfill job
+- [x] Run the command in an isolated queued environment so it does not mutate the working local dataset
+- [x] Prove the job enqueued, ran, drained the queue, and rewrote a legacy institution slug
+
+## Review
+- Used an isolated SQLite database at `/tmp/majlis-slug-backfill-proof-20260331.sqlite` together with an isolated Redis prefix (`majlis-slug-backfill-proof-20260331-`) and isolated cache prefix so the proof run would not touch the working local application state.
+- Migrated that disposable app state, created a fixture institution named `Queue Backfill Proof 20260331` with the legacy slug `legacy-proof-slug`, and confirmed the isolated Redis `default` queue length started at `0`.
+- Ran `php artisan institutions:queue-slug-backfill` under that isolated env. It printed `Queued institution slug backfill job.`, the isolated Redis queue length moved to `1`, and the queued payload showed `displayName: App\\Jobs\\BackfillInstitutionSlugs`.
+- Ran `php artisan queue:work redis --queue=default --once --tries=1` under the same isolated env. The worker processed `App\Jobs\BackfillInstitutionSlugs`, the isolated queue length returned to `0`, and the fixture institution slug changed from `legacy-proof-slug` to `queue-backfill-proof-20260331-my`.
+- Cleaned up the disposable SQLite file after verification.
+
 # Public Market Audit Follow-Up
 
 - [x] Audit the uncommitted public-market and hidden-country diff for logic regressions beyond the initial focused implementation
