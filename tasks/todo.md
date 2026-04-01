@@ -1,3 +1,17 @@
+# Institution Map Buttons Below Embed
+
+- [x] Trace the institution show-page map and navigation button layout
+- [x] Move the Waze and Google Maps buttons below the embedded Google Maps view
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Updated `resources/views/components/pages/institutions/⚡show.blade.php` so the institution page renders the Waze and Google Maps action row after the embedded map block instead of above it, while preserving the existing styling and fallback behavior.
+- Tightened `tests/Feature/InstitutionShowPageTest.php` to assert the rendered institution page emits the public Google Maps embed before the `Waze` and `Google Maps` action labels.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php --filter='uses a public google maps embed on institution show pages instead of platform api urls'` => **1 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/InstitutionShowPageTest.php` => **No files found to analyse** (the current PHPStan config excludes this test path, and no PHP source file changed for this view-only adjustment)
+
 # Event Show Page Open-Ended Status Fix
 
 - [x] Confirm the production event page is incorrectly showing an ended event as ongoing

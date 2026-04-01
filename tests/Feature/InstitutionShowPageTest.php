@@ -208,6 +208,7 @@ it('uses a public google maps embed on institution show pages instead of platfor
     $institution->address()->update([
         'line1' => 'Persiaran Masjid',
         'google_maps_url' => 'https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869&query_place_id=place_123',
+        'waze_url' => 'https://ul.waze.com/ul?place=ChIJ-test',
         'lat' => 3.139,
         'lng' => 101.6869,
     ]);
@@ -215,6 +216,11 @@ it('uses a public google maps embed on institution show pages instead of platfor
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
         ->assertSee('https://www.google.com/maps?q=3.139%2C101.6869&amp;output=embed', false)
+        ->assertSeeInOrder([
+            'output=embed',
+            'Waze',
+            'Google Maps',
+        ], false)
         ->assertDontSee('https://www.google.com/maps/embed/v1/place?key=', false)
         ->assertDontSee('https://maps.googleapis.com/maps/api/staticmap', false);
 });
