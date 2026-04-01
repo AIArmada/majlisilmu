@@ -3,14 +3,20 @@
 namespace App\Observers;
 
 use App\Actions\Institutions\GenerateInstitutionSlugAction;
+use App\Actions\Speakers\GenerateSpeakerSlugAction;
+use App\Actions\Venues\GenerateVenueSlugAction;
 use App\Models\Address;
 use App\Models\Institution;
+use App\Models\Speaker;
+use App\Models\Venue;
 use App\Support\Cache\PublicListingsCache;
 
 class AddressObserver
 {
     public function __construct(
         protected GenerateInstitutionSlugAction $generateInstitutionSlugAction,
+        protected GenerateSpeakerSlugAction $generateSpeakerSlugAction,
+        protected GenerateVenueSlugAction $generateVenueSlugAction,
         protected PublicListingsCache $publicListingsCache,
     ) {}
 
@@ -28,13 +34,25 @@ class AddressObserver
     {
         $address->loadMissing('addressable');
 
-        $institution = $address->addressable;
+        $addressable = $address->addressable;
 
-        if (! $institution instanceof Institution) {
+        if ($addressable instanceof Institution) {
+            $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($addressable->name);
+            $this->publicListingsCache->bustMajlisListing();
+
             return;
         }
 
-        $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($institution->name);
-        $this->publicListingsCache->bustMajlisListing();
+        if ($addressable instanceof Speaker) {
+            $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($addressable->name);
+            $this->publicListingsCache->bustMajlisListing();
+
+            return;
+        }
+
+        if ($addressable instanceof Venue) {
+            $this->generateVenueSlugAction->syncVenueSlugsForName($addressable->name);
+            $this->publicListingsCache->bustMajlisListing();
+        }
     }
 }

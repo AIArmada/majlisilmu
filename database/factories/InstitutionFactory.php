@@ -142,6 +142,8 @@ class InstitutionFactory extends Factory
                 'value' => fake()->phoneNumber(),
                 'type' => ContactType::Work->value,
             ]);
+
+            $institution->refresh();
         });
     }
 }

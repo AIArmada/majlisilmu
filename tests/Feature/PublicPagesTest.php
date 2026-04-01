@@ -88,6 +88,7 @@ it('loads public detail pages', function () {
 
     $institution = Institution::factory()->create(['status' => 'verified']);
     $speaker = Speaker::factory()->create(['status' => 'verified']);
+    $venue = Venue::factory()->create(['status' => 'verified']);
     $series = Series::factory()->create([
         'visibility' => 'public',
     ]);
@@ -99,6 +100,7 @@ it('loads public detail pages', function () {
     $this->get(route('events.show', $event))->assertSuccessful()->assertSee($event->title);
     $this->get(route('institutions.show', $institution))->assertSuccessful()->assertSee($institution->name);
     $this->get(route('speakers.show', $speaker))->assertSuccessful()->assertSee($speaker->name);
+    $this->get(route('venues.show', $venue))->assertSuccessful()->assertSee($venue->name);
     $this->get(route('series.show', $series))
         ->assertSuccessful()
         ->assertSee($series->title)
@@ -385,6 +387,9 @@ it('renders optimized seo metadata on public detail pages', function () {
 
     $speaker = Speaker::factory()->create([
         'name' => 'Ahmad Fauzi',
+        'honorific' => null,
+        'pre_nominal' => null,
+        'post_nominal' => null,
         'bio' => [
             'type' => 'doc',
             'content' => [[

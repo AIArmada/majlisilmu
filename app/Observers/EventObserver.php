@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Actions\Events\GenerateEventSlugAction;
+use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -17,6 +19,8 @@ use Illuminate\Support\Facades\Log;
 class EventObserver
 {
     public function __construct(
+        protected GenerateEventSlugAction $generateEventSlugAction,
+        protected SyncSlugRedirectAction $syncSlugRedirectAction,
         protected PrayerTimeService $prayerTimeService,
         protected PublicListingsCache $publicListingsCache
     ) {}
@@ -24,6 +28,15 @@ class EventObserver
     public function creating(Event $event): void
     {
         $this->calculatePrayerRelativeTime($event);
+
+        if (blank($event->slug)) {
+            $event->slug = $this->generateEventSlugAction->handle(
+                $event->title,
+                $event->starts_at,
+                is_string($event->timezone) ? $event->timezone : null,
+                (string) $event->getKey(),
+            );
+        }
     }
 
     /**
@@ -53,6 +66,16 @@ class EventObserver
     {
         $this->publicListingsCache->bustMajlisListing();
 
+        if ($event->wasChanged(['title', 'starts_at', 'timezone'])) {
+            $previousTitle = trim((string) ($event->getPrevious()['title'] ?? ''));
+
+            $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);
+
+            if ($previousTitle !== '' && $previousTitle !== $event->title) {
+                $this->generateEventSlugAction->syncEventSlugsForTitle($previousTitle);
+            }
+        }
+
         $changedFields = collect(array_keys($event->getChanges()))
             ->reject(static fn (string $field): bool => in_array($field, ['updated_at', 'saves_count', 'going_count', 'registrations_count', 'published_at'], true))
             ->values()
@@ -68,6 +91,8 @@ class EventObserver
 
     public function deleted(Event $event): void
     {
+        $this->syncSlugRedirectAction->purgeForModel($event);
+        $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);
         $this->publicListingsCache->bustMajlisListing();
     }
 

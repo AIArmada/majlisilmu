@@ -167,6 +167,56 @@ it('uses the submitted address country when approving unstaged speaker create re
         ->and($speaker->addressModel?->country_id)->toBe((int) $country->getKey());
 });
 
+it('recomputes speaker slugs when the speaker country changes', function () {
+    $proposer = User::factory()->create();
+    $malaysia = createSpeakerSlugCountry();
+    $singapore = createSpeakerSlugCountry(
+        countryName: 'Singapore',
+        countryIso2: 'SG',
+        countryIso3: 'SGP',
+        countryId: 702,
+        phoneCode: '65',
+    );
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ustaz Ahmad Fauzi',
+        'gender' => 'male',
+        'country_id' => (string) $malaysia->getKey(),
+    ], $proposer);
+
+    $speaker->addressModel?->update([
+        'country_id' => (int) $singapore->getKey(),
+    ]);
+
+    expect($speaker->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-sg');
+});
+
+it('renumbers remaining speaker duplicates when a peer is renamed out of the group', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $first = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ustaz Ahmad Fauzi',
+        'gender' => 'male',
+        'country_id' => (string) $country->getKey(),
+    ], $proposer);
+
+    $second = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ustaz Ahmad Fauzi',
+        'gender' => 'male',
+        'country_id' => (string) $country->getKey(),
+    ], $proposer);
+
+    expect($second->slug)->toBe('ustaz-ahmad-fauzi-2-my');
+
+    $first->update([
+        'name' => 'Ustaz Ahmad Fauzi Perdana',
+    ]);
+
+    expect($first->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-perdana-my')
+        ->and($second->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-my');
+});
+
 it('backfills existing speaker slugs through the queued job logic', function () {
     $country = createSpeakerSlugCountry();
 

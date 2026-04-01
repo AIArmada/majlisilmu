@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Slugs\ResolvePublicSlugAction;
 use App\Enums\ContributionSubjectType;
 use App\Enums\MemberSubjectType;
 use App\Http\Controllers\Auth\SocialiteController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Public\EventsController;
 use App\Http\Controllers\PublicMarketController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Middleware\ResolvePublicSlugRedirect;
 use App\Livewire\Pages\About\Show as AboutPage;
 use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
 use App\Livewire\Pages\Contributions\SubmitInstitution;
@@ -25,17 +27,22 @@ use App\Livewire\Pages\MembershipClaims\Create as CreateMembershipClaimPage;
 use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
-use App\Models\Reference;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 
-Route::bind('reference', fn (string $value): Reference => Reference::query()
-    ->where('slug', $value)
-    ->when(
-        Str::isUuid($value),
-        fn ($query) => $query->orWhere((new Reference)->getQualifiedKeyName(), $value),
-    )
-    ->firstOrFail());
+foreach (['event', 'institution', 'speaker', 'venue', 'reference'] as $publicSlugParameter) {
+    Route::bind($publicSlugParameter, function (mixed $value) use ($publicSlugParameter) {
+        if (! is_string($value) || trim($value) === '') {
+            throw new ModelNotFoundException;
+        }
+
+        $resolved = app(ResolvePublicSlugAction::class)->handle($publicSlugParameter, trim($value));
+
+        request()->attributes->set("public_slug_resolution.{$publicSlugParameter}", $resolved);
+
+        return $resolved['model'];
+    });
+}
 
 Route::livewire('/', 'pages.⚡home')->name('home');
 Route::livewire('/tentang-kami', AboutPage::class)->name('about');
@@ -64,8 +71,12 @@ Route::get('/kongsi/{provider}', [DawahShareController::class, 'redirect'])
 Route::livewire('/majlis', 'pages.events.index')
     ->middleware('throttle:search')
     ->name('events.index');
-Route::livewire('/majlis/{event:slug}', 'pages.events.show')->name('events.show');
-Route::get('/majlis/{event:slug}/kalendar.ics', [EventsController::class, 'calendar'])->name('events.calendar');
+Route::livewire('/majlis/{event:slug}', 'pages.events.show')
+    ->middleware(ResolvePublicSlugRedirect::class)
+    ->name('events.show');
+Route::get('/majlis/{event:slug}/kalendar.ics', [EventsController::class, 'calendar'])
+    ->middleware(ResolvePublicSlugRedirect::class)
+    ->name('events.calendar');
 
 // Event Submission (Public)
 Route::livewire('/hantar-majlis', 'pages.submit-event.create')
@@ -104,26 +115,37 @@ Route::middleware('auth')->group(function () {
 
 // Event Registration - Rate limited
 Route::post('/majlis/{event:slug}/daftar', [EventsController::class, 'register'])
-    ->middleware('throttle:registration')
+    ->middleware(['throttle:registration', ResolvePublicSlugRedirect::class])
     ->name('events.register');
 
 // Institutions (with search rate limiting)
 Route::livewire('/institusi', 'pages.institutions.index')
     ->middleware('throttle:search')
     ->name('institutions.index');
-Route::livewire('/institusi/{institution:slug}', 'pages.institutions.show')->name('institutions.show');
+Route::livewire('/institusi/{institution:slug}', 'pages.institutions.show')
+    ->middleware(ResolvePublicSlugRedirect::class)
+    ->name('institutions.show');
 
 // Speakers (with search rate limiting)
 Route::livewire('/penceramah', 'pages.speakers.index')
     ->middleware('throttle:search')
     ->name('speakers.index');
-Route::livewire('/penceramah/{speaker:slug}', 'pages.speakers.show')->name('speakers.show');
+Route::livewire('/penceramah/{speaker:slug}', 'pages.speakers.show')
+    ->middleware(ResolvePublicSlugRedirect::class)
+    ->name('speakers.show');
+
+// Venues
+Route::livewire('/lokasi/{venue:slug}', 'pages.venues.show')
+    ->middleware(ResolvePublicSlugRedirect::class)
+    ->name('venues.show');
 
 // Series
 Route::livewire('/siri/{series:slug}', 'pages.series.show')->name('series.show');
 
 // References
-Route::livewire('/rujukan/{reference}', 'pages.references.show')->name('references.show');
+Route::livewire('/rujukan/{reference:slug}', 'pages.references.show')
+    ->middleware(ResolvePublicSlugRedirect::class)
+    ->name('references.show');
 
 // Sitemap
 Route::get('/peta-laman.xml', [SitemapController::class, 'index'])->name('sitemap.index');
@@ -135,17 +157,18 @@ Route::get('/peta-laman-penceramah.xml', [SitemapController::class, 'speakers'])
 Route::get('/locale/{locale}', LocaleController::class);
 Route::get('/market/{market}', PublicMarketController::class);
 Route::livewire('/events', 'pages.events.index')->middleware('throttle:search');
-Route::livewire('/events/{event:slug}', 'pages.events.show');
-Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar']);
+Route::livewire('/events/{event:slug}', 'pages.events.show')->middleware(ResolvePublicSlugRedirect::class);
+Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar'])->middleware(ResolvePublicSlugRedirect::class);
 Route::livewire('/submit-event', 'pages.submit-event.create');
 Route::livewire('/submit-event/success', 'pages.submit-event.success');
 Route::livewire('/about', AboutPage::class);
 Route::post('/events/{event:slug}/register', [EventsController::class, 'register'])
-    ->middleware('throttle:registration');
+    ->middleware(['throttle:registration', ResolvePublicSlugRedirect::class]);
 Route::livewire('/institutions', 'pages.institutions.index')->middleware('throttle:search');
-Route::livewire('/institutions/{institution:slug}', 'pages.institutions.show');
+Route::livewire('/institutions/{institution:slug}', 'pages.institutions.show')->middleware(ResolvePublicSlugRedirect::class);
 Route::livewire('/speakers', 'pages.speakers.index')->middleware('throttle:search');
-Route::livewire('/speakers/{speaker:slug}', 'pages.speakers.show');
+Route::livewire('/speakers/{speaker:slug}', 'pages.speakers.show')->middleware(ResolvePublicSlugRedirect::class);
+Route::livewire('/venues/{venue:slug}', 'pages.venues.show')->middleware(ResolvePublicSlugRedirect::class);
 Route::livewire('/series/{series:slug}', 'pages.series.show');
 Route::redirect('/sumbangan/institution/{subjectId}/kemas-kini', '/sumbangan/institusi/{subjectId}/kemas-kini', 301);
 Route::redirect('/lapor/institution/{subjectId}', '/lapor/institusi/{subjectId}', 301);

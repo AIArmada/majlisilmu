@@ -2,6 +2,7 @@
 
 namespace App\Actions\Events;
 
+use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Event;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -12,6 +13,52 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GenerateEventSlugAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+    ) {}
+
+    public function syncEventSlugsForTitle(string $title): bool
+    {
+        $normalizedTitle = trim($title);
+
+        if ($normalizedTitle === '') {
+            return false;
+        }
+
+        $events = Event::query()
+            ->where('events.title', $normalizedTitle)
+            ->get();
+
+        $didChange = false;
+
+        foreach ($this->orderedEvents($events) as $event) {
+            $didChange = $this->syncEventSlug($event) || $didChange;
+        }
+
+        return $didChange;
+    }
+
+    public function syncEventSlug(Event $event): bool
+    {
+        $slug = $this->forEvent($event);
+
+        if ($event->slug === $slug) {
+            return false;
+        }
+
+        $previousSlug = is_string($event->slug) ? $event->slug : null;
+
+        Event::withoutTimestamps(function () use ($event, $slug): void {
+            $event->forceFill([
+                'slug' => $slug,
+            ])->saveQuietly();
+        });
+
+        $this->syncSlugRedirectAction->handle($event, $previousSlug);
+
+        return true;
+    }
 
     public function handle(
         string $title,
@@ -88,7 +135,26 @@ class GenerateEventSlugAction
      */
     private function existingEventSequence(Collection $matchingEvents, string $eventId): ?int
     {
-        $orderedEvents = $matchingEvents
+        $orderedEvents = $this->orderedEvents($matchingEvents);
+
+        $existingIndex = $orderedEvents->search(
+            fn (Event $event): bool => (string) $event->getKey() === $eventId,
+        );
+
+        if (! is_int($existingIndex)) {
+            return null;
+        }
+
+        return $existingIndex + 1;
+    }
+
+    /**
+     * @param  Collection<int, Event>  $events
+     * @return Collection<int, Event>
+     */
+    private function orderedEvents(Collection $events): Collection
+    {
+        return $events
             ->sort(function (Event $left, Event $right): int {
                 $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
                 $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
@@ -100,16 +166,6 @@ class GenerateEventSlugAction
                 return strcmp((string) $left->getKey(), (string) $right->getKey());
             })
             ->values();
-
-        $existingIndex = $orderedEvents->search(
-            fn (Event $event): bool => (string) $event->getKey() === $eventId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
     }
 
     private function dateSuffix(CarbonInterface|string|null $date, ?string $timezone): string

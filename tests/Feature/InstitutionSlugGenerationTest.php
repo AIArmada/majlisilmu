@@ -165,6 +165,27 @@ it('recomputes institution slugs when the institution name changes', function ()
     expect($institution->fresh()?->slug)->toBe('masjid-baru-shah-alam-petaling-selangor-my');
 });
 
+it('recomputes institution slugs when the institution locality changes', function () {
+    $proposer = User::factory()->create();
+    $primaryGeography = createInstitutionSlugGeography();
+    $secondaryGeography = createInstitutionSlugGeography(subdistrictName: 'Subang Jaya');
+
+    $institution = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid Lama',
+        'type' => 'masjid',
+        'address' => geographyAddressPayload($primaryGeography),
+    ], $proposer);
+
+    $institution->addressModel?->update([
+        'subdistrict_id' => (int) $secondaryGeography['subdistrict']->getKey(),
+        'district_id' => (int) $secondaryGeography['district']->getKey(),
+        'state_id' => (int) $secondaryGeography['state']->getKey(),
+        'country_id' => (int) $secondaryGeography['country']->getKey(),
+    ]);
+
+    expect($institution->fresh()?->slug)->toBe('masjid-lama-subang-jaya-petaling-selangor-my');
+});
+
 it('renumbers remaining duplicates when a peer is renamed out of the group', function () {
     $proposer = User::factory()->create();
     $geography = createInstitutionSlugGeography();

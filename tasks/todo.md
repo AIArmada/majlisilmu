@@ -1,3 +1,17 @@
+# Slug Redirect History And Admin Exposure
+
+- [x] Add a generic slug redirect persistence layer that records visited old public paths for canonical slug changes
+- [x] Extend slug recomputation across event, institution, speaker, reference, and venue so canonical slugs stay current after relevant field changes
+- [x] Resolve old public slugs to the current canonical records and return 301 redirects for supported public routes
+- [x] Expose slug redirect records in the admin panel with useful source, destination, and subject context
+- [x] Add focused regression coverage and run targeted verification for redirects, slug recomputation, and admin visibility
+
+## Review
+
+- Verified with `vendor/bin/pest --parallel tests/Feature/SlugRedirectFeatureTest.php`
+- Verified with `vendor/bin/pest --parallel tests/Feature/VenueReferenceEventSlugGenerationTest.php`
+- Smoke-checked `vendor/bin/pest --parallel tests/Feature/PublicPagesTest.php`; public route assertions now pass, with one remaining unrelated speaker SEO title assertion still failing
+
 # Admin Event Registration Toggle
 
 - [x] Add the missing registration-required control to the admin event form

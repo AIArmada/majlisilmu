@@ -2,6 +2,7 @@
 
 namespace App\Actions\Speakers;
 
+use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Country;
 use App\Models\Speaker;
 use Illuminate\Support\Collection;
@@ -11,6 +12,55 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GenerateSpeakerSlugAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+    ) {}
+
+    public function syncSpeakerSlugsForName(string $name): bool
+    {
+        $normalizedName = trim($name);
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        $speakers = Speaker::query()
+            ->where('speakers.name', $normalizedName)
+            ->with([
+                'address.country',
+            ])
+            ->get();
+
+        $didChange = false;
+
+        foreach ($this->orderedSpeakers($speakers) as $speaker) {
+            $didChange = $this->syncSpeakerSlug($speaker) || $didChange;
+        }
+
+        return $didChange;
+    }
+
+    public function syncSpeakerSlug(Speaker $speaker): bool
+    {
+        $slug = $this->forSpeaker($speaker);
+
+        if ($speaker->slug === $slug) {
+            return false;
+        }
+
+        $previousSlug = is_string($speaker->slug) ? $speaker->slug : null;
+
+        Speaker::withoutTimestamps(function () use ($speaker, $slug): void {
+            $speaker->forceFill([
+                'slug' => $slug,
+            ])->saveQuietly();
+        });
+
+        $this->syncSlugRedirectAction->handle($speaker, $previousSlug);
+
+        return true;
+    }
 
     /**
      * @param  array<string, mixed>  $address
@@ -97,7 +147,26 @@ class GenerateSpeakerSlugAction
      */
     private function existingSpeakerSequence(Collection $matchingSpeakers, string $speakerId): ?int
     {
-        $orderedSpeakers = $matchingSpeakers
+        $orderedSpeakers = $this->orderedSpeakers($matchingSpeakers);
+
+        $existingIndex = $orderedSpeakers->search(
+            fn (Speaker $speaker): bool => (string) $speaker->getKey() === $speakerId,
+        );
+
+        if (! is_int($existingIndex)) {
+            return null;
+        }
+
+        return $existingIndex + 1;
+    }
+
+    /**
+     * @param  Collection<int, Speaker>  $speakers
+     * @return Collection<int, Speaker>
+     */
+    private function orderedSpeakers(Collection $speakers): Collection
+    {
+        return $speakers
             ->sort(function (Speaker $left, Speaker $right): int {
                 $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
                 $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
@@ -109,16 +178,6 @@ class GenerateSpeakerSlugAction
                 return strcmp((string) $left->getKey(), (string) $right->getKey());
             })
             ->values();
-
-        $existingIndex = $orderedSpeakers->search(
-            fn (Speaker $speaker): bool => (string) $speaker->getKey() === $speakerId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
     }
 
     /**

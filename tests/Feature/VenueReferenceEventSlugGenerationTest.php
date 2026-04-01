@@ -19,6 +19,7 @@ use App\Jobs\BackfillEventSlugs;
 use App\Jobs\BackfillReferenceSlugs;
 use App\Jobs\BackfillVenueSlugs;
 use App\Livewire\Pages\Dashboard\Events\CreateAdvanced;
+use App\Models\Address;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
@@ -48,7 +49,7 @@ it('generates geographic slugs for venue quick-create flows', function () {
     $venueId = VenueFormSchema::createOptionUsing([
         'name' => 'Dewan Sultan Salahudin Abdul Aziz Shah',
         'type' => 'dewan',
-        'address' => geographyAddressPayload($geography),
+        'address' => venueGeographyAddressPayload($geography),
     ]);
 
     $venue = Venue::query()->findOrFail($venueId);
@@ -63,19 +64,19 @@ it('adds duplicate numbering only when the same venue name reuses the same subdi
     $firstId = VenueFormSchema::createOptionUsing([
         'name' => 'Dewan Sultan Salahudin Abdul Aziz Shah',
         'type' => 'dewan',
-        'address' => geographyAddressPayload($primaryGeography),
+        'address' => venueGeographyAddressPayload($primaryGeography),
     ]);
 
     $secondId = VenueFormSchema::createOptionUsing([
         'name' => 'Dewan Sultan Salahudin Abdul Aziz Shah',
         'type' => 'dewan',
-        'address' => geographyAddressPayload($primaryGeography),
+        'address' => venueGeographyAddressPayload($primaryGeography),
     ]);
 
     $thirdId = VenueFormSchema::createOptionUsing([
         'name' => 'Dewan Sultan Salahudin Abdul Aziz Shah',
         'type' => 'dewan',
-        'address' => geographyAddressPayload($secondaryGeography),
+        'address' => venueGeographyAddressPayload($secondaryGeography),
     ]);
 
     expect(Venue::query()->findOrFail($firstId)->slug)->toBe('dewan-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my')
@@ -98,7 +99,7 @@ it('uses the generated geographic slug when admins create venues in filament', f
             'facilities' => [],
             'contacts' => [],
             'socialMedia' => [],
-            'address' => geographyAddressPayload($geography),
+            'address' => venueGeographyAddressPayload($geography),
         ])
         ->call('create')
         ->assertHasNoErrors();
@@ -108,6 +109,28 @@ it('uses the generated geographic slug when admins create venues in filament', f
         ->firstOrFail();
 
     expect($venue->slug)->toBe('dewan-sultan-salahudin-abdul-aziz-shah-shah-alam-petaling-selangor-my');
+});
+
+it('recomputes venue slugs when the venue locality changes', function () {
+    $primaryGeography = createVenueSlugGeography();
+    $secondaryGeography = createVenueSlugGeography(subdistrictName: 'Subang Jaya');
+
+    $venueId = VenueFormSchema::createOptionUsing([
+        'name' => 'Dewan Sultan Salahudin Abdul Aziz Shah',
+        'type' => 'dewan',
+        'address' => venueGeographyAddressPayload($primaryGeography),
+    ]);
+
+    $venue = Venue::query()->findOrFail($venueId);
+
+    $venue->addressModel?->update([
+        'subdistrict_id' => (int) $secondaryGeography['subdistrict']->getKey(),
+        'district_id' => (int) $secondaryGeography['district']->getKey(),
+        'state_id' => (int) $secondaryGeography['state']->getKey(),
+        'country_id' => (int) $secondaryGeography['country']->getKey(),
+    ]);
+
+    expect($venue->fresh()?->slug)->toBe('dewan-sultan-salahudin-abdul-aziz-shah-subang-jaya-petaling-selangor-my');
 });
 
 it('backfills existing venue slugs through the queued job logic', function () {
@@ -284,6 +307,46 @@ it('generates sequential slugs for references with duplicate titles', function (
 
     expect($first->slug)->toBe('riyadhus-solihin')
         ->and($second->slug)->toBe('riyadhus-solihin-2');
+});
+
+it('recomputes reference slugs when the title changes directly', function () {
+    $reference = Reference::query()->create([
+        'title' => 'Riyadhus Solihin',
+        'type' => 'kitab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $reference->update([
+        'title' => 'Syarah Riyadhus Solihin',
+    ]);
+
+    expect($reference->fresh()?->slug)->toBe('syarah-riyadhus-solihin');
+});
+
+it('renumbers remaining reference duplicates when a peer is renamed out of the group', function () {
+    $first = Reference::query()->create([
+        'title' => 'Bulughul Maram',
+        'type' => 'kitab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $second = Reference::query()->create([
+        'title' => 'Bulughul Maram',
+        'type' => 'kitab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    expect($second->slug)->toBe('bulughul-maram-2');
+
+    $first->update([
+        'title' => 'Bulughul Maram Asal',
+    ]);
+
+    expect($first->fresh()?->slug)->toBe('bulughul-maram-asal')
+        ->and($second->fresh()?->slug)->toBe('bulughul-maram');
 });
 
 it('uses the generated sequential slug when admins create references in filament', function () {
@@ -499,6 +562,74 @@ it('regenerates the canonical dated slug when admins edit events in filament', f
     expect($event->fresh()?->slug)->toBe("forum-ramadan-dikemas-kini-{$expectedSuffix}");
 });
 
+it('recomputes event slugs when the event title changes directly', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Ramadan Pentadbiran',
+        'slug' => "forum-ramadan-pentadbiran-{$expectedSuffix}",
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $event->update([
+        'title' => 'Forum Ramadan Dikemas Kini',
+    ]);
+
+    expect($event->fresh()?->slug)->toBe("forum-ramadan-dikemas-kini-{$expectedSuffix}");
+});
+
+it('renumbers remaining duplicate event slugs when a peer is renamed out of the group', function () {
+    $startsAt = Carbon::parse('2026-04-13 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-13', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $first = Event::factory()->create([
+        'title' => 'Kuliah Dhuha Khas',
+        'slug' => "kuliah-dhuha-khas-{$expectedSuffix}",
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $second = Event::factory()->create([
+        'title' => 'Kuliah Dhuha Khas',
+        'slug' => "kuliah-dhuha-khas-2-{$expectedSuffix}",
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $first->update([
+        'title' => 'Kuliah Dhuha Khas Perdana',
+    ]);
+
+    expect($first->fresh()?->slug)->toBe("kuliah-dhuha-khas-perdana-{$expectedSuffix}")
+        ->and($second->fresh()?->slug)->toBe("kuliah-dhuha-khas-{$expectedSuffix}");
+});
+
 it('uses the generated dated slug for advanced parent program creation', function () {
     $user = User::factory()->create(['name' => 'Parent Program Member']);
     $institution = Institution::factory()->create(['name' => 'Masjid Pusat']);
@@ -645,7 +776,7 @@ function createVenueSlugGeography(
  * }  $geography
  * @return array<string, string>
  */
-function geographyAddressPayload(array $geography): array
+function venueGeographyAddressPayload(array $geography): array
 {
     return [
         'country_id' => (string) $geography['country']->getKey(),
@@ -665,22 +796,26 @@ function geographyAddressPayload(array $geography): array
  */
 function createVenueForSlugBackfill(string $id, string $name, string $slug, array $geography): Venue
 {
-    $venue = Venue::unguarded(fn () => Venue::query()->create([
+    $venue = Venue::withoutEvents(fn () => Venue::unguarded(fn () => Venue::query()->create([
         'id' => $id,
         'name' => $name,
         'slug' => $slug,
         'type' => 'dewan',
         'status' => 'verified',
         'is_active' => true,
-    ]));
+    ])));
 
-    $venue->address()->create([
-        'type' => 'main',
-        'country_id' => (int) $geography['country']->getKey(),
-        'state_id' => (int) $geography['state']->getKey(),
-        'district_id' => (int) $geography['district']->getKey(),
-        'subdistrict_id' => (int) $geography['subdistrict']->getKey(),
-    ]);
+    Venue::withoutEvents(function () use ($venue, $geography): void {
+        Address::withoutEvents(function () use ($venue, $geography): void {
+            $venue->address()->create([
+                'type' => 'main',
+                'country_id' => (int) $geography['country']->getKey(),
+                'state_id' => (int) $geography['state']->getKey(),
+                'district_id' => (int) $geography['district']->getKey(),
+                'subdistrict_id' => (int) $geography['subdistrict']->getKey(),
+            ]);
+        });
+    });
 
     return $venue->fresh(['address']) ?? $venue;
 }
