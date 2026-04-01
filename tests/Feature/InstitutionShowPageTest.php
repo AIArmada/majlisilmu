@@ -3,6 +3,7 @@
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventFormat;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventVisibility;
 use App\Enums\InstitutionType;
 use App\Enums\TimingMode;
@@ -16,8 +17,10 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
 use App\Models\Venue;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -243,6 +246,105 @@ it('displays upcoming events for the institution', function () {
         ->assertSee('Kuliah Subuh Lalu');
 });
 
+it('shows event speakers and other public roles without repeating the current institution name in the location line', function () {
+    $state = State::query()
+        ->where('country_code', 'MY')
+        ->where('name', 'Selangor')
+        ->first();
+
+    if (! $state) {
+        $countryId = DB::table('countries')->insertGetId([
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Selangor',
+            'country_code' => 'MY',
+        ]);
+
+        $state = State::query()->findOrFail($stateId);
+    }
+
+    $district = District::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Petaling',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Shah Alam',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'status' => 'verified',
+    ]);
+
+    $institution->address()->update([
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    $event = Event::factory()
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'starts_at' => now()->addDays(3),
+            'title' => 'Kuliah Maghrib Institusi',
+        ]);
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'name' => 'Ustaz Abdullah Fahmi',
+        'honorific' => null,
+        'pre_nominal' => null,
+        'post_nominal' => null,
+    ]);
+
+    $moderator = Speaker::factory()->create([
+        'status' => 'verified',
+        'name' => 'Ustazah Mariam Yusuf',
+        'honorific' => null,
+        'pre_nominal' => null,
+        'post_nominal' => null,
+    ]);
+
+    $event->keyPeople()->create([
+        'speaker_id' => $speaker->id,
+        'role' => EventKeyPersonRole::Speaker,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $event->keyPeople()->create([
+        'speaker_id' => $moderator->id,
+        'role' => EventKeyPersonRole::Moderator,
+        'order_column' => 2,
+        'is_public' => true,
+    ]);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('Penceramah: Ustaz Abdullah Fahmi')
+        ->assertSee('Moderator: Ustazah Mariam Yusuf')
+        ->assertSee('Shah Alam, Petaling, Selangor')
+        ->assertDontSee('Masjid Sultan Salahuddin Abdul Aziz Shah • Shah Alam, Petaling, Selangor');
+});
+
 it('uses stronger calendar event colors on institution page', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
 
@@ -315,6 +417,31 @@ it('displays donation channels', function () {
         ->assertSuccessful()
         ->assertSee('Tabung Masjid Al-Ikhlas')
         ->assertSee('Infaq Bulanan');
+});
+
+it('renders donation qr thumbnails without the rounded border shell', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    $channel = $institution->donationChannels()->create([
+        'method' => 'bank_account',
+        'bank_code' => 'BIMB',
+        'bank_name' => 'Bank Islam',
+        'account_number' => '123456789012',
+        'recipient' => 'Tabung Masjid Al-Ikhlas',
+        'label' => 'Infaq Bulanan',
+        'status' => 'verified',
+    ]);
+
+    $channel->addMedia(UploadedFile::fake()->image('qr.png', 300, 300))
+        ->toMediaCollection('qr');
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('class="group relative shrink-0 transition-transform active:scale-95"', false)
+        ->assertDontSee('rounded-xl border-2 border-gold-200/60 bg-white p-1 shadow-sm', false);
 });
 
 it('displays public contacts', function () {

@@ -19,6 +19,8 @@ use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Database\Seeders\PermissionSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -74,13 +76,48 @@ it('keeps reviewer context fields on update suggestion pages', function () {
         ->assertSee(__('Explain the change'));
 });
 
+it('shows the institution cover upload on the suggest update page only for maintainers', function () {
+    $owner = User::factory()->create();
+    $visitor = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $this->actingAs($visitor);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertDontSee(__('Cover Image'));
+
+    assignInstitutionOwner($owner, $institution);
+    $this->actingAs($owner);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertSee(__('Cover Image'));
+});
+
 it('exposes Filament action handlers required by public contribution media uploads', function () {
     $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    assignInstitutionOwner($user, $institution);
 
     $this->actingAs($user);
 
     expect(method_exists(Livewire::test(SubmitInstitution::class)->instance(), 'mountAction'))->toBeTrue()
-        ->and(method_exists(Livewire::test(SubmitSpeaker::class)->instance(), 'mountAction'))->toBeTrue();
+        ->and(method_exists(Livewire::test(SubmitSpeaker::class)->instance(), 'mountAction'))->toBeTrue()
+        ->and(method_exists(Livewire::test(SuggestUpdate::class, [
+            'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+            'subjectId' => $institution->slug,
+        ])->instance(), 'mountAction'))->toBeTrue();
 });
 
 it('applies direct institution edits for owner maintainers from the suggest update page', function () {
@@ -125,6 +162,33 @@ it('applies direct institution address edits for owner maintainers from the sugg
         ->assertHasNoErrors();
 
     expect($institution->fresh()->addressModel?->line1)->toBe('No. 21, Jalan Disemak')
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('applies direct institution cover edits for owner maintainers from the suggest update page', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ])
+        ->fillForm([
+            'cover' => UploadedFile::fake()->image('institution-cover.jpg', 1200, 675),
+        ])
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($institution->fresh()->getMedia('cover'))->toHaveCount(1)
+        ->and($institution->fresh()->getFirstMedia('cover'))->not->toBeNull()
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
