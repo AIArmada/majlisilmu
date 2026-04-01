@@ -1746,7 +1746,7 @@ new class extends Component {
                 </div>
                 <div class="flex items-center justify-center bg-slate-50 p-6 sm:p-10">
                     <img :src="qrActiveUrl" :alt="qrActiveLabel"
-                        class="aspect-square w-full max-w-xs rounded-2xl border-4 border-white bg-white object-contain shadow-xl"
+                        class="aspect-square w-full max-w-xs object-contain"
                         loading="lazy">
                 </div>
                 <div class="bg-white p-4 text-center">
