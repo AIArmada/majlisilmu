@@ -36,6 +36,9 @@ class ViewEvent extends ViewRecord
             $this->getReconsiderAction(),
             $this->getRemoderateAction(),
             $this->getRevertToDraftAction(),
+            Action::make('duplicate_event')
+                ->label('Duplicate Event')
+                ->url(fn (): string => route('submit-event.create', ['duplicate' => $this->eventRecord()->getKey()])),
             EditAction::make(),
         ];
     }

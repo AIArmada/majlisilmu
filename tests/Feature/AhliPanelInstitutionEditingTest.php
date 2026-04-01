@@ -104,6 +104,38 @@ it('opens the ahli view public page action in a new tab', function () {
         ->assertSee('target="_blank"', false);
 });
 
+it('shows a duplicate event action on the ahli event view page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Ahli Duplicate Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    Livewire::actingAs($user)
+        ->test(AhliViewEvent::class, ['record' => $event->id])
+        ->assertActionVisible('duplicate_event');
+
+    $this->actingAs($user)
+        ->get(EventResource::getUrl('view', ['record' => $event], panel: 'ahli'))
+        ->assertOk()
+        ->assertSee('Duplicate Event')
+        ->assertSee(route('submit-event.create', ['duplicate' => $event]), false);
+});
+
 it('renders submitter phone numbers as whatsapp links on the ahli event edit page', function () {
     $member = User::factory()->create();
     $submitter = User::factory()->create([

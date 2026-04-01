@@ -32,6 +32,13 @@
                 @if($event->description_text !== '')
                     <p class="max-w-3xl text-base leading-7 text-white/80 md:text-lg">{{ $event->description_text }}</p>
                 @endif
+                @if($parentProgramManagementLinks)
+                    <div class="flex flex-wrap items-center gap-3 pt-2">
+                        <a href="{{ $parentProgramManagementLinks['create_child_url'] }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
+                            {{ __('Create Child Event') }}
+                        </a>
+                    </div>
+                @endif
             </div>
 
             <div class="grid gap-4 md:grid-cols-3">
