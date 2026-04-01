@@ -7021,3 +7021,30 @@
   - `git diff --check -- resources/views/components/pages/institutions/⚡index.blade.php tests/Feature/InstitutionIndexTest.php tasks/todo.md` => **No diff formatting issues**
   - `curl -sk -H 'Cookie: user_timezone=Asia/Jakarta' https://majlisilmu.test/institusi` => **Livewire snapshot now carries `country_id=103`**
   - live browser reload on `https://majlisilmu.test/institusi` with `user_timezone=Asia/Jakarta` => **country select shows `Indonesia`, and the state dropdown is scoped to Indonesian states**
+
+# Submit Event Registration Default
+
+- [x] Inspect the institution submit-event flow and all `event_settings` creation paths for unintended registration defaults
+- [x] Make standalone submitted events default to no registration unless a parent program explicitly requires it
+- [x] Prevent admin relation sync from creating `event_settings` rows that silently inherit `registration_required = true`
+- [x] Add focused regressions for standalone submissions and relation sync behavior
+- [x] Verify with targeted Pest coverage, PHPStan, and formatting checks
+
+## Review
+- Root cause:
+  - the institution submit-event flow only copied `event_settings` when a parent program existed, so standalone submissions never pinned a safe registration state of their own
+  - the shared `SyncEventResourceRelationsAction` created `event_settings` rows by writing only `registration_mode`; when that happened, the database default on `registration_required` could silently turn registration on
+  - the advanced parent-program builder also defaulted `registration_required` to `true`, which was unsafe while the registration product is still incomplete
+- Fix:
+  - added an explicit `persistRegistrationSettings()` step in the submit-event flow so standalone submissions create `event_settings` with `registration_required = false` and `registration_mode = event`, while parent-child submissions still inherit the parent program settings
+  - changed `SyncEventResourceRelationsAction` to preserve the current `registration_required` value and default new settings rows to `false` instead of inheriting the table default
+  - changed the advanced builder defaults so new parent programs no longer start with registration enabled unless someone intentionally turns it on
+  - extended tests to assert the institution-scoped submission path stores `registration_required = false` and that the public event page does not render the registration UI for those events
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventActionsTest.php` => **5 passed (22 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdvancedEventCreationTest.php` => **5 passed (28 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventParentProgramTest.php` => **2 passed (19 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php` => **5 passed (30 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php tests/Feature/EventActionsTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/SubmitEventEntityAccessTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php tests/Feature/EventActionsTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/SubmitEventEntityAccessTest.php` => **pass**
+  - `git diff --check -- app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php resources/views/components/pages/submit-event/create.blade.php tests/Feature/EventActionsTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/SubmitEventEntityAccessTest.php tasks/todo.md` => **No diff formatting issues**

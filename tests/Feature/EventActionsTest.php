@@ -52,7 +52,8 @@ it('resolves advanced builder context with requested institution defaults', func
     expect($context['institution_options'])->toHaveKey($preferredInstitution->id, 'Masjid Pilihan')
         ->and($context['default_form']['organizer_type'])->toBe('institution')
         ->and($context['default_form']['organizer_id'])->toBe($preferredInstitution->id)
-        ->and($context['default_form']['location_institution_id'])->toBe($preferredInstitution->id);
+        ->and($context['default_form']['location_institution_id'])->toBe($preferredInstitution->id)
+        ->and($context['default_form']['registration_required'])->toBeFalse();
 });
 
 it('resolves advanced builder membership options from active member organizers only', function () {
@@ -96,6 +97,7 @@ it('syncs event resource relations and persists the requested registration mode'
         'registration_mode' => RegistrationMode::Event->value,
         'registration_mode_locked' => false,
     ])
+        ->and($event->settings?->registration_required)->toBeFalse()
         ->and($event->settings?->registration_mode)->toBe(RegistrationMode::Event)
         ->and($event->tags->pluck('id')->sort()->values()->all())->toBe([$domainTag->id, $issueTag->id])
         ->and($event->speakers->pluck('id')->all())->toBe([$speaker->id]);
