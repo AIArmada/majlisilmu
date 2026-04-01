@@ -1,3 +1,18 @@
+# Admin Event Registration Toggle
+
+- [x] Add the missing registration-required control to the admin event form
+- [x] Persist the submitted registration-required value through the event settings sync action
+- [x] Add focused admin create/edit regression coverage and run targeted verification
+
+## Review
+- Updated [app/Filament/Resources/Events/Schemas/EventForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Events/Schemas/EventForm.php) so the admin event form now exposes a `Pendaftaran Diperlukan` toggle alongside the existing registration mode control, and locks that toggle once registrations already exist.
+- Updated [app/Filament/Resources/Events/Pages/CreateEvent.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Events/Pages/CreateEvent.php), [app/Filament/Resources/Events/Pages/EditEvent.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Events/Pages/EditEvent.php), and [app/Actions/Events/SyncEventResourceRelationsAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Events/SyncEventResourceRelationsAction.php) so the admin page hydrates the setting, strips it from the main event payload, and persists the submitted boolean into `event_settings` instead of always reusing the old database value.
+- Added focused regression coverage in [tests/Feature/AdminEventsResourceTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AdminEventsResourceTest.php) to prove the admin edit form shows the new control, admin create can save `registration_required = true`, and admin edit can switch an existing event back to `false` when no registrations exist.
+- Verification:
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **9 passed**
+  - `XDEBUG_MODE=off vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check -- app/Filament/Resources/Events/Schemas/EventForm.php app/Filament/Resources/Events/Pages/CreateEvent.php app/Filament/Resources/Events/Pages/EditEvent.php app/Actions/Events/SyncEventResourceRelationsAction.php tests/Feature/AdminEventsResourceTest.php tasks/todo.md` => **clean**
+
 # Horizon Global Admin Authorization
 
 - [x] Narrow the Horizon dashboard gate from any global role to global admin roles only

@@ -26,22 +26,33 @@ class SyncEventResourceRelationsAction
         bool $lockRegistrationMode = true,
         bool $syncKeyPeople = true,
     ): array {
+        $eventHasRegistrations = $event->registrations()->exists();
         $requestedRegistrationMode = is_string($state['registration_mode'] ?? null) && $state['registration_mode'] !== ''
             ? $state['registration_mode']
             : RegistrationMode::Event->value;
+        $requestedRegistrationRequired = filter_var(
+            $state['registration_required'] ?? false,
+            FILTER_VALIDATE_BOOL,
+            FILTER_NULL_ON_FAILURE,
+        ) ?? false;
 
         $currentRegistrationMode = $this->resolveRegistrationMode($event)->value;
         $currentRegistrationRequired = $this->resolveRegistrationRequired($event);
         $registrationModeLocked = $lockRegistrationMode
-            && $event->registrations()->exists()
+            && $eventHasRegistrations
             && $requestedRegistrationMode !== $currentRegistrationMode;
+        $registrationRequiredLocked = $eventHasRegistrations
+            && $requestedRegistrationRequired !== $currentRegistrationRequired;
 
         $modeToPersist = $registrationModeLocked ? $currentRegistrationMode : $requestedRegistrationMode;
+        $registrationRequiredToPersist = $registrationRequiredLocked
+            ? $currentRegistrationRequired
+            : $requestedRegistrationRequired;
 
         $event->settings()->updateOrCreate(
             ['event_id' => $event->id],
             [
-                'registration_required' => $currentRegistrationRequired,
+                'registration_required' => $registrationRequiredToPersist,
                 'registration_mode' => $modeToPersist,
             ]
         );
