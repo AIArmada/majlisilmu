@@ -221,7 +221,7 @@ class Show extends Component
     {
         $now = now($this->event->timezone ?: 'Asia/Kuala_Lumpur');
         $startsAt = $this->event->starts_at;
-        $endsAt = $this->event->ends_at;
+        $endsAt = $this->effectiveEndsAt();
 
         if (! $startsAt instanceof CarbonInterface) {
             return 'upcoming';
@@ -240,6 +240,23 @@ class Show extends Component
         }
 
         return 'upcoming';
+    }
+
+    protected function effectiveEndsAt(): ?CarbonInterface
+    {
+        $endsAt = $this->event->ends_at;
+
+        if ($endsAt instanceof CarbonInterface) {
+            return $endsAt;
+        }
+
+        $startsAt = $this->event->starts_at;
+
+        if (! $startsAt instanceof CarbonInterface) {
+            return null;
+        }
+
+        return $startsAt->copy()->addHours(2);
     }
 
     /**
