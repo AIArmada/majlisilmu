@@ -3,11 +3,20 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
+use App\Enums\RegistrationMode;
 use App\Enums\TimingMode;
+use App\Filament\Resources\Events\Pages\CreateEvent;
+use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Models\Event;
+use App\Models\EventSettings;
+use App\Models\Institution;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Livewire\Livewire;
 
 it('resolves pending transitionable states without moderation context', function () {
     $event = Event::factory()->create([
@@ -92,7 +101,83 @@ it('shows typed event fields on the admin edit form', function () {
         ->assertSee('Kategori')
         ->assertSee('Bidang Ilmu')
         ->assertSee('Sumber Utama')
-        ->assertSee('Tema / Isu');
+        ->assertSee('Tema / Isu')
+        ->assertSee('Pendaftaran Diperlukan');
+});
+
+it('persists registration-required settings when admins create events', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(CreateEvent::class)
+        ->fillForm([
+            'title' => 'Admin Registration Toggle Create Coverage',
+            'event_date' => now()->addWeek()->toDateString(),
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'event_format' => EventFormat::Physical->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'event_type' => [EventType::Other->value],
+            'institution_id' => $institution->id,
+            'registration_required' => true,
+            'registration_mode' => RegistrationMode::Event->value,
+            'references' => [],
+            'series' => [],
+            'speakers' => [],
+            'other_key_people' => [],
+        ])
+        ->call('create')
+        ->assertHasNoErrors();
+
+    $event = Event::query()
+        ->where('title', 'Admin Registration Toggle Create Coverage')
+        ->firstOrFail();
+
+    $settings = $event->fresh()?->settings;
+
+    expect($settings)->not->toBeNull()
+        ->and($settings?->registration_required)->toBeTrue()
+        ->and($settings?->registration_mode)->toBe(RegistrationMode::Event);
+});
+
+it('persists registration-required changes for existing admin events without registrations', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()
+        ->has(EventSettings::factory()->state([
+            'registration_required' => true,
+            'registration_mode' => RegistrationMode::Event->value,
+        ]), 'settings')
+        ->create([
+            'status' => 'pending',
+        ]);
+
+    Livewire::actingAs($administrator)
+        ->test(EditEvent::class, ['record' => $event->id])
+        ->assertFormFieldExists('registration_required')
+        ->fillForm([
+            'registration_required' => false,
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()->settings)->not->toBeNull()
+        ->and($event->fresh()->settings?->registration_required)->toBeFalse();
 });
 
 it('renders the admin event view page with infolist tabs', function () {

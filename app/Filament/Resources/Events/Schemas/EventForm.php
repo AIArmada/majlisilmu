@@ -520,6 +520,13 @@ class EventForm
                                             ])
                                             ->columns(2)
                                             ->visible(fn (?Event $record): bool => self::latestSubmission($record) instanceof EventSubmission),
+                                        Toggle::make('registration_required')
+                                            ->label('Pendaftaran Diperlukan')
+                                            ->default(false)
+                                            ->disabled(fn (?Event $record): bool => $record?->registrations()->exists() ?? false)
+                                            ->helperText(fn (?Event $record): string => ($record?->registrations()->exists() ?? false)
+                                                ? 'Tetapan ini dikunci selepas pendaftaran pertama.'
+                                                : 'Aktifkan jika peserta perlu mendaftar sebelum hadir.'),
                                         Select::make('registration_mode')
                                             ->label('Mod Pendaftaran')
                                             ->options(

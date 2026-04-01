@@ -38,6 +38,7 @@ class CreateEvent extends CreateRecord
             $data['discipline_tags'],
             $data['source_tags'],
             $data['issue_tags'],
+            $data['registration_required'],
             $data['registration_mode'],
             $data['speakers'],
             $data['other_key_people'],
