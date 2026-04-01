@@ -1,3 +1,17 @@
+# Event Show Page Open-Ended Status Fix
+
+- [x] Confirm the production event page is incorrectly showing an ended event as ongoing
+- [x] Fix the event detail page to use a fallback end window when `ends_at` is missing
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Updated `app/Livewire/Pages/Events/Show.php` so the event detail page now treats events without an explicit `ends_at` as ending two hours after `starts_at`, instead of marking them as ongoing indefinitely.
+- Added focused coverage in `tests/Feature/EventShowPageTest.php` for both sides of that fallback window: events older than two hours now render the past-state banner, while recent no-end events still render `Sedang Berlangsung`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **21 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Show.php tests/Feature/EventShowPageTest.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
 # Slug Redirect History And Admin Exposure
 
 - [x] Add a generic slug redirect persistence layer that records visited old public paths for canonical slug changes

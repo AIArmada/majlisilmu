@@ -9,10 +9,15 @@ use App\Models\Subdistrict;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 describe('Event Show Page Going Feature', function () {
+    afterEach(function () {
+        Carbon::setTestNow();
+    });
+
     it('renders the canonical event url in the head metadata', function () {
         $event = Event::factory()->create([
             'status' => 'approved',
@@ -109,6 +114,43 @@ describe('Event Show Page Going Feature', function () {
         $this->get(route('events.show', $event))
             ->assertOk()
             ->assertDontSee(__('Akan Hadir'));
+    });
+
+    it('treats events without ends_at as past once the fallback window has elapsed', function () {
+        Carbon::setTestNow(Carbon::parse('2026-04-02 21:30:00', 'Asia/Kuala_Lumpur'));
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => Carbon::parse('2026-03-26 21:30:00', 'Asia/Kuala_Lumpur'),
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'starts_at' => Carbon::parse('2026-04-02 18:30:00', 'Asia/Kuala_Lumpur'),
+            'ends_at' => null,
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee(__('Majlis ini telah berlalu.'))
+            ->assertDontSee(__('Sedang Berlangsung'))
+            ->assertDontSee(__('Akan Hadir'));
+    });
+
+    it('treats events without ends_at as happening now within the fallback window', function () {
+        Carbon::setTestNow(Carbon::parse('2026-04-02 20:30:00', 'Asia/Kuala_Lumpur'));
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => Carbon::parse('2026-03-26 20:30:00', 'Asia/Kuala_Lumpur'),
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'starts_at' => Carbon::parse('2026-04-02 19:45:00', 'Asia/Kuala_Lumpur'),
+            'ends_at' => null,
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee(__('Sedang Berlangsung'))
+            ->assertDontSee(__('Majlis ini telah berlalu.'));
     });
 
     it('authenticated user can toggle going status via livewire', function () {
