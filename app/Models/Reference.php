@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\References\GenerateReferenceSlugAction;
 use App\Enums\MemberSubjectType;
 use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasFollowers;
@@ -15,7 +16,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Str;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
@@ -32,7 +32,7 @@ class Reference extends Model implements AuditableContract, HasMedia
     {
         static::saving(function (self $reference): void {
             if (blank($reference->slug)) {
-                $reference->slug = self::generateUniqueSlug($reference->title, $reference->getKey());
+                $reference->slug = app(GenerateReferenceSlugAction::class)->handle($reference->title, (string) $reference->getKey());
             }
         });
     }
@@ -70,7 +70,7 @@ class Reference extends Model implements AuditableContract, HasMedia
     {
         if ($this->exists && blank($this->slug)) {
             $this->forceFill([
-                'slug' => self::generateUniqueSlug($this->title, $this->getKey()),
+                'slug' => app(GenerateReferenceSlugAction::class)->handle($this->title, (string) $this->getKey()),
             ])->saveQuietly();
         }
 
@@ -166,22 +166,5 @@ class Reference extends Model implements AuditableContract, HasMedia
             ->height(232)
             ->sharpen(10)
             ->format('webp');
-    }
-
-    private static function generateUniqueSlug(?string $title, mixed $ignoreId = null): string
-    {
-        $baseSlug = Str::slug((string) $title) ?: 'rujukan';
-        $candidate = $baseSlug;
-        $suffix = 2;
-
-        while (self::query()
-            ->when($ignoreId !== null, fn (Builder $query): Builder => $query->whereKeyNot($ignoreId))
-            ->where('slug', $candidate)
-            ->exists()) {
-            $candidate = $baseSlug.'-'.$suffix;
-            $suffix++;
-        }
-
-        return $candidate;
     }
 }

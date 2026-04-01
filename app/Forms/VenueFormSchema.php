@@ -2,6 +2,7 @@
 
 namespace App\Forms;
 
+use App\Actions\Venues\GenerateVenueSlugAction;
 use App\Enums\VenueType;
 use App\Models\Venue;
 use App\Support\Location\GooglePlacesConfiguration;
@@ -12,7 +13,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Str;
 
 class VenueFormSchema
 {
@@ -77,7 +77,7 @@ class VenueFormSchema
 
         $venue = Venue::create([
             'name' => $data['name'],
-            'slug' => Str::slug((string) $data['name']).'-'.Str::lower(Str::random(7)),
+            'slug' => app(GenerateVenueSlugAction::class)->handle((string) $data['name'], $addressData),
             'type' => $data['type'],
             'status' => 'pending',
         ]);

@@ -338,15 +338,25 @@
 
 ## Review
 - Added a dedicated authenticated route at [web.php](/Users/Saiffil/Herd/majlisilmu/routes/web.php) for institution-scoped event submission and rewired the institution dashboard CTA plus parent-program child-event links in [institution-dashboard.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/dashboard/institution-dashboard.blade.php).
-- Extended the shared submit-event page in [create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/create.blade.php) so an institution-scoped entry auto-locks the organizer institution, limits location choices, and finalizes through approval instead of the public moderation queue.
-- Updated the post-submit copy and return actions in [⚡success.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/⚡success.blade.php) to reflect immediate publication for institution-scoped submissions.
+
+# Venue, Reference, And Event Slug Normalization
+
+- [x] Add shared slug generators for venue, reference, and event using the requested formats and duplicate-numbering rules
+- [x] Route every new-creation entrypoint through those generators, including public quick-create flows, public submit-event persistence, advanced parent-program creation, and Filament admin create pages
+- [x] Add queued backfill jobs and commands for venue, reference, and event slug regeneration
+- [x] Add focused regression coverage for new slug formats, duplicate handling, and queued backfill behavior
+- [x] Run targeted Pest coverage plus Pint and record the verification results
+
+## Review
+- Added shared slug actions for venues, references, and events in [GenerateVenueSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Venues/GenerateVenueSlugAction.php), [GenerateReferenceSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/References/GenerateReferenceSlugAction.php), and [GenerateEventSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Events/GenerateEventSlugAction.php) so each entity now uses a deterministic slug format with stable duplicate numbering.
+- Routed venue, reference, and event creation through those generators across public and admin entrypoints, including [VenueFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/VenueFormSchema.php), [create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/create.blade.php), [CreateVenue.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Venues/Pages/CreateVenue.php), [CreateEvent.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Events/Pages/CreateEvent.php), and [CreateAdvancedParentProgramAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Events/CreateAdvancedParentProgramAction.php).
+- Added queueable backfill jobs and console commands in [BackfillVenueSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Jobs/BackfillVenueSlugs.php), [BackfillReferenceSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Jobs/BackfillReferenceSlugs.php), [BackfillEventSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Jobs/BackfillEventSlugs.php), [QueueBackfillVenueSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/QueueBackfillVenueSlugs.php), [QueueBackfillReferenceSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/QueueBackfillReferenceSlugs.php), and [QueueBackfillEventSlugs.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/QueueBackfillEventSlugs.php).
+- Updated the generated-slug admin forms in [InstitutionForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Institutions/Schemas/InstitutionForm.php), [VenueForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Venues/Schemas/VenueForm.php), and [EventForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Events/Schemas/EventForm.php) so create pages no longer require manual slug input before the server-side generators run.
+- Added focused regression coverage in [VenueReferenceEventSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/VenueReferenceEventSlugGenerationTest.php) and kept the institution baseline covered by [InstitutionSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionSlugGenerationTest.php).
+
 - Verification:
-  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **20 passed**
-  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEntityAccessTest.php` => **5 passed**
-  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **22 passed**
-  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/AdvancedEventCreationTest.php` => **5 passed**
-  - `vendor/bin/pint --test tests/Feature/SubmitEventEntityAccessTest.php resources/views/components/pages/submit-event/create.blade.php resources/views/components/pages/submit-event/⚡success.blade.php` => **pass**
-  - `git diff --check -- routes/web.php resources/views/livewire/pages/dashboard/institution-dashboard.blade.php resources/views/components/pages/submit-event/create.blade.php resources/views/components/pages/submit-event/⚡success.blade.php tests/Feature/DashboardPagesTest.php tests/Feature/SubmitEventEntityAccessTest.php tasks/todo.md` => **clean**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **15 passed**
+  - `XDEBUG_MODE=off vendor/bin/pest --parallel --compact tests/Feature/InstitutionSlugGenerationTest.php` => **8 passed**
 
 # Full Verification Gate
 

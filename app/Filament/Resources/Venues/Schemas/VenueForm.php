@@ -47,7 +47,8 @@ class VenueForm
                             ->label('Active')
                             ->default(true),
                         TextInput::make('slug')
-                            ->required()
+                            ->required(fn (string $operation): bool => $operation !== 'create')
+                            ->hidden(fn (string $operation): bool => $operation === 'create')
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
                     ])

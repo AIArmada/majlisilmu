@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Location\ResolveGooglePlaceSelectionAction;
+use App\Actions\References\GenerateReferenceSlugAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\DawahShareOutcomeType;
@@ -1098,6 +1100,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                 ->createOptionUsing(function (array $data, Schema $schema): string {
                                     $reference = Reference::create([
                                         'title' => $data['title'],
+                                        'slug' => app(GenerateReferenceSlugAction::class)->handle((string) ($data['title'] ?? '')),
                                         'author' => $data['author'] ?? null,
                                         'type' => $data['type'] ?? 'kitab',
                                         'publication_year' => filled($data['publication_year'] ?? null) ? (string) $data['publication_year'] : null,
@@ -1562,7 +1565,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $event = Event::create(array_merge([
             'title' => $validated['title'],
-            'slug' => Str::slug($validated['title']).'-'.Str::random(7),
+            'slug' => app(GenerateEventSlugAction::class)->handle(
+                (string) $validated['title'],
+                $validated['event_date'] ?? null,
+                $timezone,
+            ),
             'description' => $validated['description'] ?? null,
             'timezone' => $timezone,
             'starts_at' => $startsAt,
