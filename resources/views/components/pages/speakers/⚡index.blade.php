@@ -61,7 +61,8 @@ new
                 ->active()
                 ->where('status', 'verified')
                 ->withCount(['events' => function ($query) {
-                    $query->active();
+                    $query->active()
+                        ->where('starts_at', '>=', now());
                 }])
                 ->with('media');
         }
@@ -74,41 +75,41 @@ new
             $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
 
             return $query->where(function (Builder $innerQuery) use ($search, $operator, $collapsedWildcardSearch, $searchTokens) {
-                        $innerQuery->where('name', $operator, "%{$search}%");
-                        $innerQuery->orWhere('name', $operator, $collapsedWildcardSearch);
+                $innerQuery->where('name', $operator, "%{$search}%");
+                $innerQuery->orWhere('name', $operator, $collapsedWildcardSearch);
 
-                        foreach ($searchTokens as $token) {
-                            if (mb_strlen($token) < 2) {
-                                continue;
-                            }
+                foreach ($searchTokens as $token) {
+                    if (mb_strlen($token) < 2) {
+                        continue;
+                    }
 
-                            $innerQuery->orWhere('name', $operator, "%{$token}%");
+                    $innerQuery->orWhere('name', $operator, "%{$token}%");
+                }
+
+                if (DB::connection()->getDriverName() === 'pgsql') {
+                    $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
+                    $innerQuery->orWhereRaw('bio::text ILIKE ?', [$collapsedWildcardSearch]);
+
+                    foreach ($searchTokens as $token) {
+                        if (mb_strlen($token) < 2) {
+                            continue;
                         }
 
-                        if (DB::connection()->getDriverName() === 'pgsql') {
-                            $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
-                            $innerQuery->orWhereRaw('bio::text ILIKE ?', [$collapsedWildcardSearch]);
+                        $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$token}%"]);
+                    }
+                } else {
+                    $innerQuery->orWhere('bio', $operator, "%{$search}%");
+                    $innerQuery->orWhere('bio', $operator, $collapsedWildcardSearch);
 
-                            foreach ($searchTokens as $token) {
-                                if (mb_strlen($token) < 2) {
-                                    continue;
-                                }
-
-                                $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$token}%"]);
-                            }
-                        } else {
-                            $innerQuery->orWhere('bio', $operator, "%{$search}%");
-                            $innerQuery->orWhere('bio', $operator, $collapsedWildcardSearch);
-
-                            foreach ($searchTokens as $token) {
-                                if (mb_strlen($token) < 2) {
-                                    continue;
-                                }
-
-                                $innerQuery->orWhere('bio', $operator, "%{$token}%");
-                            }
+                    foreach ($searchTokens as $token) {
+                        if (mb_strlen($token) < 2) {
+                            continue;
                         }
-                    });
+
+                        $innerQuery->orWhere('bio', $operator, "%{$token}%");
+                    }
+                }
+            });
         }
 
         private function fuzzySearch(string $search): LengthAwarePaginatorContract
