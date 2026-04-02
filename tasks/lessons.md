@@ -1,5 +1,7 @@
 # Lessons
 
+- When a package already exposes a static config flag for the exact behavior the app needs, do not keep a local clone of the package plugin just to avoid a runtime config mutation; use the official plugin with static config and avoid drift.
+- When a user explicitly asks for an upstream-docs pass before finalizing an infrastructure fix, read the upstream docs first and then re-evaluate the local patch set against those documented lifecycles before keeping custom code.
 - When a user explicitly asks for proof on the current live local database, do not retreat to an isolated sandbox run; use the configured connection with disposable records, verify the real queue/job path there, and clean the proof data up afterward.
 - When a wording change is explicitly scoped to mobile only, do not rename the shared desktop label or translation key globally; patch the mobile-specific template branch and add coverage for that exact surface.
 - When a user says a new selector must sit beside language but stay conceptually separate, do not overload Laravel's existing locale state; introduce a distinct market preference and keep translation language independent.
@@ -212,3 +214,4 @@
 - When a user explicitly says slug backfills do not need aliases or redirects, treat the URL break as intentional and keep the slug migration forward-only unless they later ask for backward compatibility.
 - When speaker slugs depend on country but most speakers lack deeper geography, make `country_id` required in every speaker-creation form rather than relying on a hidden default; otherwise create-time slugging and later backfills can diverge.
 - When country is part of a canonical slug or location identity, require an explicit `country_id` in every creation form for that entity type; hidden Malaysia defaults are not enough once the data becomes part of the URL contract.
+- For production-only public-route 404s, check whether any custom `Route::bind(...)` logic was registered inside `routes/*.php`; cached routes can leave those binders missing at runtime, so register them in a service provider that boots even when routes are cached.

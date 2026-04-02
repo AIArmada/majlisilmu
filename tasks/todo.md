@@ -1,3 +1,54 @@
+# Octane Revisit After Docs Review
+
+- [x] Re-evaluate the current Octane-related uncommitted changes against the Blaze and Laravel Octane docs
+- [x] Simplify the Signals integration if static package configuration is the safer long-term fit
+- [x] Re-run focused verification for the revised Octane hardening
+
+## Review
+
+- Reviewed the current Blaze and Octane integration against the upstream Blaze README plus the installed Blaze service provider and the Laravel Octane docs. The Blaze package already injects `__blaze` through a view composer and registers its own Octane request reset listener, so the app-level `View::share('__blaze', ...)` hook remained correctly removed from [BlazeServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/BlazeServiceProvider.php).
+- Simplified the admin signals integration to the package’s official plugin in [AdminPanelProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/Filament/AdminPanelProvider.php) and replaced the removed local clone with a static config override in [filament-signals.php](/Users/Saiffil/Herd/majlisilmu/config/filament-signals.php). Because this app only uses Signals on the admin panel, a static `'dashboard' => false` config is cleaner than carrying a local plugin copy just to avoid runtime config mutation.
+- Kept the [AuditedMediaObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/AuditedMediaObserver.php) `WeakMap` hardening. It still matches Octane guidance by avoiding request-leaking static snapshot arrays keyed by object IDs.
+- Expanded [OctaneCompatibilityTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/OctaneCompatibilityTest.php) so it now covers the base Octane listener / command expectations, the permission package’s Octane reset listener, the static signals config behavior, the Blaze view-sharing expectation, and the media observer `WeakMap` behavior.
+- Removed the incidental FrankenPHP worker stub that was generated only for the temporary local Octane browser proof and is not required for this repo’s current committed Octane setup.
+- Runtime sanity checks:
+  - `php artisan config:cache` => **pass**
+  - `php artisan route:cache` => **pass**
+  - `php artisan tinker --execute="dump(config('filament-signals.features.dashboard')); dump(array_key_exists('__blaze', view()->getShared())); dump(in_array(AIArmada\\FilamentSignals\\Pages\\PageViewsReport::class, (new App\\Providers\\Filament\\AdminPanelProvider(app()))->panel(new Filament\\Panel)->getPages(), true)); dump(in_array(AIArmada\\FilamentSignals\\Pages\\SignalsDashboard::class, (new App\\Providers\\Filament\\AdminPanelProvider(app()))->panel(new Filament\\Panel)->getPages(), true));"` => **`false`, `false`, `true`, `false`**
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/OctaneCompatibilityTest.php` => **6 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SlugRedirectFeatureTest.php` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminShareAnalyticsPageTest.php` => **8 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Observers/AuditedMediaObserver.php app/Providers/AppServiceProvider.php app/Providers/BlazeServiceProvider.php app/Providers/Filament/AdminPanelProvider.php tests/Feature/OctaneCompatibilityTest.php tests/Feature/SlugRedirectFeatureTest.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+  - `php artisan optimize:clear` => **pass**
+
+# Laravel Octane Compatibility Audit
+
+- [x] Audit the application for proven Octane worker-lifetime state leaks and unsafe global mutations
+- [x] Patch confirmed Octane compatibility issues without changing public behavior
+- [x] Add focused regression coverage and verify the hardening changes
+
+# Production Slug Redirect 404 Fix
+
+- [x] Move public slug route binding registration out of `routes/web.php` so it survives cached routes in production
+- [x] Keep the existing slug redirect resolution behavior unchanged for event, institution, speaker, venue, and reference routes
+- [x] Verify the fix with route cache enabled and document the production root cause
+
+## Review
+
+- Moved public slug binder registration into [AppServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/AppServiceProvider.php) and wrapped it in an Octane-safe static guard, so the `event`, `institution`, `speaker`, `venue`, and `reference` binders are registered during provider boot even when routes are cached.
+- Removed the binder loop from [web.php](/Users/Saiffil/Herd/majlisilmu/routes/web.php), which was the production-only weak point because cached routes bypass that runtime registration path.
+- Added a focused regression in [SlugRedirectFeatureTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SlugRedirectFeatureTest.php) to assert the public slug binders are present after the application boots.
+- Root cause: with cached routes enabled, `app('router')->getBindingCallback('speaker')` was `null`, so `/penceramah/{speaker:slug}` fell back to implicit slug binding and returned `404` for old slugs before `ResolvePublicSlugRedirect` could issue the `301`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SlugRedirectFeatureTest.php` => **10 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Providers/AppServiceProvider.php routes/web.php tests/Feature/SlugRedirectFeatureTest.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `php artisan route:clear && php artisan route:cache && php artisan tinker --execute="dump(app('router')->getBindingCallback('event') !== null, app('router')->getBindingCallback('institution') !== null, app('router')->getBindingCallback('speaker') !== null, app('router')->getBindingCallback('venue') !== null, app('router')->getBindingCallback('reference') !== null);" && php artisan route:clear` => **all five checks returned `true`**
+  - `git diff --check` => **clean**
+
 # Uncommitted Changes Audit
 
 - [x] Audit the nickname-related worktree changes for regressions or brittle assumptions

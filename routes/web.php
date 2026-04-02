@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Slugs\ResolvePublicSlugAction;
 use App\Enums\ContributionSubjectType;
 use App\Enums\MemberSubjectType;
 use App\Http\Controllers\Auth\SocialiteController;
@@ -27,22 +26,7 @@ use App\Livewire\Pages\MembershipClaims\Create as CreateMembershipClaimPage;
 use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Route;
-
-foreach (['event', 'institution', 'speaker', 'venue', 'reference'] as $publicSlugParameter) {
-    Route::bind($publicSlugParameter, function (mixed $value) use ($publicSlugParameter) {
-        if (! is_string($value) || trim($value) === '') {
-            throw new ModelNotFoundException;
-        }
-
-        $resolved = app(ResolvePublicSlugAction::class)->handle($publicSlugParameter, trim($value));
-
-        request()->attributes->set("public_slug_resolution.{$publicSlugParameter}", $resolved);
-
-        return $resolved['model'];
-    });
-}
 
 Route::livewire('/', 'pages.⚡home')->name('home');
 Route::livewire('/tentang-kami', AboutPage::class)->name('about');

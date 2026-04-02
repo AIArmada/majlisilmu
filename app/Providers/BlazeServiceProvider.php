@@ -2,10 +2,8 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Blaze\Config as BlazeConfig;
-use Livewire\Blaze\Runtime\BlazeRuntime;
 
 class BlazeServiceProvider extends ServiceProvider
 {
@@ -17,16 +15,6 @@ class BlazeServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $shareRuntime = static function (BlazeRuntime $runtime): void {
-            View::share('__blaze', $runtime);
-        };
-
-        if ($this->app->bound(BlazeRuntime::class)) {
-            $shareRuntime($this->app->make(BlazeRuntime::class));
-        }
-
-        $this->app->afterResolving(BlazeRuntime::class, $shareRuntime);
-
         $configure = static function (BlazeConfig $config): void {
             $config
                 ->in(resource_path('views/components'))

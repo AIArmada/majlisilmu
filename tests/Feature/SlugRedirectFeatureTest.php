@@ -22,6 +22,13 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+it('registers public slug route binders during app boot', function () {
+    foreach (['event', 'institution', 'speaker', 'venue', 'reference'] as $parameter) {
+        expect(app('router')->getBindingCallback($parameter))
+            ->not->toBeNull();
+    }
+});
+
 it('creates an institution slug redirect only after the old public path has been visited', function () {
     $proposer = User::factory()->create();
     $geography = createSlugRedirectGeography();

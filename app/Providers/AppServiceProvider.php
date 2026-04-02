@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Slugs\ResolvePublicSlugAction;
 use App\Ai\Listeners\RecordAiUsage;
 use App\Models\Address;
 use App\Models\AiModelPricing;
@@ -46,9 +47,11 @@ use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Ai\Events\AgentPrompted;
@@ -69,6 +72,8 @@ class AppServiceProvider extends ServiceProvider
     protected static bool $mediaUploadConfigured = false;
 
     protected static bool $publicListingObserversRegistered = false;
+
+    protected static bool $publicSlugBindingsRegistered = false;
 
     /**
      * Register any application services.
@@ -149,6 +154,14 @@ class AppServiceProvider extends ServiceProvider
             self::$languageSwitchConfigured = true;
         }
 
+        if (app()->runningUnitTests() || ! self::$publicSlugBindingsRegistered) {
+            $this->registerPublicSlugBindings();
+
+            if (! app()->runningUnitTests()) {
+                self::$publicSlugBindingsRegistered = true;
+            }
+        }
+
         Relation::enforceMorphMap([
             'address' => Address::class,
             'ai_model_pricing' => AiModelPricing::class,
@@ -227,6 +240,23 @@ class AppServiceProvider extends ServiceProvider
                 );
             });
             self::$mediaUploadConfigured = true;
+        }
+    }
+
+    private function registerPublicSlugBindings(): void
+    {
+        foreach (['event', 'institution', 'speaker', 'venue', 'reference'] as $publicSlugParameter) {
+            Route::bind($publicSlugParameter, function (mixed $value) use ($publicSlugParameter) {
+                if (! is_string($value) || trim($value) === '') {
+                    throw new ModelNotFoundException;
+                }
+
+                $resolved = app(ResolvePublicSlugAction::class)->handle($publicSlugParameter, trim($value));
+
+                request()->attributes->set("public_slug_resolution.{$publicSlugParameter}", $resolved);
+
+                return $resolved['model'];
+            });
         }
     }
 }
