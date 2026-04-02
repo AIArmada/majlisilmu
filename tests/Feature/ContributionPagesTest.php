@@ -124,6 +124,7 @@ it('applies direct institution edits for owner maintainers from the suggest upda
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
         'name' => 'Masjid Lama',
+        'nickname' => null,
         'status' => 'verified',
     ]);
     $institution->contacts()->delete();
@@ -136,10 +137,12 @@ it('applies direct institution edits for owner maintainers from the suggest upda
         'subjectId' => $institution->slug,
     ])
         ->set('data.name', 'Masjid Baru')
+        ->set('data.nickname', 'Masjid Segar')
         ->call('submit')
         ->assertHasNoErrors();
 
     expect($institution->fresh()->name)->toBe('Masjid Baru')
+        ->and($institution->fresh()->nickname)->toBe('Masjid Segar')
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
@@ -182,7 +185,7 @@ it('applies direct institution cover edits for owner maintainers from the sugges
         'subjectId' => $institution->slug,
     ])
         ->fillForm([
-            'cover' => UploadedFile::fake()->image('institution-cover.jpg', 1200, 675),
+            'cover' => UploadedFile::fake()->image('institution-cover.jpg', 1600, 900),
         ])
         ->call('submit')
         ->assertHasNoErrors();
@@ -245,7 +248,7 @@ it('creates pending update requests for non-maintainer suggestions', function ()
         ->and($request?->type)->toBe(ContributionRequestType::Update)
         ->and($request?->entity_id)->toBe($institution->id)
         ->and($request?->status)->toBe(ContributionRequestStatus::Pending)
-        ->and($request?->proposed_data['description'] ?? null)->toBe('Updated community description')
+        ->and(trim(strip_tags((string) ($request?->proposed_data['description'] ?? ''))))->toBe('Updated community description')
         ->and(data_get($request?->proposed_data, 'address.line1'))->toBe('No. 8, Jalan Baru');
 });
 

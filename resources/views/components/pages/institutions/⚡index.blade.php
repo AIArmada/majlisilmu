@@ -92,8 +92,7 @@ class extends Component
         $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
 
         return $query->where(function (Builder $innerQuery) use ($collapsedSearch, $operator, $collapsedWildcardSearch, $searchTokens) {
-            $innerQuery->where('name', $operator, "%{$collapsedSearch}%")
-                ->orWhere('name', $operator, $collapsedWildcardSearch)
+            $innerQuery->searchNameOrNickname($collapsedSearch)
                 ->orWhere('description', $operator, "%{$collapsedSearch}%")
                 ->orWhere('description', $operator, $collapsedWildcardSearch);
 
@@ -108,7 +107,7 @@ class extends Component
                     }
 
                     $tokenQuery->where(function (Builder $tokenMatchQuery) use ($token, $operator): void {
-                        $tokenMatchQuery->where('name', $operator, "%{$token}%")
+                        $tokenMatchQuery->searchNameOrNickname($token)
                             ->orWhere('description', $operator, "%{$token}%");
                     });
                 }
@@ -128,12 +127,13 @@ class extends Component
 
         $rankedCandidatesQuery = Institution::query()
             ->where('status', 'verified')
-            ->select(['id', 'name', 'description']);
+            ->select(['id', 'name', 'nickname', 'description']);
 
         $rankedCandidates = $this->applyLocationScope($rankedCandidatesQuery)
             ->get()
             ->map(function (Institution $institution) use ($normalizedSearch): array {
                 $normalizedName = $this->normalizeForSimilarity($institution->name);
+                $normalizedNickname = $this->normalizeForSimilarity((string) $institution->nickname);
                 $normalizedDescription = $this->normalizeForSimilarity((string) $institution->description);
 
                 $scoreCandidates = [];
@@ -143,6 +143,15 @@ class extends Component
 
                     $nameTokens = array_values(array_filter(explode(' ', $normalizedName), static fn (string $token): bool => mb_strlen($token) >= 2));
                     foreach ($nameTokens as $token) {
+                        $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
+                    }
+                }
+
+                if ($normalizedNickname !== '') {
+                    $scoreCandidates[] = $this->similarityScore($normalizedSearch, $normalizedNickname);
+
+                    $nicknameTokens = array_values(array_filter(explode(' ', $normalizedNickname), static fn (string $token): bool => mb_strlen($token) >= 2));
+                    foreach ($nicknameTokens as $token) {
                         $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
                     }
                 }

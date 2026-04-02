@@ -6,6 +6,7 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\TagType;
+use App\Livewire\Pages\Events\Index;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -165,4 +166,40 @@ it('allows institution organizer to choose a different location', function () {
         'institution_id' => null, // Since it's a venue
         'venue_id' => $otherVenue->id,
     ]);
+});
+
+it('includes institution nicknames in submit-event option labels', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => 'Masjid Biru',
+        'status' => 'verified',
+    ]);
+
+    $component = Livewire::test('pages.submit-event.create');
+
+    /** @var array<string, string> $options */
+    $options = (fn (): array => $this->availableInstitutionOptions())->call($component->instance());
+
+    expect($options)->toHaveKey($institution->id, $institution->display_name);
+});
+
+it('matches institution nicknames in event filter search options', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => 'Masjid Biru',
+        'status' => 'verified',
+    ]);
+
+    $component = Livewire::test(Index::class);
+
+    /** @var array<string, string> $results */
+    $results = (fn (): array => $this->searchInstitutionOptions(
+        countryId: null,
+        stateId: null,
+        districtId: null,
+        subdistrictId: null,
+        search: 'Masjid Biru',
+    ))->call($component->instance());
+
+    expect($results)->toHaveKey($institution->id, $institution->display_name);
 });

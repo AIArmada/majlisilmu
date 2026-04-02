@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -136,6 +137,9 @@ function something()
 
 function fakePrayerTimesApi(): void
 {
+    // Submit-event feature tests do not exercise real notification delivery.
+    Notification::fake();
+
     Http::fake([
         'api.aladhan.com/*' => Http::response([
             'code' => 200,
@@ -158,6 +162,8 @@ function fakePrayerTimesApi(): void
  */
 function setSubmitEventFormState(mixed $component, array $state): mixed
 {
+    $nonUploadState = [];
+
     foreach ($state as $field => $value) {
         if (
             $value instanceof UploadedFile ||
@@ -168,7 +174,17 @@ function setSubmitEventFormState(mixed $component, array $state): mixed
             continue;
         }
 
-        $component->set("data.{$field}", $value);
+        $nonUploadState[$field] = $value;
+    }
+
+    if ($nonUploadState !== []) {
+        if (method_exists($component, 'fillForm')) {
+            $component->fillForm($nonUploadState);
+        } else {
+            foreach ($nonUploadState as $field => $value) {
+                $component->set("data.{$field}", $value);
+            }
+        }
     }
 
     return $component;

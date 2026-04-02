@@ -588,7 +588,8 @@ it('uses rich description and full contact details in the institution quick-crea
     $components = collect(InstitutionFormSchema::createOptionForm())
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
-    expect($components->get('description'))->toBeInstanceOf(RichEditor::class)
+    expect($components->get('nickname'))->toBeInstanceOf(TextInput::class)
+        ->and($components->get('description'))->toBeInstanceOf(RichEditor::class)
         ->and($components->get('contacts'))->toBeInstanceOf(Repeater::class)
         ->and($components->has('proposer_note'))->toBeFalse()
         ->and($components->has('logo'))->toBeFalse();
@@ -597,6 +598,7 @@ it('uses rich description and full contact details in the institution quick-crea
 it('stores description and contacts when creating an institution via quick-create', function () {
     $institutionId = InstitutionFormSchema::createOptionUsing([
         'name' => 'Masjid Quick Create',
+        'nickname' => 'Masjid QC',
         'type' => 'masjid',
         'description' => '<p>Institusi komuniti yang aktif.</p>',
         'contacts' => [[
@@ -612,6 +614,7 @@ it('stores description and contacts when creating an institution via quick-creat
         ->findOrFail($institutionId);
 
     expect($institution->description)->toBe('<p>Institusi komuniti yang aktif.</p>')
+        ->and($institution->nickname)->toBe('Masjid QC')
         ->and($institution->contacts->pluck('value')->all())->toContain('0123456789');
 });
 
@@ -761,7 +764,8 @@ it('uses rich description and no logo upload in the institution contribution for
     $components = collect($flatten(InstitutionContributionFormSchema::components(includeMedia: true)))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
-    expect($components->get('description'))->toBeInstanceOf(RichEditor::class)
+    expect($components->get('nickname'))->toBeInstanceOf(TextInput::class)
+        ->and($components->get('description'))->toBeInstanceOf(RichEditor::class)
         ->and($components->get('contacts'))->toBeInstanceOf(Repeater::class)
         ->and($components->has('logo'))->toBeFalse();
 });

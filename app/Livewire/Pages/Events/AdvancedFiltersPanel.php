@@ -580,7 +580,12 @@ class AdvancedFiltersPanel extends Component implements HasForms
 
     public function institutionOptionLabel(string $value): ?string
     {
-        return Institution::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true)->whereKey($value)->value('name');
+        return Institution::query()
+            ->whereIn('status', ['verified', 'pending'])
+            ->where('is_active', true)
+            ->whereKey($value)
+            ->first(['id', 'name', 'nickname'])
+            ?->display_name;
     }
 
     public function venueOptionLabel(string $value): ?string
@@ -805,9 +810,9 @@ class AdvancedFiltersPanel extends Component implements HasForms
         $query = Institution::query()->whereIn('status', ['verified', 'pending'])->where('is_active', true);
 
         $this->applyAddressLocationFilters($query, $countryId, $stateId, $districtId, $subdistrictId);
-        $this->applySearchConstraint($query, 'name', $search);
+        $query->searchNameOrNickname($search);
 
-        return $this->pluckOptions($query->orderBy('name'), 'name', 50);
+        return $this->institutionOptionsFromQuery($query->orderBy('name'), 50);
     }
 
     /**
@@ -882,6 +887,22 @@ class AdvancedFiltersPanel extends Component implements HasForms
             ->limit($limit)
             ->pluck($labelColumn, 'id')
             ->mapWithKeys(fn (string $label, mixed $id): array => [(string) $id => $label])
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return array<string, string>
+     */
+    private function institutionOptionsFromQuery(Builder $query, int $limit): array
+    {
+        /** @var Collection<int, Institution> $institutions */
+        $institutions = $query
+            ->limit($limit)
+            ->get(['id', 'name', 'nickname']);
+
+        return $institutions
+            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
             ->all();
     }
 

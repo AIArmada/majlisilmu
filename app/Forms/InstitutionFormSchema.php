@@ -33,6 +33,11 @@ class InstitutionFormSchema
                 ->maxLength(255)
                 ->placeholder(__('e.g., Masjid Al-Falah, Surau An-Nur')),
 
+            TextInput::make('nickname')
+                ->label(__('Nickname'))
+                ->maxLength(255)
+                ->helperText(__('Optional nickname, e.g. Masjid Biru')),
+
             Select::make('type')
                 ->label(__('Institution Type'))
                 ->required()
@@ -85,6 +90,9 @@ class InstitutionFormSchema
 
         $institution = Institution::create([
             'name' => $data['name'],
+            'nickname' => is_string($data['nickname'] ?? null) && trim((string) $data['nickname']) !== ''
+                ? trim((string) $data['nickname'])
+                : null,
             'slug' => app(GenerateInstitutionSlugAction::class)->handle((string) $data['name'], $addressData),
             'type' => $data['type'],
             'description' => $data['description'] ?? null,

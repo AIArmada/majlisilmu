@@ -929,7 +929,7 @@ class Index extends Component implements HasForms
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->limit(400)
-                ->select(['id', 'name']),
+                ->select(['id', 'name', 'nickname']),
         );
     }
 
@@ -961,9 +961,9 @@ class Index extends Component implements HasForms
             ->where('is_active', true);
 
         $this->applyAddressLocationFilters($query, $countryId, $stateId, $districtId, $subdistrictId);
-        $this->applySearchConstraint($query, 'name', $search);
+        $query->searchNameOrNickname($search);
 
-        return $this->pluckOptions($query->orderBy('name'), 'name', 50);
+        return $this->institutionOptionsFromQuery($query->orderBy('name'), 50);
     }
 
     /**
@@ -1095,7 +1095,8 @@ class Index extends Component implements HasForms
             ->whereIn('status', ['verified', 'pending'])
             ->where('is_active', true)
             ->whereKey($value)
-            ->value('name');
+            ->first(['id', 'name', 'nickname'])
+            ?->display_name;
     }
 
     public function venueOptionLabel(string $value): ?string
@@ -1119,6 +1120,22 @@ class Index extends Component implements HasForms
             ->limit($limit)
             ->pluck($labelColumn, 'id')
             ->mapWithKeys(fn (string $label, mixed $id): array => [(string) $id => $label])
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return array<string, string>
+     */
+    private function institutionOptionsFromQuery(Builder $query, int $limit): array
+    {
+        /** @var Collection<int, Institution> $institutions */
+        $institutions = $query
+            ->limit($limit)
+            ->get(['id', 'name', 'nickname']);
+
+        return $institutions
+            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
             ->all();
     }
 

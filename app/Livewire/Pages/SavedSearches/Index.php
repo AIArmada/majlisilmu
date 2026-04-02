@@ -624,7 +624,10 @@ class Index extends Component
     private function institutionName(string $id): ?string
     {
         if (! array_key_exists($id, $this->institutionNames)) {
-            $this->institutionNames[$id] = Institution::query()->whereKey($id)->value('name');
+            $this->institutionNames[$id] = Institution::query()
+                ->whereKey($id)
+                ->first(['id', 'name', 'nickname'])
+                ?->display_name;
         }
 
         return $this->institutionNames[$id];

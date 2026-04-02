@@ -205,11 +205,11 @@ class Index extends Component implements HasForms
             MemberSubjectType::Institution => Institution::query()
                 ->where('status', 'verified')
                 ->where('is_active', true)
-                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'name', $search))
+                ->tap(fn (Builder $query): Builder => filled($search) ? $query->searchNameOrNickname($search) : $query)
                 ->orderBy('name')
                 ->limit(50)
-                ->get()
-                ->mapWithKeys(fn (Institution $institution): array => [$institution->slug => $institution->name])
+                ->get(['id', 'slug', 'name', 'nickname'])
+                ->mapWithKeys(fn (Institution $institution): array => [$institution->slug => $institution->display_name])
                 ->all(),
             MemberSubjectType::Speaker => Speaker::query()
                 ->where('status', 'verified')
@@ -235,7 +235,8 @@ class Index extends Component implements HasForms
                 ->where('status', 'verified')
                 ->where('is_active', true)
                 ->where('slug', $subjectSlug)
-                ->value('name'),
+                ->first(['id', 'name', 'nickname'])
+                ?->display_name,
             MemberSubjectType::Speaker => Speaker::query()
                 ->where('status', 'verified')
                 ->where('is_active', true)

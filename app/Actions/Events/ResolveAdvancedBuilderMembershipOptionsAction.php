@@ -2,6 +2,7 @@
 
 namespace App\Actions\Events;
 
+use App\Models\Institution;
 use App\Models\User;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -22,7 +23,8 @@ class ResolveAdvancedBuilderMembershipOptionsAction
                 ->whereIn('status', ['verified', 'pending'])
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->pluck('institutions.name', 'institutions.id')
+                ->get(['institutions.id', 'institutions.name', 'institutions.nickname'])
+                ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
                 ->all(),
             'speaker_options' => $user->speakers()
                 ->whereIn('status', ['verified', 'pending'])

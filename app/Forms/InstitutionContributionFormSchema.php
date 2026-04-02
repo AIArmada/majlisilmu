@@ -37,6 +37,10 @@ class InstitutionContributionFormSchema
                         ->label(__('Institution Name'))
                         ->required()
                         ->maxLength(255),
+                    TextInput::make('nickname')
+                        ->label(__('Nickname'))
+                        ->maxLength(255)
+                        ->helperText(__('Optional nickname, e.g. Masjid Biru')),
                     RichEditor::make('description')
                         ->label(__('Description'))
                         ->columnSpanFull(),
