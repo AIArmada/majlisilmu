@@ -1,3 +1,21 @@
+# Slug Redirect Resource CRUD
+
+- [x] Audit the current slug redirect Filament resource to identify why it was view-only
+- [x] Add create, edit, and delete support with a proper form schema and resource actions
+- [x] Add focused CRUD regression coverage and rerun targeted verification
+
+## Review
+
+- Added a dedicated Filament form schema in [SlugRedirectForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/Schemas/SlugRedirectForm.php) so admins can choose the redirect subject, enter the old slug, and see the derived source and destination paths before saving.
+- Extended [SlugRedirectResource.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/SlugRedirectResource.php) with full CRUD page routing plus shared redirect normalization / validation, including duplicate-source protection and canonical path recomputation for the selected public model.
+- Added create and edit pages in [CreateSlugRedirect.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/Pages/CreateSlugRedirect.php) and [EditSlugRedirect.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/Pages/EditSlugRedirect.php), then enabled create/edit/delete actions in [ListSlugRedirects.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/Pages/ListSlugRedirects.php), [ViewSlugRedirect.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/Pages/ViewSlugRedirect.php), and [SlugRedirectsTable.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/SlugRedirects/Tables/SlugRedirectsTable.php).
+- Expanded [SlugRedirectFeatureTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SlugRedirectFeatureTest.php) with create, edit, and delete admin resource coverage on top of the existing public redirect assertions.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SlugRedirectFeatureTest.php` => **13 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/SlugRedirects tests/Feature/SlugRedirectFeatureTest.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+
 # Octane Revisit After Docs Review
 
 - [x] Re-evaluate the current Octane-related uncommitted changes against the Blaze and Laravel Octane docs

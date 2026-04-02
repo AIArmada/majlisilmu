@@ -1,6 +1,8 @@
 <?php
 
 use AIArmada\Signals\Models\SignalEvent;
+use App\Filament\Resources\SlugRedirects\Pages\CreateSlugRedirect;
+use App\Filament\Resources\SlugRedirects\Pages\EditSlugRedirect;
 use App\Filament\Resources\SlugRedirects\Pages\ListSlugRedirects;
 use App\Forms\VenueFormSchema;
 use App\Models\Country;
@@ -234,6 +236,108 @@ it('shows slug redirects in the admin resource table', function () {
         ->assertSee($redirect->destination_path);
 });
 
+it('allows administrators to create slug redirects in the admin resource', function () {
+    $administrator = slugRedirectAdministrator();
+    $proposer = User::factory()->create();
+    $geography = createSlugRedirectGeography();
+
+    $institution = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid CRUD Baru',
+        'type' => 'masjid',
+        'address' => slugRedirectAddressPayload($geography),
+    ], $proposer);
+
+    Livewire::actingAs($administrator)
+        ->test(CreateSlugRedirect::class)
+        ->fillForm([
+            'redirectable_type' => 'institution',
+            'redirectable_id' => (string) $institution->getKey(),
+            'source_slug' => 'masjid-crud-lama-shah-alam-petaling-selangor-my',
+            'redirect_count' => 0,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $redirect = SlugRedirect::query()->firstOrFail();
+
+    expect($redirect->redirectable_type)->toBe('institution')
+        ->and($redirect->redirectable_id)->toBe((string) $institution->getKey())
+        ->and($redirect->source_slug)->toBe('masjid-crud-lama-shah-alam-petaling-selangor-my')
+        ->and($redirect->source_path)->toBe('/institusi/masjid-crud-lama-shah-alam-petaling-selangor-my')
+        ->and($redirect->destination_slug)->toBe($institution->slug)
+        ->and($redirect->destination_path)->toBe(route('institutions.show', $institution, false));
+});
+
+it('allows administrators to edit slug redirects in the admin resource', function () {
+    $administrator = slugRedirectAdministrator();
+    $proposer = User::factory()->create();
+    $geography = createSlugRedirectGeography();
+
+    $institution = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid CRUD Edit',
+        'type' => 'masjid',
+        'address' => slugRedirectAddressPayload($geography),
+    ], $proposer);
+
+    $redirect = SlugRedirect::query()->create([
+        'redirectable_type' => $institution->getMorphClass(),
+        'redirectable_id' => (string) $institution->getKey(),
+        'source_slug' => 'masjid-crud-asal-shah-alam-petaling-selangor-my',
+        'source_path' => '/institusi/masjid-crud-asal-shah-alam-petaling-selangor-my',
+        'destination_slug' => $institution->slug,
+        'destination_path' => route('institutions.show', $institution, false),
+        'redirect_count' => 1,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(EditSlugRedirect::class, ['record' => $redirect->getKey()])
+        ->fillForm([
+            'redirectable_type' => 'institution',
+            'redirectable_id' => (string) $institution->getKey(),
+            'source_slug' => 'masjid-crud-kemaskini-shah-alam-petaling-selangor-my',
+            'redirect_count' => 7,
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $redirect->refresh();
+
+    expect($redirect->source_slug)->toBe('masjid-crud-kemaskini-shah-alam-petaling-selangor-my')
+        ->and($redirect->source_path)->toBe('/institusi/masjid-crud-kemaskini-shah-alam-petaling-selangor-my')
+        ->and($redirect->redirect_count)->toBe(7)
+        ->and($redirect->destination_slug)->toBe($institution->slug)
+        ->and($redirect->destination_path)->toBe(route('institutions.show', $institution, false));
+});
+
+it('allows administrators to delete slug redirects in the admin resource', function () {
+    $administrator = slugRedirectAdministrator();
+    $proposer = User::factory()->create();
+    $geography = createSlugRedirectGeography();
+
+    $institution = app(ContributionEntityMutationService::class)->createInstitution([
+        'name' => 'Masjid CRUD Padam',
+        'type' => 'masjid',
+        'address' => slugRedirectAddressPayload($geography),
+    ], $proposer);
+
+    $redirect = SlugRedirect::query()->create([
+        'redirectable_type' => $institution->getMorphClass(),
+        'redirectable_id' => (string) $institution->getKey(),
+        'source_slug' => 'masjid-crud-padam-shah-alam-petaling-selangor-my',
+        'source_path' => '/institusi/masjid-crud-padam-shah-alam-petaling-selangor-my',
+        'destination_slug' => $institution->slug,
+        'destination_path' => route('institutions.show', $institution, false),
+        'redirect_count' => 0,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(ListSlugRedirects::class)
+        ->callTableAction('delete', $redirect->getKey())
+        ->assertHasNoTableActionErrors();
+
+    expect(SlugRedirect::query()->find($redirect->getKey()))->toBeNull();
+});
+
 function createSlugRedirectCountry(
     string $countryName = 'Malaysia',
     string $countryIso2 = 'MY',
@@ -261,6 +365,17 @@ function createSlugRedirectCountry(
     $country->save();
 
     return $country;
+}
+
+function slugRedirectAdministrator(): User
+{
+    test()->seed(RoleSeeder::class);
+    test()->seed(PermissionSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    return $administrator;
 }
 
 /**
