@@ -1,5 +1,11 @@
 <?php
 
+use AIArmada\FilamentSignals\FilamentSignalsPlugin;
+use AIArmada\FilamentSignals\Pages\PageViewsReport;
+use AIArmada\FilamentSignals\Pages\SignalsDashboard;
+use App\Observers\AuditedMediaObserver;
+use App\Providers\Filament\AdminPanelProvider;
+use Filament\Panel;
 use Illuminate\Contracts\Console\Kernel;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\Listeners\CollectGarbage;
@@ -25,4 +31,28 @@ it('registers octane commands', function () {
         ->toContain('octane:start')
         ->toContain('octane:stop')
         ->toContain('octane:status');
+});
+
+it('uses the package plugin with static config to exclude the signals dashboard from admin', function () {
+    expect(config('filament-signals.features.dashboard'))->toBeFalse();
+
+    $provider = new AdminPanelProvider(app());
+    $panel = $provider->panel(new Panel);
+
+    expect(collect($panel->getPlugins())->contains(
+        static fn (mixed $plugin): bool => $plugin instanceof FilamentSignalsPlugin
+    ))->toBeTrue()
+        ->and($panel->getPages())->toContain(PageViewsReport::class)
+        ->and($panel->getPages())->not->toContain(SignalsDashboard::class);
+});
+
+it('does not globally share blaze runtime state in the view factory', function () {
+    expect(view()->getShared())->not->toHaveKey('__blaze');
+});
+
+it('stores audited media transient snapshots in weak maps', function () {
+    $reflection = new ReflectionClass(AuditedMediaObserver::class);
+
+    expect($reflection->getProperty('pendingUpdateSnapshots')->getType()?->getName())->toBe(WeakMap::class)
+        ->and($reflection->getProperty('pendingDeleteSnapshots')->getType()?->getName())->toBe(WeakMap::class);
 });

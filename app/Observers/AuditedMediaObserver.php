@@ -7,29 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\MediaLibrary\MediaCollections\Models\Observers\MediaObserver;
+use WeakMap;
 
 class AuditedMediaObserver extends MediaObserver
 {
     /**
-     * @var array<int, array{
-     *     source_owner: Model|null,
-     *     source_field: string,
-     *     source_before: array<int, array<string, mixed>>,
-     *     destination_owner: Model|null,
-     *     destination_field: string|null,
-     *     destination_before: array<int, array<string, mixed>>|null
-     * }>
+     * @var WeakMap<Media, array<string, mixed>>|null
      */
-    private static array $pendingUpdateSnapshots = [];
+    private static ?WeakMap $pendingUpdateSnapshots = null;
 
     /**
-     * @var array<int, array{
-     *     owner: Model|null,
-     *     field: string,
-     *     before: array<int, array<string, mixed>>
-     * }>
+     * @var WeakMap<Media, array<string, mixed>>|null
      */
-    private static array $pendingDeleteSnapshots = [];
+    private static ?WeakMap $pendingDeleteSnapshots = null;
 
     public function created(Media $media): void
     {
@@ -67,7 +57,7 @@ class AuditedMediaObserver extends MediaObserver
 
             $sameContext = $this->sameAuditContext($sourceOwner, $destinationOwner, $sourceField, $destinationField);
 
-            self::$pendingUpdateSnapshots[spl_object_id($media)] = [
+            self::pendingUpdateSnapshots()[$media] = [
                 'source_owner' => $sourceOwner,
                 'source_field' => $sourceField,
                 'source_before' => $sourceOwner instanceof Model
@@ -89,10 +79,10 @@ class AuditedMediaObserver extends MediaObserver
     {
         parent::updated($media);
 
-        $snapshotKey = spl_object_id($media);
-        $snapshot = self::$pendingUpdateSnapshots[$snapshotKey] ?? null;
+        $pendingSnapshots = self::pendingUpdateSnapshots();
+        $snapshot = $pendingSnapshots[$media] ?? null;
 
-        unset(self::$pendingUpdateSnapshots[$snapshotKey]);
+        unset($pendingSnapshots[$media]);
 
         if (! is_array($snapshot)) {
             return;
@@ -153,7 +143,7 @@ class AuditedMediaObserver extends MediaObserver
             return;
         }
 
-        self::$pendingDeleteSnapshots[spl_object_id($media)] = [
+        self::pendingDeleteSnapshots()[$media] = [
             'owner' => $owner,
             'field' => MediaCollectionAuditSnapshot::field($media->collection_name),
             'before' => MediaCollectionAuditSnapshot::forOwner($owner, $media->collection_name),
@@ -165,10 +155,10 @@ class AuditedMediaObserver extends MediaObserver
     {
         parent::deleted($media);
 
-        $snapshotKey = spl_object_id($media);
-        $snapshot = self::$pendingDeleteSnapshots[$snapshotKey] ?? null;
+        $pendingSnapshots = self::pendingDeleteSnapshots();
+        $snapshot = $pendingSnapshots[$media] ?? null;
 
-        unset(self::$pendingDeleteSnapshots[$snapshotKey]);
+        unset($pendingSnapshots[$media]);
 
         if (! is_array($snapshot) || ! $this->canAuditOwner($snapshot['owner'])) {
             return;
@@ -244,5 +234,31 @@ class AuditedMediaObserver extends MediaObserver
         }
 
         return $sourceOwner->is($destinationOwner) && $sourceField === $destinationField;
+    }
+
+    /**
+     * @return WeakMap<Media, array<string, mixed>>
+     */
+    private static function pendingUpdateSnapshots(): WeakMap
+    {
+        /** @var WeakMap<Media, array<string, mixed>> $snapshots */
+        $snapshots = self::$pendingUpdateSnapshots ?? new WeakMap;
+
+        self::$pendingUpdateSnapshots = $snapshots;
+
+        return $snapshots;
+    }
+
+    /**
+     * @return WeakMap<Media, array<string, mixed>>
+     */
+    private static function pendingDeleteSnapshots(): WeakMap
+    {
+        /** @var WeakMap<Media, array<string, mixed>> $snapshots */
+        $snapshots = self::$pendingDeleteSnapshots ?? new WeakMap;
+
+        self::$pendingDeleteSnapshots = $snapshots;
+
+        return $snapshots;
     }
 }

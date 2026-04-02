@@ -43,8 +43,6 @@ class AdminPanelProvider extends PanelProvider
             );
         }
 
-        config()->set('filament-signals.features.dashboard', false);
-
         return $this->trackSignalsForPanel($panel, 'admin')
             ->default()
             ->id('admin')
