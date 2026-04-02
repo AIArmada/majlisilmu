@@ -180,6 +180,7 @@ class EventSeeder extends Seeder
     private function seedMajlisIlmuSchedule(): void
     {
         $malaysia = Country::where('iso2', 'MY')->first();
+        $malaysiaCountryId = $malaysia instanceof Country ? $malaysia->id : 132;
         $likeOperator = $this->databaseLikeOperator();
 
         $institution = Institution::query()->firstOrCreate([
@@ -206,7 +207,7 @@ class EventSeeder extends Seeder
                 'line1' => 'Bukit Jelutong',
                 'lat' => 3.0991666,
                 'lng' => 101.529892,
-                'country_id' => $malaysia?->id,
+                'country_id' => $malaysiaCountryId,
             ]);
 
             $state = State::query()

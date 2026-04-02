@@ -188,7 +188,7 @@ class EventContributionFormSchema
                         ->preload(),
                     Select::make('institution_id')
                         ->label(__('Institution'))
-                        ->options(fn (): array => Institution::query()->whereIn('status', ['verified', 'pending'])->orderBy('name')->pluck('name', 'id')->all())
+                        ->options(fn (): array => self::institutionOptions())
                         ->searchable()
                         ->preload()
                         ->live()
@@ -325,7 +325,7 @@ class EventContributionFormSchema
     private static function organizerOptions(mixed $organizerType): array
     {
         return match ($organizerType) {
-            Institution::class => Institution::query()->whereIn('status', ['verified', 'pending'])->orderBy('name')->pluck('name', 'id')->all(),
+            Institution::class => self::institutionOptions(),
             Speaker::class => Speaker::query()
                 ->whereIn('status', ['verified', 'pending'])
                 ->orderBy('name')
@@ -334,5 +334,18 @@ class EventContributionFormSchema
                 ->all(),
             default => [],
         };
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function institutionOptions(): array
+    {
+        return Institution::query()
+            ->whereIn('status', ['verified', 'pending'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'nickname'])
+            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
+            ->all();
     }
 }

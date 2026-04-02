@@ -57,6 +57,7 @@ class ContributionEntityMutationService
     {
         $institution = Institution::create([
             'name' => (string) ($payload['name'] ?? 'Institution'),
+            'nickname' => $this->normalizeOptionalString($payload['nickname'] ?? null),
             'slug' => $this->generateInstitutionSlugAction->handle(
                 (string) ($payload['name'] ?? 'Institution'),
                 is_array($payload['address'] ?? null) ? $payload['address'] : [],
@@ -130,6 +131,9 @@ class ContributionEntityMutationService
     {
         $institution->fill([
             'name' => $payload['name'] ?? $institution->name,
+            'nickname' => array_key_exists('nickname', $payload)
+                ? $this->normalizeOptionalString($payload['nickname'])
+                : $institution->nickname,
             'type' => array_key_exists('type', $payload)
                 ? $this->normalizeInstitutionType($payload['type'])
                 : ($institution->type instanceof BackedEnum ? $institution->type->value : $institution->type),
@@ -197,6 +201,17 @@ class ContributionEntityMutationService
         }
 
         return Gender::Male->value;
+    }
+
+    private function normalizeOptionalString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed !== '' ? $trimmed : null;
     }
 
     /**
@@ -309,6 +324,7 @@ class ContributionEntityMutationService
 
         return [
             'name' => $institution->name,
+            'nickname' => $institution->nickname,
             'type' => $institution->type instanceof BackedEnum ? $institution->type->value : (string) $institution->type,
             'description' => $institution->description,
             'address' => $this->addressState($institution->addressModel),

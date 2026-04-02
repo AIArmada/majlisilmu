@@ -386,13 +386,14 @@ class AccountSettings extends Component implements HasForms
         $search = trim($search);
 
         if ($search !== '') {
-            $query->where('name', $this->databaseLikeOperator(), '%'.$search.'%');
+            $query->searchNameOrNickname($search);
         }
 
         return $query
             ->orderBy('name')
             ->limit(50)
-            ->pluck('name', 'id')
+            ->get(['id', 'name', 'nickname'])
+            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
             ->all();
     }
 
@@ -404,7 +405,10 @@ class AccountSettings extends Component implements HasForms
             return null;
         }
 
-        return Institution::query()->whereKey($institutionId)->value('name');
+        return Institution::query()
+            ->whereKey($institutionId)
+            ->first(['id', 'name', 'nickname'])
+            ?->display_name;
     }
 
     protected function assertPrayerInstitutionSelectionAllowed(?string $selectedInstitutionId, ?string $currentInstitutionId, string $errorKey): void

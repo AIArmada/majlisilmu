@@ -2236,7 +2236,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     protected function availableInstitutionOptions(): array
     {
         if (($institution = $this->scopedInstitution()) instanceof Institution) {
-            return [$institution->id => $institution->name];
+            return [$institution->id => $institution->display_name];
         }
 
         $access = app(EntitySubmissionAccess::class);
@@ -2245,13 +2245,15 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         if (! $submitter instanceof User) {
             return Cache::remember('submit_institutions', 60, fn (): array => $access->institutionQueryForSubmitter(null)
                 ->orderBy('name')
-                ->pluck('name', 'id')
+                ->get(['institutions.id', 'institutions.name', 'institutions.nickname'])
+                ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
                 ->all());
         }
 
         return $access->institutionQueryForSubmitter($submitter)
             ->orderBy('name')
-            ->pluck('name', 'id')
+            ->get(['institutions.id', 'institutions.name', 'institutions.nickname'])
+            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
             ->all();
     }
 

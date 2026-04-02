@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -42,6 +43,7 @@ class Institution extends Model implements AuditableContract, HasMedia
     protected $fillable = [
         'type',
         'name',
+        'nickname',
         'slug',
         'description',
 
@@ -61,6 +63,25 @@ class Institution extends Model implements AuditableContract, HasMedia
             'allow_public_event_submission' => 'boolean',
             'public_submission_locked_at' => 'datetime',
         ];
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return self::formatDisplayName($this->name, $this->nickname);
+    }
+
+    public static function formatDisplayName(?string $name, ?string $nickname): string
+    {
+        $normalizedName = trim((string) $name);
+        $normalizedNickname = is_string($nickname) ? trim($nickname) : '';
+
+        if ($normalizedNickname === '') {
+            return $normalizedName;
+        }
+
+        return $normalizedName === ''
+            ? $normalizedNickname
+            : "{$normalizedName} ({$normalizedNickname})";
     }
 
     /**
@@ -181,5 +202,30 @@ class Institution extends Model implements AuditableContract, HasMedia
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function searchNameOrNickname(Builder $query, string $search): void
+    {
+        $normalizedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
+
+        if ($normalizedSearch === '') {
+            return;
+        }
+
+        $wildcardSearch = '%'.str_replace(' ', '%', $normalizedSearch).'%';
+        $driverName = DB::connection($query->getModel()->getConnectionName())->getDriverName();
+        $operator = $driverName === 'pgsql' ? 'ilike' : 'like';
+
+        $query->where(function (Builder $innerQuery) use ($normalizedSearch, $wildcardSearch, $operator): void {
+            $innerQuery
+                ->where('institutions.name', $operator, "%{$normalizedSearch}%")
+                ->orWhere('institutions.name', $operator, $wildcardSearch)
+                ->orWhere('institutions.nickname', $operator, "%{$normalizedSearch}%")
+                ->orWhere('institutions.nickname', $operator, $wildcardSearch);
+        });
     }
 }

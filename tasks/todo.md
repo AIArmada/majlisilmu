@@ -1,3 +1,52 @@
+# Uncommitted Changes Audit
+
+- [x] Audit the nickname-related worktree changes for regressions or brittle assumptions
+- [x] Fix unrelated failing assertions in institution and contribution feature coverage
+- [x] Eliminate the submit-event and contribution parallel worker memory failures
+- [x] Re-run broader verification across the affected suites and static analysis
+
+## Review
+- Tightened `tests/Feature/InstitutionIndexTest.php` so it seeds the required Malaysia country row before exercising the public institution submission form, and changed the location-scope assertion to target the missing country filter control instead of unrelated shared layout text.
+- Updated `tests/Pest.php` so the shared submit-event helper batches non-upload form state through `fillForm()` and the prayer-time API helper also fakes notification delivery for submit-event feature suites that only assert persistence/validation. This removed the repeated Livewire render churn and mail-render side effects that were exhausting worker memory.
+- Raised the PHPUnit test-process memory limit to `512M` in `phpunit.xml`, which stabilized the heavier Livewire compile and media-upload paths under parallel Pest without changing application behavior.
+- Normalized two unrelated contribution assertions in `tests/Feature/ContributionPagesTest.php`: rich-text descriptions are now asserted as rendered text instead of raw HTML-free strings, and the cover-upload fixture now uses a more robust `1600x900` image for the `16:9` validation path.
+- Fixed `database/seeders/EventSeeder.php` so seeded institution addresses always get a non-null Malaysia fallback `country_id`, which restores `EventSeederSubmitEventCompatibility` under SQLite after the address country column became non-nullable.
+- Verification:
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **16 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **23 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SubmitEventLocationTest.php` => **7 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SubmitEventCaptchaTest.php` => **2 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SubmitEventMediaTest.php` => **2 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SubmitEventNotificationTest.php` => **2 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SubmitEventEndTimeTest.php` => **9 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature --filter='SubmitEvent'` => **61 passed**
+  - `git -c core.quotePath=false diff --name-only -- '*.php' | grep -v '\.blade\.php$' | xargs env XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/phpstan analyse --memory-limit=1G --ansi` => **No errors**
+  - `/opt/homebrew/bin/php vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+
+# Institution Nickname Search Support
+
+- [x] Add optional `nickname` persistence for institutions across database, model fillable state, and contribution create/update flows
+- [x] Expose the nickname field on every shared institution form schema
+- [x] Update frontend institution search/select paths to match nickname and show consistent option labels
+- [x] Add focused regression coverage and run targeted verification
+
+## Review
+- Added [2026_04_02_120000_add_nickname_to_institutions_table.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_04_02_120000_add_nickname_to_institutions_table.php) to persist an optional `nickname` on institutions, and updated [Institution.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Institution.php) with fillable support plus shared `display_name` and `searchNameOrNickname()` helpers.
+- Added the optional nickname field to every shared institution form entry point: [InstitutionForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Institutions/Schemas/InstitutionForm.php), [InstitutionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionFormSchema.php), and [InstitutionContributionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/InstitutionContributionFormSchema.php).
+- Extended institution create/update persistence across the contribution flows in [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php) and [ApproveContributionRequestAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Contributions/ApproveContributionRequestAction.php), so staged creation, approval, and direct maintainer edits all retain `nickname`.
+- Updated frontend institution search/select paths to use nickname-aware matching and labels, including the public institution index, event filters, submit-event form, contribution claim search, dashboard account settings, saved-search labels, quick-create institution selects, and advanced event builder membership options.
+- Verification:
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php --filter='matches institution nicknames on the institution index search'` => **1 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='applies direct institution edits for owner maintainers from the suggest update page'` => **1 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SubmitEventLocationTest.php --filter='includes institution nicknames in submit-event option labels|matches institution nicknames in event filter search options'` => **2 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php --filter='uses rich description and full contact details in the institution quick-create form|stores description and contacts when creating an institution via quick-create|institution contribution form'` => **3 passed**
+  - `XDEBUG_MODE=off /opt/homebrew/bin/php vendor/bin/phpstan analyse --memory-limit=1G --ansi app/Models/Institution.php app/Services/ContributionEntityMutationService.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Events/ResolveAdvancedBuilderMembershipOptionsAction.php app/Filament/Resources/Institutions/Schemas/InstitutionForm.php app/Forms/EventContributionFormSchema.php app/Forms/InstitutionContributionFormSchema.php app/Forms/InstitutionFormSchema.php app/Forms/SpeakerFormSchema.php app/Livewire/Pages/Contributions/Index.php app/Livewire/Pages/Dashboard/AccountSettings.php app/Livewire/Pages/Events/AdvancedFiltersPanel.php app/Livewire/Pages/Events/Index.php app/Livewire/Pages/SavedSearches/Index.php database/factories/InstitutionFactory.php database/migrations/2026_04_02_120000_add_nickname_to_institutions_table.php tests/Feature/ContributionPagesTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/SubmitEventLocationTest.php` => **No errors**
+  - `/opt/homebrew/bin/php vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+  - Constraint / soft-delete hygiene greps returned no matches
+- Verification note: broader full-file runs of `InstitutionIndexTest.php`, `ContributionPagesTest.php`, and `SubmitEventLocationTest.php` still hit unrelated existing failures or test-memory exhaustion outside the nickname assertions. The targeted nickname tests above passed.
+
 # Event Duplication Prefill
 
 - [x] Add a duplicate-event query flow to the submit-event page

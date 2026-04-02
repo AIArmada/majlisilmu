@@ -12,6 +12,26 @@ use Livewire\Livewire;
 
 use function Pest\Laravel\get;
 
+function ensureMalaysiaCountryExists(): int
+{
+    $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
+
+    if (is_int($malaysiaId)) {
+        return $malaysiaId;
+    }
+
+    return DB::table('countries')->insertGetId([
+        'id' => 132,
+        'iso2' => 'MY',
+        'name' => 'Malaysia',
+        'status' => 1,
+        'phone_code' => '60',
+        'iso3' => 'MYS',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+}
+
 it('renders translated hero and search copy on institution index', function () {
     app()->setLocale('ms');
 
@@ -44,6 +64,8 @@ it('redirects guests to login when opening add institution form', function () {
 });
 
 it('allows users to submit a missing institution from institution index with pending status', function () {
+    ensureMalaysiaCountryExists();
+
     $user = User::factory()->create();
     $institutionName = 'Institusi Cadangan Baru';
 
@@ -86,6 +108,24 @@ it('supports fuzzy search with minor institution name typos', function () {
         ->assertSuccessful()
         ->assertSee('Masjid Al Hidayah')
         ->assertDontSee('Pusat Pengajian An-Nur');
+});
+
+it('matches institution nicknames on the institution index search', function () {
+    Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => 'Masjid Biru',
+        'status' => 'verified',
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Masjid Negara',
+        'status' => 'verified',
+    ]);
+
+    get('/institusi?search=Masjid+Biru')
+        ->assertSuccessful()
+        ->assertSee('Masjid Sultan Salahuddin Abdul Aziz Shah')
+        ->assertDontSee('Masjid Negara');
 });
 
 it('keeps multi-word search strict to phrase-relevant institutions', function () {
@@ -246,7 +286,7 @@ it('deduplicates matching district and subdistrict labels on institution cards',
 it('shows location scope controls on institution index without a country selector', function () {
     get('/institusi')
         ->assertSuccessful()
-        ->assertDontSee(__('Country'))
+        ->assertDontSeeHtml('id="institution-country-filter"')
         ->assertSee(__('Semua Negeri'))
         ->assertSee(__('Semua Daerah'))
         ->assertSee(__('Semua Bandar / Mukim / Zon'));

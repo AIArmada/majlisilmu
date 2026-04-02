@@ -37,6 +37,9 @@ class InstitutionForm
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
+                        TextInput::make('nickname')
+                            ->maxLength(255)
+                            ->helperText('Optional nickname, e.g. Masjid Biru'),
                         TextInput::make('slug')
                             ->required(fn (string $operation): bool => $operation !== 'create')
                             ->hidden(fn (string $operation): bool => $operation === 'create')
