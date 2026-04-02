@@ -8,6 +8,10 @@ use App\Models\Reference;
 use App\Models\SlugRedirect;
 use App\Models\Speaker;
 use App\Models\Venue;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -53,8 +57,14 @@ class SlugRedirectsTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->toolbarActions([]);
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
     }
 
     private static function subjectLabel(?Model $model): string
