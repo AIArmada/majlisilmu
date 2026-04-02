@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\DawahShareOutcomeType;
-use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Speaker;
@@ -269,8 +268,12 @@ new class extends Component
     $bioHtml = is_array($speaker->bio)
         ? $bioRenderer->toHtml()
         : $speaker->bio;
-    $isBioFilled = is_array($speaker->bio) ? filled($bioRenderer->toText()) : filled($speaker->bio);
-    $bioExcerpt = $isBioFilled ? Str::limit(strip_tags($bioHtml), 180) : null;
+    $bioText = is_array($speaker->bio)
+        ? trim($bioRenderer->toText())
+        : trim(strip_tags((string) $speaker->bio));
+    $isBioFilled = filled($bioText);
+    $bioExcerpt = $isBioFilled ? Str::limit($bioText, 180) : null;
+    $shouldCollapseBio = Str::length($bioText) > 680;
     $speakerUrl = route('speakers.show', $speaker);
     $shareText = trim($speaker->formatted_name . ' - ' . config('app.name'));
     $shareLinks = app(\App\Services\ShareTrackingService::class)->redirectLinks(
@@ -1203,7 +1206,7 @@ new class extends Component
 
             {{-- ─── BIODATA ─── --}}
             @if($isBioFilled)
-                <section class="scroll-reveal reveal-up revealed" x-data x-intersect.once="$el.classList.add('revealed')">
+                <section class="scroll-reveal reveal-up revealed" x-data="{ bioExpanded: false }" x-intersect.once="$el.classList.add('revealed')">
                     <div class="mb-5 flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/25">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
@@ -1216,11 +1219,40 @@ new class extends Component
                     <div class="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-slate-100/50">
                         {{-- Decorative left accent --}}
                         <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-300"></div>
-                        <div class="p-6 pl-7 md:p-8 md:pl-9">
-                            <div class="prose prose-slate prose-sm max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
-                                {!! $bioHtml !!}
+                        <div class="relative p-6 pl-7 md:p-8 md:pl-9">
+                            <div
+                                @if($shouldCollapseBio)
+                                    :class="bioExpanded ? '' : 'max-h-80 overflow-hidden'"
+                                @endif
+                                class="relative transition-all duration-300 ease-out"
+                            >
+                                <div class="prose prose-slate prose-sm max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-800">
+                                    {!! $bioHtml !!}
+                                </div>
                             </div>
+                            @if($shouldCollapseBio)
+                                <div
+                                    x-show="! bioExpanded"
+                                    x-cloak
+                                    class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white via-white/95 to-transparent"
+                                ></div>
+                            @endif
                         </div>
+                        @if($shouldCollapseBio)
+                            <div class="border-t border-slate-100 px-6 py-4 md:px-8">
+                                <button
+                                    type="button"
+                                    @click="bioExpanded = ! bioExpanded"
+                                    :aria-expanded="bioExpanded.toString()"
+                                    class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                                >
+                                    <svg class="h-4 w-4 transition-transform duration-200" :class="bioExpanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                    <span x-text="bioExpanded ? @js(__('Sembunyikan biodata')) : @js(__('Lihat biodata penuh'))"></span>
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 </section>
             @endif

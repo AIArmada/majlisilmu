@@ -7308,3 +7308,16 @@
   - `vendor/bin/phpstan analyse --ansi app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php tests/Feature/EventActionsTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/SubmitEventEntityAccessTest.php` => **No errors**
   - `vendor/bin/pint --test app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php tests/Feature/EventActionsTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/SubmitEventEntityAccessTest.php` => **pass**
   - `git diff --check -- app/Actions/Events/SyncEventResourceRelationsAction.php app/Actions/Events/ResolveAdvancedBuilderContextAction.php resources/views/components/pages/submit-event/create.blade.php tests/Feature/EventActionsTest.php tests/Feature/AdvancedEventCreationTest.php tests/Feature/SubmitEventEntityAccessTest.php tasks/todo.md` => **No diff formatting issues**
+
+# Speaker Biodata Collapse And Upcoming Counts
+
+- [ ] Inspect the public speaker index and show-page data paths for event counts and biodata rendering
+- [ ] Make `/penceramah` card counts include only upcoming public events
+- [ ] Collapse long speaker biodata by default and add a reveal control on `/penceramah/*`
+- [ ] Add focused regressions for the new speaker count and biodata UI behavior
+- [ ] Verify with targeted Pest coverage and formatting checks
+
+## Review
+- Root cause:
+- Fix:
+- Verification:
