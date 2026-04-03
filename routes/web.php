@@ -26,6 +26,7 @@ use App\Livewire\Pages\MembershipClaims\Create as CreateMembershipClaimPage;
 use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
+use App\Livewire\Pages\Search\Index as SearchIndex;
 use Illuminate\Support\Facades\Route;
 
 Route::livewire('/', 'pages.⚡home')->name('home');
@@ -52,6 +53,9 @@ Route::get('/kongsi/{provider}', [DawahShareController::class, 'redirect'])
 // Authentication is handled by Fortify
 
 // Events (with search rate limiting)
+Route::livewire('/carian', SearchIndex::class)
+    ->middleware('throttle:search')
+    ->name('search.index');
 Route::livewire('/majlis', 'pages.events.index')
     ->middleware('throttle:search')
     ->name('events.index');
@@ -140,6 +144,7 @@ Route::get('/peta-laman-penceramah.xml', [SitemapController::class, 'speakers'])
 // Legacy URI aliases (temporary backward compatibility)
 Route::get('/locale/{locale}', LocaleController::class);
 Route::get('/market/{market}', PublicMarketController::class);
+Route::livewire('/search', SearchIndex::class)->middleware('throttle:search');
 Route::livewire('/events', 'pages.events.index')->middleware('throttle:search');
 Route::livewire('/events/{event:slug}', 'pages.events.show')->middleware(ResolvePublicSlugRedirect::class);
 Route::get('/events/{event:slug}/calendar.ics', [EventsController::class, 'calendar'])->middleware(ResolvePublicSlugRedirect::class);

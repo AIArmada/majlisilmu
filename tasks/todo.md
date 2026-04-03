@@ -1,3 +1,200 @@
+# Admin Route Shape Cleanup
+
+- [x] Remove the redundant `/api` segment from the API-docs host paths so the docs live directly on the `api` subdomain
+- [x] Flatten the admin API from Filament-flavored `resources/.../records` routes into direct collection/item endpoints
+- [x] Update admin route metadata, docs references, and focused test coverage to the new public contract
+- [x] Verify route registration, docs exposure, admin API behavior, static analysis, and diff hygiene
+
+## Review
+
+- Changed the docs host routes in [ApiDocumentationServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/ApiDocumentationServiceProvider.php) from `api.majlisilmu.test/docs/api` and `api.majlisilmu.test/docs/api.json` to the cleaner `api.majlisilmu.test/docs` and `api.majlisilmu.test/docs.json`, then aligned the Scramble config comment/export default in [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php).
+- Flattened the admin API in [routes/api.php](/Users/Saiffil/Herd/majlisilmu/routes/api.php) from `resources/{resourceKey}/records` into direct collection and item endpoints: `GET/POST /api/v1/admin/{resourceKey}`, `GET /api/v1/admin/{resourceKey}/meta`, `GET /api/v1/admin/{resourceKey}/schema`, and `GET/PUT /api/v1/admin/{resourceKey}/{recordKey}`.
+- Updated the generated admin route metadata in [AdminResourceRegistry.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceRegistry.php) and the mutation contract endpoints in [AdminResourceMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceMutationService.php) so clients now receive `collection`, `meta`, `schema`, `store`, `item_template`, and `update_template` URLs that match the new route shape.
+- Rewrote the focused contract coverage in [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php), [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php), and [MAJLISILMU_MOBILE_API_REFERENCE.md](/Users/Saiffil/Herd/majlisilmu/docs/MAJLISILMU_MOBILE_API_REFERENCE.md) so the in-repo docs and generated OpenAPI now reflect the cleaned-up paths.
+- Verification:
+  - `php artisan route:list --path=api/v1/admin --except-vendor` => **7 admin routes** with flattened collection/item paths
+  - `php artisan route:list --path=docs --except-vendor` => **2 docs routes** at `api.majlisilmu.test/docs` and `api.majlisilmu.test/docs.json`
+  - `vendor/bin/pest --parallel tests/Feature/Api/Admin/AdminApiTest.php` => **6 passed**, 49 assertions
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php` => **5 passed**, 22 assertions
+  - `vendor/bin/phpstan analyse --ansi routes/api.php app/Providers/ApiDocumentationServiceProvider.php app/Support/Api/Admin/AdminResourceRegistry.php app/Support/Api/Admin/AdminResourceMutationService.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `git diff --check` => **clean**
+
+# Admin API Write Cleanup
+
+- [x] Align admin API and docs access with the actual Filament admin panel access gate
+- [x] Extract shared speaker/institution save actions so Filament pages and the admin API use the same write path
+- [x] Add supported admin resource schema and write endpoints for speakers and institutions
+- [x] Verify focused admin API behavior, docs exposure, static analysis, and diff hygiene
+
+## Review
+
+- Aligned [EnsureAdminApiAccess.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Middleware/EnsureAdminApiAccess.php) and [ApiDocumentationServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/ApiDocumentationServiceProvider.php) with the actual Filament admin-panel access rule by switching from a hard-coded `super_admin`/`admin`/`moderator` list to `hasApplicationAdminAccess()`, so `viewer` and `editor` style global admin-panel roles no longer get blocked by the API/docs layer when the panel itself allows them in.
+- Extracted shared admin save orchestration into [SaveInstitutionAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Institutions/SaveInstitutionAction.php) and [SaveSpeakerAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Speakers/SaveSpeakerAction.php), then rewired the Filament create/edit pages in [CreateInstitution.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Institutions/Pages/CreateInstitution.php), [EditInstitution.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Institutions/Pages/EditInstitution.php), [CreateSpeaker.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Speakers/Pages/CreateSpeaker.php), and [EditSpeaker.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Speakers/Pages/EditSpeaker.php) to use those same actions.
+- Added generic-but-supported admin write discovery and mutation routes in [routes/api.php](/Users/Saiffil/Herd/majlisilmu/routes/api.php) plus the contract/mutation coordinator in [AdminResourceMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceMutationService.php). The API now exposes schema discovery plus `POST`/`PUT` write support for `speakers` and `institutions`, while the shared resource metadata from [AdminResourceRegistry.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceRegistry.php) advertises which resources actually support schema/store/update.
+- Kept media handling reusable by extracting [ModelMediaSyncService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Media/ModelMediaSyncService.php) and having the earlier frontend-only media helper inherit from it, so admin and client write paths now share the same single-file/multi-file media sync behavior.
+- Updated [MAJLISILMU_MOBILE_API_REFERENCE.md](/Users/Saiffil/Herd/majlisilmu/docs/MAJLISILMU_MOBILE_API_REFERENCE.md) and the focused test coverage in [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) and [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php) so the documented admin surface matches the actual supported write resources and docs tags.
+- Verification:
+  - `php artisan route:list --path=api/v1/admin --except-vendor` => **7 admin API routes registered**
+  - `vendor/bin/pest --parallel tests/Feature/Api/Admin/AdminApiTest.php` => **6 passed**, 49 assertions
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php` => **5 passed**, 22 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Institutions/SaveInstitutionAction.php app/Actions/Speakers/SaveSpeakerAction.php app/Support/Media/ModelMediaSyncService.php app/Support/Api/Frontend/FrontendMediaSyncService.php app/Support/Api/Admin/AdminResourceMutationService.php app/Support/Api/Admin/AdminResourceRegistry.php app/Http/Controllers/Api/Admin/ResourceController.php app/Filament/Resources/Institutions/Pages/CreateInstitution.php app/Filament/Resources/Institutions/Pages/EditInstitution.php app/Filament/Resources/Speakers/Pages/CreateSpeaker.php app/Filament/Resources/Speakers/Pages/EditSpeaker.php app/Providers/ApiDocumentationServiceProvider.php app/Http/Middleware/EnsureAdminApiAccess.php routes/api.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+
+# Public Entity Docs And Admin API Foundation
+
+- [x] Promote the remaining public entity endpoints to explicit docs groups in Scramble
+- [x] Add an admin API manifest and resource-record browsing surface aligned to Filament resources
+- [x] Verify docs output, focused admin API coverage, static analysis, and diff hygiene
+
+## Review
+
+- Promoted the public directory/detail endpoints in [SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php) into explicit Scramble groups for `Institution`, `Speaker`, `Venue`, `Reference`, and `Series`, so those APIs now appear as first-class sections in the generated docs instead of being buried under the generic `Search` tag.
+- Added an initial admin API foundation under `/api/v1/admin` in [routes/api.php](/Users/Saiffil/Herd/majlisilmu/routes/api.php), guarded by [EnsureAdminApiAccess.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Middleware/EnsureAdminApiAccess.php), with controllers in [app/Http/Controllers/Api/Admin](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Admin) and Filament-aware resource discovery/serialization in [AdminResourceRegistry.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceRegistry.php).
+- The current admin surface is intentionally Filament-aligned at the resource and record layer: manifest discovery, per-resource metadata, paginated record browsing, record detail, and per-record ability payloads. It does not yet claim full create/edit/delete parity for every complex Filament page workflow.
+- Documented the admin foundation in [MAJLISILMU_MOBILE_API_REFERENCE.md](/Users/Saiffil/Herd/majlisilmu/docs/MAJLISILMU_MOBILE_API_REFERENCE.md) and expanded [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php) plus [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) to lock in both docs discoverability and admin-route behavior.
+- Verification:
+  - `php artisan route:list --path=api/v1/admin --except-vendor` => **4 admin API routes registered**
+  - `vendor/bin/pest --parallel tests/Feature/Api/Admin/AdminApiTest.php` => **3 passed**, 19 assertions
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php` => **5 passed**, 19 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Http/Middleware/EnsureAdminApiAccess.php app/Support/Api/Admin/AdminResourceRegistry.php app/Http/Controllers/Api/Admin app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/ScrambleDocsTest.php routes/api.php` => **No errors**
+  - Chrome DevTools browser snapshot at `https://api.majlisilmu.test/docs/api` => UI now exposes `Institution`, `Speaker`, `Venue`, `Reference`, `Series`, `Admin Manifest`, and `Admin Resource` as top-level sections
+  - `git diff --check` => **clean**
+
+# Scramble API Docs Integration
+
+- [x] Install and configure Scramble for the `/api/v1` surface
+- [x] Expose the docs UI and generated OpenAPI JSON only on `api.majlisilmu.test`
+- [x] Verify route registration, focused docs coverage, static analysis, and diff hygiene
+
+## Review
+
+- Installed `dedoc/scramble`, published [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php), and set the generated API surface to the canonical `/api/v1` path with `api.majlisilmu.test` as the documented server/domain.
+- Added [ApiDocumentationServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/ApiDocumentationServiceProvider.php) and registered it in [bootstrap/providers.php](/Users/Saiffil/Herd/majlisilmu/bootstrap/providers.php) so the docs UI and OpenAPI JSON are exposed only on `api.majlisilmu.test`, protected by Scramble's middleware/gate behavior, and filtered to the real `/api/v1` routes.
+- Promoted the speaker list/detail operations to a dedicated `Speaker` docs group in [SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php), so speaker APIs are visible as their own section in the generated reference instead of being buried under the generic `Search` tag.
+- Added focused coverage in [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php), documented the local docs endpoints in [MAJLISILMU_MOBILE_API_REFERENCE.md](/Users/Saiffil/Herd/majlisilmu/docs/MAJLISILMU_MOBILE_API_REFERENCE.md), and surfaced the new environment variables in [.env.example](/Users/Saiffil/Herd/majlisilmu/.env.example).
+- Verification:
+  - `php artisan route:list --path=docs/api --except-vendor` => `api.majlisilmu.test/docs/api` and `api.majlisilmu.test/docs/api.json` registered
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php` => **3 passed**, 8 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Providers/ApiDocumentationServiceProvider.php tests/Feature/ScrambleDocsTest.php bootstrap/providers.php` => **No errors**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `git diff --check` => **clean**
+  - Chrome DevTools browser snapshot at `https://api.majlisilmu.test/docs/api` => UI loads as **Majlis Ilmu API**, shows `https://api.majlisilmu.test/api/v1` as the base server URL, and now exposes `Speaker` as a top-level endpoint section
+  - `curl -sk --max-time 10 https://api.majlisilmu.test/...` => timed out in this shell environment, so shell HTTPS reachability here is weaker than the in-app/browser proof
+
+# Swagger Docs Package Study
+
+- [x] Inspect the current API architecture and domain/routing setup relevant to API docs hosting
+- [x] Study `wotzebra/laravel-swagger-ui` upstream maintenance, compatibility, and integration model
+- [x] Decide package fit for this repo and identify the recommended documentation path
+
+## Review
+
+- `wotzebra/laravel-swagger-ui` is currently maintained and Laravel 13 compatible, so it is a viable Swagger UI package in isolation.
+- It is not the best first integration for this repo because it is a UI host for an existing OpenAPI JSON/YAML file, while this codebase still treats OpenAPI as unfinished work and does not yet contain a generated or maintained OpenAPI source of truth.
+- Its installer assumes the older Laravel provider-registration flow and a `RouteServiceProvider` entry in `config/app.php`, while this app uses the Laravel 13 `bootstrap/app.php` routing style. Integration here would need a manual install path rather than the package’s normal scaffolding command.
+- Its routes are path-based, not domain-scoped. Serving docs only from `api.majlisilmu.test` is possible, but it would require app-level host enforcement or a dedicated host setup rather than just package config.
+- Recommendation: do not integrate `wotzebra/laravel-swagger-ui` as the first docs package for this repo. Use a generation-first package such as `dedoc/scramble`, then scope the docs host to `api.majlisilmu.test`.
+
+# API Namespace Rename
+
+- [x] Remove the `/frontend` API path segment and rename the route namespace
+- [x] Update all generated contract URLs, tests, and docs to the new canonical API shape
+- [x] Re-verify routing, focused Pest coverage, PHPStan, and diff hygiene
+
+## Review
+
+- Flattened the client-parity API onto the canonical `/api/v1/...` surface by removing the extra `/frontend` path segment in [routes/api.php](/Users/Saiffil/Herd/majlisilmu/routes/api.php) and renaming the internal route namespace from `api.frontend.*` to `api.client.*`.
+- Updated generated contract URLs, follow/templates, advanced-event next-step links, and the parity test suite so every route helper now points at the renamed client namespace without compatibility aliases.
+- Updated the mobile API reference to document the canonical `/api/v1/...` paths directly instead of the old `/api/v1/frontend/...` shim shape.
+- Verification:
+  - `php artisan route:list --path=api/v1 --except-vendor` => client endpoints now register directly under `/api/v1/...`
+  - `vendor/bin/pest --parallel tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 10 passed, 66 assertions
+  - `vendor/bin/phpstan analyse --ansi routes/api.php app/Http/Controllers/Api/Frontend/AdvancedEventController.php app/Support/Api/Frontend/FrontendFormContractService.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => no errors
+  - `git diff --check` => clean
+
+# Uncommitted Change Audit And Fix
+
+- [x] Review the full uncommitted diff for behavioral regressions, contract drift, and authorization issues
+- [x] Fix concrete issues found in the changed frontend, API, search, and shared action code
+- [x] Re-verify with focused Pest coverage, PHPStan, and diff hygiene checks
+
+## Review
+
+- Fixed frontend API manifest drift in `FrontendFormContractService` so the exposed endpoint templates now point at the real submission routes for contribution updates, membership claims, and follows, while preserving separate schema endpoints for clients that need form metadata.
+- Corrected submit-event contract metadata so `submitter_email` is no longer falsely marked as always required for guests; runtime behavior remains the intended "email or phone" requirement.
+- Hardened `SubmitFrontendEventAction` with shared conditional validation for organizer-specific fields, online/hybrid live URLs, and physical location requirements so API callers cannot bypass frontend-only rules.
+- Authorization audit: the new institution workspace endpoints match the current application permission model. Institution member roles are still scoped by subject type rather than by individual institution, and the API preserves that existing behavior instead of widening access.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 10 passed, 66 assertions
+  - `vendor/bin/pest --parallel tests/Feature/UnifiedSearchPageTest.php` => 3 passed, 12 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Services/EventSearchService.php app/Models/Institution.php app/Livewire/Pages/Search app/Http/Controllers/Api/Frontend app/Support/Api tests/Feature/UnifiedSearchPageTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => no errors
+  - `git diff --check` => clean
+
+# Frontend API Parity Audit
+
+- [x] Inventory every frontend query and submission flow that matters for public and authenticated users
+- [x] Audit each flow for required, optional, default, and derived state, including guest vs authenticated differences
+- [x] Audit each flow for role, membership, policy, and public-submission-lock parity
+- [x] Define a mobile/agent-facing API contract that mirrors the audited frontend behavior
+- [x] Implement missing query endpoints needed for frontend parity
+- [x] Implement missing submission endpoints needed for frontend parity
+- [x] Expose schema/metadata endpoints for forms and option lookups so native clients and agents can drive flows safely
+- [x] Add parity tests that compare API behavior against existing frontend rules for validation and authorization
+- [x] Update the mobile API documentation with the expanded contract and authz notes
+- [x] Run verification: focused Pest coverage, PHPStan, and repo hygiene checks
+
+## Review
+
+- Added a dedicated client-facing parity API surface directly under `/api/v1` with manifest, schema, catalog, search/detail, submission, account, contribution, membership-claim, follow, advanced-event, and institution-workspace endpoints so native clients and agents can drive the same flows as the existing web client.
+- Extracted submit-event orchestration into `SubmitFrontendEventAction`, then reused it from both the Volt page and the new API controller so guest/authenticated validation, defaults, derived state, moderation, and relationship syncing now stay in one path.
+- Verified role and permission parity against the existing frontend rules, including workspace member-management checks, contribution review ownership, membership-claim permissions, and public-submission-lock behavior. Current institution-member roles remain scoped by subject type rather than by individual institution, and the API intentionally matches that existing application behavior.
+- Fixed public detail API drift so speaker, venue, and reference payloads now use the same media collections and public-contact/social visibility rules as the frontend pages, and renamed the public API route parameters to bypass the app-wide public-slug route binders that were swallowing these endpoints.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 8 passed, 54 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/SubmitFrontendEventAction.php app/Http/Controllers/Api/Frontend app/Support/Api` => no errors
+  - `git diff --check` => clean
+
+# Unified Search Crash Fix
+
+- [x] Confirm the real local database schema state for the new institution nickname search path
+- [x] Apply the missing nickname migration and add a narrow compatibility guard in institution search
+- [x] Re-verify `/carian` with runtime checks, tests, and static analysis
+
+## Review
+
+- Confirmed the real local PostgreSQL database had not applied [2026_04_02_120000_add_nickname_to_institutions_table.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_04_02_120000_add_nickname_to_institutions_table.php): `php artisan migrate:status --ansi` showed it as **Pending**, and `Schema::hasColumn('institutions', 'nickname')` returned `false`.
+- Applied the missing migration on the real database with `php artisan migrate --ansi`, and then rechecked that `Schema::hasColumn('institutions', 'nickname')` returned `true`.
+- Hardened [Institution.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Institution.php) so `searchNameOrNickname()` now checks cached schema metadata before referencing `institutions.nickname`, which prevents this scope from hard-crashing during temporary app/schema skew.
+- Runtime verification fallback: Chrome MCP is not available in this session, so verification used the live local app over HTTPS instead. `curl -sk "https://majlisilmu.test/carian?search=masjid%20biru"` returned **200** and rendered the institutions section successfully.
+- Verification:
+  - `php artisan migrate --ansi` => **nickname migration applied**
+  - `php artisan tinker --execute="dump(\Illuminate\Support\Facades\Schema::hasColumn('institutions', 'nickname'));"` => **true**
+  - `curl -sk "https://majlisilmu.test/carian?search=masjid%20biru"` => **200**
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php --filter='matches institution nicknames on the institution index search'` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Institution.php app/Livewire/Pages/Search/Index.php app/Services/EventSearchService.php tests/Feature/UnifiedSearchPageTest.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+
+# Frontpage Unified Search
+
+- [x] Audit the current homepage search flow and define the replacement UX for cross-entity results
+- [x] Add a dedicated public search page that returns grouped matches for events, speakers, and institutions
+- [x] Repoint the homepage hero form to the unified search route while preserving nearby-search parameters for event matches
+- [x] Add focused regression coverage and rerun verification
+
+## Review
+
+- Added a dedicated unified public search route in [web.php](/Users/Saiffil/Herd/majlisilmu/routes/web.php) and a new Livewire page in [Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Search/Index.php) with its view in [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/search/index.blade.php). The new `/carian` page groups matches for majlis, penceramah, and institusi instead of redirecting broad homepage searches into the title-only `/majlis` listing.
+- Extended [EventSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/EventSearchService.php) with a geo-plus-query path so homepage nearby searches still land on relevant nearby majlis results when the new unified search page receives `lat` and `lng`.
+- Updated the homepage hero form in [⚡home.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/⚡home.blade.php) to submit into the unified search route and tightened the placeholder copy so the visible promise now matches the actual search scope.
+- Added focused UI copy coverage in [ms.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms.json) and [ms_MY.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms_MY.json) for the new search surface.
+- Added regression coverage in [UnifiedSearchPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/UnifiedSearchPageTest.php) for the homepage form target, grouped entity results, and the nearby-events flow.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **3 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Search/Index.php app/Services/EventSearchService.php tests/Feature/UnifiedSearchPageTest.php routes/web.php` => **No errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `git diff --check` => **clean**
+
 # Slug Redirect Resource CRUD
 
 - [x] Audit the current slug redirect Filament resource to identify why it was view-only

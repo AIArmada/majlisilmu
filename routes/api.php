@@ -1,5 +1,9 @@
 <?php
 
+use App\Enums\ContributionSubjectType;
+use App\Enums\MemberSubjectType;
+use App\Http\Controllers\Api\Admin\ManifestController as AdminManifestController;
+use App\Http\Controllers\Api\Admin\ResourceController as AdminResourceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EventCheckInController;
 use App\Http\Controllers\Api\EventController;
@@ -9,10 +13,21 @@ use App\Http\Controllers\Api\EventSaveController;
 use App\Http\Controllers\Api\NotificationDestinationController;
 use App\Http\Controllers\Api\NotificationMessageController;
 use App\Http\Controllers\Api\NotificationSettingsController;
+use App\Http\Controllers\Api\Frontend\AccountSettingsController;
+use App\Http\Controllers\Api\Frontend\AdvancedEventController;
+use App\Http\Controllers\Api\Frontend\CatalogController;
+use App\Http\Controllers\Api\Frontend\ContributionController;
+use App\Http\Controllers\Api\Frontend\EventSubmissionController;
+use App\Http\Controllers\Api\Frontend\FollowController;
+use App\Http\Controllers\Api\Frontend\InstitutionWorkspaceController;
+use App\Http\Controllers\Api\Frontend\ManifestController;
+use App\Http\Controllers\Api\Frontend\MembershipClaimController;
+use App\Http\Controllers\Api\Frontend\SearchController;
 use App\Http\Controllers\Api\RegistrationExportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
 use App\Http\Controllers\Api\UserRegistrationController;
+use App\Http\Middleware\EnsureAdminApiAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +37,44 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.auth.forgot-password');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
+
+    Route::name('api.client.')->group(function () {
+        Route::get('/manifest', [ManifestController::class, 'manifest'])->name('manifest');
+
+        Route::prefix('forms')->name('forms.')->group(function () {
+            Route::get('/submit-event', [ManifestController::class, 'submitEvent'])->name('submit-event');
+            Route::get('/contributions/institutions', [ManifestController::class, 'submitInstitution'])->name('contributions.institutions');
+            Route::get('/contributions/speakers', [ManifestController::class, 'submitSpeaker'])->name('contributions.speakers');
+        });
+
+        Route::prefix('catalogs')->name('catalogs.')->group(function () {
+            Route::get('/countries', [CatalogController::class, 'countries'])->name('countries');
+            Route::get('/states', [CatalogController::class, 'states'])->name('states');
+            Route::get('/districts', [CatalogController::class, 'districts'])->name('districts');
+            Route::get('/subdistricts', [CatalogController::class, 'subdistricts'])->name('subdistricts');
+            Route::get('/languages', [CatalogController::class, 'languages'])->name('languages');
+            Route::get('/tags/{type}', [CatalogController::class, 'tags'])->name('tags');
+            Route::get('/references', [CatalogController::class, 'references'])->name('references');
+            Route::get('/submit-institutions', [CatalogController::class, 'submitInstitutions'])->name('submit-institutions');
+            Route::get('/submit-speakers', [CatalogController::class, 'submitSpeakers'])->name('submit-speakers');
+            Route::get('/venues', [CatalogController::class, 'venues'])->name('venues');
+            Route::get('/spaces', [CatalogController::class, 'spaces'])->name('spaces');
+            Route::get('/membership-claim-subjects/{subjectType}', [CatalogController::class, 'membershipClaimSubjects'])
+                ->whereIn('subjectType', MemberSubjectType::claimableRouteSegments())
+                ->name('membership-claim-subjects');
+            Route::get('/prayer-institutions', [CatalogController::class, 'prayerInstitutions'])->name('prayer-institutions');
+        });
+
+        Route::get('/search', [SearchController::class, 'search'])->name('search.index');
+        Route::get('/institutions', [SearchController::class, 'institutions'])->name('institutions.index');
+        Route::get('/institutions/{institutionKey}', [SearchController::class, 'showInstitution'])->name('institutions.show');
+        Route::get('/speakers', [SearchController::class, 'speakers'])->name('speakers.index');
+        Route::get('/speakers/{speakerKey}', [SearchController::class, 'showSpeaker'])->name('speakers.show');
+        Route::get('/venues/{venueKey}', [SearchController::class, 'showVenue'])->name('venues.show');
+        Route::get('/references/{referenceKey}', [SearchController::class, 'showReference'])->name('references.show');
+        Route::get('/series/{series}', [SearchController::class, 'showSeries'])->name('series.show');
+        Route::post('/submit-event', [EventSubmissionController::class, 'store'])->name('submit-event.store');
+    });
 
     // Events API with query builder
     Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
@@ -33,9 +86,77 @@ Route::prefix('v1')->group(function () {
 
 // Authenticated API endpoints
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::prefix('admin')
+        ->middleware(EnsureAdminApiAccess::class)
+        ->name('api.admin.')
+        ->group(function (): void {
+            Route::get('/manifest', AdminManifestController::class)->name('manifest');
+            Route::get('/{resourceKey}', [AdminResourceController::class, 'indexRecords'])->name('resources.index');
+            Route::post('/{resourceKey}', [AdminResourceController::class, 'storeRecord'])->name('resources.store');
+            Route::get('/{resourceKey}/meta', [AdminResourceController::class, 'show'])->name('resources.meta');
+            Route::get('/{resourceKey}/schema', [AdminResourceController::class, 'schema'])->name('resources.schema');
+            Route::get('/{resourceKey}/{recordKey}', [AdminResourceController::class, 'showRecord'])->name('resources.show');
+            Route::put('/{resourceKey}/{recordKey}', [AdminResourceController::class, 'updateRecord'])->name('resources.update');
+        });
+
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::post('/auth/email/verification-notification', [AuthController::class, 'resendVerificationEmail'])
         ->name('api.auth.verification-notification');
+
+    Route::name('api.client.')->group(function () {
+        Route::prefix('forms')->name('forms.')->group(function () {
+            Route::get('/report', [ManifestController::class, 'report'])->name('report');
+            Route::get('/account-settings', [ManifestController::class, 'accountSettings'])->name('account-settings');
+            Route::get('/advanced-events', [ManifestController::class, 'advancedEvent'])->name('advanced-events');
+            Route::get('/institution-workspace', [ManifestController::class, 'institutionWorkspace'])->name('institution-workspace');
+            Route::get('/membership-claims/{subjectType}', [ManifestController::class, 'membershipClaim'])
+                ->whereIn('subjectType', MemberSubjectType::claimableRouteSegments())
+                ->name('membership-claims');
+            Route::get('/contributions/{subjectType}/{subject}/suggest', [ContributionController::class, 'suggestContext'])
+                ->whereIn('subjectType', ContributionSubjectType::publicRouteSegments())
+                ->name('contributions.suggest');
+        });
+
+        Route::prefix('catalogs')->name('catalogs.')->group(function () {
+            Route::get('/institution-roles', [CatalogController::class, 'institutionRoles'])->name('institution-roles');
+        });
+
+        Route::get('/account-settings', [AccountSettingsController::class, 'show'])->name('account-settings.show');
+        Route::put('/account-settings', [AccountSettingsController::class, 'update'])->name('account-settings.update');
+
+        Route::get('/contributions', [ContributionController::class, 'index'])->name('contributions.index');
+        Route::post('/contributions/institutions', [ContributionController::class, 'storeInstitution'])->name('contributions.institutions.store');
+        Route::post('/contributions/speakers', [ContributionController::class, 'storeSpeaker'])->name('contributions.speakers.store');
+        Route::post('/contributions/{subjectType}/{subject}/suggest', [ContributionController::class, 'suggestUpdate'])
+            ->whereIn('subjectType', ContributionSubjectType::publicRouteSegments())
+            ->name('contributions.suggest.store');
+        Route::post('/contributions/{requestId}/approve', [ContributionController::class, 'approve'])->name('contributions.approve');
+        Route::post('/contributions/{requestId}/reject', [ContributionController::class, 'reject'])->name('contributions.reject');
+        Route::post('/contributions/{requestId}/cancel', [ContributionController::class, 'cancel'])->name('contributions.cancel');
+
+        Route::get('/membership-claims', [MembershipClaimController::class, 'index'])->name('membership-claims.index');
+        Route::post('/membership-claims/{subjectType}/{subject}', [MembershipClaimController::class, 'store'])
+            ->whereIn('subjectType', MemberSubjectType::claimableRouteSegments())
+            ->name('membership-claims.store');
+        Route::delete('/membership-claims/{claimId}', [MembershipClaimController::class, 'cancel'])->name('membership-claims.cancel');
+
+        Route::post('/advanced-events', [AdvancedEventController::class, 'store'])->name('advanced-events.store');
+
+        Route::get('/follows/{type}/{subject}', [FollowController::class, 'show'])
+            ->whereIn('type', ['institution', 'speaker', 'reference', 'series'])
+            ->name('follows.show');
+        Route::post('/follows/{type}/{subject}', [FollowController::class, 'store'])
+            ->whereIn('type', ['institution', 'speaker', 'reference', 'series'])
+            ->name('follows.store');
+        Route::delete('/follows/{type}/{subject}', [FollowController::class, 'destroy'])
+            ->whereIn('type', ['institution', 'speaker', 'reference', 'series'])
+            ->name('follows.destroy');
+
+        Route::get('/institution-workspace', [InstitutionWorkspaceController::class, 'show'])->name('institution-workspace.show');
+        Route::post('/institution-workspace/{institutionId}/members', [InstitutionWorkspaceController::class, 'addMember'])->name('institution-workspace.members.store');
+        Route::put('/institution-workspace/{institutionId}/members/{memberId}', [InstitutionWorkspaceController::class, 'updateMemberRole'])->name('institution-workspace.members.update');
+        Route::delete('/institution-workspace/{institutionId}/members/{memberId}', [InstitutionWorkspaceController::class, 'removeMember'])->name('institution-workspace.members.destroy');
+    });
 
     // Reports (per documentation B5b) - Rate limited
     Route::post('/reports', [ReportController::class, 'store'])

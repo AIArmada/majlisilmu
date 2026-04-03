@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\Institutions\Pages;
 
-use App\Actions\Institutions\GenerateInstitutionSlugAction;
+use App\Actions\Institutions\SaveInstitutionAction;
 use App\Filament\Resources\Institutions\InstitutionResource;
+use App\Models\User;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,9 +18,16 @@ class CreateInstitution extends CreateRecord
     #[\Override]
     protected function handleRecordCreation(array $data): Model
     {
-        $address = is_array($this->data['address'] ?? null) ? $this->data['address'] : [];
-        $data['slug'] = app(GenerateInstitutionSlugAction::class)->handle((string) ($data['name'] ?? 'Institution'), $address);
+        $user = auth()->user();
 
-        return parent::handleRecordCreation($data);
+        if (! $user instanceof User) {
+            abort(403);
+        }
+
+        return app(SaveInstitutionAction::class)->handle(
+            $data,
+            $user,
+            validationErrorKey: 'data.allow_public_event_submission',
+        );
     }
 }

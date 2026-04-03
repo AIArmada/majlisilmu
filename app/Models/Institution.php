@@ -223,7 +223,8 @@ class Institution extends Model implements AuditableContract, HasMedia
         $query->where(function (Builder $innerQuery) use ($normalizedSearch, $wildcardSearch, $operator): void {
             $innerQuery
                 ->where('institutions.name', $operator, "%{$normalizedSearch}%")
-                ->orWhere('institutions.name', $operator, $wildcardSearch)
+                ->orWhere('institutions.name', $operator, $wildcardSearch);
+            $innerQuery
                 ->orWhere('institutions.nickname', $operator, "%{$normalizedSearch}%")
                 ->orWhere('institutions.nickname', $operator, $wildcardSearch);
         });

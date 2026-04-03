@@ -2,16 +2,15 @@
 
 namespace App\Filament\Resources\Speakers\Pages;
 
+use App\Actions\Speakers\SaveSpeakerAction;
 use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Speaker;
 use App\Models\User;
-use App\Support\Submission\PublicSubmissionLockService;
 use App\Support\Submission\PublicSubmissionUiEvents;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Nnjeim\World\Models\Language;
 
@@ -41,46 +40,21 @@ class EditSpeaker extends EditRecord
         return $data;
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
     #[\Override]
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function handleRecordUpdate(Model $record, array $data): Model
     {
         $actor = $this->currentUser();
 
-        if (! $actor instanceof User) {
+        if (! $actor instanceof User || ! $record instanceof Speaker) {
             abort(403);
         }
 
-        $speaker = $this->speakerRecord();
-        $requestedPublicSubmission = (bool) ($data['allow_public_event_submission'] ?? $speaker->allow_public_event_submission);
-        $currentPublicSubmission = (bool) $speaker->allow_public_event_submission;
-
-        if ($requestedPublicSubmission === $currentPublicSubmission) {
-            return $data;
-        }
-
-        $lockService = app(PublicSubmissionLockService::class);
-
-        if ($requestedPublicSubmission) {
-            $lockService->unlockSpeaker($speaker, $actor);
-
-            return $data;
-        }
-
-        $eligibility = $lockService->speakerEligibility($speaker);
-
-        if (! $eligibility->eligible) {
-            throw ValidationException::withMessages([
-                'data.allow_public_event_submission' => $eligibility->reasons,
-            ]);
-        }
-
-        $lockService->lockSpeaker($speaker, $actor);
-
-        return $data;
+        return app(SaveSpeakerAction::class)->handle(
+            $data,
+            $actor,
+            $record,
+            'data.allow_public_event_submission',
+        );
     }
 
     protected function afterSave(): void
