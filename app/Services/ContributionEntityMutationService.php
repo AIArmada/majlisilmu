@@ -435,7 +435,7 @@ class ContributionEntityMutationService
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function syncInstitutionRelations(Institution $institution, array $payload): void
+    public function syncInstitutionRelations(Institution $institution, array $payload): void
     {
         if (array_key_exists('address', $payload)) {
             $this->syncAddress($institution, $payload['address'], allowCountryOnly: true);
@@ -453,7 +453,7 @@ class ContributionEntityMutationService
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function syncSpeakerRelations(Speaker $speaker, array $payload): void
+    public function syncSpeakerRelations(Speaker $speaker, array $payload): void
     {
         $addressPayload = $this->speakerAddressPayload($payload);
 

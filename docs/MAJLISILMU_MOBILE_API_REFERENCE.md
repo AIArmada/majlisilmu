@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-03-15  
+**Last Updated:** 2026-04-03
 **Audience:** Android and iOS application developers  
 **Base Path:** `/api/v1`
 
@@ -102,6 +102,117 @@ Paginated list endpoints generally return:
 The event index uses Laravel paginator JSON, so it returns `data`, `links`, and `meta`.
 
 Validation failures return Laravel JSON validation responses with HTTP `422`.
+
+---
+
+## 2A. Client Parity API
+
+For native clients and AI agents that need to mirror the current web client behavior rather than the lower-level REST resources, use the high-level client surface under `/api/v1`.
+
+Interactive local API docs are available at [https://api.majlisilmu.test/docs](https://api.majlisilmu.test/docs), with the generated OpenAPI JSON at [https://api.majlisilmu.test/docs.json](https://api.majlisilmu.test/docs.json).
+
+### Discovery and contracts
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/manifest` | Optional | Top-level flow manifest and endpoint discovery |
+| `GET` | `/forms/submit-event` | Optional | Submit-event schema, defaults, and validation metadata |
+| `GET` | `/forms/contributions/institutions` | Optional | Institution contribution contract |
+| `GET` | `/forms/contributions/speakers` | Optional | Speaker contribution contract |
+| `GET` | `/forms/report` | Required | Report form contract |
+| `GET` | `/forms/account-settings` | Required | Account-settings contract |
+| `GET` | `/forms/advanced-events` | Required | Advanced parent-program builder contract |
+| `GET` | `/forms/institution-workspace` | Required | Institution workspace contract |
+| `GET` | `/forms/membership-claims/{subjectType}` | Required | Membership-claim contract for the selected subject type |
+| `GET` | `/forms/contributions/{subjectType}/{subject}/suggest` | Required | Suggest-update context and editable state |
+
+### Public query endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/search` | Unified search payload for events, speakers, and institutions |
+| `GET` | `/institutions` | Public institution listing filters |
+| `GET` | `/institutions/{institutionKey}` | Public institution detail by slug or UUID |
+| `GET` | `/speakers` | Public speaker listing filters |
+| `GET` | `/speakers/{speakerKey}` | Public speaker detail by slug or UUID |
+| `GET` | `/venues/{venueKey}` | Public venue detail by slug or UUID |
+| `GET` | `/references/{referenceKey}` | Public reference detail by slug or UUID |
+| `GET` | `/series/{series}` | Public series detail |
+
+Notes:
+
+- These detail payloads now mirror the web client media collections and public-contact visibility rules.
+- `speakerKey`, `venueKey`, `institutionKey`, and `referenceKey` intentionally bypass the app-wide public-slug route binders so the API can safely resolve slug or UUID itself.
+
+### Submission and authenticated workflow endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/submit-event` | Submit the public/authenticated event form, including poster/gallery uploads |
+| `GET` | `/account-settings` | Return current profile settings |
+| `PUT` | `/account-settings` | Update current profile settings |
+| `GET` | `/contributions` | Contribution inbox for the current user |
+| `POST` | `/contributions/institutions` | Submit a new institution contribution |
+| `POST` | `/contributions/speakers` | Submit a new speaker contribution |
+| `POST` | `/contributions/{subjectType}/{subject}/suggest` | Suggest an update or apply a direct edit when authorized |
+| `POST` | `/contributions/{requestId}/approve` | Approve a reviewable contribution request |
+| `POST` | `/contributions/{requestId}/reject` | Reject a reviewable contribution request |
+| `POST` | `/contributions/{requestId}/cancel` | Cancel the current user’s pending contribution request |
+| `GET` | `/membership-claims` | List the current user’s membership claims |
+| `POST` | `/membership-claims/{subjectType}/{subject}` | Submit a membership claim with evidence uploads |
+| `DELETE` | `/membership-claims/{claimId}` | Cancel the current user’s pending membership claim |
+| `POST` | `/advanced-events` | Create an advanced parent program submission |
+| `GET` | `/follows/{type}/{subject}` | Return follow state for the current user |
+| `POST` | `/follows/{type}/{subject}` | Follow a public institution, speaker, reference, or series |
+| `DELETE` | `/follows/{type}/{subject}` | Unfollow a record |
+| `GET` | `/institution-workspace` | Institution dashboard payload for events, members, and role options |
+| `POST` | `/institution-workspace/{institutionId}/members` | Add an institution member |
+| `PUT` | `/institution-workspace/{institutionId}/members/{memberId}` | Change an institution member role |
+| `DELETE` | `/institution-workspace/{institutionId}/members/{memberId}` | Remove an institution member |
+
+Authorization note:
+
+- These endpoints intentionally mirror the current web client policy and role checks.
+- Institution workspace permissions currently follow the existing app model where scoped member roles are assigned per subject type, not per individual institution. The API matches that behavior exactly.
+
+---
+
+## 2B. Admin API Foundation
+
+For authenticated users who can access the Filament admin panel, an admin surface is available under `/api/v1/admin`. This follows Filament resource discovery and authorization at the resource/record level, and is intended for admin apps and agents that need to browse and, for selected resources, mutate what the admin panel can currently expose.
+
+Current scope:
+
+- Resource manifest and capability discovery
+- Per-resource metadata
+- Resource-specific write schema discovery for supported resources
+- Generic record listing with search
+- Generic record detail with per-record abilities
+- Shared create/update write support for `speakers` and `institutions`
+
+Current limitation:
+
+- This is not yet full create-edit-delete parity for every complex Filament workflow. Write support currently exists only where the Filament save path has been extracted into reusable actions.
+
+### Admin endpoints
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/manifest` | Required Filament admin-panel access | List admin resources visible through the API |
+| `GET` | `/admin/{resourceKey}/meta` | Required Filament admin-panel access | Return metadata, pages, relations, abilities, and write-support flags for one admin resource |
+| `GET` | `/admin/{resourceKey}/schema?operation=create` | Required Filament admin-panel access | Return the create contract for supported write resources |
+| `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
+| `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource |
+| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources |
+| `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
+| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources |
+
+Authorization note:
+
+- The admin API now follows the same top-level access rule as the Filament admin panel: any authenticated user with application admin-panel access can reach it.
+- Within that surface, per-resource create/view and per-record update/view/delete abilities are still computed from the underlying Laravel policies, so the payload advertises what the current user can actually do.
+- For `speakers` and `institutions`, the API write path now reuses the same save actions as the Filament create/edit pages, including address/contact/social sync, media handling, and public-submission toggle rules.
+- Slugs for these write-capable resources are treated as auto-managed by the API contract. Clients should not attempt to persist custom slugs through these endpoints.
 
 ---
 

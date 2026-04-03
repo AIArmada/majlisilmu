@@ -1,5 +1,12 @@
 # Lessons
 
+- When exposing docs on a dedicated API subdomain, do not keep redundant path segments like `/docs/api`; prefer host-level clarity such as `/docs` and reserve path depth for real resource structure.
+- When adapting Filament concepts into a public or client-facing admin API, do not mirror internal `resources/.../records` route shapes by habit; flatten them into collection/item endpoints unless the user explicitly wants the framework vocabulary exposed.
+- When exposing a generated API reference, verify that each first-class domain entity is discoverable as its own section/tag in the docs UI; registered routes alone are not enough if Scramble collapses them under a generic controller tag.
+- When naming a long-lived public API surface, use canonical client/product terminology or no extra namespace at all; do not bake implementation-origin labels like `frontend` into route paths and route names unless the user explicitly wants a temporary shim.
+- When the real root cause is a required unapplied migration on the active database, fix the schema and keep the feature code assuming that schema; do not leave behind runtime `hasColumn(...)` guards for columns the app now requires.
+- When a user reports a local runtime error on a newly added schema-backed feature, verify the real database migration state first before assuming the code path is wrong; a pending migration can be the direct root cause.
+- When a user explicitly asks for Chrome MCP verification, check tool availability before promising browser-level verification; if Chrome MCP is unavailable in the current session, say that plainly and use the closest runtime fallback instead.
 - When a package already exposes a static config flag for the exact behavior the app needs, do not keep a local clone of the package plugin just to avoid a runtime config mutation; use the official plugin with static config and avoid drift.
 - When a user explicitly asks for an upstream-docs pass before finalizing an infrastructure fix, read the upstream docs first and then re-evaluate the local patch set against those documented lifecycles before keeping custom code.
 - When a user explicitly asks for proof on the current live local database, do not retreat to an isolated sandbox run; use the configured connection with disposable records, verify the real queue/job path there, and clean the proof data up afterward.
@@ -215,3 +222,4 @@
 - When speaker slugs depend on country but most speakers lack deeper geography, make `country_id` required in every speaker-creation form rather than relying on a hidden default; otherwise create-time slugging and later backfills can diverge.
 - When country is part of a canonical slug or location identity, require an explicit `country_id` in every creation form for that entity type; hidden Malaysia defaults are not enough once the data becomes part of the URL contract.
 - For production-only public-route 404s, check whether any custom `Route::bind(...)` logic was registered inside `routes/*.php`; cached routes can leave those binders missing at runtime, so register them in a service provider that boots even when routes are cached.
+- When a user asks for frontend/API parity, audit authorization and scoped member-role behavior alongside required/optional/default field rules; matching validation alone is not sufficient for a usable mobile or agent contract.

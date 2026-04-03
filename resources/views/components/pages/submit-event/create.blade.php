@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Events\GenerateEventSlugAction;
+use App\Actions\Events\SubmitFrontendEventAction;
 use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Actions\References\GenerateReferenceSlugAction;
 use App\Enums\ContactCategory;
@@ -68,6 +69,7 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Carbon\CarbonInterface;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -1454,278 +1456,30 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public function submit(): mixed
     {
-        $validated = $this->eventForm()->getState();
-        $validated = $this->normalizeScopedInstitutionState($validated);
-        $this->assertCaptchaIsValid($validated['captcha_token'] ?? null);
-
-        // Enforce children_allowed when AllAges or Children is selected
-        $ageGroups = $validated['age_group'] ?? [];
-        if (
-            in_array(EventAgeGroup::Children->value, $ageGroups, true) ||
-            in_array(EventAgeGroup::AllAges->value, $ageGroups, true)
-        ) {
-            $validated['children_allowed'] = true;
-        }
-
-        $this->assertSubmissionEntitiesAreAccessible($validated);
-
-        $startsAt = $this->resolveStartsAt($validated);
-        $timezone = $this->resolveUserTimezone($validated['timezone'] ?? null);
-
-        if (
-            $this->hasCommunityEventTypeSelection($validated['event_type'] ?? [])
-            && (($validated['event_format'] ?? EventFormat::Physical->value) !== EventFormat::Physical->value)
-        ) {
-            throw ValidationException::withMessages([
-                'data.event_format' => __('Jenis majlis komuniti mesti menggunakan format fizikal.'),
-            ]);
-        }
-
-        // Validate contextual prayer time constraints (client-side filtering removed)
-        $prayerTimeRaw = $validated['prayer_time'] ?? '';
-        $selectedPrayer = $prayerTimeRaw instanceof EventPrayerTime
-            ? $prayerTimeRaw
-            : EventPrayerTime::tryFrom($prayerTimeRaw);
-        $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
-
-        if (
-            in_array($selectedPrayer, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat], true)
-            && ! $eventDate->isFriday()
-        ) {
-            throw ValidationException::withMessages([
-                'data.prayer_time' => __('Pilihan waktu Jumaat hanya boleh dipilih untuk hari Jumaat.'),
-            ]);
-        }
-
-        if ($selectedPrayer === EventPrayerTime::SebelumMaghrib && ! $this->isRamadhan($eventDate, $timezone)) {
-            throw ValidationException::withMessages([
-                'data.prayer_time' => __('Sebelum Maghrib hanya boleh dipilih semasa bulan Ramadhan.'),
-            ]);
-        }
-
-        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && ! $this->isRamadhan($eventDate, $timezone)) {
-            throw ValidationException::withMessages([
-                'data.prayer_time' => __('Selepas Tarawih hanya boleh dipilih semasa bulan Ramadhan.'),
-            ]);
-        }
-
-        $organizerType = null;
-        $organizerId = null;
-        $targetInstitutionId = null;
-        $targetVenueId = null;
-        $locationType = $validated['location_type'] ?? 'institution';
-        $locationInstitutionId = $validated['location_institution_id'] ?? null;
-        $venueId = $validated['location_venue_id'] ?? null;
-
-        // If it was institution, we check if it was pre-selected or created
-        if ($locationType === 'institution' && $locationInstitutionId) {
-            $venueId = null;
-        } elseif ($locationType === 'venue' && $venueId) {
-            $locationInstitutionId = null;
-        }
-
-        if (($validated['organizer_type'] ?? null) === 'institution' && ! empty($validated['organizer_institution_id'])) {
-            $organizerType = Institution::class;
-            $organizerId = $validated['organizer_institution_id'];
-
-            if (($validated['location_same_as_institution'] ?? true) == true) {
-                $targetInstitutionId = $validated['organizer_institution_id'];
-                $targetVenueId = null;
-            } else {
-                if (($validated['location_type'] ?? null) === 'institution') {
-                    $targetInstitutionId = $validated['location_institution_id'] ?? null;
-                    $targetVenueId = null;
-                } else {
-                    $targetVenueId = $validated['location_venue_id'] ?? null;
-                    $targetInstitutionId = null;
-                }
-            }
-        } elseif (($validated['organizer_type'] ?? null) === 'speaker' && ! empty($validated['organizer_speaker_id'])) {
-            $organizerType = Speaker::class;
-            $organizerId = $validated['organizer_speaker_id'];
-
-            if ($locationInstitutionId) {
-                $targetInstitutionId = $locationInstitutionId;
-                $targetVenueId = null;
-            } elseif ($venueId) {
-                $targetInstitutionId = null;
-                $targetVenueId = $venueId;
-            }
-        }
-
-        $prayerTimeValue = $validated['prayer_time'] ?? '';
-        $prayerTime = $prayerTimeValue instanceof EventPrayerTime
-            ? $prayerTimeValue
-            : EventPrayerTime::tryFrom($prayerTimeValue);
-        $prayerReference = $prayerTime?->toPrayerReference();
-        $prayerOffset = $prayerTime?->getDefaultOffset();
-        $prayerDisplayText = $prayerTime && ! $prayerTime->isCustomTime() ? $prayerTime->getLabel() : null;
-
-        $this->validateEndsAtAfterStartsAt($validated, $startsAt, $timezone);
-
-        // Validate that the resolved start time is not in the past
-        $now = Carbon::now($timezone);
-        if ($startsAt->lessThanOrEqualTo($now)) {
-            $errorField = $prayerTime?->isCustomTime() ? 'data.custom_time' : 'data.prayer_time';
-            throw ValidationException::withMessages([
-                $errorField => __('Waktu majlis yang dipilih telah berlalu. Sila pilih waktu lain.'),
-            ]);
-        }
-
         $parentEvent = $this->selectedParentEvent();
-
-        $event = Event::create(array_merge([
-            'title' => $validated['title'],
-            'slug' => app(GenerateEventSlugAction::class)->handle(
-                (string) $validated['title'],
-                $validated['event_date'] ?? null,
-                $timezone,
-            ),
-            'description' => $validated['description'] ?? null,
-            'timezone' => $timezone,
-            'starts_at' => $startsAt,
-            'ends_at' => $this->resolveEndsAt($validated, $startsAt, $timezone),
-            'institution_id' => $targetInstitutionId,
-            'venue_id' => $targetVenueId,
-            'space_id' => $validated['space_id'] ?? null,
-            'parent_event_id' => $parentEvent?->id,
-            'event_structure' => $parentEvent instanceof Event ? EventStructure::ChildEvent->value : EventStructure::Standalone->value,
-            'event_type' => $validated['event_type'] ?? [EventType::KuliahCeramah],
-            'gender' => $validated['gender'] ?? EventGenderRestriction::All->value,
-            'age_group' => $validated['age_group'] ?? [EventAgeGroup::AllAges],
-            'children_allowed' => $validated['children_allowed'] ?? true,
-            'is_muslim_only' => $validated['is_muslim_only'] ?? false,
-            'timing_mode' => $prayerTime?->isCustomTime() ? 'absolute' : 'prayer_relative',
-            'prayer_reference' => $prayerReference?->value,
-            'prayer_offset' => $prayerOffset?->value,
-            'prayer_display_text' => $prayerDisplayText,
-            'organizer_type' => $organizerType,
-            'organizer_id' => $organizerId,
-            'event_format' => $validated['event_format'] ?? EventFormat::Physical->value,
-            'event_url' => $validated['event_url'] ?? null,
-            'live_url' => $validated['live_url'] ?? null,
-            'visibility' => $validated['visibility'] ?? EventVisibility::Public,
-            'submitter_id' => auth()->id(),
-        ], $this->shouldAutoApproveSubmission() ? ['status' => 'pending'] : []));
-
-        // Attach selected space to institution if not already attached
-        if (! empty($validated['space_id']) && ! empty($event->institution_id)) {
-            $institution = Institution::find($event->institution_id);
-            if ($institution && ! $institution->spaces()->where('spaces.id', $validated['space_id'])->exists()) {
-                $institution->spaces()->attach($validated['space_id']);
-            }
-        }
-
-        app(EventKeyPersonSyncService::class)->sync(
-            $event,
-            $validated['speakers'] ?? [],
-            $validated['other_key_people'] ?? [],
-        );
-
-        // Sync selected languages
-        if (! empty($validated['languages'])) {
-            $event->syncLanguages($validated['languages']);
-        }
-
-        // Attach tags (merge all selected tags from 4 type fields, resolving quick-add text values)
-        $tagFieldMap = [
-            'discipline_tags' => TagType::Discipline,
-            'issue_tags' => TagType::Issue,
-        ];
-
-        $allTagIds = collect(array_merge(
-            $validated['domain_tags'] ?? [],
-            $validated['source_tags'] ?? [],
-        ))
-            ->filter(fn (mixed $value): bool => is_string($value) && Str::isUuid($value))
-            ->values()
-            ->all();
-
-        // Resolve quick-add text values (non-UUID) to real tag records
-        foreach ($tagFieldMap as $field => $tagType) {
-            foreach ($validated[$field] ?? [] as $value) {
-                if (Str::isUuid($value)) {
-                    $allTagIds[] = $value;
-                } else {
-                    // Find or create tag from plain text
-                    $tag = Tag::where('type', $tagType->value)
-                        ->whereRaw("LOWER(name->>'ms') = ?", [strtolower($value)])
-                        ->first();
-
-                    if (! $tag) {
-                        $tag = Tag::create([
-                            'name' => ['ms' => $value, 'en' => $value],
-                            'type' => $tagType->value,
-                            'status' => 'pending',
-                        ]);
-                    }
-
-                    $allTagIds[] = (string) $tag->id;
-                }
-            }
-        }
-
-        $allTagIds = collect($allTagIds)
-            ->filter(fn (mixed $value): bool => Str::isUuid((string) $value))
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($allTagIds !== []) {
-            $tags = Tag::whereIn('id', $allTagIds)->get();
-            $event->syncTags($tags);
-        }
-
-        $this->eventForm()->model($event);
-        $this->eventForm()->saveRelationships();
-
-        $submitterName = $validated['submitter_name'] ?? auth()->user()?->name;
-
-        $submission = EventSubmission::create([
-            'event_id' => $event->id,
-            'submitter_name' => $submitterName,
-            'submitted_by' => auth()->id(),
-            'notes' => $validated['notes'] ?? null,
-        ]);
-
-        app(ShareTrackingService::class)->recordOutcome(
-            type: DawahShareOutcomeType::EventSubmission,
-            outcomeKey: 'event_submission:submission:'.$submission->id,
-            subject: $event,
-            actor: auth()->user(),
+        $result = app(SubmitFrontendEventAction::class)->handle(
+            state: $this->eventForm()->getState(),
             request: request(),
-            metadata: [
-                'submission_id' => $submission->id,
-                'submitted_by' => $submission->submitted_by,
-            ],
+            submitter: $this->submitterUser(),
+            parentEvent: $parentEvent,
+            scopedInstitution: $this->scopedInstitution(),
+            persistRelationships: function (Event $event): void {
+                $this->eventForm()->model($event);
+                $this->eventForm()->saveRelationships();
+            },
+            validationKeyPrefix: 'data.',
         );
 
-        if (! auth()->check()) {
-            $this->storeSubmitterContacts($submission, $validated);
-        }
-
-        $this->persistRegistrationSettings($event);
-
-        if ($this->shouldAutoApproveSubmission()) {
-            app(ModerationService::class)->approve($event, null, 'Auto-approved from institution dashboard submission.');
-        } else {
-            $event->status->transitionTo(Pending::class);
-        }
+        $event = $result['event'];
+        $submission = $result['submission'];
 
         session()->flash('event_title', $event->title);
         session()->flash('event_slug', $event->slug);
-        session()->flash('event_auto_approved', $this->shouldAutoApproveSubmission());
+        session()->flash('event_auto_approved', $result['auto_approved']);
         session()->flash('submission_institution_id', $this->scopedInstitutionId);
-        $eventVisibility = $event->visibility;
+        session()->flash('event_visibility', $result['visibility']);
 
-        session()->flash(
-            'event_visibility',
-            $eventVisibility instanceof EventVisibility
-                ? $eventVisibility->value
-                : (is_string($eventVisibility) && $eventVisibility !== '' ? $eventVisibility : 'public')
-        );
-
-        if ($parentEvent = $this->selectedParentEvent()) {
+        if ($parentEvent instanceof Event) {
             session()->flash('parent_event_id', $parentEvent->id);
             session()->flash('parent_event_title', $parentEvent->title);
         }
@@ -1918,9 +1672,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
+        $eventVisibility = $event->visibility instanceof EventVisibility
+            ? $event->visibility->value
+            : (string) $event->visibility;
+
         return $event->is_active
             && $this->isPubliclyVisibleDuplicateStatus($event)
-            && in_array($event->visibility?->value ?? $event->visibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true);
+            && in_array($eventVisibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true);
     }
 
     protected function isDuplicateEventOwner(Event $event): bool
@@ -1960,13 +1718,22 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     protected function duplicateEventDefaults(Event $duplicateEvent): array
     {
         $timezone = $this->resolveUserTimezone((string) ($this->data['timezone'] ?? null));
+        $eventFormat = $duplicateEvent->event_format instanceof EventFormat
+            ? $duplicateEvent->event_format->value
+            : (is_string($duplicateEvent->event_format) ? $duplicateEvent->event_format : EventFormat::Physical->value);
+        $visibility = $duplicateEvent->visibility instanceof EventVisibility
+            ? $duplicateEvent->visibility->value
+            : (is_string($duplicateEvent->visibility) ? $duplicateEvent->visibility : EventVisibility::Public->value);
+        $gender = $duplicateEvent->gender instanceof EventGenderRestriction
+            ? $duplicateEvent->gender->value
+            : (is_string($duplicateEvent->gender) ? $duplicateEvent->gender : EventGenderRestriction::All->value);
         $defaults = [
             'title' => $duplicateEvent->title,
             'description' => $this->duplicateEventDescription($duplicateEvent),
             'event_type' => $this->normalizeEventTypeState($duplicateEvent->event_type),
-            'event_format' => $duplicateEvent->event_format?->value ?? $duplicateEvent->event_format ?? EventFormat::Physical->value,
-            'visibility' => $duplicateEvent->visibility?->value ?? $duplicateEvent->visibility ?? EventVisibility::Public->value,
-            'gender' => $duplicateEvent->gender?->value ?? $duplicateEvent->gender ?? EventGenderRestriction::All->value,
+            'event_format' => $eventFormat,
+            'visibility' => $visibility,
+            'gender' => $gender,
             'age_group' => $this->normalizeAgeGroupState($duplicateEvent->age_group),
             'children_allowed' => (bool) $duplicateEvent->children_allowed,
             'is_muslim_only' => (bool) $duplicateEvent->is_muslim_only,
@@ -2071,8 +1838,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
-        $prayerReference = $duplicateEvent->prayer_reference?->value ?? $duplicateEvent->prayer_reference;
-        $prayerOffset = $duplicateEvent->prayer_offset?->value ?? $duplicateEvent->prayer_offset;
+        $prayerReference = $duplicateEvent->prayer_reference instanceof BackedEnum
+            ? (string) $duplicateEvent->prayer_reference->value
+            : (is_string($duplicateEvent->prayer_reference) ? $duplicateEvent->prayer_reference : null);
+        $prayerOffset = $duplicateEvent->prayer_offset instanceof BackedEnum
+            ? (string) $duplicateEvent->prayer_offset->value
+            : (is_string($duplicateEvent->prayer_offset) ? $duplicateEvent->prayer_offset : null);
 
         if (is_string($prayerReference) && $prayerReference !== '') {
             foreach (EventPrayerTime::cases() as $prayerTime) {
@@ -2117,7 +1888,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $submitter = $this->submitterUser();
 
         return $duplicateEvent->keyPeople
-            ->filter(fn (mixed $keyPerson): bool => $keyPerson instanceof \App\Models\EventKeyPerson && $keyPerson->role !== EventKeyPersonRole::Speaker)
+            ->filter(fn (\App\Models\EventKeyPerson $keyPerson): bool => $keyPerson->role !== EventKeyPersonRole::Speaker)
             ->map(function (\App\Models\EventKeyPerson $keyPerson) use ($access, $submitter): array {
                 $speakerId = is_string($keyPerson->speaker_id) && $access->canUseSpeaker($submitter, $keyPerson->speaker_id)
                     ? $keyPerson->speaker_id
@@ -2147,7 +1918,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         $access = app(EntitySubmissionAccess::class);
         $submitter = $this->submitterUser();
         $defaults = [];
-        $eventFormat = $duplicateEvent->event_format?->value ?? $duplicateEvent->event_format;
+        $eventFormat = $duplicateEvent->event_format instanceof EventFormat
+            ? $duplicateEvent->event_format->value
+            : (is_string($duplicateEvent->event_format) ? $duplicateEvent->event_format : EventFormat::Physical->value);
         $organizerId = is_string($duplicateEvent->organizer_id) ? $duplicateEvent->organizer_id : null;
         $institutionId = is_string($duplicateEvent->institution_id) ? $duplicateEvent->institution_id : null;
 

@@ -2,10 +2,11 @@
 
 namespace App\Filament\Resources\Speakers\Pages;
 
-use App\Actions\Speakers\GenerateSpeakerSlugAction;
+use App\Actions\Speakers\SaveSpeakerAction;
 use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Speaker;
+use App\Models\User;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Nnjeim\World\Models\Language;
@@ -22,10 +23,17 @@ class CreateSpeaker extends CreateRecord
     #[\Override]
     protected function handleRecordCreation(array $data): Model
     {
-        $address = is_array($this->data['address'] ?? null) ? $this->data['address'] : [];
-        $data['slug'] = app(GenerateSpeakerSlugAction::class)->handle((string) ($data['name'] ?? 'Speaker'), $address);
+        $user = auth()->user();
 
-        return parent::handleRecordCreation($data);
+        if (! $user instanceof User) {
+            abort(403);
+        }
+
+        return app(SaveSpeakerAction::class)->handle(
+            $data,
+            $user,
+            validationErrorKey: 'data.allow_public_event_submission',
+        );
     }
 
     protected function afterCreate(): void

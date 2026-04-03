@@ -2,14 +2,14 @@
 
 namespace App\Filament\Resources\Institutions\Pages;
 
+use App\Actions\Institutions\SaveInstitutionAction;
 use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Models\Institution;
 use App\Models\User;
-use App\Support\Submission\PublicSubmissionLockService;
 use App\Support\Submission\PublicSubmissionUiEvents;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\On;
 
 class EditInstitution extends EditRecord
@@ -24,46 +24,21 @@ class EditInstitution extends EditRecord
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
     #[\Override]
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function handleRecordUpdate(Model $record, array $data): Model
     {
         $actor = $this->currentUser();
 
-        if (! $actor instanceof User) {
+        if (! $actor instanceof User || ! $record instanceof Institution) {
             abort(403);
         }
 
-        $institution = $this->institutionRecord();
-        $requestedPublicSubmission = (bool) ($data['allow_public_event_submission'] ?? $institution->allow_public_event_submission);
-        $currentPublicSubmission = (bool) $institution->allow_public_event_submission;
-
-        if ($requestedPublicSubmission === $currentPublicSubmission) {
-            return $data;
-        }
-
-        $lockService = app(PublicSubmissionLockService::class);
-
-        if ($requestedPublicSubmission) {
-            $lockService->unlockInstitution($institution, $actor);
-
-            return $data;
-        }
-
-        $eligibility = $lockService->institutionEligibility($institution);
-
-        if (! $eligibility->eligible) {
-            throw ValidationException::withMessages([
-                'data.allow_public_event_submission' => $eligibility->reasons,
-            ]);
-        }
-
-        $lockService->lockInstitution($institution, $actor);
-
-        return $data;
+        return app(SaveInstitutionAction::class)->handle(
+            $data,
+            $actor,
+            $record,
+            'data.allow_public_event_submission',
+        );
     }
 
     #[On(PublicSubmissionUiEvents::REFRESH_TOGGLE)]

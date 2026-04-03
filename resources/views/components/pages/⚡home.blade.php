@@ -152,7 +152,7 @@ new
                                 }
                             }">
                     <div class="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-gold-400 to-emerald-500 rounded-2xl opacity-50 group-hover:opacity-100 blur transition duration-500 group-hover:duration-200 animate-tilt"></div>
-                    <form action="{{ route('events.index') }}" method="GET" x-ref="form"
+                    <form action="{{ route('search.index') }}" method="GET" x-ref="form"
                         class="relative bg-slate-900/90 rounded-2xl p-2 flex flex-col sm:flex-row items-center gap-2 border border-white/10 shadow-2xl backdrop-blur-xl">
 
                         {{-- Search Input --}}
@@ -162,7 +162,7 @@ new
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
                             </div>
-                            <input type="text" name="search" placeholder="{{ __('Cari topik, ustaz, atau lokasi...') }}"
+                            <input type="text" name="search" placeholder="{{ __('Cari majlis, penceramah, atau institusi...') }}"
                                 class="w-full h-full bg-transparent border-none pl-12 pr-4 text-white placeholder-slate-400 focus:ring-0 focus:outline-none text-base">
                         </div>
 

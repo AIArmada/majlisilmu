@@ -270,6 +270,41 @@ class EventSearchService
     }
 
     /**
+     * Geo search constrained by a text query.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
+     */
+    public function searchNearbyWithQuery(
+        ?string $query,
+        float $lat,
+        float $lng,
+        int $radiusKm = 50,
+        array $filters = [],
+        int $perPage = 20
+    ): LengthAwarePaginator {
+        $normalizedQuery = $this->normalizeSearchQuery($query);
+
+        if ($normalizedQuery === null) {
+            return $this->searchNearby($lat, $lng, $radiusKm, $filters, $perPage);
+        }
+
+        if ($this->requiresDatabaseFiltering($filters)) {
+            return $this->searchNearbyWithDatabaseQuery($normalizedQuery, $lat, $lng, $radiusKm, $filters, $perPage);
+        }
+
+        if (config('scout.driver') === 'typesense') {
+            try {
+                return $this->searchNearbyWithTypesenseQuery($normalizedQuery, $lat, $lng, $radiusKm, $filters, $perPage);
+            } catch (\Exception $e) {
+                Log::warning('Typesense geo query search failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return $this->searchNearbyWithDatabaseQuery($normalizedQuery, $lat, $lng, $radiusKm, $filters, $perPage);
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      * @return list<string>
      */
@@ -860,6 +895,79 @@ class EventSearchService
         $institutionMorphType = (new Institution)->getMorphClass();
 
         $queryBuilder = $this->buildDatabaseQuery(null, $filters)
+            ->leftJoin('addresses as venue_addresses', function ($join) use ($venueMorphType) {
+                $join->on('venue_addresses.addressable_id', '=', 'events.venue_id')
+                    ->where('venue_addresses.addressable_type', $venueMorphType);
+            })
+            ->leftJoin('addresses as institution_addresses', function ($join) use ($institutionMorphType) {
+                $join->on('institution_addresses.addressable_id', '=', 'events.institution_id')
+                    ->where('institution_addresses.addressable_type', $institutionMorphType);
+            })
+            ->whereRaw("{$latitudeExpression} is not null")
+            ->whereRaw("{$longitudeExpression} is not null")
+            ->select('events.*')
+            ->selectRaw("{$distanceSql} as distance_km", [$lat, $lng, $lat])
+            ->whereRaw("{$distanceSql} <= ?", [$lat, $lng, $lat, $radiusKm])
+            ->with($this->cardRelationships())
+            ->orderBy('distance_km', 'asc')
+            ->orderBy('starts_at', 'asc');
+
+        return $queryBuilder->paginate($perPage);
+    }
+
+    /**
+     * Search with Typesense via text query plus geo radius.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
+     */
+    protected function searchNearbyWithTypesenseQuery(
+        string $query,
+        float $lat,
+        float $lng,
+        int $radiusKm,
+        array $filters,
+        int $perPage
+    ): LengthAwarePaginator {
+        $search = Event::search($query)
+            ->query(fn (Builder $builder) => $builder->with($this->cardRelationships()));
+
+        $filterBy = implode(' && ', [
+            "location:({$lat}, {$lng}, {$radiusKm} km)",
+            ...$this->buildTypesenseFilterParts($filters),
+        ]);
+
+        $search->options([
+            'filter_by' => $filterBy,
+            'sort_by' => "location({$lat}, {$lng}):asc,starts_at:asc",
+            'query_by' => 'title',
+        ]);
+
+        return $search->paginate($perPage);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Event>
+     */
+    protected function searchNearbyWithDatabaseQuery(
+        string $query,
+        float $lat,
+        float $lng,
+        int $radiusKm,
+        array $filters,
+        int $perPage
+    ): LengthAwarePaginator {
+        $latitudeExpression = 'coalesce(venue_addresses.lat, institution_addresses.lat)';
+        $longitudeExpression = 'coalesce(venue_addresses.lng, institution_addresses.lng)';
+        $distanceSql = "(6371 * acos(cos(radians(?)) * cos(radians({$latitudeExpression})) * cos(radians({$longitudeExpression}) - radians(?)) + sin(radians(?)) * sin(radians({$latitudeExpression}))))";
+        $venueMorphType = (new Venue)->getMorphClass();
+        $institutionMorphType = (new Institution)->getMorphClass();
+
+        $queryBuilder = $this->buildDatabaseQuery(null, $filters);
+        $this->applyDirectSearch($queryBuilder, $query);
+
+        $queryBuilder
             ->leftJoin('addresses as venue_addresses', function ($join) use ($venueMorphType) {
                 $join->on('venue_addresses.addressable_id', '=', 'events.venue_id')
                     ->where('venue_addresses.addressable_type', $venueMorphType);
