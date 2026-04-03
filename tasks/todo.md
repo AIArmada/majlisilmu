@@ -7311,13 +7311,24 @@
 
 # Speaker Biodata Collapse And Upcoming Counts
 
-- [ ] Inspect the public speaker index and show-page data paths for event counts and biodata rendering
-- [ ] Make `/penceramah` card counts include only upcoming public events
-- [ ] Collapse long speaker biodata by default and add a reveal control on `/penceramah/*`
-- [ ] Add focused regressions for the new speaker count and biodata UI behavior
-- [ ] Verify with targeted Pest coverage and formatting checks
+- [x] Inspect the public speaker index and show-page data paths for event counts and biodata rendering
+- [x] Make `/penceramah` card counts include only upcoming public events
+- [x] Collapse long speaker biodata by default and add a reveal control on `/penceramah/*`
+- [x] Add focused regressions for the new speaker count and biodata UI behavior
+- [x] Verify with targeted Pest coverage and formatting checks
 
 ## Review
 - Root cause:
+  - the public speaker index counted every active public event on the generic `events()` relationship, so past events still inflated the card totals
+  - the speaker biodata block always rendered the full rich text payload, which makes long biographies dominate the page and forces users to scroll through all of it immediately
 - Fix:
+  - tightened the `/penceramah` card count query to include only active public events whose `starts_at` is still upcoming
+  - added a length-aware biodata preview on `/penceramah/*` that keeps shorter bios unchanged but collapses longer bios behind a reveal toggle with a gradient fade and expand/collapse button
+  - added focused feature coverage for the upcoming-only speaker counts and for the long-bio reveal control, while also updating the existing speaker submission test to seed a valid country record in the test database
 - Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **9 passed (28 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowSocialPlacementTest.php` => **3 passed (11 assertions)**
+  - `vendor/bin/pint --test resources/views/components/pages/speakers/⚡index.blade.php resources/views/components/pages/speakers/⚡show.blade.php tests/Feature/SpeakerIndexTest.php tests/Feature/SpeakerShowSocialPlacementTest.php` => **pass**
+  - `php -l resources/views/components/pages/speakers/⚡index.blade.php && php -l resources/views/components/pages/speakers/⚡show.blade.php` => **No syntax errors**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `git diff --check -- resources/views/components/pages/speakers/⚡index.blade.php resources/views/components/pages/speakers/⚡show.blade.php tests/Feature/SpeakerIndexTest.php tests/Feature/SpeakerShowSocialPlacementTest.php tasks/todo.md` => **No diff formatting issues**
