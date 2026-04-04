@@ -3,8 +3,8 @@
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
