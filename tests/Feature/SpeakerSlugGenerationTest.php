@@ -150,6 +150,23 @@ it('supports habib as a pre-nominal in formatted names and slugs', function () {
         ->and($speaker->slug)->toBe('habib-dr-ali-zainal-abidin-my');
 });
 
+it('supports maulana as a pre-nominal in formatted names and slugs', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ahmad Fauzi',
+        'gender' => 'male',
+        'pre_nominal' => ['dr', 'maulana'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe('Maulana Dr Ahmad Fauzi')
+        ->and($speaker->slug)->toBe('maulana-dr-ahmad-fauzi-my');
+});
+
 it('keeps professional prefixes ahead of doctorate titles in public display order', function () {
     $proposer = User::factory()->create();
     $country = createSpeakerSlugCountry();
