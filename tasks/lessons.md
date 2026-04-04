@@ -1,5 +1,7 @@
 # Lessons
 
+- When a product owner says the API reference itself should be public, do not conflate docs-page visibility with bearer-token protection on the endpoints; make `/docs` public and keep auth requirements documented in the spec instead.
+- When a cross-subdomain auth problem disappears in incognito, verify stale browser cookies/session state before shipping an application-side access workaround.
 - When a deployment environment already owns the correct explicit config, do not add runtime host-derivation or production-only fallback heuristics around it; fix the code to read the configured value cleanly and verify cache/deploy state instead.
 - When an API uses bearer tokens for third-party integrations, do not assume login/register endpoints are self-explanatory; surface the token acquisition path explicitly in the generated docs and provide a first-party token management UI inside the application.
 - When exposing docs on a dedicated API subdomain, do not keep redundant path segments like `/docs/api`; prefer host-level clarity such as `/docs` and reserve path depth for real resource structure.

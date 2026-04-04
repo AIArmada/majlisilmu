@@ -10,6 +10,23 @@ it('serves scramble docs only on the api host', function () {
     ])->assertNotFound();
 });
 
+it('serves scramble docs publicly on the api host outside local environments', function () {
+    $originalEnvironment = app()->environment();
+    app()['env'] = 'production';
+
+    try {
+        $this->get('https://api.majlisilmu.test/docs', [
+            'Host' => 'api.majlisilmu.test',
+        ])->assertOk();
+
+        $this->getJson('https://api.majlisilmu.test/docs.json', [
+            'Host' => 'api.majlisilmu.test',
+        ])->assertOk();
+    } finally {
+        app()['env'] = $originalEnvironment;
+    }
+});
+
 it('publishes openapi json on the api host with the api v1 server url', function () {
     $this->getJson('https://api.majlisilmu.test/docs.json', [
         'Host' => 'api.majlisilmu.test',

@@ -2,12 +2,10 @@
 
 namespace App\Providers;
 
-use App\Models\User;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Routing\Route as IlluminateRoute;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -16,15 +14,6 @@ class ApiDocumentationServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        Gate::define('viewApiDocs', function (?User $user = null): bool {
-            if (app()->runningUnitTests()) {
-                return true;
-            }
-
-            return $user instanceof User
-                && $user->hasApplicationAdminAccess();
-        });
-
         Scramble::ignoreDefaultRoutes();
 
         $apiDomain = app(ApiDocumentationUrlResolver::class)->apiDomain();
