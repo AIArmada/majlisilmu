@@ -7,8 +7,20 @@
 - [x] Verify repo tests, static analysis, and live client connectivity
 - [x] Make the MCP route production-loadable on `majlisilmu.my` by promoting `laravel/mcp` to a direct runtime dependency
 - [x] Audit the full uncommitted admin/MCP diff and rerun focused verification
+- [x] Tighten the admin MCP tool contract for better model/tool reliability
+- [x] Re-audit the current uncommitted MCP diff for secret leakage and schema/validator drift
 
 ## Review
+
+- Follow-up audit findings on the current uncommitted diff:
+  - Removed an exposed production bearer token from tracked [opencode.json](/Users/Saiffil/Herd/majlisilmu/opencode.json); the file now differs only by a trailing newline and `rg -n "Bearer\\s+[0-9]+\\|" -S . --glob '!vendor' --glob '!.git'` returns no matches.
+  - Fixed MCP schema/validator drift in [AdminListResourcesTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AdminListResourcesTool.php) and [AdminListRecordsTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AdminListRecordsTool.php) so optional arguments advertised as `nullable()` in the JSON schema are also accepted as `null` by Laravel validation.
+  - Added regression coverage in [AdminServerTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Mcp/AdminServerTest.php) for both nullable optional arguments and structured validation failure handling.
+  - Follow-up verification:
+    - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-mcp tests/Feature/Mcp/AdminServerTest.php` => **16 passed**, 100 assertions
+    - `vendor/bin/phpstan analyse --ansi app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Mcp/Tools/Admin/AdminListRecordsTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php` => **No errors**
+    - `vendor/bin/pint --test app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Mcp/Tools/Admin/AdminListRecordsTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php opencode.json` => **pass**
+    - `git diff --check` => **clean**
 
 - Read the official Laravel MCP docs end to end at [Laravel MCP](https://laravel.com/docs/13.x/mcp) and aligned the implementation with the documented shape: `Mcp::web(...)` in [routes/ai.php](/Users/Saiffil/Herd/majlisilmu/routes/ai.php), Sanctum bearer-token auth, request-based authorization in tools, and the documented `shouldRegister(Request $request)` pattern in [AbstractAdminWriteTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AbstractAdminWriteTool.php).
 - Kept the shared admin resource orchestration in [AdminResourceService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceService.php), the admin MCP server in [AdminServer.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Servers/AdminServer.php), the admin tool suite under [app/Mcp/Tools/Admin](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin), and the token command in [IssueMcpToken.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/IssueMcpToken.php).
@@ -39,6 +51,17 @@
   - `copilot -p 'Use the majlisilmu_admin MCP server...' --disable-builtin-mcps --allow-all` => Copilot CLI invoked `Admin List Resources Tool (MCP: majlisilmu_admin)` and returned **`CONNECTED`**
 - VS Code Insiders user MCP config is written, and the Herd CA path is exported through `launchctl` for GUI-launched Node processes. I did not fully exercise the Copilot chat UI in VS Code from this shell session because the `code-insiders` CLI is not on the current PATH, so the remaining step there is restarting VS Code Insiders and using Copilot chat once to let it pick up the new user-level MCP config.
 - Production status: code is now ready for `majlisilmu.my`, but the host will continue returning `404` until this diff is deployed and production runs a fresh Composer install plus normal cache reload for the new runtime package.
+- MCP contract cleanup:
+  - Tightened [AbstractAdminTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AbstractAdminTool.php) so admin tool errors now return structured MCP payloads in addition to human-readable text. Validation failures expose `error.code = validation_error` plus field-level details, HTTP failures expose stable error codes like `forbidden` and `not_found`, and server faults expose `server_error`.
+  - Added strict top-level argument checking in [AbstractAdminTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AbstractAdminTool.php), then switched every admin MCP tool to use that path. Hallucinated arguments are no longer silently ignored.
+  - Shrunk default discovery output in [AdminListResourcesTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AdminListResourcesTool.php) and [AdminResourceService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceService.php): `admin-list-resources` now returns a compact summary by default and supports `verbose=true` plus `writable_only=true` for agents that need richer or narrower discovery.
+  - Added regression coverage in [AdminServerTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Mcp/AdminServerTest.php) for compact listing, verbose listing, structured validation errors, and unexpected-argument rejection.
+  - Verification:
+    - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-mcp tests/Feature/Mcp/AdminServerTest.php` => **15 passed**, 91 assertions
+    - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-api tests/Feature/Api/Admin/AdminApiTest.php` => **6 passed**, 49 assertions
+    - `vendor/bin/phpstan analyse --ansi app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php` => **No errors**
+    - `vendor/bin/pint --test app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminGetResourceMetaTool.php app/Mcp/Tools/Admin/AdminListRecordsTool.php app/Mcp/Tools/Admin/AdminGetRecordTool.php app/Mcp/Tools/Admin/AdminGetWriteSchemaTool.php app/Mcp/Tools/Admin/AdminCreateRecordTool.php app/Mcp/Tools/Admin/AdminUpdateRecordTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php` => **pass**
+    - `git diff --check` => **clean**
 
 # Admin Route Shape Cleanup
 

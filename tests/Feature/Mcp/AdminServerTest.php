@@ -25,6 +25,22 @@ it('lists accessible admin resources for admin users through the MCP server', fu
         ->assertStructuredContent(fn ($json) => $json
             ->has('data.resources')
             ->where('data.resources.0.key', fn (string $key): bool => filled($key))
+            ->missing('data.resources.0.resource_class')
+            ->etc());
+});
+
+it('can request verbose admin resource metadata through the MCP resource list tool', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListResourcesTool::class, [
+            'verbose' => true,
+            'writable_only' => true,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data.resources', 2)
+            ->where('data.resources.0.resource_class', fn (string $resourceClass): bool => str_contains($resourceClass, 'Resource'))
             ->etc());
 });
 
@@ -237,6 +253,79 @@ it('rejects media fields through MCP write tools', function () {
             ],
         ])
         ->assertHasErrors(['Media uploads are not supported through MCP v1.']);
+});
+
+it('returns structured MCP error payloads for validation failures', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetRecordTool::class, [
+            'resource_key' => 'speakers',
+        ])
+        ->assertHasErrors(['Record key diperlukan.'])
+        ->assertStructuredContent([
+            'error' => [
+                'code' => 'validation_error',
+                'message' => 'Record key diperlukan.',
+                'details' => [
+                    'errors' => [
+                        'record_key' => [
+                            'Record key diperlukan.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+});
+
+it('rejects unexpected MCP tool arguments instead of ignoring them', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListResourcesTool::class, [
+            'unexpected' => 'value',
+        ])
+        ->assertHasErrors(['Unexpected argument(s): unexpected.'])
+        ->assertStructuredContent([
+            'error' => [
+                'code' => 'validation_error',
+                'message' => 'Unexpected argument(s): unexpected.',
+                'details' => [
+                    'errors' => [
+                        'arguments' => [
+                            'Unexpected argument(s): unexpected.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+});
+
+it('accepts nullable optional MCP arguments that are advertised by the tool schema', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListResourcesTool::class, [
+            'verbose' => null,
+            'writable_only' => null,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data.resources')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'search' => null,
+            'page' => null,
+            'per_page' => null,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'speakers')
+            ->where('meta.pagination.page', 1)
+            ->etc());
 });
 
 it('denies non-admin users from MCP tools', function () {

@@ -30,7 +30,7 @@ class AdminGetRecordTool extends AbstractAdminTool
         return $this->structuredResponse(function () use ($request): array {
             $this->authorizeAdmin($request);
 
-            $validated = $request->validate([
+            $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
                 'record_key' => ['required', 'string'],
             ]);
