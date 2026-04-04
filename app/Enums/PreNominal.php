@@ -39,13 +39,13 @@ enum PreNominal: string implements HasLabel
     {
         return match ($this) {
             // Academic
-            self::Dr => __('Dr.'),
-            self::Prof => __('Prof.'),
-            self::ProfMadya => __('Prof. Madya'),
+            self::Dr => __('Dr'),
+            self::Prof => __('Prof'),
+            self::ProfMadya => __('Prof Madya'),
 
             // Professional
-            self::Ir => __('Ir.'),
-            self::Ar => __('Ar.'),
+            self::Ir => __('Ir'),
+            self::Ar => __('Ar'),
 
             // Islamic Teachers/Scholars
             self::Ustaz => __('Ustaz'),
