@@ -97,6 +97,24 @@ it('requires address.country_id when creating speakers through the frontend api'
         ->assertJsonValidationErrors(['address.country_id']);
 });
 
+it('returns profile-quality speaker avatar urls from the frontend search api', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Kazim Elias',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->addMedia(UploadedFile::fake()->image('kazim.jpg', 1200, 1200))
+        ->toMediaCollection('avatar');
+
+    $this->getJson(route('api.client.speakers.index', ['search' => 'kazim']))
+        ->assertOk()
+        ->assertJsonPath('data.0.avatar_url', $speaker->public_avatar_url);
+});
+
 it('submits and cancels membership claims through the frontend api', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');

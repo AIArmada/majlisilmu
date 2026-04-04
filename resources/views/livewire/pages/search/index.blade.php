@@ -334,7 +334,7 @@
                                     @foreach($speakerMatches as $speaker)
                                         <a href="{{ route('speakers.show', $speaker) }}" wire:navigate class="group rounded-[1.5rem] border border-slate-200 bg-slate-50/60 p-5 text-center transition hover:-translate-y-1 hover:border-sky-200 hover:bg-white hover:shadow-lg hover:shadow-sky-900/10">
                                             <div class="mx-auto h-24 w-24 overflow-hidden rounded-full bg-white p-1.5 ring-2 ring-slate-200 transition group-hover:ring-sky-300">
-                                                <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->formatted_name }}" class="h-full w-full rounded-full object-cover" loading="lazy">
+                                                <img src="{{ $speaker->public_avatar_url }}" alt="{{ $speaker->formatted_name }}" class="h-full w-full rounded-full object-cover" loading="lazy">
                                             </div>
                                             <h3 class="mt-5 font-heading text-lg font-bold leading-tight text-slate-900 transition group-hover:text-sky-700">{{ $speaker->formatted_name }}</h3>
                                             <div class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">

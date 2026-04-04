@@ -4,7 +4,9 @@ use App\Livewire\Pages\Contributions\SubmitSpeaker;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 use function Pest\Laravel\get;
@@ -184,4 +186,22 @@ it('counts only upcoming public events on the speaker index cards', function () 
 
     expect($listedSpeaker)->not->toBeNull()
         ->and((int) $listedSpeaker?->events_count)->toBe(1);
+});
+
+it('renders profile-quality avatar URLs on the speaker index cards', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Kazim Elias',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->addMedia(UploadedFile::fake()->image('kazim.jpg', 1200, 1200))
+        ->toMediaCollection('avatar');
+
+    get('/penceramah?search=kazim')
+        ->assertSuccessful()
+        ->assertSee($speaker->public_avatar_url, false);
 });

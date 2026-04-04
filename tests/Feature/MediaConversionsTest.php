@@ -191,6 +191,19 @@ it('returns avatar_url using thumb conversion when media exists', function () {
     expect($avatarUrl)->toContain('avatar');
 });
 
+it('returns public_avatar_url using the higher-resolution profile conversion when media exists', function () {
+    $speaker = Speaker::factory()->create();
+
+    $speaker->addMedia(UploadedFile::fake()->image('avatar.jpg', 500, 500))
+        ->toMediaCollection('avatar');
+
+    $publicAvatarUrl = $speaker->public_avatar_url;
+
+    expect($publicAvatarUrl)->not->toBeNull()
+        ->and($publicAvatarUrl)->toContain('conversions')
+        ->and($publicAvatarUrl)->toContain('profile');
+});
+
 // ---------------------------------------------------------------
 // Venue model
 // ---------------------------------------------------------------

@@ -5,6 +5,8 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -15,6 +17,9 @@ it('submits the homepage hero search to the unified search page', function () {
 });
 
 it('shows grouped event speaker and institution matches on the unified search page', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
     $institution = Institution::factory()->create([
         'name' => 'Masjid Nur Hikmah',
         'status' => 'verified',
@@ -26,6 +31,9 @@ it('shows grouped event speaker and institution matches on the unified search pa
         'status' => 'verified',
         'is_active' => true,
     ]);
+
+    $speaker->addMedia(UploadedFile::fake()->image('speaker.jpg', 1200, 1200))
+        ->toMediaCollection('avatar');
 
     $event = Event::factory()
         ->for($institution)
@@ -44,6 +52,7 @@ it('shows grouped event speaker and institution matches on the unified search pa
         ->assertSee('Kuliah Nur Hikmah')
         ->assertSee('Ustaz Nur Hikmah')
         ->assertSee('Masjid Nur Hikmah')
+        ->assertSee($speaker->public_avatar_url, false)
         ->assertSee(route('events.show', $event), false)
         ->assertSee(route('speakers.show', $speaker), false)
         ->assertSee(route('institutions.show', $institution), false);
