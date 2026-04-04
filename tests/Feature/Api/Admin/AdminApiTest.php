@@ -105,12 +105,16 @@ it('exposes admin speaker write schema and can create and update speakers throug
     $speaker = Speaker::query()->findOrFail($speakerId);
 
     expect($speaker->name)->toBe('Admin API Created Speaker')
+        ->and($speaker->slug)->toBe('admin-api-created-speaker-my')
         ->and($speaker->status)->toBe('verified')
         ->and($speaker->allow_public_event_submission)->toBeTrue();
 
     $this->putJson('/api/v1/admin/speakers/'.$speakerId, [
         'name' => 'Admin API Updated Speaker',
         'gender' => 'male',
+        'honorific' => ['dato'],
+        'pre_nominal' => ['dr', 'prof'],
+        'post_nominal' => ['BA', 'PhD', 'HONS'],
         'status' => 'verified',
         'is_freelance' => true,
         'job_title' => 'Imam',
@@ -121,6 +125,7 @@ it('exposes admin speaker write schema and can create and update speakers throug
         ],
     ])->assertOk()
         ->assertJsonPath('data.record.attributes.name', 'Admin API Updated Speaker')
+        ->assertJsonPath('data.record.attributes.slug', 'prof-dato-dr-admin-api-updated-speaker-phd-ba-hons-my')
         ->assertJsonPath('data.record.attributes.job_title', 'Imam');
 });
 

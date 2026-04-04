@@ -63,19 +63,20 @@ class GenerateSpeakerSlugAction
     }
 
     /**
-     * @param  array<string, mixed>  $address
+     * @param  array<string, mixed>  $payload
      */
-    public function handle(string $name, array $address = [], ?string $ignoreSpeakerId = null): string
+    public function handle(string $name, array $payload = [], ?string $ignoreSpeakerId = null): string
     {
         $normalizedName = trim($name);
-        $nameSlug = Str::slug($normalizedName);
+        $displayName = $this->displayName($normalizedName, $payload);
+        $nameSlug = Str::slug($displayName !== '' ? $displayName : $normalizedName);
 
         if ($nameSlug === '') {
             $nameSlug = 'speaker';
         }
 
-        $countrySuffix = $this->countrySuffix($address);
-        $sequence = $this->nextSequenceForExactName($normalizedName, $countrySuffix, $ignoreSpeakerId);
+        $countrySuffix = $this->countrySuffix($payload);
+        $sequence = $this->nextSequenceForExactIdentity($normalizedName, $displayName, $countrySuffix, $ignoreSpeakerId);
 
         do {
             $candidateParts = [$nameSlug];
@@ -106,6 +107,9 @@ class GenerateSpeakerSlugAction
         return $this->handle(
             $speaker->name,
             [
+                'honorific' => $speaker->honorific,
+                'pre_nominal' => $speaker->pre_nominal,
+                'post_nominal' => $speaker->post_nominal,
                 'country_id' => $address?->country_id,
                 'country_code' => $address?->country?->iso2,
             ],
@@ -113,7 +117,7 @@ class GenerateSpeakerSlugAction
         );
     }
 
-    private function nextSequenceForExactName(string $name, string $countrySuffix, ?string $ignoreSpeakerId): int
+    private function nextSequenceForExactIdentity(string $name, string $displayName, string $countrySuffix, ?string $ignoreSpeakerId): int
     {
         $matchingSpeakers = Speaker::query()
             ->where('speakers.name', $name)
@@ -121,8 +125,9 @@ class GenerateSpeakerSlugAction
                 'address.country',
             ])
             ->get()
-            ->filter(function (Speaker $speaker) use ($countrySuffix): bool {
-                return $this->countrySuffixForSpeaker($speaker) === $countrySuffix;
+            ->filter(function (Speaker $speaker) use ($countrySuffix, $displayName): bool {
+                return $this->countrySuffixForSpeaker($speaker) === $countrySuffix
+                    && $this->displayNameForSpeaker($speaker) === $displayName;
             });
 
         if ($ignoreSpeakerId !== null && $ignoreSpeakerId !== '') {
@@ -181,15 +186,21 @@ class GenerateSpeakerSlugAction
     }
 
     /**
-     * @param  array<string, mixed>  $address
+     * @param  array<string, mixed>  $payload
      */
-    private function countrySuffix(array $address): string
+    private function countrySuffix(array $payload): string
     {
-        $countryCode = $this->resolveCountryCode($address);
+        $countryCode = $this->resolveCountryCode($payload);
+        $countryId = $this->integerValue($payload['country_id'] ?? null);
+
+        if (($countryCode === null || $countryId === null) && is_array($payload['address'] ?? null)) {
+            /** @var array<string, mixed> $address */
+            $address = $payload['address'];
+            $countryCode ??= $this->resolveCountryCode($address);
+            $countryId ??= $this->integerValue($address['country_id'] ?? null);
+        }
 
         if ($countryCode === null) {
-            $countryId = $this->integerValue($address['country_id'] ?? null);
-
             if ($countryId !== null) {
                 $countryCode = Country::query()
                     ->whereKey($countryId)
@@ -212,6 +223,29 @@ class GenerateSpeakerSlugAction
             'country_id' => $address?->country_id,
             'country_code' => $address?->country?->iso2,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function displayName(string $name, array $payload): string
+    {
+        return Speaker::formatDisplayedName(
+            $name,
+            $payload['honorific'] ?? null,
+            $payload['pre_nominal'] ?? null,
+            $payload['post_nominal'] ?? null,
+        );
+    }
+
+    private function displayNameForSpeaker(Speaker $speaker): string
+    {
+        return Speaker::formatDisplayedName(
+            $speaker->name,
+            $speaker->honorific,
+            $speaker->pre_nominal,
+            $speaker->post_nominal,
+        );
     }
 
     /**

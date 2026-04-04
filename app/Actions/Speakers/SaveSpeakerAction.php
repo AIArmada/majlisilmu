@@ -34,7 +34,7 @@ final readonly class SaveSpeakerAction
     public function handle(array $data, User $actor, ?Speaker $speaker = null, string $validationErrorKey = 'allow_public_event_submission'): Speaker
     {
         $creating = ! $speaker instanceof Speaker;
-        $speaker ??= new Speaker();
+        $speaker ??= new Speaker;
 
         $address = is_array($data['address'] ?? null) ? $data['address'] : [];
         $currentPublicSubmission = $creating ? true : (bool) $speaker->allow_public_event_submission;
@@ -62,7 +62,9 @@ final readonly class SaveSpeakerAction
         ];
 
         if ($creating) {
-            $attributes['slug'] = $this->generateSpeakerSlugAction->handle($attributes['name'], $address);
+            $attributes['slug'] = $this->generateSpeakerSlugAction->handle($attributes['name'], array_merge($data, [
+                'address' => $address,
+            ]));
             $attributes['allow_public_event_submission'] = true;
 
             $speaker = Speaker::create($attributes);

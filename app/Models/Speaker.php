@@ -150,48 +150,290 @@ class Speaker extends Model implements AuditableContract, HasMedia
 
     public function getFormattedNameAttribute(): string
     {
-        $honorificLabels = null;
-        $preNominalLabels = null;
-        $honorificValues = is_array($this->honorific)
-            ? array_values(array_filter($this->honorific, fn (mixed $value): bool => is_string($value) && $value !== ''))
-            : [];
-        $preNominalValues = is_array($this->pre_nominal)
-            ? array_values(array_filter($this->pre_nominal, fn (mixed $value): bool => is_string($value) && $value !== ''))
-            : [];
+        return self::formatDisplayedName(
+            $this->name,
+            $this->honorific,
+            $this->pre_nominal,
+            $this->post_nominal,
+        );
+    }
 
-        if ($honorificValues !== []) {
-            $honorificLabels = collect($honorificValues)
-                ->map(fn (string $value): ?string => Honorific::tryFrom($value)?->getLabel())
-                ->filter(fn (?string $label): bool => filled($label))
-                ->implode(', ');
-        }
-
-        if ($preNominalValues !== []) {
-            $preNominalLabels = collect($preNominalValues)
-                ->map(fn (string $value): ?string => PreNominal::tryFrom($value)?->getLabel())
-                ->filter(fn (?string $label): bool => filled($label))
-                ->implode(' ');
-        }
+    /**
+     * @param  iterable<int, mixed>|string|null  $honorific
+     * @param  iterable<int, mixed>|string|null  $preNominal
+     * @param  iterable<int, mixed>|string|null  $postNominal
+     */
+    public static function formatDisplayedName(
+        ?string $name,
+        iterable|string|null $honorific = null,
+        iterable|string|null $preNominal = null,
+        iterable|string|null $postNominal = null,
+    ): string {
+        // Public speaker pages follow public-profile naming, not formal salutation format:
+        // full professors lead, honorifics follow, then the remaining prefixes.
+        $leadingPreNominalLabels = self::labelsFromPreNominalCases(self::leadingPreNominalCases($preNominal));
+        $honorificLabels = self::labelsFromHonorificCases(self::orderedHonorificCases($honorific));
+        $trailingPreNominalLabels = self::labelsFromPreNominalCases(self::trailingPreNominalCases($preNominal));
 
         $parts = array_filter([
+            $leadingPreNominalLabels,
             $honorificLabels,
-            $preNominalLabels,
-            $this->name,
+            $trailingPreNominalLabels,
+            trim((string) $name),
         ], filled(...));
 
         $formatted = trim(implode(' ', $parts));
-        $postNominalValues = is_array($this->post_nominal)
-            ? array_values(array_filter($this->post_nominal, fn (string $value): bool => $value !== ''))
-            : [];
+        $postNominalValues = self::orderedPostNominalValues($postNominal);
 
         if ($postNominalValues !== []) {
-            $postNominalStr = implode(', ', $postNominalValues);
-            $formatted = trim($formatted.', '.$postNominalStr);
-        } elseif (filled($this->post_nominal)) {
-            $formatted = trim($formatted.', '.$this->post_nominal);
+            $formatted = trim($formatted.', '.implode(', ', $postNominalValues));
         }
 
         return $formatted;
+    }
+
+    /**
+     * @param  iterable<int, mixed>|string|null  $values
+     * @return list<Honorific>
+     */
+    private static function orderedHonorificCases(iterable|string|null $values): array
+    {
+        $cases = [];
+
+        foreach (self::normalizedStringValues($values) as $value) {
+            $case = Honorific::tryFrom($value);
+
+            if ($case instanceof Honorific) {
+                $cases[$case->value] = $case;
+            }
+        }
+
+        $orderedCases = array_values($cases);
+
+        usort($orderedCases, static function (Honorific $left, Honorific $right): int {
+            return self::honorificSortOrder($left) <=> self::honorificSortOrder($right);
+        });
+
+        return $orderedCases;
+    }
+
+    /**
+     * @param  iterable<int, mixed>|string|null  $values
+     * @return list<PreNominal>
+     */
+    private static function orderedPreNominalCases(iterable|string|null $values): array
+    {
+        $cases = [];
+
+        foreach (self::normalizedStringValues($values) as $value) {
+            $case = PreNominal::tryFrom($value);
+
+            if ($case instanceof PreNominal) {
+                $cases[$case->value] = $case;
+            }
+        }
+
+        $orderedCases = array_values($cases);
+
+        usort($orderedCases, static function (PreNominal $left, PreNominal $right): int {
+            return self::preNominalSortOrder($left) <=> self::preNominalSortOrder($right);
+        });
+
+        return $orderedCases;
+    }
+
+    /**
+     * @param  iterable<int, mixed>|string|null  $values
+     * @return list<PreNominal>
+     */
+    private static function leadingPreNominalCases(iterable|string|null $values): array
+    {
+        return array_values(array_filter(
+            self::orderedPreNominalCases($values),
+            static fn (PreNominal $case): bool => $case === PreNominal::Prof,
+        ));
+    }
+
+    /**
+     * @param  iterable<int, mixed>|string|null  $values
+     * @return list<PreNominal>
+     */
+    private static function trailingPreNominalCases(iterable|string|null $values): array
+    {
+        return array_values(array_filter(
+            self::orderedPreNominalCases($values),
+            static fn (PreNominal $case): bool => $case !== PreNominal::Prof,
+        ));
+    }
+
+    /**
+     * @param  list<Honorific>  $cases
+     */
+    private static function labelsFromHonorificCases(array $cases): ?string
+    {
+        if ($cases === []) {
+            return null;
+        }
+
+        return collect($cases)
+            ->map(static fn (Honorific $case): string => $case->getLabel())
+            ->implode(' ');
+    }
+
+    /**
+     * @param  list<PreNominal>  $cases
+     */
+    private static function labelsFromPreNominalCases(array $cases): ?string
+    {
+        if ($cases === []) {
+            return null;
+        }
+
+        return collect($cases)
+            ->map(static fn (PreNominal $case): string => $case->getLabel())
+            ->implode(' ');
+    }
+
+    /**
+     * @param  iterable<int, mixed>|string|null  $values
+     * @return list<string>
+     */
+    private static function orderedPostNominalValues(iterable|string|null $values): array
+    {
+        $uniqueValues = [];
+
+        foreach (self::normalizedStringValues($values) as $value) {
+            $uniqueValues[$value] = $value;
+        }
+
+        $sortableValues = [];
+
+        foreach (array_values($uniqueValues) as $index => $value) {
+            $sortableValues[] = [
+                'value' => self::postNominalDisplayValue($value),
+                'order' => self::postNominalSortOrder($value),
+                'index' => $index,
+            ];
+        }
+
+        usort($sortableValues, static function (array $left, array $right): int {
+            $orderComparison = $left['order'] <=> $right['order'];
+
+            if ($orderComparison !== 0) {
+                return $orderComparison;
+            }
+
+            return $left['index'] <=> $right['index'];
+        });
+
+        return array_values(array_map(
+            static fn (array $entry): string => $entry['value'],
+            $sortableValues,
+        ));
+    }
+
+    private static function honorificSortOrder(Honorific $honorific): int
+    {
+        return match ($honorific) {
+            Honorific::Tun,
+            Honorific::TohPuan => 10,
+            Honorific::TanSri,
+            Honorific::PuanSri => 20,
+            Honorific::DatukSeriUtama => 30,
+            Honorific::DatukPatinggi => 40,
+            Honorific::DatukAmar => 50,
+            Honorific::DatukSeriPanglima => 60,
+            Honorific::DatukSeri,
+            Honorific::DatoSri,
+            Honorific::DatukPaduka,
+            Honorific::DatinPaduka => 70,
+            Honorific::DatukWira,
+            Honorific::DatoWira => 80,
+            Honorific::Datuk,
+            Honorific::Dato,
+            Honorific::Datin => 90,
+        };
+    }
+
+    private static function preNominalSortOrder(PreNominal $preNominal): int
+    {
+        return match ($preNominal) {
+            PreNominal::Prof => 10,
+            PreNominal::Syeikh => 20,
+            PreNominal::TuanGuru => 21,
+            PreNominal::Pendeta => 22,
+            PreNominal::Ustaz => 23,
+            PreNominal::Ustazah => 24,
+            PreNominal::ImamMuda => 25,
+            PreNominal::Dai => 26,
+            PreNominal::Hafiz => 27,
+            PreNominal::Hafizah => 28,
+            PreNominal::Qari => 29,
+            PreNominal::Qariah => 30,
+            PreNominal::Mufti => 31,
+            PreNominal::Kadi => 32,
+            PreNominal::ProfMadya => 40,
+            PreNominal::Ir => 50,
+            PreNominal::Ar => 51,
+            PreNominal::Dr => 60,
+        };
+    }
+
+    private static function postNominalSortOrder(string $value): int
+    {
+        $case = PostNominal::tryFrom($value);
+
+        return match ($case) {
+            PostNominal::PhD => 10,
+            PostNominal::MSc => 20,
+            PostNominal::MA => 21,
+            PostNominal::BSc => 30,
+            PostNominal::BA => 31,
+            PostNominal::Lc => 32,
+            PostNominal::Hons => 33,
+            PostNominal::Dpl => 40,
+            null => 1_000,
+        };
+    }
+
+    private static function postNominalDisplayValue(string $value): string
+    {
+        return PostNominal::tryFrom($value)?->getLabel() ?? $value;
+    }
+
+    /**
+     * @param  iterable<int, mixed>|string|null  $values
+     * @return list<string>
+     */
+    private static function normalizedStringValues(iterable|string|null $values): array
+    {
+        if (is_string($values)) {
+            $trimmed = trim($values);
+
+            return $trimmed !== '' ? [$trimmed] : [];
+        }
+
+        if (! is_iterable($values)) {
+            return [];
+        }
+
+        return collect($values)
+            ->map(static function (mixed $value): ?string {
+                if ($value instanceof \BackedEnum) {
+                    $value = $value->value;
+                }
+
+                if (! is_string($value)) {
+                    return null;
+                }
+
+                $trimmed = trim($value);
+
+                return $trimmed !== '' ? $trimmed : null;
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**

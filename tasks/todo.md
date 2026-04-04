@@ -1,3 +1,61 @@
+# Uncommitted Change Audit
+
+- [x] Review the current uncommitted speaker-title and slug diff for behavioral regressions
+- [x] Fix issues found during the audit
+- [x] Re-run focused consumer and regression verification
+
+## Review
+
+- Audit finding fixed: the first title-ordering pass incorrectly placed professional prefixes after `Dr.`, which would have rendered public names like `Dr. Ir. ...` and produced matching slug drift. Updated the precedence table in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so public-display professional titles stay ahead of doctorate titles (`Ir. Dr.` / `Ar. Dr.`), matching common Malaysian public-profile usage.
+- Added a regression in [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) that proves `['dr', 'ir']` normalizes to `Ir. Dr.` and `ir-dr-...` regardless of input order.
+- Re-verified downstream consumers that rely on `formatted_name`, not only the slug suite, by exercising the event-form speaker label path and the public speaker page tests.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **17 passed**, 41 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventFormSpeakerLabelTest.php` => **1 passed**, 3 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter=speaker` => **2 passed**, 5 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **8 passed**, 67 assertions
+
+# Speaker Title Ordering
+
+- [x] Document the researched public-display ordering rules for speaker honorifics, pre-nominals, and post-nominals
+- [x] Normalize speaker display-name formatting so input order no longer controls public title order
+- [x] Ensure slug generation and observer-driven resync inherit the normalized title order automatically
+- [x] Add focused regressions for full-professor, associate-professor, and post-nominal ordering, then verify
+
+## Review
+
+- Reworked [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so `formatted_name` no longer trusts admin/API array order. The public display formatter now applies a deterministic precedence table before the slug generator reads it.
+- The implemented public-display rule is intentionally not the same as formal salutation order. I anchored it on Malaysian public profile usage: full `Prof.` stays first, honorifics come next, then the remaining prefixes. That matches official public-profile examples like Universiti Malaya’s faculty handbook entries rendered as `Professor Dato’ Dr. ...`, while still preserving the formal-protocol ordering used for non-full-professor combinations such as `Datuk Prof. Madya Dr. ...` from the Prime Minister’s Department circular. Post-nominals are now rendered after the name in descending academic weight (`PhD`, then masters, then bachelor-level credentials, then honours/diploma).
+- Because [GenerateSpeakerSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Speakers/GenerateSpeakerSlugAction.php) already derives the slug from `Speaker::formatDisplayedName(...)`, the new precedence automatically flows into create/update slug generation and observer-driven slug resync without any extra route-specific code.
+- Expanded [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) to lock full-professor ordering (`Prof. Dato' Dr.`), associate-professor ordering (`Dato' Prof. Madya Dr.`), religious-prefix ordering (`Dato' Ustaz Dr.`), post-nominal normalization, and arbitrary-order updates. Updated [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) so an admin API write with unsorted title arrays still returns the normalized slug.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **16 passed**, 39 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **8 passed**, 67 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/Api/Admin/AdminApiTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/Api/Admin/AdminApiTest.php` => **pass**
+  - `git diff --check` => **clean**
+
+# Speaker Display-Name Slugs
+
+- [x] Audit current speaker slug generation, display-name formatting, and update triggers
+- [x] Generate speaker slugs from the public displayed speaker name plus country suffix
+- [x] Ensure admin/API and observer-driven updates resync speaker slugs when display-name parts change
+- [x] Add focused regression coverage and verify the change
+
+## Review
+
+- Centralized the public speaker display-name formatter in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so the slug generator and `/penceramah/*` now derive from the same `honorific + pre_nominal + name + post_nominal` representation instead of maintaining separate formatting logic.
+- Updated [GenerateSpeakerSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Speakers/GenerateSpeakerSlugAction.php) so slug bases are built from the formatted display name, while duplicate numbering still scopes within the same `name + display-title parts + country` identity and country suffix.
+- Switched the create/write entry points in [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php), [SaveSpeakerAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Speakers/SaveSpeakerAction.php), and [ApproveContributionRequestAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Contributions/ApproveContributionRequestAction.php) to seed slugs from the full speaker payload, not only the raw name and country.
+- Expanded [SpeakerObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/SpeakerObserver.php) so changes to `honorific`, `pre_nominal`, and `post_nominal` trigger the same slug resync flow as name changes. That keeps admin/API updates aligned without needing route-specific slug logic.
+- Updated regression coverage in [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) and [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) to prove slugs include displayed titles and are recomputed when those fields change through both model/observer and admin API paths.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **12 passed**, 31 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **8 passed**, 67 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Models/Speaker.php app/Actions/Speakers/GenerateSpeakerSlugAction.php app/Observers/SpeakerObserver.php app/Services/ContributionEntityMutationService.php app/Actions/Speakers/SaveSpeakerAction.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Console/Commands/QueueBackfillSpeakerSlugs.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/Api/Admin/AdminApiTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Models/Speaker.php app/Actions/Speakers/GenerateSpeakerSlugAction.php app/Observers/SpeakerObserver.php app/Services/ContributionEntityMutationService.php app/Actions/Speakers/SaveSpeakerAction.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Console/Commands/QueueBackfillSpeakerSlugs.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/Api/Admin/AdminApiTest.php` => **pass**
+  - `git diff --check` => **clean**
+
 # Admin Speaker Address Read Freshness
 
 - [x] Audit the admin speaker GET/PUT path for stale or missing address relation data
