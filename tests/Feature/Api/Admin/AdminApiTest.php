@@ -124,6 +124,72 @@ it('exposes admin speaker write schema and can create and update speakers throug
         ->assertJsonPath('data.record.attributes.job_title', 'Imam');
 });
 
+it('requires address.country_id when creating speakers through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/speakers', [
+        'name' => 'Admin API Missing Country Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'is_active' => true,
+        'address' => [],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['address.country_id']);
+});
+
+it('returns fresh speaker address data on admin GET requests after updates', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/speakers', [
+        'name' => 'Admin API Address Freshness Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Asal',
+        ],
+    ])->assertCreated();
+
+    $speakerId = (string) $createResponse->json('data.record.id');
+
+    $this->getJson('/api/v1/admin/speakers/'.$speakerId)
+        ->assertOk()
+        ->assertJsonPath('data.record.attributes.address.country_id', 132)
+        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Asal');
+
+    $this->putJson('/api/v1/admin/speakers/'.$speakerId, [
+        'name' => 'Admin API Address Freshness Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Dikemas Kini',
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.address.country_id', 132)
+        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Dikemas Kini');
+
+    $this->getJson('/api/v1/admin/speakers/'.$speakerId)
+        ->assertOk()
+        ->assertJsonPath('data.record.attributes.address.country_id', 132)
+        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Dikemas Kini');
+
+    $this->getJson('/api/v1/admin/speakers?search=Admin%20API%20Address%20Freshness%20Speaker')
+        ->assertOk()
+        ->assertJsonPath('data.0.attributes.address.country_id', 132)
+        ->assertJsonPath('data.0.attributes.address.line1', 'Alamat Dikemas Kini');
+});
+
 it('exposes admin institution write schema and can create and update institutions through the api', function () {
     ensureAdminApiMalaysiaCountryExists();
 

@@ -84,6 +84,19 @@ it('creates institution contribution requests through the frontend api', functio
         ->and(ContributionRequest::query()->where('entity_id', $institution->getKey())->exists())->toBeTrue();
 });
 
+it('requires address.country_id when creating speakers through the frontend api', function () {
+    $user = User::factory()->create();
+
+    Sanctum::actingAs($user);
+
+    $this->postJson(route('api.client.contributions.speakers.store'), [
+        'name' => 'Frontend API Missing Country Speaker',
+        'gender' => 'male',
+        'address' => [],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['address.country_id']);
+});
+
 it('submits and cancels membership claims through the frontend api', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
