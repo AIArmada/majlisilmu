@@ -59,6 +59,24 @@ it('includes displayed speaker titles in the generated slug', function () {
         ->and($speaker->slug)->toBe('dato-ustaz-ahmad-fauzi-phd-my');
 });
 
+it('supports dato setia as an honorific in formatted names and slugs', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ahmad Fauzi',
+        'gender' => 'male',
+        'honorific' => ['dato_setia'],
+        'pre_nominal' => ['dr'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe("Dato' Setia Dr Ahmad Fauzi")
+        ->and($speaker->slug)->toBe('dato-setia-dr-ahmad-fauzi-my');
+});
+
 it('orders full-professor display titles before honorifics and lower prefixes', function () {
     $proposer = User::factory()->create();
     $country = createSpeakerSlugCountry();
