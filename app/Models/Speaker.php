@@ -183,7 +183,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
         iterable|string|null $postNominal = null,
     ): string {
         // Public speaker pages follow public-profile naming, not formal salutation format:
-        // full professors lead, honorifics follow, then the remaining prefixes.
+        // professor-rank titles lead, honorifics follow, then the remaining prefixes.
         $leadingPreNominalLabels = self::labelsFromPreNominalCases(self::leadingPreNominalCases($preNominal));
         $honorificLabels = self::labelsFromHonorificCases(self::orderedHonorificCases($honorific));
         $trailingPreNominalLabels = self::labelsFromPreNominalCases(self::trailingPreNominalCases($preNominal));
@@ -263,7 +263,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
     {
         return array_values(array_filter(
             self::orderedPreNominalCases($values),
-            static fn (PreNominal $case): bool => $case === PreNominal::Prof,
+            static fn (PreNominal $case): bool => in_array($case, [PreNominal::Prof, PreNominal::ProfMadya], true),
         ));
     }
 
@@ -275,7 +275,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
     {
         return array_values(array_filter(
             self::orderedPreNominalCases($values),
-            static fn (PreNominal $case): bool => $case !== PreNominal::Prof,
+            static fn (PreNominal $case): bool => ! in_array($case, [PreNominal::Prof, PreNominal::ProfMadya], true),
         ));
     }
 

@@ -78,7 +78,7 @@ it('orders full-professor display titles before honorifics and lower prefixes', 
         ->and($speaker->slug)->toBe('prof-dato-dr-azhar-sulaiman-phd-ba-hons-my');
 });
 
-it('keeps honorifics ahead of associate-professor and doctorate prefixes when professor is absent', function () {
+it('orders associate-professor display titles before honorifics and doctorate prefixes', function () {
     $proposer = User::factory()->create();
     $country = createSpeakerSlugCountry();
 
@@ -93,8 +93,8 @@ it('keeps honorifics ahead of associate-professor and doctorate prefixes when pr
         ],
     ], $proposer);
 
-    expect($speaker->formatted_name)->toBe("Dato' Prof. Madya Dr. Azhar Sulaiman, MA, HONS")
-        ->and($speaker->slug)->toBe('dato-prof-madya-dr-azhar-sulaiman-ma-hons-my');
+    expect($speaker->formatted_name)->toBe("Prof. Madya Dato' Dr. Azhar Sulaiman, MA, HONS")
+        ->and($speaker->slug)->toBe('prof-madya-dato-dr-azhar-sulaiman-ma-hons-my');
 });
 
 it('keeps religious prefixes ahead of doctorate titles in public display order', function () {
