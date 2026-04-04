@@ -39,6 +39,98 @@ it('generates country-based slugs for speaker quick-create flows', function () {
         ->and($speaker->addressModel?->country_id)->toBe((int) $country->getKey());
 });
 
+it('includes displayed speaker titles in the generated slug', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ahmad Fauzi',
+        'gender' => 'male',
+        'honorific' => ['dato'],
+        'pre_nominal' => ['ustaz'],
+        'post_nominal' => ['PhD'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe("Dato' Ustaz Ahmad Fauzi, PhD")
+        ->and($speaker->slug)->toBe('dato-ustaz-ahmad-fauzi-phd-my');
+});
+
+it('orders full-professor display titles before honorifics and lower prefixes', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Azhar Sulaiman',
+        'gender' => 'male',
+        'honorific' => ['dato'],
+        'pre_nominal' => ['dr', 'prof'],
+        'post_nominal' => ['HONS', 'BA', 'PhD'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe("Prof. Dato' Dr. Azhar Sulaiman, PhD, BA, HONS")
+        ->and($speaker->slug)->toBe('prof-dato-dr-azhar-sulaiman-phd-ba-hons-my');
+});
+
+it('keeps honorifics ahead of associate-professor and doctorate prefixes when professor is absent', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Azhar Sulaiman',
+        'gender' => 'male',
+        'honorific' => ['dato'],
+        'pre_nominal' => ['dr', 'prof_madya'],
+        'post_nominal' => ['HONS', 'MA'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe("Dato' Prof. Madya Dr. Azhar Sulaiman, MA, HONS")
+        ->and($speaker->slug)->toBe('dato-prof-madya-dr-azhar-sulaiman-ma-hons-my');
+});
+
+it('keeps religious prefixes ahead of doctorate titles in public display order', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ahmad Fauzi',
+        'gender' => 'male',
+        'honorific' => ['dato'],
+        'pre_nominal' => ['dr', 'ustaz'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe("Dato' Ustaz Dr. Ahmad Fauzi")
+        ->and($speaker->slug)->toBe('dato-ustaz-dr-ahmad-fauzi-my');
+});
+
+it('keeps professional prefixes ahead of doctorate titles in public display order', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Mimi Haryani',
+        'gender' => 'female',
+        'pre_nominal' => ['dr', 'ir'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe('Ir. Dr. Mimi Haryani')
+        ->and($speaker->slug)->toBe('ir-dr-mimi-haryani-my');
+});
+
 it('adds duplicate numbering only when the same speaker name reuses the same country suffix', function () {
     $proposer = User::factory()->create();
     $malaysia = createSpeakerSlugCountry();
@@ -189,6 +281,52 @@ it('recomputes speaker slugs when the speaker country changes', function () {
     ]);
 
     expect($speaker->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-sg');
+});
+
+it('recomputes speaker slugs when displayed name parts change', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ahmad Fauzi',
+        'gender' => 'male',
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->slug)->toBe('ahmad-fauzi-my');
+
+    $speaker->update([
+        'honorific' => ['dato'],
+        'pre_nominal' => ['dr'],
+        'post_nominal' => ['PhD'],
+    ]);
+
+    expect($speaker->fresh()?->formatted_name)->toBe("Dato' Dr. Ahmad Fauzi, PhD")
+        ->and($speaker->fresh()?->slug)->toBe('dato-dr-ahmad-fauzi-phd-my');
+});
+
+it('normalizes displayed-name ordering when title arrays are updated in arbitrary order', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Azhar Sulaiman',
+        'gender' => 'male',
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    $speaker->update([
+        'honorific' => ['dato'],
+        'pre_nominal' => ['dr', 'prof'],
+        'post_nominal' => ['BA', 'PhD', 'HONS'],
+    ]);
+
+    expect($speaker->fresh()?->formatted_name)->toBe("Prof. Dato' Dr. Azhar Sulaiman, PhD, BA, HONS")
+        ->and($speaker->fresh()?->slug)->toBe('prof-dato-dr-azhar-sulaiman-phd-ba-hons-my');
 });
 
 it('renumbers remaining speaker duplicates when a peer is renamed out of the group', function () {

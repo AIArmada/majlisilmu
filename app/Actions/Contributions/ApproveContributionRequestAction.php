@@ -150,7 +150,7 @@ class ApproveContributionRequestAction
             'job_title' => $payload['job_title'] ?? null,
             'bio' => $payload['bio'] ?? null,
             'is_freelance' => (bool) ($payload['is_freelance'] ?? false),
-            'slug' => $this->generateSpeakerSlugAction->handle((string) ($payload['name'] ?? 'Speaker'), $address),
+            'slug' => $this->generateSpeakerSlugAction->handle((string) ($payload['name'] ?? 'Speaker'), $payload),
             'status' => 'verified',
             'is_active' => true,
             'allow_public_event_submission' => true,

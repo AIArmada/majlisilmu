@@ -94,7 +94,7 @@ class ContributionEntityMutationService
             'job_title' => $payload['job_title'] ?? null,
             'slug' => $this->generateSpeakerSlugAction->handle(
                 (string) ($payload['name'] ?? 'Speaker'),
-                $this->speakerSlugPayload($payload),
+                $payload,
             ),
             'status' => 'pending',
             'is_active' => true,
@@ -570,15 +570,6 @@ class ContributionEntityMutationService
         }
 
         return $address;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function speakerSlugPayload(array $payload): array
-    {
-        return $this->speakerAddressPayload($payload) ?? [];
     }
 
     private function syncContacts(Model $model, mixed $contactPayload): void

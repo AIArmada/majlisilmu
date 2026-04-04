@@ -9,7 +9,7 @@ class QueueBackfillSpeakerSlugs extends Command
 {
     protected $signature = 'speakers:queue-slug-backfill';
 
-    protected $description = 'Queue regeneration of speaker slugs using the country-based slug format.';
+    protected $description = 'Queue regeneration of speaker slugs using the displayed-name and country slug format.';
 
     public function handle(): int
     {

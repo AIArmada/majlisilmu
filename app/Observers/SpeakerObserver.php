@@ -17,7 +17,7 @@ class SpeakerObserver
 
     public function saved(Speaker $speaker): void
     {
-        if ($speaker->wasRecentlyCreated || $speaker->wasChanged('name')) {
+        if ($speaker->wasRecentlyCreated || $speaker->wasChanged(['name', 'honorific', 'pre_nominal', 'post_nominal'])) {
             $previousName = $speaker->wasChanged('name')
                 ? trim((string) ($speaker->getPrevious()['name'] ?? ''))
                 : null;
