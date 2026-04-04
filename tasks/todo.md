@@ -1,3 +1,45 @@
+# Admin MCP Rebuild
+
+- [x] Rebuild shared admin API orchestration and thin HTTP admin controllers
+- [x] Rebuild admin MCP server, tools, and compatible HTTP transport routes
+- [x] Rebuild the `mcp:token` command and focused automated coverage
+- [x] Reconfigure OpenCode, Copilot CLI, and VS Code Insiders against `majlisilmu.test`
+- [x] Verify repo tests, static analysis, and live client connectivity
+- [x] Make the MCP route production-loadable on `majlisilmu.my` by promoting `laravel/mcp` to a direct runtime dependency
+- [x] Audit the full uncommitted admin/MCP diff and rerun focused verification
+
+## Review
+
+- Read the official Laravel MCP docs end to end at [Laravel MCP](https://laravel.com/docs/13.x/mcp) and aligned the implementation with the documented shape: `Mcp::web(...)` in [routes/ai.php](/Users/Saiffil/Herd/majlisilmu/routes/ai.php), Sanctum bearer-token auth, request-based authorization in tools, and the documented `shouldRegister(Request $request)` pattern in [AbstractAdminWriteTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AbstractAdminWriteTool.php).
+- Kept the shared admin resource orchestration in [AdminResourceService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceService.php), the admin MCP server in [AdminServer.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Servers/AdminServer.php), the admin tool suite under [app/Mcp/Tools/Admin](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin), and the token command in [IssueMcpToken.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/IssueMcpToken.php).
+- Added [NormalizeMcpAcceptHeader.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Middleware/NormalizeMcpAcceptHeader.php) so MCP HTTP requests are treated as JSON-bearing auth requests instead of redirecting to `/login`. This keeps the custom `GET /mcp/admin` compatibility route returning a proper `401` bearer challenge for unauthenticated SSE clients while the vendor-managed `POST /mcp/admin` route remains the main Laravel MCP transport.
+- Kept the compatibility controller in [AdminMcpController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Mcp/AdminMcpController.php) so `majlisilmu.test` supports an authenticated SSE heartbeat on `GET /mcp/admin` and a no-op session teardown on `DELETE /mcp/admin`, while the actual JSON-RPC handling stays on the Laravel MCP `POST /mcp/admin` route.
+- Updated local client config so the same remote server is registered in:
+  - [opencode.json](/Users/Saiffil/.config/opencode/opencode.json)
+  - [mcp-config.json](/Users/Saiffil/.copilot/mcp-config.json)
+  - [mcp.json](/Users/Saiffil/Library/Application%20Support/Code%20-%20Insiders/User/mcp.json)
+  - [.zshrc](/Users/Saiffil/.zshrc) plus `launchctl setenv NODE_EXTRA_CA_CERTS ...`
+- Production audit:
+  - `curl -isk https://majlisilmu.my/mcp/admin` currently returns **404**, so the production host is not serving the MCP route yet.
+  - Root-cause audit showed [composer.json](/Users/Saiffil/Herd/majlisilmu/composer.json) did not declare `laravel/mcp` directly; it only existed transitively in the lockfile. Because the package service provider is what loads [routes/ai.php](/Users/Saiffil/Herd/majlisilmu/routes/ai.php), a production `composer install --no-dev` could legitimately omit MCP routing entirely.
+  - Fixed that by adding `laravel/mcp` to runtime `require` in [composer.json](/Users/Saiffil/Herd/majlisilmu/composer.json), which also moved the package into the non-dev section of [composer.lock](/Users/Saiffil/Herd/majlisilmu/composer.lock) at `v0.6.5`.
+  - Composer also refreshed the generated foundational package list in [AGENTS.md](/Users/Saiffil/Herd/majlisilmu/AGENTS.md), which is expected because `laravel/mcp` is now a first-class runtime package instead of a transitive dev dependency.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-mcp tests/Feature/Mcp/AdminServerTest.php` => **12 passed**, 80 assertions
+  - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-api tests/Feature/Api/Admin/AdminApiTest.php` => **6 passed**, 49 assertions
+  - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-console tests/Feature/Console/IssueMcpTokenCommandTest.php` => **2 passed**, 4 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/Admin/ManifestController.php app/Http/Controllers/Api/Admin/ResourceController.php app/Support/Api/Admin/AdminResourceService.php app/Http/Controllers/Mcp/AdminMcpController.php app/Http/Middleware/NormalizeMcpAcceptHeader.php app/Console/Commands/IssueMcpToken.php app/Mcp routes/ai.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Mcp/AdminServerTest.php tests/Feature/Console/IssueMcpTokenCommandTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Http/Controllers/Api/Admin/ManifestController.php app/Http/Controllers/Api/Admin/ResourceController.php app/Support/Api/Admin/AdminResourceService.php app/Http/Controllers/Mcp/AdminMcpController.php app/Http/Middleware/NormalizeMcpAcceptHeader.php app/Console/Commands/IssueMcpToken.php app/Mcp routes/ai.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Mcp/AdminServerTest.php tests/Feature/Console/IssueMcpTokenCommandTest.php` => **pass**
+  - `git diff --check` => **clean**
+  - `php artisan route:list --path=mcp/admin` => **GET/DELETE/POST routes registered**
+  - `curl -isk https://majlisilmu.test/mcp/admin -H 'Accept: text/event-stream'` => **401** with `WWW-Authenticate: Bearer realm="mcp", error="invalid_token"`
+  - Authenticated `initialize`, `tools/list`, and bounded SSE GET checks against `https://majlisilmu.test/mcp/admin` => **pass**
+  - Raw authenticated `curl` against `https://majlisilmu.test/mcp/admin` with `Accept: application/json, text/event-stream` => **200** initialize response with `MCP-Session-Id` header present
+  - `opencode mcp list` => **`majlisilmu_admin connected`**
+  - `copilot -p 'Use the majlisilmu_admin MCP server...' --disable-builtin-mcps --allow-all` => Copilot CLI invoked `Admin List Resources Tool (MCP: majlisilmu_admin)` and returned **`CONNECTED`**
+- VS Code Insiders user MCP config is written, and the Herd CA path is exported through `launchctl` for GUI-launched Node processes. I did not fully exercise the Copilot chat UI in VS Code from this shell session because the `code-insiders` CLI is not on the current PATH, so the remaining step there is restarting VS Code Insiders and using Copilot chat once to let it pick up the new user-level MCP config.
+- Production status: code is now ready for `majlisilmu.my`, but the host will continue returning `404` until this diff is deployed and production runs a fresh Composer install plus normal cache reload for the new runtime package.
+
 # Admin Route Shape Cleanup
 
 - [x] Remove the redundant `/api` segment from the API-docs host paths so the docs live directly on the `api` subdomain
@@ -7529,3 +7571,10 @@
   - `php -l resources/views/components/pages/speakers/⚡index.blade.php && php -l resources/views/components/pages/speakers/⚡show.blade.php` => **No syntax errors**
   - `vendor/bin/phpstan analyse --ansi` => **No errors**
   - `git diff --check -- resources/views/components/pages/speakers/⚡index.blade.php resources/views/components/pages/speakers/⚡show.blade.php tests/Feature/SpeakerIndexTest.php tests/Feature/SpeakerShowSocialPlacementTest.php tasks/todo.md` => **No diff formatting issues**
+
+## Rebuild Plan
+- [ ] Rebuild shared admin API orchestration and thin HTTP admin controllers
+- [ ] Rebuild admin MCP server, tools, and compatible HTTP transport routes
+- [ ] Rebuild the `mcp:token` command and focused automated coverage
+- [ ] Reconfigure OpenCode, Copilot CLI, and VS Code Insiders against `majlisilmu.test`
+- [ ] Verify repo tests, static analysis, and live client connectivity
