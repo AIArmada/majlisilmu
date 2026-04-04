@@ -1,3 +1,21 @@
+# Public API Docs
+
+- [x] Audit the current Scramble docs access wiring and scope the minimum change for public docs
+- [x] Remove the admin-only docs restriction while keeping docs bound to the API host
+- [x] Add regression coverage for unauthenticated docs access outside local/test assumptions
+- [x] Verify focused tests and static checks, then record the outcome
+
+## Review
+
+- Removed Scramble's admin-only docs restriction from [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php) so the docs routes now run with plain `web` middleware and stay public on the configured API host.
+- Deleted the now-dead `viewApiDocs` gate wiring from [ApiDocumentationServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/ApiDocumentationServiceProvider.php), keeping the provider focused on host-bound docs route registration instead of application-admin auth.
+- Added a production-like regression in [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php) that flips the app environment to `production` and proves unauthenticated access to both `/docs` and `/docs.json` still succeeds on `api.majlisilmu.test`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => **7 passed**, 31 assertions
+  - `vendor/bin/phpstan analyse --ansi config/scramble.php app/Providers/ApiDocumentationServiceProvider.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `vendor/bin/pint --test config/scramble.php app/Providers/ApiDocumentationServiceProvider.php tests/Feature/ScrambleDocsTest.php` => **pass**
+  - `git diff --check` => **clean**
+
 # API Docs Host Resolution
 
 - [x] Audit the current Scramble docs host/link resolution and identify the unsafe production fallback
