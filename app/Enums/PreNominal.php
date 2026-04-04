@@ -19,6 +19,7 @@ enum PreNominal: string implements HasLabel
     case Ustaz = 'ustaz';
     case Ustazah = 'ustazah';
     case Syeikh = 'syeikh';
+    case Maulana = 'maulana';
     case Habib = 'habib';
     case Pendeta = 'pendeta';
     case TuanGuru = 'tuan_guru';
@@ -51,6 +52,7 @@ enum PreNominal: string implements HasLabel
             self::Ustaz => __('Ustaz'),
             self::Ustazah => __('Ustazah'),
             self::Syeikh => __('Syeikh'),
+            self::Maulana => __('Maulana'),
             self::Habib => __('Habib'),
             self::Pendeta => __('Pendeta'),
             self::TuanGuru => __('Tuan Guru'),

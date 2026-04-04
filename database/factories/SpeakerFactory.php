@@ -146,7 +146,7 @@ class SpeakerFactory extends Factory
             'Abdul Karim',
         ];
         // Pre-nominals (Professional/Religious titles) - using enum values
-        $preNominalsMale = ['ustaz', 'dr', 'prof', 'ir', 'tuan_guru', 'syeikh', 'hafiz', 'mufti'];
+        $preNominalsMale = ['ustaz', 'dr', 'prof', 'ir', 'tuan_guru', 'syeikh', 'maulana', 'hafiz', 'mufti'];
         $preNominalsFemale = ['ustazah', 'dr', 'prof', 'ir', 'hafizah', 'qariah'];
 
         // Honorifics (State awards) - using enum values

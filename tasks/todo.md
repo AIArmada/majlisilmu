@@ -1,3 +1,21 @@
+# Speaker Maulana Pre-Nominal
+
+- [x] Add `Maulana` to the shared speaker pre-nominal enum and label set
+- [x] Include `Maulana` in the shared speaker title-ordering precedence
+- [x] Add focused regression coverage and verify the affected speaker tests
+
+## Review
+
+- Added `PreNominal::Maulana` to [PreNominal.php](/Users/Saiffil/Herd/majlisilmu/app/Enums/PreNominal.php) so the shared speaker form and API option set can accept and label the new pre-nominal consistently.
+- Updated the normalized speaker title precedence in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so `Maulana` sorts in the scholar-title group ahead of `Dr`, which keeps public speaker formatting and slug generation deterministic.
+- Extended [SpeakerFactory.php](/Users/Saiffil/Herd/majlisilmu/database/factories/SpeakerFactory.php) so generated male speakers can now include the new enum value instead of leaving factory data behind the supported option set.
+- Added a focused regression in [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) that proves mixed-order input like `['dr', 'maulana']` renders as `Maulana Dr ...` and generates `maulana-dr-...`.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/SpeakerSlugGenerationTest.php` => **21 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerCreateOptionSchemaTest.php` => **2 passed**, 15 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventFormSpeakerLabelTest.php` => **1 passed**, 3 assertions
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
 # Speaker Dato Setia Honorific
 
 - [x] Add `Dato' Setia` to the shared speaker honorific enum
