@@ -29,6 +29,9 @@ enum Honorific: string implements HasLabel
     case DatukWira = 'datuk_wira';
     case DatoWira = 'dato_wira';
 
+    // State Distinction
+    case DatoSetia = 'dato_setia';
+
     // Sarawak Specific
     case DatukAmar = 'datuk_amar';
     case DatukPatinggi = 'datuk_patinggi';
@@ -64,6 +67,9 @@ enum Honorific: string implements HasLabel
             // Warrior Distinction
             self::DatukWira => __('Datuk Wira'),
             self::DatoWira => __('Dato\' Wira'),
+
+            // State Distinction
+            self::DatoSetia => __('Dato\' Setia'),
 
             // Sarawak Specific
             self::DatukAmar => __('Datuk Amar'),

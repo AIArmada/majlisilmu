@@ -1,3 +1,20 @@
+# Speaker Dato Setia Honorific
+
+- [x] Add `Dato' Setia` to the shared speaker honorific enum
+- [x] Place `Dato' Setia` into the shared honorific ordering used by speaker display-name formatting
+- [x] Add focused regression coverage and verify the affected speaker tests
+
+## Review
+
+- Added `Honorific::DatoSetia` to [Honorific.php](/Users/Saiffil/Herd/majlisilmu/app/Enums/Honorific.php) with the public label `Dato' Setia`, so the existing enum-backed Filament forms and admin/frontend API validation paths now accept the new honorific without any extra per-surface wiring.
+- Updated the shared honorific precedence in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so `Dato' Setia` participates in the same normalized speaker display-name pipeline as other honorifics instead of failing the exhaustive match at runtime.
+- Expanded [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) with a focused regression proving `['dato_setia']` renders as `Dato' Setia ...` and generates the expected `dato-setia-...` slug.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/SpeakerSlugGenerationTest.php` => **20 passed**, 49 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerCreateOptionSchemaTest.php` => **2 passed**, 15 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventFormSpeakerLabelTest.php` => **1 passed**, 3 assertions
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
 # Speaker Associate-Professor Ordering
 
 - [x] Audit the current professor-rank versus honorific precedence for public speaker display names
