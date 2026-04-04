@@ -36,18 +36,18 @@ class AdminResourceRegistry
     ) {}
 
     /**
-     * @return list<class-string<Resource>>
+     * @return list<class-string<resource>>
      */
     public function resources(): array
     {
-        /** @var array<int|string, class-string<Resource>> $resources */
+        /** @var array<int|string, class-string<resource>> $resources */
         $resources = Filament::getPanel('admin')->getResources();
 
         return array_values($resources);
     }
 
     /**
-     * @return list<class-string<Resource>>
+     * @return list<class-string<resource>>
      */
     public function accessibleResources(): array
     {
@@ -145,6 +145,8 @@ class AdminResourceRegistry
         /** @var Builder<Model> $query */
         $query = $resourceClass::getEloquentQuery();
 
+        $this->applyDefaultApiEagerLoads($query);
+
         return $query;
     }
 
@@ -204,6 +206,8 @@ class AdminResourceRegistry
     public function serializeRecord(string $resourceClass, Model $record): array
     {
         $pages = $resourceClass::getPages();
+
+        $this->loadMissingApiRelations($record);
 
         return [
             'id' => (string) $record->getKey(),
@@ -287,7 +291,7 @@ class AdminResourceRegistry
     }
 
     /**
-     * @param  class-string<Resource>  $resourceClass
+     * @param  class-string<resource>  $resourceClass
      */
     private function canCreate(string $resourceClass): bool
     {
@@ -300,7 +304,7 @@ class AdminResourceRegistry
     }
 
     /**
-     * @param  class-string<Resource>  $resourceClass
+     * @param  class-string<resource>  $resourceClass
      */
     private function canViewAny(string $resourceClass): bool
     {
@@ -313,7 +317,36 @@ class AdminResourceRegistry
     }
 
     /**
-     * @param  class-string<Resource>  $resourceClass
+     * @param  Builder<Model>  $query
+     */
+    private function applyDefaultApiEagerLoads(Builder $query): void
+    {
+        $relations = $this->apiRelations($query->getModel());
+
+        if ($relations !== []) {
+            $query->with($relations);
+        }
+    }
+
+    private function loadMissingApiRelations(Model $record): void
+    {
+        $relations = $this->apiRelations($record);
+
+        if ($relations !== []) {
+            $record->loadMissing($relations);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function apiRelations(Model $model): array
+    {
+        return method_exists($model, 'address') ? ['address'] : [];
+    }
+
+    /**
+     * @param  class-string<resource>  $resourceClass
      */
     private function canActOnRecord(string $ability, string $resourceClass, Model $record): bool
     {
@@ -329,7 +362,7 @@ class AdminResourceRegistry
             };
     }
 
-    private function stringOrNull(string | UnitEnum | null $value): ?string
+    private function stringOrNull(string|UnitEnum|null $value): ?string
     {
         if ($value instanceof UnitEnum) {
             return $value instanceof \BackedEnum ? (string) $value->value : $value->name;
@@ -338,7 +371,7 @@ class AdminResourceRegistry
         return filled($value) ? (string) $value : null;
     }
 
-    private function htmlableToString(Htmlable | string | null $value): ?string
+    private function htmlableToString(Htmlable|string|null $value): ?string
     {
         if ($value instanceof Htmlable) {
             return $value->toHtml();

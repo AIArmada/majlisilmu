@@ -1,3 +1,40 @@
+# Admin Speaker Address Read Freshness
+
+- [x] Audit the admin speaker GET/PUT path for stale or missing address relation data
+- [x] Add regression coverage proving admin GET returns the saved address after create/update
+- [x] Fix the admin API read path so serialized speaker records include fresh address data
+- [x] Verify focused tests and static checks, then record the outcome
+
+## Review
+
+- Reproduced the bug in [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) by creating a speaker with `address.country_id = 132`, then asserting the follow-up admin `GET /api/v1/admin/speakers/{id}` returned `null` for `data.record.attributes.address.country_id`.
+- Fixed the admin read path in [AdminResourceRegistry.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceRegistry.php) by eager-loading the `address` relation on admin resource queries and calling `loadMissing('address')` before serializing records. That keeps `show`, `index`, and any other registry-backed admin reads aligned with the fresh write response from `SaveSpeakerAction`.
+- Expanded the admin API regression in [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) so it now proves the full reported flow: create speaker, confirm `GET` returns the saved address, update the address, confirm `PUT` returns the update, then confirm subsequent `GET` and search/list responses still return the updated address.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **8 passed**, 65 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => **16 passed**, 100 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Support/Api/Admin/AdminResourceRegistry.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Mcp/AdminServerTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/Api/Admin/AdminResourceRegistry.php tests/Feature/Api/Admin/AdminApiTest.php` => **pass**
+  - `git diff --check` => **clean**
+
+# Speaker Create Country Requirement
+
+- [x] Inspect admin and public speaker-create validation paths for country requirements
+- [x] Add focused regression coverage proving missing country is rejected on both APIs
+- [x] Run focused verification and record the proof points
+
+## Review
+
+- Confirmed the public speaker contribution endpoint in [ContributionController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/ContributionController.php) validates `address.country_id` as required on create.
+- Confirmed the admin speaker create endpoint in [AdminResourceMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceMutationService.php) validates `address.country_id` as required on create, with an additional `exists:countries,id` check.
+- Added request-level regression coverage in [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) and [FrontendApiParityTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Frontend/FrontendApiParityTest.php) asserting that omitting `address.country_id` returns `422` with a validation error on `address.country_id`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **7 passed**, 52 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **11 passed**, 69 assertions
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Support/Api/Admin/AdminResourceMutationService.php app/Support/Api/Frontend/FrontendFormContractService.php` => **No errors**
+  - `vendor/bin/pint --test tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **pass**
+  - `git diff --check` => **clean**
+
 # Public API Docs
 
 - [x] Audit the current Scramble docs access wiring and scope the minimum change for public docs
