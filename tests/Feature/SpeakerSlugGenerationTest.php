@@ -115,6 +115,23 @@ it('keeps religious prefixes ahead of doctorate titles in public display order',
         ->and($speaker->slug)->toBe('dato-ustaz-dr-ahmad-fauzi-my');
 });
 
+it('supports habib as a pre-nominal in formatted names and slugs', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ali Zainal Abidin',
+        'gender' => 'male',
+        'pre_nominal' => ['dr', 'habib'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe('Habib Dr. Ali Zainal Abidin')
+        ->and($speaker->slug)->toBe('habib-dr-ali-zainal-abidin-my');
+});
+
 it('keeps professional prefixes ahead of doctorate titles in public display order', function () {
     $proposer = User::factory()->create();
     $country = createSpeakerSlugCountry();
