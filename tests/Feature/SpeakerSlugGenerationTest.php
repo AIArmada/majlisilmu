@@ -74,7 +74,7 @@ it('orders full-professor display titles before honorifics and lower prefixes', 
         ],
     ], $proposer);
 
-    expect($speaker->formatted_name)->toBe("Prof. Dato' Dr. Azhar Sulaiman, PhD, BA, HONS")
+    expect($speaker->formatted_name)->toBe("Prof Dato' Dr Azhar Sulaiman, PhD, BA, HONS")
         ->and($speaker->slug)->toBe('prof-dato-dr-azhar-sulaiman-phd-ba-hons-my');
 });
 
@@ -93,7 +93,7 @@ it('orders associate-professor display titles before honorifics and doctorate pr
         ],
     ], $proposer);
 
-    expect($speaker->formatted_name)->toBe("Prof. Madya Dato' Dr. Azhar Sulaiman, MA, HONS")
+    expect($speaker->formatted_name)->toBe("Prof Madya Dato' Dr Azhar Sulaiman, MA, HONS")
         ->and($speaker->slug)->toBe('prof-madya-dato-dr-azhar-sulaiman-ma-hons-my');
 });
 
@@ -111,7 +111,7 @@ it('keeps religious prefixes ahead of doctorate titles in public display order',
         ],
     ], $proposer);
 
-    expect($speaker->formatted_name)->toBe("Dato' Ustaz Dr. Ahmad Fauzi")
+    expect($speaker->formatted_name)->toBe("Dato' Ustaz Dr Ahmad Fauzi")
         ->and($speaker->slug)->toBe('dato-ustaz-dr-ahmad-fauzi-my');
 });
 
@@ -128,7 +128,7 @@ it('supports habib as a pre-nominal in formatted names and slugs', function () {
         ],
     ], $proposer);
 
-    expect($speaker->formatted_name)->toBe('Habib Dr. Ali Zainal Abidin')
+    expect($speaker->formatted_name)->toBe('Habib Dr Ali Zainal Abidin')
         ->and($speaker->slug)->toBe('habib-dr-ali-zainal-abidin-my');
 });
 
@@ -145,7 +145,7 @@ it('keeps professional prefixes ahead of doctorate titles in public display orde
         ],
     ], $proposer);
 
-    expect($speaker->formatted_name)->toBe('Ir. Dr. Mimi Haryani')
+    expect($speaker->formatted_name)->toBe('Ir Dr Mimi Haryani')
         ->and($speaker->slug)->toBe('ir-dr-mimi-haryani-my');
 });
 
@@ -338,7 +338,7 @@ it('recomputes speaker slugs when displayed name parts change', function () {
         'post_nominal' => ['PhD'],
     ]);
 
-    expect($speaker->fresh()?->formatted_name)->toBe("Dato' Dr. Ahmad Fauzi, PhD")
+    expect($speaker->fresh()?->formatted_name)->toBe("Dato' Dr Ahmad Fauzi, PhD")
         ->and($speaker->fresh()?->slug)->toBe('dato-dr-ahmad-fauzi-phd-my');
 });
 
@@ -360,7 +360,7 @@ it('normalizes displayed-name ordering when title arrays are updated in arbitrar
         'post_nominal' => ['BA', 'PhD', 'HONS'],
     ]);
 
-    expect($speaker->fresh()?->formatted_name)->toBe("Prof. Dato' Dr. Azhar Sulaiman, PhD, BA, HONS")
+    expect($speaker->fresh()?->formatted_name)->toBe("Prof Dato' Dr Azhar Sulaiman, PhD, BA, HONS")
         ->and($speaker->fresh()?->slug)->toBe('prof-dato-dr-azhar-sulaiman-phd-ba-hons-my');
 });
 
