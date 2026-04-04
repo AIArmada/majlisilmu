@@ -1,3 +1,25 @@
+# API Docs Host Resolution
+
+- [x] Audit the current Scramble docs host/link resolution and identify the unsafe production fallback
+- [x] Centralize API docs host/url derivation so missing env config no longer points to local `.test`
+- [x] Reuse the shared resolver in Scramble route registration and both API access UIs
+- [x] Verify focused regression coverage, static analysis, formatting, and diff hygiene
+
+## Review
+
+- Replaced the hardcoded Scramble `.test` fallback in [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php) with an explicit env-only value, added [ApiDocumentationUrlResolver.php](/Users/Saiffil/Herd/majlisilmu/app/Support/ApiDocumentation/ApiDocumentationUrlResolver.php) as the single place that normalizes the configured API docs host/origin, and set [\.env.testing](/Users/Saiffil/Herd/majlisilmu/.env.testing) to keep the test environment explicit too.
+- Wired the shared resolver into [ApiDocumentationServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/ApiDocumentationServiceProvider.php) so Scramble route registration and the generated docs host now stay aligned instead of silently binding production to `api.majlisilmu.test`.
+- Updated both API access entry points in [ViewUser.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php) and [AccountSettings.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Dashboard/AccountSettings.php), plus [account-settings.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/dashboard/account-settings.blade.php), so the `Open API Docs` button and the displayed login endpoint use the same resolved production API origin.
+- Added focused regression coverage in [ApiDocumentationUrlResolverTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Support/ApiDocumentation/ApiDocumentationUrlResolverTest.php), [AccountSettingsPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AccountSettingsPageTest.php), and [AuthzUserResourceTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AuthzUserResourceTest.php) to lock the configured-host behavior into both public account settings and the admin authz user view.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Support/ApiDocumentation/ApiDocumentationUrlResolverTest.php` => **2 passed**, 6 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => **13 passed**, 122 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AuthzUserResourceTest.php` => **8 passed**, 60 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => **6 passed**, 29 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Support/ApiDocumentation/ApiDocumentationUrlResolver.php app/Providers/ApiDocumentationServiceProvider.php app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/Support/ApiDocumentation/ApiDocumentationUrlResolverTest.php tests/Feature/AccountSettingsPageTest.php tests/Feature/AuthzUserResourceTest.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Support/ApiDocumentation/ApiDocumentationUrlResolver.php app/Providers/ApiDocumentationServiceProvider.php app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php app/Livewire/Pages/Dashboard/AccountSettings.php resources/views/livewire/pages/dashboard/account-settings.blade.php config/scramble.php tests/Feature/Support/ApiDocumentation/ApiDocumentationUrlResolverTest.php tests/Feature/AccountSettingsPageTest.php tests/Feature/AuthzUserResourceTest.php tests/Feature/ScrambleDocsTest.php` => **pass**
+  - `git diff --check` => **clean**
+
 # Admin MCP Rebuild
 
 - [x] Rebuild shared admin API orchestration and thin HTTP admin controllers

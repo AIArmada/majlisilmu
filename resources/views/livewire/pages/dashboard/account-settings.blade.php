@@ -15,10 +15,7 @@
     $notificationTimezone = $this->notificationSettingsState['timezone'] ?? config('app.timezone');
     $pushDestinations = $this->notificationDestinations['push'] ?? [];
     $apiDocsUrl = $apiDocsUrl ?? null;
-    $apiDomain = trim((string) config('scramble.api_domain'));
-    $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');
-    $apiOrigin = $apiDomain === '' ? rtrim(url('/'), '/') : (str_starts_with($apiDomain, 'http://') || str_starts_with($apiDomain, 'https://') ? rtrim($apiDomain, '/') : 'https://' . rtrim($apiDomain, '/'));
-    $apiBaseUrl = $apiPath === '' ? $apiOrigin : $apiOrigin . '/' . $apiPath;
+    $apiBaseUrl = $apiBaseUrl ?? rtrim(url('/'), '/');
 @endphp
 
 <div class="min-h-screen bg-slate-50 py-12 pb-32">

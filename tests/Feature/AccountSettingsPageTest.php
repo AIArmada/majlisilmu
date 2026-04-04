@@ -18,6 +18,9 @@ it('renders the account settings page with profile and notifications tabs', func
 
     $user = User::factory()->create();
 
+    config()->set('scramble.api_domain', 'api.majlisilmu.my');
+    config()->set('app.url', 'https://admin.majlisilmu.my');
+
     $response = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
         ->get(route('dashboard.account-settings'));
@@ -30,6 +33,8 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('API Access')
         ->assertSee('Create Token')
         ->assertSee('Authorization: Bearer')
+        ->assertSee('https://api.majlisilmu.my/docs')
+        ->assertSee('POST https://api.majlisilmu.my/api/v1/auth/login')
         ->assertDontSee('Device Preferences')
         ->assertDontSee('Show country selector on public search pages')
         ->assertSee('Prayer Institutions')

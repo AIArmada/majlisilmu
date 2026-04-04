@@ -1,5 +1,6 @@
 # Lessons
 
+- When a deployment environment already owns the correct explicit config, do not add runtime host-derivation or production-only fallback heuristics around it; fix the code to read the configured value cleanly and verify cache/deploy state instead.
 - When an API uses bearer tokens for third-party integrations, do not assume login/register endpoints are self-explanatory; surface the token acquisition path explicitly in the generated docs and provide a first-party token management UI inside the application.
 - When exposing docs on a dedicated API subdomain, do not keep redundant path segments like `/docs/api`; prefer host-level clarity such as `/docs` and reserve path depth for real resource structure.
 - When adapting Filament concepts into a public or client-facing admin API, do not mirror internal `resources/.../records` route shapes by habit; flatten them into collection/item endpoints unless the user explicitly wants the framework vocabulary exposed.

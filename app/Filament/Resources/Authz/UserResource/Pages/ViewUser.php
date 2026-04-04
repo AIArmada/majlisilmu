@@ -15,6 +15,7 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Filament\Actions\EditAction;
@@ -108,17 +109,7 @@ class ViewUser extends ViewRecord
 
     public function apiDocsUrl(): string
     {
-        $domain = trim((string) config('scramble.api_domain'));
-
-        if ($domain === '') {
-            return url('/docs');
-        }
-
-        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
-            return rtrim($domain, '/').'/docs';
-        }
-
-        return 'https://'.rtrim($domain, '/').'/docs';
+        return app(ApiDocumentationUrlResolver::class)->docsUrl();
     }
 
     private function reloadUserRecord(): void

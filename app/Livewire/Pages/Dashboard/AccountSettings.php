@@ -6,6 +6,7 @@ use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
+use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Notifications\NotificationCatalog;
 use App\Support\Timezone\UserDateTimeFormatter;
 use DateTimeZone;
@@ -562,17 +563,12 @@ class AccountSettings extends Component implements HasForms
 
     protected function apiDocsUrl(): string
     {
-        $domain = trim((string) config('scramble.api_domain'));
+        return app(ApiDocumentationUrlResolver::class)->docsUrl();
+    }
 
-        if ($domain === '') {
-            return url('/docs');
-        }
-
-        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
-            return rtrim($domain, '/').'/docs';
-        }
-
-        return 'https://'.rtrim($domain, '/').'/docs';
+    protected function apiBaseUrl(): string
+    {
+        return app(ApiDocumentationUrlResolver::class)->apiBaseUrl();
     }
 
     protected function accountSettingsForm(): Schema
@@ -590,6 +586,7 @@ class AccountSettings extends Component implements HasForms
     {
         return view('livewire.pages.dashboard.account-settings', [
             'apiDocsUrl' => $this->apiDocsUrl(),
+            'apiBaseUrl' => $this->apiBaseUrl(),
             'apiTokens' => $this->currentUser()
                 ->tokens()
                 ->latest('created_at')

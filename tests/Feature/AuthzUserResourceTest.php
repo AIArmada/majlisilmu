@@ -50,6 +50,9 @@ it('allows admins to create and revoke api tokens for dedicated service users fr
     setPermissionsTeamId(null);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
+    config()->set('scramble.api_domain', 'api.majlisilmu.my');
+    config()->set('app.url', 'https://admin.majlisilmu.my');
+
     if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
         Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
     }
@@ -66,6 +69,7 @@ it('allows admins to create and revoke api tokens for dedicated service users fr
         ->get(UserResource::getUrl('view', ['record' => $serviceUser], panel: 'admin'))
         ->assertSuccessful()
         ->assertSee('API Access')
+        ->assertSee('https://api.majlisilmu.my/docs')
         ->assertSee('Create Token')
         ->assertSee('No API tokens issued yet.');
 
