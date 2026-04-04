@@ -1,3 +1,22 @@
+# Speaker Habib Pre-Nominal
+
+- [x] Add `Habib` to the speaker pre-nominal enum and label set
+- [x] Include `Habib` in the shared speaker title-ordering precedence
+- [x] Add focused regression coverage and verify the affected speaker tests
+
+## Review
+
+- Added `PreNominal::Habib` to [PreNominal.php](/Users/Saiffil/Herd/majlisilmu/app/Enums/PreNominal.php) so the shared speaker form/API option set can accept and label the new pre-nominal consistently.
+- Updated the normalized speaker title precedence in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so `Habib` sorts ahead of `Dr.` and other religious/academic prefixes in the same public-display pipeline used by `/penceramah/*` and slug generation.
+- Added a focused regression in [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) that proves mixed-order input like `['dr', 'habib']` renders as `Habib Dr. ...` and generates `habib-dr-...`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **19 passed**, 47 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerCreateOptionSchemaTest.php` => **2 passed**, 15 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventFormSpeakerLabelTest.php` => **1 passed**, 3 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Enums/PreNominal.php app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/SpeakerCreateOptionSchemaTest.php tests/Feature/EventFormSpeakerLabelTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Enums/PreNominal.php app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/SpeakerCreateOptionSchemaTest.php tests/Feature/EventFormSpeakerLabelTest.php tasks/todo.md` => **pass**
+  - `git diff --check` => **clean**
+
 # Speaker Listing Avatar Quality
 
 - [x] Trace the avatar conversion used by the public speaker directory and unified search cards
