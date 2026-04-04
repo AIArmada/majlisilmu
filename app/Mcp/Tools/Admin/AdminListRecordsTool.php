@@ -30,11 +30,11 @@ class AdminListRecordsTool extends AbstractAdminTool
         return $this->structuredResponse(function () use ($request): array {
             $this->authorizeAdmin($request);
 
-            $validated = $request->validate([
+            $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
-                'search' => ['sometimes', 'string'],
-                'page' => ['sometimes', 'integer', 'min:1'],
-                'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+                'search' => ['sometimes', 'nullable', 'string'],
+                'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
+                'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
             ]);
 
             return $this->resourceService->listRecords(

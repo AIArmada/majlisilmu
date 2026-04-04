@@ -23,13 +23,21 @@ class AdminResourceService
     /**
      * @return array{data: array{resources: list<array<string, mixed>>}}
      */
-    public function manifest(): array
+    public function manifest(bool $compact = false, bool $writableOnly = false): array
     {
+        $resources = array_values(array_filter(
+            array_map(
+                fn (string $resourceClass): array => $this->registry->metadata($resourceClass),
+                $this->registry->accessibleResources(),
+            ),
+            fn (array $resource): bool => ! $writableOnly || $resource['write_support']['schema'] === true,
+        ));
+
         return [
             'data' => [
                 'resources' => array_values(array_map(
-                    fn (string $resourceClass): array => $this->registry->metadata($resourceClass),
-                    $this->registry->accessibleResources(),
+                    fn (array $resource): array => $compact ? $this->summarizeResource($resource) : $resource,
+                    $resources,
                 )),
             ],
         ];
@@ -258,6 +266,29 @@ class AdminResourceService
                 'page' => $records->currentPage(),
                 'per_page' => $records->perPage(),
                 'total' => $records->total(),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $resource
+     * @return array<string, mixed>
+     */
+    protected function summarizeResource(array $resource): array
+    {
+        return [
+            'key' => $resource['key'],
+            'model_label' => $resource['model_label'],
+            'plural_model_label' => $resource['plural_model_label'],
+            'navigation_group' => $resource['navigation_group'],
+            'pages' => $resource['pages'],
+            'abilities' => $resource['abilities'],
+            'write_support' => $resource['write_support'],
+            'api_routes' => [
+                'collection' => $resource['api_routes']['collection'],
+                'meta' => $resource['api_routes']['meta'],
+                'schema' => $resource['api_routes']['schema'],
+                'store' => $resource['api_routes']['store'],
             ],
         ];
     }

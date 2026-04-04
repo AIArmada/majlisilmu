@@ -19,7 +19,7 @@ class AdminListResourcesTool extends AbstractAdminTool
 {
     protected string $name = 'admin-list-resources';
 
-    protected string $description = 'List Filament admin resources the authenticated admin can access.';
+    protected string $description = 'List accessible admin resources. Returns a compact summary by default; set verbose=true for full metadata.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -30,7 +30,15 @@ class AdminListResourcesTool extends AbstractAdminTool
         return $this->structuredResponse(function () use ($request): array {
             $this->authorizeAdmin($request);
 
-            return $this->resourceService->manifest();
+            $validated = $this->validateArguments($request, [
+                'verbose' => ['sometimes', 'nullable', 'boolean'],
+                'writable_only' => ['sometimes', 'nullable', 'boolean'],
+            ]);
+
+            return $this->resourceService->manifest(
+                compact: ! (bool) ($validated['verbose'] ?? false),
+                writableOnly: (bool) ($validated['writable_only'] ?? false),
+            );
         });
     }
 
@@ -39,6 +47,9 @@ class AdminListResourcesTool extends AbstractAdminTool
      */
     public function schema(JsonSchema $schema): array
     {
-        return [];
+        return [
+            'verbose' => $schema->boolean()->default(false)->nullable(),
+            'writable_only' => $schema->boolean()->default(false)->nullable(),
+        ];
     }
 }

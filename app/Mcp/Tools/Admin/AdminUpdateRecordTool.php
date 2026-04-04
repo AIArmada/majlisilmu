@@ -26,7 +26,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
         return $this->structuredResponse(function () use ($request): array {
             $actor = $this->authorizeAdmin($request);
 
-            $validated = $request->validate([
+            $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
                 'record_key' => ['required', 'string'],
                 'payload' => ['required', 'array'],

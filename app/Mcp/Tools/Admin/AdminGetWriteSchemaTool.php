@@ -26,7 +26,7 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
         return $this->structuredResponse(function () use ($request): array {
             $actor = $this->authorizeAdmin($request);
 
-            $validated = $request->validate([
+            $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
                 'operation' => ['required', 'string', 'in:create,update'],
                 'record_key' => ['nullable', 'string', 'required_if:operation,update'],
