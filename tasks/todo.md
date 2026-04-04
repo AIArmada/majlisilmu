@@ -20,7 +20,54 @@
     - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-mcp tests/Feature/Mcp/AdminServerTest.php` => **16 passed**, 100 assertions
     - `vendor/bin/phpstan analyse --ansi app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Mcp/Tools/Admin/AdminListRecordsTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php` => **No errors**
     - `vendor/bin/pint --test app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Mcp/Tools/Admin/AdminListRecordsTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php opencode.json` => **pass**
-    - `git diff --check` => **clean**
+  - `git diff --check` => **clean**
+
+# API Access Guidance
+
+- [x] Audit the current API docs and product surfaces for token issuance clarity
+- [x] Add clear bearer-token acquisition guidance to generated API docs
+- [x] Add first-party token creation and revocation to the account settings page
+- [x] Verify focused UI/docs behavior, static analysis, formatting, and diff hygiene
+
+## Review
+
+- Confirmed the real token issuance path already existed in [AuthController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/AuthController.php): `POST /api/v1/auth/register` and `POST /api/v1/auth/login` both return a Sanctum `access_token`, but the docs home page and web UI did not make that flow obvious.
+- Added explicit authentication guidance to the generated Scramble docs in [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php), including the exact `POST /auth/login` / `POST /auth/register` path and the required `Authorization: Bearer {token}` header shape.
+- Grouped the auth endpoints under `Authentication` and added method-level descriptions in [AuthController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/AuthController.php) so the docs UI presents bearer-token issuance and revocation as a coherent section instead of scattered raw endpoints.
+- Added an `API Access` section to the authenticated account settings screen in [AccountSettings.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Dashboard/AccountSettings.php) and [account-settings.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/dashboard/account-settings.blade.php). Users can now:
+  - read the direct login flow for programmatic token issuance
+  - create a manual personal access token without using CLI or Tinker
+  - copy the new token once with the exact bearer header format
+  - review existing tokens and revoke them from the UI
+- Added focused regression coverage in [AccountSettingsPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AccountSettingsPageTest.php) and [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php) so both the in-app UI and the generated docs keep surfacing token acquisition clearly.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-account-settings tests/Feature/AccountSettingsPageTest.php` => **13 passed**, 120 assertions
+  - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-scramble tests/Feature/ScrambleDocsTest.php` => **6 passed**, 29 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/AccountSettings.php app/Http/Controllers/Api/AuthController.php config/scramble.php tests/Feature/AccountSettingsPageTest.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Livewire/Pages/Dashboard/AccountSettings.php app/Http/Controllers/Api/AuthController.php config/scramble.php resources/views/livewire/pages/dashboard/account-settings.blade.php tests/Feature/AccountSettingsPageTest.php tests/Feature/ScrambleDocsTest.php` => **pass**
+  - `git diff --check` => **clean**
+
+# Admin Service Account Token Management
+
+- [x] Reuse the admin authz user resource as the management surface for service-account tokens
+- [x] Add admin-only token creation and revocation for selected users
+- [x] Verify focused authz UI behavior, static analysis, formatting, and diff hygiene
+
+## Review
+
+- Confirmed there is no separate `service_account` model or flag in the current domain; the correct admin surface is the existing authz user resource, which already manages dedicated service users.
+- Added admin-side token management directly to [ViewUser.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php) and [view-user.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/filament/resources/authz/user-resource/pages/view-user.blade.php). Admins can now:
+  - create a Sanctum token for the selected user
+  - copy the plain token once with the full `Authorization: Bearer ...` header example
+  - review existing tokens with created/last-used timestamps
+  - revoke tokens for service users directly from the admin panel
+- Kept the guidance explicit that shared integrations should use dedicated user accounts instead of human admin accounts, so audit trails and token rotation remain separated by identity.
+- Added focused coverage in [AuthzUserResourceTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AuthzUserResourceTest.php) to prove admins can create and revoke tokens for a selected service user from the admin view page.
+- Verification:
+  - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-authz-user tests/Feature/AuthzUserResourceTest.php` => **8 passed**, 59 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php tests/Feature/AuthzUserResourceTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Filament/Resources/Authz/UserResource/Pages/ViewUser.php resources/views/filament/resources/authz/user-resource/pages/view-user.blade.php tests/Feature/AuthzUserResourceTest.php` => **pass**
+  - `git diff --check` => **clean**
 
 - Read the official Laravel MCP docs end to end at [Laravel MCP](https://laravel.com/docs/13.x/mcp) and aligned the implementation with the documented shape: `Mcp::web(...)` in [routes/ai.php](/Users/Saiffil/Herd/majlisilmu/routes/ai.php), Sanctum bearer-token auth, request-based authorization in tools, and the documented `shouldRegister(Request $request)` pattern in [AbstractAdminWriteTool.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin/AbstractAdminWriteTool.php).
 - Kept the shared admin resource orchestration in [AdminResourceService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceService.php), the admin MCP server in [AdminServer.php](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Servers/AdminServer.php), the admin tool suite under [app/Mcp/Tools/Admin](/Users/Saiffil/Herd/majlisilmu/app/Mcp/Tools/Admin), and the token command in [IssueMcpToken.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/IssueMcpToken.php).

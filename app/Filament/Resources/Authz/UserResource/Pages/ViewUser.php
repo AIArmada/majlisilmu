@@ -15,10 +15,15 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Carbon\CarbonInterface;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ViewUser extends ViewRecord
 {
@@ -28,12 +33,100 @@ class ViewUser extends ViewRecord
 
     protected string $view = 'filament.resources.authz.user-resource.pages.view-user';
 
+    public string $apiTokenName = '';
+
+    public ?string $newApiToken = null;
+
     #[\Override]
     public function mount(int|string $record): void
     {
         parent::mount($record);
 
-        $this->getRecord()->loadMissing([
+        $this->reloadUserRecord();
+    }
+
+    public function createApiToken(): void
+    {
+        $validated = $this->validate([
+            'apiTokenName' => ['required', 'string', 'max:255'],
+        ], attributes: [
+            'apiTokenName' => 'Token name',
+        ]);
+
+        $this->newApiToken = $this->userRecord()
+            ->createToken(trim((string) $validated['apiTokenName']))
+            ->plainTextToken;
+        $this->apiTokenName = '';
+
+        Notification::make()
+            ->title('API access token created.')
+            ->body('Copy the token now. It will not be shown again after you leave this page.')
+            ->success()
+            ->persistent()
+            ->send();
+    }
+
+    public function revokeApiToken(mixed $tokenId): void
+    {
+        $normalizedTokenId = filter_var($tokenId, FILTER_VALIDATE_INT);
+
+        if ($normalizedTokenId === false) {
+            throw new NotFoundHttpException;
+        }
+
+        $deleted = $this->userRecord()->tokens()->whereKey($normalizedTokenId)->delete();
+
+        if ($deleted === 0) {
+            throw new NotFoundHttpException;
+        }
+
+        Notification::make()
+            ->title('API access token revoked.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * @return list<array{id: int|string, name: string, created_at: string, last_used_at: string|null}>
+     */
+    public function apiTokens(): array
+    {
+        return $this->userRecord()
+            ->tokens()
+            ->latest('created_at')
+            ->get(['id', 'name', 'created_at', 'last_used_at'])
+            ->map(fn (PersonalAccessToken $token): array => [
+                'id' => $token->getKey(),
+                'name' => $token->name,
+                'created_at' => $this->formatTokenTimestamp($token->created_at),
+                'last_used_at' => $token->last_used_at instanceof CarbonInterface
+                    ? $this->formatTokenTimestamp($token->last_used_at)
+                    : null,
+            ])
+            ->all();
+    }
+
+    public function apiDocsUrl(): string
+    {
+        $domain = trim((string) config('scramble.api_domain'));
+
+        if ($domain === '') {
+            return url('/docs');
+        }
+
+        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
+            return rtrim($domain, '/').'/docs';
+        }
+
+        return 'https://'.rtrim($domain, '/').'/docs';
+    }
+
+    private function reloadUserRecord(): void
+    {
+        /** @var User $user */
+        $user = User::query()->findOrFail($this->getRecord()->getKey());
+
+        $user->loadMissing([
             'roles',
             'savedEvents' => fn ($query) => $query
                 ->with(['institution:id,name', 'venue:id,name'])
@@ -61,6 +154,8 @@ class ViewUser extends ViewRecord
             'references' => fn ($query) => $query->orderBy('title'),
             'savedSearches' => fn ($query) => $query->latest(),
         ]);
+
+        $this->record = $user;
     }
 
     #[\Override]
@@ -183,5 +278,14 @@ class ViewUser extends ViewRecord
         $user = $this->getRecord();
 
         return $user;
+    }
+
+    private function formatTokenTimestamp(?CarbonInterface $timestamp): string
+    {
+        if (! $timestamp instanceof CarbonInterface) {
+            return '-';
+        }
+
+        return UserDateTimeFormatter::translatedFormat($timestamp, 'j M Y, h:i A');
     }
 }

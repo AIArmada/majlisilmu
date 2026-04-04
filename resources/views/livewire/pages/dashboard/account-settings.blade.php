@@ -14,6 +14,11 @@
     $localeOptions = $this->notificationOptions['locales'] ?? [];
     $notificationTimezone = $this->notificationSettingsState['timezone'] ?? config('app.timezone');
     $pushDestinations = $this->notificationDestinations['push'] ?? [];
+    $apiDocsUrl = $apiDocsUrl ?? null;
+    $apiDomain = trim((string) config('scramble.api_domain'));
+    $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');
+    $apiOrigin = $apiDomain === '' ? rtrim(url('/'), '/') : (str_starts_with($apiDomain, 'http://') || str_starts_with($apiDomain, 'https://') ? rtrim($apiDomain, '/') : 'https://' . rtrim($apiDomain, '/'));
+    $apiBaseUrl = $apiPath === '' ? $apiOrigin : $apiOrigin . '/' . $apiPath;
 @endphp
 
 <div class="min-h-screen bg-slate-50 py-12 pb-32">
@@ -49,7 +54,7 @@
                 </div>
 
                 @if ($tab === 'profile')
-                    <div class="px-6 py-8 md:px-8">
+                    <div class="space-y-8 px-6 py-8 md:px-8">
                         <form wire:submit="saveAccountSettings" class="space-y-8">
                             {{ $this->form }}
 
@@ -68,6 +73,113 @@
                                 </button>
                             </div>
                         </form>
+
+                        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="max-w-3xl">
+                                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('API Access') }}</h2>
+                                    <p class="mt-2 text-sm leading-6 text-slate-600">
+                                        {{ __('Use this section to create a personal access token for another application. For programmatic sign-in, call the auth login endpoint with your email or phone, password, and a device name. For long-lived integrations, prefer a dedicated service account.') }}
+                                    </p>
+                                </div>
+
+                                @if (filled($apiDocsUrl))
+                                    <a href="{{ $apiDocsUrl }}" target="_blank" rel="noreferrer"
+                                        class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700">
+                                        {{ __('Open API Docs') }}
+                                    </a>
+                                @endif
+                            </div>
+
+                            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{{ __('Direct Login Flow') }}</p>
+                                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                                        {{ __('POST to the login endpoint and keep the returned access_token. Every authenticated request must send Authorization: Bearer {token}.') }}
+                                    </p>
+                                    <pre class="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100"><code>POST {{ $apiBaseUrl }}/auth/login
+{
+  "login": "you@example.com",
+  "password": "••••••••",
+  "device_name": "Partner App"
+}</code></pre>
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{{ __('Manual Token Flow') }}</p>
+                                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                                        {{ __('Create a token below when you want to connect an external tool without sharing your password. The token is shown only once, so copy it immediately.') }}
+                                    </p>
+
+                                    <form wire:submit="createApiToken" class="mt-4 space-y-4">
+                                        <div class="space-y-2">
+                                            <label class="text-sm font-semibold text-slate-700" for="api-token-name">{{ __('Token name') }}</label>
+                                            <input id="api-token-name" type="text" wire:model="apiTokenName"
+                                                placeholder="{{ __('Partner App') }}"
+                                                class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none">
+                                            @error('apiTokenName')
+                                                <p class="text-sm text-rose-600">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+
+                                        <div class="flex justify-end">
+                                            <button type="submit"
+                                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                                                {{ __('Create Token') }}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            @if (filled($newApiToken))
+                                <div class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                    <p class="text-sm font-semibold text-emerald-900">{{ __('New access token') }}</p>
+                                    <p class="mt-2 text-sm leading-6 text-emerald-800">
+                                        {{ __('Copy this token now. After you refresh the page, it cannot be shown again.') }}
+                                    </p>
+                                    <pre class="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100"><code>{{ $newApiToken }}</code></pre>
+                                    <pre class="mt-4 overflow-x-auto rounded-2xl bg-white p-4 text-xs text-slate-700"><code>Authorization: Bearer {{ $newApiToken }}</code></pre>
+                                </div>
+                            @endif
+
+                            <div class="mt-6 rounded-2xl border border-slate-200 bg-white">
+                                <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                                    <div>
+                                        <h3 class="text-sm font-bold uppercase tracking-[0.18em] text-slate-500">{{ __('Existing Tokens') }}</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ __('Revoke tokens you no longer trust or use.') }}</p>
+                                    </div>
+                                </div>
+
+                                @if ($apiTokens === [])
+                                    <div class="px-4 py-5 text-sm text-slate-600">
+                                        {{ __('No API tokens created yet.') }}
+                                    </div>
+                                @else
+                                    <div class="divide-y divide-slate-100">
+                                        @foreach ($apiTokens as $token)
+                                            <div class="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between" wire:key="api-token-{{ $token['id'] }}">
+                                                <div>
+                                                    <p class="text-sm font-semibold text-slate-900">{{ $token['name'] }}</p>
+                                                    <p class="mt-1 text-sm text-slate-600">
+                                                        {{ __('Created') }}: {{ $token['created_at_label'] }}
+                                                    </p>
+                                                    <p class="mt-1 text-sm text-slate-600">
+                                                        {{ __('Last used') }}: {{ $token['last_used_at_label'] ?? __('Never') }}
+                                                    </p>
+                                                </div>
+
+                                                <button type="button" wire:click="revokeApiToken({{ $token['id'] }})"
+                                                    wire:confirm="{{ __('Revoke this API token?') }}"
+                                                    class="inline-flex items-center justify-center rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">
+                                                    {{ __('Revoke') }}
+                                                </button>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </section>
                     </div>
                 @else
                     <div class="space-y-8 px-6 py-8 md:px-8">

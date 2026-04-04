@@ -59,3 +59,19 @@ it('exposes the admin api foundation in scramble docs under dedicated admin tags
         ->and($paths['/admin/{resourceKey}/{recordKey}']['get']['tags'] ?? null)->toContain('Admin Resource')
         ->and($paths['/admin/{resourceKey}/{recordKey}']['put']['tags'] ?? null)->toContain('Admin Resource');
 });
+
+it('documents how clients obtain bearer tokens for authenticated api access', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    $paths = $response->json('paths');
+
+    expect((string) $response->json('info.description'))
+        ->toContain('POST /auth/login')
+        ->toContain('Authorization: Bearer {token}')
+        ->toContain('Account Settings > API Access')
+        ->and($paths['/auth/login']['post']['tags'] ?? null)->toContain('Authentication')
+        ->and($paths['/auth/register']['post']['tags'] ?? null)->toContain('Authentication')
+        ->and($paths['/auth/logout']['post']['tags'] ?? null)->toContain('Authentication');
+});

@@ -27,6 +27,9 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('Profile')
         ->assertSee('Notifications')
         ->assertSee('Profile Details')
+        ->assertSee('API Access')
+        ->assertSee('Create Token')
+        ->assertSee('Authorization: Bearer')
         ->assertDontSee('Device Preferences')
         ->assertDontSee('Show country selector on public search pages')
         ->assertSee('Prayer Institutions')
@@ -36,6 +39,28 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertDontSee('Digest Preferences')
         ->assertDontSee('Save Preferences')
         ->assertSee('fi-fo-phone-input', false);
+});
+
+it('creates and revokes personal api access tokens from account settings', function () {
+    $user = User::factory()->create();
+
+    $component = Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->set('apiTokenName', 'Partner App')
+        ->call('createApiToken')
+        ->assertHasNoErrors()
+        ->assertSet('apiTokenName', '')
+        ->assertSet('newApiToken', fn (?string $token): bool => is_string($token) && $token !== '');
+
+    $tokenId = $user->fresh()->tokens()->value('id');
+
+    expect($user->fresh()->tokens()->pluck('name')->all())->toBe(['Partner App']);
+
+    $component
+        ->call('revokeApiToken', $tokenId)
+        ->assertHasNoErrors();
+
+    expect($user->fresh()->tokens()->count())->toBe(0);
 });
 
 it('renders the notifications tab in Malay without leaking raw translation keys', function () {

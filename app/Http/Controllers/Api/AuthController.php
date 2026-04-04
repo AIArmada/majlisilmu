@@ -9,6 +9,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use DateTimeInterface;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,13 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
 {
+    /**
+     * Register a new user account and immediately return a Sanctum bearer token.
+     *
+     * The returned `access_token` should be sent on future requests using
+     * `Authorization: Bearer {token}`.
+     */
+    #[Group('Authentication')]
     public function register(Request $request, RegisterApiUserAction $registerApiUserAction): JsonResponse
     {
         $validated = $request->validate([
@@ -36,6 +44,14 @@ class AuthController extends Controller
         ], 201);
     }
 
+    /**
+     * Exchange account credentials for a Sanctum bearer token.
+     *
+     * Send either an email address or phone number in `login`, plus the user's
+     * password and a client-defined `device_name`. Existing integrations may also
+     * create personal access tokens from the Account Settings screen inside the app.
+     */
+    #[Group('Authentication')]
     public function login(Request $request, AuthenticateApiUserAction $authenticateApiUserAction): JsonResponse
     {
         $validated = $request->validate([
@@ -61,6 +77,10 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Revoke the currently authenticated Sanctum bearer token.
+     */
+    #[Group('Authentication')]
     public function logout(Request $request, RevokeCurrentApiTokenAction $revokeCurrentApiTokenAction): JsonResponse
     {
         $revokeCurrentApiTokenAction->handle($this->currentUser($request));
@@ -70,6 +90,7 @@ class AuthController extends Controller
         ]);
     }
 
+    #[Group('Authentication')]
     public function forgotPassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -85,6 +106,7 @@ class AuthController extends Controller
         ]);
     }
 
+    #[Group('Authentication')]
     public function resetPassword(Request $request, ResetUserPassword $resetUserPassword): JsonResponse
     {
         $request->validate([
@@ -125,6 +147,7 @@ class AuthController extends Controller
         ]);
     }
 
+    #[Group('Authentication')]
     public function resendVerificationEmail(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
