@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Routing\Route as IlluminateRoute;
@@ -26,7 +27,7 @@ class ApiDocumentationServiceProvider extends ServiceProvider
 
         Scramble::ignoreDefaultRoutes();
 
-        $apiDomain = (string) config('scramble.api_domain');
+        $apiDomain = app(ApiDocumentationUrlResolver::class)->apiDomain();
         $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');
         $docsViewPath = base_path('vendor/dedoc/scramble/resources/views/docs.blade.php');
         $docsMiddleware = config('scramble.middleware', []);
@@ -58,7 +59,7 @@ class ApiDocumentationServiceProvider extends ServiceProvider
                 });
             };
 
-            if ($apiDomain !== '') {
+            if (filled($apiDomain)) {
                 Route::domain($apiDomain)->group($registerDocsRoutes);
 
                 return;
