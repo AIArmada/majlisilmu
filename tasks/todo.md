@@ -1,3 +1,24 @@
+# Speaker Listing Avatar Quality
+
+- [x] Trace the avatar conversion used by the public speaker directory and unified search cards
+- [x] Switch affected public speaker cards to a higher-resolution avatar URL without changing tiny-thumb consumers globally
+- [x] Add focused regression coverage and verify the affected pages
+
+## Review
+
+- Root cause: the public speaker directory and unified search cards were rendering [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) via `avatar_url`, which intentionally points at the `thumb` avatar conversion (`80x80`). The speaker detail page already uses the `profile` conversion (`400x400`), so the same uploaded avatar looked crisp there but soft on `/penceramah` and `/search`.
+- Added a dedicated [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) `public_avatar_url` accessor that prefers the `profile` conversion and only falls back to `thumb` or the gender placeholder when needed. This keeps the tiny-thumb behavior available for genuinely small UI chips while giving public cards a sharper source image.
+- Updated [⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/%E2%9A%A1index.blade.php), [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/search/index.blade.php), and [SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php) so the web directory, unified search page, and frontend speaker list API all return/use the higher-resolution avatar URL consistently.
+- Added focused coverage in [MediaConversionsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/MediaConversionsTest.php), [SpeakerIndexTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerIndexTest.php), [UnifiedSearchPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/UnifiedSearchPageTest.php), and [FrontendApiParityTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Frontend/FrontendApiParityTest.php) to lock the higher-resolution avatar path into both web and API list surfaces.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php --filter="public_avatar_url|avatar_url using thumb"` => **2 passed**, 5 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **10 passed**, 30 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **3 passed**, 13 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **12 passed**, 71 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Models/Speaker.php app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/MediaConversionsTest.php tests/Feature/SpeakerIndexTest.php tests/Feature/UnifiedSearchPageTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Models/Speaker.php app/Http/Controllers/Api/Frontend/SearchController.php resources/views/components/pages/speakers/⚡index.blade.php resources/views/livewire/pages/search/index.blade.php tests/Feature/MediaConversionsTest.php tests/Feature/SpeakerIndexTest.php tests/Feature/UnifiedSearchPageTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `git diff --check` => **clean**
+
 # Speaker Slug Field
 
 - [x] Remove the speaker slug input from the Filament admin form path

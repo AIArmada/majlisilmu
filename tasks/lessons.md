@@ -1,5 +1,6 @@
 # Lessons
 
+- Do not render 96px to 128px public speaker cards from the `thumb` avatar conversion; reserve `thumb` for tiny chips and use a higher-resolution profile/listing avatar URL for directory and search cards.
 - When a resource advertises slug behavior as auto-managed, do not expose a writable slug field in the Filament form; keep slug generation entirely in the save/action layer.
 - When display names and slugs are composed from title arrays, never trust admin/API input order; normalize honorifics, pre-nominals, and post-nominals against a researched precedence table first.
 - When a product owner says the API reference itself should be public, do not conflate docs-page visibility with bearer-token protection on the endpoints; make `/docs` public and keep auth requirements documented in the spec instead.

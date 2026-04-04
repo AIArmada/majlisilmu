@@ -315,7 +315,7 @@ new
                         <div
                             class="h-32 w-32 rounded-full p-1.5 bg-white ring-2 ring-slate-200 group-hover:ring-emerald-300 shadow-lg mb-6 relative group-hover:scale-105 transition-all duration-500">
                             <div class="w-full h-full rounded-full overflow-hidden bg-emerald-50 relative">
-                                <img src="{{ $speaker->avatar_url ?: $speaker->default_avatar_url }}" alt="{{ $speaker->name }}"
+                                <img src="{{ $speaker->public_avatar_url }}" alt="{{ $speaker->name }}"
                                     class="w-full h-full object-cover" width="128" height="128" loading="lazy">
                             </div>
                         </div>

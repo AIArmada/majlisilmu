@@ -16,8 +16,8 @@ use App\Models\SocialMedia;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
-use Dedoc\Scramble\Attributes\Group;
 use App\Services\EventSearchService;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -739,7 +739,7 @@ class SearchController extends FrontendController
             'name' => $speaker->name,
             'formatted_name' => $speaker->formatted_name,
             'events_count' => (int) ($speaker->events_count ?? 0),
-            'avatar_url' => $speaker->getFirstMediaUrl('avatar', 'thumb') ?: $speaker->getFirstMediaUrl('avatar'),
+            'avatar_url' => $speaker->public_avatar_url,
         ];
     }
 

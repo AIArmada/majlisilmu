@@ -135,6 +135,19 @@ class Speaker extends Model implements AuditableContract, HasMedia
         return null;
     }
 
+    public function getPublicAvatarUrlAttribute(): string
+    {
+        if ($this->hasMedia('avatar')) {
+            $avatarMedia = $this->getFirstMedia('avatar');
+
+            if ($avatarMedia instanceof Media) {
+                return $avatarMedia->getAvailableUrl(['profile', 'thumb']) ?: $avatarMedia->getUrl();
+            }
+        }
+
+        return $this->default_avatar_url;
+    }
+
     public function getDefaultAvatarUrlAttribute(): string
     {
         if ($this->avatar_url) {
