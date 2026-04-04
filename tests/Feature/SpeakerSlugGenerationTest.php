@@ -6,6 +6,7 @@ use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
 use App\Filament\Resources\Speakers\Pages\CreateSpeaker;
+use App\Filament\Resources\Speakers\Pages\EditSpeaker;
 use App\Forms\SpeakerFormSchema;
 use App\Jobs\BackfillSpeakerSlugs;
 use App\Models\ContributionRequest;
@@ -203,6 +204,7 @@ it('uses the generated country slug when admins create speakers in filament', fu
 
     Livewire::actingAs($administrator)
         ->test(CreateSpeaker::class)
+        ->assertFormFieldDoesNotExist('slug')
         ->fillForm([
             'name' => 'Ustaz Ahmad Fauzi',
             'gender' => 'male',
@@ -213,7 +215,6 @@ it('uses the generated country slug when admins create speakers in filament', fu
             'languages' => [],
             'contacts' => [],
             'socialMedia' => [],
-            'slug' => 'temporary-speaker-slug',
             'status' => 'verified',
             'is_active' => true,
             'address' => [
@@ -228,6 +229,23 @@ it('uses the generated country slug when admins create speakers in filament', fu
         ->firstOrFail();
 
     expect($speaker->slug)->toBe('ustaz-ahmad-fauzi-my');
+});
+
+it('does not expose a writable slug field when admins edit speakers in filament', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Editable Speaker',
+        'slug' => 'editable-speaker-my',
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(EditSpeaker::class, ['record' => $speaker->getKey()])
+        ->assertFormFieldDoesNotExist('slug');
 });
 
 it('uses the submitted address country when approving unstaged speaker create requests', function () {

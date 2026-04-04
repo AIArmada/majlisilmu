@@ -1,3 +1,19 @@
+# Speaker Slug Field
+
+- [x] Remove the speaker slug input from the Filament admin form path
+- [x] Add focused regression coverage proving the slug field is absent on create and edit
+- [x] Verify the speaker admin form and slug-generation tests still pass
+
+## Review
+
+- Removed the `slug` input from the shared Filament speaker form in [SpeakerForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Speakers/Schemas/SpeakerForm.php). Speaker slugs are already auto-managed in the save/action layer, so the edit page no longer exposes a writable slug field.
+- Updated [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) so the Filament create-page test asserts the field does not exist, and added an edit-page regression proving admins cannot edit slug through the speaker resource.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **18 passed**, 45 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Speakers/Schemas/SpeakerForm.php tests/Feature/SpeakerSlugGenerationTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Filament/Resources/Speakers/Schemas/SpeakerForm.php tests/Feature/SpeakerSlugGenerationTest.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `git diff --check` => **clean**
+
 # Uncommitted Change Audit
 
 - [x] Review the current uncommitted speaker-title and slug diff for behavioral regressions
