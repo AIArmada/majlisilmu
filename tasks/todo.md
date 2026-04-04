@@ -1,3 +1,22 @@
+# Speaker Associate-Professor Ordering
+
+- [x] Audit the current professor-rank versus honorific precedence for public speaker display names
+- [x] Move `Prof. Madya` ahead of `Dato'`/`Datuk` while keeping non-professor prefixes in their current trailing group
+- [x] Update focused regressions, admin API expectations, and notes to match the corrected rule
+
+## Review
+
+- Updated [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so the leading pre-nominal bucket now contains both professor-rank titles, `Prof.` and `Prof. Madya`. That changes the public-display and slug order for associate professors from `Dato' Prof. Madya Dr. ...` to `Prof. Madya Dato' Dr. ...`.
+- Audited the adjacent precedence rules instead of broadening the change blindly: the existing surrounding regressions still keep honorifics ahead of non-professor prefixes such as `Ustaz`, `Dr.`, `Ir.`, and `Ar.`, while `Prof.` still leads ahead of honorifics. So the only related change needed was promoting `Prof. Madya` into the same leading group as `Prof.`.
+- Updated [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) and [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) so both the direct speaker formatter/slug path and the admin API write path assert the corrected associate-professor order.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **19 passed**, 47 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventFormSpeakerLabelTest.php` => **1 passed**, 3 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **8 passed**, 67 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/EventFormSpeakerLabelTest.php tests/Feature/Api/Admin/AdminApiTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php tests/Feature/EventFormSpeakerLabelTest.php tests/Feature/Api/Admin/AdminApiTest.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `git diff --check` => **clean**
+
 # Speaker Habib Pre-Nominal
 
 - [x] Add `Habib` to the speaker pre-nominal enum and label set
@@ -81,9 +100,9 @@
 ## Review
 
 - Reworked [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so `formatted_name` no longer trusts admin/API array order. The public display formatter now applies a deterministic precedence table before the slug generator reads it.
-- The implemented public-display rule is intentionally not the same as formal salutation order. I anchored it on Malaysian public profile usage: full `Prof.` stays first, honorifics come next, then the remaining prefixes. That matches official public-profile examples like Universiti Malaya’s faculty handbook entries rendered as `Professor Dato’ Dr. ...`, while still preserving the formal-protocol ordering used for non-full-professor combinations such as `Datuk Prof. Madya Dr. ...` from the Prime Minister’s Department circular. Post-nominals are now rendered after the name in descending academic weight (`PhD`, then masters, then bachelor-level credentials, then honours/diploma).
+- The implemented public-display rule is intentionally not the same as formal salutation order. I anchored it on Malaysian public profile usage: professor-rank titles (`Prof.`, `Prof. Madya`) stay first, honorifics follow, then the remaining prefixes. That keeps public-profile examples like `Professor Dato’ Dr. ...` and `Prof. Madya Dato' Dr. ...` aligned with the speaker pages, while still leaving non-professor prefixes such as `Ustaz`, `Dr.`, and `Ir.` after honorifics. Post-nominals are now rendered after the name in descending academic weight (`PhD`, then masters, then bachelor-level credentials, then honours/diploma).
 - Because [GenerateSpeakerSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Speakers/GenerateSpeakerSlugAction.php) already derives the slug from `Speaker::formatDisplayedName(...)`, the new precedence automatically flows into create/update slug generation and observer-driven slug resync without any extra route-specific code.
-- Expanded [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) to lock full-professor ordering (`Prof. Dato' Dr.`), associate-professor ordering (`Dato' Prof. Madya Dr.`), religious-prefix ordering (`Dato' Ustaz Dr.`), post-nominal normalization, and arbitrary-order updates. Updated [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) so an admin API write with unsorted title arrays still returns the normalized slug.
+- Expanded [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) to lock full-professor ordering (`Prof. Dato' Dr.`), associate-professor ordering (`Prof. Madya Dato' Dr.`), religious-prefix ordering (`Dato' Ustaz Dr.`), post-nominal normalization, and arbitrary-order updates. Updated [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) so an admin API write with unsorted title arrays still returns the normalized slug.
 - Verification:
   - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **16 passed**, 39 assertions
   - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **8 passed**, 67 assertions

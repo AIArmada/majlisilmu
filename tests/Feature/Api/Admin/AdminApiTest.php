@@ -113,7 +113,7 @@ it('exposes admin speaker write schema and can create and update speakers throug
         'name' => 'Admin API Updated Speaker',
         'gender' => 'male',
         'honorific' => ['dato'],
-        'pre_nominal' => ['dr', 'prof'],
+        'pre_nominal' => ['dr', 'prof_madya'],
         'post_nominal' => ['BA', 'PhD', 'HONS'],
         'status' => 'verified',
         'is_freelance' => true,
@@ -125,7 +125,7 @@ it('exposes admin speaker write schema and can create and update speakers throug
         ],
     ])->assertOk()
         ->assertJsonPath('data.record.attributes.name', 'Admin API Updated Speaker')
-        ->assertJsonPath('data.record.attributes.slug', 'prof-dato-dr-admin-api-updated-speaker-phd-ba-hons-my')
+        ->assertJsonPath('data.record.attributes.slug', 'prof-madya-dato-dr-admin-api-updated-speaker-phd-ba-hons-my')
         ->assertJsonPath('data.record.attributes.job_title', 'Imam');
 });
 
