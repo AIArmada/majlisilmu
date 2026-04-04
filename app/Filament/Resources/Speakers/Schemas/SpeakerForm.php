@@ -71,11 +71,6 @@ class SpeakerForm
                             ->preload()
                             ->searchable()
                             ->placeholder(__('Select post-nominals')),
-                        TextInput::make('slug')
-                            ->label(__('Slug'))
-                            ->required()
-                            ->maxLength(255)
-                            ->unique(ignoreRecord: true),
                         RichEditor::make('bio')
                             ->label(__('Biography'))
                             ->json()
