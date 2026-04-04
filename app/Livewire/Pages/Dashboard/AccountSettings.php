@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationCatalog;
+use App\Support\Timezone\UserDateTimeFormatter;
 use DateTimeZone;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -18,10 +19,12 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use LogicException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 
@@ -94,6 +97,10 @@ class AccountSettings extends Component implements HasForms
      * @var array<int, string>
      */
     public array $fallbackChannelSlots = ['', '', '', ''];
+
+    public string $apiTokenName = '';
+
+    public ?string $newApiToken = null;
 
     public function mount(): void
     {
@@ -292,6 +299,39 @@ class AccountSettings extends Component implements HasForms
 
         $this->successToast(__('notifications.flash.updated'));
         $this->tab = 'notifications';
+    }
+
+    public function createApiToken(): void
+    {
+        $user = $this->currentUser();
+        $validated = $this->validate([
+            'apiTokenName' => ['required', 'string', 'max:255'],
+        ], attributes: [
+            'apiTokenName' => __('Token name'),
+        ]);
+
+        $this->newApiToken = $user->createToken(trim((string) $validated['apiTokenName']))->plainTextToken;
+        $this->apiTokenName = '';
+
+        $this->successToast(__('API access token created. Copy it now because it will not be shown again.'));
+    }
+
+    public function revokeApiToken(mixed $tokenId): void
+    {
+        $user = $this->currentUser();
+        $normalizedTokenId = filter_var($tokenId, FILTER_VALIDATE_INT);
+
+        if ($normalizedTokenId === false) {
+            throw new NotFoundHttpException;
+        }
+
+        $deleted = $user->tokens()->whereKey($normalizedTokenId)->delete();
+
+        if ($deleted === 0) {
+            throw new NotFoundHttpException;
+        }
+
+        $this->successToast(__('API access token revoked.'));
     }
 
     protected function hydrateNotificationCenter(User $user): void
@@ -520,6 +560,21 @@ class AccountSettings extends Component implements HasForms
         return app(NotificationSettingsManager::class);
     }
 
+    protected function apiDocsUrl(): string
+    {
+        $domain = trim((string) config('scramble.api_domain'));
+
+        if ($domain === '') {
+            return url('/docs');
+        }
+
+        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
+            return rtrim($domain, '/').'/docs';
+        }
+
+        return 'https://'.rtrim($domain, '/').'/docs';
+    }
+
     protected function accountSettingsForm(): Schema
     {
         $schema = $this->getSchema('form');
@@ -533,6 +588,21 @@ class AccountSettings extends Component implements HasForms
 
     public function render(): View
     {
-        return view('livewire.pages.dashboard.account-settings');
+        return view('livewire.pages.dashboard.account-settings', [
+            'apiDocsUrl' => $this->apiDocsUrl(),
+            'apiTokens' => $this->currentUser()
+                ->tokens()
+                ->latest('created_at')
+                ->get(['id', 'name', 'last_used_at', 'created_at'])
+                ->map(fn (PersonalAccessToken $token): array => [
+                    'id' => $token->getKey(),
+                    'name' => $token->name,
+                    'created_at_label' => UserDateTimeFormatter::translatedFormat($token->created_at, 'j M Y, h:i A'),
+                    'last_used_at_label' => $token->last_used_at !== null
+                        ? UserDateTimeFormatter::translatedFormat($token->last_used_at, 'j M Y, h:i A')
+                        : null,
+                ])
+                ->all(),
+        ]);
     }
 }

@@ -46,6 +46,48 @@ it('shows timezone and verification timestamps on the authz user edit page', fun
         ->assertSee('Phone Verified At');
 });
 
+it('allows admins to create and revoke api tokens for dedicated service users from the authz user view page', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::where('name', 'super_admin')->whereNull(app(PermissionRegistrar::class)->teamsKey)->exists()) {
+        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
+    }
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $serviceUser = User::factory()->create([
+        'name' => 'Copilot Service',
+        'email' => 'copilot-service@example.test',
+    ]);
+
+    $this->actingAs($administrator)
+        ->get(UserResource::getUrl('view', ['record' => $serviceUser], panel: 'admin'))
+        ->assertSuccessful()
+        ->assertSee('API Access')
+        ->assertSee('Create Token')
+        ->assertSee('No API tokens issued yet.');
+
+    $component = Livewire::actingAs($administrator)
+        ->test(ViewUser::class, ['record' => $serviceUser->getKey()])
+        ->set('apiTokenName', 'copilot-prod')
+        ->call('createApiToken')
+        ->assertHasNoErrors()
+        ->assertSet('apiTokenName', '')
+        ->assertSet('newApiToken', fn (?string $token): bool => is_string($token) && $token !== '');
+
+    $tokenId = $serviceUser->fresh()->tokens()->value('id');
+
+    expect($serviceUser->fresh()->tokens()->pluck('name')->all())->toBe(['copilot-prod']);
+
+    $component
+        ->call('revokeApiToken', $tokenId)
+        ->assertHasNoErrors();
+
+    expect($serviceUser->fresh()->tokens()->count())->toBe(0);
+});
+
 it('shows read only membership summaries on the authz user edit page', function () {
     setPermissionsTeamId(null);
     app(PermissionRegistrar::class)->forgetCachedPermissions();

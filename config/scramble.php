@@ -29,7 +29,10 @@ return [
         /*
          * Description rendered on the home page of the API documentation (`/docs`).
          */
-        'description' => 'Canonical API documentation for Majlis Ilmu client and platform integrations.',
+        'description' => 'Canonical API documentation for Majlis Ilmu client and platform integrations. '
+            .'Get an access token by calling POST /auth/login or POST /auth/register with a device_name, '
+            .'then send the returned access_token as Authorization: Bearer {token}. '
+            .'Existing users can also create and revoke personal access tokens from Account Settings > API Access inside the application.',
     ],
 
     /*
@@ -39,7 +42,7 @@ return [
         /*
          * Define the title of the documentation's website. App name is used when this config is `null`.
          */
-        'title' => env('SCRAMBLE_UI_TITLE', env('APP_NAME') . ' API'),
+        'title' => env('SCRAMBLE_UI_TITLE', env('APP_NAME').' API'),
 
         /*
          * Define the theme of the documentation. Available options are `light`, `dark`, and `system`.

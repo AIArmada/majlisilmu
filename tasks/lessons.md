@@ -1,5 +1,6 @@
 # Lessons
 
+- When an API uses bearer tokens for third-party integrations, do not assume login/register endpoints are self-explanatory; surface the token acquisition path explicitly in the generated docs and provide a first-party token management UI inside the application.
 - When exposing docs on a dedicated API subdomain, do not keep redundant path segments like `/docs/api`; prefer host-level clarity such as `/docs` and reserve path depth for real resource structure.
 - When adapting Filament concepts into a public or client-facing admin API, do not mirror internal `resources/.../records` route shapes by habit; flatten them into collection/item endpoints unless the user explicitly wants the framework vocabulary exposed.
 - When exposing a generated API reference, verify that each first-class domain entity is discoverable as its own section/tag in the docs UI; registered routes alone are not enough if Scramble collapses them under a generic controller tag.
