@@ -27,6 +27,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Nnjeim\World\Models\Language;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 
 uses(RefreshDatabase::class);
 
@@ -616,6 +617,63 @@ it('stores description and contacts when creating an institution via quick-creat
     expect($institution->description)->toBe('<p>Institusi komuniti yang aktif.</p>')
         ->and($institution->nickname)->toBe('Masjid QC')
         ->and($institution->contacts->pluck('value')->all())->toContain('0123456789');
+});
+
+it('uses the phone input for institution phone and whatsapp contact values', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $components = collect($flatten(AdminInstitutionForm::configure(Schema::make())->getComponents()))
+        ->first(fn (mixed $component): bool => method_exists($component, 'getName') && $component->getName() === 'contacts');
+
+    expect($components)->toBeInstanceOf(Repeater::class);
+
+    $reflection = new ReflectionObject($components);
+
+    while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+        $reflection = $parent;
+    }
+
+    $childComponents = $reflection->getProperty('childComponents')->getValue($components);
+    $defaultChildComponents = $childComponents['default'] ?? [];
+    $phoneValueFields = collect($defaultChildComponents)
+        ->filter(fn (mixed $component): bool => method_exists($component, 'getName') && $component->getName() === 'phone_value');
+    $emailValueFields = collect($defaultChildComponents)
+        ->filter(fn (mixed $component): bool => method_exists($component, 'getName') && $component->getName() === 'value');
+
+    expect($phoneValueFields->contains(fn (mixed $component): bool => $component instanceof PhoneInput))->toBeTrue();
+    expect($emailValueFields->contains(fn (mixed $component): bool => $component instanceof TextInput))->toBeTrue();
 });
 
 it('stores nested institution quick-create address data when picker mode is used', function () {

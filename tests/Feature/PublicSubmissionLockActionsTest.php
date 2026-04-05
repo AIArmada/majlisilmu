@@ -2,6 +2,8 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Filament\Resources\Institutions\Pages\EditInstitution;
 use App\Filament\Resources\Institutions\RelationManagers\MembersRelationManager as InstitutionMembersRelationManager;
 use App\Filament\Resources\Speakers\Pages\EditSpeaker;
@@ -194,6 +196,29 @@ it('locks institution submission through the toggle and stores lock metadata', f
     expect($institution->allow_public_event_submission)->toBeFalse()
         ->and($institution->public_submission_locked_by)->toBe($admin->id)
         ->and($institution->public_submission_locked_at)->not->toBeNull();
+});
+
+it('saves institution contact phone values on the edit page without nulling the database value', function () {
+    $admin = User::factory()->create();
+    assignGlobalRole($admin, 'admin');
+
+    $institution = Institution::factory()->create();
+    $institution->contacts()->create([
+        'category' => ContactCategory::Phone->value,
+        'type' => ContactType::Main->value,
+        'value' => '+60112223344',
+        'is_public' => true,
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(EditInstitution::class, ['record' => $institution->id])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($institution->fresh()->contacts()->where('category', ContactCategory::Phone->value)->value('value'))
+        ->not->toBeNull()
+        ->not->toBeEmpty();
 });
 
 it('only enables the public submission toggle for global admin, admin, and moderator', function () {

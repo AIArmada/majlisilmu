@@ -173,20 +173,7 @@ class SpeakerForm
                                     ->options(ContactCategory::class)
                                     ->required()
                                     ->live(),
-                                TextInput::make('value')
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->label(fn (Get $get) => match ($get('category')) {
-                                        ContactCategory::Email => __('Email Address'),
-                                        ContactCategory::Phone => __('Phone Number'),
-                                        ContactCategory::WhatsApp => __('WhatsApp Number'),
-                                        'email' => __('Email Address'),
-                                        'phone' => __('Phone Number'),
-                                        'whatsapp' => __('WhatsApp Number'),
-                                        default => __('Value'),
-                                    })
-                                    ->email(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Email, ContactCategory::Email->value], true))
-                                    ->tel(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Phone, ContactCategory::Phone->value, ContactCategory::WhatsApp, ContactCategory::WhatsApp->value], true)),
+                                ...SharedFormSchema::contactValueFields(),
                                 Select::make('type')
                                     ->label(__('Type'))
                                     ->options(ContactType::class)
@@ -197,19 +184,10 @@ class SpeakerForm
                                     ->default(true),
                             ])
                             ->columns(4)
-                            ->itemLabel(function (array $state): string {
-                                $category = $state['category'] ?? null;
-
-                                if ($category instanceof ContactCategory) {
-                                    $categoryLabel = $category->getLabel();
-                                } elseif (is_string($category)) {
-                                    $categoryLabel = ContactCategory::tryFrom($category)?->getLabel() ?? $category;
-                                } else {
-                                    $categoryLabel = __('Contact');
-                                }
-
-                                return $categoryLabel.': '.($state['value'] ?? '');
-                            }),
+                            ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => SharedFormSchema::normalizeContactRowsForFill($data))
+                            ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => SharedFormSchema::normalizeContactRowsForSave($data))
+                            ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => SharedFormSchema::normalizeContactRowsForSave($data))
+                            ->itemLabel(fn (array $state): string => SharedFormSchema::contactItemLabel($state)),
                     ]),
                 Section::make(__('Media'))
                     ->components([
@@ -261,12 +239,14 @@ class SpeakerForm
                                 TextInput::make('username')
                                     ->label(__('Username / Handle'))
                                     ->requiredWithout('url')
-                                    ->placeholder('@username / https://...')
+                                    ->maxLength(255)
+                                    ->placeholder(__('@username / https://...'))
                                     ->columnSpan(1),
                                 TextInput::make('url')
                                     ->label(__('URL'))
                                     ->requiredWithout('username')
                                     ->url()
+                                    ->maxLength(255)
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
