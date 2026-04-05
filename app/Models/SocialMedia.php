@@ -20,6 +20,7 @@ class SocialMedia extends Model implements AuditableContract
         'platform',
         'url',
         'username',
+        'order_column',
     ];
 
     #[\Override]
@@ -73,6 +74,16 @@ class SocialMedia extends Model implements AuditableContract
     public function socialable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'order_column' => 'integer',
+        ];
     }
 
     private static function normalizePlatformValue(mixed $platform): ?string

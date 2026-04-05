@@ -540,6 +540,7 @@ class SubmitFrontendEventAction
     {
         $email = $validated['submitter_email'] ?? null;
         $phone = $validated['submitter_phone'] ?? null;
+        $order = 1;
 
         if (filled($email)) {
             $submission->contacts()->create([
@@ -547,6 +548,7 @@ class SubmitFrontendEventAction
                 'category' => ContactCategory::Email->value,
                 'value' => $email,
                 'is_public' => false,
+                'order_column' => $order++,
             ]);
         }
 
@@ -556,6 +558,7 @@ class SubmitFrontendEventAction
                 'category' => ContactCategory::Phone->value,
                 'value' => $phone,
                 'is_public' => false,
+                'order_column' => $order++,
             ]);
         }
     }
@@ -738,7 +741,6 @@ class SubmitFrontendEventAction
     }
 
     /**
-     * @param  mixed  $values
      * @return list<string>
      */
     private function normalizeEnumList(mixed $values): array

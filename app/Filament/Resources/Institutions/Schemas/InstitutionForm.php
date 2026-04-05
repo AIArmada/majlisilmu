@@ -101,6 +101,7 @@ class InstitutionForm
                                     ->default(true),
                             ])
                             ->columns(4)
+                            ->orderColumn('order_column')
                             ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => SharedFormSchema::normalizeContactRowsForFill($data))
                             ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => SharedFormSchema::normalizeContactRowsForSave($data))
                             ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => SharedFormSchema::normalizeContactRowsForSave($data))
@@ -219,6 +220,7 @@ class InstitutionForm
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
+                            ->orderColumn('order_column')
                             ->itemLabel(function (array $state): ?string {
                                 $platform = $state['platform'] ?? null;
 

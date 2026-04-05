@@ -12,6 +12,8 @@ trait HasSocialMedia
      */
     public function socialMedia(): MorphMany
     {
-        return $this->morphMany(SocialMedia::class, 'socialable');
+        return $this->morphMany(SocialMedia::class, 'socialable')
+            ->orderBy('order_column')
+            ->orderBy('created_at');
     }
 }

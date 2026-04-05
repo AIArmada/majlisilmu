@@ -579,7 +579,8 @@ class ContributionEntityMutationService
         }
 
         $contacts = collect(is_array($contactPayload) ? $contactPayload : [])
-            ->map(function (mixed $contact): ?array {
+            ->values()
+            ->map(function (mixed $contact, int $index): ?array {
                 if (! is_array($contact)) {
                     return null;
                 }
@@ -604,6 +605,9 @@ class ContributionEntityMutationService
                     'value' => $value,
                     'type' => $type->value,
                     'is_public' => (bool) ($contact['is_public'] ?? true),
+                    'order_column' => is_numeric($contact['order_column'] ?? null)
+                        ? (int) $contact['order_column']
+                        : $index + 1,
                 ];
             })
             ->filter()
@@ -647,7 +651,8 @@ class ContributionEntityMutationService
         }
 
         $entries = collect(is_array($socialMediaPayload) ? $socialMediaPayload : [])
-            ->map(function (mixed $entry): ?array {
+            ->values()
+            ->map(function (mixed $entry, int $index): ?array {
                 if (! is_array($entry)) {
                     return null;
                 }
@@ -664,6 +669,9 @@ class ContributionEntityMutationService
                     'platform' => $platform,
                     'username' => $username !== '' ? $username : null,
                     'url' => $url !== '' ? $url : null,
+                    'order_column' => is_numeric($entry['order_column'] ?? null)
+                        ? (int) $entry['order_column']
+                        : $index + 1,
                 ];
             })
             ->filter()

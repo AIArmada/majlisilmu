@@ -200,10 +200,18 @@ it('applies structured institution updates through approval', function () {
                 'value' => '01112345678',
                 'type' => 'main',
                 'is_public' => true,
+            ], [
+                'category' => 'email',
+                'value' => 'contact@masjidhikmah.test',
+                'type' => 'main',
+                'is_public' => true,
             ]],
             'social_media' => [[
                 'platform' => 'facebook',
                 'url' => 'https://facebook.com/masjidhikmah',
+            ], [
+                'platform' => 'youtube',
+                'url' => 'https://youtube.com/@masjidhikmah',
             ]],
         ],
     );
@@ -214,8 +222,10 @@ it('applies structured institution updates through approval', function () {
 
     expect($institution->description)->toBe('New description')
         ->and($institution->addressModel?->line1)->toBe('Jalan Hikmah 5')
-        ->and($institution->contacts()->where('value', '01112345678')->exists())->toBeTrue()
-        ->and($institution->socialMedia()->where('platform', 'facebook')->exists())->toBeTrue();
+        ->and($institution->contacts->pluck('value')->all())->toEqual(['01112345678', 'contact@masjidhikmah.test'])
+        ->and($institution->contacts->pluck('order_column')->all())->toEqual([1, 2])
+        ->and($institution->socialMedia->pluck('platform')->all())->toEqual(['facebook', 'youtube'])
+        ->and($institution->socialMedia->pluck('order_column')->all())->toEqual([1, 2]);
 });
 
 it('applies structured event participant and reference updates through approval', function () {

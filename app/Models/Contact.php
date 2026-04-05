@@ -20,6 +20,7 @@ class Contact extends Model implements AuditableContract
         'type',
         'category',
         'value',
+        'order_column',
         'is_public',
     ];
 
@@ -29,6 +30,7 @@ class Contact extends Model implements AuditableContract
         return [
             'category' => ContactCategory::class,
             'type' => ContactType::class,
+            'order_column' => 'integer',
             'is_public' => 'boolean',
         ];
     }

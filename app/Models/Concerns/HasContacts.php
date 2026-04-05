@@ -13,7 +13,9 @@ trait HasContacts
      */
     public function contacts(): MorphMany
     {
-        return $this->morphMany(Contact::class, 'contactable');
+        return $this->morphMany(Contact::class, 'contactable')
+            ->orderBy('order_column')
+            ->orderBy('created_at');
     }
 
     public function getEmailAttribute(): ?string
