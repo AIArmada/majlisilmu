@@ -463,13 +463,23 @@ it('displays public contacts', function () {
     $institution->contacts()->create([
         'category' => ContactCategory::Email->value,
         'type' => ContactType::Main->value,
+        'value' => 'contact@test.com',
+        'is_public' => true,
+    ]);
+
+    $institution->contacts()->create([
+        'category' => ContactCategory::Email->value,
+        'type' => ContactType::Main->value,
         'value' => 'private@test.com',
         'is_public' => false,
     ]);
 
     $this->get(route('institutions.show', $institution))
         ->assertSuccessful()
+        ->assertSee('href="tel:0312345678"', false)
+        ->assertSee('href="mailto:contact@test.com"', false)
         ->assertSee('03-12345678')
+        ->assertSee('contact@test.com')
         ->assertDontSee('private@test.com');
 });
 
