@@ -584,9 +584,16 @@ class ContributionEntityMutationService
                     return null;
                 }
 
-                $category = ContactCategory::tryFrom((string) ($contact['category'] ?? ''));
-                $value = is_string($contact['value'] ?? null) ? trim($contact['value']) : null;
-                $type = ContactType::tryFrom((string) ($contact['type'] ?? '')) ?? ContactType::Main;
+                $category = $this->normalizeContactCategory($contact['category'] ?? null);
+                $value = match ($category) {
+                    ContactCategory::Phone, ContactCategory::WhatsApp => is_string($contact['phone_value'] ?? null)
+                        ? trim((string) $contact['phone_value'])
+                        : (is_string($contact['value'] ?? null) ? trim((string) $contact['value']) : null),
+                    default => is_string($contact['value'] ?? null)
+                        ? trim((string) $contact['value'])
+                        : null,
+                };
+                $type = $this->normalizeContactType($contact['type'] ?? null);
 
                 if ($category === null || $value === null || $value === '') {
                     return null;
@@ -605,6 +612,32 @@ class ContributionEntityMutationService
         $model->contacts()->delete();
 
         $contacts->each(fn (array $contact): Contact => $model->contacts()->create($contact));
+    }
+
+    private function normalizeContactCategory(mixed $value): ?ContactCategory
+    {
+        if ($value instanceof ContactCategory) {
+            return $value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        return ContactCategory::tryFrom(trim($value));
+    }
+
+    private function normalizeContactType(mixed $value): ContactType
+    {
+        if ($value instanceof ContactType) {
+            return $value;
+        }
+
+        if (! is_string($value)) {
+            return ContactType::Main;
+        }
+
+        return ContactType::tryFrom(trim($value)) ?? ContactType::Main;
     }
 
     private function syncSocialMedia(Model $model, mixed $socialMediaPayload): void

@@ -2,6 +2,8 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\Signals\Models\SignalEvent;
+use App\Enums\ContactCategory;
+use App\Enums\ContactType;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
@@ -143,6 +145,39 @@ it('applies direct institution edits for owner maintainers from the suggest upda
 
     expect($institution->fresh()->name)->toBe('Masjid Baru')
         ->and($institution->fresh()->nickname)->toBe('Masjid Segar')
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('applies direct institution edits when an existing phone contact is present on the suggest update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Lama',
+        'nickname' => null,
+        'status' => 'verified',
+    ]);
+    $institution->contacts()->delete();
+    $institution->contacts()->create([
+        'category' => ContactCategory::Phone->value,
+        'type' => ContactType::Main->value,
+        'value' => '+60112223344',
+        'is_public' => true,
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => 'institution',
+        'subjectId' => $institution->slug,
+    ])
+        ->set('data.nickname', 'Masjid Telefon')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($institution->fresh()->nickname)->toBe('Masjid Telefon')
+        ->and($institution->fresh()->contacts()->where('category', ContactCategory::Phone->value)->value('value'))
+        ->not->toBeNull()
+        ->not->toBeEmpty()
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 

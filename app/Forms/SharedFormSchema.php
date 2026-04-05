@@ -27,6 +27,8 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Arr;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 
 class SharedFormSchema
 {
@@ -252,17 +254,7 @@ class SharedFormSchema
                     ->options(ContactCategory::class)
                     ->required()
                     ->live(),
-                TextInput::make('value')
-                    ->label(fn (Get $get): string => match ($get('category')) {
-                        ContactCategory::Email, ContactCategory::Email->value => __('Email Address'),
-                        ContactCategory::Phone, ContactCategory::Phone->value => __('Phone Number'),
-                        ContactCategory::WhatsApp, ContactCategory::WhatsApp->value => __('WhatsApp Number'),
-                        default => __('Value'),
-                    })
-                    ->required()
-                    ->maxLength(255)
-                    ->email(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Email, ContactCategory::Email->value], true))
-                    ->tel(fn (Get $get): bool => in_array($get('category'), [ContactCategory::Phone, ContactCategory::Phone->value, ContactCategory::WhatsApp, ContactCategory::WhatsApp->value], true)),
+                ...self::contactValueFields(),
                 Select::make('type')
                     ->label(__('Type'))
                     ->options(ContactType::class)
@@ -272,13 +264,179 @@ class SharedFormSchema
                     ->label(__('Public'))
                     ->default(true),
             ])
-            ->columns(4);
+            ->columns(4)
+            ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => self::normalizeContactRowsForFill($data))
+            ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => self::normalizeContactRowsForSave($data))
+            ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => self::normalizeContactRowsForSave($data));
 
         if ($helperText !== null) {
             $repeater->helperText(__($helperText));
         }
 
         return $repeater;
+    }
+
+    /**
+     * @return array<int, TextInput|PhoneInput>
+     */
+    public static function contactValueFields(): array
+    {
+        $phoneCategories = [ContactCategory::Phone, ContactCategory::Phone->value, ContactCategory::WhatsApp, ContactCategory::WhatsApp->value];
+        $emailCategories = [ContactCategory::Email, ContactCategory::Email->value];
+
+        return [
+            PhoneInput::make('phone_value')
+                ->label(fn (Get $get): string => match ($get('category')) {
+                    ContactCategory::Phone, ContactCategory::Phone->value => __('Phone Number'),
+                    ContactCategory::WhatsApp, ContactCategory::WhatsApp->value => __('WhatsApp Number'),
+                    default => __('Value'),
+                })
+                ->required()
+                ->visible(fn (Get $get): bool => in_array($get('category'), $phoneCategories, true))
+                ->dehydrated(fn (Get $get): bool => in_array($get('category'), $phoneCategories, true))
+                ->afterStateHydrated(function (PhoneInput $component, mixed $state, Get $get, Set $set): void {
+                    if (! self::isPhoneContactCategory($get('category'))) {
+                        return;
+                    }
+
+                    $value = self::normalizedContactValue($state) ?? self::normalizedContactValue($get('value'));
+
+                    if ($value === null) {
+                        return;
+                    }
+
+                    $component->state($value);
+                    $set('value', $value);
+                })
+                ->afterStateUpdated(function (Set $set, mixed $state): void {
+                    $set('value', self::normalizedContactValue($state));
+                })
+                ->initialCountry('MY')
+                ->displayNumberFormat(PhoneInputNumberType::INTERNATIONAL)
+                ->inputNumberFormat(PhoneInputNumberType::E164),
+            TextInput::make('value')
+                ->label(fn (Get $get): string => match ($get('category')) {
+                    ContactCategory::Email, ContactCategory::Email->value => __('Email Address'),
+                    default => __('Value'),
+                })
+                ->required()
+                ->maxLength(255)
+                ->visible(fn (Get $get): bool => ! in_array($get('category'), $phoneCategories, true))
+                ->dehydrated(fn (Get $get): bool => ! in_array($get('category'), $phoneCategories, true))
+                ->email(fn (Get $get): bool => in_array($get('category'), $emailCategories, true)),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $data
+     * @return array<int, array<string, mixed>>
+     */
+    public static function normalizeContactRowsForFill(array $data): array
+    {
+        if (array_is_list($data)) {
+            return array_map(fn (array $contact): array => self::normalizeContactRowForFill($contact), $data);
+        }
+
+        return self::normalizeContactRowForFill($data);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $data
+     * @return array<int, array<string, mixed>>
+     */
+    public static function normalizeContactRowsForSave(array $data): array
+    {
+        if (array_is_list($data)) {
+            return array_map(fn (array $contact): array => self::normalizeContactRowForSave($contact), $data);
+        }
+
+        return self::normalizeContactRowForSave($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $contact
+     * @return array<string, mixed>
+     */
+    private static function normalizeContactRowForFill(array $contact): array
+    {
+        if (self::isPhoneContactCategory($contact['category'] ?? null)) {
+            $contact['phone_value'] = $contact['value'] ?? null;
+        }
+
+        return $contact;
+    }
+
+    /**
+     * @param  array<string, mixed>  $contact
+     * @return array<string, mixed>
+     */
+    private static function normalizeContactRowForSave(array $contact): array
+    {
+        $category = $contact['category'] ?? null;
+
+        if (self::isPhoneContactCategory($category)) {
+            $value = self::normalizedContactValue($contact['phone_value'] ?? $contact['value'] ?? null);
+
+            if ($value !== null) {
+                $contact['value'] = $value;
+            }
+
+            unset($contact['phone_value']);
+
+            return $contact;
+        }
+
+        $value = self::normalizedContactValue($contact['value'] ?? null);
+
+        if ($value !== null) {
+            $contact['value'] = $value;
+        }
+
+        unset($contact['phone_value']);
+
+        return $contact;
+    }
+
+    public static function isPhoneContactCategory(mixed $category): bool
+    {
+        $categoryValue = $category instanceof ContactCategory
+            ? $category->value
+            : strtolower((string) $category);
+
+        return in_array($categoryValue, [ContactCategory::Phone->value, ContactCategory::WhatsApp->value], true);
+    }
+
+    public static function normalizedContactValue(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     */
+    public static function contactItemLabel(array $state): string
+    {
+        $category = $state['category'] ?? null;
+
+        if ($category instanceof ContactCategory) {
+            $categoryLabel = $category->getLabel();
+        } elseif (is_string($category)) {
+            $categoryLabel = ContactCategory::tryFrom($category)?->getLabel() ?? $category;
+        } else {
+            $categoryLabel = __('Contact');
+        }
+
+        $value = self::isPhoneContactCategory($category)
+            ? self::normalizedContactValue($state['phone_value'] ?? ($state['value'] ?? null))
+            : self::normalizedContactValue($state['value'] ?? null);
+
+        return $categoryLabel.': '.($value ?? '');
     }
 
     /**
@@ -513,7 +671,9 @@ class SharedFormSchema
             }
 
             $category = $contact['category'] ?? null;
-            $value = $contact['value'] ?? null;
+            $value = self::isPhoneContactCategory($category)
+                ? ($contact['phone_value'] ?? ($contact['value'] ?? null))
+                : ($contact['value'] ?? null);
 
             if (! filled($category) || ! filled($value)) {
                 continue;
@@ -521,7 +681,7 @@ class SharedFormSchema
 
             $model->contacts()->create([
                 'category' => $category,
-                'value' => $value,
+                'value' => self::normalizedContactValue($value) ?? $value,
                 'type' => $contact['type'] ?? ContactType::Main->value,
                 'is_public' => (bool) ($contact['is_public'] ?? true),
             ]);
