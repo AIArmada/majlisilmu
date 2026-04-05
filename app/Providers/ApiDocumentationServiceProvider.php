@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
+use App\Support\ApiDocumentation\ReconnectCachedDatabaseConnections;
 use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Routing\Route as IlluminateRoute;
@@ -31,7 +32,9 @@ class ApiDocumentationServiceProvider extends ServiceProvider
         $this->app->booted(function () use ($apiDomain, $configureDocs, $docsMiddleware, $docsViewPath): void {
             $registerDocsRoutes = function () use ($configureDocs, $docsMiddleware, $docsViewPath): void {
                 Route::middleware($docsMiddleware)->group(function () use ($configureDocs, $docsViewPath): void {
-                    Route::get('docs', function (Generator $generator) use ($configureDocs, $docsViewPath) {
+                    Route::get('docs', function (Generator $generator, ReconnectCachedDatabaseConnections $reconnectCachedDatabaseConnections) use ($configureDocs, $docsViewPath) {
+                        $reconnectCachedDatabaseConnections();
+
                         $config = $configureDocs();
 
                         return view()->file($docsViewPath, [
@@ -40,7 +43,9 @@ class ApiDocumentationServiceProvider extends ServiceProvider
                         ]);
                     })->name('scramble.docs.ui');
 
-                    Route::get('docs.json', function (Generator $generator) use ($configureDocs) {
+                    Route::get('docs.json', function (Generator $generator, ReconnectCachedDatabaseConnections $reconnectCachedDatabaseConnections) use ($configureDocs) {
+                        $reconnectCachedDatabaseConnections();
+
                         $config = $configureDocs();
 
                         return response()->json($generator($config), options: JSON_PRETTY_PRINT);
