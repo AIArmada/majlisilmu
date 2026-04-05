@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Resources\Institutions\Schemas\InstitutionForm as AdminInstitutionForm;
+use App\Filament\Resources\References\Schemas\ReferenceForm as AdminReferenceForm;
 use App\Filament\Resources\Speakers\Schemas\SpeakerForm as AdminSpeakerForm;
 use App\Filament\Resources\Venues\Schemas\VenueForm as AdminVenueForm;
 use App\Forms\InstitutionContributionFormSchema;
@@ -23,9 +24,12 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\View as SchemaView;
+use Filament\Schemas\Concerns\InteractsWithSchemas;
+use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Livewire\Component as LivewireComponent;
 use Nnjeim\World\Models\Language;
 use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 
@@ -607,6 +611,11 @@ it('stores description and contacts when creating an institution via quick-creat
             'value' => '0123456789',
             'type' => 'main',
             'is_public' => true,
+        ], [
+            'category' => 'email',
+            'value' => 'contact@masjidqc.test',
+            'type' => 'main',
+            'is_public' => true,
         ]],
     ]);
 
@@ -616,7 +625,8 @@ it('stores description and contacts when creating an institution via quick-creat
 
     expect($institution->description)->toBe('<p>Institusi komuniti yang aktif.</p>')
         ->and($institution->nickname)->toBe('Masjid QC')
-        ->and($institution->contacts->pluck('value')->all())->toContain('0123456789');
+        ->and($institution->contacts->pluck('value')->all())->toEqual(['0123456789', 'contact@masjidqc.test'])
+        ->and($institution->contacts->pluck('order_column')->all())->toEqual([1, 2]);
 });
 
 it('uses the phone input for institution phone and whatsapp contact values', function () {
@@ -674,6 +684,77 @@ it('uses the phone input for institution phone and whatsapp contact values', fun
 
     expect($phoneValueFields->contains(fn (mixed $component): bool => $component instanceof PhoneInput))->toBeTrue();
     expect($emailValueFields->contains(fn (mixed $component): bool => $component instanceof TextInput))->toBeTrue();
+});
+
+it('configures contact and social media repeaters to persist drag ordering', function () {
+    $livewire = new class extends LivewireComponent implements HasSchemas
+    {
+        use InteractsWithSchemas;
+
+        public function render(): string
+        {
+            return '';
+        }
+    };
+
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            if (! is_object($component)) {
+                continue;
+            }
+
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $findRepeater = function (array $components, string $name) use ($flatten): ?Repeater {
+        return collect($flatten($components))
+            ->first(function (mixed $component) use ($name): bool {
+                return $component instanceof Repeater
+                    && method_exists($component, 'getName')
+                    && $component->getName() === $name;
+            });
+    };
+
+    $institutionSchema = AdminInstitutionForm::configure(Schema::make($livewire))->getComponents();
+    $speakerSchema = AdminSpeakerForm::configure(Schema::make($livewire))->getComponents();
+    $venueSchema = AdminVenueForm::configure(Schema::make($livewire))->getComponents();
+    $referenceSchema = AdminReferenceForm::configure(Schema::make($livewire))->getComponents();
+
+    expect($findRepeater($institutionSchema, 'contacts')?->getOrderColumn())->toBe('order_column')
+        ->and($findRepeater($institutionSchema, 'socialMedia')?->getOrderColumn())->toBe('order_column')
+        ->and($findRepeater($speakerSchema, 'contacts')?->getOrderColumn())->toBe('order_column')
+        ->and($findRepeater($speakerSchema, 'socialMedia')?->getOrderColumn())->toBe('order_column')
+        ->and($findRepeater($venueSchema, 'socialMedia')?->getOrderColumn())->toBe('order_column')
+        ->and($findRepeater($referenceSchema, 'socialMedia')?->getOrderColumn())->toBe('order_column');
 });
 
 it('stores nested institution quick-create address data when picker mode is used', function () {
@@ -907,6 +988,9 @@ it('stores structured speaker quick-create details when creating a speaker via q
         'social_media' => [[
             'platform' => 'facebook',
             'url' => 'https://facebook.com/ustaz.quick.create',
+        ], [
+            'platform' => 'youtube',
+            'url' => 'https://youtube.com/@ustaz.quick.create',
         ]],
     ]);
 
@@ -918,7 +1002,8 @@ it('stores structured speaker quick-create details when creating a speaker via q
         ->and($speaker->addressModel?->line1)->toBe('Jalan Hikmah 8')
         ->and($speaker->addressModel?->google_maps_url)->toBe('https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869')
         ->and($speaker->contacts->pluck('value')->all())->toContain('0123456789')
-        ->and($speaker->socialMedia->pluck('platform')->all())->toContain('facebook')
+        ->and($speaker->socialMedia->pluck('platform')->all())->toEqual(['facebook', 'youtube'])
+        ->and($speaker->socialMedia->pluck('order_column')->all())->toEqual([1, 2])
         ->and($speaker->languages->pluck('id')->all())->toContain($language->id);
 });
 

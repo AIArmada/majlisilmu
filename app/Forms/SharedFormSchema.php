@@ -646,11 +646,14 @@ class SharedFormSchema
     public static function createSocialMediaFromData(Institution|Speaker|Venue|Reference $model, array $data): void
     {
         if (! empty($data['social_media'])) {
-            foreach ($data['social_media'] as $social) {
+            foreach ($data['social_media'] as $index => $social) {
                 $model->socialMedia()->create([
                     'platform' => $social['platform'],
                     'url' => $social['url'] ?? null,
                     'username' => $social['username'] ?? null,
+                    'order_column' => is_numeric($social['order_column'] ?? null)
+                        ? (int) $social['order_column']
+                        : $index + 1,
                 ]);
             }
         }
@@ -665,7 +668,7 @@ class SharedFormSchema
             return;
         }
 
-        foreach ($data['contacts'] as $contact) {
+        foreach ($data['contacts'] as $index => $contact) {
             if (! is_array($contact)) {
                 continue;
             }
@@ -684,6 +687,9 @@ class SharedFormSchema
                 'value' => self::normalizedContactValue($value) ?? $value,
                 'type' => $contact['type'] ?? ContactType::Main->value,
                 'is_public' => (bool) ($contact['is_public'] ?? true),
+                'order_column' => is_numeric($contact['order_column'] ?? null)
+                    ? (int) $contact['order_column']
+                    : $index + 1,
             ]);
         }
     }

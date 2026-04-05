@@ -102,6 +102,7 @@ class ReferenceForm
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
+                            ->orderColumn('order_column')
                             ->collapsible()
                             ->defaultItems(0)
                             ->addActionLabel('Add Link')
