@@ -392,6 +392,8 @@ class Speaker extends Model implements AuditableContract, HasMedia
             PreNominal::Ir => 50,
             PreNominal::Ar => 51,
             PreNominal::Dr => 60,
+            PreNominal::Hj => 61,
+            PreNominal::Hjh => 62,
         };
     }
 

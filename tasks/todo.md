@@ -1,3 +1,21 @@
+# Speaker Hj And Hjh Pre-Nominals
+
+- [x] Add `Hj` and `Hjh` to the shared speaker pre-nominal enum and label set
+- [x] Include both values in the shared speaker title-ordering precedence and factory data
+- [x] Add focused regression coverage and verify the affected speaker tests
+
+## Review
+
+- Added `PreNominal::Hj` and `PreNominal::Hjh` to [PreNominal.php](/Users/Saiffil/Herd/majlisilmu/app/Enums/PreNominal.php) so the shared speaker form and API option set can accept and label both pilgrimage titles consistently.
+- Updated the normalized speaker title precedence in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) so both values participate in the same deterministic display-name and slug pipeline instead of breaking the exhaustive sort-order match.
+- Extended [SpeakerFactory.php](/Users/Saiffil/Herd/majlisilmu/database/factories/SpeakerFactory.php) so generated male and female speakers can now include the new enum values instead of leaving factory data behind the supported option set.
+- Expanded [SpeakerSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SpeakerSlugGenerationTest.php) with focused regressions proving `hj` and `hjh` both render and slugify correctly.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/SpeakerSlugGenerationTest.php` => **23 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerCreateOptionSchemaTest.php` => **2 passed**, 15 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventFormSpeakerLabelTest.php` => **1 passed**, 3 assertions
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
 # Speaker Maulana Pre-Nominal
 
 - [x] Add `Maulana` to the shared speaker pre-nominal enum and label set
