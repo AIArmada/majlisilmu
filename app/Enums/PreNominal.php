@@ -23,6 +23,8 @@ enum PreNominal: string implements HasLabel
     case Habib = 'habib';
     case Pendeta = 'pendeta';
     case TuanGuru = 'tuan_guru';
+    case Hj = 'hj';
+    case Hjh = 'hjh';
 
     // Quran Memorizers/Reciters
     case Hafiz = 'hafiz';
@@ -56,6 +58,8 @@ enum PreNominal: string implements HasLabel
             self::Habib => __('Habib'),
             self::Pendeta => __('Pendeta'),
             self::TuanGuru => __('Tuan Guru'),
+            self::Hj => __('Hj'),
+            self::Hjh => __('Hjh'),
 
             // Quran Memorizers/Reciters
             self::Hafiz => __('Hafiz'),

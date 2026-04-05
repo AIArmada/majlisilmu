@@ -167,6 +167,40 @@ it('supports maulana as a pre-nominal in formatted names and slugs', function ()
         ->and($speaker->slug)->toBe('maulana-dr-ahmad-fauzi-my');
 });
 
+it('supports hj as a pre-nominal in formatted names and slugs', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Ahmad Fauzi',
+        'gender' => 'male',
+        'pre_nominal' => ['hj'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe('Hj Ahmad Fauzi')
+        ->and($speaker->slug)->toBe('hj-ahmad-fauzi-my');
+});
+
+it('supports hjh as a pre-nominal in formatted names and slugs', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Mimi Haryani',
+        'gender' => 'female',
+        'pre_nominal' => ['hjh'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe('Hjh Mimi Haryani')
+        ->and($speaker->slug)->toBe('hjh-mimi-haryani-my');
+});
+
 it('keeps professional prefixes ahead of doctorate titles in public display order', function () {
     $proposer = User::factory()->create();
     $country = createSpeakerSlugCountry();
