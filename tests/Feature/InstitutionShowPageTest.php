@@ -393,6 +393,7 @@ it('renders institution event cards with localized prayer timing stacked speaker
             ->toContain($speaker->public_avatar_url)
             ->toContain($secondSpeaker->public_avatar_url)
             ->toContain('-space-x-3')
+            ->toContain('sm:h-11 sm:w-11')
             ->not->toContain('Selepas Maghrib')
             ->not->toContain('Penceramah:')
             ->not->toContain('Shah Alam, Petaling, Selangor');
