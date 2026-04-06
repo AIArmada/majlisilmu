@@ -2,6 +2,7 @@
 
 namespace App\Forms;
 
+use App\Enums\ReferenceType;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
@@ -28,14 +29,8 @@ class ReferenceContributionFormSchema
                         ->maxLength(255),
                     Select::make('type')
                         ->label(__('Reference Type'))
-                        ->options([
-                            'book' => 'Book',
-                            'kitab' => 'Kitab',
-                            'article' => 'Article',
-                            'video' => 'Video',
-                            'other' => 'Other',
-                        ])
-                        ->default('kitab')
+                        ->options(ReferenceType::class)
+                        ->default(ReferenceType::Book->value)
                         ->required(),
                     TextInput::make('publication_year')
                         ->label(__('Publication Year'))

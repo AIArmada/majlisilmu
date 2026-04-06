@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\References\Tables;
 
+use App\Enums\ReferenceType;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -32,12 +33,14 @@ class ReferencesTable
                     ->sortable(),
                 TextColumn::make('type')
                     ->badge()
-                    ->colors([
-                        'primary',
-                        'success' => 'kitab',
-                        'warning' => 'book',
-                        'info' => 'video',
-                    ]),
+                    ->formatStateUsing(fn (string $state): string => ReferenceType::tryFrom($state)?->getLabel() ?? ucfirst($state))
+                    ->color(fn (string $state): string => match ($state) {
+                        ReferenceType::Book->value => 'warning',
+                        ReferenceType::Article->value => 'info',
+                        ReferenceType::Video->value => 'danger',
+                        ReferenceType::Other->value => 'gray',
+                        default => 'primary',
+                    }),
                 TextColumn::make('status')
                     ->badge()
                     ->sortable(),

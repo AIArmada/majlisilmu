@@ -75,6 +75,20 @@ it('normalizes website url when pasted into username field', function () {
         ->and($social->resolved_url)->toBe('https://majlisilmu.test/profile');
 });
 
+it('keeps wikipedia urls as standard resolved links', function () {
+    $institution = Institution::factory()->create();
+
+    $social = $institution->socialMedia()->create([
+        'platform' => SocialMediaPlatform::Wikipedia->value,
+        'url' => 'https://en.wikipedia.org/wiki/Imam_al-Nawawi',
+    ])->fresh();
+
+    expect($social->platform)->toBe(SocialMediaPlatform::Wikipedia->value)
+        ->and($social->username)->toBeNull()
+        ->and($social->url)->toBe('https://en.wikipedia.org/wiki/Imam_al-Nawawi')
+        ->and($social->resolved_url)->toBe('https://en.wikipedia.org/wiki/Imam_al-Nawawi');
+});
+
 it('renders resolved social url on speaker page when url column is null', function () {
     $speaker = Speaker::factory()->create([
         'status' => 'verified',

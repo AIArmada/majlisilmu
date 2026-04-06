@@ -12,6 +12,7 @@ use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
+use App\Enums\ReferenceType;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -69,7 +70,6 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Carbon\CarbonInterface;
-use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -1057,14 +1057,8 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('cth: Imam Nawawi, Imam Ghazali')),
                                     Select::make('type')
                                         ->label(__('Jenis'))
-                                        ->options([
-                                            'kitab' => __('Kitab Turath'),
-                                            'book' => __('Buku Moden'),
-                                            'article' => __('Artikel'),
-                                            'video' => __('Video'),
-                                            'other' => __('Lain-lain'),
-                                        ])
-                                        ->default('kitab'),
+                                        ->options(ReferenceType::class)
+                                        ->default(ReferenceType::Book->value),
                                     TextInput::make('publication_year')
                                         ->label(__('Tahun Terbitan'))
                                         ->numeric()
@@ -1115,7 +1109,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         'title' => $data['title'],
                                         'slug' => app(GenerateReferenceSlugAction::class)->handle((string) ($data['title'] ?? '')),
                                         'author' => $data['author'] ?? null,
-                                        'type' => $data['type'] ?? 'kitab',
+                                        'type' => $data['type'] ?? ReferenceType::Book->value,
                                         'publication_year' => filled($data['publication_year'] ?? null) ? (string) $data['publication_year'] : null,
                                         'publisher' => $data['publisher'] ?? null,
                                         'description' => $data['description'] ?? null,
@@ -1838,10 +1832,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             }
         }
 
-        $prayerReference = $duplicateEvent->prayer_reference instanceof BackedEnum
+        $prayerReference = $duplicateEvent->prayer_reference instanceof \BackedEnum
             ? (string) $duplicateEvent->prayer_reference->value
             : (is_string($duplicateEvent->prayer_reference) ? $duplicateEvent->prayer_reference : null);
-        $prayerOffset = $duplicateEvent->prayer_offset instanceof BackedEnum
+        $prayerOffset = $duplicateEvent->prayer_offset instanceof \BackedEnum
             ? (string) $duplicateEvent->prayer_offset->value
             : (is_string($duplicateEvent->prayer_offset) ? $duplicateEvent->prayer_offset : null);
 

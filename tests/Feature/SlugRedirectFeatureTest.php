@@ -82,7 +82,7 @@ it('creates a speaker slug redirect when a visited slug changes', function () {
 it('creates a reference slug redirect when a visited title slug changes', function () {
     $reference = Reference::query()->create([
         'title' => 'Kitab Lama',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]);

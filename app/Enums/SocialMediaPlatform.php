@@ -15,6 +15,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
     case Telegram = 'telegram';
     case WhatsApp = 'whatsapp';
     case LinkedIn = 'linkedin';
+    case Wikipedia = 'wikipedia';
     case Website = 'website';
     case Threads = 'threads';
     case Other = 'other';
@@ -30,6 +31,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
             self::Telegram => __('Telegram'),
             self::WhatsApp => __('WhatsApp'),
             self::LinkedIn => __('LinkedIn'),
+            self::Wikipedia => __('Wikipedia'),
             self::Website => __('Laman Web'),
             self::Threads => __('Threads'),
             self::Other => __('Lain-lain'),
@@ -47,6 +49,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
             self::Telegram => 'heroicon-m-paper-airplane',
             self::WhatsApp => 'heroicon-m-phone',
             self::LinkedIn => 'heroicon-m-briefcase',
+            self::Wikipedia => 'heroicon-m-book-open',
             default => 'heroicon-m-link',
         };
     }
@@ -65,6 +68,7 @@ enum SocialMediaPlatform: string implements HasIcon, HasLabel
             self::Telegram => 'https://t.me/*',
             self::WhatsApp => 'https://wa.me/*',
             self::LinkedIn => 'https://*linkedin.com/*',
+            self::Wikipedia => 'https://*wikipedia.org/*',
             self::Threads => 'https://*threads.net/*',
             default => null,
         };

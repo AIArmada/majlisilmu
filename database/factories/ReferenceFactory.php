@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ReferenceType;
 use App\Models\Reference;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -24,7 +25,11 @@ class ReferenceFactory extends Factory
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower(Str::random(7)),
             'author' => $this->faker->name(),
-            'type' => $this->faker->randomElement(['kitab', 'book', 'article']),
+            'type' => $this->faker->randomElement([
+                ReferenceType::Book->value,
+                ReferenceType::Article->value,
+                ReferenceType::Video->value,
+            ]),
             'publication_year' => $this->faker->year(),
             'publisher' => $this->faker->company(),
             'description' => $this->faker->paragraph(),
