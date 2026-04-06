@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Models\Speaker;
 use App\Support\Cache\PublicListingsCache;
@@ -18,16 +19,19 @@ class BackfillSpeakerSlugs implements ShouldBeUnique, ShouldQueue
     public int $uniqueFor = 3600;
 
     public function handle(
+        GenerateEventSlugAction $generateEventSlugAction,
         GenerateSpeakerSlugAction $generateSpeakerSlugAction,
         PublicListingsCache $publicListingsCache,
     ): void {
+        $updatedSpeakerIds = [];
+
         Speaker::query()
             ->with([
                 'address.country',
             ])
             ->orderBy('name')
             ->orderBy('id')
-            ->chunk(100, function ($speakers) use ($generateSpeakerSlugAction): void {
+            ->chunk(100, function ($speakers) use ($generateSpeakerSlugAction, &$updatedSpeakerIds): void {
                 foreach ($speakers as $speaker) {
                     $slug = $generateSpeakerSlugAction->forSpeaker($speaker);
 
@@ -40,8 +44,14 @@ class BackfillSpeakerSlugs implements ShouldBeUnique, ShouldQueue
                             'slug' => $slug,
                         ])->saveQuietly();
                     });
+
+                    $updatedSpeakerIds[] = (string) $speaker->getKey();
                 }
             });
+
+        foreach (array_values(array_unique($updatedSpeakerIds)) as $speakerId) {
+            $generateEventSlugAction->syncEventSlugsForSpeakerId($speakerId);
+        }
 
         $publicListingsCache->bustMajlisListing();
     }

@@ -4,6 +4,7 @@ use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Livewire\Pages\Dashboard\Events\CreateAdvanced;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -125,4 +126,36 @@ it('shows a validation error when the parent program ends before it starts', fun
         ->assertHasErrors(['form.program_ends_at']);
 
     expect(Event::query()->where('title', 'Invalid Parent Program')->exists())->toBeFalse();
+});
+
+it('includes the organizer speaker slug when creating a parent program for a speaker organizer', function () {
+    $user = User::factory()->create(['name' => 'Speaker Organizer Member']);
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->members()->syncWithoutDetaching([$user->id]);
+
+    $programStartsAt = now()->addDays(2)->setTime(20, 0);
+
+    Livewire::actingAs($user)
+        ->test(CreateAdvanced::class)
+        ->set('form.title', 'Speaker Parent Program')
+        ->set('form.description', 'Speaker-led umbrella program.')
+        ->set('form.program_starts_at', $programStartsAt->format('Y-m-d\TH:i'))
+        ->set('form.program_ends_at', now()->addDays(10)->setTime(22, 0)->format('Y-m-d\TH:i'))
+        ->set('form.organizer_type', 'speaker')
+        ->set('form.organizer_id', $speaker->id)
+        ->set('form.default_event_type', 'kuliah_ceramah')
+        ->set('form.default_event_format', 'physical')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $parentEvent = Event::query()->where('title', 'Speaker Parent Program')->firstOrFail();
+    $expectedSuffix = $parentEvent->starts_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('j-n-y');
+
+    expect($parentEvent->slug)->toBe("speaker-parent-program-{$speaker->slug}-{$expectedSuffix}");
 });

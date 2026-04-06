@@ -28,6 +28,11 @@ class CreateAdvancedParentProgramAction
         ?string $locationInstitutionId,
     ): Event {
         return DB::transaction(function () use ($user, $form, $programStartsAt, $programEndsAt, $timezone, $organizerType, $organizerId, $locationInstitutionId): Event {
+            $organizerMorphClass = $this->organizerMorphClass($organizerType);
+            $speakerSlugSegments = $organizerMorphClass === Speaker::class
+                ? app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds([$organizerId])
+                : [];
+
             $parentEvent = Event::query()->create([
                 'user_id' => $user->id,
                 'submitter_id' => $user->id,
@@ -38,13 +43,15 @@ class CreateAdvancedParentProgramAction
                     (string) $form['title'],
                     $programStartsAt,
                     $timezone,
+                    null,
+                    $speakerSlugSegments,
                 ),
                 'description' => (string) ($form['description'] ?? ''),
                 'starts_at' => $programStartsAt,
                 'ends_at' => $programEndsAt,
                 'timezone' => $timezone,
                 'institution_id' => $locationInstitutionId,
-                'organizer_type' => $this->organizerMorphClass($organizerType),
+                'organizer_type' => $organizerMorphClass,
                 'organizer_id' => $organizerId,
                 'event_type' => [(string) $form['default_event_type']],
                 'event_format' => (string) $form['default_event_format'],

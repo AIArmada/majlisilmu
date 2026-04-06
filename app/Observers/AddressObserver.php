@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Actions\Venues\GenerateVenueSlugAction;
@@ -14,6 +15,7 @@ use App\Support\Cache\PublicListingsCache;
 class AddressObserver
 {
     public function __construct(
+        protected GenerateEventSlugAction $generateEventSlugAction,
         protected GenerateInstitutionSlugAction $generateInstitutionSlugAction,
         protected GenerateSpeakerSlugAction $generateSpeakerSlugAction,
         protected GenerateVenueSlugAction $generateVenueSlugAction,
@@ -45,6 +47,7 @@ class AddressObserver
 
         if ($addressable instanceof Speaker) {
             $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($addressable->name);
+            $this->generateEventSlugAction->syncEventSlugsForSpeakerName($addressable->name);
             $this->publicListingsCache->bustMajlisListing();
 
             return;

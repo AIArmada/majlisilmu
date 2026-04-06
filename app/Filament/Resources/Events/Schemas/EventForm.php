@@ -288,13 +288,20 @@ class EventForm
                                                 Institution::class => 'Institusi',
                                                 Speaker::class => 'Penceramah',
                                             ])
-                                            ->live(),
+                                            ->live()
+                                            ->afterStateUpdated(function (Get $get, Set $set, ?Event $record): void {
+                                                self::regenerateSlug($get, $set, $record);
+                                            }),
                                         Select::make('organizer_id')
                                             ->label('Penganjur')
                                             ->searchable()
                                             ->preload()
+                                            ->live()
                                             ->options(fn (Get $get): array => self::getOrganizerOptions($get('organizer_type')))
-                                            ->required(fn (Get $get): bool => filled($get('organizer_type'))),
+                                            ->required(fn (Get $get): bool => filled($get('organizer_type')))
+                                            ->afterStateUpdated(function (Get $get, Set $set, ?Event $record): void {
+                                                self::regenerateSlug($get, $set, $record);
+                                            }),
                                         Select::make('series')
                                             ->label('Siri')
                                             ->relationship('series', 'title')
@@ -376,9 +383,13 @@ class EventForm
                                             ->label('Penceramah')
                                             ->required(fn (Get $get): bool => self::requiresSpeakersForEventTypes($get('event_type')))
                                             ->multiple()
+                                            ->live()
                                             ->closeOnSelect()
                                             ->searchable()
                                             ->preload()
+                                            ->afterStateUpdated(function (Get $get, Set $set, ?Event $record): void {
+                                                self::regenerateSlug($get, $set, $record);
+                                            })
                                             ->options(fn (): array => Speaker::query()
                                                 ->whereIn('status', ['verified', 'pending'])
                                                 ->orderBy('name')
@@ -766,11 +777,26 @@ class EventForm
             return;
         }
 
+        $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds(
+            is_array($get('speakers')) ? $get('speakers') : [],
+        );
+
+        if (
+            $speakerSlugSegments === []
+            && $get('organizer_type') === Speaker::class
+            && filled($get('organizer_id'))
+        ) {
+            $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds([
+                (string) $get('organizer_id'),
+            ]);
+        }
+
         $set('slug', app(GenerateEventSlugAction::class)->handle(
             $resolvedTitle,
             $get('event_date') ?? $get('starts_at') ?? null,
             is_string($get('timezone')) ? $get('timezone') : null,
             $record?->getKey() !== null ? (string) $record->getKey() : null,
+            $speakerSlugSegments,
         ));
     }
 

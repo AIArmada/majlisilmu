@@ -11,6 +11,7 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -82,10 +83,19 @@ it('stores poster and gallery uploads when submitting an event', function () {
         ->assertRedirect(route('submit-event.success'));
 
     $event = Event::where('title', 'Test Event Media Upload')->firstOrFail();
+    $expectedSuffix = Carbon::parse($fixtures['event_date'], 'Asia/Kuala_Lumpur')->format('j-n-y');
+    $speakerSlugSegments = collect($fixtures['speaker_ids'])
+        ->map(fn (string $speakerId): string => Speaker::query()->findOrFail($speakerId)->slug)
+        ->all();
 
     expect($event->getMedia('poster'))->toHaveCount(1);
     expect($event->getMedia('gallery'))->toHaveCount(2);
-    expect($event->tags)->toHaveCount(3);
+    expect($event->tags)->toHaveCount(3)
+        ->and($event->slug)->toBe(sprintf(
+            'test-event-media-upload-%s-%s',
+            implode('-', $speakerSlugSegments),
+            $expectedSuffix,
+        ));
 });
 
 it('does not require guest details for authenticated users', function () {

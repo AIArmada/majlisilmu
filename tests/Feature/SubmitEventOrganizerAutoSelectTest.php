@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\Venue;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -85,4 +86,26 @@ it('shows formatted speaker names in submit event speaker selectors', function (
 
     Livewire::test('pages.submit-event.create')
         ->assertSee($speaker->formatted_name);
+});
+
+it('uses the organizer speaker slug when no explicit speakers are selected', function () {
+    $fixtures = submitEventOrganizerFixtures();
+    $eventDate = now()->addDay()->toDateString();
+    $expectedSuffix = Carbon::parse($eventDate, 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventOrganizerFormData($fixtures, [
+            'title' => 'Organizer Fallback Submit Event',
+            'event_date' => $eventDate,
+            'event_type' => [EventType::Other->value],
+            'speakers' => [],
+        ]),
+    )
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('submit-event.success'));
+
+    expect(Event::where('title', 'Organizer Fallback Submit Event')->firstOrFail()->slug)
+        ->toBe(sprintf('organizer-fallback-submit-event-%s-%s', $fixtures['speaker']->slug, $expectedSuffix));
 });

@@ -9,6 +9,7 @@ use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Address;
 use App\Models\Event;
+use App\Models\Speaker;
 use App\Services\Notifications\EventNotificationService;
 use App\Services\PrayerTimeService;
 use App\Support\Cache\PublicListingsCache;
@@ -30,11 +31,18 @@ class EventObserver
         $this->calculatePrayerRelativeTime($event);
 
         if (blank($event->slug)) {
+            $speakerSlugSegments = [];
+
+            if ($event->organizer_type === Speaker::class && is_string($event->organizer_id) && $event->organizer_id !== '') {
+                $speakerSlugSegments = $this->generateEventSlugAction->speakerSlugSegmentsForSpeakerIds([$event->organizer_id]);
+            }
+
             $event->slug = $this->generateEventSlugAction->handle(
                 $event->title,
                 $event->starts_at,
                 is_string($event->timezone) ? $event->timezone : null,
                 (string) $event->getKey(),
+                $speakerSlugSegments,
             );
         }
     }
@@ -66,7 +74,7 @@ class EventObserver
     {
         $this->publicListingsCache->bustMajlisListing();
 
-        if ($event->wasChanged(['title', 'starts_at', 'timezone'])) {
+        if ($event->wasChanged(['title', 'starts_at', 'timezone', 'organizer_type', 'organizer_id'])) {
             $previousTitle = trim((string) ($event->getPrevious()['title'] ?? ''));
 
             $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);

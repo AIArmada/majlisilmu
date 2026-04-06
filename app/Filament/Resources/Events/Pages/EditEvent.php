@@ -13,6 +13,7 @@ use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Reference;
 use App\Models\Series;
+use App\Models\Speaker;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\NeedsChanges;
@@ -77,6 +78,21 @@ class EditEvent extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
+
+        $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds(
+            is_array($data['speakers'] ?? null) ? $data['speakers'] : [],
+        );
+
+        if (
+            $speakerSlugSegments === []
+            && ($data['organizer_type'] ?? null) === Speaker::class
+            && filled($data['organizer_id'] ?? null)
+        ) {
+            $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds([
+                (string) $data['organizer_id'],
+            ]);
+        }
+
         $data['slug'] = app(GenerateEventSlugAction::class)->handle(
             (string) ($data['title'] ?? $this->eventRecord()->title ?? 'Event'),
             $data['event_date'] ?? $data['starts_at'] ?? $this->eventRecord()->starts_at,
@@ -84,6 +100,7 @@ class EditEvent extends EditRecord
                 ? $data['timezone']
                 : (is_string($this->eventRecord()->timezone) ? $this->eventRecord()->timezone : null),
             (string) $this->eventRecord()->getKey(),
+            $speakerSlugSegments,
         );
 
         unset(

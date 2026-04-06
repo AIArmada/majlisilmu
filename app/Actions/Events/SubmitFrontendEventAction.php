@@ -138,6 +138,19 @@ class SubmitFrontendEventAction
         }
 
         $autoApproved = $scopedInstitution instanceof Institution;
+        $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds(
+            is_array($validated['speakers'] ?? null) ? $validated['speakers'] : [],
+        );
+
+        if (
+            $speakerSlugSegments === []
+            && ($validated['organizer_type'] ?? null) === 'speaker'
+            && filled($validated['organizer_speaker_id'] ?? null)
+        ) {
+            $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds([
+                (string) $validated['organizer_speaker_id'],
+            ]);
+        }
 
         $event = Event::query()->create(array_merge([
             'title' => $validated['title'],
@@ -145,6 +158,8 @@ class SubmitFrontendEventAction
                 (string) $validated['title'],
                 $validated['event_date'] ?? null,
                 $timezone,
+                null,
+                $speakerSlugSegments,
             ),
             'description' => $validated['description'] ?? null,
             'timezone' => $timezone,

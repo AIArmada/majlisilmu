@@ -1,3 +1,20 @@
+# Event Slug Speaker Segment
+
+- [x] Update event slug generation to append the event's ordered speaker slug segment before the date
+- [x] Resync event slugs when event speaker assignments or speaker slugs change
+- [x] Refresh focused slug and seeded-event regressions, then run formatter, tests, and PHPStan
+
+## Review
+
+- Updated [GenerateEventSlugAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Events/GenerateEventSlugAction.php) so canonical event slugs now follow `title-speaker-slug(s)-date` when the event has speakers, while keeping the existing `title-date` behavior when the speaker list is empty. Duplicate numbering still works, but now keys off the exact `title + ordered speaker slugs + date` identity.
+- Updated [EventKeyPersonSyncService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/EventKeyPersonSyncService.php), [SpeakerObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/SpeakerObserver.php), and [AddressObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/AddressObserver.php) so event slugs are re-synchronized after event speaker assignments change and after speaker slugs are regenerated from name or address updates.
+- Updated [EventSeeder.php](/Users/Saiffil/Herd/majlisilmu/database/seeders/EventSeeder.php) and the focused regressions in [VenueReferenceEventSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/VenueReferenceEventSlugGenerationTest.php) plus [EventSeederSubmitEventCompatibilityTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/EventSeederSubmitEventCompatibilityTest.php) so the seeded schedule and the slug test suite now assert the new speaker-aware format.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **26 passed**, 68 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSeederSubmitEventCompatibilityTest.php` => **2 passed**, 12 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/GenerateEventSlugAction.php app/Services/EventKeyPersonSyncService.php app/Observers/SpeakerObserver.php app/Observers/AddressObserver.php database/seeders/EventSeeder.php tests/Feature/VenueReferenceEventSlugGenerationTest.php tests/Feature/EventSeederSubmitEventCompatibilityTest.php` => **No errors**
+
 # Speaker Share Avatar Image
 
 - [x] Trace the `/penceramah/*` share image path and replace the placeholder-prone speaker image lookup
