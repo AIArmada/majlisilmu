@@ -926,11 +926,11 @@ new class extends Component
                                                                 @foreach($speakerAvatarStack['items'] as $avatar)
                                                                     <img src="{{ $avatar['url'] }}" alt="{{ $avatar['name'] }}"
                                                                         title="{{ $avatar['name'] }}"
-                                                                        class="h-8 w-8 rounded-full object-cover ring-2 ring-white shadow-sm sm:h-10 sm:w-10">
+                                                                        class="h-9 w-9 rounded-full object-cover ring-2 ring-white shadow-sm sm:h-11 sm:w-11">
                                                                 @endforeach
                                                                 @if($speakerAvatarStack['overflow'] > 0)
                                                                     <span
-                                                                        class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white shadow-sm sm:h-10 sm:w-10 sm:text-[11px]">+{{ $speakerAvatarStack['overflow'] }}</span>
+                                                                        class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white shadow-sm sm:h-11 sm:w-11 sm:text-[11px]">+{{ $speakerAvatarStack['overflow'] }}</span>
                                                                 @endif
                                                             </div>
                                                         </div>
@@ -1188,11 +1188,11 @@ new class extends Component
                                                             @foreach($speakerAvatarStack['items'] as $avatar)
                                                                 <img src="{{ $avatar['url'] }}" alt="{{ $avatar['name'] }}"
                                                                     title="{{ $avatar['name'] }}"
-                                                                    class="h-8 w-8 rounded-full object-cover ring-2 ring-white shadow-sm sm:h-10 sm:w-10">
+                                                                    class="h-9 w-9 rounded-full object-cover ring-2 ring-white shadow-sm sm:h-11 sm:w-11">
                                                             @endforeach
                                                             @if($speakerAvatarStack['overflow'] > 0)
                                                                 <span
-                                                                    class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white shadow-sm sm:h-10 sm:w-10 sm:text-[11px]">+{{ $speakerAvatarStack['overflow'] }}</span>
+                                                                    class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white shadow-sm sm:h-11 sm:w-11 sm:text-[11px]">+{{ $speakerAvatarStack['overflow'] }}</span>
                                                             @endif
                                                         </div>
                                                     </div>

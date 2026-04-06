@@ -18,6 +18,8 @@ use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Filament\Forms\Components\FileUpload;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 it('resolves pending transitionable states without moderation context', function () {
@@ -203,6 +205,32 @@ it('allows 16:9 poster ratio options on the admin event form', function () {
 
             return true;
         });
+});
+
+it('accepts a 16:9 poster upload on the admin event edit form', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(EditEvent::class, ['record' => $event->id])
+        ->fillForm([
+            'poster' => UploadedFile::fake()->image('poster-wide.jpg', 1600, 900),
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()->hasMedia('poster'))->toBeTrue()
+        ->and($event->fresh()->poster_display_aspect_ratio)->toBe('16:9');
 });
 
 it('renders the admin event view page with infolist tabs', function () {
