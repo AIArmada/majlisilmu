@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Events\GenerateEventSlugAction;
+use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
@@ -12,6 +14,8 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\ScheduleKind;
+use App\Enums\ScheduleState;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
 use App\Models\Country;
@@ -36,6 +40,11 @@ class EventSeeder extends Seeder
      * @var array<string, string>
      */
     private array $tagIdMap = [];
+
+    /**
+     * @var array<string, string>
+     */
+    private array $scheduleSpeakerIds = [];
 
     /**
      * Run the database seeds.
@@ -341,8 +350,6 @@ class EventSeeder extends Seeder
                 $descriptionParts[] = $note;
             }
 
-            $slug = Str::slug($title.'-'.$entry['date']);
-
             // Determine timing mode
             $timingMode = TimingMode::Absolute->value;
             $prayerReference = null;
@@ -372,21 +379,15 @@ class EventSeeder extends Seeder
                 $prayerDisplayText = 'Selepas Zohor';
             }
 
-            $speaker = $this->resolveScheduleSpeaker($entry['speaker'] ?? null);
-            $organizerType = $speaker instanceof Speaker ? Speaker::class : Institution::class;
-            $organizerId = $speaker?->getKey() ?? $institution->getKey();
-
-            $event = Event::query()->updateOrCreate([
-                'slug' => $slug,
-            ], [
+            $eventAttributes = [
                 'institution_id' => null,
                 'venue_id' => $venue->id,
-                'organizer_type' => $organizerType,
-                'organizer_id' => $organizerId,
                 'title' => $title,
                 'description' => $descriptionParts !== [] ? implode(' | ', $descriptionParts) : null,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
+                'schedule_kind' => ScheduleKind::CustomChain->value,
+                'schedule_state' => ScheduleState::Active->value,
                 'timezone' => 'Asia/Kuala_Lumpur',
                 // 'language' has been removed; genre/audience are now event_type/age_group etc
                 'event_type' => EventType::KuliahCeramah,
@@ -402,7 +403,33 @@ class EventSeeder extends Seeder
                 'prayer_reference' => $prayerReference,
                 'prayer_offset' => $prayerOffset,
                 'prayer_display_text' => $prayerDisplayText,
-            ]);
+            ];
+
+            $existingScheduleEvent = $this->resolveExistingScheduleEvent($eventAttributes, $entry['speaker'] ?? null);
+            $speaker = $this->resolveScheduleSpeaker($entry['speaker'] ?? null, $existingScheduleEvent);
+            $organizerType = $speaker instanceof Speaker ? Speaker::class : Institution::class;
+            $organizerId = $speaker?->getKey() ?? $institution->getKey();
+
+            $eventAttributes['slug'] = app(GenerateEventSlugAction::class)->handle(
+                $title,
+                $entry['date'],
+                'Asia/Kuala_Lumpur',
+                $existingScheduleEvent?->getKey() !== null ? (string) $existingScheduleEvent->getKey() : null,
+                $speaker instanceof Speaker && is_string($speaker->slug) && $speaker->slug !== ''
+                    ? [$speaker->slug]
+                    : [],
+            );
+            $eventAttributes['organizer_type'] = $organizerType;
+            $eventAttributes['organizer_id'] = $organizerId;
+
+            $event = $existingScheduleEvent;
+
+            if ($event instanceof Event) {
+                $event->fill($eventAttributes);
+                $event->save();
+            } else {
+                $event = Event::query()->create($eventAttributes);
+            }
 
             // Attach default language (Malay) if exists
             if (class_exists(Language::class)) {
@@ -422,19 +449,131 @@ class EventSeeder extends Seeder
         }
     }
 
-    private function resolveScheduleSpeaker(?string $speakerName): ?Speaker
+    private function resolveScheduleSpeaker(?string $speakerName, ?Event $existingScheduleEvent = null): ?Speaker
     {
+        if ($existingScheduleEvent instanceof Event) {
+            if (! is_string($speakerName) || $speakerName === '') {
+                return null;
+            }
+
+            $organizerSpeaker = $existingScheduleEvent->organizer_type === Speaker::class
+                ? Speaker::query()->find($existingScheduleEvent->organizer_id)
+                : null;
+
+            if ($organizerSpeaker instanceof Speaker && $organizerSpeaker->name === $speakerName) {
+                app(GenerateSpeakerSlugAction::class)->syncSpeakerSlug(
+                    $organizerSpeaker->loadMissing('address.country'),
+                );
+                app(GenerateEventSlugAction::class)->syncEventSlugsForSpeakerId((string) $organizerSpeaker->getKey());
+                $this->scheduleSpeakerIds[$speakerName] = (string) $organizerSpeaker->getKey();
+
+                $organizerSpeaker->refresh();
+
+                return $organizerSpeaker;
+            }
+
+            $existingSpeaker = $existingScheduleEvent->speakers()->orderBy('event_key_people.order_column')->first();
+
+            if (
+                $existingSpeaker instanceof Speaker
+                && $existingSpeaker->name === $speakerName
+            ) {
+                app(GenerateSpeakerSlugAction::class)->syncSpeakerSlug(
+                    $existingSpeaker->loadMissing('address.country'),
+                );
+                app(GenerateEventSlugAction::class)->syncEventSlugsForSpeakerId((string) $existingSpeaker->getKey());
+                $this->scheduleSpeakerIds[$speakerName] = (string) $existingSpeaker->getKey();
+
+                $existingSpeaker->refresh();
+
+                return $existingSpeaker;
+            }
+        }
+
         if (! is_string($speakerName) || $speakerName === '') {
             return null;
         }
 
-        return Speaker::query()->firstOrCreate([
-            'slug' => Str::slug($speakerName),
-        ], [
+        if (isset($this->scheduleSpeakerIds[$speakerName])) {
+            $cachedSpeaker = Speaker::query()->find($this->scheduleSpeakerIds[$speakerName]);
+
+            if ($cachedSpeaker instanceof Speaker) {
+                return $cachedSpeaker;
+            }
+
+            unset($this->scheduleSpeakerIds[$speakerName]);
+        }
+
+        $createdSpeaker = Speaker::query()->create([
             'name' => $speakerName,
+            'slug' => app(GenerateSpeakerSlugAction::class)->handle($speakerName),
             'status' => 'verified',
             'is_active' => true,
         ]);
+
+        $this->scheduleSpeakerIds[$speakerName] = (string) $createdSpeaker->getKey();
+
+        return $createdSpeaker;
+    }
+
+    /**
+     * @param  array<string, mixed>  $eventAttributes
+     */
+    private function resolveExistingScheduleEvent(array $eventAttributes, ?string $speakerName): ?Event
+    {
+        $matchingEvents = Event::query()
+            ->with(['keyPeople.speaker'])
+            ->where('title', $eventAttributes['title'])
+            ->where('starts_at', $eventAttributes['starts_at'])
+            ->where('schedule_kind', $eventAttributes['schedule_kind'])
+            ->where('schedule_state', $eventAttributes['schedule_state'])
+            ->orderBy('id')
+            ->get();
+
+        if (is_string($speakerName) && $speakerName !== '') {
+            $matchedEvent = $matchingEvents->first(function (Event $event) use ($speakerName): bool {
+                return $event->keyPeople
+                    ->where('role', EventKeyPersonRole::Speaker->value)
+                    ->contains(function (mixed $keyPerson) use ($speakerName): bool {
+                        $speaker = $keyPerson->speaker;
+
+                        return (is_string($keyPerson->name) && $keyPerson->name === $speakerName)
+                            || ($speaker instanceof Speaker && $speaker->name === $speakerName);
+                    });
+            });
+
+            if ($matchedEvent instanceof Event) {
+                return $matchedEvent;
+            }
+
+            $organizerMatchedEvent = $matchingEvents->first(function (Event $event) use ($speakerName): bool {
+                if ($event->organizer_type !== Speaker::class || ! is_string($event->organizer_id) || $event->organizer_id === '') {
+                    return false;
+                }
+
+                $organizerSpeaker = Speaker::query()->find($event->organizer_id);
+
+                return $organizerSpeaker instanceof Speaker && $organizerSpeaker->name === $speakerName;
+            });
+
+            if ($organizerMatchedEvent instanceof Event) {
+                return $organizerMatchedEvent;
+            }
+        }
+
+        if (! is_string($speakerName) || $speakerName === '') {
+            $noSpeakerEvent = $matchingEvents->first(function (Event $event): bool {
+                return $event->keyPeople
+                    ->where('role', EventKeyPersonRole::Speaker->value)
+                    ->isEmpty();
+            });
+
+            if ($noSpeakerEvent instanceof Event) {
+                return $noSpeakerEvent;
+            }
+        }
+
+        return $matchingEvents->count() === 1 ? $matchingEvents->first() : null;
     }
 
     private function ensureScheduleEventHasTags(Event $event, string $title, ?string $topic): void

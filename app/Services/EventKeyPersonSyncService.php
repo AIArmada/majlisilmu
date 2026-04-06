@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 
 class EventKeyPersonSyncService
 {
+    public function __construct(
+        private readonly GenerateEventSlugAction $generateEventSlugAction,
+    ) {}
+
     /**
      * @param  list<string>  $speakerIds
      * @param  list<array<string, mixed>>  $otherKeyPeople
@@ -39,6 +44,8 @@ class EventKeyPersonSyncService
                 'notes' => $keyPerson['notes'],
             ]);
         }
+
+        $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);
     }
 
     /**

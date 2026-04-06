@@ -25,10 +25,12 @@ use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
 use App\Models\Venue;
+use App\Services\EventKeyPersonSyncService;
 use App\Support\Cache\PublicListingsCache;
 use Carbon\CarbonInterface;
 use Database\Seeders\PermissionSeeder;
@@ -525,6 +527,108 @@ it('uses the generated dated slug when admins create events in filament', functi
     expect($event->slug)->toBe("forum-ramadan-pentadbiran-{$expectedSuffix}");
 });
 
+it('uses the generated speaker-aware slug when admins create events with speakers in filament', function () {
+    $administrator = createSlugAdminUser();
+    $eventDate = '2026-04-12';
+    $expectedSuffix = Carbon::parse($eventDate, 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $firstSpeaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $secondSpeaker = Speaker::factory()->create([
+        'name' => 'Dr Ali',
+        'slug' => 'dr-ali',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(CreateEvent::class)
+        ->fillForm([
+            'title' => 'Forum Ramadan Pentadbiran Dengan Penceramah',
+            'slug' => 'temporary-admin-event-slug',
+            'event_date' => $eventDate,
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'event_format' => EventFormat::Physical->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'event_type' => [EventType::Other->value],
+            'languages' => [101],
+            'institution_id' => $institution->id,
+            'references' => [],
+            'series' => [],
+            'speakers' => [$firstSpeaker->id, $secondSpeaker->id],
+            'other_key_people' => [],
+        ])
+        ->call('create')
+        ->assertHasNoErrors();
+
+    $event = Event::query()
+        ->where('title', 'Forum Ramadan Pentadbiran Dengan Penceramah')
+        ->firstOrFail();
+
+    expect($event->slug)->toBe(sprintf(
+        'forum-ramadan-pentadbiran-dengan-penceramah-%s-%s-%s',
+        $firstSpeaker->fresh()?->slug,
+        $secondSpeaker->fresh()?->slug,
+        $expectedSuffix,
+    ));
+});
+
+it('includes ordered speaker slugs in event slugs when an event has speakers', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $firstSpeaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $secondSpeaker = Speaker::factory()->create([
+        'name' => 'Dr Ali',
+        'slug' => 'dr-ali',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Ramadan Pentadbiran',
+        'slug' => 'legacy-event-slug',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    app(EventKeyPersonSyncService::class)->sync($event, [$firstSpeaker->id, $secondSpeaker->id]);
+
+    expect($event->fresh()?->slug)->toBe(sprintf(
+        'forum-ramadan-pentadbiran-%s-%s-%s',
+        $firstSpeaker->fresh()?->slug,
+        $secondSpeaker->fresh()?->slug,
+        $expectedSuffix,
+    ));
+});
+
 it('regenerates the canonical dated slug when admins edit events in filament', function () {
     $administrator = createSlugAdminUser();
     $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
@@ -560,6 +664,370 @@ it('regenerates the canonical dated slug when admins edit events in filament', f
         ->assertHasNoErrors();
 
     expect($event->fresh()?->slug)->toBe("forum-ramadan-dikemas-kini-{$expectedSuffix}");
+});
+
+it('previews the speaker-aware slug when admins edit event speakers', function () {
+    $administrator = createSlugAdminUser();
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Ramadan Edit Preview',
+        'slug' => 'legacy-event-slug',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(EditEvent::class, ['record' => $event->id])
+        ->fillForm([
+            'title' => 'Forum Ramadan Edit Preview',
+            'slug' => 'legacy-event-slug',
+            'event_date' => '2026-04-12',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '20:00',
+            'end_time' => '22:00',
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'speakers' => [$speaker->id],
+        ])
+        ->assertFormSet([
+            'slug' => sprintf('forum-ramadan-edit-preview-%s-%s', $speaker->slug, $expectedSuffix),
+        ]);
+});
+
+it('updates event slugs when a related speaker slug changes', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Ramadan Pentadbiran',
+        'slug' => 'legacy-event-slug',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id]);
+
+    $speaker->update([
+        'name' => 'Habib Umar Abdullah',
+    ]);
+
+    expect($event->fresh()?->slug)->toBe(sprintf(
+        'forum-ramadan-pentadbiran-%s-%s',
+        $speaker->fresh()?->slug,
+        $expectedSuffix,
+    ));
+});
+
+it('updates organizer-fallback event slugs when the organizer speaker slug changes', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Ramadan Fallback Organizer',
+        'slug' => sprintf('forum-ramadan-fallback-organizer-%s-%s', $speaker->slug, $expectedSuffix),
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $speaker->update([
+        'name' => 'Habib Umar Abdullah',
+    ]);
+
+    expect($event->fresh()?->slug)->toBe(sprintf(
+        'forum-ramadan-fallback-organizer-%s-%s',
+        $speaker->fresh()?->slug,
+        $expectedSuffix,
+    ));
+});
+
+it('updates event slugs when only the organizer speaker changes', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Organizer Only Change',
+        'slug' => "forum-organizer-only-change-{$expectedSuffix}",
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $event->update([
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+    ]);
+
+    expect($event->fresh()?->slug)->toBe(sprintf(
+        'forum-organizer-only-change-%s-%s',
+        $speaker->slug,
+        $expectedSuffix,
+    ));
+});
+
+it('uses the organizer speaker slug when events are created through the raw model path', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::query()->create([
+        'title' => 'Forum Raw Organizer Create',
+        'slug' => null,
+        'starts_at' => $startsAt,
+        'ends_at' => $startsAt->copy()->addHours(2),
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'schedule_kind' => 'single',
+        'schedule_state' => 'active',
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    expect($event->slug)->toBe(sprintf(
+        'forum-raw-organizer-create-%s-%s',
+        $speaker->slug,
+        $expectedSuffix,
+    ));
+});
+
+it('previews the organizer speaker slug when no explicit speakers are selected', function () {
+    $administrator = createSlugAdminUser();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(CreateEvent::class)
+        ->fillForm([
+            'title' => 'Forum Organizer Preview',
+            'slug' => 'temporary-organizer-preview',
+            'event_date' => '2026-04-12',
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'event_format' => EventFormat::Physical->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'event_type' => [EventType::Other->value],
+            'languages' => [101],
+            'references' => [],
+            'series' => [],
+            'speakers' => [],
+            'other_key_people' => [],
+            'organizer_type' => Speaker::class,
+            'organizer_id' => $speaker->id,
+        ])
+        ->assertFormSet([
+            'slug' => sprintf('forum-organizer-preview-%s-%s', $speaker->slug, $expectedSuffix),
+        ]);
+});
+
+it('persists the organizer speaker slug when admins create events without explicit speakers', function () {
+    $administrator = createSlugAdminUser();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(CreateEvent::class)
+        ->fillForm([
+            'title' => 'Forum Organizer Persisted',
+            'slug' => 'temporary-organizer-persisted',
+            'event_date' => '2026-04-12',
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'event_format' => EventFormat::Physical->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'event_type' => [EventType::Other->value],
+            'languages' => [101],
+            'references' => [],
+            'series' => [],
+            'speakers' => [],
+            'other_key_people' => [],
+            'organizer_type' => Speaker::class,
+            'organizer_id' => $speaker->id,
+        ])
+        ->call('create')
+        ->assertHasNoErrors();
+
+    expect(Event::query()->where('title', 'Forum Organizer Persisted')->firstOrFail()->slug)
+        ->toBe(sprintf('forum-organizer-persisted-%s-%s', $speaker->slug, $expectedSuffix));
+});
+
+it('removes deleted speaker slug segments from related events', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Ramadan Pentadbiran',
+        'slug' => 'legacy-event-slug',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id]);
+
+    $speaker->delete();
+
+    expect($event->fresh()?->slug)->toBe("forum-ramadan-pentadbiran-{$expectedSuffix}");
+});
+
+it('keeps canonical slug sequencing stable when speaker removal makes identities collide', function () {
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $canonicalEvent = Event::factory()->create([
+        'title' => 'Forum Ramadan Pentadbiran',
+        'slug' => 'legacy-event-slug-a',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $eventWithSpeaker = Event::factory()->create([
+        'title' => 'Forum Ramadan Pentadbiran',
+        'slug' => 'legacy-event-slug-b',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    app(GenerateEventSlugAction::class)->syncEventSlug($canonicalEvent);
+    app(EventKeyPersonSyncService::class)->sync($eventWithSpeaker, [$speaker->id]);
+
+    $speaker->delete();
+
+    expect($canonicalEvent->fresh()?->slug)->toBe("forum-ramadan-pentadbiran-{$expectedSuffix}")
+        ->and($eventWithSpeaker->fresh()?->slug)->toBe("forum-ramadan-pentadbiran-2-{$expectedSuffix}");
 });
 
 it('recomputes event slugs when the event title changes directly', function () {

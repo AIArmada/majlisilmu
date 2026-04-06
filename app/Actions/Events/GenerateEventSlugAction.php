@@ -3,7 +3,9 @@
 namespace App\Actions\Events;
 
 use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
+use App\Models\Speaker;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -28,6 +30,7 @@ class GenerateEventSlugAction
 
         $events = Event::query()
             ->where('events.title', $normalizedTitle)
+            ->with(['speakers:id,slug'])
             ->get();
 
         $didChange = false;
@@ -37,6 +40,58 @@ class GenerateEventSlugAction
         }
 
         return $didChange;
+    }
+
+    public function syncEventSlugsForSpeakerName(string $speakerName): bool
+    {
+        $normalizedSpeakerName = trim($speakerName);
+
+        if ($normalizedSpeakerName === '') {
+            return false;
+        }
+
+        $speakerIds = Speaker::query()
+            ->where('name', $normalizedSpeakerName)
+            ->pluck('id');
+
+        $titles = Event::query()
+            ->where(function ($query) use ($normalizedSpeakerName, $speakerIds): void {
+                $query->whereHas('speakers', function ($speakerQuery) use ($normalizedSpeakerName): void {
+                    $speakerQuery->where('speakers.name', $normalizedSpeakerName);
+                })->orWhere(function ($organizerQuery) use ($speakerIds): void {
+                    $organizerQuery
+                        ->where('organizer_type', Speaker::class)
+                        ->whereIn('organizer_id', $speakerIds);
+                });
+            })
+            ->pluck('title');
+
+        return $this->syncEventSlugsForTitles($titles);
+    }
+
+    public function syncEventSlugsForSpeakerId(string $speakerId): bool
+    {
+        $normalizedSpeakerId = trim($speakerId);
+
+        if ($normalizedSpeakerId === '') {
+            return false;
+        }
+
+        $titles = Event::query()
+            ->where(function ($query) use ($normalizedSpeakerId): void {
+                $query->whereHas('keyPeople', function ($keyPeopleQuery) use ($normalizedSpeakerId): void {
+                    $keyPeopleQuery
+                        ->where('event_key_people.speaker_id', $normalizedSpeakerId)
+                        ->where('event_key_people.role', EventKeyPersonRole::Speaker->value);
+                })->orWhere(function ($organizerQuery) use ($normalizedSpeakerId): void {
+                    $organizerQuery
+                        ->where('organizer_type', Speaker::class)
+                        ->where('organizer_id', $normalizedSpeakerId);
+                });
+            })
+            ->pluck('title');
+
+        return $this->syncEventSlugsForTitles($titles);
     }
 
     public function syncEventSlug(Event $event): bool
@@ -60,11 +115,15 @@ class GenerateEventSlugAction
         return true;
     }
 
+    /**
+     * @param  list<string>  $speakerSlugs
+     */
     public function handle(
         string $title,
         CarbonInterface|string|null $date = null,
         ?string $timezone = null,
         ?string $ignoreEventId = null,
+        array $speakerSlugs = [],
     ): string {
         $normalizedTitle = trim($title);
         $titleSlug = Str::slug($normalizedTitle);
@@ -73,11 +132,14 @@ class GenerateEventSlugAction
             $titleSlug = 'event';
         }
 
+        $normalizedSpeakerSlugs = $this->normalizedSpeakerSlugs($speakerSlugs);
         $dateSuffix = $this->dateSuffix($date, $timezone);
-        $sequence = $this->nextSequenceForExactTitle($normalizedTitle, $dateSuffix, $ignoreEventId);
+        $sequence = $ignoreEventId === null || $ignoreEventId === ''
+            ? $this->nextSequenceForCreate($normalizedTitle, $normalizedSpeakerSlugs, $dateSuffix)
+            : 1;
 
         do {
-            $candidateParts = [$titleSlug];
+            $candidateParts = [$titleSlug, ...$normalizedSpeakerSlugs];
 
             if ($sequence > 1) {
                 $candidateParts[] = (string) $sequence;
@@ -101,51 +163,56 @@ class GenerateEventSlugAction
             $event->starts_at,
             is_string($event->timezone) ? $event->timezone : null,
             (string) $event->getKey(),
+            $this->speakerSlugSegmentsForEvent($event),
         );
-    }
-
-    private function nextSequenceForExactTitle(string $title, string $dateSuffix, ?string $ignoreEventId): int
-    {
-        $matchingEvents = Event::query()
-            ->where('events.title', $title)
-            ->get()
-            ->filter(function (Event $event) use ($dateSuffix): bool {
-                return $this->dateSuffixForEvent($event) === $dateSuffix;
-            });
-
-        if ($ignoreEventId !== null && $ignoreEventId !== '') {
-            $existingSequence = $this->existingEventSequence($matchingEvents, $ignoreEventId);
-
-            if ($existingSequence !== null) {
-                return $existingSequence;
-            }
-
-            $matchingEvents = $matchingEvents
-                ->reject(fn (Event $event): bool => (string) $event->getKey() === $ignoreEventId)
-                ->values();
-        }
-
-        $matchingCount = $matchingEvents->count();
-
-        return $matchingCount > 0 ? $matchingCount + 1 : 1;
     }
 
     /**
-     * @param  Collection<int, Event>  $matchingEvents
+     * @param  list<mixed>  $speakerIds
+     * @return list<string>
      */
-    private function existingEventSequence(Collection $matchingEvents, string $eventId): ?int
+    public function speakerSlugSegmentsForSpeakerIds(array $speakerIds): array
     {
-        $orderedEvents = $this->orderedEvents($matchingEvents);
+        $normalizedSpeakerIds = $this->normalizedSpeakerIds($speakerIds);
 
-        $existingIndex = $orderedEvents->search(
-            fn (Event $event): bool => (string) $event->getKey() === $eventId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
+        if ($normalizedSpeakerIds === []) {
+            return [];
         }
 
-        return $existingIndex + 1;
+        /** @var Collection<string, Speaker> $speakersById */
+        $speakersById = Speaker::query()
+            ->whereIn('id', $normalizedSpeakerIds)
+            ->get(['id', 'slug'])
+            ->keyBy(fn (Speaker $speaker): string => (string) $speaker->getKey());
+
+        return collect($normalizedSpeakerIds)
+            ->map(function (string $speakerId) use ($speakersById): ?string {
+                $speakerSlug = $speakersById->get($speakerId)?->slug;
+
+                return is_string($speakerSlug) && $speakerSlug !== ''
+                    ? $speakerSlug
+                    : null;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $speakerSlugs
+     */
+    private function nextSequenceForCreate(string $title, array $speakerSlugs, string $dateSuffix): int
+    {
+        $matchingEvents = Event::query()
+            ->where('events.title', $title)
+            ->with(['speakers:id,slug'])
+            ->get()
+            ->filter(function (Event $event) use ($dateSuffix, $speakerSlugs): bool {
+                return $this->dateSuffixForEvent($event) === $dateSuffix
+                    && $this->speakerSlugSegmentsForEvent($event) === $speakerSlugs;
+            });
+
+        return $matchingEvents->count() + 1;
     }
 
     /**
@@ -186,6 +253,96 @@ class GenerateEventSlugAction
             : (string) config('app.timezone', 'UTC');
 
         return $event->starts_at->copy()->timezone($timezone)->format('j-n-y');
+    }
+
+    /**
+     * @param  array<int, mixed>  $speakerSlugs
+     * @return list<string>
+     */
+    private function normalizedSpeakerSlugs(array $speakerSlugs): array
+    {
+        return collect($speakerSlugs)
+            ->map(function (mixed $speakerSlug): ?string {
+                if (! is_string($speakerSlug)) {
+                    return null;
+                }
+
+                $normalizedSpeakerSlug = trim($speakerSlug);
+
+                return $normalizedSpeakerSlug !== '' ? $normalizedSpeakerSlug : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<mixed>  $speakerIds
+     * @return list<string>
+     */
+    private function normalizedSpeakerIds(array $speakerIds): array
+    {
+        return collect($speakerIds)
+            ->map(function (mixed $speakerId): ?string {
+                if (! is_string($speakerId) && ! is_int($speakerId)) {
+                    return null;
+                }
+
+                $normalizedSpeakerId = trim((string) $speakerId);
+
+                return $normalizedSpeakerId !== '' ? $normalizedSpeakerId : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function speakerSlugSegmentsForEvent(Event $event): array
+    {
+        $event->loadMissing(['speakers:id,slug', 'organizer']);
+
+        $speakerSlugSegments = $event->speakers
+            ->map(function (Speaker $speaker): ?string {
+                $speakerSlug = $speaker->slug;
+
+                return is_string($speakerSlug) && $speakerSlug !== ''
+                    ? $speakerSlug
+                    : null;
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($speakerSlugSegments !== []) {
+            return $speakerSlugSegments;
+        }
+
+        $organizer = $event->organizer;
+
+        if ($organizer instanceof Speaker && is_string($organizer->slug) && $organizer->slug !== '') {
+            return [$organizer->slug];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $titles
+     */
+    private function syncEventSlugsForTitles(Collection $titles): bool
+    {
+        $didChange = false;
+
+        foreach ($titles->filter(fn (mixed $title): bool => is_string($title) && trim($title) !== '')->unique()->values() as $title) {
+            $didChange = $this->syncEventSlugsForTitle($title) || $didChange;
+        }
+
+        return $didChange;
     }
 
     private function resolveDate(CarbonInterface|string|null $date, ?string $timezone): ?Carbon

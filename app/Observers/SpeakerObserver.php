@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Models\Speaker;
@@ -10,6 +11,7 @@ use App\Support\Cache\PublicListingsCache;
 class SpeakerObserver
 {
     public function __construct(
+        protected GenerateEventSlugAction $generateEventSlugAction,
         protected GenerateSpeakerSlugAction $generateSpeakerSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
         protected PublicListingsCache $publicListingsCache
@@ -23,9 +25,11 @@ class SpeakerObserver
                 : null;
 
             $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($speaker->name);
+            $this->generateEventSlugAction->syncEventSlugsForSpeakerName($speaker->name);
 
             if ($previousName !== null && $previousName !== '' && $previousName !== $speaker->name) {
                 $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($previousName);
+                $this->generateEventSlugAction->syncEventSlugsForSpeakerName($previousName);
             }
         }
 
@@ -36,6 +40,8 @@ class SpeakerObserver
     {
         $this->syncSlugRedirectAction->purgeForModel($speaker);
         $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($speaker->name);
+        $this->generateEventSlugAction->syncEventSlugsForSpeakerId((string) $speaker->getKey());
+        $this->generateEventSlugAction->syncEventSlugsForSpeakerName($speaker->name);
         $this->publicListingsCache->bustMajlisListing();
     }
 }

@@ -9,6 +9,7 @@ use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Reference;
 use App\Models\Series;
+use App\Models\Speaker;
 use App\Support\Events\AdminEventTimeMapper;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
@@ -26,10 +27,27 @@ class CreateEvent extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data = AdminEventTimeMapper::normalizeForPersistence($data);
+
+        $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds(
+            is_array($data['speakers'] ?? null) ? $data['speakers'] : [],
+        );
+
+        if (
+            $speakerSlugSegments === []
+            && ($data['organizer_type'] ?? null) === Speaker::class
+            && filled($data['organizer_id'] ?? null)
+        ) {
+            $speakerSlugSegments = app(GenerateEventSlugAction::class)->speakerSlugSegmentsForSpeakerIds([
+                (string) $data['organizer_id'],
+            ]);
+        }
+
         $data['slug'] = app(GenerateEventSlugAction::class)->handle(
             (string) ($data['title'] ?? 'Event'),
             $data['event_date'] ?? $data['starts_at'] ?? null,
             is_string($data['timezone'] ?? null) ? $data['timezone'] : null,
+            null,
+            $speakerSlugSegments,
         );
 
         unset(

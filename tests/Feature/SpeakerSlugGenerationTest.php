@@ -1,23 +1,32 @@
 <?php
 
 use App\Actions\Contributions\ApproveContributionRequestAction;
+use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
 use App\Filament\Resources\Speakers\Pages\CreateSpeaker;
 use App\Filament\Resources\Speakers\Pages\EditSpeaker;
 use App\Forms\SpeakerFormSchema;
 use App\Jobs\BackfillSpeakerSlugs;
 use App\Models\ContributionRequest;
 use App\Models\Country;
+use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
+use App\Services\EventKeyPersonSyncService;
 use App\Support\Cache\PublicListingsCache;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -461,6 +470,8 @@ it('renumbers remaining speaker duplicates when a peer is renamed out of the gro
 
 it('backfills existing speaker slugs through the queued job logic', function () {
     $country = createSpeakerSlugCountry();
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
 
     $first = createSpeakerForSlugBackfill(
         id: '00000000-0000-0000-0000-000000000011',
@@ -476,13 +487,90 @@ it('backfills existing speaker slugs through the queued job logic', function () 
         country: $country,
     );
 
+    Speaker::withoutTimestamps(function () use ($first, $second): void {
+        $first->forceFill(['slug' => 'legacy-random-1'])->saveQuietly();
+        $second->forceFill(['slug' => 'legacy-random-2'])->saveQuietly();
+    });
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Backfill Penceramah',
+        'slug' => 'legacy-event-slug',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    app(EventKeyPersonSyncService::class)->sync($event, [$first->id]);
+
+    expect($event->fresh()?->slug)->toBe("forum-backfill-penceramah-legacy-random-1-{$expectedSuffix}");
+
     app(BackfillSpeakerSlugs::class)->handle(
+        app(GenerateEventSlugAction::class),
         app(GenerateSpeakerSlugAction::class),
         app(PublicListingsCache::class),
     );
 
     expect($first->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-my')
-        ->and($second->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-2-my');
+        ->and($second->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-2-my')
+        ->and($event->fresh()?->slug)->toBe("forum-backfill-penceramah-ustaz-ahmad-fauzi-my-{$expectedSuffix}");
+});
+
+it('updates related event slugs when a speaker address change changes the speaker slug', function () {
+    $malaysia = createSpeakerSlugCountry();
+    $singapore = createSpeakerSlugCountry(
+        countryName: 'Singapore',
+        countryIso2: 'SG',
+        countryIso3: 'SGP',
+        countryId: 702,
+        phoneCode: '65',
+    );
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = createSpeakerForSlugBackfill(
+        id: '00000000-0000-0000-0000-000000000013',
+        name: 'Ustaz Ahmad Fauzi',
+        slug: 'ustaz-ahmad-fauzi-my',
+        country: $malaysia,
+    );
+
+    $event = Event::factory()->create([
+        'title' => 'Forum Alamat Penceramah',
+        'slug' => 'legacy-event-slug-address',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id]);
+
+    expect($event->fresh()?->slug)->toBe("forum-alamat-penceramah-ustaz-ahmad-fauzi-my-{$expectedSuffix}");
+
+    $speaker->address()->firstOrFail()->update([
+        'country_id' => (int) $singapore->getKey(),
+    ]);
+
+    expect($speaker->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-sg')
+        ->and($event->fresh()?->slug)->toBe("forum-alamat-penceramah-ustaz-ahmad-fauzi-sg-{$expectedSuffix}");
+
+    $speaker->address()->firstOrFail()->delete();
+
+    expect($speaker->fresh()?->slug)->toBe('ustaz-ahmad-fauzi')
+        ->and($event->fresh()?->slug)->toBe("forum-alamat-penceramah-ustaz-ahmad-fauzi-{$expectedSuffix}");
 });
 
 it('queues the speaker slug backfill command', function () {
