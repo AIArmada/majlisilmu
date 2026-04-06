@@ -20,6 +20,8 @@ use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -105,6 +107,25 @@ it('loads public detail pages', function () {
         ->assertSuccessful()
         ->assertSee($series->title)
         ->assertSee($event->title);
+});
+
+it('uses the real speaker avatar in public speaker share metadata and preview', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg', 1200, 1200))
+        ->toMediaCollection('avatar');
+
+    $this->get(route('speakers.show', $speaker))
+        ->assertSuccessful()
+        ->assertSee('<meta property="og:image" content="'.$speaker->public_avatar_url.'">', false)
+        ->assertSee('<meta name="twitter:image" content="'.$speaker->public_avatar_url.'">', false)
+        ->assertSee('src="'.$speaker->public_avatar_url.'"', false);
 });
 
 it('shows share actions on public series and reference pages', function () {
