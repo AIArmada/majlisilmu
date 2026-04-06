@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\References\Schemas;
 
+use App\Enums\ReferenceType;
 use App\Enums\SocialMediaPlatform;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -26,14 +27,8 @@ class ReferenceForm
                         TextInput::make('author')
                             ->maxLength(255),
                         Select::make('type')
-                            ->options([
-                                'book' => 'Book',
-                                'kitab' => 'Kitab',
-                                'article' => 'Article',
-                                'video' => 'Video',
-                                'other' => 'Other',
-                            ])
-                            ->default('kitab')
+                            ->options(ReferenceType::class)
+                            ->default(ReferenceType::Book->value)
                             ->required(),
                         TextInput::make('publication_year')
                             ->maxLength(255),

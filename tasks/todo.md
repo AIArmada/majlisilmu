@@ -1,3 +1,26 @@
+# Reference Type And Wikipedia Social Media
+
+- [x] Centralize reference type options and remove the legacy `kitab` choice from reference forms
+- [x] Update defaults, factories, seeders, and focused tests to use `book` as the only book-type value
+- [x] Add `Wikipedia` to the shared social media platform enum and locale coverage
+- [x] Run focused formatter, static analysis, and regression checks
+
+## Review
+
+- Added [ReferenceType.php](/Users/Saiffil/Herd/majlisilmu/app/Enums/ReferenceType.php) as the single source of truth for reference types, then switched the admin reference form, contribution schema, submit-event quick-create form, and reference table badges to use it instead of duplicated literal arrays.
+- Changed fresh-install defaults in [2026_01_23_031834_create_references_table.php](/Users/Saiffil/Herd/majlisilmu/database/migrations/2026_01_23_031834_create_references_table.php) so new installs only know the canonical `book` value, without adding any runtime legacy handling.
+- Replaced legacy `kitab` seed and factory values in [ReferenceSeeder.php](/Users/Saiffil/Herd/majlisilmu/database/seeders/ReferenceSeeder.php) and [ReferenceFactory.php](/Users/Saiffil/Herd/majlisilmu/database/factories/ReferenceFactory.php), and refreshed the affected regression expectations in [ReferenceSeederTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ReferenceSeederTest.php), [VenueReferenceEventSlugGenerationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/VenueReferenceEventSlugGenerationTest.php), and [SlugRedirectFeatureTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SlugRedirectFeatureTest.php).
+- Added `Wikipedia` to [SocialMediaPlatform.php](/Users/Saiffil/Herd/majlisilmu/app/Enums/SocialMediaPlatform.php), confirmed the existing `wikipedia.svg` icon asset path still resolves through [SocialMedia.php](/Users/Saiffil/Herd/majlisilmu/app/Models/SocialMedia.php), and added locale entries in [en.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/en.json), [ms.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms.json), [ms_MY.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms_MY.json), [jv.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/jv.json), [ta.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ta.json), and [zh.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/zh.json).
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Enums/ReferenceType.php app/Models/Reference.php app/Enums/SocialMediaPlatform.php app/Filament/Resources/References/Schemas/ReferenceForm.php app/Forms/ReferenceContributionFormSchema.php database/factories/ReferenceFactory.php database/seeders/ReferenceSeeder.php app/Filament/Resources/References/Tables/ReferencesTable.php tests/Feature/ReferenceSeederTest.php tests/Feature/SocialMediaPlatformTest.php tests/Feature/SocialMediaNormalizationTest.php tests/Feature/SubmitEventTranslationCoverageTest.php tests/Feature/SlugRedirectFeatureTest.php tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **No errors**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ReferenceSeederTest.php` => **2 passed**, 12 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **24 passed**, 66 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SlugRedirectFeatureTest.php` => **13 passed**, 55 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialMediaPlatformTest.php` => **1 passed**, 1 assertion
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialMediaNormalizationTest.php` => **7 passed**, 23 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventTranslationCoverageTest.php` => **2 passed**, 26 assertions
+
 # Speaker Hj And Hjh Pre-Nominals
 
 - [x] Add `Hj` and `Hjh` to the shared speaker pre-nominal enum and label set

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ReferenceType;
 use App\Models\Event;
 use App\Models\Reference;
 use Database\Seeders\ReferenceSeeder;
@@ -16,11 +17,11 @@ it('seeds references using submit-event compatible fields and links', function (
     $statuses = Reference::query()->pluck('status')->unique()->values()->all();
 
     expect($types)
-        ->toContain('kitab')
-        ->toContain('book')
-        ->toContain('article')
-        ->toContain('video')
-        ->toContain('other');
+        ->toContain(ReferenceType::Book->value)
+        ->toContain(ReferenceType::Article->value)
+        ->toContain(ReferenceType::Video->value)
+        ->toContain(ReferenceType::Other->value)
+        ->not->toContain('kitab');
 
     expect($statuses)
         ->toContain('verified')

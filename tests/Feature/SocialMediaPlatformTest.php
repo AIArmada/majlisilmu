@@ -15,6 +15,7 @@ it('exposes only majlisilmu-relevant social media platforms', function () {
         'telegram',
         'whatsapp',
         'linkedin',
+        'wikipedia',
         'website',
         'threads',
         'other',

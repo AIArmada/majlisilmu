@@ -293,14 +293,14 @@ it('only backfills the venues assigned to a chunk job', function () {
 it('generates sequential slugs for references with duplicate titles', function () {
     $first = Reference::query()->create([
         'title' => 'Riyadhus Solihin',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]);
 
     $second = Reference::query()->create([
         'title' => 'Riyadhus Solihin',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -312,7 +312,7 @@ it('generates sequential slugs for references with duplicate titles', function (
 it('recomputes reference slugs when the title changes directly', function () {
     $reference = Reference::query()->create([
         'title' => 'Riyadhus Solihin',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -327,14 +327,14 @@ it('recomputes reference slugs when the title changes directly', function () {
 it('renumbers remaining reference duplicates when a peer is renamed out of the group', function () {
     $first = Reference::query()->create([
         'title' => 'Bulughul Maram',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]);
 
     $second = Reference::query()->create([
         'title' => 'Bulughul Maram',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -356,7 +356,7 @@ it('uses the generated sequential slug when admins create references in filament
         ->test(CreateReference::class)
         ->fillForm([
             'title' => 'Bulughul Maram',
-            'type' => 'kitab',
+            'type' => 'book',
             'status' => 'verified',
             'is_active' => true,
         ])
@@ -375,7 +375,7 @@ it('backfills existing reference slugs through the queued job logic', function (
         'id' => '00000000-0000-0000-0000-000000000031',
         'title' => 'Ihya Ulumiddin',
         'slug' => 'legacy-reference-1',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]));
@@ -384,7 +384,7 @@ it('backfills existing reference slugs through the queued job logic', function (
         'id' => '00000000-0000-0000-0000-000000000032',
         'title' => 'Ihya Ulumiddin',
         'slug' => 'legacy-reference-2',
-        'type' => 'kitab',
+        'type' => 'book',
         'status' => 'verified',
         'is_active' => true,
     ]));

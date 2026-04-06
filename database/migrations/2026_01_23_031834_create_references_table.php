@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('title');
             $table->string('slug')->unique();
             $table->string('author')->nullable();
-            $table->string('type')->default('kitab')->index(); // e.g. book, kitab, article, video, etc.
+            $table->string('type')->default('book')->index(); // e.g. book, article, video, etc.
             $table->string('publication_year')->nullable();
             $table->string('publisher')->nullable();
             $table->text('description')->nullable();
