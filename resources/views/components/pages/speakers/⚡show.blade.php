@@ -240,11 +240,17 @@ new class extends Component
 };
 ?>
 
+@php
+    $speakerShareImageUrl = $this->speaker->hasMedia('avatar')
+        ? $this->speaker->public_avatar_url
+        : ($this->speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?: $this->speaker->default_avatar_url);
+@endphp
+
 @section('title', $this->speaker->formatted_name . ' - ' . config('app.name'))
 @section('meta_description', \Illuminate\Support\Str::limit((is_array($this->speaker->bio) ? \Filament\Forms\Components\RichEditor\RichContentRenderer::make($this->speaker->bio)->toText() : trim(strip_tags((string) $this->speaker->bio))) ?: __('Lihat profil, biodata, dan jadual majlis oleh :name di :app.', ['name' => $this->speaker->formatted_name, 'app' => config('app.name')]), 160))
 @section('meta_robots', ($this->speaker->is_active && $this->speaker->status === 'verified') ? 'index, follow' : 'noindex, nofollow')
 @section('og_url', route('speakers.show', $this->speaker))
-@section('og_image', $this->speaker->getFirstMediaUrl('cover', 'banner') ?: ($this->speaker->getFirstMediaUrl('avatar', 'profile') ?: $this->speaker->default_avatar_url))
+@section('og_image', $speakerShareImageUrl)
 @section('og_image_alt', __('Profil penceramah :name', ['name' => $this->speaker->formatted_name]))
 
 @php
@@ -259,9 +265,7 @@ new class extends Component
     $otherRolePastTotal = $this->otherRolePastTotal;
     $hasOtherRoleParticipations = $otherRoleUpcomingTotal > 0 || $otherRolePastTotal > 0;
 
-    $avatarUrl = $speaker->hasMedia('avatar')
-        ? $speaker->getFirstMediaUrl('avatar', 'profile')
-        : $speaker->default_avatar_url;
+    $avatarUrl = $speaker->public_avatar_url;
     $coverUrl = $speaker->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
     $gallery = $speaker->getMedia('gallery');
     $bioRenderer = \Filament\Forms\Components\RichEditor\RichContentRenderer::make($speaker->bio);

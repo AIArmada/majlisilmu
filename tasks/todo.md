@@ -1,3 +1,17 @@
+# Speaker Share Avatar Image
+
+- [x] Trace the `/penceramah/*` share image path and replace the placeholder-prone speaker image lookup
+- [x] Add a focused regression proving public speaker pages expose the real avatar in share metadata and page preview
+- [x] Run the minimal formatter and test checks for the touched files
+
+## Review
+
+- Updated [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/%E2%9A%A1show.blade.php) so the public speaker page now prefers the resilient `public_avatar_url` accessor for both the share metadata image and the on-page share preview avatar. That removes the stricter conversion-only lookup that could fall back away from the speaker's real uploaded avatar.
+- Added a regression in [PublicPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicPagesTest.php) that creates a speaker avatar and asserts the public speaker page emits that real avatar URL in both the Open Graph and Twitter image metadata, and also renders it in the page preview image.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **23 passed**, 159 assertions
+
 # Reference Type And Wikipedia Social Media
 
 - [x] Centralize reference type options and remove the legacy `kitab` choice from reference forms
