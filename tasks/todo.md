@@ -1,3 +1,75 @@
+# Speaker Role Enum And No-Speaker Smoke Check
+
+- [x] Fix the public speaker page non-speaker role label rendering for enum-backed `EventKeyPersonRole` values
+- [x] Add focused no-speaker institution card regression coverage
+- [x] Create a disposable no-speaker event on the Labuan institution page, verify the rendered card, and clean it up
+
+## Review
+
+- Updated [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/%E2%9A%A1show.blade.php) so the public speaker page now imports `EventKeyPersonRole` explicitly and resolves role labels safely for enum, string, and backed-enum values instead of falling through to an invalid string cast.
+- Extended [InstitutionShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionShowPageTest.php) with a focused regression proving institution event cards render cleanly when an event has no speakers: the title still appears, but the speaker row and avatar stack do not.
+- Live smoke check: created a disposable `Smoke Test Tanpa Penceramah` event under `/institusi/akademi-tahfiz-al-hidayah-labuan-my`, fetched the rendered card HTML, confirmed the card had no `aria-label="Penceramah"` block and no speaker line for that event, then deleted the disposable event.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent resources/views/components/pages/speakers/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php` => **11 passed**, 36 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **28 passed**, 105 assertions
+
+# Institution Event Card Polish
+
+- [x] Remove the `Penceramah:` prefix from institution-page event cards while keeping speaker names visible
+- [x] Remove the institution-address fallback from institution-page event card location rows and add stacked speaker avatars in the card header
+- [x] Localize prayer-relative timing labels from enum data on render, then add focused institution-page regression coverage and verification notes
+
+## Review
+
+- Updated [Event.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Event.php) so prayer-relative timing now renders from `prayer_reference` and `prayer_offset` when those enums are present. That keeps labels aligned to the active locale instead of replaying whatever translated string happened to be stored when the event was saved.
+- Updated [⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/%E2%9A%A1show.blade.php) so institution event cards now show speaker names without the `Penceramah:` prefix, only show location when an explicit event venue exists, and render a stacked speaker-avatar cluster in the top-right corner of each card.
+- Extended [InstitutionShowPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/InstitutionShowPageTest.php) with a focused regression that proves the institution card shows localized prayer timing, omits the redundant institution fallback location, keeps moderator roles, and includes multiple speaker avatars in the stacked header treatment.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Models/Event.php tests/Feature/InstitutionShowPageTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Models/Event.php tests/Feature/InstitutionShowPageTest.php tests/Feature/SpeakerShowPageTimingTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **27 passed**, 100 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php --filter='prayer-relative timing text'` => **1 passed**, 4 assertions
+  - Note: the broader `tests/Feature/SpeakerShowPageTimingTest.php` file still has an unrelated pre-existing failure in the linked non-speaker roles case (`EventKeyPersonRole` string conversion on the speaker page view), so I validated only the timing-specific case relevant to this change.
+
+# Event Slug Redirects
+
+- [x] Restore the page-visit gate so slug redirects are only created for previously visited public URLs
+- [x] Revert the unvisited redirect regressions for events and institutions while keeping the slug assertions precise
+- [x] Run focused formatter, static analysis, slug redirect tests, and a live local smoke check
+
+## Review
+
+- Restored the visited-path guard in [SyncSlugRedirectAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Slugs/SyncSlugRedirectAction.php) so the shared redirect pipeline only persists a slug redirect row when Signals has recorded a prior visit for the old public path. The redirect metadata still keeps `first_visited_at`, but the row is not created at all for never-visited URLs.
+- Updated [SlugRedirectFeatureTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SlugRedirectFeatureTest.php) so unvisited event and institution slug changes now assert the original product behavior again: no redirect row is created and the old URL is not resolved. The visited-path tests continue to use exact generated source paths and slugs, and the speaker-related event redirect tests still target the event redirect row directly.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Actions/Slugs/SyncSlugRedirectAction.php tests/Feature/SlugRedirectFeatureTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Slugs/SyncSlugRedirectAction.php tests/Feature/SlugRedirectFeatureTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/SlugRedirectFeatureTest.php` => **16 passed**, 79 assertions
+  - Live local smoke check: created a disposable public event, renamed it without recording a page visit first, then requested the old URL and got `HTTP/2 404`, followed by fixture cleanup
+
+# Event Poster Ratios
+
+- [x] Add `16:9` to event poster upload aspect-ratio options in both admin and public submit forms
+- [x] Make public event poster rendering adapt to portrait, standard landscape, and wide landscape posters
+- [x] Add focused tests for ratio configuration and poster display behavior, then run formatter and focused tests
+
+## Review
+
+- Added `16:9` to the poster upload aspect-ratio options in both [EventForm.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Events/Schemas/EventForm.php) and [create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/create.blade.php), so the admin event form and the public submit-event flow now expose the same three supported poster ratios.
+- Added a shared poster-dimension resolver plus [Event.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Event.php) `poster_display_aspect_ratio` accessor. It maps uploaded posters to the closest supported display ratio (`4:5`, `3:2`, `16:9`) using the stored image dimensions instead of lumping every landscape poster into one bucket.
+- Updated the event poster rendering on [show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/show.blade.php), [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/events/index.blade.php), [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/search/index.blade.php), [⚡featured-events.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/home/%E2%9A%A1featured-events.blade.php), [series/_event-card.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/series/_event-card.blade.php), and [user-dashboard.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/dashboard/user-dashboard.blade.php) so real event posters are either framed with the correct ratio or shown with `object-contain` instead of being cropped as generic cover images.
+- Added focused regression coverage in [SubmitEventMediaTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SubmitEventMediaTest.php), [AdminEventsResourceTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AdminEventsResourceTest.php), [MediaConversionsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/MediaConversionsTest.php), and [PublicPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicPagesTest.php) to lock the new upload options, wide-poster classification, and public-page rendering hooks.
+- During browser verification on the local Herd app, the media disk resolved to `s3`, which exposed that poster-dimension detection could not rely on local file paths alone. Updated [Event.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Event.php) again to fall back to reading the original poster bytes from the configured storage disk when local path probing is unavailable.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Models/Event.php tests/Feature/SubmitEventMediaTest.php tests/Feature/AdminEventsResourceTest.php tests/Feature/MediaConversionsTest.php tests/Feature/PublicPagesTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Models/Event.php tests/Feature/SubmitEventMediaTest.php tests/Feature/AdminEventsResourceTest.php tests/Feature/MediaConversionsTest.php tests/Feature/PublicPagesTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventMediaTest.php` => **3 passed**, 18 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **11 passed**, 60 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php` => **30 passed**, 53 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **24 passed**, 164 assertions
+  - Browser verification on `https://majlisilmu.test/majlis` and the two disposable event detail pages confirmed `data-poster-aspect="4:5"` and `data-poster-aspect="16:9"` rendered in the real local app, with measured poster wrapper ratios of `0.80` and `1.78` respectively before cleanup.
+
 # Event Slug Speaker Segment
 
 - [x] Update event slug generation to append the event's ordered speaker slug segment before the date

@@ -59,7 +59,18 @@
     $copyMessage = __('Link copied to clipboard!');
     $copyPrompt = __('Copy this link:');
     $eventHasPoster = $event->hasMedia('poster');
-    $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
+    $eventPosterDisplayAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+    $eventPosterIsPortrait = $eventHasPoster && $eventPosterDisplayAspectRatio === '4:5';
+    $eventPosterFrameAspectClass = match ($eventPosterDisplayAspectRatio) {
+        '4:5' => 'aspect-[4/5]',
+        '16:9' => 'aspect-[16/9]',
+        default => 'aspect-[3/2]',
+    };
+    $eventPosterCardMaxWidthClass = match ($eventPosterDisplayAspectRatio) {
+        '4:5' => 'max-w-[260px] sm:max-w-[300px] lg:max-w-[360px]',
+        '16:9' => 'max-w-[420px] sm:max-w-[540px] lg:max-w-[640px]',
+        default => 'max-w-[340px] sm:max-w-[420px] lg:max-w-[520px]',
+    };
     $eventPosterPreviewUrl = $eventHasPoster ? $event->getFirstMedia('poster')?->getAvailableUrl(['preview', 'card', 'thumb']) : null;
     $eventPosterOriginalUrl = $eventHasPoster ? $event->getFirstMediaUrl('poster') : null;
     // Hero atmospheric background:
@@ -437,25 +448,27 @@
                     {{-- Right (5 cols): poster card — displayed clearly as a factual flyer --}}
                     <div class="order-1 flex justify-center lg:order-2 lg:col-span-5 lg:justify-end animate-fade-in-up"
                         style="--reveal-d: 100ms;">
-                        <div class="relative w-full max-w-[260px] sm:max-w-[300px] lg:max-w-none">
+                        <div class="relative w-full {{ $eventPosterCardMaxWidthClass }}">
                             {{-- Subtle glow behind the card --}}
                             <div class="absolute -inset-3 rounded-3xl bg-white/5 blur-xl" aria-hidden="true"></div>
                             {{-- Poster card button → opens fullscreen --}}
                             <button type="button" @click="posterModalOpen = true"
                                 class="group relative block w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
-                                aria-label="{{ __('Lihat poster penuh') }}">
-                                <img src="{{ $eventPosterPreviewUrl }}" alt="{{ $event->title }}"
-                                    class="w-full object-contain {{ $eventPosterIsPortrait ? 'max-h-[480px] bg-slate-900' : 'bg-slate-900' }}"
-                                    loading="lazy">
-                                {{-- Tap-to-expand hint --}}
-                                <div
-                                    class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm ring-1 ring-white/10 transition-opacity duration-300 group-hover:opacity-0">
-                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                                    </svg>
-                                    {{ __('Lihat Penuh') }}
+                                aria-label="{{ __('Lihat poster penuh') }}"
+                                data-poster-aspect="{{ $eventPosterDisplayAspectRatio }}">
+                                <div class="relative w-full {{ $eventPosterFrameAspectClass }} bg-slate-900">
+                                    <img src="{{ $eventPosterPreviewUrl }}" alt="{{ $event->title }}"
+                                        class="h-full w-full object-contain bg-slate-900" loading="lazy">
+                                    {{-- Tap-to-expand hint --}}
+                                    <div
+                                        class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm ring-1 ring-white/10 transition-opacity duration-300 group-hover:opacity-0">
+                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                        </svg>
+                                        {{ __('Lihat Penuh') }}
+                                    </div>
                                 </div>
                             </button>
                         </div>

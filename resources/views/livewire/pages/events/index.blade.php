@@ -964,7 +964,12 @@
                             $eventHasPoster = $posterMedia !== null;
                             $posterUrl = $eventHasPoster ? (string) $posterMedia->getAvailableUrl(['card', 'preview', 'thumb']) : '';
                             $eventCardImageUrl = $posterUrl !== '' ? $posterUrl : $event->card_image_url;
-                            $eventPosterIsPortrait = $eventHasPoster && in_array($event->poster_orientation, ['portrait', 'square'], true);
+                            $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+                            $eventPosterAspectClass = match ($eventPosterAspectRatio) {
+                                '4:5' => 'aspect-[4/5]',
+                                '16:9' => 'aspect-[16/9]',
+                                default => 'aspect-[3/2]',
+                            };
                             $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                             $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
                             $hierarchyParts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
@@ -989,7 +994,8 @@
                             class="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-xl hover:shadow-emerald-900/8 hover:-translate-y-1 transition-all duration-300 border border-slate-200">
                             <!-- Image/Date -->
                             <a href="{{ route('events.show', $event) }}" wire:navigate
-                                class="relative overflow-hidden bg-slate-100 block {{ $eventPosterIsPortrait ? 'aspect-[4/5]' : 'aspect-[3/2]' }}">
+                                class="relative overflow-hidden bg-slate-100 block {{ $eventPosterAspectClass }}"
+                                data-poster-aspect="{{ $eventPosterAspectRatio }}">
                                 <div
                                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70">
                                 </div>

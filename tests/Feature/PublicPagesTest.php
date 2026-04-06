@@ -109,6 +109,48 @@ it('loads public detail pages', function () {
         ->assertSee($event->title);
 });
 
+it('renders public event poster containers using the poster aspect ratio', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $portraitEvent = Event::factory()->create([
+        'title' => 'Poster Portrait Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical->value,
+        'institution_id' => $institution->id,
+    ]);
+    $portraitEvent->addMedia(UploadedFile::fake()->image('portrait-poster.jpg', 800, 1200))
+        ->toMediaCollection('poster');
+
+    $wideEvent = Event::factory()->create([
+        'title' => 'Poster Wide Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDays(2),
+        'event_format' => EventFormat::Physical->value,
+        'institution_id' => $institution->id,
+    ]);
+    $wideEvent->addMedia(UploadedFile::fake()->image('wide-poster.jpg', 1600, 900))
+        ->toMediaCollection('poster');
+
+    $this->get(route('events.index'))
+        ->assertSuccessful()
+        ->assertSee('data-poster-aspect="4:5"', false)
+        ->assertSee('data-poster-aspect="16:9"', false);
+
+    $this->get(route('events.show', $wideEvent))
+        ->assertSuccessful()
+        ->assertSee('data-poster-aspect="16:9"', false);
+});
+
 it('uses the real speaker avatar in public speaker share metadata and preview', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');

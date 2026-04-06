@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Enums\EventPrayerTime;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
@@ -168,7 +169,8 @@ class EventObserver
 
             // Update display text if not already set
             if (empty($event->prayer_display_text)) {
-                $event->prayer_display_text = $prayerOffset->displayText($prayerReference);
+                $event->prayer_display_text = EventPrayerTime::fromPrayerTiming($prayerReference, $prayerOffset)?->getLabel()
+                    ?? $prayerOffset->displayText($prayerReference);
             }
 
             Log::info('Calculated prayer-relative start time', [

@@ -2,6 +2,8 @@
 
 use App\Enums\EventFormat;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
@@ -37,6 +39,38 @@ it('shows prayer-relative timing text on speaker page instead of absolute time',
         ->assertSeeText('Selepas Asar')
         ->assertSeeText((string) $expectedEndTime)
         ->assertDontSeeText((string) $event->starts_at?->format('h:i A'));
+});
+
+it('uses the localized tarawih label instead of the generic isha offset text', function () {
+    $originalLocale = app()->getLocale();
+    app()->setLocale('en');
+
+    try {
+        $speaker = Speaker::factory()->create([
+            'status' => 'verified',
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'starts_at' => now()->addDay()->setTime(21, 30),
+            'ends_at' => now()->addDay()->setTime(23, 0),
+            'timing_mode' => TimingMode::PrayerRelative,
+            'prayer_reference' => PrayerReference::Isha,
+            'prayer_offset' => PrayerOffset::After60,
+            'prayer_display_text' => 'Selepas Tarawih',
+        ]);
+
+        $speaker->speakerEvents()->attach($event->id);
+
+        $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
+            ->get(route('speakers.show', $speaker))
+            ->assertSuccessful()
+            ->assertSeeText('After Tarawih')
+            ->assertDontSeeText('1 hour after Isha');
+    } finally {
+        app()->setLocale($originalLocale);
+    }
 });
 
 it('shows cancelled public events with cancelled badge on speaker page', function () {

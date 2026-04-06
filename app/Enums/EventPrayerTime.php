@@ -83,4 +83,26 @@ enum EventPrayerTime: string implements HasLabel
 
         return PrayerOffset::Immediately;
     }
+
+    public static function fromPrayerTiming(?PrayerReference $reference, ?PrayerOffset $offset): ?self
+    {
+        if (! $reference instanceof PrayerReference) {
+            return null;
+        }
+
+        return match ($reference) {
+            PrayerReference::FridayPrayer => $offset === PrayerOffset::Before15
+                ? self::SebelumJumaat
+                : self::SelepasJumaat,
+            PrayerReference::Maghrib => $offset === PrayerOffset::Before15
+                ? self::SebelumMaghrib
+                : self::SelepasMaghrib,
+            PrayerReference::Isha => $offset === PrayerOffset::After60
+                ? self::SelepasTarawih
+                : self::SelepasIsyak,
+            PrayerReference::Fajr => self::SelepasSubuh,
+            PrayerReference::Dhuhr => self::SelepasZuhur,
+            PrayerReference::Asr => self::SelepasAsar,
+        };
+    }
 }

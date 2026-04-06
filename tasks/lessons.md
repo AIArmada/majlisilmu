@@ -1,5 +1,9 @@
 # Lessons
 
+- In Volt/Blade files, never rely on bare enum class names inside `instanceof` checks unless the enum is explicitly imported or fully qualified; otherwise the check can silently fail and downstream code may try to cast the enum object to string.
+- When public slug redirects are intended to exist only for URLs users have actually visited, keep redirect creation gated by tracked page views; do not silently broaden it to all slug changes.
+- Filament `FileUpload::getImageEditorAspectRatioOptionsForJs()` returns a label-to-ratio map, so ratio-option tests should assert `array_keys(...)` for labels like `16:9` instead of checking the raw JS payload values directly.
+- For event poster dimension detection, do not assume `Media::getPath()` is a readable local file path; on this app it can resolve through the `s3` disk locally, so ratio detection must fall back to reading the image bytes from the configured storage disk when local path probing is unavailable.
 - Do not render 96px to 128px public speaker cards from the `thumb` avatar conversion; reserve `thumb` for tiny chips and use a higher-resolution profile/listing avatar URL for directory and search cards.
 - When a resource advertises slug behavior as auto-managed, do not expose a writable slug field in the Filament form; keep slug generation entirely in the save/action layer.
 - When display names and slugs are composed from title arrays, never trust admin/API input order; normalize honorifics, pre-nominals, and post-nominals against a researched precedence table first.

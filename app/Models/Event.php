@@ -6,6 +6,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\EventPrayerTime;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -40,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Scout\Searchable;
 use Nnjeim\World\Models\Language;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
@@ -95,6 +97,11 @@ class Event extends Model implements AuditableContract, HasMedia
     public $incrementing = false;
 
     protected $keyType = 'string';
+
+    /**
+     * @var array{width: int, height: int}|null
+     */
+    private ?array $resolvedPosterDimensions = null;
 
     #[\Override]
     protected static function booted(): void
@@ -740,8 +747,22 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function getTimingDisplayAttribute(): string
     {
-        if ($this->isPrayerRelative() && $this->prayer_display_text) {
-            return $this->prayer_display_text;
+        if ($this->isPrayerRelative()) {
+            $prayerReference = $this->prayer_reference instanceof PrayerReference
+                ? $this->prayer_reference
+                : PrayerReference::tryFrom((string) $this->prayer_reference);
+            $prayerOffset = $this->prayer_offset instanceof PrayerOffset
+                ? $this->prayer_offset
+                : PrayerOffset::tryFrom((string) $this->prayer_offset);
+            $prayerTime = EventPrayerTime::fromPrayerTiming($prayerReference, $prayerOffset);
+
+            if ($prayerTime instanceof EventPrayerTime) {
+                return $prayerTime->getLabel();
+            }
+
+            if ($this->prayer_display_text) {
+                return $this->prayer_display_text;
+            }
         }
 
         // Fallback to timezone-aware formatted time (viewer timezone)
@@ -780,6 +801,91 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * @return array{width: int, height: int}
+     */
+    private function resolvePosterDimensions(): array
+    {
+        if (is_array($this->resolvedPosterDimensions)) {
+            return $this->resolvedPosterDimensions;
+        }
+
+        $posterMedia = $this->getFirstMedia('poster');
+
+        if (! $posterMedia instanceof Media) {
+            return $this->resolvedPosterDimensions = ['width' => 0, 'height' => 0];
+        }
+
+        $storedDimensions = $posterMedia->getCustomProperty('source_dimensions', []);
+        $storedWidth = is_array($storedDimensions) ? (int) ($storedDimensions['width'] ?? 0) : 0;
+        $storedHeight = is_array($storedDimensions) ? (int) ($storedDimensions['height'] ?? 0) : 0;
+        $width = (int) ($posterMedia->width ?? 0);
+        $height = (int) ($posterMedia->height ?? 0);
+
+        if (($width <= 0 || $height <= 0) && $storedWidth > 0 && $storedHeight > 0) {
+            $width = $storedWidth;
+            $height = $storedHeight;
+        }
+
+        $posterPath = $posterMedia->getPath();
+        $relativePosterPath = $posterMedia->getPathRelativeToRoot();
+
+        if ($posterPath !== '' && ! is_file($posterPath)) {
+            try {
+                $posterPath = Storage::disk($posterMedia->disk)->path($relativePosterPath);
+            } catch (\Throwable) {
+                $posterPath = '';
+            }
+        }
+
+        if (($width <= 0 || $height <= 0) && $posterPath !== '' && is_file($posterPath)) {
+            $dimensions = @getimagesize($posterPath);
+
+            if (is_array($dimensions)) {
+                $width = (int) $dimensions[0];
+                $height = (int) $dimensions[1];
+            }
+        }
+
+        if (($width <= 0 || $height <= 0) && $relativePosterPath !== '') {
+            try {
+                $posterContents = Storage::disk($posterMedia->disk)->get($relativePosterPath);
+                $dimensions = @getimagesizefromstring($posterContents);
+
+                if (is_array($dimensions)) {
+                    $width = (int) $dimensions[0];
+                    $height = (int) $dimensions[1];
+                }
+            } catch (\Throwable) {
+            }
+        }
+
+        $this->storePosterDimensions($posterMedia, $width, $height);
+
+        return $this->resolvedPosterDimensions = ['width' => $width, 'height' => $height];
+    }
+
+    private function storePosterDimensions(Media $posterMedia, int $width, int $height): void
+    {
+        if ($width <= 0 || $height <= 0) {
+            return;
+        }
+
+        $storedDimensions = $posterMedia->getCustomProperty('source_dimensions', []);
+        $storedWidth = is_array($storedDimensions) ? (int) ($storedDimensions['width'] ?? 0) : 0;
+        $storedHeight = is_array($storedDimensions) ? (int) ($storedDimensions['height'] ?? 0) : 0;
+
+        if ($storedWidth === $width && $storedHeight === $height) {
+            return;
+        }
+
+        $posterMedia->setCustomProperty('source_dimensions', [
+            'width' => $width,
+            'height' => $height,
+        ]);
+        $posterMedia->saveQuietly();
+    }
+
+    /**
      * Get the card image URL for frontend.
      * Priority: Poster thumb -> Institution logo thumb -> Default.
      */
@@ -799,27 +905,39 @@ class Event extends Model implements AuditableContract, HasMedia
         return asset('images/placeholders/event.png');
     }
 
-    public function getPosterOrientationAttribute(): string
+    public function getPosterDisplayAspectRatioAttribute(): string
     {
-        $posterMedia = $this->getFirstMedia('poster');
+        ['width' => $width, 'height' => $height] = $this->resolvePosterDimensions();
 
-        if (! $posterMedia instanceof Media) {
-            return 'landscape';
+        if ($width <= 0 || $height <= 0) {
+            return '3:2';
         }
 
-        $width = (int) ($posterMedia->width ?? 0);
-        $height = (int) ($posterMedia->height ?? 0);
+        $ratio = $width / $height;
+        $supportedRatios = [
+            '4:5' => 4 / 5,
+            '3:2' => 3 / 2,
+            '16:9' => 16 / 9,
+        ];
 
-        $posterPath = $posterMedia->getPath();
+        $closestRatio = '3:2';
+        $closestDelta = INF;
 
-        if (($width <= 0 || $height <= 0) && $posterPath !== '') {
-            $dimensions = @getimagesize($posterPath);
+        foreach ($supportedRatios as $supportedRatioKey => $supportedRatioValue) {
+            $delta = abs($ratio - $supportedRatioValue);
 
-            if (is_array($dimensions)) {
-                $width = $dimensions[0];
-                $height = $dimensions[1];
+            if ($delta < $closestDelta) {
+                $closestRatio = $supportedRatioKey;
+                $closestDelta = $delta;
             }
         }
+
+        return $closestRatio;
+    }
+
+    public function getPosterOrientationAttribute(): string
+    {
+        ['width' => $width, 'height' => $height] = $this->resolvePosterDimensions();
 
         if ($width <= 0 || $height <= 0) {
             return 'landscape';

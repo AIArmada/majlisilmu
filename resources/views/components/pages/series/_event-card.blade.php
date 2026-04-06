@@ -1,11 +1,16 @@
-@php $isPast = $past ?? false; @endphp
+@php
+    $isPast = $past ?? false;
+    $eventHasPoster = $event->hasMedia('poster');
+    $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+@endphp
 
 <article
     class="flex flex-col md:flex-row gap-6 bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all group">
-    <div class="md:w-48 h-32 md:h-auto rounded-2xl bg-slate-100 relative overflow-hidden flex-shrink-0">
+    <div class="md:w-48 h-32 md:h-auto rounded-2xl bg-slate-100 relative overflow-hidden flex-shrink-0"
+        data-poster-aspect="{{ $eventPosterAspectRatio }}">
         @if($event->card_image_url)
             <img src="{{ $event->card_image_url }}"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 {{ $isPast ? 'grayscale' : '' }}">
+                class="w-full h-full group-hover:scale-105 transition-transform duration-500 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }} {{ $isPast ? 'grayscale' : '' }}">
         @else
             <div
                 class="w-full h-full flex items-center justify-center bg-gradient-to-br {{ $isPast ? 'from-slate-100 to-slate-200' : 'from-emerald-50 to-teal-50' }}">
