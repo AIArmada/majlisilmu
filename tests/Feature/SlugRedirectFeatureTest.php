@@ -44,17 +44,18 @@ it('creates an institution slug redirect only after the old public path has been
     ], $proposer);
 
     $oldPath = route('institutions.show', $institution, false);
+    $oldSlug = $institution->slug;
     recordVisitedPath($oldPath);
 
     $institution->update([
         'name' => 'Masjid Baru',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
-    expect($redirect->source_slug)->toBe('masjid-lama-shah-alam-petaling-selangor-my')
+    expect($redirect->source_slug)->toBe($oldSlug)
         ->and($redirect->source_path)->toBe($oldPath)
-        ->and($redirect->destination_slug)->toBe('masjid-baru-shah-alam-petaling-selangor-my')
+        ->and($redirect->destination_slug)->toBe($institution->fresh()->slug)
         ->and($redirect->destination_path)->toBe(route('institutions.show', $institution->fresh(), false));
 });
 
@@ -69,15 +70,18 @@ it('creates a speaker slug redirect when a visited slug changes', function () {
     ], $proposer);
 
     $oldPath = route('speakers.show', $speaker, false);
+    $oldSlug = $speaker->slug;
     recordVisitedPath($oldPath);
 
     $speaker->update([
         'name' => 'Ustaz Baru',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
-    expect($redirect->source_path)->toBe($oldPath)
+    expect($redirect->source_slug)->toBe($oldSlug)
+        ->and($redirect->source_path)->toBe($oldPath)
+        ->and($redirect->destination_slug)->toBe($speaker->fresh()->slug)
         ->and($redirect->destination_path)->toBe(route('speakers.show', $speaker->fresh(), false));
 });
 
@@ -90,15 +94,18 @@ it('creates a reference slug redirect when a visited title slug changes', functi
     ]);
 
     $oldPath = route('references.show', $reference, false);
+    $oldSlug = $reference->slug;
     recordVisitedPath($oldPath);
 
     $reference->update([
         'title' => 'Kitab Baru',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
-    expect($redirect->source_path)->toBe($oldPath)
+    expect($redirect->source_slug)->toBe($oldSlug)
+        ->and($redirect->source_path)->toBe($oldPath)
+        ->and($redirect->destination_slug)->toBe($reference->fresh()->slug)
         ->and($redirect->destination_path)->toBe(route('references.show', $reference->fresh(), false));
 });
 
@@ -111,16 +118,41 @@ it('creates an event slug redirect when a visited dated slug changes', function 
     );
 
     $oldPath = route('events.show', $event, false);
+    $oldSlug = $event->slug;
     recordVisitedPath($oldPath);
 
     $event->update([
         'title' => 'Majlis Baru',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
-    expect($redirect->source_path)->toBe($oldPath)
+    expect($redirect->source_slug)->toBe($oldSlug)
+        ->and($redirect->source_path)->toBe($oldPath)
+        ->and($redirect->destination_slug)->toBe($event->fresh()->slug)
         ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
+});
+
+it('does not create an event slug redirect when the old slug was never visited', function () {
+    $event = createSlugRedirectEvent(
+        id: '00000000-0000-0000-0000-000000000074',
+        title: 'Majlis Tanpa Lawatan',
+        slug: 'majlis-tanpa-lawatan-12-4-26',
+        startsAt: Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+    );
+
+    $oldPath = route('events.show', $event, false);
+    $oldSlug = $event->slug;
+
+    $event->update([
+        'title' => 'Majlis Tanpa Lawatan Baru',
+    ]);
+
+    expect($oldSlug)->not->toBe($event->fresh()->slug)
+        ->and(SlugRedirect::query()->where('source_path', $oldPath)->exists())->toBeFalse();
+
+    $this->get($oldPath)
+        ->assertNotFound();
 });
 
 it('redirects old event slugs when a related speaker slug changes', function () {
@@ -147,7 +179,7 @@ it('redirects old event slugs when a related speaker slug changes', function () 
         'name' => 'Habib Umar Abdullah',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
     expect($redirect->source_path)->toBe($oldPath)
         ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
@@ -181,7 +213,7 @@ it('redirects old event slugs when only the organizer speaker changes', function
         'organizer_id' => $speaker->id,
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
     expect($event->fresh()?->slug)->toBe(sprintf(
         'majlis-organizer-tukar-%s-%s',
@@ -205,11 +237,18 @@ it('does not create redirect rows for unvisited slug changes', function () {
         'address' => slugRedirectAddressPayload($geography),
     ], $proposer);
 
+    $oldPath = route('institutions.show', $institution, false);
+    $oldSlug = $institution->slug;
+
     $institution->update([
         'name' => 'Masjid Tidak Dilawat Baru',
     ]);
 
-    expect(SlugRedirect::query()->count())->toBe(0);
+    expect($oldSlug)->not->toBe($institution->fresh()->slug)
+        ->and(SlugRedirect::query()->where('source_path', $oldPath)->exists())->toBeFalse();
+
+    $this->get($oldPath)
+        ->assertNotFound();
 });
 
 it('creates a venue slug redirect when a visited geographic slug changes', function () {
@@ -224,15 +263,18 @@ it('creates a venue slug redirect when a visited geographic slug changes', funct
     $venue = Venue::query()->findOrFail($venueId);
 
     $oldPath = route('venues.show', $venue, false);
+    $oldSlug = $venue->slug;
     recordVisitedPath($oldPath);
 
     $venue->update([
         'name' => 'Dewan Baru',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
-    expect($redirect->source_path)->toBe($oldPath)
+    expect($redirect->source_slug)->toBe($oldSlug)
+        ->and($redirect->source_path)->toBe($oldPath)
+        ->and($redirect->destination_slug)->toBe($venue->fresh()->slug)
         ->and($redirect->destination_path)->toBe(route('venues.show', $venue->fresh(), false));
 });
 
@@ -295,13 +337,14 @@ it('shows slug redirects in the admin resource table', function () {
         'address' => slugRedirectAddressPayload($geography),
     ], $proposer);
 
-    recordVisitedPath(route('institutions.show', $institution, false));
+    $oldPath = route('institutions.show', $institution, false);
+    recordVisitedPath($oldPath);
 
     $institution->update([
         'name' => 'Masjid Admin Baru',
     ]);
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
 
     Livewire::actingAs($administrator)
         ->test(ListSlugRedirects::class)
@@ -332,7 +375,9 @@ it('allows administrators to create slug redirects in the admin resource', funct
         ->call('create')
         ->assertHasNoFormErrors();
 
-    $redirect = SlugRedirect::query()->firstOrFail();
+    $redirect = SlugRedirect::query()
+        ->where('source_path', '/institusi/masjid-crud-lama-shah-alam-petaling-selangor-my')
+        ->firstOrFail();
 
     expect($redirect->redirectable_type)->toBe('institution')
         ->and($redirect->redirectable_id)->toBe((string) $institution->getKey())

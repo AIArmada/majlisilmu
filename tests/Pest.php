@@ -1,6 +1,7 @@
 <?php
 
 use AIArmada\Signals\Models\TrackedProperty;
+use App\Support\Cache\PublicListingsCache;
 use App\Support\Signals\ProductSignalsSurfaceResolver;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,6 +91,8 @@ pest()->extend(TestCase::class)
         Cache::forget('submit_languages_safe_v1');
         Cache::forget('submit_venues');
         Cache::forget('submit_venues_safe_v1');
+
+        app(PublicListingsCache::class)->bustMajlisListing();
 
         // Seed common languages for tests that use the submit event form
         $languages = [

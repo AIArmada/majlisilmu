@@ -295,10 +295,10 @@ new class extends Component
         return __('Umum');
     };
 
-    // Event location helper — venue name when present, otherwise address hierarchy only.
-    $resolveVenueLocation = static function (\App\Models\Event $event) use ($institution, $formatAddressHierarchy): string {
+    // Event location helper — only show an explicit event venue on institution cards.
+    $resolveVenueLocation = static function (\App\Models\Event $event) use ($formatAddressHierarchy): string {
         $venueName = $event->venue?->name;
-        $address = $event->venue?->addressModel ?? $institution->addressModel;
+        $address = $event->venue?->addressModel;
         $hierarchy = $formatAddressHierarchy($address);
         $hierarchy = $hierarchy === '-' ? '' : $hierarchy;
 
@@ -316,6 +316,27 @@ new class extends Component
     };
 
     /**
+     * @return array{items: \Illuminate\Support\Collection<int, array{name: string, url: string}>, overflow: int}
+     */
+    $resolveEventSpeakerAvatarStack = static function (\App\Models\Event $event): array {
+        $avatars = $event->speakers
+            ->map(function (\App\Models\Speaker $speaker): array {
+                return [
+                    'name' => trim((string) ($speaker->formatted_name !== '' ? $speaker->formatted_name : $speaker->name)),
+                    'url' => $speaker->public_avatar_url,
+                ];
+            })
+            ->filter(fn (array $avatar): bool => $avatar['name'] !== '' && $avatar['url'] !== '')
+            ->unique('name')
+            ->values();
+
+        return [
+            'items' => $avatars->take(3)->values(),
+            'overflow' => max(0, $avatars->count() - 3),
+        ];
+    };
+
+    /**
      * @return array{speakers: string, roles: string}
      */
     $resolveEventPeople = static function (\App\Models\Event $event) use ($joinEventPeopleNames): array {
@@ -326,7 +347,7 @@ new class extends Component
             ->values();
 
         $speakerSummary = $speakerSummary->isNotEmpty()
-            ? __('Penceramah: :names', ['names' => $joinEventPeopleNames($speakerSummary)])
+            ? $joinEventPeopleNames($speakerSummary)
             : '';
 
         $roleSummary = $event->keyPeople
@@ -852,6 +873,7 @@ new class extends Component
                                         @php
                                             $venueLocation = $resolveVenueLocation($event);
                                             $eventPeople = $resolveEventPeople($event);
+                                            $speakerAvatarStack = $resolveEventSpeakerAvatarStack($event);
                                             $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                             $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                             $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -872,29 +894,46 @@ new class extends Component
                                             </div>
                                             {{-- Event details --}}
                                             <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
-                                                <div class="flex items-center gap-2">
-                                                    <span
-                                                        class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
-                                                        {{ $resolveEventTypeLabel($event->event_type) }}
-                                                    </span>
-                                                    @if($event->status instanceof \App\States\EventStatus\Pending)
+                                                <div class="flex items-start justify-between gap-3">
+                                                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                                                         <span
-                                                            class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
-                                                            {{ __('Menunggu Kelulusan') }}
+                                                            class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
+                                                            {{ $resolveEventTypeLabel($event->event_type) }}
                                                         </span>
-                                                    @endif
-                                                    @if($event->status instanceof \App\States\EventStatus\Cancelled)
-                                                        <span
-                                                            class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
-                                                            {{ __('Dibatalkan') }}
-                                                        </span>
-                                                    @endif
-                                                    @if($isRemoteEvent)
-                                                        <span
-                                                            class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
-                                                            <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                                                            {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
-                                                        </span>
+                                                        @if($event->status instanceof \App\States\EventStatus\Pending)
+                                                            <span
+                                                                class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                                {{ __('Menunggu Kelulusan') }}
+                                                            </span>
+                                                        @endif
+                                                        @if($event->status instanceof \App\States\EventStatus\Cancelled)
+                                                            <span
+                                                                class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                                                                {{ __('Dibatalkan') }}
+                                                            </span>
+                                                        @endif
+                                                        @if($isRemoteEvent)
+                                                            <span
+                                                                class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
+                                                                <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                                                                {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    @if($speakerAvatarStack['items']->isNotEmpty())
+                                                        <div class="shrink-0">
+                                                            <div class="flex -space-x-3" aria-label="{{ __('Penceramah') }}">
+                                                                @foreach($speakerAvatarStack['items'] as $avatar)
+                                                                    <img src="{{ $avatar['url'] }}" alt="{{ $avatar['name'] }}"
+                                                                        title="{{ $avatar['name'] }}"
+                                                                        class="h-8 w-8 rounded-full object-cover ring-2 ring-white shadow-sm sm:h-10 sm:w-10">
+                                                                @endforeach
+                                                                @if($speakerAvatarStack['overflow'] > 0)
+                                                                    <span
+                                                                        class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white shadow-sm sm:h-10 sm:w-10 sm:text-[11px]">+{{ $speakerAvatarStack['overflow'] }}</span>
+                                                                @endif
+                                                            </div>
+                                                        </div>
                                                     @endif
                                                 </div>
                                                 <h3
@@ -1093,6 +1132,7 @@ new class extends Component
                                     @php
                                         $pastVenueLocation = $resolveVenueLocation($event);
                                         $eventPeople = $resolveEventPeople($event);
+                                        $speakerAvatarStack = $resolveEventSpeakerAvatarStack($event);
                                         $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                         $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                         $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -1110,35 +1150,52 @@ new class extends Component
                                                 class="mt-0.5 text-[11px] font-bold tracking-wide {{ $isCancelledEvent ? 'text-rose-200/80' : ($isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80')) }} sm:text-[13px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'F') }}</span>
                                         </div>
                                         <div class="flex flex-1 flex-col justify-center gap-2 p-4 sm:p-5">
-                                            <div class="flex items-center gap-2">
-                                                <span
-                                                    class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/60">
-                                                    {{ $resolveEventTypeLabel($event->event_type) }}
-                                                </span>
-                                                @if($event->status instanceof \App\States\EventStatus\Pending)
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                                                     <span
-                                                        class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
-                                                        {{ __('Menunggu Kelulusan') }}
+                                                        class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200/60">
+                                                        {{ $resolveEventTypeLabel($event->event_type) }}
                                                     </span>
-                                                @endif
-                                                @if($event->status instanceof \App\States\EventStatus\Cancelled)
-                                                    <span
-                                                        class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
-                                                        {{ __('Dibatalkan') }}
-                                                    </span>
-                                                @endif
-                                                @if($isRemoteEvent)
-                                                    <span
-                                                        class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
-                                                        <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                                                        {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
-                                                    </span>
-                                                @endif
-                                                @if(!$isCancelledEvent)
-                                                    <span
-                                                        class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
-                                                        {{ __('Selesai') }}
-                                                    </span>
+                                                    @if($event->status instanceof \App\States\EventStatus\Pending)
+                                                        <span
+                                                            class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                            {{ __('Menunggu Kelulusan') }}
+                                                        </span>
+                                                    @endif
+                                                    @if($event->status instanceof \App\States\EventStatus\Cancelled)
+                                                        <span
+                                                            class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                                                            {{ __('Dibatalkan') }}
+                                                        </span>
+                                                    @endif
+                                                    @if($isRemoteEvent)
+                                                        <span
+                                                            class="inline-flex animate-pulse items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/80">
+                                                            <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                                                            {{ $eventFormatValue === 'hybrid' ? __('Hybrid') : __('Online') }}
+                                                        </span>
+                                                    @endif
+                                                    @if(!$isCancelledEvent)
+                                                        <span
+                                                            class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60">
+                                                            {{ __('Selesai') }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                @if($speakerAvatarStack['items']->isNotEmpty())
+                                                    <div class="shrink-0">
+                                                        <div class="flex -space-x-3" aria-label="{{ __('Penceramah') }}">
+                                                            @foreach($speakerAvatarStack['items'] as $avatar)
+                                                                <img src="{{ $avatar['url'] }}" alt="{{ $avatar['name'] }}"
+                                                                    title="{{ $avatar['name'] }}"
+                                                                    class="h-8 w-8 rounded-full object-cover ring-2 ring-white shadow-sm sm:h-10 sm:w-10">
+                                                            @endforeach
+                                                            @if($speakerAvatarStack['overflow'] > 0)
+                                                                <span
+                                                                    class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white shadow-sm sm:h-10 sm:w-10 sm:text-[11px]">+{{ $speakerAvatarStack['overflow'] }}</span>
+                                                            @endif
+                                                        </div>
+                                                    </div>
                                                 @endif
                                             </div>
                                             <h3

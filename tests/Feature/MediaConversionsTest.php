@@ -60,6 +60,51 @@ it('detects landscape poster orientation', function () {
     expect($event->poster_orientation)->toBe('landscape');
 });
 
+it('maps poster display aspect ratios to the closest supported event ratios', function () {
+    $portraitEvent = Event::factory()->create();
+    $portraitEvent->addMedia(UploadedFile::fake()->image('poster-portrait.jpg', 800, 1200))
+        ->toMediaCollection('poster');
+
+    $standardLandscapeEvent = Event::factory()->create();
+    $standardLandscapeEvent->addMedia(UploadedFile::fake()->image('poster-standard.jpg', 1200, 800))
+        ->toMediaCollection('poster');
+
+    $wideLandscapeEvent = Event::factory()->create();
+    $wideLandscapeEvent->addMedia(UploadedFile::fake()->image('poster-wide.jpg', 1600, 900))
+        ->toMediaCollection('poster');
+
+    expect($portraitEvent->poster_display_aspect_ratio)->toBe('4:5')
+        ->and($standardLandscapeEvent->poster_display_aspect_ratio)->toBe('3:2')
+        ->and($wideLandscapeEvent->poster_display_aspect_ratio)->toBe('16:9');
+});
+
+it('backfills missing poster dimensions after resolving the display aspect ratio', function () {
+    $event = Event::factory()->create();
+    $event->addMedia(UploadedFile::fake()->image('poster-wide.jpg', 1600, 900))
+        ->toMediaCollection('poster');
+
+    $posterMedia = $event->getFirstMedia('poster');
+
+    expect($posterMedia)->not->toBeNull();
+
+    $posterMedia->setCustomProperty('source_dimensions', [
+        'width' => 0,
+        'height' => 0,
+    ]);
+    $posterMedia->saveQuietly();
+
+    $event = $event->fresh();
+
+    expect($event->poster_display_aspect_ratio)->toBe('16:9');
+
+    $posterMedia = $event->getFirstMedia('poster');
+    $storedDimensions = $posterMedia?->fresh()?->getCustomProperty('source_dimensions', []);
+
+    expect($posterMedia)->not->toBeNull()
+        ->and((int) (($storedDimensions['width'] ?? 0)))->toBe(1600)
+        ->and((int) (($storedDimensions['height'] ?? 0)))->toBe(900);
+});
+
 it('defines accepted MIME types for Event poster collection', function () {
     $event = Event::factory()->create();
 

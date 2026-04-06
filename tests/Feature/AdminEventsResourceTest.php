@@ -17,6 +17,7 @@ use App\Models\Institution;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Filament\Forms\Components\FileUpload;
 use Livewire\Livewire;
 
 it('resolves pending transitionable states without moderation context', function () {
@@ -179,6 +180,29 @@ it('persists registration-required changes for existing admin events without reg
 
     expect($event->fresh()->settings)->not->toBeNull()
         ->and($event->fresh()->settings?->registration_required)->toBeFalse();
+});
+
+it('allows 16:9 poster ratio options on the admin event form', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(EditEvent::class, ['record' => $event->id])
+        ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
+            expect($upload->getImageAspectRatio())
+                ->toBe(['3:2', '4:5', '16:9'])
+                ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
+                ->toContain('3:2', '4:5', '16:9');
+
+            return true;
+        });
 });
 
 it('renders the admin event view page with infolist tabs', function () {

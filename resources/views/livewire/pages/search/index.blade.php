@@ -253,6 +253,13 @@
                         <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                             @foreach($eventMatches as $event)
                                 @php
+                                    $eventHasPoster = $event->hasMedia('poster');
+                                    $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+                                    $eventPosterAspectClass = match ($eventPosterAspectRatio) {
+                                        '4:5' => 'aspect-[4/5]',
+                                        '16:9' => 'aspect-[16/9]',
+                                        default => 'aspect-[3/2]',
+                                    };
                                     $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                                     $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
                                     $locationText = is_string($primaryLocationName) && $primaryLocationName !== ''
@@ -262,8 +269,11 @@
 
                                 <article class="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/10">
                                     <a href="{{ route('events.show', $event) }}" wire:navigate class="block">
-                                        <div class="relative aspect-[3/2] overflow-hidden bg-slate-100">
-                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-105" loading="lazy">
+                                        <div class="relative overflow-hidden bg-slate-100 {{ $eventPosterAspectClass }}"
+                                            data-poster-aspect="{{ $eventPosterAspectRatio }}">
+                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}"
+                                                class="h-full w-full transition duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}"
+                                                loading="lazy">
                                             <div class="absolute left-4 top-4 rounded-2xl bg-white/95 px-3 py-2 text-center shadow-sm">
                                                 <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</p>
                                                 <p class="mt-1 font-heading text-2xl font-bold leading-none text-slate-900">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</p>

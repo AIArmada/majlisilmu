@@ -6,6 +6,8 @@ use App\Enums\EventFormat;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventVisibility;
 use App\Enums\InstitutionType;
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
@@ -252,7 +254,13 @@ it('displays upcoming events for the institution', function () {
         ->assertSee('Kuliah Subuh Lalu');
 });
 
-it('shows event speakers and other public roles without repeating the current institution name in the location line', function () {
+it('renders institution event cards with localized prayer timing stacked speaker avatars and no institution fallback location', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $originalLocale = app()->getLocale();
+    app()->setLocale('en');
+
     $state = State::query()
         ->where('country_code', 'MY')
         ->where('name', 'Selangor')
@@ -304,51 +312,124 @@ it('shows event speakers and other public roles without repeating the current in
         'subdistrict_id' => (int) $subdistrict->id,
     ]);
 
+    try {
+        $event = Event::factory()
+            ->for($institution)
+            ->create([
+                'status' => 'approved',
+                'visibility' => EventVisibility::Public,
+                'starts_at' => now()->addDays(3)->setTime(18, 45),
+                'title' => 'Kuliah Maghrib Institusi',
+                'timing_mode' => TimingMode::PrayerRelative,
+                'prayer_reference' => PrayerReference::Maghrib,
+                'prayer_offset' => PrayerOffset::Immediately,
+                'prayer_display_text' => 'Selepas Maghrib',
+            ]);
+
+        $speaker = Speaker::factory()->create([
+            'status' => 'verified',
+            'name' => 'Ustaz Abdullah Fahmi',
+            'honorific' => null,
+            'pre_nominal' => null,
+            'post_nominal' => null,
+        ]);
+        $speaker->addMedia(UploadedFile::fake()->image('speaker-one.jpg', 320, 320))
+            ->toMediaCollection('avatar');
+
+        $secondSpeaker = Speaker::factory()->create([
+            'status' => 'verified',
+            'name' => 'Ustaz Ahmad Razak',
+            'honorific' => null,
+            'pre_nominal' => null,
+            'post_nominal' => null,
+        ]);
+        $secondSpeaker->addMedia(UploadedFile::fake()->image('speaker-two.jpg', 320, 320))
+            ->toMediaCollection('avatar');
+
+        $moderator = Speaker::factory()->create([
+            'status' => 'verified',
+            'name' => 'Ustazah Mariam Yusuf',
+            'honorific' => null,
+            'pre_nominal' => null,
+            'post_nominal' => null,
+        ]);
+
+        $event->keyPeople()->create([
+            'speaker_id' => $speaker->id,
+            'role' => EventKeyPersonRole::Speaker,
+            'order_column' => 1,
+            'is_public' => true,
+        ]);
+
+        $event->keyPeople()->create([
+            'speaker_id' => $secondSpeaker->id,
+            'role' => EventKeyPersonRole::Speaker,
+            'order_column' => 2,
+            'is_public' => true,
+        ]);
+
+        $event->keyPeople()->create([
+            'speaker_id' => $moderator->id,
+            'role' => EventKeyPersonRole::Moderator,
+            'order_column' => 3,
+            'is_public' => true,
+        ]);
+
+        $response = $this->get(route('institutions.show', $institution));
+        $response->assertSuccessful();
+
+        $html = $response->getContent();
+
+        preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($event->id, '/').'"[^>]*>.*?<\/a>/s', $html, $matches);
+
+        $eventCard = $matches[0] ?? null;
+
+        expect($eventCard)->not->toBeNull();
+        expect($eventCard)
+            ->toContain('After Maghrib')
+            ->toContain('Ustaz Abdullah Fahmi')
+            ->toContain('Ustaz Ahmad Razak')
+            ->toContain('Moderator: Ustazah Mariam Yusuf')
+            ->toContain($speaker->public_avatar_url)
+            ->toContain($secondSpeaker->public_avatar_url)
+            ->toContain('-space-x-3')
+            ->not->toContain('Selepas Maghrib')
+            ->not->toContain('Penceramah:')
+            ->not->toContain('Shah Alam, Petaling, Selangor');
+    } finally {
+        app()->setLocale($originalLocale);
+    }
+});
+
+it('renders institution event cards cleanly when an event has no speakers', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Akademi Tahfiz Tanpa Penceramah',
+        'status' => 'verified',
+    ]);
+
     $event = Event::factory()
         ->for($institution)
         ->create([
             'status' => 'approved',
             'visibility' => EventVisibility::Public,
-            'starts_at' => now()->addDays(3),
-            'title' => 'Kuliah Maghrib Institusi',
+            'starts_at' => now()->addDays(4)->setTime(20, 0),
+            'title' => 'Kuliah Tanpa Penceramah',
         ]);
 
-    $speaker = Speaker::factory()->create([
-        'status' => 'verified',
-        'name' => 'Ustaz Abdullah Fahmi',
-        'honorific' => null,
-        'pre_nominal' => null,
-        'post_nominal' => null,
-    ]);
+    $response = $this->get(route('institutions.show', $institution));
+    $response->assertSuccessful();
 
-    $moderator = Speaker::factory()->create([
-        'status' => 'verified',
-        'name' => 'Ustazah Mariam Yusuf',
-        'honorific' => null,
-        'pre_nominal' => null,
-        'post_nominal' => null,
-    ]);
+    $html = $response->getContent();
 
-    $event->keyPeople()->create([
-        'speaker_id' => $speaker->id,
-        'role' => EventKeyPersonRole::Speaker,
-        'order_column' => 1,
-        'is_public' => true,
-    ]);
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($event->id, '/').'"[^>]*>.*?<\/a>/s', $html, $matches);
 
-    $event->keyPeople()->create([
-        'speaker_id' => $moderator->id,
-        'role' => EventKeyPersonRole::Moderator,
-        'order_column' => 2,
-        'is_public' => true,
-    ]);
+    $eventCard = $matches[0] ?? null;
 
-    $this->get(route('institutions.show', $institution))
-        ->assertSuccessful()
-        ->assertSee('Penceramah: Ustaz Abdullah Fahmi')
-        ->assertSee('Moderator: Ustazah Mariam Yusuf')
-        ->assertSee('Shah Alam, Petaling, Selangor')
-        ->assertDontSee('Masjid Sultan Salahuddin Abdul Aziz Shah • Shah Alam, Petaling, Selangor');
+    expect($eventCard)->not->toBeNull();
+    expect($eventCard)
+        ->toContain('Kuliah Tanpa Penceramah')
+        ->not->toContain('aria-label="Penceramah"')
+        ->not->toContain('Penceramah:');
 });
 
 it('uses stronger calendar event colors on institution page', function () {

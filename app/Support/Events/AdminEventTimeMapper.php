@@ -81,37 +81,7 @@ class AdminEventTimeMapper
             return EventPrayerTime::LainWaktu;
         }
 
-        if ($reference === PrayerReference::FridayPrayer) {
-            return $offset === PrayerOffset::Before15
-                ? EventPrayerTime::SebelumJumaat
-                : EventPrayerTime::SelepasJumaat;
-        }
-
-        if ($reference === PrayerReference::Maghrib) {
-            return $offset === PrayerOffset::Before15
-                ? EventPrayerTime::SebelumMaghrib
-                : EventPrayerTime::SelepasMaghrib;
-        }
-
-        if ($reference === PrayerReference::Isha) {
-            return $offset === PrayerOffset::After60
-                ? EventPrayerTime::SelepasTarawih
-                : EventPrayerTime::SelepasIsyak;
-        }
-
-        if ($reference === PrayerReference::Fajr) {
-            return EventPrayerTime::SelepasSubuh;
-        }
-
-        if ($reference === PrayerReference::Dhuhr) {
-            return EventPrayerTime::SelepasZuhur;
-        }
-
-        if ($reference === PrayerReference::Asr) {
-            return EventPrayerTime::SelepasAsar;
-        }
-
-        return EventPrayerTime::LainWaktu;
+        return EventPrayerTime::fromPrayerTiming($reference, $offset) ?? EventPrayerTime::LainWaktu;
     }
 
     protected static function resolveStartsAt(Carbon $eventDate, EventPrayerTime $prayerTime, ?string $customTime): Carbon

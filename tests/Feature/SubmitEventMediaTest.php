@@ -10,6 +10,7 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
+use Filament\Forms\Components\FileUpload;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -73,7 +74,7 @@ it('stores poster and gallery uploads when submitting an event', function () {
 
     $component
         ->fillForm([
-            'poster' => UploadedFile::fake()->image('poster.jpg', 1200, 800),
+            'poster' => UploadedFile::fake()->image('poster.jpg', 1600, 900),
             'gallery' => [
                 UploadedFile::fake()->image('gallery-1.jpg', 1200, 800),
                 UploadedFile::fake()->image('gallery-2.jpg', 1200, 800),
@@ -95,7 +96,20 @@ it('stores poster and gallery uploads when submitting an event', function () {
             'test-event-media-upload-%s-%s',
             implode('-', $speakerSlugSegments),
             $expectedSuffix,
-        ));
+        ))
+        ->and($event->poster_display_aspect_ratio)->toBe('16:9');
+});
+
+it('allows 16:9 poster ratio options on the public submit-event form', function () {
+    Livewire::test('pages.submit-event.create')
+        ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
+            expect($upload->getImageAspectRatio())
+                ->toBe(['3:2', '4:5', '16:9'])
+                ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
+                ->toContain('3:2', '4:5', '16:9');
+
+            return true;
+        });
 });
 
 it('does not require guest details for authenticated users', function () {

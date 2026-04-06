@@ -486,9 +486,10 @@
                     @else
                         <div class="mt-6 space-y-3">
                             @foreach($paginatedGoingEvents as $event)
+                                @php($eventHasPoster = $event->hasMedia('poster'))
                                 <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-emerald-200 hover:shadow-md">
                                     <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center justify-between gap-3">
@@ -530,9 +531,10 @@
                             @foreach($paginatedRegisteredEvents as $registration)
                                 @php($event = $registration->event)
                                 @if($event)
+                                    @php($eventHasPoster = $event->hasMedia('poster'))
                                     <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-sky-200 hover:shadow-md">
                                         <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                         </div>
                                         <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2">
@@ -576,9 +578,10 @@
                     @else
                         <div class="mt-6 space-y-3">
                             @foreach($paginatedSavedEvents as $event)
+                                @php($eventHasPoster = $event->hasMedia('poster'))
                                 <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-amber-200 hover:shadow-md">
                                     <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center justify-between gap-3">
@@ -630,9 +633,10 @@
                             @foreach($paginatedSubmittedEvents as $submissionEntry)
                                 @php($event = $submissionEntry['event'])
                                 @if($event)
+                                    @php($eventHasPoster = $event->hasMedia('poster'))
                                     <article class="overflow-hidden rounded-[1.5rem] border border-slate-200">
                                     <div class="aspect-[16/8] overflow-hidden bg-slate-100">
-                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full object-cover">
+                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                     </div>
                                     <div class="space-y-4 p-5">
                                         <div class="flex flex-wrap items-center gap-2">

@@ -1,11 +1,13 @@
 <?php
 
 use App\Enums\DawahShareOutcomeType;
+use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Speaker;
 use App\Services\ShareTrackingService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -382,7 +384,15 @@ new class extends Component
             return $role->getLabel();
         }
 
-        return Str::headline((string) $role);
+        if (is_string($role) && $role !== '') {
+            return EventKeyPersonRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
+        }
+
+        if ($role instanceof \BackedEnum && is_string($role->value)) {
+            return EventKeyPersonRole::tryFrom($role->value)?->getLabel() ?? Str::headline($role->value);
+        }
+
+        return '';
     };
 
     // Calendar data: map events to dates for the calendar view
