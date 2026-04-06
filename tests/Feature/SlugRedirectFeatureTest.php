@@ -10,11 +10,13 @@ use App\Models\District;
 use App\Models\Event;
 use App\Models\Reference;
 use App\Models\SlugRedirect;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\ContributionEntityMutationService;
+use App\Services\EventKeyPersonSyncService;
 use App\Services\Signals\SignalsTracker;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -119,6 +121,78 @@ it('creates an event slug redirect when a visited dated slug changes', function 
 
     expect($redirect->source_path)->toBe($oldPath)
         ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
+});
+
+it('redirects old event slugs when a related speaker slug changes', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = createSlugRedirectEvent(
+        id: '00000000-0000-0000-0000-000000000072',
+        title: 'Majlis Penceramah Lama',
+        slug: 'majlis-penceramah-lama-habib-umar-12-4-26',
+        startsAt: Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+    );
+
+    app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id]);
+
+    $oldPath = route('events.show', $event->fresh(), false);
+    recordVisitedPath($oldPath);
+
+    $speaker->update([
+        'name' => 'Habib Umar Abdullah',
+    ]);
+
+    $redirect = SlugRedirect::query()->firstOrFail();
+
+    expect($redirect->source_path)->toBe($oldPath)
+        ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
+
+    $this->get($oldPath)
+        ->assertRedirect(route('events.show', $event->fresh()));
+});
+
+it('redirects old event slugs when only the organizer speaker changes', function () {
+    $expectedSuffix = Carbon::parse('2026-04-12', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Habib Umar',
+        'slug' => 'habib-umar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = createSlugRedirectEvent(
+        id: '00000000-0000-0000-0000-000000000073',
+        title: 'Majlis Organizer Tukar',
+        slug: 'majlis-organizer-tukar-12-4-26',
+        startsAt: Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+    );
+
+    $oldPath = route('events.show', $event, false);
+    recordVisitedPath($oldPath);
+
+    $event->update([
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+    ]);
+
+    $redirect = SlugRedirect::query()->firstOrFail();
+
+    expect($event->fresh()?->slug)->toBe(sprintf(
+        'majlis-organizer-tukar-%s-%s',
+        $speaker->fresh()?->slug,
+        $expectedSuffix,
+    ))
+        ->and($redirect->source_path)->toBe($oldPath)
+        ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
+
+    $this->get($oldPath)
+        ->assertRedirect(route('events.show', $event->fresh()));
 });
 
 it('does not create redirect rows for unvisited slug changes', function () {
