@@ -134,7 +134,7 @@ new class extends Component {
                                         </a>
                                     </h3>
                                     @if($event->reference_study_subtitle)
-                                        <p class="-mt-0.5 mb-2 pl-3 text-sm italic text-slate-500">
+                                        <p class="-mt-0.5 mb-2 pl-3 text-sm font-bold italic text-slate-500">
                                             {{ $event->reference_study_subtitle }}
                                         </p>
                                     @endif

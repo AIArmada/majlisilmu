@@ -459,6 +459,7 @@ it('renders the book title on institution event cards without parentheses', func
         ->toContain('Kuliah Maghrib Kitab')
         ->toContain('Riyadhus Solihin')
         ->not->toContain('(Riyadhus Solihin)')
+        ->toContain('font-bold')
         ->toContain('italic')
         ->toContain('sm:pl-4');
 
