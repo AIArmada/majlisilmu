@@ -327,7 +327,11 @@ class InstitutionDashboard extends Component
 
         $query = Event::query()
             ->where('institution_id', $institution->id)
-            ->with(['venue:id,name'])
+            ->with([
+                'space:id,name',
+                'speakers:id,name',
+                'references:id,title',
+            ])
             ->withCount('registrations');
 
         if ($this->eventSearch !== '') {

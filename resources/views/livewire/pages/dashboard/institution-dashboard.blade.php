@@ -27,6 +27,30 @@
 
         return $translated !== $label ? $translated : $label;
     };
+    $formatEventSchedule = static function (\App\Models\Event $event): string {
+        if (! $event->starts_at) {
+            return __('TBC');
+        }
+
+        $date = \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y');
+        $time = $event->isPrayerRelative()
+            ? (string) $event->timing_display
+            : \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'h:i A');
+
+        return $date.', '.$time;
+    };
+    $summarizeRelatedLabels = static function (\Illuminate\Support\Collection $items, string $attribute): array {
+        $values = $items
+            ->pluck($attribute)
+            ->filter(static fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+            ->map(static fn (string $value): string => trim($value))
+            ->values();
+
+        return [
+            'visible' => $values->take(2)->all(),
+            'remaining' => max($values->count() - 2, 0),
+        ];
+    };
     $canEditInstitution = $selectedInstitution !== null && (auth()->user()?->can('update', $selectedInstitution) ?? false);
     $ahliInstitutionEditUrl = $canEditInstitution
         ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution], panel: 'ahli')
@@ -213,16 +237,16 @@
                     </div>
 
                     <div wire:loading.delay.short wire:target="institutionId,eventSearch,eventStatus,eventVisibility,eventSort,eventPerPage" class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div class="grid grid-cols-7 gap-3 border-b border-slate-100 px-4 py-3">
-                            @for($column = 0; $column < 7; $column++)
+                        <div class="grid grid-cols-6 gap-3 border-b border-slate-100 px-4 py-3">
+                            @for($column = 0; $column < 6; $column++)
                                 <div class="h-4 animate-pulse rounded bg-slate-200"></div>
                             @endfor
                         </div>
 
                         <div class="space-y-3 px-4 py-4">
                             @for($row = 0; $row < 6; $row++)
-                                <div class="grid grid-cols-7 gap-3">
-                                    @for($column = 0; $column < 7; $column++)
+                                <div class="grid grid-cols-6 gap-3">
+                                    @for($column = 0; $column < 6; $column++)
                                         <div class="h-8 animate-pulse rounded-xl bg-slate-100"></div>
                                     @endfor
                                 </div>
@@ -242,11 +266,10 @@
                                     <tr class="text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                                         <th class="pb-3 pr-4">{{ __('Title') }}</th>
                                         <th class="pb-3 pr-4">{{ __('Date') }}</th>
-                                        <th class="pb-3 pr-4">{{ __('Venue') }}</th>
                                         <th class="pb-3 pr-4">{{ __('Status') }}</th>
-                                        <th class="pb-3 pr-4">{{ __('Visibility') }}</th>
-                                        <th class="pb-3 pr-4">{{ __('Public Page') }}</th>
-                                        <th class="pb-3">{{ __('Registrations') }}</th>
+                                        <th class="pb-3 pr-4">{{ __('Speakers') }}</th>
+                                        <th class="pb-3 pr-4">{{ __('References') }}</th>
+                                        <th class="pb-3">{{ __('Location') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
@@ -254,17 +277,7 @@
                                         @php
                                             $statusValue = (string) $event->status;
                                             $isAwaitingApproval = $statusValue === 'pending';
-                                            $visibilityValue = $event->visibility?->value ?? (string) $event->visibility;
-                                            $isPublicListed = $event->is_active
-                                                && in_array($statusValue, \App\Models\Event::PUBLIC_STATUSES, true)
-                                                && $visibilityValue === \App\Enums\EventVisibility::Public->value;
-                                            $canViewEvent = auth()->user()?->can('view', $event) ?? false;
                                             $canEditEvent = auth()->user()?->can('update', $event) ?? false;
-                                            $canViewEventRegistrations = $canViewEvent
-                                                && \App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager::canViewForRecord(
-                                                    $event,
-                                                    \App\Filament\Ahli\Resources\Events\Pages\ViewEvent::class
-                                                );
                                             $ahliEventEditUrl = $canEditEvent
                                                 ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $event], panel: 'ahli')
                                                 : null;
@@ -274,9 +287,9 @@
                                             $createChildEventUrl = $event->isParentProgram()
                                                 ? route('submit-event.create', ['parent' => $event->id])
                                                 : null;
-                                            $ahliEventRegistrationsUrl = $canViewEventRegistrations
-                                                ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $event, 'relation' => 'registrations'], panel: 'ahli')
-                                                : null;
+                                            $speakerSummary = $summarizeRelatedLabels($event->speakers, 'name');
+                                            $referenceSummary = $summarizeRelatedLabels($event->references, 'title');
+                                            $eventSchedule = $formatEventSchedule($event);
                                         @endphp
                                         <tr
                                             wire:key="institution-event-{{ $event->id }}"
@@ -298,56 +311,80 @@
                                                         </span>
                                                     </div>
                                                 @endif
-                                                @if($ahliEventEditUrl)
-                                                    <div class="mt-1">
-                                                        <a href="{{ $ahliEventEditUrl }}" class="text-xs font-semibold text-emerald-700 hover:underline">
-                                                            {{ $isAwaitingApproval ? __('Review') : __('Edit') }}
-                                                        </a>
-                                                    </div>
-                                                @endif
-                                                @if($duplicateEventUrl)
-                                                    <div class="mt-1">
-                                                        <a href="{{ $duplicateEventUrl }}" wire:navigate class="text-xs font-semibold text-amber-700 hover:underline">
-                                                            {{ __('Duplicate Event') }}
-                                                        </a>
-                                                    </div>
-                                                @endif
-                                                @if($createChildEventUrl)
-                                                    <div class="mt-1">
-                                                        <a href="{{ $createChildEventUrl }}" wire:navigate class="text-xs font-semibold text-indigo-700 hover:underline">
-                                                            {{ __('Add Child Event') }}
-                                                        </a>
+                                                @if($ahliEventEditUrl || $duplicateEventUrl || $createChildEventUrl)
+                                                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                        @if($ahliEventEditUrl)
+                                                            <a
+                                                                href="{{ $ahliEventEditUrl }}"
+                                                                title="{{ $isAwaitingApproval ? __('Review') : __('Edit') }}"
+                                                                aria-label="{{ $isAwaitingApproval ? __('Review') : __('Edit') }}"
+                                                                class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                                                            >
+                                                                <x-filament::icon icon="heroicon-o-pencil-square" class="h-4 w-4" />
+                                                            </a>
+                                                        @endif
+                                                        @if($duplicateEventUrl)
+                                                            <a
+                                                                href="{{ $duplicateEventUrl }}"
+                                                                wire:navigate
+                                                                title="{{ __('Duplicate Event') }}"
+                                                                aria-label="{{ __('Duplicate Event') }}"
+                                                                class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
+                                                            >
+                                                                <x-filament::icon icon="heroicon-o-document-duplicate" class="h-4 w-4" />
+                                                            </a>
+                                                        @endif
+                                                        @if($createChildEventUrl)
+                                                            <a href="{{ $createChildEventUrl }}" wire:navigate class="text-xs font-semibold text-indigo-700 hover:underline">
+                                                                {{ __('Add Child Event') }}
+                                                            </a>
+                                                        @endif
                                                     </div>
                                                 @endif
                                             </td>
-                                            <td class="py-4 pr-4">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y, h:i A') : __('TBC') }}</td>
-                                            <td class="py-4 pr-4">{{ $event->venue?->name ?? __('Online / TBD') }}</td>
+                                            <td class="py-4 pr-4 whitespace-nowrap">{{ $eventSchedule }}</td>
                                             <td class="py-4 pr-4">
                                                 <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $isAwaitingApproval ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-300' : 'bg-slate-100 text-slate-700' }}">
                                                     {{ $translateStatusLabel($statusValue) }}
                                                 </span>
                                             </td>
-                                            <td class="py-4 pr-4">
-                                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $visibilityValue === \App\Enums\EventVisibility::Public->value ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
-                                                    {{ match ($visibilityValue) {
-                                                        \App\Enums\EventVisibility::Public->value => __('Public'),
-                                                        \App\Enums\EventVisibility::Unlisted->value => __('Unlisted'),
-                                                        default => __('Hidden'),
-                                                    } }}
-                                                </span>
-                                            </td>
-                                            <td class="py-4 pr-4">
-                                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $isPublicListed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700' }}">
-                                                    {{ $isPublicListed ? __('Visible on public page') : __('Internal only') }}
-                                                </span>
-                                            </td>
-                                            <td class="py-4 font-semibold text-slate-900">
-                                                @if($ahliEventRegistrationsUrl)
-                                                    <a href="{{ $ahliEventRegistrationsUrl }}" class="text-emerald-700 hover:underline">
-                                                        {{ $event->registrations_count }}
-                                                    </a>
+                                            <td class="py-4 pr-4 align-top text-slate-600">
+                                                @if($speakerSummary['visible'] !== [])
+                                                    <div class="min-w-[11rem] space-y-1">
+                                                        @foreach($speakerSummary['visible'] as $speakerName)
+                                                            <div class="max-w-[14rem] truncate">{{ $speakerName }}</div>
+                                                        @endforeach
+                                                        @if($speakerSummary['remaining'] > 0)
+                                                            <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                                                +{{ $speakerSummary['remaining'] }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
                                                 @else
-                                                    {{ $event->registrations_count }}
+                                                    <span class="text-slate-400">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-4 pr-4 align-top text-slate-600">
+                                                @if($referenceSummary['visible'] !== [])
+                                                    <div class="min-w-[11rem] space-y-1">
+                                                        @foreach($referenceSummary['visible'] as $referenceTitle)
+                                                            <div class="max-w-[14rem] truncate">{{ $referenceTitle }}</div>
+                                                        @endforeach
+                                                        @if($referenceSummary['remaining'] > 0)
+                                                            <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                                                +{{ $referenceSummary['remaining'] }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @else
+                                                    <span class="text-slate-400">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-4 align-top text-slate-600">
+                                                @if($event->space?->name)
+                                                    <div class="max-w-[14rem] truncate">{{ $event->space->name }}</div>
+                                                @else
+                                                    <span class="text-slate-400">-</span>
                                                 @endif
                                             </td>
                                         </tr>
