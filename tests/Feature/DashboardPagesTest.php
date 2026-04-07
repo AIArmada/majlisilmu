@@ -10,12 +10,16 @@ use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\EventSubmission;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Registration;
 use App\Models\SavedSearch;
+use App\Models\Space;
+use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -452,6 +456,21 @@ it('shows institution profile and events for members without a separate registra
         'starts_at' => now()->addDays(5),
     ]);
 
+    $speaker = Speaker::factory()->create([
+        'name' => 'Ustaz Dashboard Speaker',
+    ]);
+    $reference = Reference::factory()->create([
+        'title' => 'Kitab Dashboard Reference',
+    ]);
+    $space = Space::factory()->create([
+        'name' => 'Dewan Utama Institusi',
+    ]);
+
+    $institution->spaces()->syncWithoutDetaching([$space->id]);
+    $eventInInstitution->update(['space_id' => $space->id]);
+    $eventInInstitution->speakers()->attach($speaker->id);
+    $eventInInstitution->references()->attach($reference->id);
+
     $parentProgram = Event::factory()->for($institution)->create([
         'title' => 'Institution Parent Program',
         'event_structure' => EventStructure::ParentProgram->value,
@@ -490,9 +509,14 @@ it('shows institution profile and events for members without a separate registra
         ->assertDontSee('Create Advanced Program')
         ->assertSee('Search by event title or venue')
         ->assertSee('Members & Roles')
+        ->assertSee('Speakers')
+        ->assertSee('References')
+        ->assertSee('Location')
         ->assertSee('Institution Dashboard Event')
         ->assertSee('Institution Parent Program')
-        ->assertSee('Duplicate Event')
+        ->assertSee('Ustaz Dashboard Speaker')
+        ->assertSee('Kitab Dashboard Reference')
+        ->assertSee('Dewan Utama Institusi')
         ->assertSee('Add Child Event')
         ->assertDontSee('Event Registrations')
         ->assertDontSee('Registrations (All)')
@@ -531,13 +555,14 @@ it('only shows duplicate event links on the institution dashboard to users who c
         'starts_at' => now()->addDays(4),
     ]);
 
+    $editEventUrl = e(EventResource::getUrl('edit', ['record' => $event], panel: 'ahli'));
     $duplicateEventUrl = e(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $event->id]));
 
     $this->withSession(['locale' => 'en'])
         ->actingAs($adminUser)
         ->get(route('dashboard.institutions', ['institution' => $institution->id]))
         ->assertOk()
-        ->assertSee('Duplicate Event')
+        ->assertSee($editEventUrl, false)
         ->assertSee($duplicateEventUrl, false);
 
     $this->withSession(['locale' => 'en'])
@@ -545,6 +570,53 @@ it('only shows duplicate event links on the institution dashboard to users who c
         ->get(route('dashboard.institutions', ['institution' => $institution->id]))
         ->assertOk()
         ->assertDontSee($duplicateEventUrl, false);
+});
+
+it('renders institution dashboard event dates with translated times or prayer labels', function () {
+    $user = User::factory()->create([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ]);
+    $institution = Institution::factory()->create(['name' => 'Masjid Format Masa']);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    $absoluteStartsAt = Carbon::create(2026, 4, 15, 11, 25, 0, 'UTC');
+    $prayerStartsAt = Carbon::create(2026, 4, 16, 11, 55, 0, 'UTC');
+
+    Event::factory()->for($institution)->create([
+        'title' => 'Majlis Masa Biasa',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => $absoluteStartsAt,
+        'timing_mode' => 'absolute',
+        'prayer_reference' => null,
+        'prayer_offset' => null,
+        'prayer_display_text' => null,
+    ]);
+
+    Event::factory()->for($institution)->kuliahMaghrib()->create([
+        'title' => 'Majlis Selepas Maghrib',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => $prayerStartsAt,
+    ]);
+
+    $expectedAbsoluteLabel = $absoluteStartsAt->copy()
+        ->timezone('Asia/Kuala_Lumpur')
+        ->locale('ms')
+        ->translatedFormat('d M Y, h:i A');
+
+    $expectedPrayerLabel = $prayerStartsAt->copy()
+        ->timezone('Asia/Kuala_Lumpur')
+        ->locale('ms')
+        ->translatedFormat('d M Y').', Selepas Maghrib';
+
+    $this->withSession(['locale' => 'ms'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertSee($expectedAbsoluteLabel)
+        ->assertSee($expectedPrayerLabel);
 });
 
 it('highlights institution events that are waiting approval', function () {
@@ -720,11 +792,7 @@ it('clearly distinguishes public and internal institution data for members', fun
         ->assertDontSee('Public Event Registrant')
         ->assertDontSee('Internal Event Registrant')
         ->assertSee('Public active: 1')
-        ->assertSee('Internal / hidden: 1')
-        ->assertSee('Hidden')
-        ->assertDontSee('Private')
-        ->assertSee('Visible on public page')
-        ->assertSee('Internal only');
+        ->assertSee('Internal / hidden: 1');
 });
 
 it('lets institution owners and admins add members and manage scoped roles from the dashboard', function () {

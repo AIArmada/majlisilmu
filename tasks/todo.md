@@ -7663,6 +7663,25 @@
   - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php` => **No errors**
   - `php -r 'foreach ([\"resources/lang/en.json\",\"resources/lang/ms.json\",\"resources/lang/ms_MY.json\",\"resources/lang/zh.json\",\"resources/lang/ta.json\",\"resources/lang/jv.json\"] as $file) { json_decode(file_get_contents($file)); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.\": \".json_last_error_msg().PHP_EOL); exit(1); } } echo \"locale JSON validation passed\\n\";'` => **locale JSON validation passed**
 
+# Institution Dashboard Event List Columns Refresh
+
+- [x] Replace the old `Venue`, `Visibility`, `Public Page`, and `Registrations` table columns with `Speakers`, `References`, and institution `Location`
+- [x] Render the date column as `d M Y, translated time` while preserving prayer-relative labels such as `Selepas Maghrib`
+- [x] Switch the title-row edit and duplicate actions from text links to icon buttons
+- [x] Update the focused institution dashboard feature test to cover the new row content and action rendering
+
+## Review
+
+- Root cause:
+  - the institution dashboard event table was still optimized for venue and visibility auditing, not for the content operators actually need when reviewing an institution's majlis lineup
+  - the existing date cell used a translated absolute timestamp, which ignored the event model's prayer-relative timing labels, while the reusable timing accessor itself falls back to a non-translated meridiem for absolute times
+- Fix:
+  - updated `app/Livewire/Pages/Dashboard/InstitutionDashboard.php` so the dashboard eagerly loads each event's `space`, `speakers`, and `references` relations for the new columns without introducing row-level query churn
+  - updated `resources/views/livewire/pages/dashboard/institution-dashboard.blade.php` to replace the old `Venue`, `Visibility`, `Public Page`, and `Registrations` columns with `Speakers`, `References`, and `Location`, render icon-only edit and duplicate actions in the title cell, and format the date column as `d M Y, translated time` while switching to prayer labels like `Selepas Maghrib` when relevant
+  - updated `tests/Feature/DashboardPagesTest.php` to verify the new row metadata, route-based icon actions, and the mixed absolute/prayer-relative date rendering on `/dashboard/institusi`
+- Verification:
+  - `vendor/bin/pint --dirty --format agent && vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/InstitutionDashboard.php tests/Feature/DashboardPagesTest.php && vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **22 passed, PHPStan clean**
+
 # Dawah Share Impact
 
 - [x] Add the `dawah_share_links`, `dawah_share_attributions`, `dawah_share_visits`, and `dawah_share_outcomes` tables and corresponding Eloquent models
