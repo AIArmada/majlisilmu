@@ -30,6 +30,7 @@ class EventSearchService
             'media' => fn ($query) => $query
                 ->where('collection_name', 'poster')
                 ->ordered(),
+            'references',
             'speakers.media' => fn ($query) => $query
                 ->where('collection_name', 'avatar')
                 ->ordered(),

@@ -1,9 +1,12 @@
 <?php
 
+use App\Enums\ReferenceType;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -75,6 +78,57 @@ it('loads the upcoming events component', function () {
 
     Livewire::test('home.upcoming-events')
         ->assertSee('Majlis Akan Datang');
+});
+
+it('renders the attached book title across homepage event components without parentheses', function () {
+    Carbon::setTestNow(Carbon::create(2026, 4, 7, 18, 0, 0));
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Riyadhus Solihin',
+        'type' => ReferenceType::Book->value,
+    ]);
+
+    $featuredEvent = Event::factory()->create([
+        'title' => 'Kuliah Kitab Pilihan',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDay(),
+        'views_count' => 150,
+        'is_active' => true,
+    ]);
+
+    $tonightEvent = Event::factory()->create([
+        'title' => 'Kuliah Kitab Malam Ini',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addHours(2),
+        'is_active' => true,
+    ]);
+
+    $featuredEvent->references()->attach($bookReference->id);
+    $tonightEvent->references()->attach($bookReference->id);
+
+    Livewire::test('home.featured-events')
+        ->assertSee('Kuliah Kitab Pilihan')
+        ->assertSee('Riyadhus Solihin')
+        ->assertDontSee('(Riyadhus Solihin)');
+
+    Livewire::test('home.upcoming-events')
+        ->assertSee('Kuliah Kitab Pilihan')
+        ->assertSee('Riyadhus Solihin')
+        ->assertDontSee('(Riyadhus Solihin)');
+
+    Livewire::test('home.tonight-events')
+        ->assertSee('Kuliah Kitab Malam Ini')
+        ->assertSee('Riyadhus Solihin')
+        ->assertDontSee('(Riyadhus Solihin)');
+
+    Livewire::test('home.upcoming-prayer-events')
+        ->assertSee('Kuliah Kitab Malam Ini')
+        ->assertSee('Riyadhus Solihin')
+        ->assertDontSee('(Riyadhus Solihin)');
+
+    Carbon::setTestNow();
 });
 
 it('renders the homepage discovery categories', function () {

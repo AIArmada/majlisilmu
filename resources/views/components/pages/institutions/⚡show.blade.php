@@ -317,18 +317,6 @@ new class extends Component
         return $names->join(', ', ' dan ');
     };
 
-    $eventHasBookReference = static function (\App\Models\Event $event): bool {
-        return $event->references->contains(function (\App\Models\Reference $reference): bool {
-            $referenceType = $reference->type;
-
-            if ($referenceType instanceof \App\Enums\ReferenceType) {
-                return $referenceType === \App\Enums\ReferenceType::Book;
-            }
-
-            return (string) $referenceType === \App\Enums\ReferenceType::Book->value;
-        });
-    };
-
     /**
      * @return array{items: \Illuminate\Support\Collection<int, array{name: string, url: string}>, overflow: int}
      */
@@ -888,7 +876,7 @@ new class extends Component
                                             $venueLocation = $resolveVenueLocation($event);
                                             $eventPeople = $resolveEventPeople($event);
                                             $speakerAvatarStack = $resolveEventSpeakerAvatarStack($event);
-                                            $showsBookReferenceSubtitle = $eventHasBookReference($event);
+                                            $bookReferenceTitle = $event->reference_study_subtitle;
                                             $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                             $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                             $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -955,9 +943,9 @@ new class extends Component
                                                     class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-emerald-700 sm:text-lg">
                                                     {{ $event->title }}
                                                 </h3>
-                                                @if($showsBookReferenceSubtitle)
+                                                @if($bookReferenceTitle)
                                                     <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
-                                                        ({{ __('Pengajian Kitab') }})
+                                                        {{ $bookReferenceTitle }}
                                                     </p>
                                                 @endif
                                                 <div class="space-y-1 text-sm text-slate-500">
@@ -1153,7 +1141,7 @@ new class extends Component
                                         $pastVenueLocation = $resolveVenueLocation($event);
                                         $eventPeople = $resolveEventPeople($event);
                                         $speakerAvatarStack = $resolveEventSpeakerAvatarStack($event);
-                                        $showsBookReferenceSubtitle = $eventHasBookReference($event);
+                                        $bookReferenceTitle = $event->reference_study_subtitle;
                                         $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                         $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                         $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -1223,9 +1211,9 @@ new class extends Component
                                                 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
                                                 {{ $event->title }}
                                             </h3>
-                                            @if($showsBookReferenceSubtitle)
+                                            @if($bookReferenceTitle)
                                                 <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
-                                                    ({{ __('Pengajian Kitab') }})
+                                                    {{ $bookReferenceTitle }}
                                                 </p>
                                             @endif
                                             <div class="space-y-1 text-sm text-slate-500">

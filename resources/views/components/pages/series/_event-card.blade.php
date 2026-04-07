@@ -43,6 +43,11 @@
             class="font-heading text-xl font-bold mb-2 {{ $isPast ? 'text-slate-600 group-hover:text-slate-800' : 'text-slate-900 group-hover:text-emerald-600' }} transition-colors">
             <a href="{{ route('events.show', $event) }}" wire:navigate>{{ $event->title }}</a>
         </h3>
+        @if($event->reference_study_subtitle)
+            <p class="-mt-1 mb-3 pl-3 text-sm italic text-slate-500">
+                {{ $event->reference_study_subtitle }}
+            </p>
+        @endif
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500 mb-4">
             <span class="flex items-center gap-1.5">
                 <svg class="w-4 h-4 {{ $isPast ? 'text-slate-400' : 'text-emerald-500' }}" fill="none"

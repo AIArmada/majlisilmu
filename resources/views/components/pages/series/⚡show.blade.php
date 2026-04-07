@@ -69,6 +69,7 @@ new
             ->active()
             ->where('starts_at', '>=', now())
             ->with([
+                'references',
                 'institution',
                 'institution.address.state',
                 'institution.address.district',
@@ -100,6 +101,7 @@ new
             ->active()
             ->where('starts_at', '<', now())
             ->with([
+                'references',
                 'institution',
                 'institution.address.state',
                 'institution.address.district',
@@ -614,6 +616,11 @@ new
                                                     class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-emerald-700 sm:text-lg">
                                                     {{ $event->title }}
                                                 </h3>
+                                                @if($event->reference_study_subtitle)
+                                                    <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                        {{ $event->reference_study_subtitle }}
+                                                    </p>
+                                                @endif
                                                 <div class="space-y-1 text-sm text-slate-500">
                                                     <div class="flex items-center gap-1.5">
                                                         <svg class="size-3.5 text-slate-400" fill="none" viewBox="0 0 24 24"
@@ -735,6 +742,11 @@ new
                                                     class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
                                                     {{ $event->title }}
                                                 </h3>
+                                                @if($event->reference_study_subtitle)
+                                                    <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                        {{ $event->reference_study_subtitle }}
+                                                    </p>
+                                                @endif
                                                 <div class="space-y-1 text-sm text-slate-500">
                                                     <div class="flex items-center gap-1.5">
                                                         <svg class="size-3.5 text-slate-400" fill="none" viewBox="0 0 24 24"

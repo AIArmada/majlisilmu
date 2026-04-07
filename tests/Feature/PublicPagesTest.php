@@ -9,6 +9,7 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\ReferenceType;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -240,6 +241,78 @@ it('shows federal territory event cards on series pages with subdistrict and sta
         ->assertSuccessful()
         ->assertSee('Dewan Utama KL, Setiawangsa, Kuala Lumpur')
         ->assertDontSee('Dewan Utama KL, Kuala Lumpur, Kuala Lumpur');
+});
+
+it('renders the book title on public event and series cards without parentheses', function () {
+    $series = Series::factory()->create([
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $bookEvent = Event::factory()->create([
+        'title' => 'Kuliah Indeks Kitab',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical,
+        'is_active' => true,
+    ]);
+
+    $articleEvent = Event::factory()->create([
+        'title' => 'Kuliah Indeks Artikel',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'starts_at' => now()->addDays(2),
+        'event_format' => EventFormat::Physical,
+        'is_active' => true,
+    ]);
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Bulugh al-Maram',
+        'type' => ReferenceType::Book->value,
+    ]);
+
+    $articleReference = Reference::factory()->create([
+        'title' => 'Artikel Semasa',
+        'type' => ReferenceType::Article->value,
+    ]);
+
+    $bookEvent->references()->attach($bookReference->id);
+    $articleEvent->references()->attach($articleReference->id);
+
+    $series->events()->attach($bookEvent->id, [
+        'id' => (string) Str::uuid(),
+        'order_column' => 1,
+    ]);
+
+    $series->events()->attach($articleEvent->id, [
+        'id' => (string) Str::uuid(),
+        'order_column' => 2,
+    ]);
+
+    $eventsIndexHtml = $this->get(route('events.index', ['search' => 'Kuliah Indeks']))
+        ->assertSuccessful()
+        ->getContent();
+
+    $seriesPageHtml = $this->get(route('series.show', $series))
+        ->assertSuccessful()
+        ->getContent();
+
+    expect($eventsIndexHtml)
+        ->toContain('Kuliah Indeks Kitab')
+        ->toContain('Kuliah Indeks Artikel')
+        ->toContain('Bulugh al-Maram')
+        ->not->toContain('(Bulugh al-Maram)')
+        ->and(substr_count($eventsIndexHtml, 'Bulugh al-Maram'))->toBe(1);
+
+    expect($seriesPageHtml)
+        ->toContain('Kuliah Indeks Kitab')
+        ->toContain('Kuliah Indeks Artikel')
+        ->toContain('Bulugh al-Maram')
+        ->not->toContain('(Bulugh al-Maram)')
+        ->and(substr_count($seriesPageHtml, 'Bulugh al-Maram'))->toBe(1);
 });
 
 it('renders threads in public share modals instead of line', function () {

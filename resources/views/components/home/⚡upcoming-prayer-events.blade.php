@@ -37,7 +37,7 @@ new class extends Component {
 
         $query = Event::active()
             ->orderBy('starts_at')
-            ->with(['institution', 'venue', 'speakers'])
+            ->with(['institution', 'venue', 'speakers', 'references'])
             ->take(6);
 
         // Simple time-based logic for now, utilizing the UTC timestamps in DB
@@ -99,6 +99,11 @@ new class extends Component {
                         <h3 class="font-heading font-bold text-lg text-slate-900 mb-2 line-clamp-2 group-hover:text-emerald-700 transition-colors">
                             {{ $event->title }}
                         </h3>
+                        @if($event->reference_study_subtitle)
+                            <p class="-mt-1 mb-3 pl-3 text-sm italic text-slate-500">
+                                {{ $event->reference_study_subtitle }}
+                            </p>
+                        @endif
                         
                         <div class="flex items-center gap-2 text-sm text-slate-500 mb-4">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -12,7 +12,7 @@ new class extends Component {
         return Event::active()
             ->where('starts_at', '>=', now())
             ->orderBy('starts_at')
-            ->with(['institution', 'venue', 'speakers'])
+            ->with(['institution', 'venue', 'speakers', 'references'])
             ->take(9)
             ->get();
     }
@@ -84,6 +84,11 @@ new class extends Component {
                                             class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors line-clamp-2">
                                             <a href="{{ route('events.show', $event) }}" wire:navigate>{{ $event->title }}</a>
                                         </h3>
+                                        @if($event->reference_study_subtitle)
+                                            <p class="mt-1 pl-3 text-sm italic text-slate-500">
+                                                {{ $event->reference_study_subtitle }}
+                                            </p>
+                                        @endif
                                         <div class="flex items-center gap-1.5 mt-1 text-sm text-slate-500">
                                             <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24"
                                                 stroke="currentColor">

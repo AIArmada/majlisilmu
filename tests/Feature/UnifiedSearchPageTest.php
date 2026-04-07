@@ -1,8 +1,10 @@
 <?php
 
 use App\Enums\EventFormat;
+use App\Enums\ReferenceType;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -89,4 +91,61 @@ it('shows nearby event matches on the unified search page when location is prese
         ->assertOk()
         ->assertSee('Kuliah Berdekatan')
         ->assertSee(__('Nearby events'));
+});
+
+it('renders the book title only on book-backed search result cards without parentheses', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Carian Kitab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $bookEvent = Event::factory()
+        ->for($institution)
+        ->create([
+            'title' => 'Fiqh Carian Kitab',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+            'event_format' => EventFormat::Physical,
+            'is_active' => true,
+        ]);
+
+    $articleEvent = Event::factory()
+        ->for($institution)
+        ->create([
+            'title' => 'Fiqh Carian Artikel',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+            'event_format' => EventFormat::Physical,
+            'is_active' => true,
+        ]);
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Matan Abi Syuja',
+        'type' => ReferenceType::Book->value,
+    ]);
+
+    $articleReference = Reference::factory()->create([
+        'title' => 'Makalah Fiqh Kontemporari',
+        'type' => ReferenceType::Article->value,
+    ]);
+
+    $bookEvent->references()->attach($bookReference->id);
+    $articleEvent->references()->attach($articleReference->id);
+
+    $response = $this->get(route('search.index', ['search' => 'Fiqh Carian']))
+        ->assertOk();
+
+    $html = $response->getContent();
+
+    expect($html)
+        ->toContain('Fiqh Carian Kitab')
+        ->toContain('Fiqh Carian Artikel')
+        ->toContain('Matan Abi Syuja')
+        ->not->toContain('(Matan Abi Syuja)')
+        ->and(substr_count($html, 'Matan Abi Syuja'))->toBe(1);
 });
