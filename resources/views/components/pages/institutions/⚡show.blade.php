@@ -95,6 +95,7 @@ new class extends Component
                 'venue.address.subdistrict',
                 'speakers.media',
                 'keyPeople.speaker',
+                'references',
                 'media',
             ])
             ->orderBy('starts_at', 'asc')
@@ -124,6 +125,7 @@ new class extends Component
                 'venue.address.subdistrict',
                 'speakers.media',
                 'keyPeople.speaker',
+                'references',
                 'media',
             ])
             ->orderBy('starts_at', 'desc')
@@ -313,6 +315,18 @@ new class extends Component
 
     $joinEventPeopleNames = static function (\Illuminate\Support\Collection $names): string {
         return $names->join(', ', ' dan ');
+    };
+
+    $eventHasBookReference = static function (\App\Models\Event $event): bool {
+        return $event->references->contains(function (\App\Models\Reference $reference): bool {
+            $referenceType = $reference->type;
+
+            if ($referenceType instanceof \App\Enums\ReferenceType) {
+                return $referenceType === \App\Enums\ReferenceType::Book;
+            }
+
+            return (string) $referenceType === \App\Enums\ReferenceType::Book->value;
+        });
     };
 
     /**
@@ -874,6 +888,7 @@ new class extends Component
                                             $venueLocation = $resolveVenueLocation($event);
                                             $eventPeople = $resolveEventPeople($event);
                                             $speakerAvatarStack = $resolveEventSpeakerAvatarStack($event);
+                                            $showsBookReferenceSubtitle = $eventHasBookReference($event);
                                             $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                             $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                             $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -940,6 +955,11 @@ new class extends Component
                                                     class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-emerald-700 sm:text-lg">
                                                     {{ $event->title }}
                                                 </h3>
+                                                @if($showsBookReferenceSubtitle)
+                                                    <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                        ({{ __('Pengajian Kitab') }})
+                                                    </p>
+                                                @endif
                                                 <div class="space-y-1 text-sm text-slate-500">
                                                     <div class="flex items-center gap-1.5">
                                                         <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24"
@@ -1133,6 +1153,7 @@ new class extends Component
                                         $pastVenueLocation = $resolveVenueLocation($event);
                                         $eventPeople = $resolveEventPeople($event);
                                         $speakerAvatarStack = $resolveEventSpeakerAvatarStack($event);
+                                        $showsBookReferenceSubtitle = $eventHasBookReference($event);
                                         $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                         $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
                                         $isPendingEvent = $event->status instanceof \App\States\EventStatus\Pending;
@@ -1202,6 +1223,11 @@ new class extends Component
                                                 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
                                                 {{ $event->title }}
                                             </h3>
+                                            @if($showsBookReferenceSubtitle)
+                                                <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                    ({{ __('Pengajian Kitab') }})
+                                                </p>
+                                            @endif
                                             <div class="space-y-1 text-sm text-slate-500">
                                                 <div class="flex items-center gap-1.5">
                                                     <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24"

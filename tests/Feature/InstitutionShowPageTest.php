@@ -8,11 +8,13 @@ use App\Enums\EventVisibility;
 use App\Enums\InstitutionType;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\ReferenceType;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Inspiration;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\State;
@@ -400,6 +402,68 @@ it('renders institution event cards with localized prayer timing stacked speaker
     } finally {
         app()->setLocale($originalLocale);
     }
+});
+
+it('renders an indented pengajian kitab subtitle on institution event cards only for book references', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'status' => 'verified',
+    ]);
+
+    $bookEvent = Event::factory()
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'starts_at' => now()->addDays(2)->setTime(19, 30),
+            'title' => 'Kuliah Maghrib Kitab',
+        ]);
+
+    $articleEvent = Event::factory()
+        ->for($institution)
+        ->create([
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public,
+            'starts_at' => now()->addDays(3)->setTime(19, 30),
+            'title' => 'Kuliah Maghrib Artikel',
+        ]);
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Riyadhus Solihin',
+        'type' => ReferenceType::Book->value,
+    ]);
+
+    $articleReference = Reference::factory()->create([
+        'title' => 'Artikel Dakwah Semasa',
+        'type' => ReferenceType::Article->value,
+    ]);
+
+    $bookEvent->references()->attach($bookReference->id);
+    $articleEvent->references()->attach($articleReference->id);
+
+    $response = $this->get(route('institutions.show', $institution));
+    $response->assertSuccessful();
+
+    $html = $response->getContent();
+
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($bookEvent->id, '/').'"[^>]*>.*?<\/a>/s', $html, $bookMatches);
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($articleEvent->id, '/').'"[^>]*>.*?<\/a>/s', $html, $articleMatches);
+
+    $bookEventCard = $bookMatches[0] ?? null;
+    $articleEventCard = $articleMatches[0] ?? null;
+
+    expect($bookEventCard)->not->toBeNull();
+    expect($articleEventCard)->not->toBeNull();
+
+    expect($bookEventCard)
+        ->toContain('Kuliah Maghrib Kitab')
+        ->toContain('(Pengajian Kitab)')
+        ->toContain('italic')
+        ->toContain('sm:pl-4');
+
+    expect($articleEventCard)
+        ->toContain('Kuliah Maghrib Artikel')
+        ->not->toContain('(Pengajian Kitab)');
 });
 
 it('renders institution event cards cleanly when an event has no speakers', function () {

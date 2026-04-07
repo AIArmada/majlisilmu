@@ -1,3 +1,23 @@
+# Institution Event Book Reference Subtitle
+
+- [x] Preload event references for the public institution page event cards without introducing N+1 queries
+- [x] Render an indented italic `(Pengajian Kitab)` subtitle under institution event titles when any attached reference is a book
+- [x] Add a focused institution page regression and run the minimal formatter plus affected test file
+
+## Review
+
+- Root cause:
+  - institution event cards did not load event references, so there was no reliable way to decorate title blocks based on attached reference types without introducing lazy-load queries
+  - the card layout had no secondary title line for book-based study sessions
+- Fix:
+  - updated `resources/views/components/pages/institutions/⚡show.blade.php` to eager-load `references` for both upcoming and past institution event queries
+  - added a small card helper that detects whether an event has any attached `book` reference and renders an indented italic `(Pengajian Kitab)` subtitle directly under the event title in both card variants
+  - extended `tests/Feature/InstitutionShowPageTest.php` with a focused regression that proves the subtitle appears for a book reference and stays absent for a non-book reference
+- Verification:
+  - `vendor/bin/pint --dirty --format agent resources/views/components/pages/institutions/⚡show.blade.php tests/Feature/InstitutionShowPageTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php` => **29 passed**, 115 assertions
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/InstitutionShowPageTest.php` => unable to verify via targeted PHPStan because the project config reported `No files found to analyse` for the supplied test path; editor diagnostics on the touched files were clean
+
 # Institution Dashboard Audit Fixes
 
 - [x] Audit the uncommitted institution dashboard Filament table refactor for behavior regressions beyond the existing focused suite
