@@ -270,14 +270,33 @@ class Show extends Component
         if (is_array($description)) {
             $html = $description['html'] ?? null;
 
-            if (is_string($html) && $html !== '') {
+            if (is_string($html) && $this->hasRenderableHtmlContent($html)) {
                 return $html;
             }
         }
 
-        $text = $this->event->description_text;
+        $text = trim($this->event->description_text);
 
         return $text !== '' ? nl2br(e($text)) : '';
+    }
+
+    #[Computed]
+    public function hasAboutContent(): bool
+    {
+        return $this->descriptionHtml() !== '' || $this->event->tags->isNotEmpty();
+    }
+
+    private function hasRenderableHtmlContent(string $html): bool
+    {
+        $plainText = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $plainText = str_replace("\u{00A0}", ' ', $plainText);
+        $plainText = preg_replace('/\s+/u', '', $plainText) ?? trim($plainText);
+
+        if ($plainText !== '') {
+            return true;
+        }
+
+        return preg_match('/<(img|picture|figure|iframe|video|audio|embed|object|svg|canvas)\b/i', $html) === 1;
     }
 
     /**

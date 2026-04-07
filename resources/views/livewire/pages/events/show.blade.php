@@ -39,6 +39,7 @@
     }
     $eventTimeStatus = $this->eventTimeStatus;
     $descriptionHtml = $this->descriptionHtml;
+    $hasAboutContent = $this->hasAboutContent;
     $isCancelledStatus = $event->status instanceof \App\States\EventStatus\Cancelled || (string) $event->status === 'cancelled';
     $checkInState = $this->checkInState;
     $canCheckIn = $checkInState['available'];
@@ -1047,84 +1048,87 @@
                         @endif
                 </section>
             @endif
-
         {{-- ABOUT --}}
-        <section
-            class="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all hover:shadow-2xl hover:shadow-slate-200/50 sm:p-8 scroll-reveal reveal-up revealed"
-            x-intersect.once="$el.classList.add('revealed')">
-            <div
-                class="absolute -right-20 -top-20 size-64 rounded-full bg-emerald-50 opacity-50 blur-3xl transition-opacity group-hover:opacity-100">
-            </div>
-
-            <div class="relative z-10">
-                <div class="flex items-center gap-3">
-                    <div class="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('About this Event') }}</h2>
-                </div>
-
+        @if($hasAboutContent)
+            <section
+                class="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all hover:shadow-2xl hover:shadow-slate-200/50 sm:p-8 scroll-reveal reveal-up revealed"
+                x-intersect.once="$el.classList.add('revealed')">
                 <div
-                    class="prose prose-slate prose-lg mt-6 max-w-none prose-headings:font-heading prose-headings:font-bold prose-a:text-emerald-600 hover:prose-a:text-emerald-500 prose-img:rounded-2xl">
-                    {!! $descriptionHtml !!}
+                    class="absolute -right-20 -top-20 size-64 rounded-full bg-emerald-50 opacity-50 blur-3xl transition-opacity group-hover:opacity-100">
                 </div>
 
-                {{-- Tag cloud by taxonomy type (aligned with submit-event categories) --}}
-                @if($event->tags->isNotEmpty())
-                    @php
-                        $tagCloudSections = [
-                            [
-                                'key' => \App\Enums\TagType::Domain->value,
-                                'label' => __('Kategori'),
-                                'color' => 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-                            ],
-                            [
-                                'key' => \App\Enums\TagType::Discipline->value,
-                                'label' => __('Bidang Ilmu'),
-                                'color' => 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100',
-                            ],
-                            [
-                                'key' => \App\Enums\TagType::Source->value,
-                                'label' => __('Sumber Rujukan Utama'),
-                                'color' => 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-                            ],
-                            [
-                                'key' => \App\Enums\TagType::Issue->value,
-                                'label' => __('Tema / Isu'),
-                                'color' => 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-                            ],
-                        ];
-                    @endphp
-                    <div class="mt-8 border-t border-slate-100 pt-6">
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-                            @foreach($tagCloudSections as $section)
-                                @php
-                                    $sectionTags = $tagsByType->get($section['key']);
-                                @endphp
-                                @if($sectionTags instanceof \Illuminate\Support\Collection && $sectionTags->isNotEmpty())
-                                    <div>
-                                        <p class="mb-2.5 text-xs font-bold uppercase tracking-widest text-slate-400">
-                                            {{ $section['label'] }}
-                                        </p>
-                                        <div class="flex flex-wrap gap-2.5">
-                                            @foreach($sectionTags as $tag)
-                                                <span wire:key="tag-cloud-{{ $section['key'] }}-{{ $tag->id }}"
-                                                    class="inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors {{ $section['color'] }}">
-                                                    {{ $tag->name }}
-                                                </span>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-                            @endforeach
+                <div class="relative z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                         </div>
+                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('About this Event') }}</h2>
                     </div>
-                @endif
-            </div>
-        </section>
+
+                    @if($descriptionHtml !== '')
+                        <div
+                            class="prose prose-slate prose-lg mt-6 max-w-none prose-headings:font-heading prose-headings:font-bold prose-a:text-emerald-600 hover:prose-a:text-emerald-500 prose-img:rounded-2xl">
+                            {!! $descriptionHtml !!}
+                        </div>
+                    @endif
+
+                    {{-- Tag cloud by taxonomy type (aligned with submit-event categories) --}}
+                    @if($event->tags->isNotEmpty())
+                        @php
+                            $tagCloudSections = [
+                                [
+                                    'key' => \App\Enums\TagType::Domain->value,
+                                    'label' => __('Kategori'),
+                                    'color' => 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+                                ],
+                                [
+                                    'key' => \App\Enums\TagType::Discipline->value,
+                                    'label' => __('Bidang Ilmu'),
+                                    'color' => 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100',
+                                ],
+                                [
+                                    'key' => \App\Enums\TagType::Source->value,
+                                    'label' => __('Sumber Rujukan Utama'),
+                                    'color' => 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                                ],
+                                [
+                                    'key' => \App\Enums\TagType::Issue->value,
+                                    'label' => __('Tema / Isu'),
+                                    'color' => 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+                                ],
+                            ];
+                        @endphp
+                        <div class="mt-8 border-t border-slate-100 pt-6">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                                @foreach($tagCloudSections as $section)
+                                    @php
+                                        $sectionTags = $tagsByType->get($section['key']);
+                                    @endphp
+                                    @if($sectionTags instanceof \Illuminate\Support\Collection && $sectionTags->isNotEmpty())
+                                        <div>
+                                            <p class="mb-2.5 text-xs font-bold uppercase tracking-widest text-slate-400">
+                                                {{ $section['label'] }}
+                                            </p>
+                                            <div class="flex flex-wrap gap-2.5">
+                                                @foreach($sectionTags as $tag)
+                                                    <span wire:key="tag-cloud-{{ $section['key'] }}-{{ $tag->id }}"
+                                                        class="inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors {{ $section['color'] }}">
+                                                        {{ $tag->name }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </section>
+        @endif
 
         {{-- TEMP-HIDDEN SECTION (DO NOT REMOVE):
         Organizer/Location context card is intentionally disabled per product request.
