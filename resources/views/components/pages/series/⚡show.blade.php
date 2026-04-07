@@ -617,7 +617,7 @@ new
                                                     {{ $event->title }}
                                                 </h3>
                                                 @if($event->reference_study_subtitle)
-                                                    <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                    <p class="pl-3 text-sm font-bold italic text-slate-500 sm:pl-4">
                                                         {{ $event->reference_study_subtitle }}
                                                     </p>
                                                 @endif
@@ -743,7 +743,7 @@ new
                                                     {{ $event->title }}
                                                 </h3>
                                                 @if($event->reference_study_subtitle)
-                                                    <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                    <p class="pl-3 text-sm font-bold italic text-slate-500 sm:pl-4">
                                                         {{ $event->reference_study_subtitle }}
                                                     </p>
                                                 @endif

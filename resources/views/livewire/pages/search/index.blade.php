@@ -293,7 +293,7 @@
                                                 <h3 class="font-heading text-xl font-bold leading-tight text-slate-900 line-clamp-2">{{ $event->title }}</h3>
                                             </a>
                                             @if($event->reference_study_subtitle)
-                                                <p class="mt-1 pl-3 text-sm italic text-slate-500">
+                                                <p class="mt-1 pl-3 text-sm font-bold italic text-slate-500">
                                                     {{ $event->reference_study_subtitle }}
                                                 </p>
                                             @endif

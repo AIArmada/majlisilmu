@@ -944,7 +944,7 @@ new class extends Component
                                                     {{ $event->title }}
                                                 </h3>
                                                 @if($bookReferenceTitle)
-                                                    <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                    <p class="pl-3 text-sm font-bold italic text-slate-500 sm:pl-4">
                                                         {{ $bookReferenceTitle }}
                                                     </p>
                                                 @endif
@@ -1212,7 +1212,7 @@ new class extends Component
                                                 {{ $event->title }}
                                             </h3>
                                             @if($bookReferenceTitle)
-                                                <p class="pl-3 text-sm italic text-slate-500 sm:pl-4">
+                                                <p class="pl-3 text-sm font-bold italic text-slate-500 sm:pl-4">
                                                     {{ $bookReferenceTitle }}
                                                 </p>
                                             @endif

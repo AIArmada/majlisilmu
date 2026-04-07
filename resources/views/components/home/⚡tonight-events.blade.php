@@ -84,7 +84,7 @@ style="display: none;" @endif>
                             <div class="min-w-0">
                                 <h3 class="font-bold text-slate-900 truncate">{{ $event->title }}</h3>
                                 @if($event->reference_study_subtitle)
-                                    <p class="mt-1 pl-3 text-xs italic text-slate-500">
+                                    <p class="mt-1 pl-3 text-xs font-bold italic text-slate-500">
                                         {{ $event->reference_study_subtitle }}
                                     </p>
                                 @endif
