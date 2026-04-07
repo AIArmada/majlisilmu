@@ -1,7 +1,8 @@
 <?php
 
 use App\Support\Location\PreferredCountryResolver;
-use App\Support\Location\PublicMarketPreference;
+use App\Support\Location\PublicCountryPreference;
+use App\Support\Location\PublicCountryRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,7 @@ beforeEach(function () {
     }
 });
 
-it('falls back to Malaysia when the saved user timezone resolves to a disabled market country', function () {
+it('falls back to Malaysia when the saved user timezone resolves to a disabled country', function () {
     DB::table('countries')->insertGetId([
         'iso2' => 'ID',
         'name' => 'Indonesia',
@@ -43,7 +44,7 @@ it('falls back to Malaysia when the saved user timezone resolves to a disabled m
     expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
 });
 
-it('falls back to Malaysia when CF-IPCountry resolves to a disabled market country', function () {
+it('falls back to Malaysia when CF-IPCountry resolves to a disabled country', function () {
     DB::table('countries')->insertGetId([
         'iso2' => 'ID',
         'name' => 'Indonesia',
@@ -62,18 +63,34 @@ it('falls back to Malaysia when CF-IPCountry resolves to a disabled market count
     expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
 });
 
-it('prefers the selected market when timezone is unavailable', function () {
+it('prefers the selected country over the viewer timezone', function () {
+    config()->set('public-countries.countries.singapore.enabled', true);
+
+    $singaporeId = DB::table('countries')->insertGetId([
+        'iso2' => 'SG',
+        'name' => 'Singapore',
+        'status' => 1,
+        'phone_code' => '65',
+        'iso3' => 'SGP',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+
+    app()->forgetInstance(PublicCountryRegistry::class);
+    app()->forgetInstance(PublicCountryPreference::class);
+
     $request = Request::create('/events', 'GET');
-    $request->cookies->set(PublicMarketPreference::COOKIE_NAME, 'malaysia');
+    $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'singapore');
+    $request->cookies->set('user_timezone', 'Asia/Kuala_Lumpur');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
 
-    expect($resolved)->toBe(PreferredCountryResolver::MALAYSIA_ID);
+    expect($resolved)->toBe($singaporeId);
 });
 
-it('falls back to Malaysia when the selected market is invalid', function () {
+it('falls back to Malaysia when the selected country is invalid', function () {
     $request = Request::create('/events', 'GET');
-    $request->cookies->set(PublicMarketPreference::COOKIE_NAME, 'unsupported-market');
+    $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'unsupported-country');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
 

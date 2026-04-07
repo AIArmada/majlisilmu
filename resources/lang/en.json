@@ -893,6 +893,7 @@
     "We could not find a user with that email address.": "We could not find a user with that email address.",
     "Pending Approval": "Pending Approval",
     "Select a role": "Select a role",
-    "Market": "Market",
+    "Country": "Country",
+    "Market": "Country",
     "Coming soon": "Coming soon"
 }

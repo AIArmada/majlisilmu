@@ -10,6 +10,9 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Tag;
+use App\Support\Location\PublicCountryPreference;
+use App\Support\Location\PublicCountryRegistry;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -53,7 +56,6 @@ function submitEventEndTimeFormData(array $fixtures, array $overrides = []): arr
         'speakers' => [$fixtures['speaker']->id],
         'submitter_name' => 'Test User',
         'submitter_email' => 'test@example.com',
-        'timezone' => 'Asia/Jakarta',
     ], $overrides);
 }
 
@@ -73,9 +75,9 @@ it('can submit event with optional end time', function () {
 
     $event = Event::where('title', 'Event With End Time')->firstOrFail();
     expect($event->ends_at)->not->toBeNull();
-    expect($event->timezone)->toBe('Asia/Jakarta');
-    expect($event->ends_at->timezone('Asia/Jakarta')->format('H:i'))->toBe('21:30');
-    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('14:30');
+    expect($event->timezone)->toBe('Asia/Kuala_Lumpur');
+    expect($event->ends_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('21:30');
+    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('13:30');
     // Verify ends_at has same date as starts_at
     expect($event->ends_at->toDateString())->toBe($event->starts_at->toDateString());
 });
@@ -114,13 +116,99 @@ it('can submit event with custom time and end time', function () {
         ->assertRedirect(route('submit-event.success'));
 
     $event = Event::where('title', 'Custom Time With End Time')->firstOrFail();
-    expect($event->timezone)->toBe('Asia/Jakarta');
-    expect($event->starts_at->timezone('Asia/Jakarta')->format('H:i'))->toBe('10:00');
-    expect($event->ends_at->timezone('Asia/Jakarta')->format('H:i'))->toBe('12:00');
-    expect($event->starts_at->timezone('UTC')->format('H:i'))->toBe('03:00');
-    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('05:00');
+    expect($event->timezone)->toBe('Asia/Kuala_Lumpur');
+    expect($event->starts_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('10:00');
+    expect($event->ends_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('12:00');
+    expect($event->starts_at->timezone('UTC')->format('H:i'))->toBe('02:00');
+    expect($event->ends_at->timezone('UTC')->format('H:i'))->toBe('04:00');
     expect($event->ends_at->toDateString())->toBe($event->starts_at->toDateString());
 });
+
+it('uses the selected public country timezone instead of the browser timezone when submitting', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::withCookie('user_timezone', 'America/Los_Angeles')
+            ->withCookie('public_country', 'malaysia')
+            ->test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Selected Country Timezone Wins',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '00:30',
+            'end_time' => '02:00',
+        ]),
+    )
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('submit-event.success'));
+
+    $event = Event::where('title', 'Selected Country Timezone Wins')->firstOrFail();
+
+    expect($event->timezone)->toBe('Asia/Kuala_Lumpur')
+        ->and($event->starts_at->timezone('Asia/Kuala_Lumpur')->toDateString())->toBe(now()->addDays(5)->toDateString())
+        ->and($event->starts_at->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('00:30')
+        ->and($event->ends_at?->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('02:00');
+});
+
+it('defaults the submit-event form to the inferred preferred country when no explicit country is selected', function () {
+    config()->set('public-countries.countries.singapore.enabled', true);
+
+    $singaporeId = DB::table('countries')->insertGetId([
+        'iso2' => 'SG',
+        'name' => 'Singapore',
+        'status' => 1,
+        'phone_code' => '65',
+        'iso3' => 'SGP',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+
+    app()->forgetInstance(PublicCountryRegistry::class);
+    app()->forgetInstance(PublicCountryPreference::class);
+
+    Livewire::withQueryParams(['user_timezone' => 'Asia/Singapore'])
+        ->test('pages.submit-event.create')
+        ->assertSet('data.submission_country_id', $singaporeId);
+});
+
+it('rejects unsupported submission country ids in the public submit flow', function () {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => 'Unsupported Submission Country Invalid',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '10:00',
+            'submission_country_id' => 999999,
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.submission_country_id']);
+
+    expect(Event::where('title', 'Unsupported Submission Country Invalid')->exists())->toBeFalse();
+});
+
+it('rejects malformed submission country ids in the public submit flow', function (string $submissionCountryId, string $title) {
+    $fixtures = submitEventEndTimeFixtures();
+
+    setSubmitEventFormState(
+        Livewire::test('pages.submit-event.create'),
+        submitEventEndTimeFormData($fixtures, [
+            'title' => $title,
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '10:00',
+            'submission_country_id' => $submissionCountryId,
+        ]),
+    )
+        ->call('submit')
+        ->assertHasErrors(['data.submission_country_id']);
+
+    expect(Event::where('title', $title)->exists())->toBeFalse();
+})->with([
+    'letters' => ['abc', 'Malformed Submission Country Letters'],
+    'decimal' => ['132.5', 'Malformed Submission Country Decimal'],
+]);
 
 it('rejects end time that is earlier than estimated prayer start time', function () {
     $fixtures = submitEventEndTimeFixtures();
@@ -164,7 +252,6 @@ it('stores 08:00PM local as 12:00 UTC in database', function () {
         Livewire::test('pages.submit-event.create'),
         submitEventEndTimeFormData($fixtures, [
             'title' => 'KL 8PM UTC 12 Test',
-            'timezone' => 'Asia/Kuala_Lumpur',
             'prayer_time' => EventPrayerTime::SelepasAsar->value,
             'end_time' => '20:00',
         ]),
@@ -190,7 +277,6 @@ it('allows sebelum maghrib during ramadhan', function () {
             'title' => 'Ramadhan Sebelum Maghrib Valid',
             'event_date' => '2027-02-10',
             'prayer_time' => EventPrayerTime::SebelumMaghrib->value,
-            'timezone' => 'Asia/Kuala_Lumpur',
             'end_time' => '20:00',
         ]),
     )

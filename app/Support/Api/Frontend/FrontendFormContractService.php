@@ -5,7 +5,6 @@ namespace App\Support\Api\Frontend;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
-use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -17,18 +16,15 @@ use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
-use App\Enums\VenueType;
-use App\Models\Institution;
 use App\Models\User;
 use App\Support\Location\GooglePlacesConfiguration;
-use App\Support\Notifications\NotificationCatalog;
-use App\Support\Timezone\UserTimezoneResolver;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryRegistry;
 
 class FrontendFormContractService
 {
     public function __construct(
         private readonly FrontendCatalogService $catalogService,
-        private readonly UserTimezoneResolver $userTimezoneResolver,
     ) {}
 
     /**
@@ -172,9 +168,19 @@ class FrontendFormContractService
      */
     public function submitEvent(?User $user): array
     {
-        $timezone = $user instanceof User
-            ? ($user->timezone ?: $this->userTimezoneResolver->resolve())
-            : $this->userTimezoneResolver->resolve();
+        $publicCountryRegistry = app(PublicCountryRegistry::class);
+        $submissionCountryIds = collect($publicCountryRegistry->all())
+            ->filter(static fn (array $country): bool => $country['enabled'])
+            ->keys()
+            ->map(fn (string $countryKey): ?int => $publicCountryRegistry->countryIdForKey($countryKey))
+            ->filter(static fn (?int $countryId): bool => is_int($countryId))
+            ->values()
+            ->all();
+        $submissionCountryId = $publicCountryRegistry->normalizeCountryId(
+            app(PreferredCountryResolver::class)->resolveId(),
+        ) ?? $publicCountryRegistry->countryIdForKey($publicCountryRegistry->defaultKey())
+            ?? $publicCountryRegistry->countryIdFromIso2('MY')
+            ?? 132;
 
         return [
             'flow' => 'submit_event',
@@ -198,7 +204,7 @@ class FrontendFormContractService
                 'is_muslim_only' => false,
                 'other_key_people' => [],
                 'captcha_token' => null,
-                'timezone' => $timezone,
+                'submission_country_id' => $submissionCountryId,
             ],
             'fields' => [
                 $this->field('title', 'string', required: true, maxLength: 255),
@@ -234,7 +240,7 @@ class FrontendFormContractService
                 $this->field('space_id', 'uuid', required: false, catalog: route('api.client.catalogs.spaces')),
                 $this->field('speakers', 'array<string>', required: false, catalog: route('api.client.catalogs.submit-speakers')),
                 $this->field('other_key_people', 'array<object>', required: false),
-                $this->field('timezone', 'timezone', required: true, default: $timezone),
+                $this->field('submission_country_id', 'integer', required: false, default: $submissionCountryId, allowedValues: $submissionCountryIds),
                 $this->field('submitter_name', 'string', required: ! $user instanceof User, maxLength: 255),
                 $this->field('submitter_email', 'email', required: false),
                 $this->field('submitter_phone', 'string', required: false),

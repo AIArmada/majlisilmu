@@ -1,5 +1,4 @@
 @php
-    use App\Support\Timezone\UserTimezoneResolver;
     use App\Enums\EventAgeGroup;
     use App\Enums\EventFormat;
     use App\Enums\EventGenderRestriction;
@@ -13,6 +12,7 @@
     use App\Models\Speaker;
     use App\Models\Tag;
     use App\Models\Venue;
+    use App\Support\Location\PublicCountryRegistry;
     use Illuminate\Support\Carbon;
     use Illuminate\Support\Collection;
     use Illuminate\Support\Str;
@@ -75,10 +75,10 @@
         return (string) $value;
     };
 
-    $preferredTimezone = $toScalar($get('timezone'));
-    $previewTimezone = UserTimezoneResolver::resolve(
-        request(),
-        $preferredTimezone !== '' ? $preferredTimezone : null,
+    $publicCountryRegistry = app(PublicCountryRegistry::class);
+    $submissionCountryId = is_numeric($get('submission_country_id')) ? (int) $get('submission_country_id') : null;
+    $previewTimezone = $publicCountryRegistry->defaultTimezoneForCountryId(
+        $publicCountryRegistry->normalizeCountryId($submissionCountryId),
     );
 
     $toTimeLabel = static function (mixed $value) use ($dash, $previewTimezone): string {

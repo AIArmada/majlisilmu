@@ -13,23 +13,37 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Support\Enums\Width;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
-class InstitutionDashboard extends Component
+class InstitutionDashboard extends Component implements HasForms, HasTable
 {
+    use InteractsWithActions;
+    use InteractsWithForms;
+    use InteractsWithTable {
+        bootedInteractsWithTable as protected filamentBootedInteractsWithTable;
+    }
     use InteractsWithToasts;
-    use WithPagination;
 
     #[Url(as: 'institution')]
     public ?string $institutionId = null;
@@ -79,10 +93,21 @@ class InstitutionDashboard extends Component
             abort(403);
         }
 
-        $this->eventPerPage = $this->normalizeEventPerPage($this->eventPerPage);
         $this->eventStatus = $this->normalizeEventStatus($this->eventStatus);
         $this->eventVisibility = $this->normalizeEventVisibility($this->eventVisibility);
         $this->eventSort = $this->normalizeEventSort($this->eventSort);
+        $this->eventPerPage = $this->normalizeEventPerPage($this->eventPerPage);
+    }
+
+    public function bootedInteractsWithTable(): void
+    {
+        $this->filamentBootedInteractsWithTable();
+        $this->syncTableStateFromLegacyQuery();
+    }
+
+    public function getTablePaginationPageName(): string
+    {
+        return 'institution_events_page';
     }
 
     public function updatedInstitutionId(?string $institutionId): void
@@ -96,7 +121,8 @@ class InstitutionDashboard extends Component
         $this->institutionId = $this->normalizeInstitutionId($institutionId);
 
         if ($this->institutionId === null) {
-            $this->resetPage('institution_events_page');
+            $this->flushCachedTableRecords();
+            $this->resetPage();
             $this->resetPage('institution_members_page');
             $this->resetMemberEditor();
 
@@ -107,38 +133,44 @@ class InstitutionDashboard extends Component
             abort(403);
         }
 
-        $this->resetPage('institution_events_page');
+        $this->flushCachedTableRecords();
+        $this->resetPage();
         $this->resetPage('institution_members_page');
         $this->resetMemberEditor();
-    }
-
-    public function updatedEventSearch(): void
-    {
-        $this->resetPage('institution_events_page');
-    }
-
-    public function updatedEventStatus(string $value): void
-    {
-        $this->eventStatus = $this->normalizeEventStatus($value);
-        $this->resetPage('institution_events_page');
-    }
-
-    public function updatedEventVisibility(string $value): void
-    {
-        $this->eventVisibility = $this->normalizeEventVisibility($value);
-        $this->resetPage('institution_events_page');
     }
 
     public function updatedEventSort(string $value): void
     {
         $this->eventSort = $this->normalizeEventSort($value);
-        $this->resetPage('institution_events_page');
+        $this->tableSort = null;
+
+        $this->flushCachedTableRecords();
+        $this->resetPage();
     }
 
-    public function updatedEventPerPage(int|string $value): void
+    public function updated(string $name, mixed $value): void
     {
-        $this->eventPerPage = $this->normalizeEventPerPage($value);
-        $this->resetPage('institution_events_page');
+        if ($name === 'tableSearch') {
+            $this->eventSearch = $this->tableSearch ?? '';
+
+            return;
+        }
+
+        if (str($name)->startsWith('tableFilters')) {
+            $this->syncLegacyFilterStateFromTable();
+
+            return;
+        }
+
+        if ($name === 'tableSort') {
+            $this->eventSort = $this->legacyEventSortFromTableState();
+
+            return;
+        }
+
+        if ($name === 'tableRecordsPerPage') {
+            $this->eventPerPage = $this->normalizeEventPerPage($this->tableRecordsPerPage ?? 8);
+        }
     }
 
     public function addMember(): void
@@ -312,52 +344,6 @@ class InstitutionDashboard extends Component
     }
 
     /**
-     * @return LengthAwarePaginator<int, Event>
-     */
-    #[Computed]
-    public function institutionEvents(): LengthAwarePaginator
-    {
-        $institution = $this->selectedInstitution();
-
-        if (! $institution instanceof Institution) {
-            return Event::query()
-                ->whereRaw('1 = 0')
-                ->paginate(perPage: $this->eventPerPage, pageName: 'institution_events_page');
-        }
-
-        $query = Event::query()
-            ->where('institution_id', $institution->id)
-            ->with([
-                'space:id,name',
-                'speakers:id,name',
-                'references:id,title',
-            ])
-            ->withCount('registrations');
-
-        if ($this->eventSearch !== '') {
-            $search = '%'.mb_strtolower(trim($this->eventSearch)).'%';
-
-            $query->where(function (Builder $builder) use ($search): void {
-                $builder
-                    ->whereRaw('LOWER(title) LIKE ?', [$search])
-                    ->orWhereHas('venue', fn (Builder $venueQuery) => $venueQuery->whereRaw('LOWER(name) LIKE ?', [$search]));
-            });
-        }
-
-        if ($this->eventStatus !== 'all') {
-            $query->where('status', $this->eventStatus);
-        }
-
-        if ($this->eventVisibility !== 'all') {
-            $query->where('visibility', $this->eventVisibility);
-        }
-
-        $this->applyEventSort($query);
-
-        return $query->paginate(perPage: $this->eventPerPage, pageName: 'institution_events_page');
-    }
-
-    /**
      * @return LengthAwarePaginator<int, User>
      */
     #[Computed]
@@ -465,6 +451,126 @@ class InstitutionDashboard extends Component
             && $this->userHasInstitutionManagementRole($user);
     }
 
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(function (): Builder {
+                $institution = $this->selectedInstitution();
+
+                if (! $institution instanceof Institution) {
+                    return Event::query()->whereRaw('1 = 0');
+                }
+
+                return Event::query()
+                    ->where('institution_id', $institution->id)
+                    ->with([
+                        'space:id,name',
+                        'speakers:id,name',
+                        'references:id,title',
+                    ])
+                    ->withCount(['registrations as dashboard_registrations_count']);
+            })
+            ->columns([
+                TextColumn::make('title')
+                    ->label(__('Title'))
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        $search = '%'.mb_strtolower(trim($search)).'%';
+
+                        return $query->where(function (Builder $builder) use ($search): void {
+                            $builder
+                                ->whereRaw('LOWER(title) LIKE ?', [$search])
+                                ->orWhereHas('venue', fn (Builder $venueQuery) => $venueQuery->whereRaw('LOWER(name) LIKE ?', [$search]));
+                        });
+                    })
+                    ->sortable()
+                    ->html()
+                    ->wrap()
+                    ->formatStateUsing(fn (Event $record): HtmlString => new HtmlString(view(
+                        'livewire.pages.dashboard.partials.institution-event-title-cell',
+                        [
+                            'event' => $record,
+                            'selectedInstitutionId' => $this->institutionId,
+                        ],
+                    )->render())),
+                TextColumn::make('starts_at')
+                    ->label(__('Date'))
+                    ->state(fn (Event $record): string => $this->formatEventSchedule($record))
+                    ->sortable()
+                    ->wrap(),
+                TextColumn::make('status')
+                    ->label(__('Status'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => $this->translateStatusLabel($state))
+                    ->color(fn (string $state): string => match ($state) {
+                        'approved' => 'success',
+                        'pending' => 'warning',
+                        'needs_changes' => 'info',
+                        'rejected', 'cancelled' => 'danger',
+                        default => 'gray',
+                    }),
+                TextColumn::make('speaker_names')
+                    ->label(__('Speakers'))
+                    ->state(fn (Event $record): array => $record->speakers
+                        ->pluck('name')
+                        ->filter(fn (mixed $name): bool => is_string($name) && trim($name) !== '')
+                        ->map(fn (string $name): string => trim($name))
+                        ->values()
+                        ->all())
+                    ->listWithLineBreaks()
+                    ->limitList(2)
+                    ->expandableLimitedList()
+                    ->placeholder('-')
+                    ->wrap()
+                    ->tooltip(fn (Event $record): ?string => $record->speakers
+                        ->pluck('name')
+                        ->filter(fn (mixed $name): bool => is_string($name) && trim($name) !== '')
+                        ->map(fn (string $name): string => trim($name))
+                        ->implode(', ') ?: null),
+                TextColumn::make('reference_titles')
+                    ->label(__('References'))
+                    ->state(fn (Event $record): array => $record->references
+                        ->pluck('title')
+                        ->filter(fn (mixed $title): bool => is_string($title) && trim($title) !== '')
+                        ->map(fn (string $title): string => trim($title))
+                        ->values()
+                        ->all())
+                    ->listWithLineBreaks()
+                    ->limitList(2)
+                    ->expandableLimitedList()
+                    ->placeholder('-')
+                    ->wrap()
+                    ->tooltip(fn (Event $record): ?string => $record->references
+                        ->pluck('title')
+                        ->filter(fn (mixed $title): bool => is_string($title) && trim($title) !== '')
+                        ->map(fn (string $title): string => trim($title))
+                        ->implode(', ') ?: null),
+                TextColumn::make('space.name')
+                    ->label(__('Location'))
+                    ->placeholder('-')
+                    ->wrap(),
+            ])
+            ->defaultSort(fn (Builder $query): string|Builder|null => $this->applyLegacyEventSort($query), fn (): string => $this->legacyEventSortDirection())
+            ->searchPlaceholder(__('Search by event title or venue'))
+            ->filters([
+                SelectFilter::make('status')
+                    ->label(__('Status'))
+                    ->options(collect($this->eventStatusOptions())->except('all')->all()),
+                SelectFilter::make('visibility')
+                    ->label(__('Visibility'))
+                    ->options(collect($this->eventVisibilityOptions())->except('all')->all()),
+            ])
+            ->deferFilters(false)
+            ->filtersFormColumns(2)
+            ->filtersFormWidth(Width::Medium)
+            ->paginated([8, 15, 25])
+            ->defaultPaginationPageOption(8)
+            ->recordClasses(fn (Event $record): ?string => (string) $record->status === 'pending' ? 'bg-amber-50/80' : null)
+            ->stackedOnMobile()
+            ->scrollToTopOnPageChange()
+            ->emptyStateHeading(__('No events match the current filters.'))
+            ->emptyStateDescription(__('Try adjusting the search or filters.'));
+    }
+
     /**
      * @return BelongsToMany<Institution, User>
      */
@@ -565,21 +671,95 @@ class InstitutionDashboard extends Component
         abort_unless($user instanceof User && $this->userHasInstitutionManagementRole($user), 403);
     }
 
+    protected function translateStatusLabel(string $status): string
+    {
+        $translated = __($status);
+
+        if ($translated !== $status) {
+            return $translated;
+        }
+
+        return str($status)->replace('_', ' ')->headline()->toString();
+    }
+
+    protected function formatEventSchedule(Event $event): string
+    {
+        if (! $event->starts_at) {
+            return __('TBC');
+        }
+
+        $date =
+            UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M Y');
+        $time = $event->isPrayerRelative()
+            ? (string) $event->timing_display
+            : UserDateTimeFormatter::translatedFormat($event->starts_at, 'h:i A');
+
+        return $date.', '.$time;
+    }
+
     /**
      * @param  Builder<Event>  $query
+     * @return Builder<Event>|string|null
      */
-    protected function applyEventSort(Builder $query): void
+    protected function applyLegacyEventSort(Builder $query): Builder|string|null
     {
-        match ($this->eventSort) {
-            'starts_asc' => $query->orderBy('starts_at')->orderBy('title'),
-            'title_asc' => $query->orderBy('title')->orderBy('starts_at', 'desc'),
-            'title_desc' => $query->orderByDesc('title')->orderBy('starts_at', 'desc'),
-            'registrations_desc' => $query->orderByDesc('registrations_count')->orderBy('starts_at', 'desc'),
+        if (filled($this->tableSort)) {
+            return null;
+        }
+
+        return match ($this->eventSort) {
+            'starts_asc', 'starts_desc' => 'starts_at',
+            'title_asc', 'title_desc' => 'title',
+            'registrations_desc' => 'dashboard_registrations_count',
             'pending_first' => $query
                 ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
                 ->orderBy('starts_at')
                 ->orderBy('title'),
-            default => $query->orderByDesc('starts_at')->orderBy('title'),
+            default => 'starts_at',
+        };
+    }
+
+    protected function legacyEventSortDirection(): string
+    {
+        return match ($this->eventSort) {
+            'starts_asc', 'title_asc', 'pending_first' => 'asc',
+            default => 'desc',
+        };
+    }
+
+    protected function syncTableStateFromLegacyQuery(): void
+    {
+        $this->eventStatus = $this->normalizeEventStatus($this->eventStatus);
+        $this->eventVisibility = $this->normalizeEventVisibility($this->eventVisibility);
+        $this->eventSort = $this->normalizeEventSort($this->eventSort);
+        $this->eventPerPage = $this->normalizeEventPerPage($this->eventPerPage);
+
+        $this->tableSearch = $this->eventSearch;
+        $this->tableFilters = array_filter([
+            'status' => $this->eventStatus === 'all' ? null : ['value' => $this->eventStatus],
+            'visibility' => $this->eventVisibility === 'all' ? null : ['value' => $this->eventVisibility],
+        ], fn (?array $filter): bool => $filter !== null);
+        $this->tableDeferredFilters = $this->tableFilters;
+        $this->tableRecordsPerPage = $this->eventPerPage;
+
+        $this->getTableFiltersForm()->fill($this->tableFilters);
+    }
+
+    protected function syncLegacyFilterStateFromTable(): void
+    {
+        $this->eventStatus = $this->normalizeEventStatus((string) (data_get($this->getTableFilterState('status'), 'value') ?? 'all'));
+        $this->eventVisibility = $this->normalizeEventVisibility((string) (data_get($this->getTableFilterState('visibility'), 'value') ?? 'all'));
+    }
+
+    protected function legacyEventSortFromTableState(): string
+    {
+        return match ($this->tableSort) {
+            'starts_at:asc', 'starts_at' => 'starts_asc',
+            'starts_at:desc' => 'starts_desc',
+            'title:asc', 'title' => 'title_asc',
+            'title:desc' => 'title_desc',
+            null, '' => 'starts_desc',
+            default => 'starts_desc',
         };
     }
 

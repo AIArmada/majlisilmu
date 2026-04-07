@@ -15,20 +15,20 @@ class PreferredCountryResolver
     {
         $request ??= request();
 
+        $selectedCountryId = $this->normalizeSupportedCountryId(
+            ($selectedCountryKey = app(PublicCountryPreference::class)->selectedKey($request)) !== null
+                ? app(PublicCountryRegistry::class)->countryIdForKey($selectedCountryKey)
+                : null
+        );
+
+        if ($selectedCountryId !== null) {
+            return $selectedCountryId;
+        }
+
         $timezoneCountryId = $this->normalizeSupportedCountryId($this->resolveFromTimezone($request));
 
         if ($timezoneCountryId !== null) {
             return $timezoneCountryId;
-        }
-
-        $marketCountryId = $this->normalizeSupportedCountryId(
-            ($selectedMarketKey = app(PublicMarketPreference::class)->selectedKey($request)) !== null
-                ? app(PublicMarketRegistry::class)->countryIdForMarket($selectedMarketKey)
-                : null
-        );
-
-        if ($marketCountryId !== null) {
-            return $marketCountryId;
         }
 
         $ipCountryId = $this->normalizeSupportedCountryId($this->countryIdFromIso2($request->header('CF-IPCountry')));
@@ -93,6 +93,6 @@ class PreferredCountryResolver
 
     private function normalizeSupportedCountryId(?int $countryId): ?int
     {
-        return app(PublicMarketRegistry::class)->normalizeCountryId($countryId);
+        return app(PublicCountryRegistry::class)->normalizeCountryId($countryId);
     }
 }

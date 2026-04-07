@@ -11,7 +11,10 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
+use App\Support\Location\PublicCountryPreference;
+use App\Support\Location\PublicCountryRegistry;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
@@ -35,6 +38,9 @@ it('exposes corrected frontend contract metadata', function () {
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
+        ->and($submitEventFields)->toContain('submission_country_id')
+        ->not->toContain('timezone')
+        ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])->toContain(132)
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'notes')['max_length'])->toBe(1000)
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'captcha_token')['required'])->toBeFalse()
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'submitter_email')['required'])->toBeFalse()
@@ -59,6 +65,31 @@ it('exposes corrected frontend contract metadata', function () {
     $institutionFields = collect($institutionContract['fields'] ?? [])->pluck('name')->all();
 
     expect($institutionFields)->not->toContain('logo');
+});
+
+it('uses the inferred preferred country for submit-event contract defaults', function () {
+    config()->set('public-countries.countries.singapore.enabled', true);
+
+    $singaporeId = DB::table('countries')->insertGetId([
+        'iso2' => 'SG',
+        'name' => 'Singapore',
+        'status' => 1,
+        'phone_code' => '65',
+        'iso3' => 'SGP',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+
+    app()->forgetInstance(PublicCountryRegistry::class);
+    app()->forgetInstance(PublicCountryPreference::class);
+
+    $submitEvent = $this->withHeader('X-Timezone', 'Asia/Singapore')
+        ->getJson(route('api.client.forms.submit-event'))
+        ->assertOk()
+        ->json('data');
+
+    expect(data_get($submitEvent, 'defaults.submission_country_id'))->toBe($singaporeId)
+        ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])->toContain($singaporeId);
 });
 
 it('creates institution contribution requests through the frontend api', function () {
@@ -208,7 +239,7 @@ it('submits events with media through the frontend api', function () {
         'organizer_type' => 'institution',
         'organizer_institution_id' => $institution->getKey(),
         'speakers' => [$speaker->getKey()],
-        'timezone' => 'Asia/Kuala_Lumpur',
+        'submission_country_id' => 132,
         'poster' => UploadedFile::fake()->image('poster.jpg'),
         'gallery' => [UploadedFile::fake()->image('gallery.jpg')],
     ], [
@@ -223,6 +254,104 @@ it('submits events with media through the frontend api', function () {
 
     expect($event->getMedia('poster'))->toHaveCount(1)
         ->and($event->getMedia('gallery'))->toHaveCount(1);
+});
+
+it('still accepts legacy timezone-only event submissions through the frontend api', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
+    ]);
+    $domainTag = Tag::factory()->domain()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $this->postJson(route('api.client.submit-event.store'), [
+        'title' => 'Frontend API Legacy Timezone Event',
+        'description' => 'API description',
+        'event_type' => ['kuliah_ceramah'],
+        'event_date' => now()->addDay()->toDateString(),
+        'prayer_time' => 'lain_waktu',
+        'custom_time' => '20:15',
+        'event_format' => 'physical',
+        'visibility' => 'public',
+        'gender' => 'all',
+        'age_group' => ['all_ages'],
+        'languages' => [101],
+        'domain_tags' => [$domainTag->getKey()],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $institution->getKey(),
+        'speakers' => [$speaker->getKey()],
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.event.title', 'Frontend API Legacy Timezone Event');
+
+    $event = Event::query()->where('title', 'Frontend API Legacy Timezone Event')->firstOrFail();
+
+    expect($event->timezone)->toBe('Asia/Kuala_Lumpur')
+        ->and($event->starts_at?->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('20:15');
+});
+
+it('rejects unsupported or disabled submission countries for frontend event submissions', function () {
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
+    ]);
+    $domainTag = Tag::factory()->domain()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
+    ]);
+
+    $disabledCountryId = DB::table('countries')->insertGetId([
+        'iso2' => 'SG',
+        'name' => 'Singapore',
+        'status' => 1,
+        'phone_code' => '65',
+        'iso3' => 'SGP',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+
+    $payload = [
+        'title' => 'Frontend API Invalid Country Event',
+        'description' => 'API description',
+        'event_type' => ['kuliah_ceramah'],
+        'event_date' => now()->addDay()->toDateString(),
+        'prayer_time' => 'selepas_maghrib',
+        'event_format' => 'physical',
+        'visibility' => 'public',
+        'gender' => 'all',
+        'age_group' => ['all_ages'],
+        'languages' => [101],
+        'domain_tags' => [$domainTag->getKey()],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $institution->getKey(),
+        'speakers' => [$speaker->getKey()],
+        'submitter_name' => 'Guest Submitter',
+        'submitter_email' => 'guest@example.test',
+    ];
+
+    $this->postJson(route('api.client.submit-event.store'), array_merge($payload, [
+        'submission_country_id' => 999999,
+    ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['submission_country_id']);
+
+    $this->postJson(route('api.client.submit-event.store'), array_merge($payload, [
+        'submission_country_id' => $disabledCountryId,
+    ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['submission_country_id']);
 });
 
 it('requires guest event submissions to include email or phone', function () {
@@ -253,7 +382,7 @@ it('requires guest event submissions to include email or phone', function () {
         'organizer_type' => 'institution',
         'organizer_institution_id' => $institution->getKey(),
         'speakers' => [$speaker->getKey()],
-        'timezone' => 'Asia/Kuala_Lumpur',
+        'submission_country_id' => 132,
         'submitter_name' => 'Guest Submitter',
     ])
         ->assertUnprocessable()
@@ -282,7 +411,7 @@ it('requires a live url for online frontend event submissions', function () {
         'domain_tags' => [$domainTag->getKey()],
         'organizer_type' => 'institution',
         'organizer_institution_id' => $institution->getKey(),
-        'timezone' => 'Asia/Kuala_Lumpur',
+        'submission_country_id' => 132,
         'submitter_name' => 'Guest Submitter',
         'submitter_email' => 'guest@example.test',
     ])
@@ -312,7 +441,7 @@ it('requires a physical location for speaker-organized physical event submission
         'domain_tags' => [$domainTag->getKey()],
         'organizer_type' => 'speaker',
         'organizer_speaker_id' => $speaker->getKey(),
-        'timezone' => 'Asia/Kuala_Lumpur',
+        'submission_country_id' => 132,
         'submitter_name' => 'Guest Submitter',
         'submitter_email' => 'guest@example.test',
     ])
