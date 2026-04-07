@@ -6,6 +6,7 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\Subdistrict;
+use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Http\UploadedFile;
@@ -249,6 +250,41 @@ describe('Event Show Page Going Feature', function () {
 });
 
 describe('Event Show Page Location & Contact Info', function () {
+    it('hides the about section when the event has no description or tags', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'description' => ['html' => '<p><br></p>'],
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertDontSee(__('About this Event'));
+    });
+
+    it('shows the about section when the event has tags even without a description', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'description' => ['html' => '<p><br></p>'],
+        ]);
+        $tag = Tag::factory()->domain()->create([
+            'name' => ['en' => 'Akidah', 'ms' => 'Akidah'],
+            'slug' => ['en' => 'akidah', 'ms' => 'akidah'],
+        ]);
+
+        $event->attachTag($tag);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee(__('About this Event'))
+            ->assertSee('Akidah');
+    });
+
     it('renders a single reference material card at full width', function () {
         $event = Event::factory()->create([
             'status' => 'approved',

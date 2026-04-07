@@ -1,3 +1,19 @@
+# Event About Section Empty State
+
+- [x] Normalize empty rich-text event descriptions so blank editor markup does not count as content
+- [x] Hide the public event About section when neither description nor tags exist
+- [x] Add focused event show page regression coverage and run verification
+
+## Review
+
+- Updated the public event page component so empty rich-text payloads such as `<p><br></p>` no longer count as description content; non-text embeds like images and iframes still count as renderable content.
+- Wrapped the About section on the public event page so it only renders when there is an actual description block or taxonomy tags to show, which removes the empty card/header on blank events.
+- Added focused event show page regressions for both cases: the section stays hidden when description and tags are absent, and it still appears when tags exist without a description.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Livewire/Pages/Events/Show.php resources/views/livewire/pages/events/show.blade.php tests/Feature/EventShowPageTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Events/Show.php tests/Feature/EventShowPageTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **24 passed**, 68 assertions
+
 # Speaker Role Enum And No-Speaker Smoke Check
 
 - [x] Fix the public speaker page non-speaker role label rendering for enum-backed `EventKeyPersonRole` values
