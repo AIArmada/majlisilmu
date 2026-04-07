@@ -404,7 +404,7 @@ it('renders institution event cards with localized prayer timing stacked speaker
     }
 });
 
-it('renders an indented pengajian kitab subtitle on institution event cards only for book references', function () {
+it('renders the book title on institution event cards without parentheses', function () {
     $institution = Institution::factory()->create([
         'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
         'status' => 'verified',
@@ -457,13 +457,15 @@ it('renders an indented pengajian kitab subtitle on institution event cards only
 
     expect($bookEventCard)
         ->toContain('Kuliah Maghrib Kitab')
-        ->toContain('(Pengajian Kitab)')
+        ->toContain('Riyadhus Solihin')
+        ->not->toContain('(Riyadhus Solihin)')
         ->toContain('italic')
         ->toContain('sm:pl-4');
 
     expect($articleEventCard)
         ->toContain('Kuliah Maghrib Artikel')
-        ->not->toContain('(Pengajian Kitab)');
+        ->not->toContain('Riyadhus Solihin')
+        ->not->toContain('Artikel Dakwah Semasa');
 });
 
 it('renders institution event cards cleanly when an event has no speakers', function () {

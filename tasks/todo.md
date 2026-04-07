@@ -1,3 +1,24 @@
+# Public Event Card Book Subtitle Rollout
+
+- [x] Add a reusable event-level accessor for the public book-study subtitle so views do not duplicate the reference-type check
+- [x] Roll the subtitle out to homepage, events index, unified search results, and series event cards while eager-loading references on those surfaces
+- [x] Add focused regressions for the homepage components, public listings, and series/search output, then run formatter and affected tests
+
+## Review
+
+- Root cause:
+  - the institution-page fix was isolated to one Blade component, while the rest of the public card surfaces still had no shared way to detect book-backed events or render the subtitle consistently
+  - several of those surfaces also did not eager-load `references`, so a naive reuse would have introduced avoidable lazy-load queries
+- Fix:
+  - added `Event::hasBookReference()` plus the `reference_study_subtitle` accessor in `app/Models/Event.php` so all public views can use one shared rule for book-backed events
+  - updated `app/Services/EventSearchService.php` and the homepage/series inline component queries to eager-load `references` on the public card surfaces that now use the subtitle
+  - rendered the indented italic `(Pengajian Kitab)` subtitle on homepage cards, the public events index, unified search result cards, the main series show page cards, and the shared series event-card partial
+  - added focused regressions in `tests/Feature/HomePageTest.php`, `tests/Feature/PublicPagesTest.php`, and `tests/Feature/UnifiedSearchPageTest.php` to lock the rollout across homepage, listings, search, and series output
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `XDEBUG_MODE=off vendor/bin/phpstan analyse --ansi app/Models/Event.php app/Services/EventSearchService.php` => no errors
+  - focused test run on `tests/Feature/HomePageTest.php`, `tests/Feature/PublicPagesTest.php`, and `tests/Feature/UnifiedSearchPageTest.php` => **37 passed**
+
 # Institution Event Book Reference Subtitle
 
 - [x] Preload event references for the public institution page event cards without introducing N+1 queries

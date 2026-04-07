@@ -17,7 +17,7 @@ new class extends Component {
         return Event::active()
             ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at')
-            ->with(['institution', 'venue'])
+            ->with(['institution', 'venue', 'references'])
             ->take(4)
             ->get();
     }
@@ -83,6 +83,11 @@ style="display: none;" @endif>
                             </div>
                             <div class="min-w-0">
                                 <h3 class="font-bold text-slate-900 truncate">{{ $event->title }}</h3>
+                                @if($event->reference_study_subtitle)
+                                    <p class="mt-1 pl-3 text-xs italic text-slate-500">
+                                        {{ $event->reference_study_subtitle }}
+                                    </p>
+                                @endif
                                 <p class="text-sm text-slate-500 truncate">
                                     {{ $event->venue?->name ?? $event->institution?->name ?? __('Online') }}
                                 </p>

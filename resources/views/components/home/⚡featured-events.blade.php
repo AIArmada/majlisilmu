@@ -18,6 +18,7 @@ new class extends Component {
             ->orderByRaw('(going_count * 5 + saves_count * 2 + views_count * 0.1) DESC')
             ->orderBy('starts_at')
             ->with([
+                'references',
                 'media' => fn($query) => $query
                     ->where('collection_name', 'poster')
                     ->ordered(),
@@ -132,6 +133,11 @@ new class extends Component {
                                             {{ $event->title }}
                                         </a>
                                     </h3>
+                                    @if($event->reference_study_subtitle)
+                                        <p class="-mt-0.5 mb-2 pl-3 text-sm italic text-slate-500">
+                                            {{ $event->reference_study_subtitle }}
+                                        </p>
+                                    @endif
 
                                     @if($event->speakers->isNotEmpty())
                                         <p class="text-sm text-slate-500 mb-3 truncate">

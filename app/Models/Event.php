@@ -13,6 +13,7 @@ use App\Enums\EventVisibility;
 use App\Enums\MemberSubjectType;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\ReferenceType;
 use App\Enums\ScheduleKind;
 use App\Enums\ScheduleState;
 use App\Enums\TagType;
@@ -72,6 +73,7 @@ use Spatie\Tags\HasTags;
  * @property-read Address|null $addressModel
  * @property-read Institution|null $institution
  * @property-read Venue|null $venue
+ * @property-read string|null $reference_study_subtitle
  * @property-read \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson> $keyPeople
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Speaker> $speakers
  */
@@ -246,6 +248,41 @@ class Event extends Model implements AuditableContract, HasMedia
         $table = $query->getModel()->getTable();
 
         $query->where("{$table}.event_structure", '!=', EventStructure::ParentProgram->value);
+    }
+
+    public function bookReference(): ?Reference
+    {
+        if ($this->relationLoaded('references')) {
+            /** @var ?Reference $reference */
+            $reference = $this->references->first(function (Reference $reference): bool {
+                $referenceType = $reference->type;
+
+                if ($referenceType instanceof ReferenceType) {
+                    return $referenceType === ReferenceType::Book;
+                }
+
+                return (string) $referenceType === ReferenceType::Book->value;
+            });
+
+            return $reference;
+        }
+
+        /** @var ?Reference $reference */
+        $reference = $this->references()
+            ->where('references.type', ReferenceType::Book->value)
+            ->first();
+
+        return $reference;
+    }
+
+    public function hasBookReference(): bool
+    {
+        return $this->bookReference() !== null;
+    }
+
+    public function getReferenceStudySubtitleAttribute(): ?string
+    {
+        return $this->bookReference()?->title;
     }
 
     /**

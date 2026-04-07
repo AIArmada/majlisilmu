@@ -1052,12 +1052,19 @@
 
                             <div class="p-6 flex flex-col">
                                 <div class="flex justify-between items-start mb-3 gap-4">
-                                    <a href="{{ route('events.show', $event) }}" wire:navigate
-                                        class="group-hover:text-emerald-700 transition-colors">
-                                        <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
-                                            {{ $event->title }}
-                                        </h3>
-                                    </a>
+                                    <div>
+                                        <a href="{{ route('events.show', $event) }}" wire:navigate
+                                            class="group-hover:text-emerald-700 transition-colors">
+                                            <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
+                                                {{ $event->title }}
+                                            </h3>
+                                        </a>
+                                        @if($event->reference_study_subtitle)
+                                            <p class="mt-1 pl-3 text-sm italic text-slate-500">
+                                                {{ $event->reference_study_subtitle }}
+                                            </p>
+                                        @endif
+                                    </div>
                                 </div>
 
                                 <div class="space-y-3">
