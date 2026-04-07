@@ -5,11 +5,11 @@ namespace App\Support\Location;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 
-class PublicMarketPreference
+class PublicCountryPreference
 {
-    public const COOKIE_NAME = 'public_market';
+    public const COOKIE_NAME = 'public_country';
 
-    public const SESSION_KEY = 'public_market';
+    public const SESSION_KEY = 'public_country';
 
     public function selectedKey(?Request $request = null): ?string
     {
@@ -46,18 +46,18 @@ class PublicMarketPreference
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, enabled: bool, coming_soon: bool}
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}
      */
     public function current(?Request $request = null): array
     {
-        return $this->registry()->market($this->currentKey($request));
+        return $this->registry()->country($this->currentKey($request));
     }
 
-    public function set(string $marketKey, ?Request $request = null): string
+    public function set(string $countryKey, ?Request $request = null): string
     {
         $request ??= request();
 
-        $normalizedKey = $this->registry()->normalizeMarketKey($marketKey);
+        $normalizedKey = $this->registry()->normalizeCountryKey($countryKey);
 
         if ($request->hasSession()) {
             $request->session()->put(self::SESSION_KEY, $normalizedKey);
@@ -76,14 +76,14 @@ class PublicMarketPreference
         return $normalizedKey;
     }
 
-    protected function registry(): PublicMarketRegistry
+    protected function registry(): PublicCountryRegistry
     {
-        return app(PublicMarketRegistry::class);
+        return app(PublicCountryRegistry::class);
     }
 
-    protected function normalizeSelectedKey(?string $marketKey): ?string
+    protected function normalizeSelectedKey(?string $countryKey): ?string
     {
-        $normalizedKey = strtolower(trim((string) $marketKey));
+        $normalizedKey = strtolower(trim((string) $countryKey));
 
         if ($normalizedKey === '' || ! $this->registry()->has($normalizedKey)) {
             return null;

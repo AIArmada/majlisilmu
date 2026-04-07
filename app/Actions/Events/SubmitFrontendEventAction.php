@@ -26,8 +26,10 @@ use App\Services\EventKeyPersonSyncService;
 use App\Services\ModerationService;
 use App\Services\ShareTrackingService;
 use App\States\EventStatus\Pending;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryPreference;
+use App\Support\Location\PublicCountryRegistry;
 use App\Support\Submission\EntitySubmissionAccess;
-use App\Support\Timezone\UserTimezoneResolver;
 use BackedEnum;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -67,6 +69,7 @@ class SubmitFrontendEventAction
         );
         $this->assertCaptchaIsValid($request, $validated['captcha_token'] ?? null, $validationKeyPrefix);
         $this->assertConditionalRequirements($validated, $validationKeyPrefix);
+        $this->assertValidSubmissionCountryId($validated, $validationKeyPrefix);
 
         $ageGroups = $validated['age_group'] ?? [];
 
@@ -79,8 +82,9 @@ class SubmitFrontendEventAction
 
         $this->assertSubmissionEntitiesAreAccessible($validated, $submitter, $validationKeyPrefix);
 
+        $submissionCountryId = $this->resolveSubmissionCountryId($validated, $request);
         $startsAt = $this->resolveStartsAt($validated, $request);
-        $timezone = $this->resolveUserTimezone($request, $validated['timezone'] ?? null);
+        $timezone = $this->resolveSubmissionTimezone($validated, $request, $submissionCountryId);
 
         if (
             $this->hasCommunityEventTypeSelection($validated['event_type'] ?? [])
@@ -440,11 +444,11 @@ class SubmitFrontendEventAction
     }
 
     /**
-     * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null, timezone?: string|null}  $validated
+     * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null, submission_country_id?: int|string|null, timezone?: string|null}  $validated
      */
     private function resolveStartsAt(array $validated, Request $request): Carbon
     {
-        $timezone = $this->resolveUserTimezone($request, $validated['timezone'] ?? null);
+        $timezone = $this->resolveSubmissionTimezone($validated, $request);
         $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
         $prayerTimeValue = $validated['prayer_time'] ?? '';
         $prayerTime = $prayerTimeValue instanceof EventPrayerTime
@@ -522,7 +526,7 @@ class SubmitFrontendEventAction
 
     private function isRamadhan(Carbon $date, Request $request, ?string $timezone = null): bool
     {
-        $timezone = $this->resolveUserTimezone($request, $timezone);
+        $timezone ??= $this->resolveSubmissionTimezone([], $request);
         $year = $date->year;
         $ramadhanPeriods = [
             2026 => ['start' => '02-18', 'end' => '03-19'],
@@ -543,9 +547,121 @@ class SubmitFrontendEventAction
         return $date->between($startDate, $endDate);
     }
 
-    private function resolveUserTimezone(Request $request, ?string $preferredTimezone = null): string
+    /**
+     * @param  array{submission_country_id?: int|string|null}  $validated
+     */
+    private function assertValidSubmissionCountryId(array $validated, string $validationKeyPrefix): void
     {
-        return UserTimezoneResolver::resolve($request, $preferredTimezone);
+        if ($this->submissionCountryIdInput($validated) === null) {
+            return;
+        }
+
+        if ($this->normalizedSubmissionCountryId($validated) !== null) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $this->validationKey('submission_country_id', $validationKeyPrefix) => __('The selected country is invalid.'),
+        ]);
+    }
+
+    /**
+     * @param  array{submission_country_id?: int|string|null, timezone?: string|null}  $validated
+     */
+    private function resolveSubmissionCountryId(array $validated, Request $request): int
+    {
+        $registry = app(PublicCountryRegistry::class);
+        $normalizedCountryId = $this->normalizedSubmissionCountryId($validated);
+
+        if (is_int($normalizedCountryId)) {
+            return $normalizedCountryId;
+        }
+
+        if ($this->submissionCountryIdInput($validated) === null) {
+            $legacyTimezone = $this->legacySubmissionTimezone($validated);
+
+            if ($legacyTimezone !== null) {
+                $legacyCountryId = $registry->normalizeCountryId(
+                    app(PreferredCountryResolver::class)->countryIdFromTimezone($legacyTimezone),
+                );
+
+                if (is_int($legacyCountryId)) {
+                    return $legacyCountryId;
+                }
+            }
+        }
+
+        $currentCountryId = $registry->countryIdForKey(app(PublicCountryPreference::class)->currentKey($request));
+
+        if (is_int($currentCountryId)) {
+            return $currentCountryId;
+        }
+
+        return $registry->countryIdForKey($registry->defaultKey())
+            ?? $registry->countryIdFromIso2('MY')
+            ?? 132;
+    }
+
+    /**
+     * @param  array{submission_country_id?: int|string|null, timezone?: string|null}  $validated
+     */
+    private function resolveSubmissionTimezone(array $validated, Request $request, ?int $submissionCountryId = null): string
+    {
+        if ($this->submissionCountryIdInput($validated) === null) {
+            $legacyTimezone = $this->legacySubmissionTimezone($validated);
+
+            if ($legacyTimezone !== null) {
+                return $legacyTimezone;
+            }
+        }
+
+        $resolvedCountryId = $submissionCountryId ?? $this->resolveSubmissionCountryId($validated, $request);
+
+        return app(PublicCountryRegistry::class)->defaultTimezoneForCountryId($resolvedCountryId);
+    }
+
+    /**
+     * @param  array{submission_country_id?: int|string|null}  $validated
+     */
+    private function submissionCountryIdInput(array $validated): ?string
+    {
+        $countryId = $validated['submission_country_id'] ?? null;
+
+        if (is_int($countryId)) {
+            return (string) $countryId;
+        }
+
+        if (! is_string($countryId)) {
+            return null;
+        }
+
+        $countryId = trim($countryId);
+
+        return $countryId !== '' ? $countryId : null;
+    }
+
+    /**
+     * @param  array{submission_country_id?: int|string|null}  $validated
+     */
+    private function normalizedSubmissionCountryId(array $validated): ?int
+    {
+        $countryId = $this->submissionCountryIdInput($validated);
+
+        if ($countryId === null || ! ctype_digit($countryId)) {
+            return null;
+        }
+
+        return app(PublicCountryRegistry::class)->normalizeCountryId((int) $countryId);
+    }
+
+    /**
+     * @param  array{timezone?: string|null}  $validated
+     */
+    private function legacySubmissionTimezone(array $validated): ?string
+    {
+        $timezone = trim((string) ($validated['timezone'] ?? ''));
+
+        return $timezone !== '' ? $timezone : null;
     }
 
     /**

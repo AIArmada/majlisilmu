@@ -3,6 +3,7 @@
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
 use App\Enums\EventStructure;
+use App\Enums\EventVisibility;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Livewire\Pages\Dashboard\InstitutionDashboard;
 use App\Livewire\Pages\Dashboard\UserDashboard;
@@ -638,8 +639,7 @@ it('highlights institution events that are waiting approval', function () {
 
     $response->assertOk()
         ->assertSee('Pending Institution Dashboard Event')
-        ->assertSee('Pending Approval')
-        ->assertSee('data-event-status="pending-attention"', false);
+        ->assertSee('Pending Approval');
 });
 
 it('filters and sorts institution events on the dashboard', function () {
@@ -649,33 +649,37 @@ it('filters and sorts institution events on the dashboard', function () {
 
     $user->institutions()->attach($institution->id);
 
-    Event::factory()->for($institution)->create([
+    $zuluEvent = Event::factory()->for($institution)->create([
         'title' => 'Zulu Public Event',
         'status' => 'approved',
         'visibility' => 'public',
         'starts_at' => now()->addDays(3),
     ]);
 
-    Event::factory()->for($institution)->create([
+    $alphaEvent = Event::factory()->for($institution)->create([
         'title' => 'Alpha Hidden Pending Event',
         'status' => 'pending',
         'visibility' => 'private',
         'starts_at' => now()->addDays(1),
     ]);
 
-    Event::factory()->for($institution)->create([
+    $betaEvent = Event::factory()->for($institution)->create([
         'title' => 'Beta Unlisted Event',
         'status' => 'approved',
         'visibility' => 'unlisted',
         'starts_at' => now()->addDays(2),
     ]);
 
-    Event::factory()->for($otherInstitution)->create([
+    $outsideEvent = Event::factory()->for($otherInstitution)->create([
         'title' => 'Outside Event',
         'status' => 'pending',
         'visibility' => 'private',
         'starts_at' => now()->addDays(4),
     ]);
+
+    Registration::factory()->for($zuluEvent)->create();
+    Registration::factory()->for($zuluEvent)->create();
+    Registration::factory()->for($betaEvent)->create();
 
     $filteredResponse = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
@@ -684,7 +688,6 @@ it('filters and sorts institution events on the dashboard', function () {
             'event_search' => 'alpha',
             'event_status' => 'pending',
             'event_visibility' => 'private',
-            'event_sort' => 'title_asc',
         ]));
 
     $filteredResponse->assertOk()
@@ -706,6 +709,42 @@ it('filters and sorts institution events on the dashboard', function () {
             'Beta Unlisted Event',
             'Zulu Public Event',
         ]);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($user)
+        ->test(InstitutionDashboard::class)
+        ->assertTableColumnExists('title')
+        ->assertTableColumnExists('starts_at')
+        ->assertTableColumnExists('status')
+        ->assertTableColumnExists('speaker_names')
+        ->assertTableColumnExists('reference_titles')
+        ->assertTableColumnExists('space.name')
+        ->searchTable('alpha')
+        ->filterTable('status', 'pending')
+        ->filterTable('visibility', EventVisibility::Private->value)
+        ->assertCanSeeTableRecords([$alphaEvent])
+        ->assertCanNotSeeTableRecords([$zuluEvent, $betaEvent, $outsideEvent]);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($user)
+        ->test(InstitutionDashboard::class)
+        ->sortTable('title', 'asc')
+        ->assertCanSeeTableRecords([$alphaEvent, $betaEvent, $zuluEvent], true)
+        ->assertCanNotSeeTableRecords([$outsideEvent]);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($user)
+        ->test(InstitutionDashboard::class)
+        ->set('eventSort', 'pending_first')
+        ->assertCanSeeTableRecords([$alphaEvent, $betaEvent, $zuluEvent], true)
+        ->assertCanNotSeeTableRecords([$outsideEvent]);
+
+    Livewire::withQueryParams(['institution' => $institution->id])
+        ->actingAs($user)
+        ->test(InstitutionDashboard::class)
+        ->set('eventSort', 'registrations_desc')
+        ->assertCanSeeTableRecords([$zuluEvent, $betaEvent, $alphaEvent], true)
+        ->assertCanNotSeeTableRecords([$outsideEvent]);
 });
 
 it('paginates institution events on the dashboard', function () {
@@ -714,13 +753,15 @@ it('paginates institution events on the dashboard', function () {
 
     $user->institutions()->attach($institution->id);
 
+    $events = collect();
+
     foreach (range(1, 9) as $index) {
-        Event::factory()->for($institution)->create([
+        $events->push(Event::factory()->for($institution)->create([
             'title' => sprintf('Paged Institution Event %02d', $index),
             'status' => 'approved',
             'visibility' => 'public',
             'starts_at' => now()->addDays($index),
-        ]);
+        ]));
     }
 
     $pageOne = $this->actingAs($user)

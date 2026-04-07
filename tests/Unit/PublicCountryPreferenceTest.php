@@ -10,8 +10,6 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-const LEGACY_PUBLIC_MARKET_COOKIE = 'public_market';
-
 beforeEach(function () {
     if (! DB::table('countries')->where('id', 132)->exists()) {
         DB::table('countries')->insert([
@@ -27,9 +25,9 @@ beforeEach(function () {
     }
 });
 
-it('ignores the legacy public_market cookie when resolving the selected country', function () {
+it('treats unsupported and disabled saved country values as absent selections', function () {
     $request = Request::create('/events', 'GET');
-    $request->cookies->set(LEGACY_PUBLIC_MARKET_COOKIE, 'indonesia');
+    $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'indonesia');
 
     $preference = app(PublicCountryPreference::class);
 
@@ -37,10 +35,10 @@ it('ignores the legacy public_market cookie when resolving the selected country'
         ->and($preference->currentKey($request))->toBe('malaysia');
 });
 
-it('ignores the legacy public_market session key when a current country cookie is available', function () {
+it('falls back to a valid cookie selection when the session country value is stale', function () {
     $request = Request::create('/events', 'GET');
     $request->setLaravelSession(app('session')->driver());
-    $request->session()->put('public_market', 'indonesia');
+    $request->session()->put(PublicCountryPreference::SESSION_KEY, 'indonesia');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'malaysia');
 
     $selectedKey = app(PublicCountryPreference::class)->selectedKey($request);
@@ -48,7 +46,7 @@ it('ignores the legacy public_market session key when a current country cookie i
     expect($selectedKey)->toBe('malaysia');
 });
 
-it('ignores the legacy public_market cookie so country inference can still use timezone and ip resolution', function () {
+it('ignores an invalid saved country so CF-IPCountry can still win later in resolution order', function () {
     config()->set('public-countries.countries.singapore.enabled', true);
 
     $singaporeId = DB::table('countries')->insertGetId([
@@ -65,8 +63,7 @@ it('ignores the legacy public_market cookie so country inference can still use t
     app()->forgetInstance(PublicCountryPreference::class);
 
     $request = Request::create('/events', 'GET');
-    $request->cookies->set(LEGACY_PUBLIC_MARKET_COOKIE, 'malaysia');
-    $request->cookies->set('user_timezone', 'Asia/Singapore');
+    $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'unsupported-country');
     $request->headers->set('CF-IPCountry', 'SG');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);

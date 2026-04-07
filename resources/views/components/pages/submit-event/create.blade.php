@@ -44,7 +44,9 @@ use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
 use App\Support\Submission\EntitySubmissionAccess;
-use App\Support\Timezone\UserTimezoneResolver;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryPreference;
+use App\Support\Location\PublicCountryRegistry;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
@@ -112,7 +114,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
     public function mount(): void
     {
-        $timezone = $this->resolveUserTimezone();
+        $submissionCountryId = $this->resolveSubmissionCountryId();
         $this->parentEventId = request()->query('parent');
         $this->duplicateEventId = request()->query('duplicate');
         $scopedInstitution = $this->resolveScopedInstitution(request()->query('institution'));
@@ -136,7 +138,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             'is_muslim_only' => false,
             'other_key_people' => [],
             'captcha_token' => null,
-            'timezone' => $timezone,
+            'submission_country_id' => $submissionCountryId,
         ];
 
         if ($parentEvent = $this->selectedParentEvent()) {
@@ -551,13 +553,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                             $eventDate = $get('event_date');
 
                                             return collect(EventPrayerTime::cases())
-                                                ->filter(function (EventPrayerTime $case) use ($eventDate) {
+                                                ->filter(function (EventPrayerTime $case) use ($eventDate, $get) {
                                                     if (! $eventDate) {
                                                         // No date selected — show base options only (no Jumaat/Tarawih/Ramadhan-only options)
                                                         return ! in_array($case, [EventPrayerTime::SebelumJumaat, EventPrayerTime::SelepasJumaat, EventPrayerTime::SebelumMaghrib, EventPrayerTime::SelepasTarawih], true);
                                                     }
 
-                                                    $timezone = $this->resolveUserTimezone();
+                                                    $timezone = $this->resolveSubmissionTimezone($get('submission_country_id'));
                                                     $date = Carbon::parse($eventDate, $timezone)->startOfDay();
 
                                                     if ($case === EventPrayerTime::SebelumJumaat) {
@@ -620,7 +622,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->rule(function (Get $get): Closure {
                                             return function (string $attribute, $value, Closure $fail) use ($get) {
                                                 $eventDate = $get('event_date');
-                                                $timezone = $this->resolveUserTimezone((string) ($get('timezone') ?? ''));
+                                                $timezone = $this->resolveSubmissionTimezone($get('submission_country_id'));
                                                 $now = Carbon::now($timezone);
 
                                                 if (! $eventDate || ! $value) {
@@ -1350,9 +1352,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     Step::make(__('Semak & Hantar'))
                         ->icon('heroicon-o-paper-airplane')
                         ->schema([
-                            Hidden::make('timezone')
+                            Hidden::make('submission_country_id')
                                 ->dehydrated()
-                                ->default(fn (): string => $this->resolveUserTimezone()),
+                                ->default(fn (): int => $this->resolveSubmissionCountryId()),
 
                             Hidden::make('captcha_token')
                                 ->dehydrated(),
@@ -1410,12 +1412,6 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     ->persistStepInQueryString()
                     ->extraAlpineAttributes([
                         'x-init' => <<<'JS'
-                            const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-                            if (browserTimezone && $wire.get('data.timezone') !== browserTimezone) {
-                                $wire.$set('data.timezone', browserTimezone)
-                            }
-
                             window.__submitEventReviewRefreshed ??= false
 
                             $watch('step', () => {
@@ -1711,7 +1707,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
      */
     protected function duplicateEventDefaults(Event $duplicateEvent): array
     {
-        $timezone = $this->resolveUserTimezone((string) ($this->data['timezone'] ?? null));
+        $timezone = $this->resolveSubmissionTimezone($this->data['submission_country_id'] ?? null);
         $eventFormat = $duplicateEvent->event_format instanceof EventFormat
             ? $duplicateEvent->event_format->value
             : (is_string($duplicateEvent->event_format) ? $duplicateEvent->event_format : EventFormat::Physical->value);
@@ -2160,11 +2156,11 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     /**
      * Resolve the starts_at datetime from event_date and prayer_time/custom_time.
      *
-     * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null, timezone?: string|null}  $validated
+      * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null, submission_country_id?: int|string|null}  $validated
      */
     protected function resolveStartsAt(array $validated): Carbon
     {
-        $timezone = $this->resolveUserTimezone($validated['timezone'] ?? null);
+          $timezone = $this->resolveSubmissionTimezone($validated['submission_country_id'] ?? null);
         $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
         $prayerTimeValue = $validated['prayer_time'] ?? '';
         $prayerTime = $prayerTimeValue instanceof EventPrayerTime
@@ -2267,7 +2263,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
      */
     protected function isRamadhan(Carbon $date, ?string $timezone = null): bool
     {
-        $timezone = $this->resolveUserTimezone($timezone);
+        $timezone ??= $this->resolveSubmissionTimezone($this->data['submission_country_id'] ?? null);
         $year = $date->year;
 
         // Ramadhan dates for common years (approximate)
@@ -2290,9 +2286,34 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
         return $date->between($startDate, $endDate);
     }
 
-    protected function resolveUserTimezone(?string $preferredTimezone = null): string
+    protected function resolveSubmissionCountryId(mixed $countryId = null): int
     {
-        return UserTimezoneResolver::resolve(request(), $preferredTimezone);
+        $registry = app(PublicCountryRegistry::class);
+
+        $normalizedCountryId = is_numeric($countryId)
+            ? $registry->normalizeCountryId((int) $countryId)
+            : null;
+
+        if (is_int($normalizedCountryId)) {
+            return $normalizedCountryId;
+        }
+
+        $currentCountryId = $registry->normalizeCountryId(app(PreferredCountryResolver::class)->resolveId(request()));
+
+        if (is_int($currentCountryId)) {
+            return $currentCountryId;
+        }
+
+        return $registry->countryIdForKey($registry->defaultKey())
+            ?? $registry->countryIdFromIso2('MY')
+            ?? 132;
+    }
+
+    protected function resolveSubmissionTimezone(mixed $countryId = null): string
+    {
+        return app(PublicCountryRegistry::class)->defaultTimezoneForCountryId(
+            $this->resolveSubmissionCountryId($countryId),
+        );
     }
 
     /**

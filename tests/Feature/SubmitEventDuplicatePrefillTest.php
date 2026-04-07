@@ -46,8 +46,8 @@ it('prefills the submit-event form from a duplicated public event', function () 
         'visibility' => EventVisibility::Public->value,
         'published_at' => now()->subDay(),
         'timezone' => 'Asia/Kuala_Lumpur',
-        'starts_at' => Carbon::parse('2026-05-10 20:15:00', 'Asia/Kuala_Lumpur'),
-        'ends_at' => Carbon::parse('2026-05-10 22:00:00', 'Asia/Kuala_Lumpur'),
+        'starts_at' => Carbon::parse('2026-05-10 20:15:00', 'Asia/Kuala_Lumpur')->utc(),
+        'ends_at' => Carbon::parse('2026-05-10 22:00:00', 'Asia/Kuala_Lumpur')->utc(),
         'event_type' => [EventType::KuliahCeramah->value],
         'event_format' => EventFormat::Physical->value,
         'organizer_type' => Institution::class,
@@ -135,7 +135,7 @@ it('filters inaccessible organizer and speaker defaults when duplicating an even
         'visibility' => EventVisibility::Public->value,
         'published_at' => now()->subDay(),
         'timezone' => 'Asia/Kuala_Lumpur',
-        'starts_at' => Carbon::parse('2026-06-12 19:30:00', 'Asia/Kuala_Lumpur'),
+        'starts_at' => Carbon::parse('2026-06-12 19:30:00', 'Asia/Kuala_Lumpur')->utc(),
         'event_type' => [EventType::KuliahCeramah->value],
         'event_format' => EventFormat::Physical->value,
         'organizer_type' => Institution::class,
@@ -204,4 +204,38 @@ it('allows institution admins to duplicate managed non-public events', function 
         ->assertSet('data.title', 'Majlis Dalaman Untuk Duplikasi')
         ->assertSet('data.organizer_type', 'institution')
         ->assertSet('data.organizer_institution_id', $institution->id);
+});
+
+it('prefills duplicated event times in the selected public country timezone instead of the viewer timezone', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Rentas Zon',
+        'allow_public_event_submission' => true,
+    ]);
+
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Tengah Malam Malaysia',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public->value,
+        'published_at' => now()->subDay(),
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => Carbon::parse('2026-05-10 00:30:00', 'Asia/Kuala_Lumpur')->utc(),
+        'ends_at' => Carbon::parse('2026-05-10 02:00:00', 'Asia/Kuala_Lumpur')->utc(),
+        'event_type' => [EventType::KuliahCeramah->value],
+        'event_format' => EventFormat::Physical->value,
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+    ]);
+
+    $component = Livewire::withCookie('user_timezone', 'America/Los_Angeles')
+        ->withCookie('public_country', 'malaysia')
+        ->withQueryParams(['duplicate' => $event->id])
+        ->test('pages.submit-event.create');
+
+    $component->assertFormSet([
+        'event_date' => '2026-05-10',
+        'prayer_time' => EventPrayerTime::LainWaktu->value,
+        'custom_time' => '00:30',
+        'end_time' => '02:00',
+    ]);
 });

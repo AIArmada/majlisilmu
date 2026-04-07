@@ -4,7 +4,7 @@ namespace App\Support\Location;
 
 use App\Models\Country;
 
-class PublicMarketRegistry
+class PublicCountryRegistry
 {
     /**
      * @var array<string, int|null>
@@ -12,19 +12,19 @@ class PublicMarketRegistry
     protected ?array $countryIdsByIso2 = null;
 
     /**
-     * @return array<string, array{label: string, flag: string, iso2: string, enabled: bool, coming_soon: bool}>
+     * @return array<string, array{label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}>
      */
     public function all(): array
     {
-        /** @var array<string, array{label: string, flag: string, iso2: string, enabled: bool, coming_soon: bool}> $markets */
-        $markets = config('public-markets.markets', []);
+        /** @var array<string, array{label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}> $countries */
+        $countries = config('public-countries.countries', []);
 
-        return $markets;
+        return $countries;
     }
 
     public function defaultKey(): string
     {
-        $configured = (string) config('public-markets.default', 'malaysia');
+        $configured = (string) config('public-countries.default', 'malaysia');
 
         if ($this->has($configured) && $this->isEnabled($configured)) {
             return $configured;
@@ -34,8 +34,8 @@ class PublicMarketRegistry
             return 'malaysia';
         }
 
-        foreach ($this->all() as $key => $market) {
-            if ((bool) ($market['enabled'] ?? false)) {
+        foreach ($this->all() as $key => $country) {
+            if ((bool) ($country['enabled'] ?? false)) {
                 return $key;
             }
         }
@@ -44,11 +44,11 @@ class PublicMarketRegistry
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, enabled: bool, coming_soon: bool}
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}
      */
     public function default(): array
     {
-        return $this->market($this->defaultKey());
+        return $this->country($this->defaultKey());
     }
 
     public function has(string $key): bool
@@ -62,7 +62,7 @@ class PublicMarketRegistry
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, enabled: bool, coming_soon: bool}|null
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}|null
      */
     public function find(string $key): ?array
     {
@@ -70,27 +70,28 @@ class PublicMarketRegistry
             return null;
         }
 
-        return $this->market($key);
+        return $this->country($key);
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, enabled: bool, coming_soon: bool}
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}
      */
-    public function market(string $key): array
+    public function country(string $key): array
     {
-        $market = $this->all()[$key];
+        $country = $this->all()[$key];
 
         return [
             'key' => $key,
-            'label' => $market['label'],
-            'flag' => $market['flag'],
-            'iso2' => strtoupper($market['iso2']),
-            'enabled' => (bool) $market['enabled'],
-            'coming_soon' => (bool) $market['coming_soon'],
+            'label' => $country['label'],
+            'flag' => $country['flag'],
+            'iso2' => strtoupper($country['iso2']),
+            'default_timezone' => $country['default_timezone'],
+            'enabled' => (bool) $country['enabled'],
+            'coming_soon' => (bool) $country['coming_soon'],
         ];
     }
 
-    public function normalizeMarketKey(?string $key, bool $enabledOnly = true): string
+    public function normalizeCountryKey(?string $key, bool $enabledOnly = true): string
     {
         $normalized = strtolower(trim((string) $key));
 
@@ -105,15 +106,15 @@ class PublicMarketRegistry
         return $normalized;
     }
 
-    public function countryIdForMarket(string $key): ?int
+    public function countryIdForKey(string $key): ?int
     {
-        $market = $this->find($key);
+        $country = $this->find($key);
 
-        if ($market === null) {
+        if ($country === null) {
             return null;
         }
 
-        return $this->countryIdFromIso2($market['iso2']);
+        return $this->countryIdFromIso2($country['iso2']);
     }
 
     public function normalizeCountryId(?int $countryId): ?int
@@ -122,19 +123,19 @@ class PublicMarketRegistry
             return null;
         }
 
-        $marketKey = $this->marketKeyForCountryId($countryId);
+        $countryKey = $this->keyForCountryId($countryId);
 
-        if ($marketKey === null || ! $this->isEnabled($marketKey)) {
+        if ($countryKey === null || ! $this->isEnabled($countryKey)) {
             return null;
         }
 
         return $countryId;
     }
 
-    public function marketKeyForCountryId(int $countryId): ?string
+    public function keyForCountryId(int $countryId): ?string
     {
-        foreach ($this->all() as $key => $market) {
-            $resolvedCountryId = $this->countryIdFromIso2((string) $market['iso2']);
+        foreach ($this->all() as $key => $country) {
+            $resolvedCountryId = $this->countryIdFromIso2((string) $country['iso2']);
 
             if ($resolvedCountryId === $countryId) {
                 return $key;
@@ -161,6 +162,22 @@ class PublicMarketRegistry
         return $normalizedIso2 === 'MY'
             ? PreferredCountryResolver::MALAYSIA_ID
             : null;
+    }
+
+    public function defaultTimezoneForKey(string $key): string
+    {
+        return $this->country($this->normalizeCountryKey($key, enabledOnly: false))['default_timezone'];
+    }
+
+    public function defaultTimezoneForCountryId(?int $countryId): string
+    {
+        $countryKey = is_int($countryId) ? $this->keyForCountryId($countryId) : null;
+
+        if ($countryKey === null) {
+            return $this->default()['default_timezone'];
+        }
+
+        return $this->defaultTimezoneForKey($countryKey);
     }
 
     /**

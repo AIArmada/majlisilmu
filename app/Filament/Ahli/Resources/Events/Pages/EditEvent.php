@@ -49,6 +49,7 @@ class EditEvent extends EditRecord
         $data['discipline_tags'] = $this->getTagIdsByType(TagType::Discipline);
         $data['source_tags'] = $this->getTagIdsByType(TagType::Source);
         $data['issue_tags'] = $this->getTagIdsByType(TagType::Issue);
+        $data['registration_required'] = (bool) $event->settings?->registration_required;
         $data['registration_mode'] = $this->resolveRegistrationMode($event)->value;
 
         $event->loadMissing(['keyPeople']);
@@ -91,6 +92,7 @@ class EditEvent extends EditRecord
             $data['discipline_tags'],
             $data['source_tags'],
             $data['issue_tags'],
+            $data['registration_required'],
             $data['registration_mode'],
             $data['speakers'],
             $data['other_key_people'],

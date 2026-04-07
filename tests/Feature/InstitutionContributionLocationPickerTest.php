@@ -84,14 +84,13 @@ it('falls back to the manual location fields when google places is disabled', fu
         ->assertSee(__('Google Maps URL'));
 });
 
-it('hides the institution contribution country selector while still seeding Malaysia when timezone resolves outside enabled markets', function () {
+it('seeds Malaysia for institution contributions when timezone resolves outside enabled countries', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->withUnencryptedCookie('user_timezone', 'Asia/Jakarta')
         ->get(route('contributions.submit-institution'))
-        ->assertOk()
-        ->assertDontSee(__('Country'));
+        ->assertOk();
 
     Livewire::withCookie('user_timezone', 'Asia/Jakarta')
         ->actingAs($user)
@@ -118,6 +117,8 @@ it('keeps manual fallback mode off the places api while still normalizing pasted
     config()->set('services.google.places_enabled', false);
     config()->set('services.google.place_link_resolution_enabled', true);
     config()->set('services.google.places_server_api_key', 'server-test-key');
+
+    ensureCountryForLocationPicker('MY', 'Malaysia', 132);
 
     Http::fake([
         'https://maps.app.goo.gl/*' => Http::response('', 302, [

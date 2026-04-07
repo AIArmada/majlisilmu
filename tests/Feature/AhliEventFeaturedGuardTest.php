@@ -1,6 +1,7 @@
 <?php
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use App\Enums\RegistrationMode;
 use App\Filament\Ahli\Resources\Events\Pages\EditEvent as AhliEditEvent;
 use App\Filament\Ahli\Resources\Events\Pages\ListEvents as AhliListEvents;
 use App\Filament\Resources\Events\Pages\EditEvent as AdminEditEvent;
@@ -116,8 +117,14 @@ it('allows application admins to save events without mass assigning speakers', f
     assignGlobalRoleForFeaturedGuard($administrator, 'super_admin');
 
     $speaker = Speaker::factory()->create();
+    $startsAt = now('Asia/Kuala_Lumpur')->addDays(2)->setTime(20, 0)->utc();
+    $endsAt = now('Asia/Kuala_Lumpur')->addDays(2)->setTime(22, 0)->utc();
+
     $event = Event::factory()->create([
         'is_featured' => false,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => $startsAt,
+        'ends_at' => $endsAt,
     ]);
 
     app(EventKeyPersonSyncService::class)->sync($event, [$speaker->id], []);
@@ -143,6 +150,36 @@ it('ignores crafted ahli payloads that try to set featured on save', function ()
 
     expect($event->fresh()->is_featured)->toBeFalse()
         ->and($event->fresh()->escalated_at)->toBeNull();
+});
+
+it('persists ahli registration settings without mass assigning the event model', function () {
+    [$member, $event] = createAhliInstitutionAdmin();
+
+    $event->settings()->updateOrCreate(
+        ['event_id' => $event->id],
+        [
+            'registration_required' => true,
+            'registration_mode' => RegistrationMode::Event->value,
+        ],
+    );
+
+    Livewire::actingAs($member)
+        ->test(AhliEditEvent::class, ['record' => $event->id])
+        ->assertFormSet([
+            'registration_required' => true,
+            'registration_mode' => RegistrationMode::Event->value,
+        ])
+        ->fillForm([
+            'registration_required' => false,
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $settings = $event->fresh()->settings;
+
+    expect($settings)->not->toBeNull()
+        ->and($settings?->registration_required)->toBeFalse()
+        ->and($settings?->registration_mode)->toBe(RegistrationMode::Event);
 });
 
 it('persists ahli speaker updates through the shared event sync action', function () {

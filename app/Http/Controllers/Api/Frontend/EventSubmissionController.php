@@ -13,6 +13,8 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Api\Frontend\FrontendMediaSyncService;
+use App\Support\Location\PublicCountryRegistry;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -27,6 +29,7 @@ class EventSubmissionController extends FrontendController
         FrontendMediaSyncService $frontendMediaSyncService,
     ): JsonResponse {
         $user = $this->currentUser($request);
+        $publicCountryRegistry = app(PublicCountryRegistry::class);
 
         $validated = $request->validate([
             'parent_event_id' => ['nullable', 'uuid'],
@@ -76,7 +79,20 @@ class EventSubmissionController extends FrontendController
             'other_key_people.*.name' => ['nullable', 'string', 'max:255'],
             'other_key_people.*.is_public' => ['nullable', 'boolean'],
             'other_key_people.*.notes' => ['nullable', 'string', 'max:1000'],
-            'timezone' => ['required', 'timezone'],
+            'submission_country_id' => [
+                'nullable',
+                'integer',
+                static function (string $attribute, mixed $value, Closure $fail) use ($publicCountryRegistry): void {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+
+                    if ($publicCountryRegistry->normalizeCountryId((int) $value) === null) {
+                        $fail(__('The selected country is invalid.'));
+                    }
+                },
+            ],
+            'timezone' => ['nullable', 'timezone'],
             'submitter_name' => [$user instanceof User ? 'nullable' : 'required', 'string', 'max:255'],
             'submitter_email' => ['nullable', 'email', 'max:255'],
             'submitter_phone' => ['nullable', 'string', 'max:20'],
