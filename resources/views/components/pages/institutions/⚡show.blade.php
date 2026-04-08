@@ -4,6 +4,7 @@ use App\Enums\DawahShareOutcomeType;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Services\ShareTrackingService;
+use App\Support\Auth\IntendedRedirect;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
 
@@ -47,7 +48,7 @@ new class extends Component
         $user = auth()->user();
 
         if (! $user) {
-            $this->redirect(route('login'), navigate: true);
+            $this->redirect(IntendedRedirect::loginUrl(route('institutions.show', $this->institution)), navigate: true);
 
             return;
         }

@@ -435,9 +435,9 @@ class extends Component
     };
 @endphp
 
-<div class="relative min-h-screen pb-32">
+<div class="relative min-h-screen">
         <!-- Hero Section -->
-        <div class="relative pt-24 pb-16 bg-white border-b border-slate-100 overflow-hidden">
+        <div class="relative pt-12 pb-16 bg-white border-b border-slate-100 overflow-hidden">
              <div class="absolute inset-0 bg-emerald-50/50"></div>
             <div class="absolute inset-0 bg-[url('/images/pattern-bg.png')] opacity-5"></div>
 

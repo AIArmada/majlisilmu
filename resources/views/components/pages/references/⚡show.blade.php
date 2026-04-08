@@ -4,6 +4,7 @@ use App\Enums\DawahShareOutcomeType;
 use App\Models\Event;
 use App\Models\Reference;
 use App\Services\ShareTrackingService;
+use App\Support\Auth\IntendedRedirect;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -43,7 +44,7 @@ new
             $user = Auth::user();
 
             if (! $user) {
-                $this->redirect(route('login'), navigate: true);
+                $this->redirect(IntendedRedirect::loginUrl(route('references.show', $this->reference)), navigate: true);
 
                 return;
             }

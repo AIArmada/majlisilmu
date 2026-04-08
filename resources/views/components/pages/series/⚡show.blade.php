@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Series;
+use App\Support\Auth\IntendedRedirect;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
@@ -38,8 +39,8 @@ new
     {
         $user = Auth::user();
 
-        if (!$user) {
-            $this->redirect(route('login'), navigate: true);
+        if (! $user) {
+            $this->redirect(IntendedRedirect::loginUrl(route('series.show', $this->series)), navigate: true);
 
             return;
         }

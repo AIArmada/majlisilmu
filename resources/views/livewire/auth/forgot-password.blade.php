@@ -1,5 +1,7 @@
 <x-layouts.auth>
     <div class="flex flex-col gap-6">
+        @php($authRedirectTarget = request('redirect'))
+
         <div class="flex w-full flex-col">
             <h1 class="font-heading text-2xl font-bold tracking-tight text-slate-900">{{ __('Forgot password') }}</h1>
             <p class="mt-1 text-sm text-slate-500">{{ __('No problem. Enter your email and we\'ll send a reset link.') }}</p>
@@ -22,7 +24,7 @@
 
         <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-slate-500">
             <span>{{ __('Remember your password?') }}</span>
-            <flux:link :href="route('login')" wire:navigate class="font-bold!">{{ __('Sign in') }}</flux:link>
+            <flux:link :href="\App\Support\Auth\IntendedRedirect::loginUrl($authRedirectTarget)" wire:navigate class="font-bold!">{{ __('Sign in') }}</flux:link>
         </div>
     </div>
 </x-layouts.auth>

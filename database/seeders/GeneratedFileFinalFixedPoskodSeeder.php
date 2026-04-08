@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\InstitutionType;
+use App\Models\Address;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
@@ -100,6 +101,11 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
      */
     private array $subdistrictsByState = [];
 
+    /**
+     * @var array<string, true>
+     */
+    private array $canonicalSlugs = [];
+
     public function run(): void
     {
         $csvPath = database_path(self::CSV_PATH);
@@ -109,6 +115,7 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
         }
 
         $this->bootGeographyLookups();
+        $this->canonicalSlugs = array_fill_keys(GeneratedPoskodInstitutionData::allCanonicalSlugs(), true);
 
         $handle = fopen($csvPath, 'r');
 
@@ -143,30 +150,73 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
                 $nullDistrictRows[] = $record['No.'];
             }
 
-            $institution = Institution::query()->updateOrCreate(
-                ['slug' => $slug],
-                [
-                    'name' => $record['Nama'],
-                    'type' => InstitutionType::Masjid->value,
-                    'status' => 'verified',
-                    'is_active' => true,
-                ]
-            );
+            $line1 = $this->nullableString($record['Alamat']);
+            $postcode = $this->normalizePostcode($record['Poskod']);
 
-            $institution->address()->updateOrCreate(
-                ['type' => 'main'],
-                [
-                    'line1' => $this->nullableString($record['Alamat']),
-                    'postcode' => $this->normalizePostcode($record['Poskod']),
-                    'country_id' => $this->malaysia->getKey(),
-                    'state_id' => $state->getKey(),
-                    'district_id' => $district?->getKey(),
-                    'subdistrict_id' => $subdistrict?->getKey(),
-                    'city_id' => null,
-                    'lat' => null,
-                    'lng' => null,
-                ]
-            );
+            $institution = Institution::query()
+                ->where('slug', $slug)
+                ->first();
+
+            if (! $institution instanceof Institution) {
+                $institution = Institution::query()
+                    ->where('name', $record['Nama'])
+                    ->whereHas('address', function ($addressQuery) use ($line1, $postcode, $state, $district, $subdistrict): void {
+                        $addressQuery
+                            ->where('type', 'main')
+                            ->where('line1', $line1)
+                            ->where('postcode', $postcode)
+                            ->where('country_id', $this->malaysia->getKey())
+                            ->where('state_id', $state->getKey())
+                            ->where('district_id', $district?->getKey())
+                            ->where('subdistrict_id', $subdistrict?->getKey());
+                    })
+                    ->get()
+                    ->first(function (Institution $candidate): bool {
+                        $candidateSlug = $candidate->slug;
+
+                        return ! is_string($candidateSlug)
+                            || ! isset($this->canonicalSlugs[$candidateSlug]);
+                    });
+            }
+
+            if ($institution instanceof Institution) {
+                Institution::withoutEvents(function () use ($institution, $slug, $record): void {
+                    $institution->forceFill([
+                        'slug' => $slug,
+                        'name' => $record['Nama'],
+                        'type' => InstitutionType::Masjid->value,
+                        'status' => 'verified',
+                        'is_active' => true,
+                    ])->saveQuietly();
+                });
+            } else {
+                $institution = Institution::withoutEvents(function () use ($slug, $record): Institution {
+                    return Institution::query()->create([
+                        'slug' => $slug,
+                        'name' => $record['Nama'],
+                        'type' => InstitutionType::Masjid->value,
+                        'status' => 'verified',
+                        'is_active' => true,
+                    ]);
+                });
+            }
+
+            Address::withoutEvents(function () use ($institution, $line1, $postcode, $state, $district, $subdistrict): void {
+                $institution->address()->updateOrCreate(
+                    ['type' => 'main'],
+                    [
+                        'line1' => $line1,
+                        'postcode' => $postcode,
+                        'country_id' => $this->malaysia->getKey(),
+                        'state_id' => $state->getKey(),
+                        'district_id' => $district?->getKey(),
+                        'subdistrict_id' => $subdistrict?->getKey(),
+                        'city_id' => null,
+                        'lat' => null,
+                        'lng' => null,
+                    ]
+                );
+            });
 
             if ($subdistrict instanceof Subdistrict) {
                 $resolvedSubdistricts++;

@@ -98,6 +98,24 @@ it('seeds Malaysia for institution contributions when timezone resolves outside 
         ->assertSet('data.address.country_id', 132);
 });
 
+it('pins the hidden institution contribution country to the selected public country preference', function () {
+    config()->set('public-countries.countries.indonesia.enabled', true);
+    config()->set('public-countries.countries.indonesia.coming_soon', false);
+
+    $indonesiaId = ensureCountryForLocationPicker('ID', 'Indonesia');
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->withUnencryptedCookie('public_country', 'indonesia')
+        ->get(route('contributions.submit-institution'))
+        ->assertOk();
+
+    Livewire::withCookie('public_country', 'indonesia')
+        ->actingAs($user)
+        ->test(SubmitInstitution::class)
+        ->assertSet('data.address.country_id', $indonesiaId);
+});
+
 it('still requires a selected location when the picker is enabled', function () {
     config()->set('services.google.maps_api_key', 'test-maps-key');
     config()->set('services.google.places_enabled', true);

@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Speaker;
 use App\Services\ShareTrackingService;
+use App\Support\Auth\IntendedRedirect;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -61,7 +62,7 @@ new class extends Component
         $user = auth()->user();
 
         if (! $user) {
-            $this->redirect(route('login'), navigate: true);
+            $this->redirect(IntendedRedirect::loginUrl(route('speakers.show', $this->speaker)), navigate: true);
 
             return;
         }

@@ -1975,11 +1975,11 @@
                         </li>
                     </ul>
                     <div class="mt-6 space-y-3">
-                        <a href="{{ route('register') }}"
+                        <a href="{{ \App\Support\Auth\IntendedRedirect::registerUrl(route('events.show', $event)) }}"
                             class="flex w-full items-center justify-center rounded-2xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-500/30">
                             {{ __('Daftar Akaun Percuma') }}
                         </a>
-                        <a href="{{ route('login') }}"
+                        <a href="{{ \App\Support\Auth\IntendedRedirect::loginUrl(route('events.show', $event)) }}"
                             class="flex w-full items-center justify-center rounded-2xl border-2 border-emerald-200/60 bg-white/50 py-3 text-sm font-bold text-emerald-700 transition-all hover:border-emerald-300 hover:bg-white">
                             {{ __('Log Masuk') }}
                         </a>
@@ -2280,7 +2280,7 @@ MOBILE BOTTOM ACTION BAR
                     </div>
                 @endif
             @else
-                <a href="{{ route('login') }}"
+                <a href="{{ \App\Support\Auth\IntendedRedirect::loginUrl(route('events.show', $event)) }}"
                     class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700">
                     <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"

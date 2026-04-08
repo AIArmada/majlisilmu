@@ -50,7 +50,30 @@ it('renders the dedicated institution contribution page', function () {
     $this->get(route('contributions.submit-institution'))
         ->assertOk()
         ->assertSee(__('Add a New Institution'))
-        ->assertDontSee(__('Submission Note'));
+        ->assertSee(__('Address'))
+        ->assertSee(__('3. You become the initial editor'))
+        ->assertSee(__('The original contributor is attached as the initial editor. When an owner or admin becomes available, they can retain that role, upgrade it, or remove it.'))
+        ->assertDontSee(__('Need to add a speaker instead?'))
+        ->assertDontSee(__('Submit Speaker'))
+        ->assertDontSee(__('The original contributor is attached as the initial owner so future edits can be managed directly.'))
+        ->assertDontSee(__('Submission Note'))
+        ->assertDontSee('lg:grid-cols-2', false);
+});
+
+it('renders the institution contribution page with translated copy when the locale changes', function () {
+    $user = User::factory()->create();
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.submit-institution'))
+        ->assertOk()
+        ->assertSee('Sumbangan Komuniti')
+        ->assertSee('Tambah Institusi Baharu')
+        ->assertSee('Profil Institusi')
+        ->assertSee('Alamat')
+        ->assertSee('Apa yang berlaku seterusnya?')
+        ->assertSee('Lihat Sumbangan Saya');
 });
 
 it('renders the dedicated speaker contribution page', function () {

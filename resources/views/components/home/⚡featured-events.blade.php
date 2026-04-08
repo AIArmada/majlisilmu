@@ -77,7 +77,7 @@ new class extends Component {
                 @foreach($this->events as $event)
                     @php
                         $eventHasPoster = $event->hasMedia('poster');
-                        $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+                        $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
                         $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                             '4:5' => 'aspect-[4/5]',
                             '16:9' => 'aspect-[16/9]',
@@ -96,15 +96,6 @@ new class extends Component {
                                         class="w-full h-full transition-transform duration-500 group-hover:scale-110 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                     <!-- Gradient Overlay -->
                                     <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
-                                    <!-- Date Badge -->
-                                    <div class="absolute top-4 left-4 bg-white rounded-xl px-3 py-2 shadow-md">
-                                        <div class="text-[13px] font-bold text-slate-400 uppercase">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
-                                        </div>
-                                        <div class="text-xl font-black text-slate-900 leading-none">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}
-                                        </div>
-                                    </div>
                                     @if($event->isPrayerRelative() && $event->prayer_display_text)
                                         <div
                                             class="absolute top-4 right-4 bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full">
@@ -114,22 +105,35 @@ new class extends Component {
                                 </div>
 
                                 <div class="p-5 flex flex-col flex-grow">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <span
-                                            class="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                            {{ $event->eventType?->name ?? __('Kuliah') }}
-                                        </span>
-                                        @if($event->gender && $event->gender->value !== 'all')
+                                    <div class="mb-3 flex items-start justify-between gap-3" data-testid="homepage-featured-card-meta-row">
+                                        <div class="flex flex-wrap items-center gap-2">
                                             <span
-                                                class="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                                {{ $event->gender->getLabel() }}
+                                                class="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                                {{ $event->eventType?->name ?? __('Kuliah') }}
                                             </span>
-                                        @endif
+                                            @if($event->gender && $event->gender->value !== 'all')
+                                                <span
+                                                    class="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                                    {{ $event->gender->getLabel() }}
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        <div
+                                            class="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center shadow-sm"
+                                            data-testid="homepage-featured-card-date-badge">
+                                            <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
+                                            </div>
+                                            <div class="mt-1 text-xl font-black leading-none text-slate-900">
+                                                {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <h3 class="font-heading text-lg font-bold text-slate-900 line-clamp-2 mb-2">
                                         <a href="{{ route('events.show', $event) }}" wire:navigate
-                                            class="hover:text-emerald-600 transition-colors">
+                                            class="hover:text-emerald-600 transition-colors" data-testid="homepage-featured-card-title-link">
                                             {{ $event->title }}
                                         </a>
                                     </h3>

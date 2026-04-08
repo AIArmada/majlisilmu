@@ -1,3 +1,179 @@
+# Public Listing Page Vertical Spacing
+
+- [x] Reduce the top padding on `/majlis`, `/institusi`, and `/penceramah` to match the homepage rhythm more closely
+- [x] Reduce the extra bottom gap before the footer on the same three public listing pages
+- [x] Keep the existing hero styling and footer unchanged while tightening only page-level spacing
+- [x] Verify the three pages locally in the browser after the Blade updates
+
+## Review
+
+- Root cause:
+  - the public listing hero wrappers for `/majlis`, `/institusi`, and `/penceramah` were all using `pt-24`, which left a visibly larger gap below the shared navbar than the homepage hero
+  - those same listing pages also added an extra `pb-32` page wrapper padding before the shared footer, which stacked with the layout footer margin and made the bottom gap larger than the homepage
+- Fix:
+  - reduced the top padding on the first hero wrapper in the three listing views from `pt-24` to `pt-12` without changing the rest of the hero styling or downstream content layout
+  - removed the extra `pb-32` page-level bottom padding from the three listing page roots so the footer spacing falls back to the shared layout rhythm used by the homepage
+  - updated the focused public-pages regression to assert both the tighter hero wrapper and the removal of the extra bottom padding on all three routes
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='uses homepage-like vertical spacing on the public listing pages'` => **1 passed**, 12 assertions
+  - browser screenshots on `https://majlisilmu.test/`, `https://majlisilmu.test/majlis`, `https://majlisilmu.test/institusi`, and `https://majlisilmu.test/penceramah` confirmed the listing-page headings sit closer to the navbar and the pre-footer gap now matches the homepage baseline much more closely
+
+# Institution Contribution Country And Layout Cleanup
+
+- [x] Hide the institution contribution country field while pinning it to the current public country preference
+- [x] Remove the speaker promo card so the next-steps panel takes the full width
+- [x] Rename the institution contribution location section label from Location to Address
+- [x] Add focused regressions and run the minimal formatter plus affected tests
+
+## Review
+
+- Root cause:
+  - the institution contribution form still exposed a country selector even though the public country preference resolver already knew the active market country from the public selection cookie or session
+  - the bottom support area on the submit-institution page still reserved a second column for the speaker promo card, which prevented the next-steps panel from taking the full width
+  - the contribution schema heading still used `Location`, which no longer matched the requested user-facing label
+- Fix:
+  - switched the institution contribution address schema to hide `country_id` while still including it in form state with the current preferred public-country default
+  - renamed the section heading from `Location` to `Address` and kept it directly below the institution profile section
+  - removed the speaker promo card from the page wrapper and collapsed the lower layout to a single full-width next-steps panel
+  - tightened the focused tests so schema coverage proves the field is hidden while the location-picker coverage proves the selected public country still hydrates into the Livewire state
+- Verification:
+  - `vendor/bin/pint --dirty --format agent tests/Feature/SharedFormSchemaTest.php tests/Feature/InstitutionContributionLocationPickerTest.php` => pass
+  - focused contribution page, shared schema, and institution location-picker tests => **62 passed**, 0 failed
+
+# Institution Contribution Copy And Layout
+
+- [x] Move the institution contribution address section directly below the profile section
+- [x] Change the initial contributor copy from owner to editor and clarify owner/admin can later retain, upgrade, or remove the role
+- [x] Add translation coverage for the visible institution contribution page copy
+- [x] Add focused regression coverage and run the minimal formatter plus affected tests
+
+## Review
+
+- Root cause:
+  - the shared institution contribution schema rendered `Location` after `Contact`, so the address block was not placed directly under the institution profile section
+  - the institution contribution page copy still described the original contributor as the initial `owner`, and several page-specific strings were only wrapped in `__()` without locale entries for supported JSON translations
+  - the page title also relied on a static Livewire `Title` attribute, which could bypass localized runtime title handling under navigation
+- Fix:
+  - reordered `InstitutionContributionFormSchema` so `Location` now appears immediately after `Institution Profile`, while keeping media, contact, and social sections intact
+  - updated the institution contribution page copy to use `initial editor` wording and clarified that a later owner or admin can retain, upgrade, or remove that role
+  - added the missing institution contribution and location-picker translation keys across the supported locale JSON files and switched the form section heading to the translatable `Institution Profile` key
+  - replaced the static page-title attribute with a localized `rendering()` hook and added focused tests for the schema order, updated copy, and Malay page rendering
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Forms/InstitutionContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitInstitution.php resources/views/livewire/pages/contributions/submit-institution.blade.php tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php` => pass
+  - `vendor/bin/pint --dirty --format agent tests/Feature/ContributionPagesTest.php` => pass
+  - `vendor/bin/pest --parallel tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php` => **54 passed**, 0 failed
+
+# Auth Intended Redirects
+
+- [x] Capture safe auth redirect targets from login, register, and Google sign-in entrypoints
+- [x] Patch public guest-only follow and engagement actions to send users into auth with their current page attached
+- [x] Preserve the same redirect target across the public auth views and event-page auth CTAs
+- [x] Add focused regressions and run the minimal formatter plus affected auth tests
+
+## Review
+
+- Root cause:
+  - the active web auth flow is handled by Fortify, whose fallback redirect is `config('fortify.home')`, currently `/dashboard`
+  - several public Livewire and Volt guest actions redirected straight to `route('login')` without ever setting `url.intended`, so Fortify had no page to return to after auth
+  - the public login, register, and Google sign-in links also dropped the original page context, so even deliberate auth prompts from a public page lost the return target
+- Fix:
+  - added `App\Support\Auth\IntendedRedirect` to validate same-site redirect targets, normalize them to internal paths, and build safe login/register/socialite URLs
+  - updated `FortifyServiceProvider` login/register views and `SocialiteController::redirect()` to capture valid `?redirect=` targets into the session before the auth flow continues
+  - patched public guest redirects in the event, speaker, institution, series, and reference pages, plus the public event auth CTAs, to include the originating page as the intended destination
+  - updated the active Fortify login/register views and the forgot-password back-to-login link to preserve the redirect target while switching auth screens
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialiteAuthTest.php` => **9 passed**, 41 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventCheckInTest.php --filter='redirects guests to login when trying to check in'` => **1 passed**, 2 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php --filter='(redirects guests to login when trying to toggle going|preserves the event url in guest auth links)'` => **2 passed**, 5 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerFollowTest.php --filter='redirects guest to login when trying to follow'` => **1 passed**, 2 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php --filter='redirects guest to login when trying to follow an institution'` => **1 passed**, 2 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php --filter='guest follow actions redirect to login with the current page as intended destination'` => **4 passed**, 8 assertions
+
+# Homepage Event Card Date Placement
+
+- [x] Move the featured-homepage event-card date badge below the poster image
+- [x] Keep the homepage prayer-time badge on-image while the always-visible date moves into the content block
+- [x] Add focused homepage regression coverage for the new date placement
+- [x] Run the minimal formatter and affected homepage test coverage
+
+## Review
+
+- Root cause:
+  - the homepage featured-events card still rendered its date tile as an absolute overlay on the poster image even after the `/majlis` listing cards were moved to body-level metadata
+  - that made the featured-homepage cards keep covering poster faces and schedule text while the listing cards no longer did
+- Fix:
+  - removed the over-image date tile from `resources/views/components/home/⚡featured-events.blade.php`
+  - moved the always-visible date into the content block beside the existing event-type and gender chips, while keeping the occasional prayer-relative badge on-image
+  - added focused homepage test hooks and a regression in `tests/Feature/HomePageTest.php` proving the featured-card meta row renders after the poster block
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/HomePageTest.php` => **10 passed**, 38 assertions
+  - browser follow-up on `https://majlisilmu.test/` confirmed the homepage still loads, but the lazy featured section did not resolve cleanly through the browser scroll locator during this session, so final verification relied on the passing homepage feature tests plus direct Blade inspection
+
+# Public Card Placeholder Ratio Rollout
+
+- [x] Change the no-poster fallback ratio to `16:9` on home featured-event cards
+- [x] Change the no-poster fallback ratio to `16:9` on unified search event cards
+- [x] Change the no-poster fallback ratio to `16:9` on series event cards
+- [x] Add focused regressions for each affected surface and run the minimal test coverage
+
+## Review
+
+- Root cause:
+  - the public `/majlis` card fallback had already moved to `16:9`, but the other public card surfaces still defaulted no-poster events to `3:2`
+  - the current series show page no longer renders poster cards; the only series poster-card implementation left in the repo is the shared `components/pages/series/_event-card` partial
+- Fix:
+  - changed the no-poster fallback ratio from `3:2` to `16:9` in the live home featured-events card and unified-search event card templates
+  - aligned the shared series event-card partial to the same `16:9` fallback and updated its wrapper classes so the placeholder frame actually renders at `16:9` when no poster exists
+  - added focused regressions in `tests/Feature/HomePageTest.php`, `tests/Feature/UnifiedSearchPageTest.php`, and a direct partial-render assertion in `tests/Feature/PublicPagesTest.php`
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/HomePageTest.php` => **9 passed**, 34 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **5 passed**, 22 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='shared series event card partial without posters'` => **1 passed**, 2 assertions
+  - note: an earlier full-file run of `tests/Feature/PublicPagesTest.php` also surfaced unrelated submit-event copy assertions outside this change scope, so the final verification stayed focused on the touched series-partial assertion
+
+# Event Card Placeholder Ratio
+
+- [x] Change the no-poster placeholder ratio on `/majlis` event cards from `3:2` to `16:9`
+- [x] Add a focused regression for no-poster event cards on the public events index
+- [x] Run the minimal formatter and affected test coverage
+
+## Review
+
+- Root cause:
+  - the public `/majlis` card view still defaulted no-poster events to a `3:2` media box, even though the requested placeholder treatment should be a wider `16:9` frame
+- Fix:
+  - changed the no-poster fallback aspect ratio in `resources/views/livewire/pages/events/index.blade.php` from `3:2` to `16:9`
+  - added a dedicated regression in `tests/Feature/PublicPagesTest.php` that creates a no-poster event and asserts the public events index renders `data-poster-aspect="16:9"`
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='(renders public event poster containers using the poster aspect ratio|uses a 16:9 placeholder aspect ratio for public events index cards without posters)'` => **2 passed**, 8 assertions
+
+# Event Card Badge Placement
+
+- [x] Move the always-visible date and event-type badges below the poster image on `/majlis` event cards
+- [x] Keep infrequent status and distance badges readable without re-covering poster details
+- [x] Add focused regression coverage that proves the badge row renders after the media block
+- [x] Run the minimal formatter and affected test coverage
+
+## Review
+
+- Root cause:
+  - the date tile and event-type pill were both absolutely positioned inside the poster area on the public `/majlis` cards, so they could cover poster faces, logos, or schedule text
+  - those two badges are always visible, which made them the persistent poster obstructions on the listing cards
+- Fix:
+  - moved the date tile and event-type pill out of the poster overlay and into a dedicated badge row at the top of the white content section in `resources/views/livewire/pages/events/index.blade.php`
+  - left the infrequent moderation-status badge on the poster and nudged the distance chip slightly so exceptional-state metadata remains readable without putting the always-on badges back over the image
+  - added focused test hooks (`event-card-badge-row`, `event-card-date-badge`, `event-card-type-badge`) and a regression in `tests/Feature/PublicPagesTest.php` that proves the badge row renders after the media block
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='(comma-separated location hierarchy text on public events index cards|date and event-type badges below the poster on public events index cards)'` => **2 passed**, 9 assertions
+  - local browser verification on `https://majlisilmu.test/majlis` initially hit a stale compiled-view error (`Call to undefined function ...`) after the Blade change; `php artisan view:clear` resolved it
+  - refreshed local page snapshot then showed each event card as `poster image -> badge row -> title`, confirming the badges render below the poster area
+
 # Event Card Location Separator
 
 - [x] Remove the `&` join from `/majlis` event-card location hierarchy text

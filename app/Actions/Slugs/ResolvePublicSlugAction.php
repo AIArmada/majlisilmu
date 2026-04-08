@@ -63,19 +63,24 @@ final readonly class ResolvePublicSlugAction
     private function resolveCurrentModel(string $parameter, string $value): ?Model
     {
         return match ($parameter) {
-            'event' => Event::query()->where('slug', $value)->first(),
-            'institution' => Institution::query()->where('slug', $value)->first(),
-            'speaker' => Speaker::query()->where('slug', $value)->first(),
-            'venue' => Venue::query()->where('slug', $value)->first(),
-            'reference' => Reference::query()
-                ->where('slug', $value)
-                ->when(
-                    Str::isUuid($value),
-                    fn (Builder $query) => $query->orWhere((new Reference)->getQualifiedKeyName(), $value),
-                )
-                ->first(),
+            'event' => $this->resolveBySlugOrUuid(new Event, $value),
+            'institution' => $this->resolveBySlugOrUuid(new Institution, $value),
+            'speaker' => $this->resolveBySlugOrUuid(new Speaker, $value),
+            'venue' => $this->resolveBySlugOrUuid(new Venue, $value),
+            'reference' => $this->resolveBySlugOrUuid(new Reference, $value),
             default => null,
         };
+    }
+
+    private function resolveBySlugOrUuid(Model $model, string $value): ?Model
+    {
+        return $model->newQuery()
+            ->where($model->qualifyColumn('slug'), $value)
+            ->when(
+                Str::isUuid($value),
+                fn (Builder $query) => $query->orWhere($model->getQualifiedKeyName(), $value),
+            )
+            ->first();
     }
 
     private function throwNotFound(string $parameter, string $value): never

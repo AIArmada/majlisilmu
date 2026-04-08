@@ -223,7 +223,23 @@ describe('Event Show Page Going Feature', function () {
 
         Livewire::test('pages.events.show', ['event' => $event])
             ->call('toggleGoing')
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('login', ['redirect' => route('events.show', $event, absolute: false)]));
+    });
+
+    it('preserves the event url in guest auth links', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $eventUrl = route('events.show', $event, absolute: false);
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('href="'.route('register', ['redirect' => $eventUrl]).'"', false)
+            ->assertSee('href="'.route('login', ['redirect' => $eventUrl]).'"', false);
     });
 
     it('shows correct going count in the UI', function () {

@@ -655,6 +655,28 @@ test('follow actions are attributed across supported public followable pages', f
     ]), 'reference_follow', 'reference'],
 ]);
 
+test('guest follow actions redirect to login with the current page as intended destination', function (string $component, string $routeName, string $parameter, callable $recordFactory) {
+    $record = $recordFactory();
+
+    Livewire::test($component, [$parameter => $record])
+        ->call('toggleFollow')
+        ->assertRedirect(route('login', ['redirect' => route($routeName, $record, absolute: false)]));
+})->with(fn (): array => [
+    'institution guest follow redirect' => ['pages.institutions.show', 'institutions.show', 'institution', fn () => Institution::factory()->create([
+        'status' => 'verified',
+    ])],
+    'speaker guest follow redirect' => ['pages.speakers.show', 'speakers.show', 'speaker', fn () => Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ])],
+    'series guest follow redirect' => ['pages.series.show', 'series.show', 'series', fn () => Series::factory()->create([
+        'visibility' => 'public',
+    ])],
+    'reference guest follow redirect' => ['pages.references.show', 'references.show', 'reference', fn () => Reference::factory()->create([
+        'is_active' => true,
+    ])],
+]);
+
 test('impact dashboard highlights event check-ins and submissions', function () {
     fakePrayerTimesApi();
 

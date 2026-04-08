@@ -24,6 +24,7 @@ use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\EventStatus;
 use App\States\EventStatus\Pending;
+use App\Support\Auth\IntendedRedirect;
 use Carbon\CarbonInterface;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\View\View;
@@ -330,7 +331,7 @@ class Show extends Component
         $user = auth()->user();
 
         if (! $user instanceof User) {
-            $this->redirectRoute('login');
+            $this->redirect(IntendedRedirect::loginUrl(route('events.show', $this->event)), navigate: true);
 
             return;
         }
@@ -404,7 +405,7 @@ class Show extends Component
         $user = auth()->user();
 
         if (! $user instanceof User) {
-            $this->redirectRoute('login');
+            $this->redirect(IntendedRedirect::loginUrl(route('events.show', $this->event)), navigate: true);
 
             return;
         }

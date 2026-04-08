@@ -1,6 +1,7 @@
 <x-layouts.auth>
     <div class="flex flex-col gap-6">
         @php($googleOauthConfigured = \App\Support\Auth\SocialiteProviderConfiguration::isConfigured('google'))
+        @php($authRedirectTarget = $redirectTarget ?? null)
 
         <div class="flex w-full flex-col">
             <h1 class="font-heading text-2xl font-bold tracking-tight text-slate-900">{{ __('Create an account') }}</h1>
@@ -12,7 +13,7 @@
 
         @if ($googleOauthConfigured)
             <!-- Social Login First -->
-            <a href="{{ route('socialite.redirect', 'google') }}"
+            <a href="{{ \App\Support\Auth\IntendedRedirect::socialiteUrl('google', $authRedirectTarget) }}"
                 class="group flex w-full items-center justify-center gap-3 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:ring-offset-1">
                 <svg class="h-5 w-5" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -65,7 +66,7 @@
 
         <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-slate-500">
             <span>{{ __('Already have an account?') }}</span>
-            <flux:link :href="route('login')" wire:navigate class="font-bold!">{{ __('Sign in') }}</flux:link>
+            <flux:link :href="\App\Support\Auth\IntendedRedirect::loginUrl($authRedirectTarget)" wire:navigate class="font-bold!">{{ __('Sign in') }}</flux:link>
         </div>
     </div>
 </x-layouts.auth>

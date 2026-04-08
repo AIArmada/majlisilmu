@@ -57,11 +57,25 @@ it('keeps the homepage nearby button visible', function () {
         ->assertSee('data-testid="near-me-button"', false);
 });
 
+it('uses homepage-like vertical spacing on the public listing pages', function () {
+    collect([
+        route('events.index'),
+        route('institutions.index'),
+        route('speakers.index'),
+    ])->each(function (string $url): void {
+        $this->get($url)
+            ->assertSuccessful()
+            ->assertSee('class="relative pt-12 pb-16 bg-white border-b border-slate-100 overflow-hidden"', false)
+            ->assertDontSee('class="relative pt-24 pb-16 bg-white border-b border-slate-100 overflow-hidden"', false)
+            ->assertDontSee('class="relative min-h-screen pb-32"', false);
+    });
+});
+
 it('renders accessible labels on the public submit-event form', function () {
     $this->get('/submit-event')
         ->assertSuccessful()
-        ->assertSee('Pilih poster, gambar, atau PDF majlis')
-        ->assertSee('submit-event-source-attachment', false)
+        ->assertSee('Hantar Majlis Ilmu')
+        ->assertSee('Kongsi majlis ilmu dengan komuniti. Penghantaran anda akan disemak sebelum diterbitkan.')
         ->assertSee('aria-label="Fizikal"', false)
         ->assertSee('aria-label="Dalam talian"', false)
         ->assertSee('aria-label="Hibrid"', false);
@@ -71,10 +85,10 @@ it('renders the submit-event upload copy in the selected locale', function () {
     $this->withSession(['locale' => 'en'])
         ->get('/hantar-majlis')
         ->assertSuccessful()
-        ->assertSee('Choose an event poster, image, or PDF')
-        ->assertSee('PDF, JPEG, PNG, or WEBP files are allowed. We will try to read the event details from this file.')
-        ->assertDontSee('Pilih poster, gambar, atau PDF majlis')
-        ->assertDontSee('PDF, JPEG, PNG, atau WEBP dibenarkan. Kami akan cuba baca butiran majlis daripada fail ini.');
+        ->assertSee('Submit Knowledge Event')
+        ->assertSee('Share your knowledge event with the community. Your submission will be reviewed before it is published.')
+        ->assertDontSee('Hantar Majlis Ilmu')
+        ->assertDontSee('Kongsi majlis ilmu dengan komuniti. Penghantaran anda akan disemak sebelum diterbitkan.');
 });
 
 it('does not expose experimental AI homepage variants', function () {
@@ -150,6 +164,29 @@ it('renders public event poster containers using the poster aspect ratio', funct
 
     $this->get(route('events.show', $wideEvent))
         ->assertSuccessful()
+        ->assertSee('data-poster-aspect="16:9"', false);
+});
+
+it('uses a 16:9 placeholder aspect ratio for public events index cards without posters', function () {
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Majlis Tanpa Poster',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical->value,
+        'institution_id' => $institution->id,
+        'is_active' => true,
+    ]);
+
+    $this->get(route('events.index', ['search' => 'Tanpa Poster']))
+        ->assertSuccessful()
+        ->assertSee('Majlis Tanpa Poster')
         ->assertSee('data-poster-aspect="16:9"', false);
 });
 
@@ -244,6 +281,27 @@ it('shows federal territory event cards on series pages with subdistrict and sta
         ->assertDontSee('Dewan Utama KL, Kuala Lumpur, Kuala Lumpur');
 });
 
+it('uses a 16:9 placeholder aspect ratio in the shared series event card partial without posters', function () {
+    $event = Event::factory()->create([
+        'title' => 'Kuliah Siri Tanpa Poster',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical,
+        'is_active' => true,
+    ]);
+
+    $html = view('components.pages.series._event-card', [
+        'event' => $event,
+        'past' => false,
+    ])->render();
+
+    expect($html)
+        ->toContain('data-poster-aspect="16:9"')
+        ->toContain('aspect-[16/9]');
+});
+
 it('shows comma-separated location hierarchy text on public events index cards', function () {
     $institution = Institution::factory()->create([
         'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
@@ -294,6 +352,36 @@ it('shows comma-separated location hierarchy text on public events index cards',
         ->assertSee('Shah Alam, Petaling, Selangor')
         ->assertDontSee('Shah Alam, Petaling &amp; Selangor', false)
         ->assertDontSee('Shah Alam, Petaling & Selangor');
+});
+
+it('renders the date and event-type badges below the poster on public events index cards', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Diskusi Dhuha',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical,
+        'institution_id' => $institution->id,
+        'is_active' => true,
+    ]);
+
+    $this->get(route('events.index', ['search' => 'Diskusi Dhuha']))
+        ->assertSuccessful()
+        ->assertSee('data-testid="event-card-badge-row"', false)
+        ->assertSee('data-testid="event-card-date-badge"', false)
+        ->assertSee('data-testid="event-card-type-badge"', false)
+        ->assertSeeInOrder([
+            'data-poster-aspect=',
+            'data-testid="event-card-badge-row"',
+            'data-testid="event-card-title-link"',
+        ], false);
 });
 
 it('renders the book title on public event and series cards without parentheses', function () {

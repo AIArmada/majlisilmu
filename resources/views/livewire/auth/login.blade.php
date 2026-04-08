@@ -4,6 +4,7 @@
 
 @section('content')
     @php($googleOauthConfigured = \App\Support\Auth\SocialiteProviderConfiguration::isConfigured('google'))
+    @php($authRedirectTarget = $redirectTarget ?? null)
 
     <div class="space-y-6">
         <div class="text-center space-y-2">
@@ -13,7 +14,7 @@
 
         @if ($googleOauthConfigured)
             <div>
-                <a href="{{ route('socialite.redirect', 'google') }}"
+                <a href="{{ \App\Support\Auth\IntendedRedirect::socialiteUrl('google', $authRedirectTarget) }}"
                     class="group relative flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.98] transition-all duration-200 shadow-sm">
                     <svg class="h-5 w-5 shrink-0 transition-opacity opacity-80 group-hover:opacity-100" viewBox="0 0 24 24">
                         <path
@@ -62,7 +63,7 @@
                 <div class="flex items-center justify-between">
                     <label for="password" class="block text-sm font-semibold text-slate-700">{{ __('Password') }}</label>
                     @if (Route::has('password.request'))
-                        <a href="{{ route('password.request') }}"
+                        <a href="{{ route('password.request', \App\Support\Auth\IntendedRedirect::queryParameters($authRedirectTarget)) }}"
                             class="text-xs font-semibold text-emerald-600 hover:text-amber-600 hover:underline transition-colors decoration-2 underline-offset-4">
                             {{ __('Forgot password?') }}
                         </a>
@@ -108,7 +109,7 @@
             <div class="text-center pt-2">
                 <p class="text-sm text-slate-500">
                     {{ __('Don\'t have an account?') }}
-                    <a href="{{ route('register') }}"
+                    <a href="{{ \App\Support\Auth\IntendedRedirect::registerUrl($authRedirectTarget) }}"
                         class="ml-1 font-bold text-emerald-700 hover:text-amber-600 hover:underline transition-colors decoration-2 underline-offset-4">
                         {{ __('Create one') }}
                     </a>

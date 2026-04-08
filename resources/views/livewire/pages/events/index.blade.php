@@ -285,8 +285,8 @@
     $showsGeolocationControls = $this->showsGeolocationControls();
 @endphp
 
-<div class="relative min-h-screen pb-32">
-    <div class="relative pt-24 pb-16 bg-white border-b border-slate-100 overflow-hidden">
+<div class="relative min-h-screen">
+    <div class="relative pt-12 pb-16 bg-white border-b border-slate-100 overflow-hidden">
         <div class="absolute inset-0 bg-emerald-50/50"></div>
         <div class="absolute inset-0 bg-[url('/images/pattern-bg.png')] opacity-5"></div>
 
@@ -964,7 +964,7 @@
                             $eventHasPoster = $posterMedia !== null;
                             $posterUrl = $eventHasPoster ? (string) $posterMedia->getAvailableUrl(['card', 'preview', 'thumb']) : '';
                             $eventCardImageUrl = $posterUrl !== '' ? $posterUrl : $event->card_image_url;
-                            $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+                            $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
                             $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                                 '4:5' => 'aspect-[4/5]',
                                 '16:9' => 'aspect-[16/9]',
@@ -997,32 +997,24 @@
                                         class="w-full h-full transition-transform duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                 </div>
 
-                                <!-- Badges -->
-                                <div class="absolute top-4 left-4 z-20 flex flex-col gap-2">
-                                    <div
-                                        class="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-1.5 text-center shadow-sm border border-black/5 min-w-[3.5rem]">
-                                        <div class="text-xs font-bold uppercase tracking-wider text-slate-600">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
-                                        </div>
-                                        <div class="text-xl font-bold font-heading text-slate-900 leading-none">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}
-                                        </div>
+                                @if($event->status instanceof \App\States\EventStatus\Pending || $event->status instanceof \App\States\EventStatus\Cancelled)
+                                    <div class="absolute top-5 left-5 z-20">
+                                        @if($event->status instanceof \App\States\EventStatus\Pending)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/92 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                {{ __('Menunggu Kelulusan') }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-600/92 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636"/></svg>
+                                                {{ __('Dibatalkan') }}
+                                            </span>
+                                        @endif
                                     </div>
-                                    @if($event->status instanceof \App\States\EventStatus\Pending)
-                                        <span class="inline-flex items-center gap-1 bg-amber-500/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-[0.65rem] font-bold shadow-lg uppercase tracking-wide">
-                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                            {{ __('Menunggu Kelulusan') }}
-                                        </span>
-                                    @elseif($event->status instanceof \App\States\EventStatus\Cancelled)
-                                        <span class="inline-flex items-center gap-1 bg-rose-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-[0.65rem] font-bold shadow-lg uppercase tracking-wide">
-                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636"/></svg>
-                                            {{ __('Dibatalkan') }}
-                                        </span>
-                                    @endif
-                                </div>
+                                @endif
 
                                 @if(isset($event->distance_km))
-                                    <div class="absolute top-4 right-4 z-20">
+                                    <div class="absolute top-5 right-5 z-20">
                                         <span
                                             class="inline-flex items-center gap-1 bg-emerald-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-xs font-semibold shadow-lg">
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1033,21 +1025,32 @@
                                         </span>
                                     </div>
                                 @endif
-
-                                <!-- Category Pill -->
-                                <div class="absolute bottom-4 left-4 z-20">
-                                    <span
-                                        class="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-white/30 transition-colors">
-                                        {{ $event->eventType?->name ?? __('Kuliah') }}
-                                    </span>
-                                </div>
                             </a>
 
                             <div class="p-6 flex flex-col">
+                                <div class="mb-4 flex items-start justify-between gap-4" data-testid="event-card-badge-row">
+                                    <span
+                                        class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm"
+                                        data-testid="event-card-type-badge">
+                                        {{ $event->eventType?->name ?? __('Kuliah') }}
+                                    </span>
+
+                                    <div
+                                        class="min-w-[4.5rem] shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center shadow-sm"
+                                        data-testid="event-card-date-badge">
+                                        <div class="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
+                                        </div>
+                                        <div class="mt-1 text-2xl font-bold font-heading leading-none text-slate-900">
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="flex justify-between items-start mb-3 gap-4">
                                     <div>
                                         <a href="{{ route('events.show', $event) }}" wire:navigate
-                                            class="group-hover:text-emerald-700 transition-colors">
+                                            class="group-hover:text-emerald-700 transition-colors" data-testid="event-card-title-link">
                                             <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
                                                 {{ $event->title }}
                                             </h3>

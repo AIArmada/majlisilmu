@@ -7,6 +7,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\ShareTrackingService;
 use App\Services\Signals\ProductSignalsService;
+use App\Support\Auth\IntendedRedirect;
 use App\Support\Auth\SocialiteProviderConfiguration;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
@@ -19,6 +20,8 @@ class SocialiteController extends Controller
      */
     public function redirect(string $provider): RedirectResponse
     {
+        IntendedRedirect::captureFromRequest(request());
+
         if (! SocialiteProviderConfiguration::isConfigured($provider)) {
             return redirect()->route('login')->with('toast', [
                 'type' => 'error',
