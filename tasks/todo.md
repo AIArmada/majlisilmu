@@ -1,3 +1,24 @@
+# Event Card Location Separator
+
+- [x] Remove the `&` join from `/majlis` event-card location hierarchy text
+- [x] Reuse the shared address hierarchy formatter for comma-separated output
+- [x] Add a focused public-pages regression for `Shah Alam, Petaling, Selangor`
+- [x] Run the minimal formatter, static check, and affected test coverage
+
+## Review
+
+- Root cause:
+  - the public `/majlis` card view had its own custom hierarchy join that replaced the last comma with `&`, which produced strings like `Shah Alam, Petaling & Selangor`
+  - that view diverged from the shared address hierarchy formatter already used elsewhere for comma-separated output
+- Fix:
+  - removed the custom `match (...)` join logic from the public events index card view and reused `AddressHierarchyFormatter::format($addressModel)` directly
+  - added a focused regression in `tests/Feature/PublicPagesTest.php` that creates a Shah Alam / Petaling / Selangor institution event and asserts the public `/majlis` card shows `Shah Alam, Petaling, Selangor`
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass (also reordered imports in `tests/Feature/PublicPagesTest.php`)
+  - editor diagnostics on the changed Blade and test files => no errors
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/PublicPagesTest.php` => project config reported `No files found to analyse` for that path, so no PHPStan result was available for the changed test file
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='comma-separated location hierarchy text on public events index cards'` => **1 passed**, 4 assertions
+
 # Speaker Prenominal: Syeikhul Maqari
 
 - [x] Add `Syeikhul Maqari` to the canonical speaker prenominal enum
