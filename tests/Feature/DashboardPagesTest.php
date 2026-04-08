@@ -402,6 +402,22 @@ it('hides institution dashboard access for users without institution membership'
         ->assertForbidden();
 });
 
+it('renders the institution dashboard picker as a searchable flux select', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Flux Pilihan']);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    $response = $this->actingAs($user)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+
+    $response->assertOk()
+        ->assertSee('data-testid="institution-dashboard-picker"', false)
+        ->assertSee('data-testid="institution-dashboard-picker-option"', false)
+        ->assertDontSee('data-flux-select-native', false)
+        ->assertSee('Masjid Flux Pilihan');
+});
+
 it('merges overlapping planner relationships into one calendar entry', function () {
     $user = User::factory()->create();
 
