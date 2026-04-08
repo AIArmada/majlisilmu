@@ -12,6 +12,7 @@ use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Events\AdminEventTimeMapper;
@@ -20,6 +21,7 @@ use BackedEnum;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 final readonly class SaveAdminEventAction
@@ -161,6 +163,7 @@ final readonly class SaveAdminEventAction
             : array_replace($this->formStateForRecord($event), $data);
 
         $state['organizer_type'] = $this->normalizeOrganizerType($state['organizer_type'] ?? null);
+        $this->validateState($state);
 
         $persistence = AdminEventTimeMapper::normalizeForPersistence($state);
         [$institutionId, $venueId, $spaceId] = $this->resolveLocationState($state);
@@ -276,6 +279,69 @@ final readonly class SaveAdminEventAction
 
     /**
      * @param  array<string, mixed>  $state
+     */
+    private function validateState(array $state): void
+    {
+        $errors = [];
+        $organizerType = $this->normalizeOrganizerType($state['organizer_type'] ?? null);
+        $organizerId = $this->normalizeOptionalString($state['organizer_id'] ?? null);
+        $institutionId = $this->normalizeOptionalString($state['institution_id'] ?? null);
+        $venueId = $this->normalizeOptionalString($state['venue_id'] ?? null);
+        $spaceId = $this->normalizeOptionalString($state['space_id'] ?? null);
+        $speakerIds = $this->normalizeStringArray($state['speakers'] ?? []);
+
+        if ($organizerId !== null && $organizerType === null) {
+            $errors['organizer_type'][] = __('Sila pilih jenis penganjur untuk ID penganjur yang diberikan.');
+        }
+
+        if ($organizerType !== null && $organizerId === null) {
+            $errors['organizer_id'][] = __('Sila pilih penganjur untuk jenis penganjur yang dipilih.');
+        }
+
+        if ($organizerType === Institution::class && $organizerId !== null && ! Institution::query()->whereKey($organizerId)->exists()) {
+            $errors['organizer_id'][] = __('Penganjur institusi yang dipilih tidak wujud.');
+        }
+
+        if ($organizerType === Speaker::class && $organizerId !== null && ! Speaker::query()->whereKey($organizerId)->exists()) {
+            $errors['organizer_id'][] = __('Penganjur penceramah yang dipilih tidak wujud.');
+        }
+
+        if ($institutionId !== null && $venueId !== null) {
+            $message = __('Pilih institusi atau venue, bukan kedua-duanya sekali.');
+            $errors['institution_id'][] = $message;
+            $errors['venue_id'][] = $message;
+        }
+
+        if ($spaceId !== null && ($institutionId === null || $venueId !== null)) {
+            $errors['space_id'][] = __('Ruang hanya boleh dipilih apabila institusi dipilih tanpa venue.');
+        }
+
+        if ($spaceId !== null && $institutionId !== null) {
+            $space = Space::query()->find($spaceId);
+
+            if ($space instanceof Space) {
+                $linkedInstitutionsExist = $space->institutions()->exists();
+                $isLinkedToInstitution = $space->institutions()
+                    ->where('institutions.id', $institutionId)
+                    ->exists();
+
+                if ($linkedInstitutionsExist && ! $isLinkedToInstitution) {
+                    $errors['space_id'][] = __('Ruang yang dipilih tidak tersedia untuk institusi ini.');
+                }
+            }
+        }
+
+        if ($this->requiresSpeakers($state['event_type'] ?? []) && $speakerIds === []) {
+            $errors['speakers'][] = __('Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.');
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
      * @param  array<string, mixed>  $attributes
      */
     private function generateSlug(array $attributes, array $state, Event $event, bool $creating): string
@@ -367,6 +433,19 @@ final readonly class SaveAdminEventAction
             Speaker::class, 'speaker' => Speaker::class,
             default => null,
         };
+    }
+
+    private function requiresSpeakers(mixed $eventTypes): bool
+    {
+        foreach ($this->normalizeEnumValues($eventTypes, EventType::class) as $eventTypeValue) {
+            $eventType = EventType::tryFrom($eventTypeValue);
+
+            if ($eventType?->requiresSpeakerByDefault()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function normalizeOptionalString(mixed $value): ?string
