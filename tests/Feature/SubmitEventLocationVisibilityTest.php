@@ -2,6 +2,7 @@
 
 use App\Enums\EventFormat;
 use App\Enums\EventType;
+use Filament\Forms\Components\TextInput;
 use Livewire\Livewire;
 
 test('event format can be set to physical', function () {
@@ -20,6 +21,15 @@ test('event format can be set to hybrid', function () {
     Livewire::test('pages.submit-event.create')
         ->set('data.event_format', EventFormat::Hybrid->value)
         ->assertSet('data.event_format', EventFormat::Hybrid->value);
+});
+
+test('live url is not required on the public submit-event form', function () {
+    Livewire::test('pages.submit-event.create')
+        ->assertFormFieldExists('live_url', function (TextInput $input): bool {
+            expect($input->isRequired())->toBeFalse();
+
+            return true;
+        });
 });
 
 test('community event type forces physical format', function () {

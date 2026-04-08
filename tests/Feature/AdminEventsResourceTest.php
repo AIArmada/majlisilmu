@@ -18,6 +18,7 @@ use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TextInput;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -158,6 +159,47 @@ it('persists registration-required settings when admins create events', function
     expect($settings)->not->toBeNull()
         ->and($settings?->registration_required)->toBeTrue()
         ->and($settings?->registration_mode)->toBe(RegistrationMode::Event);
+});
+
+it('does not require live url and allows admins to create hybrid events without it', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($administrator)
+        ->test(CreateEvent::class)
+        ->assertFormFieldExists('live_url', function (TextInput $input): bool {
+            expect($input->isRequired())->toBeFalse();
+
+            return true;
+        })
+        ->fillForm([
+            'title' => 'Admin Hybrid Event Without Live URL',
+            'event_date' => now()->addWeek()->toDateString(),
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'event_format' => EventFormat::Hybrid->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'event_type' => [EventType::Other->value],
+            'institution_id' => $institution->id,
+            'references' => [],
+            'series' => [],
+            'speakers' => [],
+            'other_key_people' => [],
+        ])
+        ->call('create')
+        ->assertHasNoErrors();
+
+    expect(Event::query()->where('title', 'Admin Hybrid Event Without Live URL')->value('live_url'))->toBeNull();
 });
 
 it('persists registration-required changes for existing admin events without registrations', function () {

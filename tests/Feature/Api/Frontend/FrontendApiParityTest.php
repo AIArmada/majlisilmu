@@ -35,11 +35,13 @@ it('exposes corrected frontend contract metadata', function () {
         ->json('data');
 
     $submitEventFields = collect($submitEvent['fields'] ?? [])->pluck('name')->all();
+    $submitEventConditionalRules = collect($submitEvent['conditional_rules'] ?? []);
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
         ->and($submitEventFields)->toContain('submission_country_id')
         ->not->toContain('timezone')
+        ->and($submitEventConditionalRules->pluck('field')->all())->not->toContain('live_url')
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])->toContain(132)
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'notes')['max_length'])->toBe(1000)
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'captcha_token')['required'])->toBeFalse()
@@ -389,7 +391,7 @@ it('requires guest event submissions to include email or phone', function () {
         ->assertJsonValidationErrors(['submitter_email', 'submitter_phone']);
 });
 
-it('requires a live url for online frontend event submissions', function () {
+it('allows online frontend event submissions without a live url', function () {
     $institution = Institution::factory()->create([
         'status' => 'verified',
         'is_active' => true,
@@ -415,8 +417,10 @@ it('requires a live url for online frontend event submissions', function () {
         'submitter_name' => 'Guest Submitter',
         'submitter_email' => 'guest@example.test',
     ])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['live_url']);
+        ->assertCreated()
+        ->assertJsonPath('data.event.title', 'Online Frontend API Event');
+
+    expect(Event::query()->where('title', 'Online Frontend API Event')->value('live_url'))->toBeNull();
 });
 
 it('requires a physical location for speaker-organized physical event submissions', function () {

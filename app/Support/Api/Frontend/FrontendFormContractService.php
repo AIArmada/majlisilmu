@@ -250,7 +250,6 @@ class FrontendFormContractService
                 $this->field('gallery', 'array<file>', required: false),
             ],
             'conditional_rules' => [
-                ['field' => 'live_url', 'required_when' => ['event_format' => [EventFormat::Online->value, EventFormat::Hybrid->value]]],
                 ['field' => 'organizer_institution_id', 'required_when' => ['organizer_type' => ['institution']]],
                 ['field' => 'organizer_speaker_id', 'required_when' => ['organizer_type' => ['speaker']]],
                 ['field' => 'location_institution_id', 'required_when' => ['location_type' => ['institution']]],
