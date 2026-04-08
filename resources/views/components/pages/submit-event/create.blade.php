@@ -2432,6 +2432,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                 </p>
             </div>
 
+            {{--
             <div class="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="text-base font-semibold text-slate-900">{{ __('Isi Automatik Dengan AI') }}</h2>
                 <p class="mt-2 text-sm text-slate-600">
@@ -2466,6 +2467,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                     {{ __('Sedang mengekstrak maklumat daripada fail...') }}
                 </p>
             </div>
+            --}}
 
             <form wire:submit="submit" novalidate>
                 {{ $this->form }}
