@@ -1,3 +1,41 @@
+# Remove Homepage Category Discovery Section
+
+- [x] Locate the homepage category discovery section and the regression that asserts its presence
+- [x] Remove the category discovery block from the homepage without affecting adjacent homepage sections
+- [x] Update focused homepage coverage and run minimal verification
+
+## Review
+
+- Root cause:
+  - the homepage still rendered a standalone `Jelajah Mengikut Kategori` discovery block with hard-coded category links
+  - the homepage test suite also asserted that block was present, so removing the UI requires updating coverage in the same pass
+- Fix:
+  - removed the entire homepage category discovery section from the public home Blade view
+  - replaced the homepage assertion with a regression that confirms the removed heading and subtitle no longer render
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/HomePageTest.php` => **10 passed**, 37 assertions
+
+# Speaker Event Card Book Subtitle Parity
+
+- [x] Compare the public speaker-page event card against the institution-page card treatment for attached book references
+- [x] Render the speaker-page book subtitle when a book reference is attached, matching the existing bold italic styling
+- [x] Add a focused regression for the speaker page and run minimal verification
+
+## Review
+
+- Root cause:
+  - the institution public page already rendered `reference_study_subtitle` on its main event cards, but the speaker public page cards never output that accessor
+  - the speaker page event queries also were not eager-loading `references`, so once the subtitle is rendered each card would otherwise fall back to per-card reference queries
+- Fix:
+  - added `references` eager loading to the speaker page upcoming and past event collections
+  - rendered the attached book title under the event title on the speaker page main cards using the same bold italic styling already used on institution cards
+  - added a focused regression that extracts the speaker-page event card HTML and asserts book-backed cards show the title without parentheses while non-book references stay hidden
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerShowPageTimingTest.php` => **13 passed**, 51 assertions
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/SpeakerShowPageTimingTest.php` => project config reported `No files found to analyse` for isolated test targets
+
 # Audit Live URL Changes And Add Admin Event Write API
 
 - [x] Review the current uncommitted live-url optionality changes for correctness and consistency across public, admin, and API surfaces

@@ -167,11 +167,10 @@ it('renders the attached book title across homepage event components without par
     Carbon::setTestNow();
 });
 
-it('renders the homepage discovery categories', function () {
+it('does not render the removed homepage discovery categories section', function () {
     $response = $this->get('/');
 
     $response->assertSuccessful()
-        ->assertSee('Jelajah Mengikut Kategori')
-        ->assertSee('Tazkirah')
-        ->assertSee('Tafsir');
+        ->assertDontSee('Jelajah Mengikut Kategori')
+        ->assertDontSee('Pilih topik yang anda minati');
 });

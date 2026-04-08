@@ -119,6 +119,7 @@ new class extends Component
                 'institution.address.state',
                 'institution.address.district',
                 'institution.address.subdistrict',
+                'references',
                 'venue.address.state',
                 'venue.address.district',
                 'venue.address.subdistrict',
@@ -150,6 +151,7 @@ new class extends Component
                 'institution.address.state',
                 'institution.address.district',
                 'institution.address.subdistrict',
+                'references',
                 'venue.address.state',
                 'venue.address.district',
                 'venue.address.subdistrict',
@@ -749,6 +751,7 @@ new class extends Component
                         <div class="space-y-4">
                             @foreach($upcomingEvents as $event)
                                 @php
+                                    $bookReferenceTitle = $event->reference_study_subtitle;
                                     $venueLocation = $resolveVenueLocation($event);
                                     $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                     $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
@@ -789,6 +792,11 @@ new class extends Component
                                         <h3 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-emerald-700 sm:text-lg">
                                             {{ $event->title }}
                                         </h3>
+                                        @if($bookReferenceTitle)
+                                            <p class="pl-3 text-sm font-bold italic text-slate-500 sm:pl-4">
+                                                {{ $bookReferenceTitle }}
+                                            </p>
+                                        @endif
                                         <div class="space-y-1 text-sm text-slate-500">
                                             <div class="flex items-center gap-1.5">
                                                 <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -913,6 +921,7 @@ new class extends Component
                     <div class="space-y-4">
                         @foreach($pastEvents as $event)
                             @php
+                                $bookReferenceTitle = $event->reference_study_subtitle;
                                 $pastVenueLocation = $resolveVenueLocation($event);
                                 $eventFormatValue = $event->event_format?->value ?? $event->event_format;
                                 $isRemoteEvent = in_array($eventFormatValue, ['online', 'hybrid'], true);
@@ -958,6 +967,11 @@ new class extends Component
                                     <h3 class="font-heading text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-slate-700 sm:text-lg">
                                         {{ $event->title }}
                                     </h3>
+                                    @if($bookReferenceTitle)
+                                        <p class="pl-3 text-sm font-bold italic text-slate-500 sm:pl-4">
+                                            {{ $bookReferenceTitle }}
+                                        </p>
+                                    @endif
                                     <div class="space-y-1 text-sm text-slate-500">
                                         <div class="flex items-center gap-1.5">
                                             <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

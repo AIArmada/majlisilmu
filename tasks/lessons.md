@@ -1,5 +1,6 @@
 # Lessons
 
+- When a user asks to remove a homepage marketing/discovery block, delete the section and update any explicit presence assertions in the homepage tests in the same pass so the removed UI does not reappear unnoticed.
 - In Volt/Blade files, never rely on bare enum class names inside `instanceof` checks unless the enum is explicitly imported or fully qualified; otherwise the check can silently fail and downstream code may try to cast the enum object to string.
 - When public slug redirects are intended to exist only for URLs users have actually visited, keep redirect creation gated by tracked page views; do not silently broaden it to all slug changes.
 - Filament `FileUpload::getImageEditorAspectRatioOptionsForJs()` returns a label-to-ratio map, so ratio-option tests should assert `array_keys(...)` for labels like `16:9` instead of checking the raw JS payload values directly.

@@ -4,10 +4,12 @@ use App\Enums\EventFormat;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\PrayerOffset;
 use App\Enums\PrayerReference;
+use App\Enums\ReferenceType;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
@@ -382,4 +384,67 @@ it('shows linked non-speaker roles in a separate section on the speaker page', f
         ->assertSee('Forum Dengan Moderator');
 
     expect(substr_count((string) $response->getContent(), 'Forum Dengan Moderator'))->toBe(1);
+});
+
+it('renders the book title on speaker event cards without parentheses', function () {
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $bookEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(2)->setTime(19, 30),
+        'title' => 'Kuliah Maghrib Kitab Penceramah',
+    ]);
+
+    $articleEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3)->setTime(19, 30),
+        'title' => 'Kuliah Maghrib Artikel Penceramah',
+    ]);
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Al-Hikam',
+        'type' => ReferenceType::Book->value,
+    ]);
+
+    $articleReference = Reference::factory()->create([
+        'title' => 'Artikel Dakwah Semasa',
+        'type' => ReferenceType::Article->value,
+    ]);
+
+    $bookEvent->references()->attach($bookReference->id);
+    $articleEvent->references()->attach($articleReference->id);
+
+    $speaker->speakerEvents()->attach([$bookEvent->id, $articleEvent->id]);
+
+    $response = $this->get(route('speakers.show', $speaker));
+    $response->assertSuccessful();
+
+    $html = $response->getContent();
+
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($bookEvent->id, '/').'"[^>]*>.*?<\/a>/s', $html, $bookMatches);
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($articleEvent->id, '/').'"[^>]*>.*?<\/a>/s', $html, $articleMatches);
+
+    $bookEventCard = $bookMatches[0] ?? null;
+    $articleEventCard = $articleMatches[0] ?? null;
+
+    expect($bookEventCard)->not->toBeNull();
+    expect($articleEventCard)->not->toBeNull();
+
+    expect($bookEventCard)
+        ->toContain('Kuliah Maghrib Kitab Penceramah')
+        ->toContain('Al-Hikam')
+        ->not->toContain('(Al-Hikam)')
+        ->toContain('font-bold')
+        ->toContain('italic')
+        ->toContain('sm:pl-4');
+
+    expect($articleEventCard)
+        ->toContain('Kuliah Maghrib Artikel Penceramah')
+        ->not->toContain('Al-Hikam')
+        ->not->toContain('Artikel Dakwah Semasa');
 });
