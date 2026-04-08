@@ -4,12 +4,15 @@ namespace App\Filament\Resources\Events\Pages;
 
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\User;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
+use App\Support\Submission\EntitySubmissionAccess;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -38,9 +41,56 @@ class ViewEvent extends ViewRecord
             $this->getRevertToDraftAction(),
             Action::make('duplicate_event')
                 ->label('Duplicate Event')
-                ->url(fn (): string => route('submit-event.create', ['duplicate' => $this->eventRecord()->getKey()])),
+                ->url(fn (): string => $this->duplicateEventUrl()),
             EditAction::make(),
         ];
+    }
+
+    protected function duplicateEventUrl(): string
+    {
+        $event = $this->eventRecord();
+        $institutionId = $this->duplicateScopedInstitutionId($event, auth()->user());
+
+        if ($institutionId !== null) {
+            return route('dashboard.institutions.submit-event', [
+                'institution' => $institutionId,
+                'duplicate' => $event->getKey(),
+            ]);
+        }
+
+        return route('submit-event.create', ['duplicate' => $event->getKey()]);
+    }
+
+    protected function duplicateScopedInstitutionId(Event $event, mixed $user): ?string
+    {
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $organizerInstitutionId = $event->organizer_type === Institution::class && is_string($event->organizer_id)
+            ? $event->organizer_id
+            : null;
+
+        if ($organizerInstitutionId !== null) {
+            return $this->userIsInstitutionMember($user, $organizerInstitutionId)
+                ? $organizerInstitutionId
+                : null;
+        }
+
+        $linkedInstitutionId = is_string($event->institution_id) ? $event->institution_id : null;
+
+        if ($linkedInstitutionId === null) {
+            return null;
+        }
+
+        return $this->userIsInstitutionMember($user, $linkedInstitutionId)
+            ? $linkedInstitutionId
+            : null;
+    }
+
+    protected function userIsInstitutionMember(User $user, string $institutionId): bool
+    {
+        return app(EntitySubmissionAccess::class)->canUseMemberInstitution($user, $institutionId);
     }
 
     protected function getApproveAction(): Action

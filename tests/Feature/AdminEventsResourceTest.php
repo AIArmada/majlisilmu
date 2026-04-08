@@ -19,12 +19,17 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 it('resolves pending transitionable states without moderation context', function () {
     $event = Event::factory()->create([
         'status' => 'pending',
+        'event_type' => [EventType::Other->value],
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => Carbon::parse('2026-05-13 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+        'ends_at' => Carbon::parse('2026-05-13 22:00:00', 'Asia/Kuala_Lumpur')->utc(),
     ]);
 
     $states = $event->status->transitionableStates();
@@ -169,6 +174,10 @@ it('persists registration-required changes for existing admin events without reg
         ]), 'settings')
         ->create([
             'status' => 'pending',
+            'event_type' => [EventType::Other->value],
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'starts_at' => Carbon::parse('2026-05-12 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+            'ends_at' => Carbon::parse('2026-05-12 22:00:00', 'Asia/Kuala_Lumpur')->utc(),
         ]);
 
     Livewire::actingAs($administrator)
@@ -219,11 +228,19 @@ it('accepts a 16:9 poster upload on the admin event edit form', function () {
 
     $event = Event::factory()->create([
         'status' => 'pending',
+        'event_type' => [EventType::Other->value],
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => Carbon::parse('2026-05-13 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+        'ends_at' => Carbon::parse('2026-05-13 22:00:00', 'Asia/Kuala_Lumpur')->utc(),
     ]);
 
     Livewire::actingAs($administrator)
         ->test(EditEvent::class, ['record' => $event->id])
         ->fillForm([
+            'event_date' => '2026-05-13',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '20:00',
+            'end_time' => '22:00',
             'poster' => UploadedFile::fake()->image('poster-wide.jpg', 1600, 900),
         ])
         ->call('save')
@@ -261,20 +278,95 @@ it('shows a duplicate event action on the admin event view page', function () {
     $administrator = User::factory()->create();
     $administrator->assignRole('super_admin');
 
-    $event = Event::factory()->create([
-        'status' => 'approved',
-        'visibility' => 'public',
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
     ]);
 
-    Livewire::actingAs($administrator)
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+    ]);
+
+    $component = Livewire::actingAs($administrator)
         ->test(ViewEvent::class, ['record' => $event->id])
         ->assertActionVisible('duplicate_event');
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('submit-event.create', ['duplicate' => $event]));
 
     $this->actingAs($administrator)
         ->get("/admin/events/{$event->id}")
         ->assertSuccessful()
-        ->assertSee('Duplicate Event')
-        ->assertSee(route('submit-event.create', ['duplicate' => $event]), false);
+        ->assertSee('Duplicate Event');
+});
+
+it('uses the institution-scoped duplicate route for admin viewers who are institution members', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $institution = Institution::factory()->create();
+    $institution->members()->syncWithoutDetaching([$administrator->id]);
+
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+    ]);
+
+    $component = Livewire::actingAs($administrator)
+        ->test(ViewEvent::class, ['record' => $event->id]);
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('dashboard.institutions.submit-event', [
+        'institution' => $institution->id,
+        'duplicate' => $event,
+    ]));
+
+    $this->actingAs($administrator)
+        ->get("/admin/events/{$event->id}")
+        ->assertSuccessful()
+        ->assertSee('Duplicate Event');
+});
+
+it('falls back to the generic duplicate route for admin viewers who only belong to an inactive institution', function () {
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => false,
+        'allow_public_event_submission' => false,
+    ]);
+    $institution->members()->syncWithoutDetaching([$administrator->id]);
+
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+    ]);
+
+    $component = Livewire::actingAs($administrator)
+        ->test(ViewEvent::class, ['record' => $event->id]);
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('submit-event.create', ['duplicate' => $event]));
 });
 
 it('sanitizes description and uses full-width layout on admin event view page', function () {

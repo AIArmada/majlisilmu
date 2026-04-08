@@ -15,6 +15,8 @@ it('returns translated labels for submit-event enums', function () {
         ->and(EventPrayerTime::SelepasSubuh->getLabel())->toBe('After Fajr')
         ->and(EventType::KuliahCeramah->getLabel())->toBe('Lecture / Talk')
         ->and(EventType::KuliahCeramah->getGroup())->toBe('Knowledge')
+        ->and(EventType::Talim->getLabel())->toBe("Ta'lim")
+        ->and(EventType::Talim->getGroup())->toBe('Knowledge')
         ->and(ReferenceType::Book->getLabel())->toBe('Book')
         ->and(SocialMediaPlatform::Twitter->getLabel())->toBe('Twitter / X')
         ->and(SocialMediaPlatform::Wikipedia->getLabel())->toBe('Wikipedia')

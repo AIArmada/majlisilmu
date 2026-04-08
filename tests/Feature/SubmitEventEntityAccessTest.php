@@ -147,6 +147,34 @@ it('forbids the institution-scoped dashboard submit flow for non-members', funct
         ->assertForbidden();
 });
 
+it('forbids the institution-scoped dashboard submit flow for non-members even when public submission is enabled', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'allow_public_event_submission' => true,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard.institutions.submit-event', ['institution' => $institution->id]))
+        ->assertForbidden();
+});
+
+it('forbids the institution-scoped dashboard submit flow for members of inactive institutions', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'allow_public_event_submission' => false,
+        'status' => 'verified',
+        'is_active' => false,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard.institutions.submit-event', ['institution' => $institution->id]))
+        ->assertForbidden();
+});
+
 it('auto-approves institution-scoped dashboard submissions and locks the organizer institution', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([

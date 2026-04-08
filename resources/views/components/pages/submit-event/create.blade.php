@@ -166,9 +166,9 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         abort_unless($user instanceof User, 403);
 
-        $institution = Institution::query()
+        $institution = app(EntitySubmissionAccess::class)
+            ->memberInstitutionQueryForSubmitter($user)
             ->whereKey($institutionId)
-            ->whereHas('members', fn (Builder $query) => $query->whereKey($user->getKey()))
             ->first();
 
         abort_unless($institution instanceof Institution, 403);

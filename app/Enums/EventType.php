@@ -11,6 +11,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     // Ilmu
     case KuliahCeramah = 'kuliah_ceramah';
     case KelasDaurah = 'kelas_daurah';
+    case Talim = 'talim';
     case Forum = 'forum';
     case SeminarKonvensyen = 'seminar_konvensyen';
     case Tazkirah = 'tazkirah';
@@ -48,6 +49,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
         return match ($this) {
             self::KuliahCeramah => __('Kuliah / Ceramah'),
             self::KelasDaurah => __('Kelas / Daurah'),
+            self::Talim => __('Ta\'lim'),
             self::Forum => __('Forum'),
             self::SeminarKonvensyen => __('Seminar / Konvensyen'),
             self::Tazkirah => __('Tazkirah'),
@@ -75,7 +77,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     public function getGroup(): string
     {
         return match ($this) {
-            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah, self::KhutbahJumaat => __('Ilmu'),
+            self::KuliahCeramah, self::KelasDaurah, self::Talim, self::Forum, self::SeminarKonvensyen, self::Tazkirah, self::KhutbahJumaat => __('Ilmu'),
             self::Qiamullail, self::Tahlil, self::SolatHajat => __('Ibadah'),
             self::Zikir, self::Selawat, self::DoaSelamat => __('Zikir & Doa'),
             self::BacaanYasin, self::KhatamQuran, self::Tilawah, self::HafazanQuran => __('Tilawah'),
@@ -87,7 +89,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
     public function getColor(): string
     {
         return match ($this) {
-            self::KuliahCeramah, self::KelasDaurah, self::Forum, self::SeminarKonvensyen, self::Tazkirah, self::KhutbahJumaat => 'info',
+            self::KuliahCeramah, self::KelasDaurah, self::Talim, self::Forum, self::SeminarKonvensyen, self::Tazkirah, self::KhutbahJumaat => 'info',
             self::Qiamullail, self::Tahlil, self::SolatHajat => 'success',
             self::Zikir, self::Selawat, self::DoaSelamat => 'primary',
             self::BacaanYasin, self::KhatamQuran, self::Tilawah, self::HafazanQuran => 'success',
@@ -101,6 +103,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
         return match ($this) {
             self::KuliahCeramah => 'heroicon-m-book-open',
             self::KelasDaurah => 'heroicon-m-academic-cap',
+            self::Talim => 'heroicon-m-book-open',
             self::Forum => 'heroicon-m-chat-bubble-left-right',
             self::SeminarKonvensyen => 'heroicon-m-academic-cap',
             self::Tazkirah => 'heroicon-m-megaphone',
@@ -130,6 +133,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
         return match ($this) {
             self::KuliahCeramah,
             self::KelasDaurah,
+            self::Talim,
             self::Forum,
             self::SeminarKonvensyen,
             self::Tazkirah => true,
@@ -145,6 +149,7 @@ enum EventType: string implements HasColor, HasIcon, HasLabel
         return match ($this) {
             self::KuliahCeramah,
             self::KelasDaurah,
+            self::Talim,
             self::SeminarKonvensyen,
             self::Tazkirah => [EventKeyPersonRole::Speaker->value, EventKeyPersonRole::Moderator->value],
             self::Forum => [EventKeyPersonRole::Speaker->value, EventKeyPersonRole::Moderator->value],

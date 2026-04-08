@@ -5,7 +5,7 @@
     $ahliEventEditUrl = $canEditEvent
         ? \App\Filament\Ahli\Resources\Events\EventResource::getUrl('edit', ['record' => $event], panel: 'ahli')
         : null;
-    $duplicateEventUrl = $canEditEvent && filled($selectedInstitutionId)
+    $duplicateEventUrl = $canEditEvent && $canUseSelectedInstitutionForScopedSubmission && filled($selectedInstitutionId)
         ? route('dashboard.institutions.submit-event', ['institution' => $selectedInstitutionId, 'duplicate' => $event->id])
         : null;
     $createChildEventUrl = $event->isParentProgram()

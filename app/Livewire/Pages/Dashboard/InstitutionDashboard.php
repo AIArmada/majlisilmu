@@ -13,6 +13,7 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -317,6 +318,12 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
         return $institution;
     }
 
+    #[Computed]
+    public function canUseSelectedInstitutionForScopedSubmission(): bool
+    {
+        return $this->selectedInstitutionSupportsScopedSubmission();
+    }
+
     /**
      * @return array{events_count:int,public_events_count:int,internal_events_count:int}
      */
@@ -453,6 +460,8 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
 
     public function table(Table $table): Table
     {
+        $canUseSelectedInstitutionForScopedSubmission = $this->canUseSelectedInstitutionForScopedSubmission();
+
         return $table
             ->query(function (): Builder {
                 $institution = $this->selectedInstitution();
@@ -489,6 +498,7 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
                         'livewire.pages.dashboard.partials.institution-event-title-cell',
                         [
                             'event' => $record,
+                            'canUseSelectedInstitutionForScopedSubmission' => $canUseSelectedInstitutionForScopedSubmission,
                             'selectedInstitutionId' => $this->institutionId,
                         ],
                     )->render())),
@@ -577,6 +587,18 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
     protected function availableInstitutionsQuery(User $user): BelongsToMany
     {
         return $user->institutions();
+    }
+
+    protected function selectedInstitutionSupportsScopedSubmission(): bool
+    {
+        $user = auth()->user();
+        $institution = $this->selectedInstitution();
+
+        if (! $user instanceof User || ! $institution instanceof Institution) {
+            return false;
+        }
+
+        return app(EntitySubmissionAccess::class)->canUseMemberInstitution($user, $institution->getKey());
     }
 
     protected function normalizeInstitutionId(?string $institutionId): ?string
