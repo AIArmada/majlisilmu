@@ -359,6 +359,112 @@ it('exposes admin event write schema and can create and update events through th
         ->and($event->slug)->toContain($speaker->slug);
 });
 
+it('rejects admin event writes that omit required speakers for speaker-led event types', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+
+    $this->postJson('/api/v1/admin/events', adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ], [
+        'event_type' => [EventType::KuliahCeramah->value],
+        'speakers' => [],
+    ]))->assertUnprocessable()
+        ->assertJsonValidationErrors(['speakers']);
+});
+
+it('rejects admin event writes with organizer ids that do not match the organizer type', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+
+    $this->postJson('/api/v1/admin/events', adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ], [
+        'organizer_type' => Institution::class,
+        'organizer_id' => (string) $speaker->getKey(),
+    ]))->assertUnprocessable()
+        ->assertJsonValidationErrors(['organizer_id']);
+});
+
+it('rejects admin event writes with conflicting location selections', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $otherInstitution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+    $venue = \App\Models\Venue::factory()->create();
+    $space = \App\Models\Space::factory()->create();
+    $otherInstitution->spaces()->attach($space);
+
+    $this->postJson('/api/v1/admin/events', adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ], [
+        'venue_id' => (string) $venue->getKey(),
+        'space_id' => (string) $space->getKey(),
+    ]))->assertUnprocessable()
+        ->assertJsonValidationErrors(['institution_id', 'venue_id', 'space_id']);
+});
+
 function ensureAdminApiMalaysiaCountryExists(): int
 {
     $malaysiaId = DB::table('countries')->where('id', 132)->value('id');

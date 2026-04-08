@@ -346,6 +346,41 @@ it('creates and updates events through MCP write tools', function () {
         ->and($event->keyPeople)->toHaveCount(0);
 });
 
+it('surfaces admin event validation failures through MCP write tools', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'payload' => adminMcpEventPayload([
+                'institution' => $institution,
+                'speaker' => $speaker,
+                'reference' => $reference,
+                'series' => $series,
+                'domain_tag' => $domainTag,
+                'discipline_tag' => $disciplineTag,
+            ], [
+                'event_type' => [EventType::KuliahCeramah->value],
+                'speakers' => [],
+            ]),
+        ])
+        ->assertHasErrors(['Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.']);
+});
+
 it('rejects media fields through MCP write tools', function () {
     ensureMcpMalaysiaCountryExists();
 
