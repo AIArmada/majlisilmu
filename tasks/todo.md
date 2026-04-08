@@ -1,3 +1,22 @@
+# Dashboard Institution Picker Uses Flux
+
+- [x] Confirm the institution dashboard selector implementation and verify whether Flux select is available in the current install
+- [x] Replace the native institution dashboard selector with a searchable Flux picker bound to the same Livewire state
+- [ ] Add focused verification coverage and run the minimal checks
+
+## Review
+
+- Root cause:
+  - `/dashboard/institusi` used a plain native `<select>` for institution switching even though Flux is installed in the project
+  - the page is a standard Livewire Blade view, so it was not benefiting from any richer searchable selector UX
+- Fix:
+  - replaced the native institution picker with a custom searchable picker built from Flux input/icon styling and the existing Livewire `institutionId` state
+  - kept the existing dashboard selection logic unchanged by updating the Livewire property directly when a picker option is chosen
+  - added a focused dashboard regression that checks the searchable picker hooks render and that the old native Flux-select markup path is not present
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php --filter='institution dashboard picker as a searchable flux select|shows institution profile and events for members without a separate registrations section'` => **2 passed**, 30 assertions
+
 # Remove Homepage Category Discovery Section
 
 - [x] Locate the homepage category discovery section and the regression that asserts its presence

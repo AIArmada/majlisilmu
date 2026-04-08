@@ -10,6 +10,13 @@
     $institutionRoleOptions = $this->institutionRoleOptions;
     $canManageMembers = $this->canManageMembers;
     $canUseSelectedInstitutionForScopedSubmission = $this->canUseSelectedInstitutionForScopedSubmission;
+    $institutionPickerOptions = $institutions
+        ->map(fn ($institution): array => [
+            'id' => (string) $institution->id,
+            'name' => $institution->name,
+        ])
+        ->values()
+        ->all();
     $translateStatusLabel = static function (string $status): string {
         $translated = __($status);
 
@@ -52,21 +59,101 @@
                         <p class="mt-2 text-sm text-slate-500">{{ __('Review institution profile, events, and members in one place.') }}</p>
                     </div>
 
-                    <div class="w-full md:w-80">
+                    <div
+                        class="w-full md:w-80"
+                        x-data="{
+                            open: false,
+                            search: '',
+                            selectedId: @js($selectedInstitution?->id),
+                            selectedName: @js($selectedInstitution?->name),
+                            institutions: @js($institutionPickerOptions),
+                            get filteredInstitutions() {
+                                const term = this.search.trim().toLowerCase();
+
+                                if (term === '') {
+                                    return this.institutions;
+                                }
+
+                                return this.institutions.filter((institution) => institution.name.toLowerCase().includes(term));
+                            },
+                            async chooseInstitution(institution) {
+                                this.selectedId = institution.id;
+                                this.selectedName = institution.name;
+                                this.open = false;
+                                this.search = '';
+
+                                await this.$wire.set('institutionId', institution.id);
+                            },
+                            openPicker() {
+                                this.open = true;
+
+                                this.$nextTick(() => this.$refs.institutionSearch?.focus());
+                            },
+                            closePicker() {
+                                this.open = false;
+                                this.search = '';
+                            },
+                        }"
+                        @click.outside="closePicker()"
+                        @keydown.escape.window="closePicker()"
+                        data-testid="institution-dashboard-picker"
+                    >
                         <label for="institution-dashboard-select" class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">
                             {{ __('Institution') }}
                         </label>
-                        <select
-                            id="institution-dashboard-select"
-                            wire:model.live="institutionId"
-                            class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:outline-none"
-                        >
-                            @forelse($institutions as $institution)
-                                <option value="{{ $institution->id }}">{{ $institution->name }}</option>
-                            @empty
-                                <option value="">{{ __('No institution membership') }}</option>
-                            @endforelse
-                        </select>
+                        <div class="relative">
+                            <button
+                                id="institution-dashboard-select"
+                                type="button"
+                                @click="open ? closePicker() : openPicker()"
+                                class="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-xs transition hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                aria-haspopup="listbox"
+                                :aria-expanded="open.toString()"
+                            >
+                                <span class="min-w-0 truncate text-left" x-text="selectedName || @js(__('Select institution'))"></span>
+                                <flux:icon.chevron-up-down variant="mini" class="size-4 shrink-0 text-zinc-400" />
+                            </button>
+
+                            <div
+                                x-show="open"
+                                x-cloak
+                                class="absolute z-30 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10"
+                            >
+                                <flux:input
+                                    x-ref="institutionSearch"
+                                    x-model="search"
+                                    placeholder="{{ __('Search institution...') }}"
+                                    icon:leading="magnifying-glass"
+                                />
+
+                                <div class="mt-3 max-h-64 overflow-y-auto">
+                                    <template x-if="filteredInstitutions.length === 0">
+                                        <div class="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                                            {{ __('No matching institutions.') }}
+                                        </div>
+                                    </template>
+
+                                    <template x-for="institution in filteredInstitutions" :key="institution.id">
+                                        <button
+                                            type="button"
+                                            @click="chooseInstitution(institution)"
+                                            class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+                                            role="option"
+                                            :aria-selected="(institution.id === selectedId).toString()"
+                                            data-testid="institution-dashboard-picker-option"
+                                        >
+                                            <span class="min-w-0 truncate" x-text="institution.name"></span>
+                                            <flux:icon.check
+                                                variant="mini"
+                                                class="size-4 shrink-0 text-emerald-600"
+                                                x-show="institution.id === selectedId"
+                                                x-cloak
+                                            />
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
