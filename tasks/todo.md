@@ -2,7 +2,25 @@
 
 - [x] Review the current uncommitted live-url optionality changes for correctness and consistency across public, admin, and API surfaces
 - [x] Fix any issues found in the current uncommitted change set, then re-verify and commit it cleanly
-- [ ] After the worktree is clean, add admin event write support to the generic admin API with focused tests and verification
+- [x] After the worktree is clean, add admin event write support to the generic admin API with focused tests and verification
+
+## Review
+
+- Root cause:
+  - the generic admin API already exposed `/api/v1/admin/events` metadata and read endpoints through the shared resource registry, but the mutation layer only allowlisted institutions and speakers
+  - because `AdminResourceMutationService::supports()` excluded `EventResource`, the admin API and MCP layer both treated event write schema/store/update as unavailable even though the Filament admin event workflow already had a complete create/edit flow
+  - event writes need more than a simple allowlist flip because the admin form uses derived time fields (`event_date`, `prayer_time`, `custom_time`), auto-managed slugs, registration settings, relation syncing, and media collections
+- Fix:
+  - added a dedicated `SaveAdminEventAction` that converts admin-form event payloads into persisted event attributes, reuses the existing time mapper and slug generator, syncs references/series/tags/languages/key people/registration settings, and supports poster/gallery media syncing
+  - extended `AdminResourceMutationService` to expose event write schema, defaults, validation rules, and store/update handling through the same generic admin API used by the existing speaker and institution write paths
+  - updated the MCP admin server copy and write-tool media guard so events are advertised as writable and `poster` uploads are rejected with the same explicit MCP-v1 media limitation message as the other resources
+  - added focused admin API and MCP regressions that prove event write schema discovery works, event creation accepts a nullable `live_url`, updates persist relation clears and organizer changes, and writable-only resource listings now include events
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **9 passed**, 108 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => **17 passed**, 130 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **15 passed**, 75 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/SaveAdminEventAction.php app/Support/Api/Admin/AdminResourceMutationService.php app/Mcp/Servers/AdminServer.php app/Mcp/Tools/Admin/AbstractAdminWriteTool.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Mcp/AdminServerTest.php` => pass
 
 # Submit Event Live URL Optional For Online And Hybrid
 

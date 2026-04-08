@@ -18,7 +18,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     {
         $errors = [];
 
-        foreach (['logo', 'cover', 'avatar', 'gallery'] as $field) {
+        foreach (['logo', 'cover', 'avatar', 'poster', 'gallery'] as $field) {
             if (! array_key_exists($field, $payload) || ! $this->hasMeaningfulMediaValue($payload[$field])) {
                 continue;
             }

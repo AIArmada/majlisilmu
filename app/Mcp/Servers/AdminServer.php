@@ -18,7 +18,7 @@ use Laravel\Mcp\Server\Attributes\Version;
 
 #[Name('majlisilmu-admin')]
 #[Version('1.0.0')]
-#[Instructions('Authenticated admin MCP server with parity to the Filament admin resource API for listing resources, reading records, discovering write schemas, and writing supported speaker and institution records.')]
+#[Instructions('Authenticated admin MCP server with parity to the Filament admin resource API for listing resources, reading records, discovering write schemas, and writing supported event, speaker, and institution records.')]
 class AdminServer extends Server
 {
     protected array $tools = [
