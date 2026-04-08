@@ -324,15 +324,6 @@ class SubmitFrontendEventAction
             ]);
         }
 
-        if (
-            in_array($eventFormat, [EventFormat::Online->value, EventFormat::Hybrid->value], true)
-            && ! filled($validated['live_url'] ?? null)
-        ) {
-            throw ValidationException::withMessages([
-                $this->validationKey('live_url', $validationKeyPrefix) => __('Sila masukkan pautan siaran langsung untuk format dalam talian atau hibrid.'),
-            ]);
-        }
-
         if ($eventFormat === EventFormat::Online->value) {
             return;
         }

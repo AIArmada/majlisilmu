@@ -1,3 +1,39 @@
+# Audit Live URL Changes And Add Admin Event Write API
+
+- [x] Review the current uncommitted live-url optionality changes for correctness and consistency across public, admin, and API surfaces
+- [x] Fix any issues found in the current uncommitted change set, then re-verify and commit it cleanly
+- [ ] After the worktree is clean, add admin event write support to the generic admin API with focused tests and verification
+
+# Submit Event Live URL Optional For Online And Hybrid
+
+- [x] Remove the public submit-event `live_url` requirement for online and hybrid formats
+- [x] Keep frontend contract metadata aligned so API consumers no longer see `live_url` as conditionally required
+- [x] Audit backend admin Filament and API event entrypoints for the same optionality rule
+- [x] Add focused regression coverage for online submissions without a live URL and run minimal verification
+
+## Review
+
+- Root cause:
+  - the public `/hantar-majlis` form still marked `live_url` as required whenever `event_format` was `online` or `hybrid`
+  - the shared `SubmitFrontendEventAction` repeated the same rule, so both Livewire and frontend API submissions were rejected before the event could be created
+  - the frontend form contract also advertised `live_url` as conditionally required, which would keep external clients out of sync with the intended behavior
+  - the follow-up audit showed the backend admin Filament event form was already permissive, but there was no regression proving that behavior and the generic admin resource API did not currently expose event write support
+- Fix:
+  - removed the public form-level `required(...)` rule from the `live_url` field while keeping the field visible for online and hybrid formats
+  - deleted the `live_url` conditional requirement from `SubmitFrontendEventAction`, leaving the URL format check intact when a value is provided
+  - removed the matching `live_url` conditional rule from the frontend form contract so API consumers now see it as optional
+  - audited backend write surfaces and confirmed the generic admin resource API exists, but `AdminResourceMutationService` does not expose event write schema/store/update support; event submission remains available through the dedicated frontend submit-event endpoint
+  - added backend admin regression coverage so the Filament event create form asserts `live_url` is not required and a hybrid event can be created without it
+  - updated focused regressions to assert the contract no longer lists `live_url` as conditionally required, online frontend API submissions succeed without it, and the public form field is not required
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **15 passed**, 88 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventLocationVisibilityTest.php` => **6 passed**, 9 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **15 passed**, 75 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Events/SubmitFrontendEventAction.php app/Support/Api/Frontend/FrontendFormContractService.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/SubmitEventLocationVisibilityTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi tests/Feature/AdminEventsResourceTest.php` => project config reported `No files found to analyse` for isolated test targets
+  - `vendor/bin/phpstan analyse --ansi` => fails on pre-existing unrelated `normalizeContactRowsForFill()/normalizeContactRowsForSave()` return-shape issues in `app/Forms/SharedFormSchema.php`
+
 # Public Listing Page Vertical Spacing
 
 - [x] Reduce the top padding on `/majlis`, `/institusi`, and `/penceramah` to match the homepage rhythm more closely

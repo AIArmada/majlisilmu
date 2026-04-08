@@ -756,8 +756,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         ->placeholder(__('https://youtube.com/...'))
                                         ->visibleJs(<<<'JS'
                                                     ['online', 'hybrid'].includes($get('event_format'))
-                                                    JS)
-                                        ->required(fn (Get $get): bool => in_array($get('event_format'), [EventFormat::Online, EventFormat::Hybrid], true)),
+                                                    JS),
                                 ]),
 
                             Grid::make(['default' => 1, 'sm' => 2])
