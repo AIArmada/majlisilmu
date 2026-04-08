@@ -26,6 +26,20 @@ final class EntitySubmissionAccess
     }
 
     /**
+     * @return Builder<Institution>
+     */
+    public function memberInstitutionQueryForSubmitter(User $user): Builder
+    {
+        /** @var Builder<Institution> $query */
+        $query = Institution::query();
+
+        return $query
+            ->whereIn('status', self::ALLOWED_ENTITY_STATUSES)
+            ->where('is_active', true)
+            ->whereHas('members', fn (Builder $memberQuery): Builder => $memberQuery->whereKey($user->getKey()));
+    }
+
+    /**
      * @return Builder<Speaker>
      */
     public function speakerQueryForSubmitter(?User $user): Builder
@@ -75,6 +89,13 @@ final class EntitySubmissionAccess
     public function canUseInstitution(?User $user, string $institutionId): bool
     {
         return $this->institutionQueryForSubmitter($user)
+            ->whereKey($institutionId)
+            ->exists();
+    }
+
+    public function canUseMemberInstitution(User $user, string $institutionId): bool
+    {
+        return $this->memberInstitutionQueryForSubmitter($user)
             ->whereKey($institutionId)
             ->exists();
     }

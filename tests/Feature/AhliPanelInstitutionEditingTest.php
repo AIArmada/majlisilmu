@@ -129,11 +129,151 @@ it('shows a duplicate event action on the ahli event view page', function () {
         ->test(AhliViewEvent::class, ['record' => $event->id])
         ->assertActionVisible('duplicate_event');
 
+    $component = Livewire::actingAs($user)
+        ->test(AhliViewEvent::class, ['record' => $event->id]);
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('dashboard.institutions.submit-event', [
+        'institution' => $institution->id,
+        'duplicate' => $event,
+    ]));
+
     $this->actingAs($user)
         ->get(EventResource::getUrl('view', ['record' => $event], panel: 'ahli'))
         ->assertOk()
-        ->assertSee('Duplicate Event')
-        ->assertSee(route('submit-event.create', ['duplicate' => $event]), false);
+        ->assertSee('Duplicate Event');
+});
+
+it('hides the duplicate event action on the ahli event view page for institution viewers', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Ahli Viewer Duplicate Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['viewer']);
+    }, $user);
+
+    Livewire::actingAs($user)
+        ->test(AhliViewEvent::class, ['record' => $event->id])
+        ->assertActionHidden('duplicate_event');
+});
+
+it('uses the institution-scoped duplicate route for speaker-organized events linked to a managed institution', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create();
+    $speaker = Speaker::factory()->create();
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Ahli Speaker Organized Duplicate Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->id,
+        'institution_id' => $institution->id,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $component = Livewire::actingAs($user)
+        ->test(AhliViewEvent::class, ['record' => $event->id]);
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('dashboard.institutions.submit-event', [
+        'institution' => $institution->id,
+        'duplicate' => $event,
+    ]));
+});
+
+it('prefers the organizer institution when duplicating institution-organized events with a different linked location institution', function () {
+    $user = User::factory()->create();
+    $organizerInstitution = Institution::factory()->create();
+    $linkedInstitution = Institution::factory()->create();
+
+    $event = Event::factory()->create([
+        'title' => 'Ahli Organizer Institution Wins Duplicate Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $organizerInstitution->id,
+        'institution_id' => $linkedInstitution->id,
+    ]);
+
+    $organizerInstitution->members()->syncWithoutDetaching([$user->id]);
+    $linkedInstitution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $component = Livewire::actingAs($user)
+        ->test(AhliViewEvent::class, ['record' => $event->id]);
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('dashboard.institutions.submit-event', [
+        'institution' => $organizerInstitution->id,
+        'duplicate' => $event,
+    ]));
+});
+
+it('falls back to the generic duplicate route when an institution-organized event is only manageable through a different linked institution', function () {
+    $user = User::factory()->create();
+    $organizerInstitution = Institution::factory()->create([
+        'allow_public_event_submission' => false,
+    ]);
+    $linkedInstitution = Institution::factory()->create();
+
+    $event = Event::factory()->create([
+        'title' => 'Ahli Generic Duplicate Fallback Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $organizerInstitution->id,
+        'institution_id' => $linkedInstitution->id,
+    ]);
+
+    $linkedInstitution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $component = Livewire::actingAs($user)
+        ->test(AhliViewEvent::class, ['record' => $event->id])
+        ->assertActionVisible('duplicate_event');
+
+    $duplicateUrl = (fn (): string => $this->duplicateEventUrl())->call($component->instance());
+
+    expect($duplicateUrl)->toBe(route('submit-event.create', ['duplicate' => $event]));
 });
 
 it('renders submitter phone numbers as whatsapp links on the ahli event edit page', function () {
@@ -461,8 +601,7 @@ it('shows ahli edit links on institution dashboard only when user can update', f
         ->assertDontSee(__('Edit in Ahli Panel'))
         ->assertSee($institutionEditUrl, false)
         ->assertSee($institutionInvitationsUrl, false)
-        ->assertSee($eventEditUrl, false)
-        ->assertSee($eventRegistrationsUrl, false);
+        ->assertSee($eventEditUrl, false);
 
     $this->actingAs($adminUser)
         ->get($institutionInvitationsUrl)

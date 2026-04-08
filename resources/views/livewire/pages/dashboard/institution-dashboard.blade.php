@@ -9,6 +9,7 @@
     $eventSortOptions = $this->eventSortOptions;
     $institutionRoleOptions = $this->institutionRoleOptions;
     $canManageMembers = $this->canManageMembers;
+    $canUseSelectedInstitutionForScopedSubmission = $this->canUseSelectedInstitutionForScopedSubmission;
     $translateStatusLabel = static function (string $status): string {
         $translated = __($status);
 
@@ -31,7 +32,7 @@
     $ahliInstitutionInvitationsUrl = $selectedInstitution !== null && $canManageMembers
         ? \App\Filament\Ahli\Resources\Institutions\InstitutionResource::getUrl('edit', ['record' => $selectedInstitution, 'relation' => 'member_invitations'], panel: 'ahli')
         : null;
-    $institutionSubmitUrl = $selectedInstitution !== null
+    $institutionSubmitUrl = $selectedInstitution !== null && $canUseSelectedInstitutionForScopedSubmission
         ? route('dashboard.institutions.submit-event', ['institution' => $selectedInstitution->id])
         : null;
 @endphp

@@ -573,6 +573,51 @@ it('only shows duplicate event links on the institution dashboard to users who c
         ->assertDontSee($duplicateEventUrl, false);
 });
 
+it('hides scoped submit and duplicate links for inactive institution dashboards', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Tidak Aktif',
+        'status' => 'verified',
+        'is_active' => false,
+        'allow_public_event_submission' => true,
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($user): void {
+        $user->syncRoles(['admin']);
+    }, $user);
+
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Inactive Institution Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(4),
+    ]);
+
+    $editEventUrl = e(EventResource::getUrl('edit', ['record' => $event], panel: 'ahli'));
+    $submitEventUrl = e(route('dashboard.institutions.submit-event', ['institution' => $institution->id]));
+    $duplicateEventUrl = e(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $event->id]));
+
+    $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertSee('Inactive Institution Event')
+        ->assertSee($editEventUrl, false)
+        ->assertDontSee($submitEventUrl, false)
+        ->assertDontSee($duplicateEventUrl, false);
+
+    $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $event->id]))
+        ->assertForbidden();
+});
+
 it('renders institution dashboard event dates with translated times or prayer labels', function () {
     $user = User::factory()->create([
         'timezone' => 'Asia/Kuala_Lumpur',
