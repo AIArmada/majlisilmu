@@ -1,3 +1,24 @@
+# Speaker Prenominal: Syeikhul Maqari
+
+- [x] Add `Syeikhul Maqari` to the canonical speaker prenominal enum
+- [x] Place it in speaker display ordering ahead of `Ustaz`
+- [x] Add focused regression coverage for formatted speaker names and slugs
+- [x] Run the minimal formatter and affected test file
+
+## Review
+
+- Root cause:
+  - the canonical speaker prenominal enum did not include `Syeikhul Maqari`, so the form schema could not offer it and the speaker formatter/slug pipeline could not recognize or order it
+  - speaker display ordering is centralized in `Speaker::preNominalSortOrder()`, so adding the enum case alone would not guarantee the requested `Syeikhul Maqari Ustaz ...` output
+- Fix:
+  - added `PreNominal::SyeikhulMaqari` with the `Syeikhul Maqari` label in the canonical prenominal enum
+  - inserted the new title into the speaker pre-nominal ordering immediately ahead of `Ustaz`, keeping it in the religious-prefix bucket used by public display names and slug generation
+  - extended `tests/Feature/SpeakerSlugGenerationTest.php` with a focused regression proving `['ustaz', 'syeikhul_maqari']` formats and slugs as `Syeikhul Maqari Ustaz Othman Hamzah`
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Enums/PreNominal.php app/Models/Speaker.php tests/Feature/SpeakerSlugGenerationTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerSlugGenerationTest.php` => **25 passed**, 64 assertions
+
 # Submit Event Wizard Navigation
 
 - [x] Change the submit-event wizard next button label to `Seterusnya`

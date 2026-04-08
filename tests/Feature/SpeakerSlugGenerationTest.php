@@ -176,6 +176,23 @@ it('supports maulana as a pre-nominal in formatted names and slugs', function ()
         ->and($speaker->slug)->toBe('maulana-dr-ahmad-fauzi-my');
 });
 
+it('supports syeikhul maqari ahead of ustaz in formatted names and slugs', function () {
+    $proposer = User::factory()->create();
+    $country = createSpeakerSlugCountry();
+
+    $speaker = app(ContributionEntityMutationService::class)->createSpeaker([
+        'name' => 'Othman Hamzah',
+        'gender' => 'male',
+        'pre_nominal' => ['ustaz', 'syeikhul_maqari'],
+        'address' => [
+            'country_id' => (string) $country->getKey(),
+        ],
+    ], $proposer);
+
+    expect($speaker->formatted_name)->toBe('Syeikhul Maqari Ustaz Othman Hamzah')
+        ->and($speaker->slug)->toBe('syeikhul-maqari-ustaz-othman-hamzah-my');
+});
+
 it('supports hj as a pre-nominal in formatted names and slugs', function () {
     $proposer = User::factory()->create();
     $country = createSpeakerSlugCountry();
