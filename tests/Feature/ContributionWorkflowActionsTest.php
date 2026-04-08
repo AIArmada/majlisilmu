@@ -255,13 +255,13 @@ it('resolves contribution update context from slug and uuid subjects', function 
         'slug' => 'speaker-action-subject',
         'name' => 'Speaker Action Subject',
         'bio' => 'Speaker bio.',
-    ]);
+    ])->fresh();
     $event = Event::factory()->create([
         'title' => 'Action Event',
         'slug' => 'action-event',
     ]);
 
-    $speakerContext = app(ResolveContributionUpdateContextAction::class)->handle('penceramah', 'speaker-action-subject');
+    $speakerContext = app(ResolveContributionUpdateContextAction::class)->handle('penceramah', (string) $speaker->slug);
     $eventContext = app(ResolveContributionUpdateContextAction::class)->handle('majlis', 'action-event');
 
     expect($speakerContext['entity']->is($speaker))->toBeTrue()
@@ -274,12 +274,12 @@ it('resolves contribution subjects from slug and uuid identifiers through the ac
     $institution = Institution::factory()->create([
         'slug' => 'institusi-tindakan',
         'name' => 'Institusi Tindakan',
-    ]);
+    ])->fresh();
     $reference = Reference::factory()->create([
         'slug' => 'tafsir-tindakan',
     ]);
 
-    $resolvedInstitution = app(ResolveContributionSubjectAction::class)->handle('institution', 'institusi-tindakan');
+    $resolvedInstitution = app(ResolveContributionSubjectAction::class)->handle('institution', (string) $institution->slug);
     $resolvedReference = app(ResolveContributionSubjectAction::class)->handle('rujukan', 'tafsir-tindakan');
 
     expect($resolvedInstitution->is($institution))->toBeTrue()

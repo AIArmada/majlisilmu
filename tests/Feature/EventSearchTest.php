@@ -286,7 +286,7 @@ describe('Event Search Filters', function () {
 
         $component
             ->assertSee('Surau Taman Melawati')
-            ->assertSee('Taman Melawati, Gombak & '.$state->name);
+            ->assertSee('Taman Melawati, Gombak, '.$state->name);
     });
 
     it('searches events by title', function () {

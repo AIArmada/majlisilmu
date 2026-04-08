@@ -17,13 +17,11 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Schema;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use RuntimeException;
 
 #[Layout('layouts.app')]
-#[Title('Submit Institution')]
 class SubmitInstitution extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
@@ -125,6 +123,13 @@ class SubmitInstitution extends Component implements HasActions, HasForms
         $this->successToast(__('Institution submitted for review.'));
 
         $this->redirect(route('contributions.index'), navigate: true);
+    }
+
+    public function rendering(object $view): void
+    {
+        if (method_exists($view, 'title')) {
+            $view->title(__('Submit Institution').' - '.config('app.name'));
+        }
     }
 
     protected function contributionForm(): Schema

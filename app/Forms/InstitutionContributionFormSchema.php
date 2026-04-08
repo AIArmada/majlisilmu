@@ -27,7 +27,7 @@ class InstitutionContributionFormSchema
         $publicCountryId = SharedFormSchema::preferredPublicCountryId();
 
         $components = [
-            Section::make(__('Profil Institusi'))
+            Section::make(__('Institution Profile'))
                 ->schema([
                     Select::make('type')
                         ->label(__('Institution Type'))
@@ -46,11 +46,7 @@ class InstitutionContributionFormSchema
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
-            Section::make(__('Contact'))
-                ->schema([
-                    SharedFormSchema::contactsRepeater(),
-                ]),
-            Section::make(__('Location'))
+            Section::make(__('Address'))
                 ->schema([
                     ...($shouldRenderLocationPicker
                         ? [
@@ -68,7 +64,7 @@ class InstitutionContributionFormSchema
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
-                            showCountryField: true,
+                            showCountryField: false,
                             defaultCountryId: $publicCountryId,
                             requireCountryField: true,
                         )
@@ -79,12 +75,16 @@ class InstitutionContributionFormSchema
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
-                            showCountryField: true,
+                            showCountryField: false,
                             defaultCountryId: $publicCountryId,
                             requireCountryField: true,
                         )]),
                 ])
                 ->columns($addressStatePath === null ? 2 : 1),
+            Section::make(__('Contact'))
+                ->schema([
+                    SharedFormSchema::contactsRepeater(),
+                ]),
             Section::make(__('Social Media'))
                 ->schema([
                     SharedFormSchema::socialMediaRepeater(__('Add social media links for this institution')),
@@ -92,7 +92,7 @@ class InstitutionContributionFormSchema
         ];
 
         if ($includeMedia) {
-            array_splice($components, 1, 0, [
+            array_splice($components, 2, 0, [
                 Section::make(__('Media'))
                     ->schema([
                         SpatieMediaLibraryFileUpload::make('cover')

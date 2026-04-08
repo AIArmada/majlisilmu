@@ -319,11 +319,11 @@
                             </div>
                         @else
                             <div class="flex items-center gap-2 hidden sm:flex">
-                                <a href="{{ route('login') }}" wire:navigate
+                                <a href="{{ \App\Support\Auth\IntendedRedirect::loginUrl(request()->fullUrl()) }}" wire:navigate
                                     class="hidden lg:inline-flex text-sm font-semibold text-slate-600 hover:text-emerald-600 transition-colors px-3">
                                     {{ __('Log In') }}
                                 </a>
-                                <a href="{{ route('register') }}" wire:navigate
+                                <a href="{{ \App\Support\Auth\IntendedRedirect::registerUrl(request()->fullUrl()) }}" wire:navigate
                                     class="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-700 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all duration-300">
                                     {{ __('Sign Up') }}
                                 </a>
@@ -350,11 +350,11 @@
                             </a>
                             @guest
                                 <div class="grid grid-cols-2 gap-3">
-                                    <a href="{{ route('login') }}" wire:navigate
+                                    <a href="{{ \App\Support\Auth\IntendedRedirect::loginUrl(request()->fullUrl()) }}" wire:navigate
                                         class="flex items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
                                         {{ __('Log In') }}
                                     </a>
-                                    <a href="{{ route('register') }}" wire:navigate
+                                    <a href="{{ \App\Support\Auth\IntendedRedirect::registerUrl(request()->fullUrl()) }}" wire:navigate
                                         class="flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">
                                         {{ __('Sign Up') }}
                                     </a>

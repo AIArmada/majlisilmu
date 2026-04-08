@@ -254,7 +254,7 @@
                             @foreach($eventMatches as $event)
                                 @php
                                     $eventHasPoster = $event->hasMedia('poster');
-                                    $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+                                    $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
                                     $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                                         '4:5' => 'aspect-[4/5]',
                                         '16:9' => 'aspect-[16/9]',

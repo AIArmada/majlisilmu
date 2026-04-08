@@ -23,6 +23,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View as SchemaView;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -305,13 +306,11 @@ it('requires country fields in institution and venue public creation forms', fun
 
     expect($institutionCountry)->toBeInstanceOf(Select::class)
         ->and($venueCountry)->toBeInstanceOf(Select::class)
-        ->and($contributionCountry)->toBeInstanceOf(Select::class);
+        ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
     expect(method_exists($institutionCountry, 'isRequired'))->toBeTrue();
     expect(method_exists($venueCountry, 'isRequired'))->toBeTrue();
-    expect(method_exists($contributionCountry, 'isRequired'))->toBeTrue();
     expect($institutionCountry?->isRequired())->toBeTrue();
     expect($venueCountry?->isRequired())->toBeTrue();
-    expect($contributionCountry?->isRequired())->toBeTrue();
 });
 
 it('requires google maps url in institution and venue quick-create forms', function () {
@@ -907,6 +906,74 @@ it('uses rich description and no logo upload in the institution contribution for
         ->and($components->get('description'))->toBeInstanceOf(RichEditor::class)
         ->and($components->get('contacts'))->toBeInstanceOf(Repeater::class)
         ->and($components->has('logo'))->toBeFalse();
+});
+
+it('places the institution contribution location section directly after the profile section', function () {
+    $sectionHeadings = collect(InstitutionContributionFormSchema::components(
+        includeMedia: true,
+        requireGoogleMaps: true,
+        addressStatePath: 'address',
+        includeLocationPicker: true,
+    ))
+        ->map(fn (mixed $component): ?string => $component instanceof Section ? (string) $component->getHeading() : null)
+        ->filter()
+        ->values()
+        ->all();
+
+    expect($sectionHeadings)->toBe([
+        __('Institution Profile'),
+        __('Address'),
+        __('Media'),
+        __('Contact'),
+        __('Social Media'),
+    ]);
+});
+
+it('keeps the institution contribution country field hidden while still storing its state', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponentsProperty = $reflection->getProperty('childComponents');
+            $childComponents = $childComponentsProperty->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $components = collect($flatten(InstitutionContributionFormSchema::components(
+        includeMedia: true,
+        requireGoogleMaps: true,
+        addressStatePath: 'address',
+        includeLocationPicker: true,
+    )))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
+
+    expect($components->get('country_id'))->toBeInstanceOf(Hidden::class);
 });
 
 it('uses the same core speaker fields in the quick-create modal and dedicated contribution form', function () {

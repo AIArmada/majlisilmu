@@ -782,7 +782,23 @@ it('redirects guest to login when trying to follow an institution', function () 
 
     Livewire::test('pages.institutions.show', ['institution' => $institution])
         ->call('toggleFollow')
-        ->assertRedirect(route('login'));
+        ->assertRedirect(route('login', ['redirect' => route('institutions.show', $institution, absolute: false)]));
+});
+
+it('preserves the institution url in guest auth links', function () {
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'name' => 'Institusi Arah Balik',
+    ]);
+
+    $institutionUrl = route('institutions.show', $institution, absolute: false);
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('href="'.route('register', ['redirect' => $institutionUrl]).'"', false)
+        ->assertSee('href="'.route('login', ['redirect' => $institutionUrl]).'"', false)
+        ->assertDontSee('href="'.route('register').'"', false)
+        ->assertDontSee('href="'.route('login').'"', false);
 });
 
 it('does not render breadcrumb and removed hero/page summary actions', function () {

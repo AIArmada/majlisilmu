@@ -3,6 +3,7 @@
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -51,6 +52,58 @@ it('redirects back to login when the provider is not configured', function () {
     $response->assertRedirect(route('login'));
     $response->assertSessionHas('toast.type', 'error');
     $response->assertSessionHas('toast.message', __('Google sign-in is not configured right now. Please use email and password instead.'));
+});
+
+it('redirects to the intended page after password login', function () {
+    $user = User::factory()->create([
+        'password' => Hash::make('Password123!'),
+    ]);
+
+    $target = route('events.index', absolute: false);
+
+    $this->get(route('login', ['redirect' => $target]))->assertOk();
+
+    $response = $this->post(route('login'), [
+        'email' => $user->email,
+        'password' => 'Password123!',
+    ]);
+
+    $response->assertRedirect($target);
+    $this->assertAuthenticatedAs($user);
+});
+
+it('redirects to the intended page after registration', function () {
+    $target = route('events.index', absolute: false);
+
+    $this->get(route('register', ['redirect' => $target]))->assertOk();
+
+    $response = $this->post(route('register.store'), [
+        'name' => 'New Member',
+        'email' => 'new-member@example.com',
+        'password' => 'Password123!',
+        'password_confirmation' => 'Password123!',
+    ]);
+
+    $response->assertRedirect($target);
+    $this->assertAuthenticated();
+});
+
+it('redirects to the intended page after google sign-in', function () {
+    $target = route('speakers.index', absolute: false);
+
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => 'google-intended-123',
+        'name' => 'Jane Intended',
+        'email' => 'intended@example.com',
+        'avatar' => 'https://example.com/intended.jpg',
+    ]));
+
+    $this->get(route('socialite.redirect', ['provider' => 'google', 'redirect' => $target]))
+        ->assertRedirect();
+
+    $response = $this->get(route('socialite.callback', ['provider' => 'google']));
+
+    $response->assertRedirect($target);
 });
 
 it('creates a user and social account on callback', function () {

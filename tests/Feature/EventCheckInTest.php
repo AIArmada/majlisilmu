@@ -113,7 +113,7 @@ it('redirects guests to login when trying to check in', function () {
 
     Livewire::test('pages.events.show', ['event' => $event])
         ->call('checkIn')
-        ->assertRedirect(route('login'));
+        ->assertRedirect(route('login', ['redirect' => route('events.show', $event, absolute: false)]));
 });
 
 it('prevents duplicate check-ins for the same event and user', function () {

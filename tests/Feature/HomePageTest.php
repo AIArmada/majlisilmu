@@ -69,6 +69,42 @@ it('loads the featured events component with upcoming events', function () {
         ->assertSee('Majlis Pilihan');
 });
 
+it('uses a 16:9 placeholder aspect ratio on featured home cards without posters', function () {
+    Event::factory()->create([
+        'title' => 'Majlis Pilihan Tanpa Poster',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+        'views_count' => 100,
+        'is_active' => true,
+    ]);
+
+    Livewire::test('home.featured-events')
+        ->assertSee('Majlis Pilihan Tanpa Poster')
+        ->assertSee('data-poster-aspect="16:9"', false);
+});
+
+it('renders the featured homepage card date badge below the poster image', function () {
+    Event::factory()->create([
+        'title' => 'Majlis Pilihan Dengan Tarikh Bawah',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+        'views_count' => 120,
+        'is_active' => true,
+    ]);
+
+    Livewire::test('home.featured-events')
+        ->assertSee('Majlis Pilihan Dengan Tarikh Bawah')
+        ->assertSee('data-testid="homepage-featured-card-meta-row"', false)
+        ->assertSee('data-testid="homepage-featured-card-date-badge"', false)
+        ->assertSeeInOrder([
+            'data-poster-aspect=',
+            'data-testid="homepage-featured-card-meta-row"',
+            'data-testid="homepage-featured-card-title-link"',
+        ], false);
+});
+
 it('loads the upcoming events component', function () {
     Event::factory()->create([
         'status' => 'approved',

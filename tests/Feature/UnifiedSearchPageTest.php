@@ -93,6 +93,31 @@ it('shows nearby event matches on the unified search page when location is prese
         ->assertSee(__('Nearby events'));
 });
 
+it('uses a 16:9 placeholder aspect ratio on unified search event cards without posters', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Carian Tanpa Poster',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Event::factory()
+        ->for($institution)
+        ->create([
+            'title' => 'Kuliah Carian Tanpa Poster',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+            'event_format' => EventFormat::Physical,
+            'is_active' => true,
+        ]);
+
+    $this->get(route('search.index', ['search' => 'Carian Tanpa Poster']))
+        ->assertOk()
+        ->assertSee('Kuliah Carian Tanpa Poster')
+        ->assertSee('data-poster-aspect="16:9"', false);
+});
+
 it('renders the book title only on book-backed search result cards without parentheses', function () {
     $institution = Institution::factory()->create([
         'name' => 'Masjid Carian Kitab',

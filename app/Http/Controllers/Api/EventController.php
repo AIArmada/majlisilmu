@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
+use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
@@ -319,7 +320,7 @@ class EventController extends Controller
     /**
      * Show a single event by ID or slug.
      */
-    public function show(Request $request, string $eventIdentifier): JsonResponse
+    public function show(Request $request, Event $event): JsonResponse
     {
         /** @var list<string> $allowedIncludes */
         $allowedIncludes = [
@@ -346,15 +347,19 @@ class EventController extends Controller
             'address.city',
         ];
 
+        $status = (string) $event->getRawOriginal('status');
+        $visibility = (string) $event->getRawOriginal('visibility');
+
+        abort_unless(
+            $event->is_active
+                && in_array($status, self::PUBLIC_STATUSES, true)
+                && $visibility === EventVisibility::Public->value,
+            404,
+        );
+
         $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker']))
             ->allowedIncludes(...$allowedIncludes)
-            ->where(function (Builder $query) use ($eventIdentifier): void {
-                $query->where('id', $eventIdentifier)
-                    ->orWhere('slug', $eventIdentifier);
-            })
-            ->where('is_active', true)
-            ->whereIn('status', self::PUBLIC_STATUSES)
-            ->where('visibility', 'public')
+            ->whereKey($event->getKey())
             ->firstOrFail();
 
         return response()->json(['data' => $event]);

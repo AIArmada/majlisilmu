@@ -329,9 +329,6 @@ it('supports locking and unlocking speaker records through the toggle', function
     Livewire::test(EditSpeaker::class, ['record' => $speaker->id])
         ->fillForm([
             'allow_public_event_submission' => false,
-            'address' => [
-                'country_id' => null,
-            ],
         ])
         ->call('save')
         ->assertHasNoErrors();
@@ -342,9 +339,6 @@ it('supports locking and unlocking speaker records through the toggle', function
     Livewire::test(EditSpeaker::class, ['record' => $speaker->id])
         ->fillForm([
             'allow_public_event_submission' => true,
-            'address' => [
-                'country_id' => null,
-            ],
         ])
         ->call('save')
         ->assertHasNoErrors();

@@ -192,14 +192,19 @@ class EventSeeder extends Seeder
         $malaysiaCountryId = $malaysia instanceof Country ? $malaysia->id : 132;
         $likeOperator = $this->databaseLikeOperator();
 
-        $institution = Institution::query()->firstOrCreate([
-            'slug' => 'masjid-tengku-ampuan-jemaah-bukit-jelutong',
-        ], [
-            'type' => 'masjid',
-            'name' => 'Masjid Tengku Ampuan Jemaah Bukit Jelutong',
-            'description' => 'Jadual kuliah Januari 2026.',
-            'status' => 'verified',
-        ]);
+        $institution = Institution::query()
+            ->where('name', 'Masjid Tengku Ampuan Jemaah Bukit Jelutong')
+            ->first();
+
+        if (! $institution instanceof Institution) {
+            $institution = Institution::query()->create([
+                'type' => 'masjid',
+                'name' => 'Masjid Tengku Ampuan Jemaah Bukit Jelutong',
+                'slug' => 'masjid-tengku-ampuan-jemaah-bukit-jelutong',
+                'description' => 'Jadual kuliah Januari 2026.',
+                'status' => 'verified',
+            ]);
+        }
 
         $institution->contacts()->firstOrCreate(
             ['category' => ContactCategory::Email->value],
@@ -238,11 +243,17 @@ class EventSeeder extends Seeder
             ]);
         }
 
-        $venue = Venue::query()->firstOrCreate([
-            'slug' => 'dewan-solat-utama-mtaj',
-        ], [
-            'name' => 'Dewan Solat Utama',
-        ]);
+        $venue = Venue::query()
+            ->whereIn('slug', ['dewan-solat-utama-mtaj', 'dewan-solat-utama'])
+            ->orWhere('name', 'Dewan Solat Utama')
+            ->first();
+
+        if (! $venue instanceof Venue) {
+            $venue = Venue::query()->create([
+                'name' => 'Dewan Solat Utama',
+                'slug' => 'dewan-solat-utama-mtaj',
+            ]);
+        }
 
         if (! $venue->address) {
             $venue->address()->create([
