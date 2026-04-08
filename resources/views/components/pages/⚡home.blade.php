@@ -348,34 +348,6 @@ new
         </section>
     @endguest
 
-    <section class="bg-slate-50 py-16">
-        <div class="container mx-auto px-6 lg:px-12">
-            <div class="mb-10 text-center">
-                <h2 class="font-heading text-3xl font-bold text-slate-900">{{ __('Jelajah Mengikut Kategori') }}</h2>
-                <p class="mt-3 text-slate-600">{{ __('Pilih topik yang anda minati') }}</p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <a href="{{ route('events.index', ['search' => 'Tazkirah']) }}" wire:navigate class="rounded-2xl border border-emerald-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
-                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-600">{{ __('Kategori') }}</div>
-                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Tazkirah') }}</div>
-                </a>
-                <a href="{{ route('events.index', ['search' => 'Tafsir']) }}" wire:navigate class="rounded-2xl border border-blue-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md">
-                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-blue-600">{{ __('Kategori') }}</div>
-                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Tafsir') }}</div>
-                </a>
-                <a href="{{ route('events.index', ['search' => 'Fiqh']) }}" wire:navigate class="rounded-2xl border border-amber-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md">
-                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-amber-600">{{ __('Kategori') }}</div>
-                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Fiqh') }}</div>
-                </a>
-                <a href="{{ route('events.index', ['search' => 'Sirah']) }}" wire:navigate class="rounded-2xl border border-violet-200 bg-white px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md">
-                    <div class="mb-3 text-sm font-semibold uppercase tracking-wide text-violet-600">{{ __('Kategori') }}</div>
-                    <div class="font-heading text-xl font-bold text-slate-900">{{ __('Sirah') }}</div>
-                </a>
-            </div>
-        </div>
-    </section>
-
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- UPCOMING CONTEXTUAL EVENTS (Prayer-time based)          --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
