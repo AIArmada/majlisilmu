@@ -972,14 +972,7 @@
                             };
                             $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                             $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
-                            $hierarchyParts = \App\Support\Location\AddressHierarchyFormatter::parts($addressModel);
-
-                            $hierarchyText = match (count($hierarchyParts)) {
-                                0 => '',
-                                1 => $hierarchyParts[0],
-                                2 => $hierarchyParts[0].' & '.$hierarchyParts[1],
-                                default => implode(', ', array_slice($hierarchyParts, 0, -1)).' & '.$hierarchyParts[array_key_last($hierarchyParts)],
-                            };
+                            $hierarchyText = \App\Support\Location\AddressHierarchyFormatter::format($addressModel);
 
                             $locationPrimaryText = is_string($primaryLocationName) && $primaryLocationName !== ''
                                 ? $primaryLocationName

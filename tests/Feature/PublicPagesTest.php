@@ -10,6 +10,7 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\ReferenceType;
+use App\Models\District;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
@@ -241,6 +242,58 @@ it('shows federal territory event cards on series pages with subdistrict and sta
         ->assertSuccessful()
         ->assertSee('Dewan Utama KL, Setiawangsa, Kuala Lumpur')
         ->assertDontSee('Dewan Utama KL, Kuala Lumpur, Kuala Lumpur');
+});
+
+it('shows comma-separated location hierarchy text on public events index cards', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahudin Abdul Aziz Shah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $state = State::query()->create([
+        'country_id' => 132,
+        'name' => 'Selangor',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Petaling',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => 132,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Shah Alam',
+    ]);
+
+    $institution->address()->update([
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Diskusi Dhuha Al-Quran',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'starts_at' => now()->addDay(),
+        'event_format' => EventFormat::Physical,
+        'institution_id' => $institution->id,
+        'is_active' => true,
+    ]);
+
+    $this->get(route('events.index', ['search' => 'Diskusi Dhuha']))
+        ->assertSuccessful()
+        ->assertSee('Shah Alam, Petaling, Selangor')
+        ->assertDontSee('Shah Alam, Petaling &amp; Selangor', false)
+        ->assertDontSee('Shah Alam, Petaling & Selangor');
 });
 
 it('renders the book title on public event and series cards without parentheses', function () {
