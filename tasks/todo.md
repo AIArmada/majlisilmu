@@ -1,3 +1,24 @@
+# Submit Event Wizard Navigation
+
+- [x] Change the submit-event wizard next button label to `Seterusnya`
+- [x] Hide the server-rendered next action on the final review step
+- [x] Add focused regression coverage and run the minimal formatter/tests
+
+## Review
+
+- Root cause:
+  - the wizard was relying on Filament's default next-step translation, which rendered as `Seterus` instead of the requested `Seterusnya`
+  - the review step state was inferred from the raw request query string, which did not survive the Livewire rerender path used when the wizard refreshes on the final step
+- Fix:
+  - imported Filament's `Action` type and Livewire's `#[Url(as: 'step')]` attribute into the inline submit-event component so the persisted wizard step survives Livewire rerenders
+  - assigned a stable explicit id to the review step and used the hydrated Livewire step property to suppress the next action on that final step while keeping the requested `Seterusnya` label elsewhere
+  - expanded `tests/Feature/SubmitEventReviewPreviewTest.php` to cover both the first-step next label and the review-step Livewire rerender path
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi resources/views/components/pages/submit-event/create.blade.php tests/Feature/SubmitEventReviewPreviewTest.php` => no errors
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventReviewPreviewTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter=SubmitEvent` => **80 passed**, 382 assertions
+
 # Public Event Card Book Subtitle Rollout
 
 - [x] Add a reusable event-level accessor for the public book-study subtitle so views do not duplicate the reference-type check

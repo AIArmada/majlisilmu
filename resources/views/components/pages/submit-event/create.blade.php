@@ -47,6 +47,7 @@ use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
+use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\DatePicker;
@@ -82,6 +83,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -94,8 +96,13 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     use InteractsWithForms;
     use WithFileUploads;
 
+    private const REVIEW_STEP_ID = 'form.semak-sebelum-hantar::data::wizard-step';
+
     /** @var array<string, mixed>|null */
     public ?array $data = [];
+
+    #[Url(as: 'step')]
+    public ?string $wizardStep = null;
 
     public ?string $parentEventId = null;
 
@@ -403,14 +410,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $hasScopedInstitution = $this->hasScopedInstitution();
         $hasScopedInstitutionJs = $hasScopedInstitution ? 'true' : 'false';
+        $isReviewStep = $this->wizardStep === self::REVIEW_STEP_ID;
         $submitButtonLabel = $hasScopedInstitution
             ? __('Publish Institution Event')
             : __('Hantar Majlis untuk Semakan');
 
-        return $schema
-            ->model(new Event)
-            ->schema([
-                Wizard::make([
+        $wizard = Wizard::make([
                     Step::make(__('Maklumat Majlis'))
                         ->icon('heroicon-o-document-text')
                         ->schema([
@@ -1350,6 +1355,7 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                         ]),
 
                     Step::make(__('Semak & Hantar'))
+                        ->id(self::REVIEW_STEP_ID)
                         ->icon('heroicon-o-paper-airplane')
                         ->schema([
                             Hidden::make('submission_country_id')
@@ -1430,6 +1436,10 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                             })
                         JS,
                     ])
+                    ->nextAction(fn (Action $action): Action => $action
+                        ->label($isReviewStep ? '' : __('Seterusnya'))
+                        ->hidden($isReviewStep)
+                    )
                     ->submitAction(new HtmlString(Blade::render(<<<'BLADE'
                                         <x-filament::button
                                             type="submit"
@@ -1439,7 +1449,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
                                         >
                                             {{ $label }}
                                         </x-filament::button>
-                                    BLADE, ['label' => $submitButtonLabel]))),
+                                    BLADE, ['label' => $submitButtonLabel])));
+
+        return $schema
+            ->model(new Event)
+            ->schema([
+                $wizard,
             ])
             ->statePath('data');
     }
