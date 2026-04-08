@@ -1,5 +1,12 @@
 <?php
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
+use App\Enums\RegistrationMode;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminGetRecordTool;
@@ -8,8 +15,12 @@ use App\Mcp\Tools\Admin\AdminGetWriteSchemaTool;
 use App\Mcp\Tools\Admin\AdminListRecordsTool;
 use App\Mcp\Tools\Admin\AdminListResourcesTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
+use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Series;
 use App\Models\Speaker;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -39,7 +50,7 @@ it('can request verbose admin resource metadata through the MCP resource list to
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->has('data.resources', 2)
+            ->has('data.resources', 3)
             ->where('data.resources.0.resource_class', fn (string $resourceClass): bool => str_contains($resourceClass, 'Resource'))
             ->etc());
 });
@@ -107,7 +118,7 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->etc());
 });
 
-it('returns write schema for supported resources and rejects unsupported resources', function () {
+it('returns write schema for supported resources and rejects unknown resources', function () {
     $admin = adminMcpUser('super_admin');
 
     AdminServer::actingAs($admin)
@@ -124,6 +135,17 @@ it('returns write schema for supported resources and rejects unsupported resourc
     AdminServer::actingAs($admin)
         ->tool(AdminGetWriteSchemaTool::class, [
             'resource_key' => 'events',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'events')
+            ->where('data.schema.method', 'POST')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'not-a-resource',
             'operation' => 'create',
         ])
         ->assertHasErrors(['Resource not found.']);
@@ -230,6 +252,98 @@ it('creates and updates institutions through MCP write tools', function () {
             ->where('data.record.attributes.name', 'Admin MCP Institution Updated')
             ->where('data.record.attributes.nickname', 'MCP Masjid')
             ->etc());
+});
+
+it('creates and updates events through MCP write tools', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+    $sourceTag = Tag::factory()->source()->verified()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'payload' => adminMcpEventPayload([
+                'institution' => $institution,
+                'speaker' => $speaker,
+                'reference' => $reference,
+                'series' => $series,
+                'domain_tag' => $domainTag,
+                'discipline_tag' => $disciplineTag,
+            ]),
+        ])
+        ->assertOk();
+
+    $event = Event::query()->where('title', 'Admin MCP Event Created')->with(['settings', 'references', 'series', 'tags', 'keyPeople'])->firstOrFail();
+    $eventId = (string) $event->getKey();
+
+    expect($event->live_url)->toBeNull()
+        ->and($event->organizer_type)->toBe(Institution::class)
+        ->and($event->settings?->registration_required)->toBeTrue()
+        ->and($event->references->pluck('id')->all())->toContain($reference->getKey())
+        ->and($event->series->pluck('id')->all())->toContain($series->getKey())
+        ->and($event->tags->pluck('id')->all())->toContain($domainTag->getKey(), $disciplineTag->getKey())
+        ->and($event->keyPeople)->toHaveCount(2);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'events',
+            'record_key' => $eventId,
+            'payload' => adminMcpEventPayload([
+                'institution' => $institution,
+                'speaker' => $speaker,
+                'reference' => $reference,
+                'series' => $series,
+                'domain_tag' => $domainTag,
+                'discipline_tag' => $disciplineTag,
+            ], [
+                'title' => 'Admin MCP Event Updated',
+                'event_date' => '2026-06-10',
+                'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+                'custom_time' => null,
+                'live_url' => 'https://youtube.com/watch?v=admin-mcp-event-live',
+                'organizer_type' => Speaker::class,
+                'organizer_id' => $speaker->getKey(),
+                'institution_id' => null,
+                'references' => [],
+                'series' => [],
+                'domain_tags' => [],
+                'discipline_tags' => [],
+                'source_tags' => [(string) $sourceTag->getKey()],
+                'speakers' => [],
+                'other_key_people' => [],
+                'registration_required' => false,
+            ]),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.title', 'Admin MCP Event Updated')
+            ->where('data.record.attributes.live_url', 'https://youtube.com/watch?v=admin-mcp-event-live')
+            ->etc());
+
+    $event->refresh()->load(['settings', 'references', 'series', 'tags', 'keyPeople']);
+
+    expect($event->title)->toBe('Admin MCP Event Updated')
+        ->and($event->live_url)->toBe('https://youtube.com/watch?v=admin-mcp-event-live')
+        ->and($event->organizer_type)->toBe(Speaker::class)
+        ->and($event->settings?->registration_required)->toBeFalse()
+        ->and($event->references)->toHaveCount(0)
+        ->and($event->series)->toHaveCount(0)
+        ->and($event->tags->pluck('id')->all())->toContain($sourceTag->getKey())
+        ->and($event->tags->pluck('id')->all())->not->toContain($domainTag->getKey(), $disciplineTag->getKey())
+        ->and($event->keyPeople)->toHaveCount(0);
 });
 
 it('rejects media fields through MCP write tools', function () {
@@ -437,4 +551,59 @@ function adminMcpUser(string $role): User
     $user->assignRole($role);
 
     return $user;
+}
+
+/**
+ * @param  array{
+ *     institution: Institution,
+ *     speaker: Speaker,
+ *     reference: Reference,
+ *     series: Series,
+ *     domain_tag: Tag,
+ *     discipline_tag: Tag
+ * }  $fixtures
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function adminMcpEventPayload(array $fixtures, array $overrides = []): array
+{
+    return array_replace([
+        'title' => 'Admin MCP Event Created',
+        'event_date' => '2026-05-27',
+        'prayer_time' => EventPrayerTime::LainWaktu->value,
+        'custom_time' => '20:00',
+        'end_time' => '22:00',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_format' => EventFormat::Hybrid->value,
+        'visibility' => EventVisibility::Public->value,
+        'event_url' => 'https://example.com/events/admin-mcp-event-created',
+        'live_url' => null,
+        'recording_url' => 'https://example.com/recordings/admin-mcp-event-created',
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'is_muslim_only' => true,
+        'event_type' => [EventType::Other->value],
+        'domain_tags' => [(string) $fixtures['domain_tag']->getKey()],
+        'discipline_tags' => [(string) $fixtures['discipline_tag']->getKey()],
+        'source_tags' => [],
+        'issue_tags' => [],
+        'references' => [(string) $fixtures['reference']->getKey()],
+        'organizer_type' => Institution::class,
+        'organizer_id' => (string) $fixtures['institution']->getKey(),
+        'institution_id' => (string) $fixtures['institution']->getKey(),
+        'series' => [(string) $fixtures['series']->getKey()],
+        'speakers' => [(string) $fixtures['speaker']->getKey()],
+        'other_key_people' => [
+            [
+                'role' => 'moderator',
+                'name' => 'Admin MCP Moderator',
+                'is_public' => true,
+                'notes' => 'Will host the session.',
+            ],
+        ],
+        'registration_required' => true,
+        'registration_mode' => RegistrationMode::Event->value,
+        'is_active' => true,
+    ], $overrides);
 }

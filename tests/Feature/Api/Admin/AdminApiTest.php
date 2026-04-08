@@ -1,7 +1,18 @@
 <?php
 
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
+use App\Enums\RegistrationMode;
+use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Series;
 use App\Models\Speaker;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -240,6 +251,114 @@ it('exposes admin institution write schema and can create and update institution
         ->assertJsonPath('data.record.attributes.nickname', 'API Masjid');
 });
 
+it('exposes admin event write schema and can create and update events through the api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+    $sourceTag = Tag::factory()->source()->verified()->create();
+
+    $this->getJson('/api/v1/admin/events/meta')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'events')
+        ->assertJsonPath('data.resource.write_support.schema', true)
+        ->assertJsonPath('data.resource.write_support.store', true)
+        ->assertJsonPath('data.resource.write_support.update', true)
+        ->assertJsonPath('data.resource.api_routes.collection', '/api/v1/admin/events')
+        ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/events/schema');
+
+    $this->getJson('/api/v1/admin/events/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.schema.resource_key', 'events')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/events')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.defaults.live_url', null);
+
+    $createResponse = $this->postJson('/api/v1/admin/events', adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ]))->assertCreated();
+
+    $eventId = (string) $createResponse->json('data.record.id');
+    $event = Event::query()
+        ->with(['settings', 'references', 'series', 'tags', 'keyPeople'])
+        ->findOrFail($eventId);
+
+    expect($event->title)->toBe('Admin API Event Created')
+        ->and($event->live_url)->toBeNull()
+        ->and($event->organizer_type)->toBe(Institution::class)
+        ->and($event->organizer_id)->toBe($institution->getKey())
+        ->and($event->starts_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('Y-m-d H:i'))->toBe('2026-05-20 20:00')
+        ->and($event->settings?->registration_required)->toBeTrue()
+        ->and($event->settings?->registration_mode)->toBe(RegistrationMode::Event)
+        ->and($event->references->pluck('id')->all())->toContain($reference->getKey())
+        ->and($event->series->pluck('id')->all())->toContain($series->getKey())
+        ->and($event->tags->pluck('id')->all())->toContain($domainTag->getKey(), $disciplineTag->getKey())
+        ->and($event->keyPeople)->toHaveCount(2);
+
+    $this->putJson('/api/v1/admin/events/'.$eventId, adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ], [
+        'title' => 'Admin API Event Updated',
+        'event_date' => '2026-06-01',
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'custom_time' => null,
+        'end_time' => '22:30',
+        'live_url' => 'https://youtube.com/watch?v=admin-api-event-live',
+        'organizer_type' => Speaker::class,
+        'organizer_id' => $speaker->getKey(),
+        'institution_id' => null,
+        'references' => [],
+        'series' => [],
+        'domain_tags' => [],
+        'discipline_tags' => [],
+        'source_tags' => [(string) $sourceTag->getKey()],
+        'speakers' => [],
+        'other_key_people' => [],
+        'registration_required' => false,
+    ]))->assertOk()
+        ->assertJsonPath('data.record.attributes.title', 'Admin API Event Updated')
+        ->assertJsonPath('data.record.attributes.live_url', 'https://youtube.com/watch?v=admin-api-event-live');
+
+    $event->refresh()->load(['settings', 'references', 'series', 'tags', 'keyPeople']);
+
+    expect($event->title)->toBe('Admin API Event Updated')
+        ->and($event->live_url)->toBe('https://youtube.com/watch?v=admin-api-event-live')
+        ->and($event->organizer_type)->toBe(Speaker::class)
+        ->and($event->organizer_id)->toBe($speaker->getKey())
+        ->and($event->starts_at?->copy()->timezone('Asia/Kuala_Lumpur')->format('Y-m-d H:i'))->toBe('2026-06-01 20:00')
+        ->and($event->settings?->registration_required)->toBeFalse()
+        ->and($event->references)->toHaveCount(0)
+        ->and($event->series)->toHaveCount(0)
+        ->and($event->tags->pluck('id')->all())->toContain($sourceTag->getKey())
+        ->and($event->tags->pluck('id')->all())->not->toContain($domainTag->getKey(), $disciplineTag->getKey())
+        ->and($event->keyPeople)->toHaveCount(0)
+        ->and($event->slug)->toContain($speaker->slug);
+});
+
 function ensureAdminApiMalaysiaCountryExists(): int
 {
     $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
@@ -275,4 +394,59 @@ function adminApiUser(string $role): User
     $user->assignRole($role);
 
     return $user;
+}
+
+/**
+ * @param  array{
+ *     institution: Institution,
+ *     speaker: Speaker,
+ *     reference: Reference,
+ *     series: Series,
+ *     domain_tag: Tag,
+ *     discipline_tag: Tag
+ * }  $fixtures
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function adminApiEventPayload(array $fixtures, array $overrides = []): array
+{
+    return array_replace([
+        'title' => 'Admin API Event Created',
+        'event_date' => '2026-05-20',
+        'prayer_time' => EventPrayerTime::LainWaktu->value,
+        'custom_time' => '20:00',
+        'end_time' => '22:00',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_format' => EventFormat::Hybrid->value,
+        'visibility' => EventVisibility::Public->value,
+        'event_url' => 'https://example.com/events/admin-api-event-created',
+        'live_url' => null,
+        'recording_url' => 'https://example.com/recordings/admin-api-event-created',
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'is_muslim_only' => true,
+        'event_type' => [EventType::Other->value],
+        'domain_tags' => [(string) $fixtures['domain_tag']->getKey()],
+        'discipline_tags' => [(string) $fixtures['discipline_tag']->getKey()],
+        'source_tags' => [],
+        'issue_tags' => [],
+        'references' => [(string) $fixtures['reference']->getKey()],
+        'organizer_type' => Institution::class,
+        'organizer_id' => (string) $fixtures['institution']->getKey(),
+        'institution_id' => (string) $fixtures['institution']->getKey(),
+        'series' => [(string) $fixtures['series']->getKey()],
+        'speakers' => [(string) $fixtures['speaker']->getKey()],
+        'other_key_people' => [
+            [
+                'role' => 'moderator',
+                'name' => 'Admin API Moderator',
+                'is_public' => true,
+                'notes' => 'Will host the session.',
+            ],
+        ],
+        'registration_required' => true,
+        'registration_mode' => RegistrationMode::Event->value,
+        'is_active' => true,
+    ], $overrides);
 }

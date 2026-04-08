@@ -2,18 +2,29 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Actions\Events\SaveAdminEventAction;
 use App\Actions\Institutions\SaveInstitutionAction;
 use App\Actions\Speakers\SaveSpeakerAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
+use App\Enums\EventKeyPersonRole;
+use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
 use App\Enums\Gender;
 use App\Enums\Honorific;
 use App\Enums\InstitutionType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Enums\RegistrationMode;
 use App\Enums\SocialMediaPlatform;
+use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
+use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
@@ -21,11 +32,13 @@ use App\Services\ContributionEntityMutationService;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
+use Spatie\MediaLibrary\HasMedia;
 
 class AdminResourceMutationService
 {
     public function __construct(
         private readonly ContributionEntityMutationService $contributionEntityMutationService,
+        private readonly SaveAdminEventAction $saveAdminEventAction,
         private readonly SaveInstitutionAction $saveInstitutionAction,
         private readonly SaveSpeakerAction $saveSpeakerAction,
     ) {}
@@ -36,6 +49,7 @@ class AdminResourceMutationService
     public function supports(string $resourceClass): bool
     {
         return in_array($resourceClass, [
+            EventResource::class,
             InstitutionResource::class,
             SpeakerResource::class,
         ], true);
@@ -53,6 +67,23 @@ class AdminResourceMutationService
             : $this->defaultsForCreate($resourceClass);
 
         return match ($resourceClass) {
+            EventResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'auto_managed',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof Event ? $this->mediaState($record, ['poster', 'gallery']) : null,
+                'fields' => $this->eventFields($updating),
+                'conditional_rules' => [
+                    ['field' => 'custom_time', 'required_when' => ['prayer_time' => [EventPrayerTime::LainWaktu->value]]],
+                    ['field' => 'organizer_id', 'required_when' => ['organizer_type' => [Institution::class, Speaker::class]]],
+                ],
+            ],
             InstitutionResource::class => [
                 'resource_key' => $resourceKey,
                 'operation' => $operation,
@@ -94,6 +125,7 @@ class AdminResourceMutationService
     public function rules(string $resourceClass, bool $updating = false): array
     {
         return match ($resourceClass) {
+            EventResource::class => $this->eventRules($updating),
             InstitutionResource::class => $this->institutionRules($updating),
             SpeakerResource::class => $this->speakerRules($updating),
             default => [],
@@ -107,6 +139,7 @@ class AdminResourceMutationService
     public function store(string $resourceClass, array $validated, User $actor): Model
     {
         return match ($resourceClass) {
+            EventResource::class => $this->saveAdminEventAction->handle($validated, $actor),
             InstitutionResource::class => $this->saveInstitutionAction->handle($validated, $actor),
             SpeakerResource::class => $this->saveSpeakerAction->handle($validated, $actor),
             default => throw new \RuntimeException('Unsupported admin write resource.'),
@@ -120,6 +153,9 @@ class AdminResourceMutationService
     public function update(string $resourceClass, Model $record, array $validated, User $actor): Model
     {
         return match ($resourceClass) {
+            EventResource::class => $record instanceof Event
+                ? $this->saveAdminEventAction->handle($validated, $actor, $record)
+                : throw new \RuntimeException('Expected event record.'),
             InstitutionResource::class => $record instanceof Institution
                 ? $this->saveInstitutionAction->handle($validated, $actor, $record)
                 : throw new \RuntimeException('Expected institution record.'),
@@ -137,6 +173,7 @@ class AdminResourceMutationService
     private function defaultsForCreate(string $resourceClass): array
     {
         return match ($resourceClass) {
+            EventResource::class => $this->saveAdminEventAction->defaultsForCreate(),
             InstitutionResource::class => [
                 'type' => InstitutionType::Masjid->value,
                 'is_active' => true,
@@ -185,6 +222,10 @@ class AdminResourceMutationService
             $defaults['clear_avatar'] = false;
             $defaults['clear_cover'] = false;
             $defaults['clear_gallery'] = false;
+        }
+
+        if ($record instanceof Event) {
+            $defaults = $this->saveAdminEventAction->formStateForRecord($record);
         }
 
         return $defaults;
@@ -257,8 +298,58 @@ class AdminResourceMutationService
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<int, array<string, mixed>>
+     */
+    private function eventFields(bool $updating): array
+    {
+        return [
+            $this->field('title', 'string', required: true, maxLength: 255),
+            $this->field('description', 'rich_text', required: false),
+            $this->field('event_date', 'date', required: true),
+            $this->field('prayer_time', 'string', required: true, default: EventPrayerTime::LainWaktu->value, allowedValues: $this->enumValues(EventPrayerTime::class)),
+            $this->field('custom_time', 'string', required: false, maxLength: 32),
+            $this->field('end_time', 'string', required: false, maxLength: 32),
+            $this->field('timezone', 'string', required: true, default: 'Asia/Kuala_Lumpur', maxLength: 64),
+            $this->field('event_format', 'string', required: true, default: EventFormat::Physical->value, allowedValues: $this->enumValues(EventFormat::class)),
+            $this->field('visibility', 'string', required: true, default: EventVisibility::Public->value, allowedValues: $this->enumValues(EventVisibility::class)),
+            $this->field('event_url', 'string', required: false, maxLength: 255),
+            $this->field('live_url', 'string', required: false, maxLength: 255),
+            $this->field('recording_url', 'string', required: false, maxLength: 255),
+            $this->field('gender', 'string', required: true, default: EventGenderRestriction::All->value, allowedValues: $this->enumValues(EventGenderRestriction::class)),
+            $this->field('age_group', 'array<string>', required: true, allowedValues: $this->enumValues(EventAgeGroup::class)),
+            $this->field('children_allowed', 'boolean', required: false, default: false),
+            $this->field('is_muslim_only', 'boolean', required: false, default: false),
+            $this->field('languages', 'array<int>', required: false),
+            $this->field('event_type', 'array<string>', required: true, allowedValues: $this->enumValues(EventType::class)),
+            $this->field('domain_tags', 'array<string>', required: false),
+            $this->field('discipline_tags', 'array<string>', required: false),
+            $this->field('source_tags', 'array<string>', required: false),
+            $this->field('issue_tags', 'array<string>', required: false),
+            $this->field('references', 'array<string>', required: false),
+            $this->field('organizer_type', 'string', required: false, allowedValues: [Institution::class, Speaker::class]),
+            $this->field('organizer_id', 'string', required: false),
+            $this->field('series', 'array<string>', required: false),
+            $this->field('institution_id', 'string', required: false),
+            $this->field('venue_id', 'string', required: false),
+            $this->field('space_id', 'string', required: false),
+            $this->field('speakers', 'array<string>', required: false),
+            $this->field('other_key_people', 'array<object>', required: false),
+            $this->field('poster', 'file', required: false),
+            $this->field('gallery', 'array<file>', required: false),
+            $this->field('clear_poster', 'boolean', required: false, default: false),
+            $this->field('clear_gallery', 'boolean', required: false, default: false),
+            $this->field('is_priority', 'boolean', required: false, default: false),
+            $this->field('is_featured', 'boolean', required: false, default: false),
+            $this->field('is_active', 'boolean', required: false, default: true),
+            $this->field('escalated_at', 'datetime', required: false),
+            $this->field('registration_required', 'boolean', required: false, default: false),
+            $this->field('registration_mode', 'string', required: false, default: RegistrationMode::Event->value, allowedValues: $this->enumValues(RegistrationMode::class)),
+        ];
+    }
+
+    /**
      * @param  list<string|int>|null  $allowedValues
+     * @return array<string, mixed>
      */
     private function field(
         string $name,
@@ -291,7 +382,6 @@ class AdminResourceMutationService
     }
 
     /**
-     * @param  bool  $updating
      * @return array<string, mixed>
      */
     private function institutionRules(bool $updating): array
@@ -339,7 +429,74 @@ class AdminResourceMutationService
     }
 
     /**
-     * @param  bool  $updating
+     * @return array<string, mixed>
+     */
+    private function eventRules(bool $updating): array
+    {
+        $required = $updating ? 'sometimes' : 'required';
+
+        return [
+            'title' => [$required, 'string', 'max:255'],
+            'description' => ['nullable'],
+            'event_date' => [$required, 'date'],
+            'prayer_time' => [$required, Rule::enum(EventPrayerTime::class)],
+            'custom_time' => ['nullable', 'string', 'max:32', 'required_if:prayer_time,'.EventPrayerTime::LainWaktu->value],
+            'end_time' => ['nullable', 'string', 'max:32'],
+            'timezone' => [$required, 'string', 'max:64'],
+            'event_format' => [$required, Rule::enum(EventFormat::class)],
+            'visibility' => [$required, Rule::enum(EventVisibility::class)],
+            'event_url' => ['nullable', 'url', 'max:255'],
+            'live_url' => ['nullable', 'url', 'max:255'],
+            'recording_url' => ['nullable', 'url', 'max:255'],
+            'gender' => [$required, Rule::enum(EventGenderRestriction::class)],
+            'age_group' => [$required, 'array', 'min:1'],
+            'age_group.*' => [Rule::enum(EventAgeGroup::class)],
+            'children_allowed' => ['sometimes', 'boolean'],
+            'is_muslim_only' => ['sometimes', 'boolean'],
+            'languages' => ['nullable', 'array'],
+            'languages.*' => ['integer', 'exists:languages,id'],
+            'event_type' => [$required, 'array', 'min:1'],
+            'event_type.*' => [Rule::enum(EventType::class)],
+            'domain_tags' => ['nullable', 'array'],
+            'domain_tags.*' => ['uuid', 'exists:tags,id'],
+            'discipline_tags' => ['nullable', 'array'],
+            'discipline_tags.*' => ['uuid', 'exists:tags,id'],
+            'source_tags' => ['nullable', 'array'],
+            'source_tags.*' => ['uuid', 'exists:tags,id'],
+            'issue_tags' => ['nullable', 'array'],
+            'issue_tags.*' => ['uuid', 'exists:tags,id'],
+            'references' => ['nullable', 'array'],
+            'references.*' => ['uuid', 'exists:references,id'],
+            'organizer_type' => ['nullable', 'string', Rule::in([Institution::class, Speaker::class, 'institution', 'speaker'])],
+            'organizer_id' => ['nullable', 'uuid'],
+            'series' => ['nullable', 'array'],
+            'series.*' => ['uuid', 'exists:series,id'],
+            'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
+            'venue_id' => ['nullable', 'uuid', 'exists:venues,id'],
+            'space_id' => ['nullable', 'uuid', 'exists:spaces,id'],
+            'speakers' => ['nullable', 'array'],
+            'speakers.*' => ['uuid', 'exists:speakers,id'],
+            'other_key_people' => ['nullable', 'array'],
+            'other_key_people.*.role' => ['required_with:other_key_people.*.name,other_key_people.*.speaker_id', Rule::enum(EventKeyPersonRole::class)],
+            'other_key_people.*.speaker_id' => ['nullable', 'uuid', 'exists:speakers,id', 'required_without:other_key_people.*.name'],
+            'other_key_people.*.name' => ['nullable', 'string', 'max:255', 'required_without:other_key_people.*.speaker_id'],
+            'other_key_people.*.is_public' => ['sometimes', 'boolean'],
+            'other_key_people.*.notes' => ['nullable', 'string', 'max:500'],
+            'poster' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'gallery' => ['nullable', 'array'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'clear_poster' => ['sometimes', 'boolean'],
+            'clear_gallery' => ['sometimes', 'boolean'],
+            'is_priority' => ['sometimes', 'boolean'],
+            'is_featured' => ['sometimes', 'boolean'],
+            'is_active' => ['sometimes', 'boolean'],
+            'escalated_at' => ['nullable', 'date'],
+            'registration_required' => ['sometimes', 'boolean'],
+            'registration_mode' => ['sometimes', Rule::enum(RegistrationMode::class)],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function speakerRules(bool $updating): array
@@ -401,7 +558,7 @@ class AdminResourceMutationService
     }
 
     /**
-     * @param  Model&\Spatie\MediaLibrary\HasMedia  $record
+     * @param  Model&HasMedia  $record
      * @param  list<string>  $collections
      * @return array<string, mixed>
      */
