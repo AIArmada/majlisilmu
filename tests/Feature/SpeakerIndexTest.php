@@ -159,6 +159,19 @@ it('renders translated search placeholder on speaker index', function () {
         ->assertSee(__('Search speakers...'));
 });
 
+it('renders the search clear control as an icon button instead of text', function () {
+    Speaker::factory()->create([
+        'name' => 'Samad Al-Bakri',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/penceramah?search=samad')
+        ->assertSuccessful()
+        ->assertSee('aria-label="Clear search"', false)
+        ->assertDontSee('>Clear<', false);
+});
+
 it('shows add-missing-speaker call to action on speaker index', function () {
     get('/penceramah')
         ->assertSuccessful()
