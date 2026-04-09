@@ -196,6 +196,7 @@ class SharedFormSchema
             ->label(__('Google Maps URL'))
             ->url()
             ->required($required)
+            ->readOnly(fn (Get $get): bool => $get('google_resolution_source') === 'picker' && filled($get('google_maps_url')))
             ->live(onBlur: true)
             ->afterStateUpdated(function (Get $get, Set $set, ?string $old, ?string $state): void {
                 self::normalizeGoogleMapsFieldState($get, $set, $state, $old);

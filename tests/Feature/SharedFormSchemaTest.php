@@ -482,7 +482,7 @@ it('requires google maps url on the dedicated institution contribution create fo
     expect($googleMaps?->isRequired())->toBeTrue();
 });
 
-it('hides the raw google maps field in picker mode while keeping the location requirement', function () {
+it('shows the raw google maps field in picker mode while keeping the location requirement', function () {
     config()->set('services.google.maps_api_key', 'test-maps-key');
     config()->set('services.google.places_enabled', true);
 
@@ -530,9 +530,101 @@ it('hides the raw google maps field in picker mode while keeping the location re
 
     $googleMaps = $components->get('google_maps_url');
 
-    expect($googleMaps)->toBeInstanceOf(Hidden::class);
+    expect($googleMaps)->toBeInstanceOf(TextInput::class);
     expect(method_exists($googleMaps, 'isRequired'))->toBeTrue();
     expect($googleMaps?->isRequired())->toBeTrue();
+});
+
+it('locks the dedicated institution contribution google maps url after picker selection but keeps manual mode editable', function () {
+    $livewire = new class extends LivewireComponent implements HasSchemas
+    {
+        use InteractsWithSchemas;
+
+        public ?array $data = [];
+
+        public function render(): string
+        {
+            return '';
+        }
+    };
+
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            if (! is_object($component)) {
+                continue;
+            }
+
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $findGoogleMapsField = function (Schema $schema) use ($flatten): ?TextInput {
+        return collect($flatten($schema->getComponents()))
+            ->first(function (mixed $component): bool {
+                return $component instanceof TextInput
+                    && method_exists($component, 'getName')
+                    && $component->getName() === 'google_maps_url';
+            });
+    };
+
+    $schema = Schema::make($livewire)
+        ->statePath('data')
+        ->components(InstitutionContributionFormSchema::components(
+            includeMedia: false,
+            requireGoogleMaps: true,
+            addressStatePath: 'address',
+            includeLocationPicker: true,
+        ));
+
+    $schema->fill([
+        'address' => [
+            'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+            'google_resolution_source' => 'manual',
+        ],
+    ]);
+
+    $googleMaps = $findGoogleMapsField($schema);
+
+    expect($googleMaps)->toBeInstanceOf(TextInput::class)
+        ->and(method_exists($googleMaps, 'isReadOnly'))->toBeTrue()
+        ->and($googleMaps?->isReadOnly())->toBeFalse();
+
+    $schema->fill([
+        'address' => [
+            'google_maps_url' => 'https://www.google.com/maps/search/?api=1&query=3.07853%2C101.52073&query_place_id=place_abc123',
+            'google_resolution_source' => 'picker',
+        ],
+    ]);
+
+    expect($googleMaps?->isReadOnly())->toBeTrue();
 });
 
 it('shows the raw google maps field in manual institution contribution mode', function () {
