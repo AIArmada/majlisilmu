@@ -30,7 +30,14 @@ return [
         'description' => 'Canonical API documentation for Majlis Ilmu client and platform integrations. '
             .'Get an access token by calling POST /auth/login or POST /auth/register with a device_name, '
             .'then send the returned access_token as Authorization: Bearer {token}. '
-            .'Existing users can also create and revoke personal access tokens from Account Settings > API Access inside the application.',
+            .'Existing users can also create and revoke personal access tokens from Account Settings > API Access inside the application. '
+            .'Public create flows currently exist for events, institutions, and speakers. '
+            .'Public update flows currently exist for events, institutions, speakers, and references via the contribution suggestion endpoints; those updates either apply immediately (`mode=direct_edit`) or create a review request (`mode=review`) depending on the caller\'s permissions. '
+            .'Public API support does not currently include creating references, venues, or series, and it does not currently include updating venues or series through the contribution endpoints. '
+            .'When you need required versus optional fields, defaults, catalog lookups, or conditional rules for a public mutation, fetch the corresponding GET /forms/* contract first. '
+            .'For public update suggestions specifically, fetch GET /forms/contributions/{subjectType}/{subject}/suggest first to get the current state, sparse editable fields, and direct-edit media capabilities. '
+            .'Admin create and update flows are schema-driven: discover writable resources with GET /admin/manifest, then fetch the exact contract with GET /admin/{resourceKey}/schema?operation=create or GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}. '
+            .'Admin write support is limited to resources whose write_support.schema flag is true in the admin manifest.',
     ],
 
     /*

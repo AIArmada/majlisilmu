@@ -8,12 +8,25 @@ use App\Enums\EventFormat;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+#[Group(
+    'Advanced Event',
+    'Authenticated parent-program creation flow. '
+    .'Use this when you need to create a reusable parent event and then attach child event submissions to it.',
+    weight: 31,
+)]
 class AdvancedEventController extends FrontendController
 {
+    #[Endpoint(
+        title: 'Create an advanced parent program',
+        description: 'Creates an authenticated parent program and returns the next submit-event endpoint to use for child sessions. '
+            .'Fetch `GET /forms/advanced-events` first to discover the exact required fields and option catalogs.',
+    )]
     public function store(
         Request $request,
         PrepareAdvancedParentProgramSubmissionAction $prepareAdvancedParentProgramSubmissionAction,

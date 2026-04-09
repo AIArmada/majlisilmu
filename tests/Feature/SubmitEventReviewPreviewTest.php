@@ -10,6 +10,14 @@ it('shows a submission preview section on submit event page', function () {
         ->assertSee(__('Seterusnya'));
 });
 
+it('scopes the next action loading target to the wizard next step only', function () {
+    $this->get(route('submit-event.create', ['step' => 'form.penceramah-media::data::wizard-step']))
+        ->assertSuccessful()
+        ->assertSee("callSchemaComponentMethod('form.data::wizard', 'nextStep')", false)
+        ->assertDontSee('window.__submitEventReviewRefreshed', false)
+        ->assertDontSee('$wire.$refresh()', false);
+});
+
 it('hides the next action when the review step rerenders', function () {
     $reviewStepId = 'form.semak-sebelum-hantar::data::wizard-step';
 

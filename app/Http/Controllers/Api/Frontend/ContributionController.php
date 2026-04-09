@@ -29,14 +29,29 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Services\ContributionEntityMutationService;
 use App\Support\Api\Frontend\FrontendMediaSyncService;
+use Dedoc\Scramble\Attributes\BodyParameter;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\PathParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
+#[Group(
+    'Contribution',
+    'Authenticated public contribution flows for creating institutions or speakers and suggesting edits to existing events, institutions, speakers, or references. '
+    .'Update suggestions are permission-aware: the same endpoint either edits directly or creates a review request.',
+    weight: 20,
+)]
 class ContributionController extends FrontendController
 {
+    #[Endpoint(
+        title: 'List contribution requests and pending approvals',
+        description: 'Returns the authenticated user\'s own contribution requests plus any pending approvals they are allowed to review.',
+    )]
     public function index(Request $request, ResolvePendingContributionApprovalsAction $resolvePendingContributionApprovalsAction): JsonResponse
     {
         $user = $this->requireUser($request);
@@ -59,6 +74,11 @@ class ContributionController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Create an institution contribution',
+        description: 'Creates a new public institution contribution request. '
+            .'Fetch `GET /forms/contributions/institutions` first to discover required fields, defaults, media support, and conditional rules.',
+    )]
     public function storeInstitution(
         Request $request,
         SubmitStagedContributionCreateAction $submitStagedContributionCreateAction,
@@ -128,6 +148,11 @@ class ContributionController extends FrontendController
         ], 201);
     }
 
+    #[Endpoint(
+        title: 'Create a speaker contribution',
+        description: 'Creates a new public speaker contribution request. '
+            .'Fetch `GET /forms/contributions/speakers` first to discover required fields, defaults, media support, and conditional rules.',
+    )]
     public function storeSpeaker(
         Request $request,
         SubmitStagedContributionCreateAction $submitStagedContributionCreateAction,
@@ -213,6 +238,22 @@ class ContributionController extends FrontendController
         ], 201);
     }
 
+    #[PathParameter(
+        'subjectType',
+        'Editable public subject type. Supported public route values are `majlis`, `institusi`, `penceramah`, and `rujukan`.',
+        example: 'penceramah',
+    )]
+    #[PathParameter(
+        'subject',
+        'Target entity slug or UUID.',
+        example: 'ustaz-hasan',
+    )]
+    #[Endpoint(
+        title: 'Get editable contribution context',
+        description: 'Returns the current editable state, presentation metadata, and permission flags for an existing subject. '
+            .'Call this before submitting an update so you know whether the caller can edit directly, which sparse top-level fields are supported, and whether a pending request already exists. '
+            .'Only institution `cover` uploads are supported, and only when `can_direct_edit` is true.',
+    )]
     public function suggestContext(
         string $subjectType,
         string $subject,
@@ -226,6 +267,7 @@ class ContributionController extends FrontendController
 
         $context = $resolveContributionUpdateContextAction->handle($subjectType, $subject);
         $entity = $context['entity'];
+        $canDirectEdit = $user->can('update', $entity);
 
         abort_unless($user->can('view', $entity), 403);
 
@@ -233,8 +275,12 @@ class ContributionController extends FrontendController
             'data' => [
                 'entity' => $this->entityData($entity),
                 'initial_state' => $context['initial_state'],
+                'accepts_partial_updates' => $context['contract']['accepts_partial_updates'],
+                'fields' => $context['contract']['fields'],
+                'conditional_rules' => $context['contract']['conditional_rules'],
+                'direct_edit_media_fields' => $canDirectEdit ? $context['contract']['direct_edit_media_fields'] : [],
                 'subject_presentation' => $resolveContributionSubjectPresentationAction->handle($entity),
-                'can_direct_edit' => $user->can('update', $entity),
+                'can_direct_edit' => $canDirectEdit,
                 'latest_pending_request' => ($latestPendingRequest = $resolveLatestPendingContributionRequestAction->handle($user, $entity)) instanceof ContributionRequest
                     ? $this->contributionRequestData($latestPendingRequest, $user)
                     : null,
@@ -245,6 +291,30 @@ class ContributionController extends FrontendController
         ]);
     }
 
+    #[PathParameter(
+        'subjectType',
+        'Editable public subject type. Supported public route values are `majlis`, `institusi`, `penceramah`, and `rujukan`.',
+        example: 'majlis',
+    )]
+    #[PathParameter(
+        'subject',
+        'Target entity slug or UUID.',
+        example: 'kuliah-maghrib-masjid-jamek',
+    )]
+    #[BodyParameter(
+        'proposer_note',
+        'Optional note from the proposer explaining why the requested changes are needed.',
+        required: false,
+        type: 'string',
+        infer: false,
+        example: 'Please update the speaker list and correct the title spelling.',
+    )]
+    #[Endpoint(
+        title: 'Submit a contribution update',
+        description: 'Submits a sparse top-level payload for an existing event, institution, speaker, or reference. '
+            .'Fetch `GET /forms/contributions/{subjectType}/{subject}/suggest` first to discover the editable field contract and current values. '
+            .'If the caller can update the subject directly, the changes are applied immediately and the response `mode` is `direct_edit`; otherwise a contribution review request is created and the response `mode` is `review`.',
+    )]
     public function suggestUpdate(
         string $subjectType,
         string $subject,
@@ -256,6 +326,7 @@ class ContributionController extends FrontendController
         SubmitContributionUpdateRequestAction $submitContributionUpdateRequestAction,
         ResolveContributionSubjectPresentationAction $resolveContributionSubjectPresentationAction,
         FrontendMediaSyncService $frontendMediaSyncService,
+        ContributionEntityMutationService $contributionEntityMutationService,
     ): JsonResponse {
         $user = $this->requireUser($request);
         $this->ensureDirectoryFeedbackAllowed($user);
@@ -263,22 +334,40 @@ class ContributionController extends FrontendController
         $context = $resolveContributionUpdateContextAction->handle($subjectType, $subject);
         $entity = $context['entity'];
         $originalData = $context['initial_state'];
+        $canDirectEdit = $user->can('update', $entity);
+        $allowsInstitutionCoverUpload = $canDirectEdit && $entity instanceof Institution;
 
         abort_unless($user->can('view', $entity), 403);
+
+        $uploadedFiles = array_keys($request->allFiles());
+
+        if ($uploadedFiles !== []) {
+            $unsupportedFileFields = array_values(array_filter(
+                $uploadedFiles,
+                static fn (string $field): bool => ! ($allowsInstitutionCoverUpload && $field === 'cover'),
+            ));
+
+            if ($unsupportedFileFields !== []) {
+                throw ValidationException::withMessages([
+                    'files' => [__('This update flow only supports institution cover uploads during direct edits.')],
+                ]);
+            }
+        }
 
         $payload = collect($request->all())
             ->only(array_merge(array_keys($originalData), ['proposer_note']))
             ->all();
 
-        if (isset($payload['proposer_note']) && ! is_string($payload['proposer_note'])) {
-            throw ValidationException::withMessages([
-                'proposer_note' => __('The proposer note must be a string.'),
-            ]);
-        }
+        $validatedPayload = validator(
+            $payload,
+            array_merge(
+                $contributionEntityMutationService->updateRulesFor($entity),
+                ['proposer_note' => ['sometimes', 'nullable', 'string', 'max:2000']],
+            ),
+        )->validate();
 
-        $submissionState = $resolveContributionSubmissionStateAction->handle($payload);
+        $submissionState = $resolveContributionSubmissionStateAction->handle($validatedPayload);
         $changes = $resolveContributionChangedPayloadAction->handle($submissionState['state'], $originalData);
-        $canDirectEdit = $user->can('update', $entity);
         $hasInstitutionCoverChange = $canDirectEdit && $entity instanceof Institution && $request->hasFile('cover');
 
         if ($changes === [] && ! $hasInstitutionCoverChange) {
@@ -326,6 +415,10 @@ class ContributionController extends FrontendController
         ], 201);
     }
 
+    #[Endpoint(
+        title: 'Approve a contribution request',
+        description: 'Approves a reviewable contribution request and applies the proposed changes.',
+    )]
     public function approve(
         string $requestId,
         Request $request,
@@ -348,6 +441,10 @@ class ContributionController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Reject a contribution request',
+        description: 'Rejects a reviewable contribution request with a reason code and optional reviewer note.',
+    )]
     public function reject(
         string $requestId,
         Request $request,
@@ -378,6 +475,10 @@ class ContributionController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Cancel a contribution request',
+        description: 'Cancels the authenticated user\'s own pending contribution request.',
+    )]
     public function cancel(
         string $requestId,
         Request $request,

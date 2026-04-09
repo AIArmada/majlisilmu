@@ -7,9 +7,19 @@ use App\Actions\Membership\AddMemberToSubject;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
+use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
 use App\Enums\Gender;
+use App\Enums\Honorific;
 use App\Enums\InstitutionType;
+use App\Enums\PostNominal;
+use App\Enums\PreNominal;
+use App\Enums\ReferenceType;
+use App\Enums\SocialMediaPlatform;
 use App\Enums\TagType;
 use App\Forms\SharedFormSchema;
 use App\Models\Address;
@@ -25,6 +35,7 @@ use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 class ContributionEntityMutationService
@@ -46,6 +57,243 @@ class ContributionEntityMutationService
             $entity instanceof Speaker => $this->speakerState($entity),
             $entity instanceof Reference => $this->referenceState($entity),
             $entity instanceof Event => $this->eventState($entity),
+            default => throw new RuntimeException('Unsupported contribution entity type.'),
+        };
+    }
+
+    /**
+     * @return array{
+     *     accepts_partial_updates: bool,
+     *     fields: list<array<string, mixed>>,
+     *     conditional_rules: list<array<string, mixed>>,
+     *     direct_edit_media_fields: list<string>
+     * }
+     */
+    public function contractFor(Model $entity): array
+    {
+        return match (true) {
+            $entity instanceof Institution => [
+                'accepts_partial_updates' => true,
+                'fields' => [
+                    $this->field('name', 'string', maxLength: 255),
+                    $this->field('nickname', 'string', maxLength: 255),
+                    $this->field('type', 'string', allowedValues: $this->enumValues(InstitutionType::class)),
+                    $this->field('description', 'rich_text'),
+                    $this->field('address', 'object'),
+                    $this->field('contacts', 'array<object>'),
+                    $this->field('social_media', 'array<object>'),
+                ],
+                'conditional_rules' => [],
+                'direct_edit_media_fields' => ['cover'],
+            ],
+            $entity instanceof Speaker => [
+                'accepts_partial_updates' => true,
+                'fields' => [
+                    $this->field('name', 'string', maxLength: 255),
+                    $this->field('gender', 'string', allowedValues: $this->enumValues(Gender::class)),
+                    $this->field('is_freelance', 'boolean'),
+                    $this->field('job_title', 'string', maxLength: 255),
+                    $this->field('honorific', 'array<string>', allowedValues: $this->enumValues(Honorific::class)),
+                    $this->field('pre_nominal', 'array<string>', allowedValues: $this->enumValues(PreNominal::class)),
+                    $this->field('post_nominal', 'array<string>', allowedValues: $this->enumValues(PostNominal::class)),
+                    $this->field('bio', 'rich_text'),
+                    $this->field('qualifications', 'array<object>'),
+                    $this->field('language_ids', 'array<int>', catalog: route('api.client.catalogs.languages')),
+                    $this->field('address', 'object'),
+                    $this->field('contacts', 'array<object>'),
+                    $this->field('social_media', 'array<object>'),
+                ],
+                'conditional_rules' => [],
+                'direct_edit_media_fields' => [],
+            ],
+            $entity instanceof Reference => [
+                'accepts_partial_updates' => true,
+                'fields' => [
+                    $this->field('title', 'string', maxLength: 255),
+                    $this->field('author', 'string', maxLength: 255),
+                    $this->field('type', 'string', allowedValues: $this->enumValues(ReferenceType::class)),
+                    $this->field('publication_year', 'string', maxLength: 255),
+                    $this->field('publisher', 'string', maxLength: 255),
+                    $this->field('description', 'string'),
+                    $this->field('social_media', 'array<object>'),
+                ],
+                'conditional_rules' => [],
+                'direct_edit_media_fields' => [],
+            ],
+            $entity instanceof Event => [
+                'accepts_partial_updates' => true,
+                'fields' => [
+                    $this->field('title', 'string', maxLength: 255),
+                    $this->field('description', 'rich_text'),
+                    $this->field('starts_at', 'datetime'),
+                    $this->field('ends_at', 'datetime'),
+                    $this->field('timezone', 'timezone'),
+                    $this->field('event_type', 'array<string>', allowedValues: $this->enumValues(EventType::class)),
+                    $this->field('gender', 'string', allowedValues: $this->enumValues(EventGenderRestriction::class)),
+                    $this->field('age_group', 'array<string>', allowedValues: $this->enumValues(EventAgeGroup::class)),
+                    $this->field('children_allowed', 'boolean'),
+                    $this->field('is_muslim_only', 'boolean'),
+                    $this->field('event_format', 'string', allowedValues: $this->enumValues(EventFormat::class)),
+                    $this->field('visibility', 'string', allowedValues: $this->enumValues(EventVisibility::class)),
+                    $this->field('event_url', 'url'),
+                    $this->field('live_url', 'url'),
+                    $this->field('recording_url', 'url'),
+                    $this->field('organizer_type', 'string', allowedValues: ['institution', 'speaker']),
+                    $this->field('organizer_id', 'uuid'),
+                    $this->field('institution_id', 'uuid', catalog: route('api.client.catalogs.submit-institutions')),
+                    $this->field('venue_id', 'uuid', catalog: route('api.client.catalogs.venues')),
+                    $this->field('space_id', 'uuid', catalog: route('api.client.catalogs.spaces')),
+                    $this->field('language_ids', 'array<int>', catalog: route('api.client.catalogs.languages')),
+                    $this->field('domain_tags', 'array<string>', catalog: route('api.client.catalogs.tags', ['type' => TagType::Domain->value])),
+                    $this->field('discipline_tags', 'array<string>', catalog: route('api.client.catalogs.tags', ['type' => TagType::Discipline->value])),
+                    $this->field('source_tags', 'array<string>', catalog: route('api.client.catalogs.tags', ['type' => TagType::Source->value])),
+                    $this->field('issue_tags', 'array<string>', catalog: route('api.client.catalogs.tags', ['type' => TagType::Issue->value])),
+                    $this->field('reference_ids', 'array<string>', catalog: route('api.client.catalogs.references')),
+                    $this->field('series_ids', 'array<string>'),
+                    $this->field('speaker_ids', 'array<string>', catalog: route('api.client.catalogs.submit-speakers')),
+                    $this->field('other_key_people', 'array<object>'),
+                ],
+                'conditional_rules' => [],
+                'direct_edit_media_fields' => [],
+            ],
+            default => throw new RuntimeException('Unsupported contribution entity type.'),
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function updateRulesFor(Model $entity): array
+    {
+        return match (true) {
+            $entity instanceof Institution => [
+                'name' => ['sometimes', 'string', 'max:255'],
+                'nickname' => ['nullable', 'string', 'max:255'],
+                'type' => ['sometimes', Rule::in($this->enumValues(InstitutionType::class))],
+                'description' => ['nullable'],
+                'address' => ['sometimes', 'array'],
+                'address.country_id' => ['sometimes', 'integer', 'exists:countries,id'],
+                'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
+                'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
+                'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
+                'address.line1' => ['nullable', 'string', 'max:255'],
+                'address.line2' => ['nullable', 'string', 'max:255'],
+                'address.postcode' => ['nullable', 'string', 'max:16'],
+                'address.lat' => ['nullable', 'numeric', 'between:-90,90'],
+                'address.lng' => ['nullable', 'numeric', 'between:-180,180'],
+                'address.google_maps_url' => ['nullable', 'url', 'max:255'],
+                'address.google_place_id' => ['nullable', 'string', 'max:255'],
+                'address.waze_url' => ['nullable', 'url', 'max:255'],
+                'contacts' => ['sometimes', 'array'],
+                'contacts.*.category' => ['required_with:contacts.*.value', Rule::in($this->enumValues(ContactCategory::class))],
+                'contacts.*.value' => ['required_with:contacts.*.category', 'string', 'max:255'],
+                'contacts.*.type' => ['nullable', Rule::in($this->enumValues(ContactType::class))],
+                'contacts.*.is_public' => ['nullable', 'boolean'],
+                'social_media' => ['sometimes', 'array'],
+                'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::in($this->enumValues(SocialMediaPlatform::class))],
+                'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
+                'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
+            ],
+            $entity instanceof Speaker => [
+                'name' => ['sometimes', 'string', 'max:255'],
+                'gender' => ['sometimes', Rule::in($this->enumValues(Gender::class))],
+                'is_freelance' => ['nullable', 'boolean'],
+                'job_title' => ['nullable', 'string', 'max:255'],
+                'honorific' => ['sometimes', 'array'],
+                'honorific.*' => ['string', Rule::in($this->enumValues(Honorific::class))],
+                'pre_nominal' => ['sometimes', 'array'],
+                'pre_nominal.*' => ['string', Rule::in($this->enumValues(PreNominal::class))],
+                'post_nominal' => ['sometimes', 'array'],
+                'post_nominal.*' => ['string', Rule::in($this->enumValues(PostNominal::class))],
+                'bio' => ['nullable'],
+                'address' => ['sometimes', 'array'],
+                'address.country_id' => ['sometimes', 'integer', 'exists:countries,id'],
+                'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
+                'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
+                'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
+                'address.line1' => ['nullable', 'string', 'max:255'],
+                'address.line2' => ['nullable', 'string', 'max:255'],
+                'address.postcode' => ['nullable', 'string', 'max:16'],
+                'address.lat' => ['nullable', 'numeric', 'between:-90,90'],
+                'address.lng' => ['nullable', 'numeric', 'between:-180,180'],
+                'address.google_maps_url' => ['nullable', 'url', 'max:255'],
+                'address.google_place_id' => ['nullable', 'string', 'max:255'],
+                'address.waze_url' => ['nullable', 'url', 'max:255'],
+                'qualifications' => ['sometimes', 'array'],
+                'qualifications.*.institution' => ['required_with:qualifications.*.degree', 'nullable', 'string', 'max:255'],
+                'qualifications.*.degree' => ['required_with:qualifications.*.institution', 'nullable', 'string', 'max:255'],
+                'qualifications.*.field' => ['nullable', 'string', 'max:255'],
+                'qualifications.*.year' => ['nullable', 'digits:4'],
+                'language_ids' => ['sometimes', 'array'],
+                'language_ids.*' => ['integer', 'exists:languages,id'],
+                'contacts' => ['sometimes', 'array'],
+                'contacts.*.category' => ['required_with:contacts.*.value', Rule::in($this->enumValues(ContactCategory::class))],
+                'contacts.*.value' => ['required_with:contacts.*.category', 'string', 'max:255'],
+                'contacts.*.type' => ['nullable', Rule::in($this->enumValues(ContactType::class))],
+                'contacts.*.is_public' => ['nullable', 'boolean'],
+                'social_media' => ['sometimes', 'array'],
+                'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::in($this->enumValues(SocialMediaPlatform::class))],
+                'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
+                'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
+            ],
+            $entity instanceof Reference => [
+                'title' => ['sometimes', 'string', 'max:255'],
+                'author' => ['nullable', 'string', 'max:255'],
+                'type' => ['sometimes', Rule::in($this->enumValues(ReferenceType::class))],
+                'publication_year' => ['nullable', 'string', 'max:255'],
+                'publisher' => ['nullable', 'string', 'max:255'],
+                'description' => ['nullable', 'string'],
+                'social_media' => ['sometimes', 'array'],
+                'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::in($this->enumValues(SocialMediaPlatform::class))],
+                'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
+                'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
+            ],
+            $entity instanceof Event => [
+                'title' => ['sometimes', 'string', 'max:255'],
+                'description' => ['nullable'],
+                'starts_at' => ['sometimes', 'date'],
+                'ends_at' => ['nullable', 'date'],
+                'timezone' => ['sometimes', 'timezone'],
+                'event_type' => ['sometimes', 'array'],
+                'event_type.*' => ['string', Rule::in($this->enumValues(EventType::class))],
+                'gender' => ['sometimes', Rule::in($this->enumValues(EventGenderRestriction::class))],
+                'age_group' => ['sometimes', 'array'],
+                'age_group.*' => ['string', Rule::in($this->enumValues(EventAgeGroup::class))],
+                'children_allowed' => ['nullable', 'boolean'],
+                'is_muslim_only' => ['nullable', 'boolean'],
+                'event_format' => ['sometimes', Rule::in($this->enumValues(EventFormat::class))],
+                'visibility' => ['sometimes', Rule::in($this->enumValues(EventVisibility::class))],
+                'event_url' => ['nullable', 'url', 'max:255'],
+                'live_url' => ['nullable', 'url', 'max:255'],
+                'recording_url' => ['nullable', 'url', 'max:255'],
+                'organizer_type' => ['sometimes', Rule::in(['institution', 'speaker', Institution::class, Speaker::class])],
+                'organizer_id' => ['nullable', 'uuid'],
+                'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
+                'venue_id' => ['nullable', 'uuid', 'exists:venues,id'],
+                'space_id' => ['nullable', 'uuid', 'exists:spaces,id'],
+                'language_ids' => ['sometimes', 'array'],
+                'language_ids.*' => ['integer', 'exists:languages,id'],
+                'domain_tags' => ['sometimes', 'array'],
+                'domain_tags.*' => ['uuid', Rule::exists('tags', 'id')->where('type', TagType::Domain->value)],
+                'discipline_tags' => ['sometimes', 'array'],
+                'discipline_tags.*' => ['uuid', Rule::exists('tags', 'id')->where('type', TagType::Discipline->value)],
+                'source_tags' => ['sometimes', 'array'],
+                'source_tags.*' => ['uuid', Rule::exists('tags', 'id')->where('type', TagType::Source->value)],
+                'issue_tags' => ['sometimes', 'array'],
+                'issue_tags.*' => ['uuid', Rule::exists('tags', 'id')->where('type', TagType::Issue->value)],
+                'reference_ids' => ['sometimes', 'array'],
+                'reference_ids.*' => ['uuid', 'exists:references,id'],
+                'series_ids' => ['sometimes', 'array'],
+                'series_ids.*' => ['uuid', 'exists:series,id'],
+                'speaker_ids' => ['sometimes', 'array'],
+                'speaker_ids.*' => ['uuid', 'exists:speakers,id'],
+                'other_key_people' => ['sometimes', 'array'],
+                'other_key_people.*.role' => ['required_with:other_key_people.*.name,other_key_people.*.speaker_id', Rule::in($this->enumValues(EventKeyPersonRole::class))],
+                'other_key_people.*.speaker_id' => ['nullable', 'uuid', 'exists:speakers,id', 'required_without:other_key_people.*.name'],
+                'other_key_people.*.name' => ['nullable', 'string', 'max:255', 'required_without:other_key_people.*.speaker_id'],
+                'other_key_people.*.is_public' => ['nullable', 'boolean'],
+                'other_key_people.*.notes' => ['nullable', 'string', 'max:1000'],
+            ],
             default => throw new RuntimeException('Unsupported contribution entity type.'),
         };
     }
@@ -137,7 +385,7 @@ class ContributionEntityMutationService
             'type' => array_key_exists('type', $payload)
                 ? $this->normalizeInstitutionType($payload['type'])
                 : ($institution->type instanceof BackedEnum ? $institution->type->value : $institution->type),
-            'description' => $payload['description'] ?? $institution->description,
+            'description' => array_key_exists('description', $payload) ? $payload['description'] : $institution->description,
         ]);
 
         $dirty = $institution->getDirty();
@@ -203,6 +451,37 @@ class ContributionEntityMutationService
         return Gender::Male->value;
     }
 
+    private function normalizeReferenceType(mixed $value): string
+    {
+        if ($value instanceof ReferenceType) {
+            return $value->value;
+        }
+
+        if (is_string($value) && ReferenceType::tryFrom($value) instanceof ReferenceType) {
+            return $value;
+        }
+
+        return ReferenceType::Book->value;
+    }
+
+    private function normalizeEventOrganizerTypeForPublicApi(mixed $value): ?string
+    {
+        return match ($value) {
+            Institution::class, 'institution' => 'institution',
+            Speaker::class, 'speaker' => 'speaker',
+            default => null,
+        };
+    }
+
+    private function normalizeEventOrganizerTypeForPersistence(mixed $value): ?string
+    {
+        return match ($value) {
+            Institution::class, 'institution' => Institution::class,
+            Speaker::class, 'speaker' => Speaker::class,
+            default => null,
+        };
+    }
+
     private function normalizeOptionalString(mixed $value): ?string
     {
         if (! is_string($value)) {
@@ -222,10 +501,10 @@ class ContributionEntityMutationService
     {
         $reference->fill([
             'title' => $payload['title'] ?? $reference->title,
-            'author' => $payload['author'] ?? $reference->author,
-            'type' => $payload['type'] ?? $reference->type,
-            'publication_year' => $payload['publication_year'] ?? $reference->publication_year,
-            'publisher' => $payload['publisher'] ?? $reference->publisher,
+            'author' => array_key_exists('author', $payload) ? $this->normalizeOptionalString($payload['author']) : $reference->author,
+            'type' => array_key_exists('type', $payload) ? $this->normalizeReferenceType($payload['type']) : $reference->type,
+            'publication_year' => array_key_exists('publication_year', $payload) ? $this->normalizeOptionalString($payload['publication_year']) : $reference->publication_year,
+            'publisher' => array_key_exists('publisher', $payload) ? $this->normalizeOptionalString($payload['publisher']) : $reference->publisher,
             'description' => array_key_exists('description', $payload) ? $payload['description'] : $reference->description,
         ]);
 
@@ -248,24 +527,26 @@ class ContributionEntityMutationService
         $event->fill([
             'title' => $payload['title'] ?? $event->title,
             'description' => array_key_exists('description', $payload) ? $payload['description'] : $event->description,
-            'starts_at' => $payload['starts_at'] ?? $event->starts_at,
-            'ends_at' => $payload['ends_at'] ?? $event->ends_at,
-            'timezone' => $payload['timezone'] ?? $event->timezone,
+            'starts_at' => array_key_exists('starts_at', $payload) ? $payload['starts_at'] : $event->starts_at,
+            'ends_at' => array_key_exists('ends_at', $payload) ? $payload['ends_at'] : $event->ends_at,
+            'timezone' => array_key_exists('timezone', $payload) ? $payload['timezone'] : $event->timezone,
             'event_type' => array_key_exists('event_type', $payload) ? $this->normalizeStringArray($payload['event_type']) : $event->event_type,
-            'gender' => $payload['gender'] ?? $event->gender,
+            'gender' => array_key_exists('gender', $payload) ? $payload['gender'] : $event->gender,
             'age_group' => array_key_exists('age_group', $payload) ? $this->normalizeStringArray($payload['age_group']) : $event->age_group,
             'children_allowed' => array_key_exists('children_allowed', $payload) ? (bool) $payload['children_allowed'] : $event->children_allowed,
             'is_muslim_only' => array_key_exists('is_muslim_only', $payload) ? (bool) $payload['is_muslim_only'] : $event->is_muslim_only,
-            'event_format' => $payload['event_format'] ?? $event->event_format,
-            'visibility' => $payload['visibility'] ?? $event->visibility,
-            'event_url' => $payload['event_url'] ?? $event->event_url,
-            'live_url' => $payload['live_url'] ?? $event->live_url,
-            'recording_url' => $payload['recording_url'] ?? $event->recording_url,
-            'organizer_type' => $payload['organizer_type'] ?? $event->organizer_type,
-            'organizer_id' => $payload['organizer_id'] ?? $event->organizer_id,
-            'institution_id' => $payload['institution_id'] ?? $event->institution_id,
-            'venue_id' => $payload['venue_id'] ?? $event->venue_id,
-            'space_id' => $payload['space_id'] ?? $event->space_id,
+            'event_format' => array_key_exists('event_format', $payload) ? $payload['event_format'] : $event->event_format,
+            'visibility' => array_key_exists('visibility', $payload) ? $payload['visibility'] : $event->visibility,
+            'event_url' => array_key_exists('event_url', $payload) ? $this->normalizeOptionalString($payload['event_url']) : $event->event_url,
+            'live_url' => array_key_exists('live_url', $payload) ? $this->normalizeOptionalString($payload['live_url']) : $event->live_url,
+            'recording_url' => array_key_exists('recording_url', $payload) ? $this->normalizeOptionalString($payload['recording_url']) : $event->recording_url,
+            'organizer_type' => array_key_exists('organizer_type', $payload)
+                ? $this->normalizeEventOrganizerTypeForPersistence($payload['organizer_type'])
+                : $event->organizer_type,
+            'organizer_id' => array_key_exists('organizer_id', $payload) ? $this->normalizeOptionalString($payload['organizer_id']) : $event->organizer_id,
+            'institution_id' => array_key_exists('institution_id', $payload) ? $this->normalizeOptionalString($payload['institution_id']) : $event->institution_id,
+            'venue_id' => array_key_exists('venue_id', $payload) ? $this->normalizeOptionalString($payload['venue_id']) : $event->venue_id,
+            'space_id' => array_key_exists('space_id', $payload) ? $this->normalizeOptionalString($payload['space_id']) : $event->space_id,
         ]);
 
         $dirty = $event->getDirty();
@@ -400,7 +681,7 @@ class ContributionEntityMutationService
             'event_url' => $event->event_url,
             'live_url' => $event->live_url,
             'recording_url' => $event->recording_url,
-            'organizer_type' => $event->organizer_type,
+            'organizer_type' => $this->normalizeEventOrganizerTypeForPublicApi($event->organizer_type),
             'organizer_id' => $event->organizer_id,
             'institution_id' => $event->institution_id,
             'venue_id' => $event->venue_id,
@@ -570,6 +851,39 @@ class ContributionEntityMutationService
         }
 
         return $address;
+    }
+
+    /**
+     * @param  class-string<BackedEnum>  $enumClass
+     * @return list<string|int>
+     */
+    private function enumValues(string $enumClass): array
+    {
+        return array_map(
+            static fn (BackedEnum $case): string|int => $case->value,
+            $enumClass::cases(),
+        );
+    }
+
+    /**
+     * @param  list<string|int>|null  $allowedValues
+     * @return array<string, mixed>
+     */
+    private function field(
+        string $name,
+        string $type,
+        ?int $maxLength = null,
+        ?array $allowedValues = null,
+        ?string $catalog = null,
+    ): array {
+        return array_filter([
+            'name' => $name,
+            'type' => $type,
+            'required' => false,
+            'max_length' => $maxLength,
+            'allowed_values' => $allowedValues,
+            'catalog' => $catalog,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     private function syncContacts(Model $model, mixed $contactPayload): void
