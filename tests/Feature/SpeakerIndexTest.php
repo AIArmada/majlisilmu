@@ -114,6 +114,9 @@ it('shows the total speaker count on the speaker index', function () {
 });
 
 it('uses a stable random speaker order instead of alphabetical sorting', function () {
+    $sessionSeed = 'speaker-index-test-seed';
+    session([Speaker::PUBLIC_DIRECTORY_SESSION_KEY => $sessionSeed]);
+
     $firstAlphabetical = Speaker::factory()->create([
         'name' => 'Adam Penceramah Rawak',
         'status' => 'verified',
@@ -134,9 +137,9 @@ it('uses a stable random speaker order instead of alphabetical sorting', functio
 
     $expectedOrder = [$firstAlphabetical->id, $secondAlphabetical->id];
 
-    usort($expectedOrder, static function (string $left, string $right): int {
-        $leftParts = Speaker::publicDirectorySortParts($left);
-        $rightParts = Speaker::publicDirectorySortParts($right);
+    usort($expectedOrder, static function (string $left, string $right) use ($sessionSeed): int {
+        $leftParts = Speaker::publicDirectorySortParts($left, $sessionSeed);
+        $rightParts = Speaker::publicDirectorySortParts($right, $sessionSeed);
 
         $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
 
