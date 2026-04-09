@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -40,6 +41,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  */
 class Speaker extends Model implements AuditableContract, HasMedia
 {
+    public const string PUBLIC_DIRECTORY_SESSION_KEY = 'public_speakers_directory_seed';
+
     /** @use HasFactory<SpeakerFactory> */
     use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
@@ -622,30 +625,59 @@ class Speaker extends Model implements AuditableContract, HasMedia
     #[Scope]
     protected function publicDirectoryOrder(Builder $query): void
     {
-        $offset = self::publicDirectoryOrderOffset();
+        $offset = self::publicDirectoryOrderOffset(self::publicDirectorySessionSeed());
         $idExpression = self::publicDirectoryOrderIdExpression($query);
 
         $query->orderByRaw("substr({$idExpression}, {$offset}, 32)")
             ->orderByRaw($idExpression.' asc');
     }
 
-    public static function publicDirectoryOrderOffset(?CarbonInterface $at = null): int
+    public static function publicDirectoryOrderOffset(?string $sessionSeed = null, ?CarbonInterface $at = null): int
     {
+        if (is_string($sessionSeed) && $sessionSeed !== '') {
+            return (abs((int) crc32($sessionSeed)) % 24) + 1;
+        }
+
         return (((int) ($at ?? now())->format('z')) % 24) + 1;
     }
 
     /**
      * @return array{primary: string, secondary: string}
      */
-    public static function publicDirectorySortParts(string $speakerId, ?CarbonInterface $at = null): array
+    public static function publicDirectorySortParts(string $speakerId, ?string $sessionSeed = null, ?CarbonInterface $at = null): array
     {
         $normalizedId = str_replace('-', '', $speakerId);
-        $offset = self::publicDirectoryOrderOffset($at);
+        $offset = self::publicDirectoryOrderOffset($sessionSeed, $at);
 
         return [
             'primary' => substr($normalizedId, $offset - 1),
             'secondary' => $normalizedId,
         ];
+    }
+
+    public static function publicDirectorySessionSeed(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+
+        if (! $request->hasSession()) {
+            return null;
+        }
+
+        $session = $request->session();
+        $seed = $session->get(self::PUBLIC_DIRECTORY_SESSION_KEY);
+
+        if (is_string($seed) && $seed !== '') {
+            return $seed;
+        }
+
+        $seed = (string) Str::uuid();
+        $session->put(self::PUBLIC_DIRECTORY_SESSION_KEY, $seed);
+
+        return $seed;
     }
 
     /**
