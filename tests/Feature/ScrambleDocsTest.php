@@ -69,6 +69,10 @@ it('exposes the admin api foundation in scramble docs under dedicated admin tags
     $paths = $response->json('paths');
 
     expect($paths['/admin/manifest']['get']['tags'] ?? null)->toContain('Admin Manifest')
+        ->and($paths['/admin/catalogs/countries']['get']['tags'] ?? null)->toContain('Admin Catalog')
+        ->and($paths['/admin/catalogs/states']['get']['tags'] ?? null)->toContain('Admin Catalog')
+        ->and($paths['/admin/catalogs/districts']['get']['tags'] ?? null)->toContain('Admin Catalog')
+        ->and($paths['/admin/catalogs/subdistricts']['get']['tags'] ?? null)->toContain('Admin Catalog')
         ->and($paths['/admin/{resourceKey}']['get']['tags'] ?? null)->toContain('Admin Resource')
         ->and($paths['/admin/{resourceKey}']['post']['tags'] ?? null)->toContain('Admin Resource')
         ->and($paths['/admin/{resourceKey}/meta']['get']['tags'] ?? null)->toContain('Admin Resource')
@@ -104,7 +108,9 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('does not currently include creating references, venues, or series')
         ->toContain('GET /forms/*')
         ->toContain('GET /admin/manifest')
-        ->toContain('GET /admin/{resourceKey}/schema?operation=create');
+        ->toContain('GET /admin/{resourceKey}/schema?operation=create')
+        ->toContain('GET /admin/catalogs/*')
+        ->toContain('Current admin write support includes events, institutions, speakers, references, and subdistricts.');
 });
 
 it('adds workflow summaries to public contract and mutation endpoints', function () {

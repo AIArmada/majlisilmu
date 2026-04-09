@@ -7,12 +7,17 @@ use App\Models\ContributionRequest;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Services\Notifications\ContributionRequestNotificationService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
 class RejectContributionRequestAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly ContributionRequestNotificationService $contributionRequestNotificationService,
+    ) {}
 
     public function handle(
         ContributionRequest $request,
@@ -43,6 +48,10 @@ class RejectContributionRequestAction
             }
         }
 
-        return $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
+        $freshRequest = $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
+
+        $this->contributionRequestNotificationService->notifyCreateRequestRejected($freshRequest);
+
+        return $freshRequest;
     }
 }

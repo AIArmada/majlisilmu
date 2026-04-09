@@ -77,6 +77,7 @@ class ContributionController extends FrontendController
     #[Endpoint(
         title: 'Create an institution contribution',
         description: 'Creates a new public institution contribution request. '
+            .'The proposer is not automatically added as an institution owner, admin, editor, or member; they only receive review outcome notifications. '
             .'Fetch `GET /forms/contributions/institutions` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeInstitution(
@@ -134,6 +135,7 @@ class ContributionController extends FrontendController
         );
 
         return response()->json([
+            'message' => __('Thank you. Your institution submission has been received. We will notify you if it is approved or rejected.'),
             'data' => [
                 'institution' => [
                     'id' => $institution->getKey(),

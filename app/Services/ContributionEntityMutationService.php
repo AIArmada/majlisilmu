@@ -317,8 +317,6 @@ class ContributionEntityMutationService
             'allow_public_event_submission' => true,
         ]);
 
-        $this->addMemberToSubject->handle($institution, $proposer);
-
         $this->syncInstitutionRelations($institution, $payload);
         $this->generateInstitutionSlugAction->syncInstitutionSlug($institution);
 
@@ -752,6 +750,16 @@ class ContributionEntityMutationService
 
         if (array_key_exists('language_ids', $payload)) {
             $speaker->syncLanguages($this->normalizeIntegerArray($payload['language_ids']));
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function syncReferenceRelations(Reference $reference, array $payload): void
+    {
+        if (array_key_exists('social_media', $payload)) {
+            $this->syncSocialMedia($reference, $payload['social_media']);
         }
     }
 

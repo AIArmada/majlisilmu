@@ -172,7 +172,7 @@ return [
         ],
         'submission_workflow' => [
             'label' => 'Aliran Hantar Majlis',
-            'description' => 'Kemas kini moderasi untuk majlis yang anda hantar atau bantu uruskan.',
+            'description' => 'Kemas kini moderasi untuk majlis dan entri direktori yang anda hantar atau bantu uruskan.',
         ],
     ],
     'triggers' => [
@@ -238,15 +238,15 @@ return [
         ],
         'submission_received' => [
             'label' => 'Hantaran diterima',
-            'description' => 'Sahkan bahawa majlis yang dihantar sudah masuk ke aliran moderasi.',
+            'description' => 'Sahkan bahawa sesuatu hantaran sudah masuk ke aliran moderasi.',
         ],
         'submission_approved' => [
             'label' => 'Hantaran diluluskan',
-            'description' => 'Maklumkan apabila majlis yang dihantar diluluskan.',
+            'description' => 'Maklumkan apabila salah satu hantaran saya diluluskan.',
         ],
         'submission_rejected' => [
             'label' => 'Hantaran ditolak',
-            'description' => 'Maklumkan apabila majlis yang dihantar ditolak.',
+            'description' => 'Maklumkan apabila salah satu hantaran saya ditolak.',
         ],
         'submission_needs_changes' => [
             'label' => 'Hantaran perlu pembetulan',
@@ -310,6 +310,15 @@ return [
         ],
         'submission_rejected' => [
             'title' => 'Hantaran ditolak: :title',
+            'body' => 'Hantaran ini telah ditolak.',
+            'body_with_note' => 'Hantaran ini telah ditolak. Nota: :note',
+        ],
+        'directory_submission_approved' => [
+            'title' => ':subject diluluskan: :title',
+            'body' => 'Hantaran anda telah diluluskan dan kini boleh dilihat oleh umum.',
+        ],
+        'directory_submission_rejected' => [
+            'title' => ':subject ditolak: :title',
             'body' => 'Hantaran ini telah ditolak.',
             'body_with_note' => 'Hantaran ini telah ditolak. Nota: :note',
         ],

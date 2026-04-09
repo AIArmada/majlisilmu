@@ -11,9 +11,13 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
+use App\Models\Space;
 use App\Models\Speaker;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\User;
+use App\Models\Venue;
+use App\Support\Location\FederalTerritoryLocation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -38,7 +42,7 @@ it('lists accessible admin resources for privileged users', function () {
 
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 
-    expect($resourceKeys)->toContain('speakers', 'events', 'institutions');
+    expect($resourceKeys)->toContain('speakers', 'events', 'institutions', 'references', 'subdistricts');
 });
 
 it('allows viewer-role users who can access the admin panel to reach the admin api manifest', function () {
@@ -251,6 +255,222 @@ it('exposes admin institution write schema and can create and update institution
         ->assertJsonPath('data.record.attributes.nickname', 'API Masjid');
 });
 
+it('lists admin geography catalogs and exposes catalog metadata through admin write schemas', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $fixtures = ensureAdminApiSubdistrictFixtures();
+
+    $subdistrictId = DB::table('subdistricts')->insertGetId([
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['state_id'],
+        'district_id' => $fixtures['district_id'],
+        'name' => 'Admin API Catalog Subdistrict',
+        'country_code' => 'MY',
+    ]);
+
+    $this->getJson('/api/v1/admin/catalogs/countries')
+        ->assertOk()
+        ->assertJsonFragment([
+            'id' => $fixtures['country_id'],
+            'label' => 'Malaysia',
+        ]);
+
+    $this->getJson('/api/v1/admin/catalogs/states?country_id='.$fixtures['country_id'])
+        ->assertOk()
+        ->assertJsonFragment([
+            'id' => $fixtures['state_id'],
+        ]);
+
+    $this->getJson('/api/v1/admin/catalogs/districts?state_id='.$fixtures['state_id'])
+        ->assertOk()
+        ->assertJsonFragment([
+            'id' => $fixtures['district_id'],
+        ]);
+
+    $this->getJson('/api/v1/admin/catalogs/subdistricts?district_id='.$fixtures['district_id'])
+        ->assertOk()
+        ->assertJsonFragment([
+            'id' => $subdistrictId,
+            'label' => 'Admin API Catalog Subdistrict',
+        ]);
+
+    $institutionSchema = $this->getJson('/api/v1/admin/institutions/schema?operation=create')
+        ->assertOk()
+        ->json('data.schema.catalogs');
+
+    $institutionCatalogs = collect(is_array($institutionSchema) ? $institutionSchema : [])->keyBy('field');
+
+    expect($institutionCatalogs->get('address.country_id')['endpoint'] ?? null)->toBe('/api/v1/admin/catalogs/countries')
+        ->and($institutionCatalogs->get('address.state_id')['query']['country_id'] ?? null)->toBe('{address.country_id}')
+        ->and($institutionCatalogs->get('address.district_id')['query']['state_id'] ?? null)->toBe('{address.state_id}')
+        ->and($institutionCatalogs->get('address.subdistrict_id')['query']['district_id'] ?? null)->toBe('{address.district_id}');
+
+    $subdistrictSchema = $this->getJson('/api/v1/admin/subdistricts/schema?operation=create')
+        ->assertOk()
+        ->json('data.schema.catalogs');
+
+    $subdistrictCatalogs = collect(is_array($subdistrictSchema) ? $subdistrictSchema : [])->keyBy('field');
+
+    expect($subdistrictCatalogs->get('country_id')['endpoint'] ?? null)->toBe('/api/v1/admin/catalogs/countries')
+        ->and($subdistrictCatalogs->get('state_id')['query']['country_id'] ?? null)->toBe('{country_id}')
+        ->and($subdistrictCatalogs->get('district_id')['query']['state_id'] ?? null)->toBe('{state_id}');
+});
+
+it('exposes admin reference write schema and can create and update references through the api', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/references/meta')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'references')
+        ->assertJsonPath('data.resource.write_support.schema', true)
+        ->assertJsonPath('data.resource.write_support.store', true)
+        ->assertJsonPath('data.resource.write_support.update', true)
+        ->assertJsonPath('data.resource.api_routes.collection', '/api/v1/admin/references')
+        ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/references/schema');
+
+    $this->getJson('/api/v1/admin/references/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.schema.resource_key', 'references')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/references')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.defaults.type', 'book');
+
+    $createResponse = $this->postJson('/api/v1/admin/references', [
+        'title' => 'Admin API Reference',
+        'author' => 'Admin API Author',
+        'type' => 'book',
+        'publication_year' => '2024',
+        'publisher' => 'Admin API Press',
+        'description' => 'Admin API reference description.',
+        'is_canonical' => true,
+        'status' => 'verified',
+        'is_active' => true,
+        'social_media' => [
+            [
+                'platform' => 'website',
+                'url' => 'https://example.com/references/admin-api-reference',
+            ],
+        ],
+    ])->assertCreated();
+
+    $referenceId = (string) $createResponse->json('data.record.id');
+    $reference = Reference::query()->with('socialMedia')->findOrFail($referenceId);
+
+    expect($reference->title)->toBe('Admin API Reference')
+        ->and($reference->slug)->toBe('admin-api-reference')
+        ->and($reference->is_canonical)->toBeTrue()
+        ->and($reference->status)->toBe('verified')
+        ->and($reference->is_active)->toBeTrue()
+        ->and($reference->socialMedia)->toHaveCount(1)
+        ->and($reference->socialMedia->first()?->platform)->toBe('website');
+
+    $this->putJson('/api/v1/admin/references/'.$referenceId, [
+        'title' => 'Admin API Reference Updated',
+        'author' => 'Admin API Editor',
+        'type' => 'article',
+        'publication_year' => null,
+        'publisher' => 'Admin API Review',
+        'description' => 'Updated admin API reference description.',
+        'is_canonical' => false,
+        'status' => 'pending',
+        'is_active' => false,
+        'social_media' => [
+            [
+                'platform' => 'youtube',
+                'url' => 'https://youtube.com/watch?v=admin-api-reference-updated',
+            ],
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.title', 'Admin API Reference Updated')
+        ->assertJsonPath('data.record.attributes.slug', 'admin-api-reference-updated')
+        ->assertJsonPath('data.record.attributes.type', 'article');
+
+    $reference->refresh()->load('socialMedia');
+
+    expect($reference->title)->toBe('Admin API Reference Updated')
+        ->and($reference->slug)->toBe('admin-api-reference-updated')
+        ->and($reference->type)->toBe('article')
+        ->and($reference->publication_year)->toBeNull()
+        ->and($reference->publisher)->toBe('Admin API Review')
+        ->and($reference->is_canonical)->toBeFalse()
+        ->and($reference->status)->toBe('pending')
+        ->and($reference->is_active)->toBeFalse()
+        ->and($reference->socialMedia)->toHaveCount(1)
+        ->and($reference->socialMedia->first()?->platform)->toBe('youtube');
+});
+
+it('exposes admin subdistrict write schema and can create and update subdistricts through the api', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $fixtures = ensureAdminApiSubdistrictFixtures();
+
+    $this->getJson('/api/v1/admin/subdistricts/meta')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'subdistricts')
+        ->assertJsonPath('data.resource.write_support.schema', true)
+        ->assertJsonPath('data.resource.write_support.store', true)
+        ->assertJsonPath('data.resource.write_support.update', true)
+        ->assertJsonPath('data.resource.api_routes.collection', '/api/v1/admin/subdistricts')
+        ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/subdistricts/schema');
+
+    $this->getJson('/api/v1/admin/subdistricts/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.schema.resource_key', 'subdistricts')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/subdistricts')
+        ->assertJsonPath('data.schema.content_type', 'application/json')
+        ->assertJsonPath('data.schema.conditional_rules.0.field', 'district_id');
+
+    $createResponse = $this->postJson('/api/v1/admin/subdistricts', [
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['federal_state_id'],
+        'district_id' => null,
+        'name' => 'Admin API Federal Territory Subdistrict',
+    ])->assertCreated();
+
+    $subdistrictId = (string) $createResponse->json('data.record.id');
+    $subdistrict = Subdistrict::query()->findOrFail($subdistrictId);
+
+    expect((int) $subdistrict->country_id)->toBe($fixtures['country_id'])
+        ->and((int) $subdistrict->state_id)->toBe($fixtures['federal_state_id'])
+        ->and($subdistrict->district_id)->toBeNull()
+        ->and($subdistrict->country_code)->toBe('MY');
+
+    $this->putJson('/api/v1/admin/subdistricts/'.$subdistrictId, [
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['state_id'],
+        'district_id' => $fixtures['district_id'],
+        'name' => 'Admin API Updated Subdistrict',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Updated Subdistrict')
+        ->assertJsonPath('data.record.attributes.district_id', $fixtures['district_id']);
+
+    $subdistrict->refresh();
+
+    expect((int) $subdistrict->state_id)->toBe($fixtures['state_id'])
+        ->and((int) $subdistrict->district_id)->toBe($fixtures['district_id'])
+        ->and($subdistrict->name)->toBe('Admin API Updated Subdistrict');
+});
+
+it('requires district_id for non-federal-territory subdistrict writes', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $fixtures = ensureAdminApiSubdistrictFixtures();
+
+    $this->postJson('/api/v1/admin/subdistricts', [
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['state_id'],
+        'district_id' => null,
+        'name' => 'Admin API Invalid Subdistrict',
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['district_id']);
+});
+
 it('exposes admin event write schema and can create and update events through the api', function () {
     ensureAdminApiMalaysiaCountryExists();
 
@@ -447,8 +667,8 @@ it('rejects admin event writes with conflicting location selections', function (
     $series = Series::factory()->create();
     $domainTag = Tag::factory()->domain()->verified()->create();
     $disciplineTag = Tag::factory()->discipline()->verified()->create();
-    $venue = \App\Models\Venue::factory()->create();
-    $space = \App\Models\Space::factory()->create();
+    $venue = Venue::factory()->create();
+    $space = Space::factory()->create();
     $otherInstitution->spaces()->attach($space);
 
     $this->postJson('/api/v1/admin/events', adminApiEventPayload([
@@ -483,6 +703,50 @@ function ensureAdminApiMalaysiaCountryExists(): int
         'region' => 'Asia',
         'subregion' => 'South-Eastern Asia',
     ]);
+}
+
+/**
+ * @return array{country_id: int, state_id: int, district_id: int, federal_state_id: int}
+ */
+function ensureAdminApiSubdistrictFixtures(): array
+{
+    $countryId = ensureAdminApiMalaysiaCountryExists();
+    $suffix = Str::lower(Str::random(8));
+
+    $stateId = DB::table('states')->insertGetId([
+        'country_id' => $countryId,
+        'name' => 'Admin API Negeri '.$suffix,
+        'country_code' => 'MY',
+    ]);
+
+    $districtId = DB::table('districts')->insertGetId([
+        'country_id' => $countryId,
+        'state_id' => $stateId,
+        'name' => 'Admin API Daerah '.$suffix,
+        'country_code' => 'MY',
+    ]);
+
+    $federalStateId = DB::table('states')
+        ->where('country_id', $countryId)
+        ->where('name', 'Kuala Lumpur')
+        ->value('id');
+
+    if (! is_int($federalStateId)) {
+        $federalStateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Kuala Lumpur',
+            'country_code' => 'MY',
+        ]);
+    }
+
+    FederalTerritoryLocation::flushStateIdCache();
+
+    return [
+        'country_id' => $countryId,
+        'state_id' => $stateId,
+        'district_id' => $districtId,
+        'federal_state_id' => $federalStateId,
+    ];
 }
 
 function adminApiUser(string $role): User

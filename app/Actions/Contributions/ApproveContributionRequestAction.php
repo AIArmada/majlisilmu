@@ -16,6 +16,7 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
 use App\Services\ModerationService;
+use App\Services\Notifications\ContributionRequestNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -28,6 +29,7 @@ class ApproveContributionRequestAction
     public function __construct(
         private readonly ModerationService $moderationService,
         private readonly ContributionEntityMutationService $entityMutationService,
+        private readonly ContributionRequestNotificationService $contributionRequestNotificationService,
         private readonly AssignOwnerToNewSubject $assignOwnerToNewSubject,
         private readonly GenerateInstitutionSlugAction $generateInstitutionSlugAction,
         private readonly GenerateSpeakerSlugAction $generateSpeakerSlugAction,
@@ -59,7 +61,11 @@ class ApproveContributionRequestAction
             ])->save();
         });
 
-        return $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
+        $freshRequest = $request->fresh(['entity', 'proposer', 'reviewer']) ?? $request;
+
+        $this->contributionRequestNotificationService->notifyCreateRequestApproved($freshRequest);
+
+        return $freshRequest;
     }
 
     private function approveCreateRequest(ContributionRequest $request): Institution|Speaker
@@ -75,7 +81,7 @@ class ApproveContributionRequestAction
                 'is_active' => true,
             ])->save();
 
-            $this->attachAsOwner($request->proposer, $entity);
+            $this->attachAsOwnerIfSupported($request->proposer, $entity);
 
             return $entity;
         }
@@ -129,7 +135,6 @@ class ApproveContributionRequestAction
 
         SharedFormSchema::createAddressFromData($institution, $address, allowCountryOnly: true);
         $this->generateInstitutionSlugAction->syncInstitutionSlug($institution);
-        $this->attachAsOwner($request->proposer, $institution);
 
         return $institution;
     }
@@ -157,7 +162,7 @@ class ApproveContributionRequestAction
         ]);
 
         SharedFormSchema::createAddressFromData($speaker, $address, allowCountryOnly: true);
-        $this->attachAsOwner($request->proposer, $speaker);
+        $this->attachAsOwnerIfSupported($request->proposer, $speaker);
 
         return $speaker;
     }
@@ -198,9 +203,9 @@ class ApproveContributionRequestAction
         return $address;
     }
 
-    private function attachAsOwner(?User $user, Institution|Speaker $entity): void
+    private function attachAsOwnerIfSupported(?User $user, Institution|Speaker $entity): void
     {
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $entity instanceof Institution) {
             return;
         }
 

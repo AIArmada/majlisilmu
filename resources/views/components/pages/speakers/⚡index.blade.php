@@ -1,11 +1,10 @@
 <?php
 
 use App\Models\Speaker;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -25,17 +24,14 @@ new
         public function speakers(): LengthAwarePaginatorContract
         {
             $search = $this->normalizedSearch();
-            $baseQuery = $this->baseSpeakersQuery();
 
             if ($search === null) {
-                return $baseQuery
-                    ->orderBy('name', 'asc')
+                return $this->baseSpeakersQuery()
+                    ->publicDirectoryOrder()
                     ->paginate(12);
             }
 
-            $directMatches = $this->applyDirectSearch($baseQuery, $search)
-                ->orderBy('name', 'asc')
-                ->paginate(12);
+            $directMatches = $this->directSearch($search);
 
             if ($directMatches->total() > 0 || mb_strlen($search) < 3) {
                 return $directMatches;
@@ -67,99 +63,33 @@ new
                 ->with('media');
         }
 
-        private function applyDirectSearch(Builder $query, string $search): Builder
+        private function directSearch(string $search): LengthAwarePaginatorContract
         {
-            $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-            $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
-            $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
-            $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
+            $matchingIds = $this->speakerSearchService()->publicSearchIds($search);
 
-            return $query->where(function (Builder $innerQuery) use ($search, $operator, $collapsedWildcardSearch, $searchTokens) {
-                $innerQuery->where('name', $operator, "%{$search}%");
-                $innerQuery->orWhere('name', $operator, $collapsedWildcardSearch);
+            if ($matchingIds === []) {
+                return $this->emptyPaginator();
+            }
 
-                foreach ($searchTokens as $token) {
-                    if (mb_strlen($token) < 2) {
-                        continue;
-                    }
-
-                    $innerQuery->orWhere('name', $operator, "%{$token}%");
-                }
-
-                if (DB::connection()->getDriverName() === 'pgsql') {
-                    $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$search}%"]);
-                    $innerQuery->orWhereRaw('bio::text ILIKE ?', [$collapsedWildcardSearch]);
-
-                    foreach ($searchTokens as $token) {
-                        if (mb_strlen($token) < 2) {
-                            continue;
-                        }
-
-                        $innerQuery->orWhereRaw('bio::text ILIKE ?', ["%{$token}%"]);
-                    }
-                } else {
-                    $innerQuery->orWhere('bio', $operator, "%{$search}%");
-                    $innerQuery->orWhere('bio', $operator, $collapsedWildcardSearch);
-
-                    foreach ($searchTokens as $token) {
-                        if (mb_strlen($token) < 2) {
-                            continue;
-                        }
-
-                        $innerQuery->orWhere('bio', $operator, "%{$token}%");
-                    }
-                }
-            });
+            return $this->baseSpeakersQuery()
+                ->whereIn('speakers.id', $matchingIds)
+                ->publicDirectoryOrder()
+                ->paginate(12);
         }
 
         private function fuzzySearch(string $search): LengthAwarePaginatorContract
         {
-            $normalizedSearch = $this->normalizeForSimilarity($search);
-            if ($normalizedSearch === '') {
+            $orderedIds = $this->speakerSearchService()->publicFuzzySearchIds($search);
+
+            if ($orderedIds === []) {
                 return $this->baseSpeakersQuery()
-                    ->orderBy('name', 'asc')
+                    ->publicDirectoryOrder()
                     ->paginate(12);
             }
 
-            $rankedCandidates = $this->baseSpeakersQuery()
-                ->select(['id', 'name'])
-                ->get()
-                ->map(function (Speaker $speaker) use ($normalizedSearch): array {
-                    $normalizedName = $this->normalizeForSimilarity($speaker->name);
-                    if ($normalizedName === '') {
-                        return ['id' => $speaker->id, 'score' => 0.0];
-                    }
-
-                    $scoreCandidates = [
-                        $this->similarityScore($normalizedSearch, $normalizedName),
-                    ];
-
-                    $nameTokens = array_values(array_filter(explode(' ', $normalizedName), static fn (string $token): bool => mb_strlen($token) >= 2));
-                    foreach ($nameTokens as $token) {
-                        $scoreCandidates[] = $this->similarityScore($normalizedSearch, $token);
-                    }
-
-                    return [
-                        'id' => $speaker->id,
-                        'score' => max($scoreCandidates),
-                    ];
-                })
-                ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
-                ->sortByDesc('score')
-                ->values();
-
             $currentPage = max(1, (int) $this->getPage());
             $perPage = 12;
-            $paginationMeta = [
-                'path' => request()->url(),
-                'query' => request()->query(),
-            ];
-
-            if ($rankedCandidates->isEmpty()) {
-                return new LengthAwarePaginator(collect(), 0, $perPage, $currentPage, $paginationMeta);
-            }
-
-            $orderedIds = $rankedCandidates->pluck('id')->all();
+            $paginationMeta = $this->paginationMeta();
             $paginatedIds = array_slice($orderedIds, ($currentPage - 1) * $perPage, $perPage);
 
             if ($paginatedIds === []) {
@@ -179,6 +109,11 @@ new
             return new LengthAwarePaginator($speakers, count($orderedIds), $perPage, $currentPage, $paginationMeta);
         }
 
+        private function emptyPaginator(): LengthAwarePaginatorContract
+        {
+            return new LengthAwarePaginator(collect(), 0, 12, max(1, (int) $this->getPage()), $this->paginationMeta());
+        }
+
         private function normalizedSearch(): ?string
         {
             if (! is_string($this->search)) {
@@ -190,30 +125,20 @@ new
             return $search === '' ? null : $search;
         }
 
-        private function normalizeForSimilarity(string $value): string
+        /**
+         * @return array{path: string, query: array<string, mixed>}
+         */
+        private function paginationMeta(): array
         {
-            return (string) Str::of($value)
-                ->lower()
-                ->ascii()
-                ->replaceMatches('/[^a-z0-9\s]+/u', ' ')
-                ->replaceMatches('/\s+/u', ' ')
-                ->trim();
+            return [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ];
         }
 
-        private function similarityScore(string $search, string $candidate): float
+        private function speakerSearchService(): SpeakerSearchService
         {
-            if ($search === '' || $candidate === '') {
-                return 0.0;
-            }
-
-            $distance = levenshtein($search, $candidate);
-            $maxLength = max(mb_strlen($search), mb_strlen($candidate));
-            $distanceScore = $maxLength > 0 ? 1 - ($distance / $maxLength) : 0.0;
-
-            similar_text($search, $candidate, $similarityPercent);
-            $similarityScore = $similarityPercent / 100;
-
-            return max($distanceScore, $similarityScore);
+            return app(SpeakerSearchService::class);
         }
     };
 ?>
@@ -231,6 +156,7 @@ new
     $search = $this->search;
     $speakerLoadingTarget = 'search,clearSearch';
     $submitSpeakerUrl = route('contributions.submit-speaker');
+    $speakerTotal = $speakers->total();
 @endphp
 
 <div class="relative min-h-screen">
@@ -340,6 +266,13 @@ new
             <div class="mt-16">
                 {{ $speakers->links() }}
             </div>
+
+            <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-center shadow-sm">
+                <p class="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">{{ __('Direktori Penceramah') }}</p>
+                <p class="mt-2 text-sm font-semibold text-slate-600">
+                    {{ __('Jumlah penceramah: :count', ['count' => number_format($speakerTotal)]) }}
+                </p>
+            </div>
         @endif
 
         <section class="mt-16">
@@ -356,7 +289,7 @@ new
                             {{ __('Tak jumpa penceramah yang anda cari? Cadangkan profil baharu.') }}
                         </h2>
                         <p class="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/90 md:text-base">
-                            {{ __('Bantu kami tambah ustaz, asatizah, dan pendakwah yang patut ditemui ramai. Hantaran anda akan disemak dahulu sebelum dipaparkan kepada umum.') }}
+                            {{ __('Bantu kami tambah ustaz, ustazah, asatizah, dan pendakwah yang patut ditemui ramai. Hantaran anda akan disemak dahulu sebelum dipaparkan kepada umum.') }}
                         </p>
                     </div>
 

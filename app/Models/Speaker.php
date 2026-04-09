@@ -14,6 +14,7 @@ use App\Models\Concerns\HasDonationChannels;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasLanguages;
 use App\Models\Concerns\HasSocialMedia;
+use Carbon\CarbonInterface;
 use Database\Factories\SpeakerFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -610,6 +612,52 @@ class Speaker extends Model implements AuditableContract, HasMedia
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    /**
+     * Stable pseudo-random directory order that stays pagination-safe for a day.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function publicDirectoryOrder(Builder $query): void
+    {
+        $offset = self::publicDirectoryOrderOffset();
+        $idExpression = self::publicDirectoryOrderIdExpression($query);
+
+        $query->orderByRaw("substr({$idExpression}, {$offset}, 32)")
+            ->orderByRaw($idExpression.' asc');
+    }
+
+    public static function publicDirectoryOrderOffset(?CarbonInterface $at = null): int
+    {
+        return (((int) ($at ?? now())->format('z')) % 24) + 1;
+    }
+
+    /**
+     * @return array{primary: string, secondary: string}
+     */
+    public static function publicDirectorySortParts(string $speakerId, ?CarbonInterface $at = null): array
+    {
+        $normalizedId = str_replace('-', '', $speakerId);
+        $offset = self::publicDirectoryOrderOffset($at);
+
+        return [
+            'primary' => substr($normalizedId, $offset - 1),
+            'secondary' => $normalizedId,
+        ];
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    private static function publicDirectoryOrderIdExpression(Builder $query): string
+    {
+        $driver = DB::connection($query->getModel()->getConnectionName())->getDriverName();
+
+        return $driver === 'pgsql'
+            ? "replace(cast(speakers.id as text), '-', '')"
+            : "replace(speakers.id, '-', '')";
     }
 
     /**

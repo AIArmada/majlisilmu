@@ -2,6 +2,7 @@
 
 use App\Enums\ContributionSubjectType;
 use App\Enums\MemberSubjectType;
+use App\Http\Controllers\Api\Admin\CatalogController as AdminCatalogController;
 use App\Http\Controllers\Api\Admin\ManifestController as AdminManifestController;
 use App\Http\Controllers\Api\Admin\ResourceController as AdminResourceController;
 use App\Http\Controllers\Api\AuthController;
@@ -10,9 +11,6 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventGoingController;
 use App\Http\Controllers\Api\EventRegistrationController;
 use App\Http\Controllers\Api\EventSaveController;
-use App\Http\Controllers\Api\NotificationDestinationController;
-use App\Http\Controllers\Api\NotificationMessageController;
-use App\Http\Controllers\Api\NotificationSettingsController;
 use App\Http\Controllers\Api\Frontend\AccountSettingsController;
 use App\Http\Controllers\Api\Frontend\AdvancedEventController;
 use App\Http\Controllers\Api\Frontend\CatalogController;
@@ -23,6 +21,9 @@ use App\Http\Controllers\Api\Frontend\InstitutionWorkspaceController;
 use App\Http\Controllers\Api\Frontend\ManifestController;
 use App\Http\Controllers\Api\Frontend\MembershipClaimController;
 use App\Http\Controllers\Api\Frontend\SearchController;
+use App\Http\Controllers\Api\NotificationDestinationController;
+use App\Http\Controllers\Api\NotificationMessageController;
+use App\Http\Controllers\Api\NotificationSettingsController;
 use App\Http\Controllers\Api\RegistrationExportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
@@ -91,6 +92,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->name('api.admin.')
         ->group(function (): void {
             Route::get('/manifest', AdminManifestController::class)->name('manifest');
+            Route::prefix('catalogs')->name('catalogs.')->group(function (): void {
+                Route::get('/countries', [AdminCatalogController::class, 'countries'])->name('countries');
+                Route::get('/states', [AdminCatalogController::class, 'states'])->name('states');
+                Route::get('/districts', [AdminCatalogController::class, 'districts'])->name('districts');
+                Route::get('/subdistricts', [AdminCatalogController::class, 'subdistricts'])->name('subdistricts');
+            });
             Route::get('/{resourceKey}', [AdminResourceController::class, 'indexRecords'])->name('resources.index');
             Route::post('/{resourceKey}', [AdminResourceController::class, 'storeRecord'])->name('resources.store');
             Route::get('/{resourceKey}/meta', [AdminResourceController::class, 'show'])->name('resources.meta');

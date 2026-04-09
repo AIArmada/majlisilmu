@@ -1,5 +1,7 @@
 # Lessons
 
+- When changing public directory ordering or browsing behavior, audit the matching public API collection endpoints in the same pass; do not assume a page-only change is sufficient if clients can browse the same resource over the API.
+- When a public institution submission is only a moderation request, do not auto-attach the submitter as an owner, admin, editor, or member; keep permissions separate from review-outcome notifications on both web and API flows.
 - For Filament wizard next buttons, never leave the loading target at the generic `callSchemaComponentMethod` when the same step contains file uploads; upload fields call that method during initialization, so the button spinner must be scoped to the exact wizard `nextStep` call, and last-step visibility should rely on the wizard footer instead of a forced `$wire.$refresh()` hack.
 - When a user asks to remove a homepage marketing/discovery block, delete the section and update any explicit presence assertions in the homepage tests in the same pass so the removed UI does not reappear unnoticed.
 - In Volt/Blade files, never rely on bare enum class names inside `instanceof` checks unless the enum is explicitly imported or fully qualified; otherwise the check can silently fail and downstream code may try to cast the enum object to string.

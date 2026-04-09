@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Search\SpeakerSearchService;
 use App\Support\Submission\EntitySubmissionAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -25,6 +26,10 @@ use Nnjeim\World\Models\Language;
 
 class FrontendCatalogService
 {
+    public function __construct(
+        private readonly SpeakerSearchService $speakerSearchService,
+    ) {}
+
     /**
      * @return list<array{id: int, label: string}>
      */
@@ -363,8 +368,6 @@ class FrontendCatalogService
             return $query;
         }
 
-        $operator = config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
-
-        return $query->where('name', $operator, '%'.$normalizedSearch.'%');
+        return $this->speakerSearchService->applyIndexedSearch($query, $normalizedSearch);
     }
 }
