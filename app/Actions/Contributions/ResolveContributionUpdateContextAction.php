@@ -21,7 +21,13 @@ class ResolveContributionUpdateContextAction
     /**
      * @return array{
      *     entity: Event|Institution|Reference|Speaker,
-     *     initial_state: array<string, mixed>
+     *     initial_state: array<string, mixed>,
+     *     contract: array{
+     *         accepts_partial_updates: bool,
+     *         fields: list<array<string, mixed>>,
+     *         conditional_rules: list<array<string, mixed>>,
+     *         direct_edit_media_fields: list<string>
+     *     }
      * }
      */
     public function handle(string $subjectType, string $subjectId): array
@@ -31,6 +37,7 @@ class ResolveContributionUpdateContextAction
         return [
             'entity' => $entity,
             'initial_state' => $this->contributionEntityMutationService->stateFor($entity),
+            'contract' => $this->contributionEntityMutationService->contractFor($entity),
         ];
     }
 }

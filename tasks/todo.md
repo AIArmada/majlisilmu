@@ -1,3 +1,77 @@
+# Contribution Update API Audit
+
+- [x] Audit the uncommitted contribution-update API changes against real developer write workflows
+- [x] Expose a machine-readable editable-field contract for authenticated public update suggestions
+- [x] Align the update runtime with the documented contract, including validation, normalization, and file handling
+- [x] Add focused API regressions and re-verify the contribution and submit-event surfaces
+
+## Review
+
+- Root cause:
+  - the new docs explained that developers should call the contribution update form endpoint first, but that endpoint still returned only `initial_state` and not a real editable-field contract
+  - the public update runtime still accepted sparse payloads without validating them against a subject-specific contract, which meant the docs could become more precise than the actual behavior
+  - the event update context leaked internal morph-class values for `organizer_type`, and several nullable fields could not actually be cleared because the apply layer used null-coalescing fallbacks
+  - unsupported file uploads on the update route were silently ignored instead of being rejected explicitly
+- Fix:
+  - extended the contribution update context action and API response to expose `fields`, `conditional_rules`, `accepts_partial_updates`, and permission-gated `direct_edit_media_fields`
+  - upgraded [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php) so update contracts now include enum `allowed_values`, catalog URLs where the public API already provides lookups, and stronger validation rules for IDs, enums, contacts, and social-media payloads
+  - updated [ContributionController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/ContributionController.php) to validate sparse update payloads against the subject contract, enforce a bounded `proposer_note`, and reject unsupported file uploads with a 422 instead of silently dropping them
+  - normalized public event `organizer_type` values to `institution` / `speaker` in update context responses while still persisting the correct morph classes server-side, and fixed nullable direct edits so fields such as institution descriptions and event URLs can be cleared intentionally
+  - added focused frontend API regressions for contract discovery, direct-edit media support, public organizer normalization, nullable-field clearing, organizer remapping, and unsupported upload rejection
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **20 passed** (115 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **25 passed** (116 assertions)
+  - `php artisan test tests/Feature/ScrambleDocsTest.php` => **10 passed** (57 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventReviewPreviewTest.php` => **4 passed** (15 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Services/ContributionEntityMutationService.php app/Actions/Contributions/ResolveContributionUpdateContextAction.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Http/Controllers/Api/Frontend/ManifestController.php app/Http/Controllers/Api/Frontend/EventSubmissionController.php app/Http/Controllers/Api/Frontend/AdvancedEventController.php app/Http/Controllers/Api/Admin/ManifestController.php app/Http/Controllers/Api/Admin/ResourceController.php config/scramble.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/ScrambleDocsTest.php tests/Feature/SubmitEventReviewPreviewTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Services/ContributionEntityMutationService.php app/Actions/Contributions/ResolveContributionUpdateContextAction.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Http/Controllers/Api/Frontend/ManifestController.php app/Http/Controllers/Api/Frontend/EventSubmissionController.php app/Http/Controllers/Api/Frontend/AdvancedEventController.php app/Http/Controllers/Api/Admin/ManifestController.php app/Http/Controllers/Api/Admin/ResourceController.php config/scramble.php resources/views/components/pages/submit-event/create.blade.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/ScrambleDocsTest.php tests/Feature/SubmitEventReviewPreviewTest.php tasks/todo.md` => **pass**
+
+# API Docs Workflow Clarity Upgrade
+
+- [x] Audit the live Scramble docs against public and admin developer workflows for create and update flows
+- [x] Add explicit documentation for public submit and update capabilities, including what is not supported
+- [x] Add explicit documentation for admin schema-driven create and update capabilities, including resource limitations
+- [x] Add focused documentation tests and verify the generated docs output
+
+## Review
+
+- Root cause:
+  - the generated Scramble surface exposed many endpoints, but the workflow-critical mutation routes relied mostly on inferred schemas with little explanation of how a developer should actually use them
+  - public create versus update capability boundaries were not stated clearly, so a developer could not quickly tell from the docs that public create is limited to events, institutions, and speakers, while public updates are limited to events, institutions, speakers, and references
+  - the most dynamic write flows, especially contribution updates and generic admin writes, did not explain that clients must fetch a form or schema contract first because the payload depends on the subject or resource key
+- Fix:
+  - expanded the top-level Scramble description in [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php) to document auth, public create and update support, unsupported public write scenarios, and the schema-driven admin workflow
+  - added explicit Scramble group and endpoint metadata to the public manifest, event-submission, contribution, advanced-event, admin manifest, and admin resource controllers so the generated docs now explain what each workflow endpoint is for and when to call form or schema discovery first
+  - added focused Scramble regression coverage to prove the generated docs now expose workflow summaries and the public versus admin write guidance
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **15 passed** (88 assertions)
+  - `php artisan test tests/Feature/ScrambleDocsTest.php` => **10 passed** (57 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/Frontend/ManifestController.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Http/Controllers/Api/Frontend/EventSubmissionController.php app/Http/Controllers/Api/Frontend/AdvancedEventController.php app/Http/Controllers/Api/Admin/ManifestController.php app/Http/Controllers/Api/Admin/ResourceController.php config/scramble.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Http/Controllers/Api/Frontend/ManifestController.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Http/Controllers/Api/Frontend/EventSubmissionController.php app/Http/Controllers/Api/Frontend/AdvancedEventController.php app/Http/Controllers/Api/Admin/ManifestController.php app/Http/Controllers/Api/Admin/ResourceController.php config/scramble.php tests/Feature/ScrambleDocsTest.php tasks/todo.md` => **pass**
+
+# Submit Event Wizard Footer State Fixes
+
+- [x] Reproduce the submit-event wizard footer issues on the media and review steps
+- [x] Fix the media-step `Seterusnya` loading indicator so idle file-upload initialization does not keep it spinning
+- [x] Remove the last-step refresh workaround and keep the final review step free of the `Seterusnya` action
+- [x] Add focused coverage and verify the updated wizard behavior in tests and the local browser
+
+## Review
+
+- Root cause:
+  - the wizard next action used the broad Livewire loading target `callSchemaComponentMethod`, while the media step's file-upload fields make async `getUploadedFiles` schema-component calls on load
+  - because those upload initialization calls matched the same generic target, the `Seterusnya` button inherited their loading indicator and looked perpetually in progress on the media step
+  - the form also carried a custom Alpine `$wire.$refresh()` workaround for the last step even though Filament's wizard footer already hides the next action and shows the submit action client-side
+- Fix:
+  - scoped the wizard next action loading target to `callSchemaComponentMethod('form.data::wizard', 'nextStep')` so only the actual next-step request can toggle that button's loading state
+  - removed the custom last-step Alpine refresh hook and kept the server-side `hidden($isReviewStep)` guard for direct review-step loads and non-JS assertions
+  - added a focused regression that asserts the specific next-step target is rendered and that the removed refresh hack does not return
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventReviewPreviewTest.php` => **4 passed**, 15 assertions
+  - browser check on `https://majlisilmu.test/hantar-majlis?step=form.penceramah-media::data::wizard-step` confirmed the media-step spinner is idle
+  - browser check on `https://majlisilmu.test/hantar-majlis?step=form.semak-sebelum-hantar::data::wizard-step` confirmed `Seterusnya` is absent and only the submit action remains
+
 # Dashboard Institution Picker Uses Flux
 
 - [x] Confirm the institution dashboard selector implementation and verify whether Flux select is available in the current install

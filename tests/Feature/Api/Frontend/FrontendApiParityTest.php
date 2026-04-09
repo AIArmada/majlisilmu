@@ -1,5 +1,6 @@
 <?php
 
+use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
 use App\Models\ContributionRequest;
@@ -11,16 +12,33 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
+use App\Support\Authz\MemberRoleScopes;
+use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     fakePrayerTimesApi();
+    $this->seed(PermissionSeeder::class);
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
+
+function assignInstitutionOwnerForFrontendApi(User $user, Institution $institution): void
+{
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    Authz::withScope(app(MemberRoleScopes::class)->institution(), function () use ($user): void {
+        $user->syncRoles(['owner']);
+    }, $user);
+}
 
 it('exposes corrected frontend contract metadata', function () {
     $manifest = $this->getJson(route('api.client.manifest'))
@@ -67,6 +85,160 @@ it('exposes corrected frontend contract metadata', function () {
     $institutionFields = collect($institutionContract['fields'] ?? [])->pluck('name')->all();
 
     expect($institutionFields)->not->toContain('logo');
+});
+
+it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
+    $owner = User::factory()->create();
+    $visitor = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'description' => 'Community institution',
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+
+    Sanctum::actingAs($visitor);
+
+    $visitorResponse = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'institusi',
+        'subject' => $institution->slug,
+    ]))->assertOk();
+
+    Sanctum::actingAs($owner);
+
+    $ownerResponse = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'institusi',
+        'subject' => $institution->slug,
+    ]))->assertOk();
+
+    $fields = collect($ownerResponse->json('data.fields'));
+
+    expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
+        ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
+        ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['cover'])
+        ->and($fields->pluck('name')->all())->toContain('description', 'address', 'social_media')
+        ->and($fields->firstWhere('name', 'type')['allowed_values'])->toContain('masjid')
+        ->and($ownerResponse->json('data.initial_state.description'))->toBe('Community institution');
+});
+
+it('normalizes event update context to public organizer values and exposes lookup metadata', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'API Contract Event',
+        'slug' => 'api-contract-event',
+        'status' => 'approved',
+        'is_active' => true,
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->getKey(),
+        'event_type' => ['kuliah_ceramah'],
+        'gender' => 'all',
+        'age_group' => ['all_ages'],
+        'event_format' => 'physical',
+        'visibility' => 'public',
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $response = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]))->assertOk();
+
+    $fields = collect($response->json('data.fields'));
+
+    expect($response->json('data.initial_state.organizer_type'))->toBe('institution')
+        ->and($fields->firstWhere('name', 'organizer_type')['allowed_values'])->toBe(['institution', 'speaker'])
+        ->and($fields->firstWhere('name', 'language_ids')['catalog'])->toContain('/api/v1/catalogs/languages')
+        ->and($fields->firstWhere('name', 'speaker_ids')['catalog'])->toContain('/api/v1/catalogs/submit-speakers');
+});
+
+it('allows direct contribution updates to clear nullable institution fields', function () {
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'description' => 'Old description',
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+    Sanctum::actingAs($owner);
+
+    $this->postJson(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'institusi',
+        'subject' => $institution->slug,
+    ]), [
+        'description' => null,
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    expect($institution->fresh()->description)->toBeNull();
+});
+
+it('maps public event organizer values back to persistence classes during direct updates', function () {
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'is_active' => true,
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->getKey(),
+        'live_url' => 'https://live.example.test/watch',
+        'event_type' => ['kuliah_ceramah'],
+        'gender' => 'all',
+        'age_group' => ['all_ages'],
+        'event_format' => 'physical',
+        'visibility' => 'public',
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+    Sanctum::actingAs($owner);
+
+    $this->postJson(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]), [
+        'organizer_type' => 'speaker',
+        'organizer_id' => $speaker->getKey(),
+        'live_url' => null,
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    expect($event->fresh()->organizer_type)->toBe(Speaker::class)
+        ->and($event->fresh()->organizer_id)->toBe($speaker->getKey())
+        ->and($event->fresh()->live_url)->toBeNull();
+});
+
+it('rejects unsupported files on public contribution update suggestions', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'institusi',
+        'subject' => $institution->slug,
+    ]), [
+        'cover' => UploadedFile::fake()->image('institution-cover.jpg'),
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['files']);
 });
 
 it('uses the inferred preferred country for submit-event contract defaults', function () {

@@ -15,14 +15,28 @@ use App\Models\User;
 use App\Support\Api\Frontend\FrontendMediaSyncService;
 use App\Support\Location\PublicCountryRegistry;
 use Closure;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
+#[Group(
+    'Event Submission',
+    'Public event submission flow for guests and authenticated users. '
+    .'Use the paired form-contract endpoint to discover required fields, defaults, catalogs, and conditional rules before posting.',
+    weight: 30,
+)]
 class EventSubmissionController extends FrontendController
 {
+    #[Endpoint(
+        title: 'Submit a public event',
+        description: 'Creates a new event submission. '
+            .'This route is create-only; use the contribution suggestion endpoints for later event updates. '
+            .'Fetch `GET /forms/submit-event` first to resolve required versus optional fields, conditional rules, catalogs, and guest-contact requirements.',
+    )]
     public function store(
         Request $request,
         SubmitFrontendEventAction $submitFrontendEventAction,
