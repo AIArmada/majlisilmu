@@ -114,6 +114,7 @@ it('submits staged institution contributions through the action layer', function
 
     expect($institution->name)->toBe('Masjid Beraksi')
         ->and($institution->status)->toBe('pending')
+        ->and($institution->members()->whereKey($proposer->id)->exists())->toBeFalse()
         ->and($request)->not->toBeNull()
         ->and($request?->entity_id)->toBe($institution->id)
         ->and($request?->proposed_data)->toMatchArray([
@@ -181,7 +182,6 @@ it('approves staged institution create requests through the action layer without
         'status' => 'pending',
         'is_active' => true,
     ]);
-    $institution->members()->syncWithoutDetaching([$proposer->id]);
 
     $request = ContributionRequest::factory()->create([
         'type' => ContributionRequestType::Create,
@@ -200,7 +200,8 @@ it('approves staged institution create requests through the action layer without
 
     expect(Institution::query()->where('name', 'Masjid Action Pending')->count())->toBe(1)
         ->and($approvedRequest->status)->toBe(ContributionRequestStatus::Approved)
-        ->and($institution->fresh()->status)->toBe('verified');
+        ->and($institution->fresh()->status)->toBe('verified')
+        ->and($institution->fresh()->members()->whereKey($proposer->id)->exists())->toBeFalse();
 });
 
 it('approves staged create requests when the proposer relation is missing', function () {

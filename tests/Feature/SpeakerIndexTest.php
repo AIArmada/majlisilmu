@@ -4,6 +4,7 @@ use App\Livewire\Pages\Contributions\SubmitSpeaker;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -58,6 +59,26 @@ it('can search speakers case-insensitively', function () {
         ->assertDontSee('Ahmad');
 });
 
+it('can search speakers by formatted honorific and prenominal titles', function () {
+    Speaker::factory()->create([
+        'name' => 'Aisyah Binti Hassan',
+        'pre_nominal' => ['syeikhul_maqari'],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Speaker::factory()->create([
+        'name' => 'Fatimah Binti Omar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/penceramah?search='.urlencode('syeikhul maqari'))
+        ->assertSuccessful()
+        ->assertSee('Aisyah Binti Hassan')
+        ->assertDontSee('Fatimah Binti Omar');
+});
+
 it('filters by active status on public speaker index', function () {
     Speaker::factory()->create([
         'name' => 'Active Speaker',
@@ -77,6 +98,59 @@ it('filters by active status on public speaker index', function () {
         ->assertDontSee('Inactive Speaker');
 });
 
+it('shows the total speaker count on the speaker index', function () {
+    $searchPrefix = 'Jumlah Penceramah Ujian';
+
+    Speaker::factory()->count(2)->create([
+        'name' => $searchPrefix,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/penceramah?search='.urlencode($searchPrefix))
+        ->assertSuccessful()
+        ->assertSee('Direktori Penceramah')
+        ->assertSee('Jumlah penceramah: 2');
+});
+
+it('uses a stable random speaker order instead of alphabetical sorting', function () {
+    $firstAlphabetical = Speaker::factory()->create([
+        'name' => 'Adam Penceramah Rawak',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $secondAlphabetical = Speaker::factory()->create([
+        'name' => 'Zaid Penceramah Rawak',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $component = Livewire::test('pages.speakers.index');
+
+    $orderedIds = collect($component->instance()->speakers->items())
+        ->pluck('id')
+        ->all();
+
+    $expectedOrder = [$firstAlphabetical->id, $secondAlphabetical->id];
+
+    usort($expectedOrder, static function (string $left, string $right): int {
+        $leftParts = Speaker::publicDirectorySortParts($left);
+        $rightParts = Speaker::publicDirectorySortParts($right);
+
+        $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
+
+        if ($primaryComparison !== 0) {
+            return $primaryComparison;
+        }
+
+        return $leftParts['secondary'] <=> $rightParts['secondary'];
+    });
+
+    expect(array_values(array_intersect($orderedIds, [$firstAlphabetical->id, $secondAlphabetical->id])))
+        ->toBe($expectedOrder);
+});
+
 it('renders translated search placeholder on speaker index', function () {
     app()->setLocale('ms');
 
@@ -89,6 +163,7 @@ it('shows add-missing-speaker call to action on speaker index', function () {
     get('/penceramah')
         ->assertSuccessful()
         ->assertSee('Tak jumpa penceramah yang anda cari? Cadangkan profil baharu.')
+        ->assertSee('Bantu kami tambah ustaz, ustazah, asatizah, dan pendakwah yang patut ditemui ramai. Hantaran anda akan disemak dahulu sebelum dipaparkan kepada umum.')
         ->assertSee('Cadangkan penceramah baharu');
 });
 
@@ -128,6 +203,36 @@ it('updates search results live when query changes', function () {
         ->set('search', 'Smad')
         ->assertSee('Samad')
         ->assertDontSee('Ahmad');
+});
+
+it('refreshes cached speaker title search results after speaker updates', function () {
+    $searchService = app(SpeakerSearchService::class);
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nurul Akma',
+        'pre_nominal' => ['ustazah'],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    expect($searchService->publicSearchIds('ustazah'))
+        ->toContain((string) $speaker->id);
+
+    $speaker->update([
+        'pre_nominal' => ['hafizah'],
+    ]);
+
+    expect($searchService->publicSearchIds('ustazah'))
+        ->not->toContain((string) $speaker->id)
+        ->and($searchService->publicSearchIds('hafizah'))
+        ->toContain((string) $speaker->id);
+
+    $updatedSearchResults = Livewire::test('pages.speakers.index')
+        ->set('search', 'hafizah')
+        ->instance()
+        ->speakers;
+
+    expect(collect($updatedSearchResults->items())->pluck('id')->all())
+        ->toContain((string) $speaker->id);
 });
 
 it('allows users to submit a missing speaker from speaker index with pending status', function () {

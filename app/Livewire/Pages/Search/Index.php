@@ -8,10 +8,10 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Services\EventSearchService;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -167,36 +167,21 @@ class Index extends Component
      */
     private function speakerSearchQuery(string $search): Builder
     {
-        $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
-        $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
-        $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
-        $operator = $this->databaseLikeOperator();
-
-        return Speaker::query()
-            ->active()
-            ->where('status', 'verified')
-            ->withCount(['events' => function (Builder $query): void {
-                $query
-                    ->where('events.is_active', true)
-                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                    ->where('events.visibility', EventVisibility::Public)
-                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('events.starts_at', '>=', now());
-            }])
-            ->with('media')
-            ->where(function (Builder $query) use ($collapsedSearch, $collapsedWildcardSearch, $searchTokens, $operator): void {
-                $query
-                    ->where('name', $operator, "%{$collapsedSearch}%")
-                    ->orWhere('name', $operator, $collapsedWildcardSearch);
-
-                foreach ($searchTokens as $token) {
-                    if (mb_strlen($token) < 2) {
-                        continue;
-                    }
-
-                    $query->orWhere('name', $operator, "%{$token}%");
-                }
-            });
+        return app(SpeakerSearchService::class)->applyIndexedSearch(
+            Speaker::query()
+                ->active()
+                ->where('status', 'verified')
+                ->withCount(['events' => function (Builder $query): void {
+                    $query
+                        ->where('events.is_active', true)
+                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                        ->where('events.visibility', EventVisibility::Public)
+                        ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                        ->where('events.starts_at', '>=', now());
+                }])
+                ->with('media'),
+            $search,
+        );
     }
 
     /**
@@ -254,10 +239,5 @@ class Index extends Component
     private function normalizedRadius(): int
     {
         return max(1, min($this->radius_km, 100));
-    }
-
-    private function databaseLikeOperator(): string
-    {
-        return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
     }
 }

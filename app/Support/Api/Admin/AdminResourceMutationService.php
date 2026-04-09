@@ -4,7 +4,9 @@ namespace App\Support\Api\Admin;
 
 use App\Actions\Events\SaveAdminEventAction;
 use App\Actions\Institutions\SaveInstitutionAction;
+use App\Actions\References\SaveReferenceAction;
 use App\Actions\Speakers\SaveSpeakerAction;
+use App\Actions\Subdistricts\SaveSubdistrictAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
@@ -19,16 +21,22 @@ use App\Enums\Honorific;
 use App\Enums\InstitutionType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Enums\ReferenceType;
 use App\Enums\RegistrationMode;
 use App\Enums\SocialMediaPlatform;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
+use App\Filament\Resources\References\ReferenceResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
+use App\Filament\Resources\Subdistricts\SubdistrictResource;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
+use App\Models\Subdistrict;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
+use App\Support\Location\FederalTerritoryLocation;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
@@ -40,7 +48,9 @@ class AdminResourceMutationService
         private readonly ContributionEntityMutationService $contributionEntityMutationService,
         private readonly SaveAdminEventAction $saveAdminEventAction,
         private readonly SaveInstitutionAction $saveInstitutionAction,
+        private readonly SaveReferenceAction $saveReferenceAction,
         private readonly SaveSpeakerAction $saveSpeakerAction,
+        private readonly SaveSubdistrictAction $saveSubdistrictAction,
     ) {}
 
     /**
@@ -51,7 +61,9 @@ class AdminResourceMutationService
         return in_array($resourceClass, [
             EventResource::class,
             InstitutionResource::class,
+            ReferenceResource::class,
             SpeakerResource::class,
+            SubdistrictResource::class,
         ], true);
     }
 
@@ -79,6 +91,7 @@ class AdminResourceMutationService
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Event ? $this->mediaState($record, ['poster', 'gallery']) : null,
                 'fields' => $this->eventFields($updating),
+                'catalogs' => [],
                 'conditional_rules' => [
                     ['field' => 'custom_time', 'required_when' => ['prayer_time' => [EventPrayerTime::LainWaktu->value]]],
                     ['field' => 'organizer_id', 'required_when' => ['organizer_type' => [Institution::class, Speaker::class]]],
@@ -96,6 +109,22 @@ class AdminResourceMutationService
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Institution ? $this->mediaState($record, ['logo', 'cover', 'gallery']) : null,
                 'fields' => $this->institutionFields($updating),
+                'catalogs' => $this->addressCatalogs('address'),
+                'conditional_rules' => [],
+            ],
+            ReferenceResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'auto_managed',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof Reference ? $this->mediaState($record, ['front_cover', 'back_cover', 'gallery']) : null,
+                'fields' => $this->referenceFields(),
+                'catalogs' => [],
                 'conditional_rules' => [],
             ],
             SpeakerResource::class => [
@@ -110,8 +139,25 @@ class AdminResourceMutationService
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Speaker ? $this->mediaState($record, ['avatar', 'cover', 'gallery']) : null,
                 'fields' => $this->speakerFields($updating),
+                'catalogs' => $this->addressCatalogs('address'),
                 'conditional_rules' => [
                     ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
+                ],
+            ],
+            SubdistrictResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'application/json',
+                'slug_behavior' => 'not_applicable',
+                'defaults' => $defaults,
+                'fields' => $this->subdistrictFields(),
+                'catalogs' => $this->subdistrictCatalogs(),
+                'conditional_rules' => [
+                    ['field' => 'district_id', 'required_unless' => ['state_id' => $this->federalTerritoryStateIds()]],
                 ],
             ],
             default => throw new \RuntimeException('Unsupported admin write resource.'),
@@ -127,7 +173,9 @@ class AdminResourceMutationService
         return match ($resourceClass) {
             EventResource::class => $this->eventRules($updating),
             InstitutionResource::class => $this->institutionRules($updating),
+            ReferenceResource::class => $this->referenceRules($updating),
             SpeakerResource::class => $this->speakerRules($updating),
+            SubdistrictResource::class => $this->subdistrictRules($updating),
             default => [],
         };
     }
@@ -141,7 +189,9 @@ class AdminResourceMutationService
         return match ($resourceClass) {
             EventResource::class => $this->saveAdminEventAction->handle($validated, $actor),
             InstitutionResource::class => $this->saveInstitutionAction->handle($validated, $actor),
+            ReferenceResource::class => $this->saveReferenceAction->handle($validated),
             SpeakerResource::class => $this->saveSpeakerAction->handle($validated, $actor),
+            SubdistrictResource::class => $this->saveSubdistrictAction->handle($validated),
             default => throw new \RuntimeException('Unsupported admin write resource.'),
         };
     }
@@ -159,9 +209,15 @@ class AdminResourceMutationService
             InstitutionResource::class => $record instanceof Institution
                 ? $this->saveInstitutionAction->handle($validated, $actor, $record)
                 : throw new \RuntimeException('Expected institution record.'),
+            ReferenceResource::class => $record instanceof Reference
+                ? $this->saveReferenceAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected reference record.'),
             SpeakerResource::class => $record instanceof Speaker
                 ? $this->saveSpeakerAction->handle($validated, $actor, $record)
                 : throw new \RuntimeException('Expected speaker record.'),
+            SubdistrictResource::class => $record instanceof Subdistrict
+                ? $this->saveSubdistrictAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected subdistrict record.'),
             default => throw new \RuntimeException('Unsupported admin write resource.'),
         };
     }
@@ -184,6 +240,16 @@ class AdminResourceMutationService
                 'clear_cover' => false,
                 'clear_gallery' => false,
             ],
+            ReferenceResource::class => [
+                'type' => ReferenceType::Book->value,
+                'is_canonical' => false,
+                'status' => 'verified',
+                'is_active' => true,
+                'social_media' => [],
+                'clear_front_cover' => false,
+                'clear_back_cover' => false,
+                'clear_gallery' => false,
+            ],
             SpeakerResource::class => [
                 'gender' => Gender::Male->value,
                 'is_freelance' => false,
@@ -194,6 +260,9 @@ class AdminResourceMutationService
                 'clear_avatar' => false,
                 'clear_cover' => false,
                 'clear_gallery' => false,
+            ],
+            SubdistrictResource::class => [
+                'district_id' => null,
             ],
             default => [],
         };
@@ -224,8 +293,26 @@ class AdminResourceMutationService
             $defaults['clear_gallery'] = false;
         }
 
+        if ($record instanceof Reference) {
+            $defaults['is_canonical'] = (bool) $record->is_canonical;
+            $defaults['status'] = $record->status;
+            $defaults['is_active'] = (bool) $record->is_active;
+            $defaults['clear_front_cover'] = false;
+            $defaults['clear_back_cover'] = false;
+            $defaults['clear_gallery'] = false;
+        }
+
         if ($record instanceof Event) {
             $defaults = $this->saveAdminEventAction->formStateForRecord($record);
+        }
+
+        if ($record instanceof Subdistrict) {
+            $defaults = [
+                'country_id' => (int) $record->country_id,
+                'state_id' => (int) $record->state_id,
+                'district_id' => $record->district_id !== null ? (int) $record->district_id : null,
+                'name' => $record->name,
+            ];
         }
 
         return $defaults;
@@ -295,6 +382,44 @@ class AdminResourceMutationService
         }
 
         return $fields;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function referenceFields(): array
+    {
+        return [
+            $this->field('title', 'string', required: true, maxLength: 255),
+            $this->field('author', 'string', required: false, maxLength: 255),
+            $this->field('type', 'string', required: true, default: ReferenceType::Book->value, allowedValues: $this->enumValues(ReferenceType::class)),
+            $this->field('publication_year', 'string', required: false, maxLength: 255),
+            $this->field('publisher', 'string', required: false, maxLength: 255),
+            $this->field('description', 'string', required: false),
+            $this->field('is_canonical', 'boolean', required: false, default: false),
+            $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['pending', 'verified']),
+            $this->field('is_active', 'boolean', required: false, default: true),
+            $this->field('social_media', 'array<object>', required: false),
+            $this->field('front_cover', 'file', required: false),
+            $this->field('back_cover', 'file', required: false),
+            $this->field('gallery', 'array<file>', required: false),
+            $this->field('clear_front_cover', 'boolean', required: false, default: false),
+            $this->field('clear_back_cover', 'boolean', required: false, default: false),
+            $this->field('clear_gallery', 'boolean', required: false, default: false),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function subdistrictFields(): array
+    {
+        return [
+            $this->field('country_id', 'integer', required: true),
+            $this->field('state_id', 'integer', required: true),
+            $this->field('district_id', 'integer', required: false),
+            $this->field('name', 'string', required: true, maxLength: 255),
+        ];
     }
 
     /**
@@ -499,6 +624,37 @@ class AdminResourceMutationService
     /**
      * @return array<string, mixed>
      */
+    private function referenceRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+
+        return [
+            'title' => [$required, 'string', 'max:255'],
+            'author' => ['nullable', 'string', 'max:255'],
+            'type' => [$required, Rule::enum(ReferenceType::class)],
+            'publication_year' => ['nullable', 'string', 'max:255'],
+            'publisher' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'is_canonical' => ['sometimes', 'boolean'],
+            'status' => [$required, Rule::in(['pending', 'verified'])],
+            'is_active' => ['sometimes', 'boolean'],
+            'social_media' => ['nullable', 'array'],
+            'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::enum(SocialMediaPlatform::class)],
+            'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
+            'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
+            'front_cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'back_cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'gallery' => ['nullable', 'array'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'clear_front_cover' => ['sometimes', 'boolean'],
+            'clear_back_cover' => ['sometimes', 'boolean'],
+            'clear_gallery' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function speakerRules(bool $updating): array
     {
         $addressRule = $updating ? ['sometimes', 'array'] : ['required', 'array'];
@@ -558,6 +714,21 @@ class AdminResourceMutationService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function subdistrictRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+
+        return [
+            'country_id' => [$required, 'integer', 'exists:countries,id'],
+            'state_id' => [$required, 'integer', 'exists:states,id'],
+            'district_id' => ['nullable', 'integer', 'exists:districts,id'],
+            'name' => [$required, 'string', 'max:255'],
+        ];
+    }
+
+    /**
      * @param  Model&HasMedia  $record
      * @param  list<string>  $collections
      * @return array<string, mixed>
@@ -581,5 +752,74 @@ class AdminResourceMutationService
         }
 
         return $state;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function addressCatalogs(string $prefix): array
+    {
+        return [
+            $this->catalog($prefix.'.country_id', route('api.admin.catalogs.countries', [], false)),
+            $this->catalog(
+                $prefix.'.state_id',
+                route('api.admin.catalogs.states', [], false),
+                ['country_id' => '{'.$prefix.'.country_id}'],
+            ),
+            $this->catalog(
+                $prefix.'.district_id',
+                route('api.admin.catalogs.districts', [], false),
+                ['state_id' => '{'.$prefix.'.state_id}'],
+            ),
+            $this->catalog(
+                $prefix.'.subdistrict_id',
+                route('api.admin.catalogs.subdistricts', [], false),
+                [
+                    'state_id' => '{'.$prefix.'.state_id}',
+                    'district_id' => '{'.$prefix.'.district_id}',
+                ],
+            ),
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function subdistrictCatalogs(): array
+    {
+        return [
+            $this->catalog('country_id', route('api.admin.catalogs.countries', [], false)),
+            $this->catalog(
+                'state_id',
+                route('api.admin.catalogs.states', [], false),
+                ['country_id' => '{country_id}'],
+            ),
+            $this->catalog(
+                'district_id',
+                route('api.admin.catalogs.districts', [], false),
+                ['state_id' => '{state_id}'],
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $query
+     * @return array<string, mixed>
+     */
+    private function catalog(string $field, string $endpoint, array $query = []): array
+    {
+        return array_filter([
+            'field' => $field,
+            'endpoint' => $endpoint,
+            'query' => $query,
+        ], static fn (mixed $value): bool => $value !== []);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function federalTerritoryStateIds(): array
+    {
+        return array_keys(FederalTerritoryLocation::stateIds());
     }
 }

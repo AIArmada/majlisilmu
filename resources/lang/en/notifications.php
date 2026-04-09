@@ -172,7 +172,7 @@ return [
         ],
         'submission_workflow' => [
             'label' => 'Submission Workflow',
-            'description' => 'Moderation updates for events you submitted or help manage.',
+            'description' => 'Moderation updates for events and directory entries you submitted or help manage.',
         ],
     ],
     'triggers' => [
@@ -238,15 +238,15 @@ return [
         ],
         'submission_received' => [
             'label' => 'Submission received',
-            'description' => 'Confirm that an event submission entered the moderation flow.',
+            'description' => 'Confirm that a submission entered the moderation flow.',
         ],
         'submission_approved' => [
             'label' => 'Submission approved',
-            'description' => 'Alert me when a submitted event is approved.',
+            'description' => 'Alert me when one of my submitted items is approved.',
         ],
         'submission_rejected' => [
             'label' => 'Submission rejected',
-            'description' => 'Alert me when a submitted event is rejected.',
+            'description' => 'Alert me when one of my submitted items is rejected.',
         ],
         'submission_needs_changes' => [
             'label' => 'Submission needs changes',
@@ -310,6 +310,15 @@ return [
         ],
         'submission_rejected' => [
             'title' => 'Submission rejected: :title',
+            'body' => 'This submission was rejected.',
+            'body_with_note' => 'This submission was rejected. Note: :note',
+        ],
+        'directory_submission_approved' => [
+            'title' => ':subject approved: :title',
+            'body' => 'Your submission is approved and now visible to the public.',
+        ],
+        'directory_submission_rejected' => [
+            'title' => ':subject rejected: :title',
             'body' => 'This submission was rejected.',
             'body_with_note' => 'This submission was rejected. Note: :note',
         ],

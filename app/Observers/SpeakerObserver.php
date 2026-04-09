@@ -7,6 +7,7 @@ use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Models\Speaker;
 use App\Support\Cache\PublicListingsCache;
+use App\Support\Search\SpeakerSearchService;
 
 class SpeakerObserver
 {
@@ -14,11 +15,14 @@ class SpeakerObserver
         protected GenerateEventSlugAction $generateEventSlugAction,
         protected GenerateSpeakerSlugAction $generateSpeakerSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
-        protected PublicListingsCache $publicListingsCache
+        protected PublicListingsCache $publicListingsCache,
+        protected SpeakerSearchService $speakerSearchService,
     ) {}
 
     public function saved(Speaker $speaker): void
     {
+        $this->speakerSearchService->syncSpeakerRecord($speaker);
+
         if ($speaker->wasRecentlyCreated || $speaker->wasChanged(['name', 'honorific', 'pre_nominal', 'post_nominal'])) {
             $previousName = $speaker->wasChanged('name')
                 ? trim((string) ($speaker->getPrevious()['name'] ?? ''))
@@ -42,6 +46,7 @@ class SpeakerObserver
         $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($speaker->name);
         $this->generateEventSlugAction->syncEventSlugsForSpeakerId((string) $speaker->getKey());
         $this->generateEventSlugAction->syncEventSlugsForSpeakerName($speaker->name);
+        $this->speakerSearchService->purgeSpeakerRecord($speaker);
         $this->publicListingsCache->bustMajlisListing();
     }
 }

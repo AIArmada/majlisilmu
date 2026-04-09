@@ -32,7 +32,7 @@ it('lists accessible admin resources for admin users through the MCP server', fu
     AdminServer::actingAs($admin)
         ->tool(AdminListResourcesTool::class)
         ->assertOk()
-        ->assertSee(['speakers', 'events', 'institutions'])
+        ->assertSee(['speakers', 'events', 'institutions', 'references', 'subdistricts'])
         ->assertStructuredContent(fn ($json) => $json
             ->has('data.resources')
             ->where('data.resources.0.key', fn (string $key): bool => filled($key))
@@ -50,7 +50,7 @@ it('can request verbose admin resource metadata through the MCP resource list to
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->has('data.resources', 3)
+            ->has('data.resources', 5)
             ->where('data.resources.0.resource_class', fn (string $resourceClass): bool => str_contains($resourceClass, 'Resource'))
             ->etc());
 });
@@ -140,6 +140,28 @@ it('returns write schema for supported resources and rejects unknown resources',
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('data.schema.resource_key', 'events')
+            ->where('data.schema.method', 'POST')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'references',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'references')
+            ->where('data.schema.method', 'POST')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'subdistricts',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'subdistricts')
             ->where('data.schema.method', 'POST')
             ->etc());
 
@@ -399,6 +421,18 @@ it('rejects media fields through MCP write tools', function () {
                 'address' => [
                     'country_id' => 132,
                 ],
+            ],
+        ])
+        ->assertHasErrors(['Media uploads are not supported through MCP v1.']);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'references',
+            'payload' => [
+                'title' => 'Reference With Media',
+                'type' => 'book',
+                'status' => 'verified',
+                'front_cover' => 'base64-data',
             ],
         ])
         ->assertHasErrors(['Media uploads are not supported through MCP v1.']);

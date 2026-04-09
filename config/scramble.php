@@ -37,6 +37,8 @@ return [
             .'When you need required versus optional fields, defaults, catalog lookups, or conditional rules for a public mutation, fetch the corresponding GET /forms/* contract first. '
             .'For public update suggestions specifically, fetch GET /forms/contributions/{subjectType}/{subject}/suggest first to get the current state, sparse editable fields, and direct-edit media capabilities. '
             .'Admin create and update flows are schema-driven: discover writable resources with GET /admin/manifest, then fetch the exact contract with GET /admin/{resourceKey}/schema?operation=create or GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}. '
+            .'For admin geography lookups, use the authenticated GET /admin/catalogs/* endpoints referenced by schema catalog metadata. '
+            .'Current admin write support includes events, institutions, speakers, references, and subdistricts. '
             .'Admin write support is limited to resources whose write_support.schema flag is true in the admin manifest.',
     ],
 

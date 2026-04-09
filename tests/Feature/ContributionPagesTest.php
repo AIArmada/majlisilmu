@@ -51,11 +51,12 @@ it('renders the dedicated institution contribution page', function () {
         ->assertOk()
         ->assertSee(__('Add a New Institution'))
         ->assertSee(__('Address'))
-        ->assertSee(__('3. You become the initial editor'))
-        ->assertSee(__('The original contributor is attached as the initial editor. When an owner or admin becomes available, they can retain that role, upgrade it, or remove it.'))
+        ->assertSee(__('Check the existing directory first'))
+        ->assertSee(__('Before you submit, please check the existing institutions directory and make sure the institution is not already listed. If it already exists, submit an update instead of creating a duplicate record.'))
+        ->assertSee(__('Check Existing Institutions'))
         ->assertDontSee(__('Need to add a speaker instead?'))
         ->assertDontSee(__('Submit Speaker'))
-        ->assertDontSee(__('The original contributor is attached as the initial owner so future edits can be managed directly.'))
+        ->assertDontSee(__('What happens next?'))
         ->assertDontSee(__('Submission Note'))
         ->assertDontSee('lg:grid-cols-2', false);
 });
@@ -72,7 +73,9 @@ it('renders the institution contribution page with translated copy when the loca
         ->assertSee('Tambah Institusi Baharu')
         ->assertSee('Profil Institusi')
         ->assertSee('Alamat')
-        ->assertSee('Apa yang berlaku seterusnya?')
+        ->assertSee('Semak direktori sedia ada dahulu')
+        ->assertSee('Semak Institusi Sedia Ada')
+        ->assertDontSee('Apa yang berlaku seterusnya?')
         ->assertSee('Lihat Sumbangan Saya');
 });
 

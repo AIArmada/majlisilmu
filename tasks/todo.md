@@ -1,3 +1,200 @@
+# Audit Uncommitted Changes
+
+- [x] Inspect the full current uncommitted diff, including new files, for behavioral regressions, incomplete work, and API or docs drift
+- [x] Run the relevant targeted verification suites for contribution workflow, admin API and MCP, docs, and speaker/search surfaces
+- [x] Fix any confirmed issues, rerun verification, and record the audit result
+
+## Review
+
+- Root cause:
+  - the uncommitted diff contained a partially landed speaker-name indexing feature: the new search index service and migration existed, but the public speaker directory, unified search page, frontend API, and frontend catalogs still largely used older ad-hoc `name` queries
+  - the new speaker ordering helpers in [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) also had a real PHPStan break from importing the wrong `CarbonInterface`, and the new search service lacked some iterable value typing
+  - the first speaker-search pass was also rollout-fragile because the new service assumed the `searchable_name` column and `speaker_search_terms` table already existed, which would break local usage before migrations were applied
+  - one added regression test was asserting against rendered HTML rather than the actual result set, which made it too easy to misread hidden component state as a real search regression
+- Fix:
+  - finished wiring [SpeakerSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Search/SpeakerSearchService.php) into the public directory view, the frontend speaker API, the unified search page, and frontend speaker catalogs so title-aware speaker matching now comes from one shared path
+  - connected [SpeakerObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/SpeakerObserver.php) to keep the speaker search index and cached public search IDs fresh on create, update, and delete
+  - added schema-safe fallbacks in the search service so the app degrades to legacy name matching when the new migration has not been run yet, instead of crashing on missing search columns or tables
+  - tightened fuzzy matching to behave like typo recovery rather than cross-matching unrelated titles, and corrected the audit regression coverage to assert against cached IDs and actual result items rather than broad HTML output
+  - fixed the `CarbonInterface` import and the new service docblocks so the touched PHP code is clean under PHPStan
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowServiceTest.php` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowActionsTest.php` => **19 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **25 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **16 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => **18 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **14 passed**
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **23 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Speaker.php app/Support/Search/SpeakerSearchService.php app/Observers/SpeakerObserver.php app/Http/Controllers/Api/Frontend/SearchController.php app/Livewire/Pages/Search/Index.php app/Support/Api/Frontend/FrontendCatalogService.php tests/Feature/SpeakerIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint app/Models/Speaker.php app/Support/Search/SpeakerSearchService.php app/Observers/SpeakerObserver.php resources/views/components/pages/speakers/⚡index.blade.php app/Http/Controllers/Api/Frontend/SearchController.php app/Livewire/Pages/Search/Index.php app/Support/Api/Frontend/FrontendCatalogService.php tests/Feature/SpeakerIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md` => **formatted cleanly**
+
+# Speaker Search Reindex Command
+
+- [x] Add an artisan command to rebuild speaker searchable names and indexed search terms after title-format or enum changes
+- [x] Keep the command idempotent and avoid per-speaker cache thrashing during bulk rebuilds
+- [x] Add focused console verification and record the operational usage
+
+## Review
+
+- Root cause:
+  - the search index migration only backfilled existing speakers once, and ongoing sync only covered speaker save/delete events
+  - that meant future code-only changes to title formatting or enum labels would still need a one-off operational rebuild path, but none existed yet
+- Fix:
+  - added [ReindexSpeakerSearch.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/ReindexSpeakerSearch.php) with `speakers:reindex-search` and a `--chunk` option
+  - extended [SpeakerSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Search/SpeakerSearchService.php) with a bulk `reindexAll()` path plus a schema-readiness check so the command fails cleanly before migrations and only busts cached public search IDs once at the end
+  - added [ReindexSpeakerSearchCommandTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Console/ReindexSpeakerSearchCommandTest.php) to prove the command rebuilds stale `searchable_name` values and `speaker_search_terms`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Console/ReindexSpeakerSearchCommandTest.php` => **1 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **14 passed**
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='searches speakers api by formatted title parts used on the public directory|uses the same stable public directory ordering in the frontend speaker api'` => **2 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Console/Commands/ReindexSpeakerSearch.php app/Support/Search/SpeakerSearchService.php tests/Feature/Console/ReindexSpeakerSearchCommandTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Console/Commands/ReindexSpeakerSearch.php app/Support/Search/SpeakerSearchService.php tests/Feature/Console/ReindexSpeakerSearchCommandTest.php tasks/todo.md` => **pass**
+
+# Speaker Detail API Web Parity
+
+- [x] Audit the speaker show page contract and serialize the missing profile, institution, bio, gallery, and participation fields in the frontend API
+- [x] Enrich the speaker event payload so app clients get the same card-ready metadata the web page already uses
+- [x] Add focused frontend API parity coverage and verify the updated speaker detail contract
+
+## Review
+
+- Root cause:
+  - the public speaker directory API had already been aligned with the web listing order, but `GET /api/v1/speakers/{speaker}` still exposed only a thin profile payload
+  - an app trying to reproduce the public speaker page still had to reverse-engineer view-only logic for rendered bio text, location badges, institution affiliations, gallery images, richer event cards, and the non-speaker participation sections
+  - the shared `eventListData()` serializer was also too sparse for web-parity cards, so even if speaker detail grew new sections, app clients would still miss fields like the book subtitle, timing display, event type label, remote flags, and resolved location text
+- Fix:
+  - expanded [SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php) so the speaker detail payload now includes `job_title`, `is_freelance`, rendered bio helpers, location, institution affiliation chips, gallery images, and share-ready media
+  - added explicit `other_role_upcoming_participations` and `other_role_past_participations` sections, each with role metadata plus the same enriched event payload used for talk listings
+  - enriched the shared event serializer with `event_type_label`, `event_format_label`, `timing_display`, `end_time_display`, `reference_study_subtitle`, `location`, `status_label`, `is_remote`, `is_pending`, and `is_cancelled`, then loaded the extra relations needed by the public detail endpoints that consume it
+  - added focused API parity coverage proving an app client can now fetch the same speaker-profile, event-card, and non-speaker participation data the public web page already renders
+- Verification:
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='mirrors public detail media and public contact payloads|mirrors the public speaker page payload for app clients|uses the same stable public directory ordering in the frontend speaker api'` => **3 passed**
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **22 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md` => **pass**
+
+# Speaker API Directory Parity
+
+- [x] Audit which speaker-related API surfaces should mirror the public directory changes versus stay deterministic for search/lookup usage
+- [x] Move shared stable public speaker ordering into a reusable query path and align the public speaker API collection endpoint with it
+- [x] Add focused API verification and record the outcome
+
+## Review
+
+- Root cause:
+  - the public speaker directory had been changed to use a stable pseudo-random browse order, but the matching public API collection endpoint `GET /api/v1/speakers` was still sorting by `name`
+  - the ordering SQL had also been duplicated inside the Volt page component, which made the pgsql UUID-cast fixes easy to miss and increased the risk of web and API drift
+  - not every speaker-related API surface should mirror the directory: compact grouped search and catalog endpoints behave more like lookup APIs, where deterministic ordering is still more appropriate than browse-style randomization
+- Fix:
+  - moved the stable public speaker ordering into [Speaker.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Speaker.php) as a reusable `publicDirectoryOrder()` scope plus `publicDirectorySortParts()` helper for test parity
+  - updated the public speaker page in [⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/⚡index.blade.php) to use the shared scope instead of duplicating raw SQL
+  - aligned [SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php) so `GET /api/v1/speakers` now uses the same stable public directory order, while leaving grouped `/api/v1/search` and speaker catalogs deterministic
+  - added focused API parity coverage proving the frontend speaker API returns the same order contract as the public directory
+- Verification:
+  - `php artisan test tests/Feature/SpeakerIndexTest.php --filter='shows the total speaker count on the speaker index|uses a stable random speaker order instead of alphabetical sorting'` => **2 passed**
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='returns profile-quality speaker avatar urls from the frontend search api|uses the same stable public directory ordering in the frontend speaker api'` => **2 passed**
+  - `vendor/bin/pint --test app/Models/Speaker.php app/Http/Controllers/Api/Frontend/SearchController.php resources/views/components/pages/speakers/⚡index.blade.php tests/Feature/SpeakerIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md tasks/lessons.md` => **pass**
+
+# Speaker Name Search Indexing And Cache Busting
+
+- [x] Add a speaker search index that covers formatted names, honorifics, pre-nominals, and post-nominals with indexed lookup terms
+- [x] Route the public speaker directory, unified search page, frontend API, and speaker catalogs through the shared speaker search contract
+- [x] Cache public speaker search result IDs and bust them safely when speakers are created, updated, or deleted
+- [x] Add focused regression coverage and verify the touched paths
+
+## Review
+
+- Root cause:
+  - the initial speaker-title search work only added the new [SpeakerSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Search/SpeakerSearchService.php) and migration, but did not actually route the main speaker-facing entrypoints through it, so the new index contract was incomplete
+  - cache busting and term syncing were also missing from the actual speaker lifecycle, which meant the new public search caches could drift after edits if the feature were fully enabled
+  - the first fuzzy-search threshold also treated unrelated religious titles such as `ustazah` and `hafizah` as similar enough, which is not the intended typo-recovery behavior
+- Fix:
+  - wired the shared service into [⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/⚡index.blade.php), [SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php), [Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Search/Index.php), and [FrontendCatalogService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Frontend/FrontendCatalogService.php)
+  - updated [SpeakerObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/SpeakerObserver.php) so speaker create/update/delete now keeps indexed terms and cached public search IDs in sync
+  - added schema-aware fallbacks in the search service so local or pre-migration environments do not crash when the search index tables are not present yet
+  - constrained fuzzy matching to actual typo-like candidates and added focused regression coverage for title-part search plus cache-refresh behavior
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **14 passed**
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **23 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Speaker.php app/Support/Search/SpeakerSearchService.php app/Observers/SpeakerObserver.php app/Http/Controllers/Api/Frontend/SearchController.php app/Livewire/Pages/Search/Index.php app/Support/Api/Frontend/FrontendCatalogService.php tests/Feature/SpeakerIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint app/Models/Speaker.php app/Support/Search/SpeakerSearchService.php app/Observers/SpeakerObserver.php resources/views/components/pages/speakers/⚡index.blade.php app/Http/Controllers/Api/Frontend/SearchController.php app/Livewire/Pages/Search/Index.php app/Support/Api/Frontend/FrontendCatalogService.php tests/Feature/SpeakerIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md` => **formatted cleanly**
+
+# Admin Geography Catalog Metadata
+
+- [x] Add authenticated admin-side geography catalog endpoints for countries, states, districts, and subdistricts
+- [x] Expose admin schema catalog metadata for geography IDs in subdistrict writes and nested institution or speaker address payloads
+- [x] Add focused admin API and docs verification for the new catalog discovery surface
+
+## Review
+
+- Root cause:
+  - the first pass added admin write support for `subdistricts`, but the schema still exposed geography fields as plain integer IDs with no admin-scoped discovery path for valid countries, states, districts, or dependent subdistricts
+  - `institutions` and `speakers` had the same problem indirectly inside their nested `address` payloads, so an external admin client still had to hard-code geography lookups or fall back to the public catalog surface
+  - the authenticated admin API did not yet expose a dedicated `/admin/catalogs/*` surface, and the docs did not advertise one
+- Fix:
+  - added [CatalogController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Admin/CatalogController.php) and routed authenticated admin geography catalogs under `/api/v1/admin/catalogs/countries`, `/states`, `/districts`, and `/subdistricts` in [api.php](/Users/Saiffil/Herd/majlisilmu/routes/api.php)
+  - extended [AdminResourceMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceMutationService.php) so admin write schemas now expose a `catalogs` section with endpoint URLs and query placeholder templates for `country_id`, `state_id`, `district_id`, and nested `address.*` geography fields
+  - updated [config/scramble.php](/Users/Saiffil/Herd/majlisilmu/config/scramble.php) and [ScrambleDocsTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ScrambleDocsTest.php) so the docs explicitly mention `GET /admin/catalogs/*` and group the new endpoints under an `Admin Catalog` tag
+  - added focused admin API coverage proving the catalog endpoints return data and that schema metadata now references the correct endpoints and dependency placeholders
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **16 passed** (202 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => **10 passed** (63 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Http/Controllers/Api/Admin/CatalogController.php app/Support/Api/Admin/AdminResourceMutationService.php config/scramble.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/ScrambleDocsTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Http/Controllers/Api/Admin/CatalogController.php app/Support/Api/Admin/AdminResourceMutationService.php config/scramble.php routes/api.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/ScrambleDocsTest.php tasks/todo.md` => **pass**
+
+# Admin API Reference And Subdistrict Writes
+
+- [x] Audit the existing admin resource mutation layer and the matching Filament UI contracts for references and subdistricts
+- [x] Add admin API create and update support for references and subdistricts, including reference media handling and subdistrict federal-territory validation
+- [x] Align MCP/admin-doc surfaces that derive from the same write-support registry, then run focused verification
+
+## Review
+
+- Root cause:
+  - the generic admin API registry already exposed `references` and `subdistricts` as readable resources, but the mutation layer still hard-coded write support to events, institutions, and speakers only
+  - `reference` writes need more than a simple allowlist flip because the Filament UI includes status, canonical flags, social links, and three media collections with auto-managed slugs
+  - `subdistrict` writes also have a UI-only conditional rule where `district_id` is hidden and not required for federal territory states, so the admin API needed explicit validation and normalization to match that behavior instead of accepting inconsistent geography payloads
+- Fix:
+  - extended [AdminResourceMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceMutationService.php) to advertise schema, defaults, validation rules, and create or update handling for `references` and `subdistricts`
+  - added [SaveReferenceAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/References/SaveReferenceAction.php) to persist reference fields, keep slugs auto-managed, sync social media, and manage `front_cover`, `back_cover`, and `gallery` media collections
+  - added [SaveSubdistrictAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Subdistricts/SaveSubdistrictAction.php) to derive `country_code`, enforce state-country and district-state consistency, and mirror the federal-territory district rule from the admin form
+  - exposed reference relation syncing through [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php), updated MCP media guards and server copy for the newly writable resource set, and added focused admin API, MCP, and Scramble doc regressions
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **15 passed** (183 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => **18 passed** (144 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => **10 passed** (58 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Actions/References/SaveReferenceAction.php app/Actions/Subdistricts/SaveSubdistrictAction.php app/Services/ContributionEntityMutationService.php app/Support/Api/Admin/AdminResourceMutationService.php app/Mcp/Servers/AdminServer.php app/Mcp/Tools/Admin/AbstractAdminWriteTool.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Mcp/AdminServerTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Actions/References/SaveReferenceAction.php app/Actions/Subdistricts/SaveSubdistrictAction.php app/Services/ContributionEntityMutationService.php app/Support/Api/Admin/AdminResourceMutationService.php app/Mcp/Servers/AdminServer.php app/Mcp/Tools/Admin/AbstractAdminWriteTool.php config/scramble.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/Mcp/AdminServerTest.php tests/Feature/ScrambleDocsTest.php tasks/todo.md` => **pass**
+
+# Institution Submission Ownership And Messaging
+
+- [x] Audit the institution contribution page, action flow, approval path, and API behavior for duplicate-prevention guidance and unintended proposer privileges
+- [x] Update the institution submission page copy, remove the next-steps block, and clarify the approval or rejection notification expectation
+- [x] Stop auto-assigning institution submitters as owners, admins, editors, or members in staged creation and approval flows, including the frontend API path
+- [x] Add institution contribution approval and rejection notifications plus focused regression coverage, then verify the touched paths
+
+## Review
+
+- Root cause:
+  - the public institution contribution page still told users they would become the initial editor and hid duplicate-prevention guidance behind the form instead of making directory checking the first step
+  - the contribution mutation service and approval action were both auto-attaching the proposer to institutions, so a simple public submission silently granted internal membership and ownership state
+  - the shared frontend API route used the same staged-create path, so the unexpected institution membership assignment also existed for API clients
+  - institution and speaker contribution approvals or rejections did not dispatch the generic submission-workflow notifications, even though the institution submission flow now promises that contributors will be notified about the decision
+- Fix:
+  - updated [submit-institution.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/contributions/submit-institution.blade.php) to lead with a directory-check callout and link, remove the old “What happens next?” block, and keep the page copy focused on review plus notifications
+  - changed [SubmitInstitution.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SubmitInstitution.php) and [ContributionController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/ContributionController.php) so both the web flow and the API now return a thank-you message that promises only approval or rejection notifications
+  - removed automatic institution membership attachment from [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php) and blocked institution owner assignment inside [ApproveContributionRequestAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Contributions/ApproveContributionRequestAction.php)
+  - added [ContributionRequestNotificationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/Notifications/ContributionRequestNotificationService.php) and wired it into approval and rejection actions so institution and speaker create requests now notify the proposer on review outcome without granting edit access
+  - updated the institution page, workflow, and frontend API tests to prove the new copy, no-membership rule, API message, and notification triggers
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **25 passed** (119 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowActionsTest.php` => **19 passed** (65 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionWorkflowServiceTest.php` => **10 passed** (48 assertions)
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **20 passed** (117 assertions)
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions/SubmitInstitution.php app/Services/ContributionEntityMutationService.php app/Services/Notifications/ContributionRequestNotificationService.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Contributions/RejectContributionRequestAction.php app/Http/Controllers/Api/Frontend/ContributionController.php tests/Feature/ContributionPagesTest.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionWorkflowServiceTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Livewire/Pages/Contributions/SubmitInstitution.php app/Services/ContributionEntityMutationService.php app/Services/Notifications/ContributionRequestNotificationService.php app/Actions/Contributions/ApproveContributionRequestAction.php app/Actions/Contributions/RejectContributionRequestAction.php app/Http/Controllers/Api/Frontend/ContributionController.php resources/views/livewire/pages/contributions/submit-institution.blade.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json resources/lang/en/notifications.php resources/lang/ms/notifications.php tests/Feature/ContributionPagesTest.php tests/Feature/ContributionWorkflowActionsTest.php tests/Feature/ContributionWorkflowServiceTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md tasks/lessons.md` => **pass**
+
 # Contribution Update API Audit
 
 - [x] Audit the uncommitted contribution-update API changes against real developer write workflows

@@ -3,12 +3,19 @@
 use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
+use App\Enums\EventFormat;
+use App\Enums\EventKeyPersonRole;
+use App\Enums\EventType;
 use App\Models\ContributionRequest;
+use App\Models\District;
 use App\Models\Event;
+use App\Models\EventKeyPerson;
 use App\Models\Institution;
 use App\Models\MembershipClaim;
 use App\Models\Reference;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
@@ -20,6 +27,7 @@ use Database\Seeders\PermissionSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -38,6 +46,26 @@ function assignInstitutionOwnerForFrontendApi(User $user, Institution $instituti
     Authz::withScope(app(MemberRoleScopes::class)->institution(), function () use ($user): void {
         $user->syncRoles(['owner']);
     }, $user);
+}
+
+function ensureFrontendApiMalaysiaCountryExists(): int
+{
+    $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
+
+    if (is_int($malaysiaId)) {
+        return $malaysiaId;
+    }
+
+    return DB::table('countries')->insertGetId([
+        'id' => 132,
+        'iso2' => 'MY',
+        'name' => 'Malaysia',
+        'status' => 1,
+        'phone_code' => '60',
+        'iso3' => 'MYS',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
 }
 
 it('exposes corrected frontend contract metadata', function () {
@@ -221,6 +249,28 @@ it('maps public event organizer values back to persistence classes during direct
         ->and($event->fresh()->live_url)->toBeNull();
 });
 
+it('searches speakers api by formatted title parts used on the public directory', function () {
+    $matchingSpeaker = Speaker::factory()->create([
+        'name' => 'Aisyah Binti Hassan',
+        'pre_nominal' => ['syeikhul_maqari'],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $otherSpeaker = Speaker::factory()->create([
+        'name' => 'Fatimah Binti Omar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson('/api/v1/speakers?search='.urlencode('syeikhul maqari'))
+        ->assertOk();
+
+    expect(collect($response->json('data'))->pluck('id')->all())
+        ->toContain((string) $matchingSpeaker->id)
+        ->not->toContain((string) $otherSpeaker->id);
+});
+
 it('rejects unsupported files on public contribution update suggestions', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
@@ -281,11 +331,13 @@ it('creates institution contribution requests through the frontend api', functio
         ],
     ])
         ->assertCreated()
+        ->assertJsonPath('message', __('Thank you. Your institution submission has been received. We will notify you if it is approved or rejected.'))
         ->assertJsonPath('data.institution.name', 'Masjid API');
 
     $institution = Institution::query()->where('name', 'Masjid API')->firstOrFail();
 
     expect($institution->status)->toBe('pending')
+        ->and($institution->members()->whereKey($user->id)->exists())->toBeFalse()
         ->and(ContributionRequest::query()->where('entity_id', $institution->getKey())->exists())->toBeTrue();
 });
 
@@ -318,6 +370,46 @@ it('returns profile-quality speaker avatar urls from the frontend search api', f
     $this->getJson(route('api.client.speakers.index', ['search' => 'kazim']))
         ->assertOk()
         ->assertJsonPath('data.0.avatar_url', $speaker->public_avatar_url);
+});
+
+it('uses the same stable public directory ordering in the frontend speaker api', function () {
+    $firstSpeaker = Speaker::factory()->create([
+        'name' => 'Adam Speaker API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $secondSpeaker = Speaker::factory()->create([
+        'name' => 'Zaid Speaker API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson(route('api.client.speakers.index', [
+        'search' => 'Speaker API',
+        'per_page' => 12,
+    ]))->assertOk();
+
+    $expectedOrder = [$firstSpeaker->id, $secondSpeaker->id];
+
+    usort($expectedOrder, static function (string $left, string $right): int {
+        $leftParts = Speaker::publicDirectorySortParts($left);
+        $rightParts = Speaker::publicDirectorySortParts($right);
+
+        $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
+
+        if ($primaryComparison !== 0) {
+            return $primaryComparison;
+        }
+
+        return $leftParts['secondary'] <=> $rightParts['secondary'];
+    });
+
+    expect(collect($response->json('data'))
+        ->pluck('id')
+        ->intersect([$firstSpeaker->id, $secondSpeaker->id])
+        ->values()
+        ->all())->toBe($expectedOrder);
 });
 
 it('submits and cancels membership claims through the frontend api', function () {
@@ -689,6 +781,182 @@ it('mirrors public detail media and public contact payloads', function () {
 
     $speakerResponse->assertJsonMissingPath('data.speaker.media.main_url');
     $referenceResponse->assertJsonMissingPath('data.reference.media.cover_url');
+});
+
+it('mirrors the public speaker page payload for app clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+    $bioText = str_repeat('Biodata speaker aplikasi ini panjang dan terperinci. ', 20);
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'job_title' => 'Penasihat Dakwah',
+        'is_freelance' => true,
+        'bio' => [
+            'type' => 'doc',
+            'content' => [[
+                'type' => 'paragraph',
+                'content' => [[
+                    'type' => 'text',
+                    'text' => $bioText,
+                ]],
+            ]],
+        ],
+    ]);
+    $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg'))->toMediaCollection('avatar');
+    $speaker->addMedia(UploadedFile::fake()->image('speaker-cover.jpg'))->toMediaCollection('cover');
+    $speaker->addMedia(UploadedFile::fake()->image('speaker-gallery-1.jpg'))->toMediaCollection('gallery');
+    $speaker->addMedia(UploadedFile::fake()->image('speaker-gallery-2.jpg'))->toMediaCollection('gallery');
+    $speaker->update(['job_title' => 'Penasihat Dakwah']);
+
+    $speakerState = State::query()->create([
+        'country_id' => $countryId,
+        'name' => 'Pahang',
+        'country_code' => 'MY',
+    ]);
+    $speakerDistrict = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $speakerState->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+    $speakerSubdistrict = Subdistrict::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $speakerState->id,
+        'district_id' => (int) $speakerDistrict->id,
+        'country_code' => 'MY',
+        'name' => 'Temerloh',
+    ]);
+
+    $speaker->address()->update([
+        'country_id' => $countryId,
+        'state_id' => (int) $speakerState->id,
+        'district_id' => (int) $speakerDistrict->id,
+        'subdistrict_id' => (int) $speakerSubdistrict->id,
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Madrasah API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $institution->addMedia(UploadedFile::fake()->image('institution-cover.jpg'))->toMediaCollection('cover');
+    $speaker->institutions()->attach($institution->id, [
+        'position' => 'Mudarris',
+        'is_primary' => true,
+    ]);
+
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan Seri API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $venueSubdistrict = Subdistrict::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $speakerState->id,
+        'district_id' => (int) $speakerDistrict->id,
+        'country_code' => 'MY',
+        'name' => 'Mentakab',
+    ]);
+    $venue->address()->update([
+        'country_id' => $countryId,
+        'state_id' => (int) $speakerState->id,
+        'district_id' => (int) $speakerDistrict->id,
+        'subdistrict_id' => (int) $venueSubdistrict->id,
+    ]);
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Kitab API',
+        'type' => 'book',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $upcomingEvent = Event::factory()->prayerRelative()->create([
+        'title' => 'Majlis API Akan Datang',
+        'status' => 'pending',
+        'is_active' => true,
+        'visibility' => 'public',
+        'event_format' => 'hybrid',
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+        'starts_at' => now()->addDays(3)->setTime(19, 30),
+        'ends_at' => now()->addDays(3)->setTime(21, 0),
+        'event_type' => ['kuliah_ceramah'],
+    ]);
+    $upcomingEvent->references()->attach($bookReference->id);
+    $speaker->speakerEvents()->attach($upcomingEvent->id);
+
+    $pastEvent = Event::factory()->create([
+        'title' => 'Majlis API Lepas',
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'event_format' => 'physical',
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+        'starts_at' => now()->subDays(2)->setTime(20, 0),
+        'ends_at' => now()->subDays(2)->setTime(22, 0),
+        'event_type' => ['forum'],
+    ]);
+    $speaker->speakerEvents()->attach($pastEvent->id);
+
+    $otherRoleEvent = Event::factory()->create([
+        'title' => 'Forum API Moderator',
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'event_format' => 'physical',
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+        'starts_at' => now()->addWeek()->setTime(20, 0),
+        'ends_at' => now()->addWeek()->setTime(22, 0),
+        'event_type' => ['forum'],
+    ]);
+
+    EventKeyPerson::factory()->create([
+        'event_id' => $otherRoleEvent->id,
+        'speaker_id' => $speaker->id,
+        'role' => EventKeyPersonRole::Moderator,
+        'is_public' => true,
+        'order_column' => 1,
+    ]);
+
+    $response = $this->withUnencryptedCookie('user_timezone', 'Asia/Kuala_Lumpur')
+        ->getJson(route('api.client.speakers.show', ['speakerKey' => $speaker->slug]))
+        ->assertOk();
+
+    expect($response->json('data.speaker.job_title'))->toBe('Penasihat Dakwah')
+        ->and($response->json('data.speaker.is_freelance'))->toBeTrue()
+        ->and($response->json('data.speaker.location'))->toBe('Temerloh, Pahang')
+        ->and($response->json('data.speaker.bio_text'))->toContain('Biodata speaker aplikasi ini panjang')
+        ->and($response->json('data.speaker.bio_html'))->toContain('<p')
+        ->and($response->json('data.speaker.bio_excerpt'))->toBe(Str::limit($bioText, 180))
+        ->and($response->json('data.speaker.should_collapse_bio'))->toBeTrue()
+        ->and($response->json('data.speaker.media.avatar_url'))->not->toBeEmpty()
+        ->and($response->json('data.speaker.media.share_image_url'))->not->toBeEmpty()
+        ->and($response->json('data.speaker.gallery'))->toHaveCount(2)
+        ->and($response->json('data.speaker.institutions.0.name'))->toBe('Madrasah API')
+        ->and($response->json('data.speaker.institutions.0.position'))->toBe('Mudarris')
+        ->and($response->json('data.speaker.institutions.0.is_primary'))->toBeTrue()
+        ->and($response->json('data.speaker.institutions.0.chip_image_url'))->not->toBeEmpty()
+        ->and($response->json('data.upcoming_events.0.reference_study_subtitle'))->toBe('Kitab API')
+        ->and($response->json('data.upcoming_events.0.event_type_label'))->toBe(EventType::KuliahCeramah->getLabel())
+        ->and($response->json('data.upcoming_events.0.event_format'))->toBe('hybrid')
+        ->and($response->json('data.upcoming_events.0.event_format_label'))->toBe(EventFormat::Hybrid->getLabel())
+        ->and($response->json('data.upcoming_events.0.timing_display'))->not->toBeEmpty()
+        ->and($response->json('data.upcoming_events.0.location'))->toBe('Dewan Seri API, Mentakab, Temerloh, Pahang')
+        ->and($response->json('data.upcoming_events.0.is_remote'))->toBeTrue()
+        ->and($response->json('data.upcoming_events.0.is_pending'))->toBeTrue()
+        ->and($response->json('data.upcoming_events.0.is_cancelled'))->toBeFalse()
+        ->and($response->json('data.other_role_upcoming_total'))->toBe(1)
+        ->and($response->json('data.other_role_past_total'))->toBe(0)
+        ->and($response->json('data.other_role_upcoming_participations.0.role'))->toBe('moderator')
+        ->and($response->json('data.other_role_upcoming_participations.0.role_label'))->toBe(EventKeyPersonRole::Moderator->getLabel())
+        ->and($response->json('data.other_role_upcoming_participations.0.event.title'))->toBe('Forum API Moderator');
 });
 
 it('allows following and unfollowing a speaker through the frontend api', function () {

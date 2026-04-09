@@ -120,7 +120,7 @@ class SubmitInstitution extends Component implements HasActions, HasForms
             },
         );
 
-        $this->successToast(__('Institution submitted for review.'));
+        $this->successToast(__('Thank you. Your institution submission has been received. We will notify you if it is approved or rejected.'));
 
         $this->redirect(route('contributions.index'), navigate: true);
     }

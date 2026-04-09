@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api\Frontend;
 
 use App\Enums\ContactCategory;
+use App\Enums\EventFormat;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
+use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
 use App\Models\Event;
+use App\Models\EventKeyPerson;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
@@ -17,16 +21,25 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use App\Support\Location\AddressHierarchyFormatter;
+use App\Support\Search\SpeakerSearchService;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Dedoc\Scramble\Attributes\Group;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
+use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class SearchController extends FrontendController
 {
     public function __construct(
         private readonly EventSearchService $eventSearchService,
+        private readonly SpeakerSearchService $speakerSearchService,
     ) {}
 
     public function search(Request $request): JsonResponse
@@ -127,27 +140,11 @@ class SearchController extends FrontendController
     public function speakers(Request $request): JsonResponse
     {
         $search = $this->normalizedString($request->query('search'));
+        $perPage = $request->integer('per_page', 12);
 
-        $query = Speaker::query()
-            ->where('status', 'verified')
-            ->where('is_active', true)
-            ->withCount(['events' => function (Builder $query): void {
-                $query
-                    ->where('events.is_active', true)
-                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                    ->where('events.visibility', EventVisibility::Public)
-                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('events.starts_at', '>=', now());
-            }])
-            ->with('media');
-
-        if ($search !== null) {
-            $this->applySpeakerSearchConstraint($query, $search);
-        }
-
-        $speakers = $query
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 12));
+        $speakers = $search === null
+            ? $this->baseSpeakerQuery()->publicDirectoryOrder()->paginate($perPage)
+            : $this->speakerDirectorySearchPaginator($request, $search, $perPage);
 
         return response()->json([
             'data' => collect($speakers->items())->map(fn (Speaker $speaker): array => $this->speakerListData($speaker))->all(),
@@ -213,7 +210,7 @@ class SearchController extends FrontendController
                 'upcoming_events' => $record->events()
                     ->active()
                     ->where('starts_at', '>=', now())
-                    ->with(['venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media'])
+                    ->with(['institution.media', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media', 'references'])
                     ->orderBy('starts_at')
                     ->take(max(1, min($request->integer('upcoming_per_page', 6), 50)))
                     ->get()
@@ -223,7 +220,7 @@ class SearchController extends FrontendController
                 'past_events' => $record->events()
                     ->active()
                     ->where('starts_at', '<', now())
-                    ->with(['venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media'])
+                    ->with(['institution.media', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media', 'references'])
                     ->orderByDesc('starts_at')
                     ->take(max(1, min($request->integer('past_per_page', 6), 50)))
                     ->get()
@@ -262,28 +259,73 @@ class SearchController extends FrontendController
 
         abort_unless($user instanceof User ? $user->can('view', $record) : ($record->is_active && $record->status === 'verified'), 404);
 
+        $otherRoleUpcomingParticipations = $record->nonSpeakerEventKeyPeople()
+            ->whereHas('event', function (Builder $query): void {
+                $query
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public)
+                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                    ->where('starts_at', '>=', now());
+            })
+            ->with([
+                'event.institution',
+                'event.institution.media',
+                'event.institution.address.state',
+                'event.institution.address.district',
+                'event.institution.address.subdistrict',
+                'event.venue.address.state',
+                'event.venue.address.district',
+                'event.venue.address.subdistrict',
+                'event.media',
+                'event.references',
+            ])
+            ->get()
+            ->sortBy(function (EventKeyPerson $keyPerson): int {
+                $startsAt = $keyPerson->event?->starts_at;
+
+                return $startsAt instanceof \DateTimeInterface ? $startsAt->getTimestamp() : PHP_INT_MAX;
+            })
+            ->take(max(1, min($request->integer('other_role_upcoming_per_page', 6), 50)))
+            ->values();
+
+        $otherRolePastParticipations = $record->nonSpeakerEventKeyPeople()
+            ->whereHas('event', function (Builder $query): void {
+                $query
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public)
+                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                    ->where('starts_at', '<', now());
+            })
+            ->with([
+                'event.institution',
+                'event.institution.media',
+                'event.institution.address.state',
+                'event.institution.address.district',
+                'event.institution.address.subdistrict',
+                'event.venue.address.state',
+                'event.venue.address.district',
+                'event.venue.address.subdistrict',
+                'event.media',
+                'event.references',
+            ])
+            ->get()
+            ->sortByDesc(function (EventKeyPerson $keyPerson): int {
+                $startsAt = $keyPerson->event?->starts_at;
+
+                return $startsAt instanceof \DateTimeInterface ? $startsAt->getTimestamp() : 0;
+            })
+            ->take(max(1, min($request->integer('other_role_past_per_page', 6), 50)))
+            ->values();
+
         return response()->json([
             'data' => [
-                'speaker' => [
-                    'id' => $record->id,
-                    'slug' => $record->slug,
-                    'name' => $record->name,
-                    'formatted_name' => $record->formatted_name,
-                    'bio' => $record->bio,
-                    'status' => $record->status,
-                    'is_active' => (bool) $record->is_active,
-                    'is_following' => $user?->isFollowing($record) ?? false,
-                    'media' => [
-                        'avatar_url' => $record->getFirstMediaUrl('avatar', 'profile') ?: $record->getFirstMediaUrl('avatar'),
-                        'cover_url' => $record->getFirstMediaUrl('cover', 'banner') ?: $record->getFirstMediaUrl('cover'),
-                    ],
-                    'contacts' => $this->contactData($record->contacts),
-                    'social_media' => $this->socialMediaData($record->socialMedia),
-                ],
+                'speaker' => $this->speakerDetailData($record, $user),
                 'upcoming_events' => $record->speakerEvents()
                     ->active()
                     ->where('starts_at', '>=', now())
-                    ->with(['institution', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media'])
+                    ->with(['institution', 'institution.media', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media', 'references'])
                     ->orderBy('starts_at')
                     ->take(max(1, min($request->integer('upcoming_per_page', 10), 50)))
                     ->get()
@@ -293,13 +335,39 @@ class SearchController extends FrontendController
                 'past_events' => $record->speakerEvents()
                     ->active()
                     ->where('starts_at', '<', now())
-                    ->with(['institution', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media'])
+                    ->with(['institution', 'institution.media', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media', 'references'])
                     ->orderByDesc('starts_at')
                     ->take(max(1, min($request->integer('past_per_page', 10), 50)))
                     ->get()
                     ->map(fn (Event $event): array => $this->eventListData($event))
                     ->all(),
                 'past_total' => $record->speakerEvents()->active()->where('starts_at', '<', now())->count(),
+                'other_role_upcoming_participations' => $otherRoleUpcomingParticipations
+                    ->map(fn (EventKeyPerson $keyPerson): array => $this->eventParticipationData($keyPerson))
+                    ->all(),
+                'other_role_upcoming_total' => $record->nonSpeakerEventKeyPeople()
+                    ->whereHas('event', function (Builder $query): void {
+                        $query
+                            ->where('events.is_active', true)
+                            ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                            ->where('events.visibility', EventVisibility::Public)
+                            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                            ->where('starts_at', '>=', now());
+                    })
+                    ->count(),
+                'other_role_past_participations' => $otherRolePastParticipations
+                    ->map(fn (EventKeyPerson $keyPerson): array => $this->eventParticipationData($keyPerson))
+                    ->all(),
+                'other_role_past_total' => $record->nonSpeakerEventKeyPeople()
+                    ->whereHas('event', function (Builder $query): void {
+                        $query
+                            ->where('events.is_active', true)
+                            ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                            ->where('events.visibility', EventVisibility::Public)
+                            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                            ->where('starts_at', '<', now());
+                    })
+                    ->count(),
             ],
         ]);
     }
@@ -360,6 +428,7 @@ class SearchController extends FrontendController
                         'speakers.media',
                         'keyPeople.speaker.media',
                         'media',
+                        'references',
                     ])
                     ->orderBy('starts_at')
                     ->take(max(1, min($request->integer('upcoming_per_page', 8), 50)))
@@ -378,6 +447,7 @@ class SearchController extends FrontendController
                         'speakers.media',
                         'keyPeople.speaker.media',
                         'media',
+                        'references',
                     ])
                     ->orderByDesc('starts_at')
                     ->take(max(1, min($request->integer('past_per_page', 8), 50)))
@@ -549,36 +619,7 @@ class SearchController extends FrontendController
      */
     private function speakerSearchQuery(string $search): Builder
     {
-        $operator = config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
-        $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
-        $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
-        $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
-
-        return Speaker::query()
-            ->active()
-            ->where('status', 'verified')
-            ->withCount(['events' => function (Builder $query): void {
-                $query
-                    ->where('events.is_active', true)
-                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                    ->where('events.visibility', EventVisibility::Public)
-                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('events.starts_at', '>=', now());
-            }])
-            ->with('media')
-            ->where(function (Builder $query) use ($collapsedSearch, $collapsedWildcardSearch, $searchTokens, $operator): void {
-                $query
-                    ->where('name', $operator, "%{$collapsedSearch}%")
-                    ->orWhere('name', $operator, $collapsedWildcardSearch);
-
-                foreach ($searchTokens as $token) {
-                    if (mb_strlen($token) < 2) {
-                        continue;
-                    }
-
-                    $query->orWhere('name', $operator, "%{$token}%");
-                }
-            });
+        return $this->speakerSearchService->applyIndexedSearch($this->baseSpeakerQuery(), $search);
     }
 
     /**
@@ -661,28 +702,144 @@ class SearchController extends FrontendController
     }
 
     /**
-     * @param  Builder<Speaker>  $query
+     * @return Builder<Speaker>
      */
-    private function applySpeakerSearchConstraint(Builder $query, string $search): void
+    private function baseSpeakerQuery(): Builder
     {
-        $operator = config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
-        $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
-        $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
-        $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
+        return Speaker::query()
+            ->active()
+            ->where('status', 'verified')
+            ->withCount(['events' => function (Builder $query): void {
+                $query
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public)
+                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                    ->where('events.starts_at', '>=', now());
+            }])
+            ->with('media');
+    }
 
-        $query->where(function (Builder $innerQuery) use ($collapsedSearch, $collapsedWildcardSearch, $searchTokens, $operator): void {
-            $innerQuery
-                ->where('name', $operator, "%{$collapsedSearch}%")
-                ->orWhere('name', $operator, $collapsedWildcardSearch);
+    /**
+     * @return LengthAwarePaginator<int, Speaker>
+     */
+    private function speakerDirectorySearchPaginator(Request $request, string $search, int $perPage): LengthAwarePaginator
+    {
+        $matchingIds = $this->speakerSearchService->publicSearchIds($search);
 
-            foreach ($searchTokens as $token) {
-                if (mb_strlen($token) < 2) {
-                    continue;
-                }
+        if ($matchingIds !== []) {
+            return $this->baseSpeakerQuery()
+                ->whereIn('speakers.id', $matchingIds)
+                ->publicDirectoryOrder()
+                ->paginate($perPage);
+        }
 
-                $innerQuery->orWhere('name', $operator, "%{$token}%");
-            }
-        });
+        if (mb_strlen($search) < 3) {
+            return $this->emptySpeakerPaginator($request, $perPage);
+        }
+
+        $orderedIds = $this->speakerSearchService->publicFuzzySearchIds($search);
+
+        if ($orderedIds === []) {
+            return $this->emptySpeakerPaginator($request, $perPage);
+        }
+
+        $currentPage = max(1, $request->integer('page', 1));
+        $paginatedIds = array_slice($orderedIds, ($currentPage - 1) * $perPage, $perPage);
+
+        if ($paginatedIds === []) {
+            return new LengthAwarePaginator(
+                collect(),
+                count($orderedIds),
+                $perPage,
+                $currentPage,
+                $this->speakerPaginatorOptions($request),
+            );
+        }
+
+        $speakers = $this->baseSpeakerQuery()
+            ->whereIn('speakers.id', $paginatedIds)
+            ->get()
+            ->sortBy(static function (Speaker $speaker) use ($paginatedIds): int {
+                $position = array_search($speaker->id, $paginatedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values();
+
+        return new LengthAwarePaginator(
+            $speakers,
+            count($orderedIds),
+            $perPage,
+            $currentPage,
+            $this->speakerPaginatorOptions($request),
+        );
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Speaker>
+     */
+    private function emptySpeakerPaginator(Request $request, int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            collect(),
+            0,
+            $perPage,
+            max(1, $request->integer('page', 1)),
+            $this->speakerPaginatorOptions($request),
+        );
+    }
+
+    /**
+     * @return array{path: string, query: array<string, mixed>}
+     */
+    private function speakerPaginatorOptions(Request $request): array
+    {
+        return [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function speakerDetailData(Speaker $speaker, ?User $user): array
+    {
+        $bio = $this->speakerBioData($speaker);
+        $coverUrl = $speaker->getFirstMediaUrl('cover', 'banner') ?: $speaker->getFirstMediaUrl('cover');
+
+        return [
+            'id' => $speaker->id,
+            'slug' => $speaker->slug,
+            'name' => $speaker->name,
+            'formatted_name' => $speaker->formatted_name,
+            'job_title' => $speaker->job_title,
+            'is_freelance' => (bool) $speaker->is_freelance,
+            'bio' => $speaker->bio,
+            'bio_html' => $bio['html'],
+            'bio_text' => $bio['text'],
+            'bio_excerpt' => $bio['excerpt'],
+            'should_collapse_bio' => $bio['should_collapse'],
+            'qualifications' => is_array($speaker->qualifications) ? array_values($speaker->qualifications) : [],
+            'location' => $this->addressLocation($speaker->addressModel),
+            'status' => $speaker->status,
+            'is_active' => (bool) $speaker->is_active,
+            'is_following' => $user?->isFollowing($speaker) ?? false,
+            'media' => [
+                'avatar_url' => $speaker->public_avatar_url,
+                'cover_url' => $coverUrl,
+                'share_image_url' => $speaker->hasMedia('avatar')
+                    ? $speaker->public_avatar_url
+                    : ($coverUrl !== '' ? $coverUrl : $speaker->default_avatar_url),
+            ],
+            'gallery' => $this->speakerGalleryData($speaker),
+            'institutions' => $speaker->institutions
+                ->map(fn (Institution $institution): array => $this->speakerInstitutionData($institution))
+                ->all(),
+            'contacts' => $this->contactData($speaker->contacts),
+            'social_media' => $this->socialMediaData($speaker->socialMedia),
+        ];
     }
 
     /**
@@ -690,24 +847,61 @@ class SearchController extends FrontendController
      */
     private function eventListData(Event $event): array
     {
+        $eventTypeValues = $this->eventTypeValues($event);
+        $eventFormat = $event->event_format;
+        $eventFormatValue = $this->enumValue($eventFormat);
+        $status = $event->status;
+        $statusValue = (string) $status;
+
         return [
             'id' => $event->id,
             'slug' => $event->slug,
             'title' => $event->title,
             'starts_at' => $this->optionalDateTimeString($event->starts_at),
             'ends_at' => $this->optionalDateTimeString($event->ends_at),
+            'timing_display' => $event->timing_display,
+            'end_time_display' => $event->ends_at instanceof \DateTimeInterface
+                ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
+                : null,
             'visibility' => $this->enumValue($event->visibility),
-            'status' => (string) $event->status,
+            'status' => $statusValue,
+            'status_label' => $status instanceof HasLabel ? $status->getLabel() : Str::headline($statusValue),
+            'event_type' => $eventTypeValues,
+            'event_type_label' => $this->eventTypeLabel($eventTypeValues),
+            'event_format' => $eventFormatValue,
+            'event_format_label' => $this->eventFormatLabel($eventFormatValue),
+            'reference_study_subtitle' => $event->reference_study_subtitle,
+            'location' => $this->eventLocation($event),
+            'is_remote' => in_array($eventFormatValue, [EventFormat::Online->value, EventFormat::Hybrid->value], true),
+            'is_pending' => $statusValue === 'pending',
+            'is_cancelled' => $statusValue === 'cancelled',
             'card_image_url' => $event->card_image_url,
             'institution' => $event->institution ? [
                 'id' => $event->institution->id,
                 'name' => $event->institution->name,
                 'slug' => $event->institution->slug,
+                'display_name' => $event->institution->display_name,
+                'logo_url' => $event->institution->getFirstMediaUrl('logo', 'thumb') ?: $event->institution->getFirstMediaUrl('logo'),
             ] : null,
             'venue' => $event->venue ? [
                 'id' => $event->venue->id,
                 'name' => $event->venue->name,
+                'slug' => $event->venue->slug,
             ] : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eventParticipationData(EventKeyPerson $keyPerson): array
+    {
+        return [
+            'id' => $keyPerson->id,
+            'role' => $this->enumValue($keyPerson->role),
+            'role_label' => $this->keyPersonRoleLabel($keyPerson->role),
+            'display_name' => $keyPerson->display_name,
+            'event' => $keyPerson->event ? $this->eventListData($keyPerson->event) : null,
         ];
     }
 
@@ -741,6 +935,155 @@ class SearchController extends FrontendController
             'events_count' => (int) ($speaker->events_count ?? 0),
             'avatar_url' => $speaker->public_avatar_url,
         ];
+    }
+
+    /**
+     * @return array{id: string, name: string, display_name: string, slug: string, position: ?string, is_primary: bool, logo_url: string, cover_url: string, chip_image_url: string}
+     */
+    private function speakerInstitutionData(Institution $institution): array
+    {
+        $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb') ?: $institution->getFirstMediaUrl('logo');
+        $coverUrl = $institution->getFirstMediaUrl('cover', 'banner') ?: $institution->getFirstMediaUrl('cover');
+        $position = data_get($institution, 'pivot.position');
+        $isPrimary = data_get($institution, 'pivot.is_primary');
+
+        return [
+            'id' => $institution->id,
+            'name' => $institution->name,
+            'display_name' => $institution->display_name,
+            'slug' => $institution->slug,
+            'position' => is_string($position) && $position !== '' ? $position : null,
+            'is_primary' => (bool) $isPrimary,
+            'logo_url' => $logoUrl,
+            'cover_url' => $coverUrl,
+            'chip_image_url' => $coverUrl !== '' ? $coverUrl : $logoUrl,
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, name: string, url: string, thumb_url: string}>
+     */
+    private function speakerGalleryData(Speaker $speaker): array
+    {
+        return $speaker->getMedia('gallery')
+            ->map(fn (Media $media): array => [
+                'id' => (string) $media->getKey(),
+                'name' => $media->name,
+                'url' => $media->getUrl(),
+                'thumb_url' => $media->getAvailableUrl(['gallery_thumb']) ?: $media->getUrl(),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array{html: string, text: string, excerpt: ?string, should_collapse: bool}
+     */
+    private function speakerBioData(Speaker $speaker): array
+    {
+        $bio = $speaker->bio;
+
+        if (is_array($bio)) {
+            $renderer = RichContentRenderer::make($bio);
+            $html = $renderer->toHtml();
+            $text = trim($renderer->toText());
+        } else {
+            $html = (string) $bio;
+            $text = trim(strip_tags((string) $bio));
+        }
+
+        return [
+            'html' => $html,
+            'text' => $text,
+            'excerpt' => $text !== '' ? Str::limit($text, 180) : null,
+            'should_collapse' => Str::length($text) > 680,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function eventTypeValues(Event $event): array
+    {
+        $eventType = $event->event_type;
+
+        if ($eventType instanceof Collection) {
+            return $eventType
+                ->map(fn (EventType $value): string => $value->value)
+                ->filter(fn (string $value): bool => $value !== '')
+                ->values()
+                ->all();
+        }
+
+        if (is_array($eventType)) {
+            return array_values(array_filter(array_map(strval(...), $eventType), static fn (string $value): bool => $value !== ''));
+        }
+
+        $value = $this->enumValue($eventType);
+
+        return $value !== '' ? [$value] : [];
+    }
+
+    /**
+     * @param  list<string>  $eventTypeValues
+     */
+    private function eventTypeLabel(array $eventTypeValues): string
+    {
+        $value = $eventTypeValues[0] ?? null;
+
+        if (! is_string($value) || $value === '') {
+            return __('Umum');
+        }
+
+        return EventType::tryFrom($value)?->getLabel() ?? __('Umum');
+    }
+
+    private function eventFormatLabel(string $eventFormatValue): string
+    {
+        if ($eventFormatValue === '') {
+            return EventFormat::Physical->getLabel();
+        }
+
+        return EventFormat::tryFrom($eventFormatValue)?->getLabel() ?? Str::headline($eventFormatValue);
+    }
+
+    private function eventLocation(Event $event): ?string
+    {
+        $venue = $event->venue;
+        $institution = $event->institution;
+        $primaryLocationName = $venue?->name ?: $institution?->name;
+        $address = $venue?->addressModel;
+
+        if (! $address instanceof Address) {
+            $address = $institution?->addressModel;
+        }
+
+        $parts = array_values(array_filter([
+            $primaryLocationName,
+            ...AddressHierarchyFormatter::parts($address),
+        ], static fn (mixed $value): bool => is_string($value) && $value !== ''));
+
+        if ($parts === []) {
+            return null;
+        }
+
+        return implode(', ', $parts);
+    }
+
+    private function keyPersonRoleLabel(mixed $role): string
+    {
+        if ($role instanceof EventKeyPersonRole) {
+            return $role->getLabel();
+        }
+
+        if ($role instanceof \BackedEnum && is_string($role->value)) {
+            return EventKeyPersonRole::tryFrom($role->value)?->getLabel() ?? Str::headline($role->value);
+        }
+
+        if (is_string($role) && $role !== '') {
+            return EventKeyPersonRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
+        }
+
+        return '';
     }
 
     private function normalizedString(mixed $value): ?string
@@ -826,16 +1169,8 @@ class SearchController extends FrontendController
 
     private function addressLocation(?Address $address): ?string
     {
-        if (! $address instanceof Address) {
-            return null;
-        }
+        $location = AddressHierarchyFormatter::format($address);
 
-        $parts = array_values(array_filter([
-            $address->district?->name,
-            $address->subdistrict?->name,
-            $address->state?->name,
-        ], static fn (mixed $value): bool => is_string($value) && $value !== ''));
-
-        return $parts !== [] ? implode(', ', array_unique($parts)) : null;
+        return $location !== '' ? $location : null;
     }
 }
