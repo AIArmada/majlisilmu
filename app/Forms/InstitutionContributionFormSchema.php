@@ -60,7 +60,7 @@ class InstitutionContributionFormSchema
                     ...($addressStatePath === null
                         ? SharedFormSchema::addressFields(
                             requireGoogleMaps: $requireGoogleMaps,
-                            showGoogleMapsUrlField: ! $shouldRenderLocationPicker,
+                            showGoogleMapsUrlField: true,
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,
@@ -71,7 +71,7 @@ class InstitutionContributionFormSchema
                         : [SharedFormSchema::addressGroup(
                             requireGoogleMaps: $requireGoogleMaps,
                             statePath: $addressStatePath,
-                            showGoogleMapsUrlField: ! $shouldRenderLocationPicker,
+                            showGoogleMapsUrlField: true,
                             enableGoogleMapsNormalization: true,
                             enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                             includeCountryField: true,

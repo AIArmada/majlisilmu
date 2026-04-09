@@ -67,7 +67,7 @@ it('renders the institution location picker when google places is enabled', func
         ->assertOk()
         ->assertSee(__('Find the institution location'))
         ->assertSee(__('Search for an institution or address'))
-        ->assertDontSee(__('Google Maps URL'));
+        ->assertSee(__('Google Maps URL'));
 });
 
 it('falls back to the manual location fields when google places is disabled', function () {
