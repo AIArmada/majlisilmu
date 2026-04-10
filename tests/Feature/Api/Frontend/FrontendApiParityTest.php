@@ -5,11 +5,16 @@ use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
 use App\Enums\EventFormat;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\EventStructure;
 use App\Enums\EventType;
+use App\Enums\EventVisibility;
+use App\Enums\InspirationCategory;
+use App\Http\Controllers\Api\Frontend\SearchController;
 use App\Models\ContributionRequest;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
+use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\MembershipClaim;
 use App\Models\Reference;
@@ -24,6 +29,7 @@ use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
 use Database\Seeders\PermissionSeeder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -75,6 +81,7 @@ it('exposes corrected frontend contract metadata', function () {
     $contributionUpdateFlow = $manifest['flows']['contribution_update'] ?? [];
     $membershipClaimFlow = $manifest['flows']['membership_claim'] ?? [];
     $followFlow = $manifest['flows']['follow'] ?? [];
+    $inspirationFlow = $manifest['flows']['inspirations_random'] ?? [];
 
     $submitEvent = $this->getJson(route('api.client.forms.submit-event'))
         ->assertOk()
@@ -95,7 +102,8 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($contributionUpdateFlow['endpoint_template'] ?? null)->toContain('/api/v1/contributions/subjectType/subject/suggest')
         ->and($contributionUpdateFlow['schema_endpoint_template'] ?? null)->toContain('/api/v1/forms/contributions/subjectType/subject/suggest')
         ->and($membershipClaimFlow['endpoint_template'] ?? null)->toContain('/api/v1/membership-claims/subjectType/subject')
-        ->and($followFlow['state_endpoint_template'] ?? null)->toContain('/api/v1/follows/type/subject');
+        ->and($followFlow['state_endpoint_template'] ?? null)->toContain('/api/v1/follows/type/subject')
+        ->and($inspirationFlow['endpoint'] ?? null)->toContain('/api/v1/inspirations/random');
 
     $speakerContract = $this->getJson(route('api.client.forms.contributions.speakers'))
         ->assertOk()
@@ -271,6 +279,64 @@ it('searches speakers api by formatted title parts used on the public directory'
         ->not->toContain((string) $otherSpeaker->id);
 });
 
+it('serializes institution directory payloads with card media aliases for mobile clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+    $malaysiaId = ensureFrontendApiMalaysiaCountryExists();
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid API Directory',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->address()->create([
+        'country_id' => $malaysiaId,
+    ]);
+
+    $institution->addMedia(UploadedFile::fake()->image('directory-logo.jpg', 640, 640))
+        ->toMediaCollection('logo');
+
+    $institution->addMedia(UploadedFile::fake()->image('directory-cover.jpg', 1600, 900))
+        ->toMediaCollection('cover');
+
+    Event::factory()->for($institution)->create([
+        'is_active' => true,
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    $directoryInstitution = $institution->fresh(['address.state', 'address.district', 'address.subdistrict', 'media']);
+
+    expect($directoryInstitution)->not->toBeNull();
+
+    $directoryInstitution?->loadCount(['events' => function (Builder $query): void {
+        $query
+            ->where('events.is_active', true)
+            ->whereIn('events.status', Event::PUBLIC_STATUSES)
+            ->where('events.visibility', EventVisibility::Public)
+            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
+    }]);
+
+    $item = Closure::bind(
+        fn (): array => $this->institutionListData($directoryInstitution),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($item, 'display_name'))->toBe($institution->display_name)
+        ->and(data_get($item, 'events_count'))->toBe(1)
+        ->and(data_get($item, 'event_count'))->toBe(1)
+        ->and(data_get($item, 'logo_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'cover_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'image_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'cover_url'))
+        ->and(data_get($item, 'image_url'))->not->toBe(data_get($item, 'logo_url'))
+        ->and(array_key_exists('location', $item))->toBeTrue()
+        ->and(array_key_exists('location_text', $item))->toBeTrue();
+});
+
 it('rejects unsupported files on public contribution update suggestions', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
@@ -410,6 +476,46 @@ it('uses the same stable public directory ordering in the frontend speaker api',
         ->intersect([$firstSpeaker->id, $secondSpeaker->id])
         ->values()
         ->all())->toBe($expectedOrder);
+});
+
+it('returns random inspiration payloads with category and media metadata for mobile clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    Inspiration::factory()->category(InspirationCategory::QuranQuote)->create([
+        'locale' => 'en',
+        'title' => 'English Inspiration',
+        'content' => 'English content should be filtered out.',
+    ]);
+
+    $inspiration = Inspiration::factory()->category(InspirationCategory::IslamicComic)->create([
+        'locale' => 'ms',
+        'title' => 'Komik API',
+        'content' => 'Renungan komik untuk klien mudah alih.',
+        'source' => 'Sirah API',
+        'is_active' => true,
+    ]);
+
+    $inspiration->addMedia(UploadedFile::fake()->image('inspiration.jpg', 1200, 900))
+        ->toMediaCollection('main');
+
+    $response = $this->getJson(route('api.client.inspirations.random', ['locale' => 'ms']))
+        ->assertOk();
+
+    expect($response->json('data.id'))->toBe($inspiration->id)
+        ->and($response->json('data.title'))->toBe('Komik API')
+        ->and($response->json('data.content'))->toContain('Renungan komik untuk klien mudah alih')
+        ->and($response->json('data.content_html'))->toContain('Renungan komik untuk klien mudah alih')
+        ->and($response->json('data.preview_text'))->not->toBe('')
+        ->and($response->json('data.source'))->toBe('Sirah API')
+        ->and($response->json('data.category.value'))->toBe(InspirationCategory::IslamicComic->value)
+        ->and($response->json('data.category.label'))->toBe(InspirationCategory::IslamicComic->label())
+        ->and($response->json('data.category.color'))->toBe(InspirationCategory::IslamicComic->color())
+        ->and($response->json('data.category.is_comic'))->toBeTrue()
+        ->and($response->json('data.media.has_media'))->toBeTrue()
+        ->and($response->json('data.media.thumb_url'))->not->toBe('')
+        ->and($response->json('data.media.full_url'))->not->toBe('')
+        ->and($response->json('meta.locale'))->toBe('ms');
 });
 
 it('submits and cancels membership claims through the frontend api', function () {

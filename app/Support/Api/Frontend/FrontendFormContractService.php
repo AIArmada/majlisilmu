@@ -33,7 +33,7 @@ class FrontendFormContractService
     public function manifest(?User $user): array
     {
         return [
-            'version' => '2026-04-03',
+            'version' => '2026-04-10',
             'flows' => [
                 'search' => [
                     'method' => 'GET',
@@ -58,6 +58,11 @@ class FrontendFormContractService
                 'speakers_show' => [
                     'method' => 'GET',
                     'endpoint_template' => route('api.client.speakers.show', ['speakerKey' => 'subject'], false),
+                    'auth_required' => false,
+                ],
+                'inspirations_random' => [
+                    'method' => 'GET',
+                    'endpoint' => route('api.client.inspirations.random'),
                     'auth_required' => false,
                 ],
                 'venues_show' => [
