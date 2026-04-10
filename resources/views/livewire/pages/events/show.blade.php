@@ -60,17 +60,17 @@
     $copyMessage = __('Link copied to clipboard!');
     $copyPrompt = __('Copy this link:');
     $eventHasPoster = $event->hasMedia('poster');
-    $eventPosterDisplayAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '3:2';
+    $eventPosterDisplayAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
     $eventPosterIsPortrait = $eventHasPoster && $eventPosterDisplayAspectRatio === '4:5';
     $eventPosterFrameAspectClass = match ($eventPosterDisplayAspectRatio) {
         '4:5' => 'aspect-[4/5]',
         '16:9' => 'aspect-[16/9]',
-        default => 'aspect-[3/2]',
+        default => 'aspect-[16/9]',
     };
     $eventPosterCardMaxWidthClass = match ($eventPosterDisplayAspectRatio) {
         '4:5' => 'max-w-[260px] sm:max-w-[300px] lg:max-w-[360px]',
         '16:9' => 'max-w-[420px] sm:max-w-[540px] lg:max-w-[640px]',
-        default => 'max-w-[340px] sm:max-w-[420px] lg:max-w-[520px]',
+        default => 'max-w-[420px] sm:max-w-[540px] lg:max-w-[640px]',
     };
     $eventPosterPreviewUrl = $eventHasPoster ? $event->getFirstMedia('poster')?->getAvailableUrl(['preview', 'card', 'thumb']) : null;
     $eventPosterOriginalUrl = $eventHasPoster ? $event->getFirstMediaUrl('poster') : null;

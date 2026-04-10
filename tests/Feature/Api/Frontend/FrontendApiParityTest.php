@@ -103,8 +103,10 @@ it('exposes corrected frontend contract metadata', function () {
     $speakerFields = collect($speakerContract['fields'] ?? [])->pluck('name')->all();
 
     expect($speakerFields)->toContain('job_title', 'cover', 'address', 'qualifications')
+        ->toContain('address.country_id', 'address.state_id', 'address.district_id', 'address.subdistrict_id')
         ->not->toContain('position')
         ->not->toContain('main')
+        ->not->toContain('address.line1')
         ->not->toContain('institution_id');
 
     $institutionContract = $this->getJson(route('api.client.forms.contributions.institutions'))
@@ -354,6 +356,32 @@ it('requires address.country_id when creating speakers through the frontend api'
         ->assertJsonValidationErrors(['address.country_id']);
 });
 
+it('accepts a region-only speaker address payload through the frontend api', function () {
+    $user = User::factory()->create();
+
+    Sanctum::actingAs($user);
+
+    $this->postJson(route('api.client.contributions.speakers.store'), [
+        'name' => 'Frontend API Region Speaker',
+        'gender' => 'male',
+        'address' => [
+            'country_id' => 132,
+            'state_id' => null,
+            'district_id' => null,
+            'subdistrict_id' => null,
+        ],
+    ])->assertCreated()
+        ->assertJsonPath('message', __('Thank you. Your speaker submission has been received. We will notify you if it is approved or rejected.'))
+        ->assertJsonPath('data.speaker.name', 'Frontend API Region Speaker');
+
+    $speaker = Speaker::query()->where('name', 'Frontend API Region Speaker')->firstOrFail();
+
+    expect($speaker->addressModel)->not->toBeNull()
+        ->and($speaker->addressModel?->country_id)->toBe(132)
+        ->and($speaker->addressModel?->line1)->toBeNull()
+        ->and($speaker->addressModel?->google_maps_url)->toBeNull();
+});
+
 it('returns profile-quality speaker avatar urls from the frontend search api', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
@@ -408,6 +436,46 @@ it('uses the same stable public directory ordering in the frontend speaker api',
     expect(collect($response->json('data'))
         ->pluck('id')
         ->intersect([$firstSpeaker->id, $secondSpeaker->id])
+        ->values()
+        ->all())->toBe($expectedOrder);
+});
+
+it('uses the same stable public directory ordering in the frontend institution api', function () {
+    $firstInstitution = Institution::factory()->create([
+        'name' => 'Adam Institution API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $secondInstitution = Institution::factory()->create([
+        'name' => 'Zaid Institution API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson(route('api.client.institutions.index', [
+        'search' => 'Institution API',
+        'per_page' => 12,
+    ]))->assertOk();
+
+    $expectedOrder = [$firstInstitution->id, $secondInstitution->id];
+
+    usort($expectedOrder, static function (string $left, string $right): int {
+        $leftParts = Institution::publicDirectorySortParts($left);
+        $rightParts = Institution::publicDirectorySortParts($right);
+
+        $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
+
+        if ($primaryComparison !== 0) {
+            return $primaryComparison;
+        }
+
+        return $leftParts['secondary'] <=> $rightParts['secondary'];
+    });
+
+    expect(collect($response->json('data'))
+        ->pluck('id')
+        ->intersect([$firstInstitution->id, $secondInstitution->id])
         ->values()
         ->all())->toBe($expectedOrder);
 });

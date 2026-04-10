@@ -6,13 +6,15 @@ use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Institution;
 use App\Support\Cache\PublicListingsCache;
+use App\Support\Search\InstitutionSearchService;
 
 class InstitutionObserver
 {
     public function __construct(
         protected GenerateInstitutionSlugAction $generateInstitutionSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
-        protected PublicListingsCache $publicListingsCache
+        protected PublicListingsCache $publicListingsCache,
+        protected InstitutionSearchService $institutionSearchService,
     ) {}
 
     public function saved(Institution $institution): void
@@ -28,6 +30,7 @@ class InstitutionObserver
         }
 
         $this->publicListingsCache->bustMajlisListing();
+        $this->institutionSearchService->bustPublicSearchCache();
     }
 
     public function deleted(Institution $institution): void
@@ -35,5 +38,6 @@ class InstitutionObserver
         $this->syncSlugRedirectAction->purgeForModel($institution);
         $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($institution->name);
         $this->publicListingsCache->bustMajlisListing();
+        $this->institutionSearchService->bustPublicSearchCache();
     }
 }

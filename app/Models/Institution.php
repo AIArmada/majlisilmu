@@ -11,6 +11,7 @@ use App\Models\Concerns\HasDonationChannels;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasLanguages;
 use App\Models\Concerns\HasSocialMedia;
+use Carbon\CarbonInterface;
 use Database\Factories\InstitutionFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -30,6 +32,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Institution extends Model implements AuditableContract, HasMedia
 {
+    public const string PUBLIC_DIRECTORY_SESSION_KEY = 'public_institutions_directory_seed';
+
     /** @use HasFactory<InstitutionFactory> */
     use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
 
@@ -228,5 +232,80 @@ class Institution extends Model implements AuditableContract, HasMedia
                 ->orWhere('institutions.nickname', $operator, "%{$normalizedSearch}%")
                 ->orWhere('institutions.nickname', $operator, $wildcardSearch);
         });
+    }
+
+    /**
+     * Stable pseudo-random directory order that stays pagination-safe for a day.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function publicDirectoryOrder(Builder $query): void
+    {
+        $offset = self::publicDirectoryOrderOffset(self::publicDirectorySessionSeed());
+        $idExpression = self::publicDirectoryOrderIdExpression($query);
+
+        $query->orderByRaw("substr({$idExpression}, {$offset}, 32)")
+            ->orderByRaw($idExpression.' asc');
+    }
+
+    public static function publicDirectoryOrderOffset(?string $sessionSeed = null, ?CarbonInterface $at = null): int
+    {
+        if (is_string($sessionSeed) && $sessionSeed !== '') {
+            return (abs((int) crc32($sessionSeed)) % 24) + 1;
+        }
+
+        return (((int) ($at ?? now())->format('z')) % 24) + 1;
+    }
+
+    /**
+     * @return array{primary: string, secondary: string}
+     */
+    public static function publicDirectorySortParts(string $institutionId, ?string $sessionSeed = null, ?CarbonInterface $at = null): array
+    {
+        $normalizedId = str_replace('-', '', $institutionId);
+        $offset = self::publicDirectoryOrderOffset($sessionSeed, $at);
+
+        return [
+            'primary' => substr($normalizedId, $offset - 1),
+            'secondary' => $normalizedId,
+        ];
+    }
+
+    public static function publicDirectorySessionSeed(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+
+        if (! $request->hasSession()) {
+            return null;
+        }
+
+        $session = $request->session();
+        $seed = $session->get(self::PUBLIC_DIRECTORY_SESSION_KEY);
+
+        if (is_string($seed) && $seed !== '') {
+            return $seed;
+        }
+
+        $seed = (string) Str::uuid();
+        $session->put(self::PUBLIC_DIRECTORY_SESSION_KEY, $seed);
+
+        return $seed;
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    private static function publicDirectoryOrderIdExpression(Builder $query): string
+    {
+        $driver = DB::connection($query->getModel()->getConnectionName())->getDriverName();
+
+        return $driver === 'pgsql'
+            ? "replace(cast(institutions.id as text), '-', '')"
+            : "replace(institutions.id, '-', '')";
     }
 }

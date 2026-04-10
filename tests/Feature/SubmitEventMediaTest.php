@@ -100,13 +100,13 @@ it('stores poster and gallery uploads when submitting an event', function () {
         ->and($event->poster_display_aspect_ratio)->toBe('16:9');
 });
 
-it('allows 16:9 poster ratio options on the public submit-event form', function () {
+it('allows only 16:9 and 4:5 poster ratio options on the public submit-event form', function () {
     Livewire::test('pages.submit-event.create')
         ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
             expect($upload->getImageAspectRatio())
-                ->toBe(['3:2', '4:5', '16:9'])
+                ->toBe(['16:9', '4:5'])
                 ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
-                ->toContain('3:2', '4:5', '16:9');
+                ->toBe(['16:9', '4:5']);
 
             return true;
         });

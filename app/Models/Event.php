@@ -947,17 +947,16 @@ class Event extends Model implements AuditableContract, HasMedia
         ['width' => $width, 'height' => $height] = $this->resolvePosterDimensions();
 
         if ($width <= 0 || $height <= 0) {
-            return '3:2';
+            return '16:9';
         }
 
         $ratio = $width / $height;
         $supportedRatios = [
             '4:5' => 4 / 5,
-            '3:2' => 3 / 2,
             '16:9' => 16 / 9,
         ];
 
-        $closestRatio = '3:2';
+        $closestRatio = '16:9';
         $closestDelta = INF;
 
         foreach ($supportedRatios as $supportedRatioKey => $supportedRatioValue) {

@@ -4,54 +4,76 @@
     'scripts' => ['filament/support', 'filament/schemas', 'filament/forms', 'filament/actions'],
 ])
 
-<div class="min-h-screen bg-slate-50 py-10 pb-28">
-    <div class="container mx-auto max-w-7xl px-6 lg:px-8">
-        <section class="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 lg:p-10">
-            <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">{{ __('Community Contribution') }}</p>
-            <h1 class="mt-3 font-heading text-3xl font-bold text-slate-900 md:text-4xl">{{ __('Add a New Speaker') }}</h1>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 md:text-base">
-                {{ __('Submit a speaker profile for the public directory. This works best for people who are already known in the community but do not yet have a record in MajlisIlmu.') }}
-            </p>
+@once
+    @push('styles')
+        <style>
+            @media (max-width: 767px) {
+                .mi-submit-speaker-form .fi-section {
+                    border-radius: 1rem;
+                    border-color: rgb(226 232 240 / 0.72);
+                    background: rgb(255 255 255 / 0.96);
+                    box-shadow: none;
+                }
 
-            <form wire:submit="submit" class="mt-8 space-y-6">
+                .mi-submit-speaker-form .fi-section-header {
+                    padding: 1rem 1rem 0.75rem;
+                }
+
+                .mi-submit-speaker-form .fi-section-content-ctn {
+                    padding: 0 1rem 1rem;
+                }
+
+                .mi-submit-speaker-form .fi-section-content {
+                    gap: 0.85rem;
+                }
+
+                .mi-submit-speaker-form .fi-input-wrp,
+                .mi-submit-speaker-form .fi-select-input,
+                .mi-submit-speaker-form .fi-select-control,
+                .mi-submit-speaker-form .fi-fo-file-upload,
+                .mi-submit-speaker-form .fi-fo-repeater-item {
+                    border-radius: 0.95rem;
+                }
+            }
+        </style>
+    @endpush
+@endonce
+
+<div class="min-h-screen bg-slate-50 py-6 pb-24 sm:py-10 sm:pb-28">
+    <div class="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section class="rounded-3xl border border-slate-200/80 bg-white px-4 py-5 shadow-none sm:rounded-4xl sm:p-6 sm:shadow-sm md:p-8 lg:p-10">
+            <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">{{ __('Community Contribution') }}</p>
+            <h1 class="mt-3 font-heading text-2xl font-bold text-slate-900 sm:text-3xl md:text-4xl">{{ __('Add a New Speaker') }}</h1>
+            <p class="mt-3 w-full text-sm leading-6 text-slate-600 md:text-base">
+                {{ __('Submit a new speaker record for the MajlisIlmu directory. We will notify you if it is approved or rejected.') }}
+            </p>
+            <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+                <p class="font-semibold text-slate-900">{{ __('Check the existing directory first') }}</p>
+                <p class="mt-2 w-full leading-6">
+                    {{ __('Before you submit, please check the existing speakers directory. If it already exists, submit an update instead of creating a new record.') }}
+                </p>
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <a href="{{ route('speakers.index') }}" wire:navigate
+                        class="inline-flex w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 transition hover:border-amber-400 hover:bg-amber-100 sm:w-auto">
+                        {{ __('Check Existing Speakers') }}
+                    </a>
+                </div>
+            </div>
+
+            <form wire:submit="submit" class="mi-submit-speaker-form mt-6 space-y-5 sm:mt-8 sm:space-y-6">
                 {{ $this->form }}
 
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <button type="submit"
-                        class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                        class="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 sm:w-auto">
                         {{ __('Submit Speaker') }}
                     </button>
                     <a href="{{ route('contributions.index') }}" wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                        class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:w-auto">
                         {{ __('View My Contributions') }}
                     </a>
                 </div>
             </form>
         </section>
-
-        <div class="mt-8 grid gap-6 lg:grid-cols-2">
-            <section class="rounded-4xl border border-slate-200 bg-slate-950 p-6 text-white shadow-sm md:p-7">
-                <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">{{ __('Review flow') }}</p>
-                <div class="mt-5 space-y-4 text-sm text-slate-300">
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p class="font-semibold text-white">{{ __('A full pending profile is staged') }}</p>
-                        <p class="mt-2">{{ __('MajlisIlmu stores the speaker details, relationships, and media up front so reviewers can approve the real profile directly.') }}</p>
-                    </div>
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p class="font-semibold text-white">{{ __('Approval simply publishes it') }}</p>
-                        <p class="mt-2">{{ __('Once approved, the staged speaker becomes the live public record and stays linked to the original contributor.') }}</p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm md:p-7">
-                <p class="text-sm font-semibold text-slate-900">{{ __('Need to add an institution too?') }}</p>
-                <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('You can submit the institution first, then come back and connect speakers to it after approval.') }}</p>
-                <a href="{{ route('contributions.submit-institution') }}" wire:navigate
-                    class="mt-4 inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100">
-                    {{ __('Submit Institution') }}
-                </a>
-            </section>
-        </div>
     </div>
 </div>

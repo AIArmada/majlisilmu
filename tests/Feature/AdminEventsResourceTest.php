@@ -235,7 +235,7 @@ it('persists registration-required changes for existing admin events without reg
         ->and($event->fresh()->settings?->registration_required)->toBeFalse();
 });
 
-it('allows 16:9 poster ratio options on the admin event form', function () {
+it('allows only 16:9 and 4:5 poster ratio options on the admin event form', function () {
     $this->seed(PermissionSeeder::class);
     $this->seed(RoleSeeder::class);
 
@@ -250,9 +250,9 @@ it('allows 16:9 poster ratio options on the admin event form', function () {
         ->test(EditEvent::class, ['record' => $event->id])
         ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
             expect($upload->getImageAspectRatio())
-                ->toBe(['3:2', '4:5', '16:9'])
+                ->toBe(['16:9', '4:5'])
                 ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
-                ->toContain('3:2', '4:5', '16:9');
+                ->toBe(['16:9', '4:5']);
 
             return true;
         });

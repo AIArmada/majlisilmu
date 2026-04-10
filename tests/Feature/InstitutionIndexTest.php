@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
+use App\Support\Search\InstitutionSearchService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -56,6 +57,69 @@ it('shows add-missing-institution call to action on institution index', function
         ->assertSuccessful()
         ->assertSee('Tak jumpa institusi yang anda cari? Cadangkan institusi baharu.')
         ->assertSee('Cadangkan institusi baharu');
+});
+
+it('shows the total institution count at the bottom of the institution index', function () {
+    $searchPrefix = 'Jumlah Institusi Ujian';
+
+    Institution::factory()->count(2)->create([
+        'name' => $searchPrefix,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/institusi?search='.urlencode($searchPrefix))
+        ->assertSuccessful()
+        ->assertSee('Direktori Institusi')
+        ->assertSee('Jumlah institusi: 2');
+});
+
+it('centers the institution card majlis counter without a view details label', function () {
+    Institution::factory()->create([
+        'name' => 'Institusi Kad Tanpa Butiran',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/institusi?search='.urlencode('Institusi Kad Tanpa Butiran'))
+        ->assertSuccessful()
+        ->assertSee('Institusi Kad Tanpa Butiran')
+        ->assertSee('aspect-video bg-slate-50', false)
+        ->assertSee('border-t border-slate-100 flex items-center justify-center', false)
+        ->assertDontSee(__('View Details'));
+});
+
+it('uses a stable random institution order instead of alphabetical sorting', function () {
+    $sessionSeed = 'institution-index-test-seed';
+    session([Institution::PUBLIC_DIRECTORY_SESSION_KEY => $sessionSeed]);
+
+    $firstAlphabetical = Institution::factory()->create([
+        'name' => 'Adam Institusi Rawak',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $secondAlphabetical = Institution::factory()->create([
+        'name' => 'Zaid Institusi Rawak',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $component = Livewire::test('pages.institutions.index');
+
+    $orderedIds = collect($component->instance()->institutions->items())
+        ->pluck('id')
+        ->all();
+
+    $expectedOrder = Institution::query()
+        ->whereIn('institutions.id', [$firstAlphabetical->id, $secondAlphabetical->id])
+        ->publicDirectoryOrder()
+        ->pluck('institutions.id')
+        ->map(static fn (mixed $id): string => (string) $id)
+        ->all();
+
+    expect(array_values(array_intersect($orderedIds, [$firstAlphabetical->id, $secondAlphabetical->id])))
+        ->toBe($expectedOrder);
 });
 
 it('redirects guests to login when opening add institution form', function () {
@@ -166,6 +230,36 @@ it('updates institution results live when search changes', function () {
         ->set('search', 'Hidayh')
         ->assertSee('Masjid Al Hidayah')
         ->assertDontSee('Pusat Pengajian An-Nur');
+});
+
+it('refreshes cached institution search results after institution updates', function () {
+    $searchService = app(InstitutionSearchService::class);
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => 'Masjid Biru',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    expect($searchService->publicSearchIds('biru'))
+        ->toContain((string) $institution->id);
+
+    $institution->update([
+        'nickname' => 'Masjid Hijau',
+    ]);
+
+    expect($searchService->publicSearchIds('biru'))
+        ->not->toContain((string) $institution->id)
+        ->and($searchService->publicSearchIds('hijau'))
+        ->toContain((string) $institution->id);
+
+    $updatedSearchResults = Livewire::test('pages.institutions.index')
+        ->set('search', 'hijau')
+        ->instance()
+        ->institutions;
+
+    expect(collect($updatedSearchResults->items())->pluck('id')->all())
+        ->toContain((string) $institution->id);
 });
 
 it('shows location hierarchy values without labels on institution cards', function () {

@@ -22,6 +22,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View as SchemaView;
@@ -1000,6 +1001,120 @@ it('uses rich description and no logo upload in the institution contribution for
         ->and($components->has('logo'))->toBeFalse();
 });
 
+it('keeps institution cover uploads locked to a 16:9 ratio across public and admin forms', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $coverFields = [
+        collect($flatten(InstitutionContributionFormSchema::components(includeMedia: true)))
+            ->first(fn (mixed $component): bool => method_exists($component, 'getName') && $component->getName() === 'cover'),
+        collect($flatten(InstitutionFormSchema::createOptionForm()))
+            ->first(fn (mixed $component): bool => method_exists($component, 'getName') && $component->getName() === 'cover'),
+        collect($flatten(AdminInstitutionForm::configure(Schema::make())->getComponents()))
+            ->first(fn (mixed $component): bool => method_exists($component, 'getName') && $component->getName() === 'cover'),
+    ];
+
+    foreach ($coverFields as $coverField) {
+        expect($coverField)->toBeInstanceOf(SpatieMediaLibraryFileUpload::class);
+
+        if (! $coverField instanceof SpatieMediaLibraryFileUpload) {
+            continue;
+        }
+
+        expect($coverField->getImageAspectRatio())
+            ->toBe('16:9');
+    }
+});
+
+it('uses a centered avatar and 4:5 cover layout on the speaker contribution media form', function () {
+    $flatten = function (array $components) use (&$flatten): array {
+        $flattened = [];
+
+        foreach ($components as $component) {
+            $flattened[] = $component;
+
+            $reflection = new ReflectionObject($component);
+
+            while (! $reflection->hasProperty('childComponents') && ($parent = $reflection->getParentClass())) {
+                $reflection = $parent;
+            }
+
+            if (! $reflection->hasProperty('childComponents')) {
+                continue;
+            }
+
+            $childComponents = $reflection->getProperty('childComponents')->getValue($component);
+
+            if (! is_array($childComponents)) {
+                continue;
+            }
+
+            $defaultChildComponents = $childComponents['default'] ?? null;
+
+            if (! is_array($defaultChildComponents)) {
+                continue;
+            }
+
+            array_push($flattened, ...$flatten($defaultChildComponents));
+        }
+
+        return $flattened;
+    };
+
+    $components = collect($flatten(SpeakerContributionFormSchema::components(includeMedia: true)))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
+
+    $avatar = $components->get('avatar');
+    $cover = $components->get('cover');
+    $gallery = $components->get('gallery');
+
+    expect($avatar)->toBeInstanceOf(SpatieMediaLibraryFileUpload::class)
+        ->and($cover)->toBeInstanceOf(SpatieMediaLibraryFileUpload::class)
+        ->and($gallery)->toBeInstanceOf(SpatieMediaLibraryFileUpload::class);
+
+    if (! $avatar instanceof SpatieMediaLibraryFileUpload
+        || ! $cover instanceof SpatieMediaLibraryFileUpload
+        || ! $gallery instanceof SpatieMediaLibraryFileUpload) {
+        return;
+    }
+
+    expect($avatar->getColumnSpan('default'))->toBe('full')
+        ->and($avatar->getExtraAttributes()['class'] ?? null)->toContain('mx-auto')
+        ->and($cover->getImageAspectRatio())->toBe('4:5')
+        ->and($gallery->getColumnSpan('default'))->toBe(1);
+});
+
 it('places the institution contribution location section directly after the profile section', function () {
     $sectionHeadings = collect(InstitutionContributionFormSchema::components(
         includeMedia: true,
@@ -1068,7 +1183,7 @@ it('keeps the institution contribution country field hidden while still storing 
     expect($components->get('country_id'))->toBeInstanceOf(Hidden::class);
 });
 
-it('uses the same core speaker fields in the quick-create modal and dedicated contribution form', function () {
+it('uses a reduced region-only address contract on the dedicated speaker contribution form', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -1107,12 +1222,26 @@ it('uses the same core speaker fields in the quick-create modal and dedicated co
     $quickCreateComponents = collect($flatten(SpeakerFormSchema::createOptionForm()))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
-    $contributionComponents = collect($flatten(SpeakerContributionFormSchema::components(includeMedia: true)))
+    $contributionComponents = collect($flatten(SpeakerContributionFormSchema::components(
+        includeMedia: true,
+        addressStatePath: 'address',
+        regionOnlyAddress: true,
+        showCountryField: false,
+    )))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
-    foreach (['bio', 'language_ids', 'qualifications', 'contacts', 'social_media', 'avatar', 'cover', 'gallery', 'line1', 'google_maps_url'] as $field) {
+    foreach (['bio', 'language_ids', 'qualifications', 'contacts', 'social_media', 'avatar', 'cover', 'gallery'] as $field) {
         expect($quickCreateComponents->has($field))->toBeTrue();
         expect($contributionComponents->has($field))->toBeTrue();
+    }
+
+    foreach (['state_id', 'district_id', 'subdistrict_id'] as $field) {
+        expect($contributionComponents->has($field))->toBeTrue();
+    }
+
+    foreach (['line1', 'line2', 'postcode', 'google_maps_url', 'waze_url', 'lat', 'lng'] as $field) {
+        expect($quickCreateComponents->has($field))->toBeTrue();
+        expect($contributionComponents->has($field))->toBeFalse();
     }
 });
 
@@ -1204,16 +1333,19 @@ it('requires country fields in speaker public creation forms', function () {
     $quickCreateCountry = collect($flatten(SpeakerFormSchema::createOptionForm()))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
         ->get('country_id');
-    $contributionCountry = collect($flatten(SpeakerContributionFormSchema::components(includeMedia: true)))
+    $contributionCountry = collect($flatten(SpeakerContributionFormSchema::components(
+        includeMedia: true,
+        addressStatePath: 'address',
+        regionOnlyAddress: true,
+        showCountryField: false,
+    )))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
         ->get('country_id');
 
     expect($quickCreateCountry)->toBeInstanceOf(Select::class)
-        ->and($contributionCountry)->toBeInstanceOf(Select::class);
+        ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
     expect(method_exists($quickCreateCountry, 'isRequired'))->toBeTrue();
-    expect(method_exists($contributionCountry, 'isRequired'))->toBeTrue();
     expect($quickCreateCountry?->isRequired())->toBeTrue();
-    expect($contributionCountry?->isRequired())->toBeTrue();
 });
 
 it('requires country fields in the admin speaker form', function () {
