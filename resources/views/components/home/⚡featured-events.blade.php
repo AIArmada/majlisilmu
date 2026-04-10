@@ -5,7 +5,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
-new class extends Component {
+new class extends Component
+{
     #[Computed]
     public function events(): Collection
     {
@@ -19,13 +20,13 @@ new class extends Component {
             ->orderBy('starts_at')
             ->with([
                 'references',
-                'media' => fn($query) => $query
+                'media' => fn ($query) => $query
                     ->where('collection_name', 'poster')
                     ->ordered(),
-                'institution.media' => fn($query) => $query
+                'institution.media' => fn ($query) => $query
                     ->where('collection_name', 'logo')
                     ->ordered(),
-                'speakers.media' => fn($query) => $query
+                'speakers.media' => fn ($query) => $query
                     ->where('collection_name', 'avatar')
                     ->ordered(),
             ])
@@ -81,7 +82,7 @@ new class extends Component {
                         $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                             '4:5' => 'aspect-[4/5]',
                             '16:9' => 'aspect-[16/9]',
-                            default => 'aspect-[3/2]',
+                            default => 'aspect-[16/9]',
                         };
                     @endphp
                     <div wire:key="featured-{{ $event->id }}" class="flex-shrink-0">

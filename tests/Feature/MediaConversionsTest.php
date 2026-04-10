@@ -74,7 +74,7 @@ it('maps poster display aspect ratios to the closest supported event ratios', fu
         ->toMediaCollection('poster');
 
     expect($portraitEvent->poster_display_aspect_ratio)->toBe('4:5')
-        ->and($standardLandscapeEvent->poster_display_aspect_ratio)->toBe('3:2')
+        ->and($standardLandscapeEvent->poster_display_aspect_ratio)->toBe('16:9')
         ->and($wideLandscapeEvent->poster_display_aspect_ratio)->toBe('16:9');
 });
 

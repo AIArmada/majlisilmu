@@ -66,29 +66,12 @@ class SharedFormSchema
                 ->maxLength(16)
                 ->placeholder(__('e.g., 50000')),
 
-            ...($includeCountryField
-                ? [($showCountryField
-                    ? Select::make('country_id')
-                        ->label(__('Country'))
-                        ->options(fn (): array => Country::query()->orderBy('name')->pluck('name', 'id')->all())
-                        ->searchable()
-                        ->preload()
-                        ->live()
-                        ->required($requireCountryField)
-                        ->default($defaultCountryId)
-                        ->afterStateUpdatedJs(<<<'JS'
-                            const guard = Number($get('cascade_reset_guard') ?? 0)
-
-                            if (guard > 0) {
-                                $set('cascade_reset_guard', guard - 1)
-                            } else {
-                                $set('state_id', null)
-                                $set('district_id', null)
-                                $set('subdistrict_id', null)
-                            }
-                            JS)
-                    : Hidden::make('country_id')->default($defaultCountryId))]
-                : [Hidden::make('country_id')->default($defaultCountryId)]),
+            ...self::countryFieldComponents(
+                includeCountryField: $includeCountryField,
+                showCountryField: $showCountryField,
+                defaultCountryId: $defaultCountryId,
+                requireCountryField: $requireCountryField,
+            ),
 
             Hidden::make('lat'),
             Hidden::make('lng'),
@@ -106,47 +89,10 @@ class SharedFormSchema
                 ->default(0)
                 ->dehydrated(false),
 
-            Select::make('state_id')
-                ->label(__('Negeri'))
-                ->options(fn (Get $get): array => self::stateOptionsForCountry(
-                    $includeCountryField ? $get('country_id') : $defaultCountryId,
-                ))
-                ->searchable()
-                ->preload()
-                ->live()
-                ->disabled(fn (Get $get): bool => $includeCountryField && self::normalizeLocationId($get('country_id')) === null)
-                ->afterStateUpdatedJs(<<<'JS'
-                    const guard = Number($get('cascade_reset_guard') ?? 0)
-
-                    if (guard > 0) {
-                        $set('cascade_reset_guard', guard - 1)
-                    } else {
-                        $set('district_id', null)
-                        $set('subdistrict_id', null)
-                    }
-                    JS),
-
-            Select::make('district_id')
-                ->label(__('Daerah'))
-                ->options(fn (Get $get): array => self::districtOptionsForState($get('state_id')))
-                ->searchable()
-                ->live()
-                ->afterStateUpdatedJs(<<<'JS'
-                    const guard = Number($get('cascade_reset_guard') ?? 0)
-
-                    if (guard > 0) {
-                        $set('cascade_reset_guard', guard - 1)
-                    } else {
-                        $set('subdistrict_id', null)
-                    }
-                    JS)
-                ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id'))),
-
-            Select::make('subdistrict_id')
-                ->label(__('Bandar / Mukim / Zon'))
-                ->options(fn (Get $get): array => self::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
-                ->searchable()
-                ->visible(fn (Get $get): bool => self::shouldShowSubdistrictField($get('state_id'), $get('district_id'))),
+            ...self::regionalLocationFields(
+                includeCountryField: $includeCountryField,
+                defaultCountryId: $defaultCountryId,
+            ),
 
             ...($showGoogleMapsUrlField
                 ? [self::googleMapsUrlField(required: $requireGoogleMaps)]
@@ -188,6 +134,62 @@ class SharedFormSchema
         }
 
         return $group;
+    }
+
+    /**
+     * Region-only address group for public speaker submissions.
+     */
+    public static function regionAddressGroup(
+        ?string $statePath = null,
+        bool $includeCountryField = false,
+        ?bool $showCountryField = null,
+        ?int $defaultCountryId = null,
+        bool $requireCountryField = false,
+    ): Group {
+        $group = Group::make(self::regionAddressFields(
+            includeCountryField: $includeCountryField,
+            showCountryField: $showCountryField,
+            defaultCountryId: $defaultCountryId,
+            requireCountryField: $requireCountryField,
+        ))
+            ->columns(2);
+
+        if ($statePath !== null) {
+            $group->statePath($statePath);
+        }
+
+        return $group;
+    }
+
+    /**
+     * Region-only address fields for public speaker submissions.
+     *
+     * @return array<int, Component>
+     */
+    public static function regionAddressFields(
+        bool $includeCountryField = false,
+        ?bool $showCountryField = null,
+        ?int $defaultCountryId = null,
+        bool $requireCountryField = false,
+    ): array {
+        $defaultCountryId ??= PreferredCountryResolver::MALAYSIA_ID;
+        $showCountryField ??= true;
+
+        return [
+            ...self::countryFieldComponents(
+                includeCountryField: $includeCountryField,
+                showCountryField: $showCountryField,
+                defaultCountryId: $defaultCountryId,
+                requireCountryField: $requireCountryField,
+            ),
+            Hidden::make('cascade_reset_guard')
+                ->default(0)
+                ->dehydrated(false),
+            ...self::regionalLocationFields(
+                includeCountryField: $includeCountryField,
+                defaultCountryId: $defaultCountryId,
+            ),
+        ];
     }
 
     public static function googleMapsUrlField(bool $required = false, ?string $defaultHelperText = null): TextInput
@@ -329,8 +331,8 @@ class SharedFormSchema
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $data
-     * @return array<int, array<string, mixed>>
+     * @param  array<string, mixed>|list<array<string, mixed>>  $data
+     * @return array<string, mixed>|list<array<string, mixed>>
      */
     public static function normalizeContactRowsForFill(array $data): array
     {
@@ -342,8 +344,8 @@ class SharedFormSchema
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $data
-     * @return array<int, array<string, mixed>>
+     * @param  array<string, mixed>|list<array<string, mixed>>  $data
+     * @return array<string, mixed>|list<array<string, mixed>>
      */
     public static function normalizeContactRowsForSave(array $data): array
     {
@@ -775,6 +777,111 @@ class SharedFormSchema
     public static function publicLocationPickerCascadeResetGuard(): int
     {
         return 2;
+    }
+
+    /**
+     * @return array<int, Component>
+     */
+    private static function countryFieldComponents(
+        bool $includeCountryField,
+        bool $showCountryField,
+        int $defaultCountryId,
+        bool $requireCountryField,
+    ): array {
+        if (! $includeCountryField) {
+            return [Hidden::make('country_id')->default($defaultCountryId)];
+        }
+
+        if (! $showCountryField) {
+            return [Hidden::make('country_id')->default($defaultCountryId)];
+        }
+
+        return [
+            Select::make('country_id')
+                ->label(__('Country'))
+                ->options(fn (): array => Country::query()->orderBy('name')->pluck('name', 'id')->all())
+                ->searchable()
+                ->preload()
+                ->live()
+                ->required($requireCountryField)
+                ->default($defaultCountryId)
+                ->afterStateUpdatedJs(self::countryCascadeResetScript()),
+        ];
+    }
+
+    /**
+     * @return array<int, Component>
+     */
+    private static function regionalLocationFields(bool $includeCountryField, int $defaultCountryId): array
+    {
+        return [
+            Select::make('state_id')
+                ->label(__('Negeri'))
+                ->options(fn (Get $get): array => self::stateOptionsForCountry(
+                    $includeCountryField ? $get('country_id') : $defaultCountryId,
+                ))
+                ->searchable()
+                ->preload()
+                ->live()
+                ->disabled(fn (Get $get): bool => $includeCountryField && self::normalizeLocationId($get('country_id')) === null)
+                ->afterStateUpdatedJs(self::stateCascadeResetScript()),
+
+            Select::make('district_id')
+                ->label(__('Daerah'))
+                ->options(fn (Get $get): array => self::districtOptionsForState($get('state_id')))
+                ->searchable()
+                ->live()
+                ->afterStateUpdatedJs(self::districtCascadeResetScript())
+                ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id'))),
+
+            Select::make('subdistrict_id')
+                ->label(__('Bandar / Mukim / Zon'))
+                ->options(fn (Get $get): array => self::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
+                ->searchable()
+                ->visible(fn (Get $get): bool => self::shouldShowSubdistrictField($get('state_id'), $get('district_id'))),
+        ];
+    }
+
+    private static function countryCascadeResetScript(): string
+    {
+        return <<<'JS'
+            const guard = Number($get('cascade_reset_guard') ?? 0)
+
+            if (guard > 0) {
+                $set('cascade_reset_guard', guard - 1)
+            } else {
+                $set('state_id', null)
+                $set('district_id', null)
+                $set('subdistrict_id', null)
+            }
+            JS;
+    }
+
+    private static function stateCascadeResetScript(): string
+    {
+        return <<<'JS'
+            const guard = Number($get('cascade_reset_guard') ?? 0)
+
+            if (guard > 0) {
+                $set('cascade_reset_guard', guard - 1)
+            } else {
+                $set('district_id', null)
+                $set('subdistrict_id', null)
+            }
+            JS;
+    }
+
+    private static function districtCascadeResetScript(): string
+    {
+        return <<<'JS'
+            const guard = Number($get('cascade_reset_guard') ?? 0)
+
+            if (guard > 0) {
+                $set('cascade_reset_guard', guard - 1)
+            } else {
+                $set('subdistrict_id', null)
+            }
+            JS;
     }
 
     public static function normalizeLocationId(mixed $value): ?int
