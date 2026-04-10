@@ -88,6 +88,12 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/sumbangan', ContributionsIndex::class)->name('contributions.index');
     Route::livewire('/sumbangan/institusi/baru', SubmitInstitution::class)->name('contributions.submit-institution');
     Route::livewire('/sumbangan/penceramah/baru', SubmitSpeaker::class)->name('contributions.submit-speaker');
+    Route::livewire('/sumbangan/{subjectType}/berjaya', 'pages.contributions.submission-success')
+        ->whereIn('subjectType', [
+            ContributionSubjectType::Institution->publicRouteSegment(),
+            ContributionSubjectType::Speaker->publicRouteSegment(),
+        ])
+        ->name('contributions.submission-success');
     Route::livewire('/tuntutan-keahlian', MembershipClaimsIndex::class)->name('membership-claims.index');
     Route::livewire('/tuntut-keahlian/{subjectType}/{subjectId}', CreateMembershipClaimPage::class)
         ->whereIn('subjectType', MemberSubjectType::claimableRouteSegments())
@@ -179,6 +185,8 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/contributions', ContributionsIndex::class);
     Route::livewire('/contributions/institutions/create', SubmitInstitution::class);
     Route::livewire('/contributions/speakers/create', SubmitSpeaker::class);
+    Route::livewire('/contributions/{subjectType}/success', 'pages.contributions.submission-success')
+        ->whereIn('subjectType', ['institution', 'speaker']);
     Route::livewire('/membership-claims', MembershipClaimsIndex::class);
     Route::livewire('/claim-membership/{subjectType}/{subjectId}', CreateMembershipClaimPage::class)
         ->whereIn('subjectType', ['institution', 'speaker']);

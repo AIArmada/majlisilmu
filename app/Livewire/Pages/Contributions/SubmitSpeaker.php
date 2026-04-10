@@ -6,7 +6,6 @@ use App\Actions\Contributions\SubmitStagedContributionCreateAction;
 use App\Enums\ContributionSubjectType;
 use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerContributionFormSchema;
-use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Speaker;
 use App\Models\User;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -26,7 +25,6 @@ class SubmitSpeaker extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
     use InteractsWithForms;
-    use InteractsWithToasts;
     use WithFileUploads;
 
     /** @var array<string, mixed>|null */
@@ -65,6 +63,8 @@ class SubmitSpeaker extends Component implements HasActions, HasForms
 
         abort_unless($user instanceof User, 403);
 
+        $submittedName = data_get($this->data, 'name');
+
         $submitStagedContributionCreateAction->handle(
             ContributionSubjectType::Speaker,
             $this->contributionForm()->getState(),
@@ -74,9 +74,13 @@ class SubmitSpeaker extends Component implements HasActions, HasForms
             },
         );
 
-        $this->successToast(__('Thank you. Your speaker submission has been received. We will notify you if it is approved or rejected.'));
+        if (is_string($submittedName) && filled($submittedName)) {
+            session()->flash('contribution_submission_name', $submittedName);
+        }
 
-        $this->redirect(route('contributions.index'), navigate: true);
+        $this->redirect(route('contributions.submission-success', [
+            'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        ]), navigate: true);
     }
 
     protected function contributionForm(): Schema

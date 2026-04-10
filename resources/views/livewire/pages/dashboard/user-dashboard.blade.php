@@ -144,7 +144,7 @@
                             </a>
                             <a href="{{ route('contributions.index') }}" wire:navigate
                                 class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-300 hover:text-emerald-200">
-                                {{ __('My Contributions') }}
+                                {{ __('Sumbangan') }}
                             </a>
                             <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
                                 class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-300 hover:text-emerald-200">

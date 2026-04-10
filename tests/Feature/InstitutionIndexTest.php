@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ContributionSubjectType;
 use App\Livewire\Pages\Contributions\SubmitInstitution;
 use App\Models\District;
 use App\Models\Event;
@@ -142,7 +143,10 @@ it('allows users to submit a missing institution from institution index with pen
         ->set('data.address.lat', 3.1390)
         ->set('data.address.lng', 101.6869)
         ->call('submit')
+        ->assertRedirect(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Institution->publicRouteSegment()]))
         ->assertHasNoErrors();
+
+    expect(session('contribution_submission_name'))->toBe($institutionName);
 
     $institution = Institution::query()
         ->with('address')

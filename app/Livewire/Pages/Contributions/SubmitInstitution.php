@@ -7,7 +7,6 @@ use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Enums\ContributionSubjectType;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\SharedFormSchema;
-use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Location\GooglePlacesConfiguration;
@@ -26,7 +25,6 @@ class SubmitInstitution extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
     use InteractsWithForms;
-    use InteractsWithToasts;
     use WithFileUploads;
 
     /** @var array<string, mixed>|null */
@@ -111,6 +109,8 @@ class SubmitInstitution extends Component implements HasActions, HasForms
 
         abort_unless($user instanceof User, 403);
 
+        $submittedName = data_get($this->data, 'name');
+
         $submitStagedContributionCreateAction->handle(
             ContributionSubjectType::Institution,
             $this->contributionForm()->getState(),
@@ -120,9 +120,13 @@ class SubmitInstitution extends Component implements HasActions, HasForms
             },
         );
 
-        $this->successToast(__('Thank you. Your institution submission has been received. We will notify you if it is approved or rejected.'));
+        if (is_string($submittedName) && filled($submittedName)) {
+            session()->flash('contribution_submission_name', $submittedName);
+        }
 
-        $this->redirect(route('contributions.index'), navigate: true);
+        $this->redirect(route('contributions.submission-success', [
+            'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        ]), navigate: true);
     }
 
     public function rendering(object $view): void

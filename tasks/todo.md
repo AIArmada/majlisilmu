@@ -1,3 +1,36 @@
+# Contribution Hub Listing Follow-up
+
+- [x] Remove the shortcut-only update/report block from `/sumbangan`
+- [x] Add report submissions to the contributions history
+- [x] Refresh contribution page tests and locale strings
+
+## Review
+
+- Removed the extra `/sumbangan` shortcut panel so the page now lists real submissions instead of presenting update/report action links.
+- Added a dedicated paginated report submissions history alongside the existing event and contribution-request sections.
+- Split contribution histories so update submissions now appear under a dedicated `Status Kemaskini` section instead of being buried in the create-request list.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **30 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `get_errors` on the modified contributions component, view, and test files => **no errors**
+
+# Contribution Hub Tracking
+
+- [x] Update thank-you copy to `Jejaki sumbangan anda dan statusnya.`
+- [x] Replace the approval panel on `/sumbangan` with submission history and event submissions
+- [x] Ensure `/hantar-majlis` submissions surface in the contributions hub
+- [x] Refresh contribution page tests and locale strings
+
+## Review
+
+- Updated the shared contribution thank-you page copy to the requested tracker wording.
+- Reworked `/sumbangan` into a submission history page that shows request type, record name, and event submission details while removing approval actions.
+- Added locale keys and focused regressions for the new tracker copy and event-submission visibility.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => passed
+  - `vendor/bin/pint --dirty --format agent` => formatted `tests/Feature/ContributionPagesTest.php`
+  - `get_errors` on `app/Livewire/Pages/Contributions/Index.php` and `tests/Feature/ContributionPagesTest.php` => no errors
+
 # Uncommitted Worktree Audit
 
 - [x] Inventory all current uncommitted files and identify the main change groups

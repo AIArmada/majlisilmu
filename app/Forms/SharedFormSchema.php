@@ -204,11 +204,15 @@ class SharedFormSchema
                 self::normalizeGoogleMapsFieldState($get, $set, $state, $old);
             })
             ->placeholder(__('https://maps.google.com/...'))
-            ->helperText(function (Get $get) use ($defaultHelperText): string {
+            ->helperText(function (Get $get) use ($defaultHelperText): ?string {
                 $message = $get('google_resolution_message');
 
                 if (is_string($message) && $message !== '') {
                     return $message;
+                }
+
+                if ($get('google_resolution_source') === 'picker' && filled($get('google_maps_url'))) {
+                    return null;
                 }
 
                 return $defaultHelperText ?? __('Paste the full Google Maps link from your browser');

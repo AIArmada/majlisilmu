@@ -66,9 +66,15 @@ it('renders the institution location picker when google places is enabled', func
     $this->get(route('contributions.submit-institution'))
         ->assertOk()
         ->assertSee(__('Find the institution location'))
+        ->assertSee(__('Search like a ride-hailing destination, pick the correct place, then confirm it on the map before submitting.'))
         ->assertSee(__('Search for an institution or address'))
+        ->assertSee('<label class="text-sm font-medium text-slate-900" for="institution-location-search">', false)
+        ->assertSee('element.placeholder =', false)
         ->assertSee('mi-institution-location-picker-search', false)
-        ->assertSee('focus-within:ring-2', false)
+        ->assertSee('rounded-xl border border-slate-200 bg-white shadow-sm', false)
+        ->assertDontSee('pointer-events-none absolute inset-y-0 left-0', false)
+        ->assertSee('await this.loadGoogleMaps();', false)
+        ->assertSee("element.className = 'block w-full text-sm text-slate-900';", false)
         ->assertSee(__('Google Maps URL'));
 });
 
@@ -234,7 +240,8 @@ it('applies a google place selection into the nested institution address state',
         ->assertSet('data.address.google_resolution_source', 'picker')
         ->assertSet('data.address.google_resolution_status', 'resolved')
         ->assertSet('data.address.lat', 3.07853)
-        ->assertSet('data.address.lng', 101.52073);
+        ->assertSet('data.address.lng', 101.52073)
+        ->assertDontSee(__('Paste the full Google Maps link from your browser'));
 
     Http::assertNothingSent();
 });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ContributionSubjectType;
 use App\Livewire\Pages\Contributions\SubmitSpeaker;
 use App\Models\Event;
 use App\Models\Speaker;
@@ -262,7 +263,10 @@ it('allows users to submit a missing speaker from speaker index with pending sta
         ->set('data.gender', 'male')
         ->set('data.country_id', (string) $countryId)
         ->call('submit')
+        ->assertRedirect(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment()]))
         ->assertHasNoErrors();
+
+    expect(session('contribution_submission_name'))->toBe($speakerName);
 
     $speaker = Speaker::query()
         ->where('name', $speakerName)
