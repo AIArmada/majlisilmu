@@ -309,6 +309,47 @@ it('serializes event list payloads with card image metadata for mobile clients',
         ->and(data_get($item, 'card_image_url'))->toBeString()->not->toBe('');
 });
 
+it('returns card image metadata on public events index responses', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $posterEvent = Event::factory()->for($institution)->create([
+        'title' => 'Home Poster Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => true,
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $posterEvent->addMedia(UploadedFile::fake()->image('home-poster.jpg', 1200, 1600))
+        ->toMediaCollection('poster');
+
+    $placeholderEvent = Event::factory()->create([
+        'title' => 'Home Placeholder Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $posterResponse = $this->getJson('/api/v1/events?include=institution,venue,speakers&filter[search]=Home%20Poster%20Event&per_page=1')
+        ->assertOk();
+    $placeholderResponse = $this->getJson('/api/v1/events?include=institution,venue,speakers&filter[search]=Home%20Placeholder%20Event&per_page=1')
+        ->assertOk();
+
+    expect($posterResponse->json('data.0.has_poster'))->toBeTrue()
+        ->and($posterResponse->json('data.0.card_image_url'))->toBeString()->not->toBe('')
+        ->and($posterResponse->json('data.0.poster_url'))->toBeString()->not->toBe('')
+        ->and($placeholderResponse->json('data.0.has_poster'))->toBeFalse()
+        ->and($placeholderResponse->json('data.0.card_image_url'))->toContain('images/placeholders/event.png')
+        ->and($placeholderResponse->json('data.0.poster_url'))->toBeNull();
+});
+
 it('serializes institution directory payloads with card media aliases for mobile clients', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
