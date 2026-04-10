@@ -6,7 +6,7 @@
 <div {{ $attributes->class(['grid gap-8', $columns]) }}>
     @foreach(range(1, (int) $items) as $index)
         <article class="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm animate-pulse">
-            <div class="relative aspect-[3/2] bg-slate-200">
+            <div class="relative aspect-[16/9] bg-slate-200">
                 <div class="absolute left-4 top-4 h-14 w-14 rounded-xl bg-white/80"></div>
                 <div class="absolute bottom-4 left-4 h-6 w-20 rounded-full bg-white/70"></div>
             </div>

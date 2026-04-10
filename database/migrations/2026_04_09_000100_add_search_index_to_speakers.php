@@ -411,7 +411,7 @@ return new class extends Migration
 
         /** @var list<string> $normalized */
         $normalized = collect($values)
-            ->map(static fn (mixed $value): ?string => is_string($value) && trim($value) !== '' ? trim($value) : null)
+            ->map(static fn (string $value): ?string => trim($value) !== '' ? trim($value) : null)
             ->filter()
             ->values()
             ->all();

@@ -8,6 +8,25 @@
     $pickerTargetStatePath = $targetStatePath ?? $getStatePath();
 @endphp
 
+@once
+    <style>
+        .mi-institution-location-picker-search gmp-place-autocomplete {
+            display: block;
+            width: 100%;
+            min-height: 2.5rem;
+            color-scheme: light;
+        }
+
+        .mi-institution-location-picker-search gmp-place-autocomplete::part(input) {
+            border: 0;
+            box-shadow: none;
+            font: inherit;
+            min-height: 2.5rem;
+            padding: 0;
+        }
+    </style>
+@endonce
+
 <div
     wire:ignore
     x-data="{
@@ -80,6 +99,7 @@
             const element = new PlaceAutocompleteElement()
 
             element.placeholder = @js($pickerSearchLabel)
+            element.className = 'block w-full text-sm text-slate-900'
 
             element.addEventListener('gmp-select', async (event) => {
                 await this.handleSelection(event)
@@ -205,12 +225,12 @@
         },
     }"
     x-init="init()"
-    class="space-y-4"
+    class="mi-institution-location-picker space-y-4"
 >
     <div
         x-show="enabled"
         x-cloak
-        class="space-y-4 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5"
+        class="space-y-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm"
     >
         <div class="space-y-1.5">
             <h3 class="text-sm font-semibold text-slate-900">{{ $pickerTitle }}</h3>
@@ -224,11 +244,18 @@
                 {{ $pickerSearchLabel }}
             </label>
 
-            <div
-                id="institution-location-search"
-                x-ref="autocompleteHost"
-                class="min-h-14 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm"
-            ></div>
+            <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex w-12 items-center justify-center text-slate-400">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.1-5.4a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
+                    </svg>
+                </div>
+                <div
+                    id="institution-location-search"
+                    x-ref="autocompleteHost"
+                    class="mi-institution-location-picker-search min-h-14 rounded-xl border border-slate-200 bg-white py-2 pl-12 pr-3 shadow-sm ring-1 ring-white/70 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200"
+                ></div>
+            </div>
 
             <p x-show="loading" x-cloak class="text-xs text-slate-500">
                 {{ __('Loading Google location search...') }}

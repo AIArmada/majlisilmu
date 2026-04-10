@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
 use App\Support\Location\AddressHierarchyFormatter;
+use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Dedoc\Scramble\Attributes\Group;
@@ -41,6 +42,7 @@ class SearchController extends FrontendController
 {
     public function __construct(
         private readonly EventSearchService $eventSearchService,
+        private readonly InstitutionSearchService $institutionSearchService,
         private readonly SpeakerSearchService $speakerSearchService,
     ) {}
 
@@ -99,32 +101,15 @@ class SearchController extends FrontendController
     public function institutions(Request $request): JsonResponse
     {
         $search = $this->normalizedString($request->query('search'));
-        $countryId = $request->integer('country_id');
-        $stateId = $request->integer('state_id');
-        $districtId = $request->integer('district_id');
-        $subdistrictId = $request->integer('subdistrict_id');
+        $countryId = $this->normalizedInt($request->query('country_id'));
+        $stateId = $this->normalizedInt($request->query('state_id'));
+        $districtId = $this->normalizedInt($request->query('district_id'));
+        $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
+        $perPage = $request->integer('per_page', 12);
 
-        $query = Institution::query()
-            ->where('status', 'verified')
-            ->where('is_active', true)
-            ->withCount(['events' => function (Builder $query): void {
-                $query
-                    ->where('events.is_active', true)
-                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                    ->where('events.visibility', EventVisibility::Public)
-                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
-            }])
-            ->with(['address.state', 'address.district', 'address.subdistrict', 'media']);
-
-        $this->applyInstitutionLocationScope($query, $countryId, $stateId, $districtId, $subdistrictId);
-
-        if ($search !== null) {
-            $query = $this->applyInstitutionSearch($query, $search);
-        }
-
-        $institutions = $query
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 12));
+        $institutions = $search === null
+            ? $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)->publicDirectoryOrder()->paginate($perPage)
+            : $this->institutionDirectorySearchPaginator($request, $search, $perPage, $countryId, $stateId, $districtId, $subdistrictId);
 
         return response()->json([
             'data' => collect($institutions->items())->map(fn (Institution $institution): array => $this->institutionListData($institution))->all(),
@@ -648,7 +633,29 @@ class SearchController extends FrontendController
      */
     private function institutionSearchQuery(string $search): Builder
     {
-        return Institution::query()
+        return $this->institutionSearchService->applySearch(
+            Institution::query()
+                ->active()
+                ->where('status', 'verified')
+                ->withCount(['events' => function (Builder $query): void {
+                    $query
+                        ->where('events.is_active', true)
+                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                        ->where('events.visibility', EventVisibility::Public)
+                        ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                        ->where('events.starts_at', '>=', now());
+                }])
+                ->with(['address.state', 'address.district', 'address.subdistrict', 'media']),
+            $search,
+        );
+    }
+
+    /**
+     * @return Builder<Institution>
+     */
+    private function baseInstitutionQuery(?int $countryId = null, ?int $stateId = null, ?int $districtId = null, ?int $subdistrictId = null): Builder
+    {
+        $query = Institution::query()
             ->active()
             ->where('status', 'verified')
             ->withCount(['events' => function (Builder $query): void {
@@ -656,11 +663,13 @@ class SearchController extends FrontendController
                     ->where('events.is_active', true)
                     ->whereIn('events.status', Event::PUBLIC_STATUSES)
                     ->where('events.visibility', EventVisibility::Public)
-                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('events.starts_at', '>=', now());
+                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
             }])
-            ->with(['address.state', 'address.district', 'address.subdistrict', 'media'])
-            ->searchNameOrNickname($search);
+            ->with(['address.state', 'address.district', 'address.subdistrict', 'media']);
+
+        $this->applyInstitutionLocationScope($query, $countryId, $stateId, $districtId, $subdistrictId);
+
+        return $query;
     }
 
     /**
@@ -668,6 +677,10 @@ class SearchController extends FrontendController
      */
     private function applyInstitutionLocationScope(Builder $query, ?int $countryId, ?int $stateId, ?int $districtId, ?int $subdistrictId): void
     {
+        if ($countryId === null && $stateId === null && $districtId === null && $subdistrictId === null) {
+            return;
+        }
+
         $query->whereHas('address', function (Builder $addressQuery) use ($countryId, $stateId, $districtId, $subdistrictId): void {
             if ($countryId !== null) {
                 $addressQuery->where('country_id', $countryId);
@@ -688,38 +701,118 @@ class SearchController extends FrontendController
     }
 
     /**
-     * @param  Builder<Institution>  $query
-     * @return Builder<Institution>
+     * @return LengthAwarePaginator<int, Institution>
      */
-    private function applyInstitutionSearch(Builder $query, string $search): Builder
+    private function institutionDirectorySearchPaginator(Request $request, string $search, int $perPage, ?int $countryId, ?int $stateId, ?int $districtId, ?int $subdistrictId): LengthAwarePaginator
     {
-        $operator = config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
-        $collapsedSearch = preg_replace('/\s+/u', ' ', trim($search)) ?? '';
-        $collapsedWildcardSearch = '%'.str_replace(' ', '%', $collapsedSearch).'%';
-        $searchTokens = array_values(array_filter(explode(' ', $collapsedSearch), static fn (string $token): bool => $token !== ''));
+        $matchingIds = $this->institutionSearchService->publicSearchIds($search);
 
-        return $query->where(function (Builder $innerQuery) use ($collapsedSearch, $operator, $collapsedWildcardSearch, $searchTokens): void {
-            $innerQuery->searchNameOrNickname($collapsedSearch)
-                ->orWhere('description', $operator, "%{$collapsedSearch}%")
-                ->orWhere('description', $operator, $collapsedWildcardSearch);
+        if ($matchingIds !== []) {
+            $directMatches = $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)
+                ->whereIn('institutions.id', $matchingIds)
+                ->publicDirectoryOrder()
+                ->paginate($perPage);
 
-            if (count($searchTokens) < 2) {
-                return;
+            if ($directMatches->total() > 0 || mb_strlen($search) < 3) {
+                return $directMatches;
             }
+        } elseif (mb_strlen($search) < 3) {
+            return $this->emptyInstitutionPaginator($request, $perPage);
+        }
 
-            $innerQuery->orWhere(function (Builder $tokenQuery) use ($searchTokens, $operator): void {
-                foreach ($searchTokens as $token) {
-                    if (mb_strlen($token) < 2) {
-                        continue;
-                    }
+        $orderedIds = $this->filterInstitutionSearchIds(
+            $this->institutionSearchService->publicFuzzySearchIds($search),
+            $countryId,
+            $stateId,
+            $districtId,
+            $subdistrictId,
+        );
 
-                    $tokenQuery->where(function (Builder $tokenMatchQuery) use ($token, $operator): void {
-                        $tokenMatchQuery->searchNameOrNickname($token)
-                            ->orWhere('description', $operator, "%{$token}%");
-                    });
-                }
-            });
-        });
+        if ($orderedIds === []) {
+            return $this->emptyInstitutionPaginator($request, $perPage);
+        }
+
+        $currentPage = max(1, $request->integer('page', 1));
+        $paginatedIds = array_slice($orderedIds, ($currentPage - 1) * $perPage, $perPage);
+
+        if ($paginatedIds === []) {
+            return new LengthAwarePaginator(
+                collect(),
+                count($orderedIds),
+                $perPage,
+                $currentPage,
+                $this->institutionPaginatorOptions($request),
+            );
+        }
+
+        $institutions = $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)
+            ->whereIn('institutions.id', $paginatedIds)
+            ->get()
+            ->sortBy(static function (Institution $institution) use ($paginatedIds): int {
+                $position = array_search($institution->id, $paginatedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values();
+
+        return new LengthAwarePaginator(
+            $institutions,
+            count($orderedIds),
+            $perPage,
+            $currentPage,
+            $this->institutionPaginatorOptions($request),
+        );
+    }
+
+    /**
+     * @param  list<string>  $orderedIds
+     * @return list<string>
+     */
+    private function filterInstitutionSearchIds(array $orderedIds, ?int $countryId, ?int $stateId, ?int $districtId, ?int $subdistrictId): array
+    {
+        if ($orderedIds === []) {
+            return [];
+        }
+
+        $scopedIds = $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)
+            ->whereIn('institutions.id', $orderedIds)
+            ->pluck('institutions.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+
+        return collect($scopedIds)
+            ->sortBy(static function (string $id) use ($orderedIds): int {
+                $position = array_search($id, $orderedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Institution>
+     */
+    private function emptyInstitutionPaginator(Request $request, int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            collect(),
+            0,
+            $perPage,
+            max(1, $request->integer('page', 1)),
+            $this->institutionPaginatorOptions($request),
+        );
+    }
+
+    /**
+     * @return array{path: string, query: array<string, mixed>}
+     */
+    private function institutionPaginatorOptions(Request $request): array
+    {
+        return [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ];
     }
 
     /**
@@ -1205,6 +1298,21 @@ class SearchController extends FrontendController
         }
 
         return (float) $value;
+    }
+
+    private function normalizedInt(mixed $value): ?int
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        if ($normalized === '' || ! ctype_digit($normalized)) {
+            return null;
+        }
+
+        return (int) $normalized;
     }
 
     /**

@@ -44,13 +44,13 @@
         <section class="mi-submit-institution-shell rounded-3xl border border-slate-200/80 bg-white px-4 py-5 shadow-none sm:rounded-4xl sm:p-6 sm:shadow-sm md:p-8 lg:p-10">
             <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">{{ __('Community Contribution') }}</p>
             <h1 class="mt-3 font-heading text-2xl font-bold text-slate-900 sm:text-3xl md:text-4xl">{{ __('Add a New Institution') }}</h1>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 md:text-base">
-                {{ __('Submit a new institution record for the MajlisIlmu directory. Maintainers will review it before it goes live. We will notify you if it is approved or rejected.') }}
+            <p class="mi-submit-institution-intro mt-3 w-full text-sm leading-6 text-slate-600 md:text-base">
+                {{ __('Submit a new institution record for the MajlisIlmu directory. We will notify you if it is approved or rejected.') }}
             </p>
             <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
                 <p class="font-semibold text-slate-900">{{ __('Check the existing directory first') }}</p>
-                <p class="mt-2 max-w-3xl leading-6">
-                    {{ __('Before you submit, please check the existing institutions directory and make sure the institution is not already listed. If it already exists, submit an update instead of creating a duplicate record.') }}
+                <p class="mi-submit-institution-duplicate-copy mt-2 w-full leading-6">
+                    {{ __('Before you submit, please check the existing institutions directory. If it already exists, submit an update instead of creating a new record.') }}
                 </p>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <a href="{{ route('institutions.index') }}" wire:navigate

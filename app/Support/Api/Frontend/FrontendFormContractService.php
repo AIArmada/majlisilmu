@@ -314,6 +314,8 @@ class FrontendFormContractService
      */
     public function submitSpeaker(): array
     {
+        $preferredCountryId = app(PreferredCountryResolver::class)->resolveId() ?? PreferredCountryResolver::MALAYSIA_ID;
+
         return [
             'flow' => 'submit_speaker',
             'method' => 'POST',
@@ -323,7 +325,10 @@ class FrontendFormContractService
                 'gender' => Gender::Male->value,
                 'is_freelance' => false,
                 'address' => [
-                    'country_id' => 132,
+                    'country_id' => $preferredCountryId,
+                    'state_id' => null,
+                    'district_id' => null,
+                    'subdistrict_id' => null,
                 ],
             ],
             'fields' => [
@@ -336,6 +341,10 @@ class FrontendFormContractService
                 $this->field('job_title', 'string', required: false, maxLength: 255),
                 $this->field('bio', 'rich_text', required: false),
                 $this->field('address', 'object', required: true),
+                $this->field('address.country_id', 'integer', required: true, default: $preferredCountryId),
+                $this->field('address.state_id', 'integer', required: false),
+                $this->field('address.district_id', 'integer', required: false),
+                $this->field('address.subdistrict_id', 'integer', required: false),
                 $this->field('qualifications', 'array<object>', required: false),
                 $this->field('language_ids', 'array<int>', required: false, catalog: route('api.client.catalogs.languages')),
                 $this->field('contacts', 'array<object>', required: false),
