@@ -135,6 +135,7 @@ Interactive local API docs are available at [https://api.majlisilmu.test/docs](h
 | `GET` | `/institutions/{institutionKey}` | Public institution detail by slug or UUID |
 | `GET` | `/speakers` | Public speaker listing filters |
 | `GET` | `/speakers/{speakerKey}` | Public speaker detail by slug or UUID |
+| `GET` | `/inspirations/random` | Random active inspiration payload with category and media metadata |
 | `GET` | `/venues/{venueKey}` | Public venue detail by slug or UUID |
 | `GET` | `/references/{referenceKey}` | Public reference detail by slug or UUID |
 | `GET` | `/series/{series}` | Public series detail |
@@ -142,6 +143,7 @@ Interactive local API docs are available at [https://api.majlisilmu.test/docs](h
 Notes:
 
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
+- The inspiration endpoint returns `title`, plain-text `content`, `content_html`, `preview_text`, `source`, category metadata, and both thumb/full media URLs when an image exists.
 - `speakerKey`, `venueKey`, `institutionKey`, and `referenceKey` intentionally bypass the app-wide public-slug route binders so the API can safely resolve slug or UUID itself.
 
 ### Submission and authenticated workflow endpoints

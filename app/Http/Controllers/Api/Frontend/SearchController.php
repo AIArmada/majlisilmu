@@ -8,11 +8,13 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\InspirationCategory;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
+use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
@@ -154,6 +156,25 @@ class SearchController extends FrontendController
                     'per_page' => $speakers->perPage(),
                     'total' => $speakers->total(),
                 ],
+            ],
+        ]);
+    }
+
+    #[Group('Inspiration')]
+    public function randomInspiration(Request $request): JsonResponse
+    {
+        $locale = $this->normalizedString($request->query('locale'));
+        $record = Inspiration::query()
+            ->with('media')
+            ->active()
+            ->forLocale($locale)
+            ->inRandomOrder()
+            ->first();
+
+        return response()->json([
+            'data' => $record ? $this->inspirationData($record) : null,
+            'meta' => [
+                'locale' => $locale ?? app()->getLocale(),
             ],
         ]);
     }
@@ -910,16 +931,61 @@ class SearchController extends FrontendController
      */
     private function institutionListData(Institution $institution): array
     {
+        $eventsCount = (int) ($institution->events_count ?? 0);
+        $media = $this->institutionCardMediaData($institution);
+        $location = $this->addressLocation($institution->address);
+
         return [
             'id' => $institution->id,
             'slug' => $institution->slug,
             'name' => $institution->name,
             'nickname' => $institution->nickname,
             'display_name' => $institution->display_name,
-            'events_count' => (int) ($institution->events_count ?? 0),
-            'logo_url' => $institution->getFirstMediaUrl('logo', 'thumb') ?: $institution->getFirstMediaUrl('logo'),
-            'location' => $this->addressLocation($institution->address),
+            'events_count' => $eventsCount,
+            'event_count' => $eventsCount,
+            'image_url' => $media['image_url'],
+            'logo_url' => $media['logo_url'],
+            'cover_url' => $media['cover_url'],
+            'location' => $location,
+            'location_text' => $location,
         ];
+    }
+
+    /**
+     * @return array{image_url: ?string, logo_url: ?string, cover_url: ?string}
+     */
+    private function institutionCardMediaData(Institution $institution): array
+    {
+        $logoUrl = $this->availableMediaUrl($institution->getFirstMedia('logo'), ['thumb']);
+        $coverUrl = $this->availableMediaUrl($institution->getFirstMedia('cover'), ['banner']);
+
+        return [
+            'image_url' => $coverUrl ?? $logoUrl,
+            'logo_url' => $logoUrl,
+            'cover_url' => $coverUrl,
+        ];
+    }
+
+    /**
+     * @param  list<string>  $preferredConversions
+     */
+    private function availableMediaUrl(?Media $media, array $preferredConversions = []): ?string
+    {
+        if (! $media instanceof Media) {
+            return null;
+        }
+
+        $availableUrl = $preferredConversions === []
+            ? $media->getUrl()
+            : $media->getAvailableUrl($preferredConversions);
+
+        if ($availableUrl !== '') {
+            return $availableUrl;
+        }
+
+        $originalUrl = $media->getUrl();
+
+        return $originalUrl !== '' ? $originalUrl : null;
     }
 
     /**
@@ -938,12 +1004,47 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function inspirationData(Inspiration $inspiration): array
+    {
+        $category = $inspiration->category;
+        $contentHtml = $inspiration->renderContentHtml();
+        $contentText = trim(strip_tags($contentHtml));
+        $thumbUrl = $inspiration->getFirstMediaUrl('main', 'thumb') ?: null;
+        $fullUrl = $inspiration->getFirstMediaUrl('main') ?: null;
+
+        return [
+            'id' => $inspiration->id,
+            'locale' => $inspiration->locale,
+            'title' => $inspiration->title,
+            'content' => $contentText,
+            'content_html' => $contentHtml,
+            'preview_text' => $inspiration->contentPreviewText(160),
+            'source' => $inspiration->source,
+            'category' => [
+                'value' => $category->value,
+                'label' => $category->label(),
+                'icon' => $category->icon(),
+                'color' => $category->color(),
+                'is_comic' => $category === InspirationCategory::IslamicComic,
+            ],
+            'media' => [
+                'thumb_url' => $thumbUrl,
+                'full_url' => $fullUrl,
+                'has_media' => is_string($thumbUrl) && $thumbUrl !== '',
+            ],
+        ];
+    }
+
+    /**
      * @return array{id: string, name: string, display_name: string, slug: string, position: ?string, is_primary: bool, logo_url: string, cover_url: string, chip_image_url: string}
      */
     private function speakerInstitutionData(Institution $institution): array
     {
-        $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb') ?: $institution->getFirstMediaUrl('logo');
-        $coverUrl = $institution->getFirstMediaUrl('cover', 'banner') ?: $institution->getFirstMediaUrl('cover');
+        $media = $this->institutionCardMediaData($institution);
+        $logoUrl = $media['logo_url'] ?? '';
+        $coverUrl = $media['cover_url'] ?? '';
         $position = data_get($institution, 'pivot.position');
         $isPrimary = data_get($institution, 'pivot.is_primary');
 
@@ -956,7 +1057,7 @@ class SearchController extends FrontendController
             'is_primary' => (bool) $isPrimary,
             'logo_url' => $logoUrl,
             'cover_url' => $coverUrl,
-            'chip_image_url' => $coverUrl !== '' ? $coverUrl : $logoUrl,
+            'chip_image_url' => $media['image_url'] ?? '',
         ];
     }
 

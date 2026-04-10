@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/institutions/{institutionKey}', [SearchController::class, 'showInstitution'])->name('institutions.show');
         Route::get('/speakers', [SearchController::class, 'speakers'])->name('speakers.index');
         Route::get('/speakers/{speakerKey}', [SearchController::class, 'showSpeaker'])->name('speakers.show');
+        Route::get('/inspirations/random', [SearchController::class, 'randomInspiration'])->name('inspirations.random');
         Route::get('/venues/{venueKey}', [SearchController::class, 'showVenue'])->name('venues.show');
         Route::get('/references/{referenceKey}', [SearchController::class, 'showReference'])->name('references.show');
         Route::get('/series/{series}', [SearchController::class, 'showSeries'])->name('series.show');
