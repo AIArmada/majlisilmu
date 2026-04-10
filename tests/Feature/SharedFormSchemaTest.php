@@ -1057,7 +1057,7 @@ it('keeps institution cover uploads locked to a 16:9 ratio across public and adm
     }
 });
 
-it('uses a centered avatar and 4:5 cover layout on the speaker contribution media form', function () {
+it('uses the standard media grid layout on the speaker contribution media form', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -1109,8 +1109,9 @@ it('uses a centered avatar and 4:5 cover layout on the speaker contribution medi
         return;
     }
 
-    expect($avatar->getColumnSpan('default'))->toBe('full')
-        ->and($avatar->getExtraAttributes()['class'] ?? null)->toContain('mx-auto')
+    expect($avatar->getColumnSpan('default'))->toBe(1)
+        ->and($avatar->getExtraFieldWrapperAttributes())->toBe([])
+        ->and($avatar->getExtraAttributes())->toBe([])
         ->and($cover->getImageAspectRatio())->toBe('4:5')
         ->and($gallery->getColumnSpan('default'))->toBe(1);
 });

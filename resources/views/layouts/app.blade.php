@@ -300,7 +300,7 @@
                                     </a>
                                     <a href="{{ route('contributions.index') }}" wire:navigate
                                         class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('My Contributions') }}
+                                        {{ __('Sumbangan') }}
                                     </a>
                                     @if($hasInstitutionDashboardAccess)
                                         <a href="{{ route('dashboard.institutions') }}" wire:navigate
@@ -397,7 +397,7 @@
                                 </a>
                                 <a href="{{ route('contributions.index') }}" wire:navigate
                                     class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('My Contributions') }}
+                                    {{ __('Sumbangan') }}
                                 </a>
                                 @if($hasInstitutionDashboardAccess)
                                     <a href="{{ route('dashboard.institutions') }}" wire:navigate

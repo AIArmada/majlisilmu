@@ -68,10 +68,6 @@
                         class="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 sm:w-auto">
                         {{ __('Submit Speaker') }}
                     </button>
-                    <a href="{{ route('contributions.index') }}" wire:navigate
-                        class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:w-auto">
-                        {{ __('View My Contributions') }}
-                    </a>
                 </div>
             </form>
         </section>

@@ -14,8 +14,10 @@ use App\Livewire\Pages\Contributions\SuggestUpdate;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Models\ContributionRequest;
 use App\Models\Event;
+use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Reference;
+use App\Models\Report;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
@@ -54,6 +56,7 @@ it('renders the dedicated institution contribution page', function () {
         ->assertSee(__('Check the existing directory first'))
         ->assertSee(__('Before you submit, please check the existing institutions directory. If it already exists, submit an update instead of creating a new record.'))
         ->assertSee(__('Check Existing Institutions'))
+        ->assertDontSee(__('View My Contributions'))
         ->assertDontSee(__('Need to add a speaker instead?'))
         ->assertDontSee(__('Submit Speaker'))
         ->assertDontSee(__('What happens next?'))
@@ -81,7 +84,7 @@ it('renders the institution contribution page with translated copy when the loca
         ->assertDontSee('rekod pendua')
         ->assertSee('Semak Institusi Sedia Ada')
         ->assertDontSee('Apa yang berlaku seterusnya?')
-        ->assertSee('Lihat Sumbangan Saya');
+        ->assertDontSee('Lihat Sumbangan Saya');
 });
 
 it('renders the dedicated speaker contribution page', function () {
@@ -96,6 +99,7 @@ it('renders the dedicated speaker contribution page', function () {
         ->assertSee(__('Check the existing directory first'))
         ->assertSee(__('Before you submit, please check the existing speakers directory. If it already exists, submit an update instead of creating a new record.'))
         ->assertSee(__('Check Existing Speakers'))
+        ->assertDontSee(__('View My Contributions'))
         ->assertDontSee(__('Need to add an institution too?'))
         ->assertDontSee(__('Submit Institution'))
         ->assertDontSee(__('Review flow'))
@@ -121,9 +125,84 @@ it('renders the speaker contribution page with translated copy when the locale c
         ->assertSee('Semak direktori sedia ada dahulu')
         ->assertSee('Semak Penceramah Sedia Ada')
         ->assertSee('rekod baru')
+        ->assertDontSee('Lihat Sumbangan Saya')
         ->assertDontSee('Add a New Speaker')
         ->assertDontSee('Education')
         ->assertDontSee('Contact Details');
+});
+
+it('renders the institution contribution submission success page', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $this->withSession(['contribution_submission_name' => 'Masjid Al-Huda'])
+        ->get(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Institution->publicRouteSegment()]))
+        ->assertOk()
+        ->assertSee('Masjid Al-Huda')
+        ->assertSee(__('Thank you for submitting a new institution.'))
+        ->assertSee(__('Jejaki sumbangan anda dan statusnya.'))
+        ->assertDontSee(__('We appreciate you taking the time to grow the MajlisIlmu directory. Our team will review your submission carefully.'))
+        ->assertDontSee(__('We will notify you once your submission has been approved or rejected.'))
+        ->assertDontSee(__('What happens next?'))
+        ->assertSee(__('Explore Institutions'))
+        ->assertSee(__('Browse Events'))
+        ->assertSee(__('My Contributions'));
+});
+
+it('renders the speaker contribution submission success page', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $this->withSession(['contribution_submission_name' => 'Ustaz Cadangan Baru'])
+        ->get(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment()]))
+        ->assertOk()
+        ->assertSee('Ustaz Cadangan Baru')
+        ->assertSee(__('Thank you for submitting a new speaker.'))
+        ->assertSee(__('Jejaki sumbangan anda dan statusnya.'))
+        ->assertDontSee(__('We appreciate you taking the time to grow the MajlisIlmu directory. Our team will review your submission carefully.'))
+        ->assertDontSee(__('We will notify you once your submission has been approved or rejected.'))
+        ->assertDontSee(__('What happens next?'))
+        ->assertDontSee('Apa yang berlaku seterusnya?')
+        ->assertSee(__('Explore Speakers'))
+        ->assertSee(__('Browse Events'))
+        ->assertSee(__('My Contributions'));
+});
+
+it('renders the institution contribution submission success page with translated copy when the locale changes', function () {
+    $user = User::factory()->create();
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Institution->publicRouteSegment()]))
+        ->assertOk()
+        ->assertSee('Terima kasih kerana menghantar institusi baharu.')
+        ->assertSee('Jejaki sumbangan anda dan statusnya.')
+        ->assertDontSee('Kami menghargai masa anda untuk membantu mengembangkan direktori MajlisIlmu. Pasukan kami akan menyemak sumbangan anda dengan teliti.')
+        ->assertDontSee('Kami akan memaklumkan anda sebaik sahaja sumbangan anda diluluskan atau ditolak.')
+        ->assertDontSee('Apa yang berlaku seterusnya?')
+        ->assertSee('Terokai Institusi')
+        ->assertSee('Lihat Majlis')
+        ->assertSee('Sumbangan Saya');
+});
+
+it('renders the speaker contribution submission success page with translated copy when the locale changes', function () {
+    $user = User::factory()->create();
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment()]))
+        ->assertOk()
+        ->assertSee('Terima kasih kerana menghantar penceramah baru.')
+        ->assertSee('Jejaki sumbangan anda dan statusnya.')
+        ->assertDontSee('Apa yang berlaku seterusnya?')
+        ->assertDontSee('What happens next?')
+        ->assertSee('Terokai Penceramah')
+        ->assertSee('Lihat Majlis')
+        ->assertSee('Sumbangan Saya');
 });
 
 it('keeps reviewer context fields on update suggestion pages', function () {
@@ -371,74 +450,177 @@ it('shows the latest pending request notice on the suggest update page', functio
         ->assertSee('You already have a pending update request for this record from');
 });
 
-it('lets maintainers approve pending update requests from the contributions inbox', function () {
-    $owner = User::factory()->create();
-    $proposer = User::factory()->create();
-    $institution = Institution::factory()->create([
-        'description' => 'Before approval',
+it('renders contribution requests and event submissions without approval controls', function () {
+    app()->setLocale('ms');
+
+    $user = User::factory()->create();
+    $requestInstitution = Institution::factory()->create([
+        'name' => 'Masjid Al-Huda',
         'status' => 'verified',
     ]);
-    $request = ContributionRequest::factory()->create([
-        'type' => ContributionRequestType::Update,
+    $eventInstitution = Institution::factory()->create([
+        'name' => 'Masjid Al-Ihsan',
+        'status' => 'verified',
+    ]);
+    $speaker = Speaker::factory()->create([
+        'name' => 'Ustaz Ahmad',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->create([
+        'title' => 'Rujukan Majlis Ilmu',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $createRequest = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Create,
         'subject_type' => ContributionSubjectType::Institution,
-        'entity_type' => $institution->getMorphClass(),
-        'entity_id' => $institution->id,
-        'proposer_id' => $proposer->id,
+        'entity_type' => null,
+        'entity_id' => null,
+        'proposer_id' => $user->id,
         'status' => ContributionRequestStatus::Pending,
         'proposed_data' => [
-            'description' => 'After approval',
+            'name' => 'Masjid Al-Huda Baharu',
+        ],
+        'proposer_note' => 'Please add this institution.',
+    ]);
+    $updateRequest = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Update,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $requestInstitution->getMorphClass(),
+        'entity_id' => $requestInstitution->id,
+        'proposer_id' => $user->id,
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'name' => 'Masjid Al-Huda Baharu',
         ],
         'original_data' => [
-            'description' => 'Before approval',
+            'name' => 'Masjid Al-Huda',
+        ],
+        'proposer_note' => 'Please update the institution name.',
+    ]);
+    $event = Event::factory()->for($eventInstitution)->create([
+        'title' => 'Majlis Ilmu Tracker',
+        'status' => 'pending',
+        'visibility' => 'public',
+    ]);
+
+    $event->speakers()->syncWithoutDetaching([$speaker->id]);
+    $event->references()->syncWithoutDetaching([$reference->id]);
+
+    EventSubmission::factory()->for($event)->for($user, 'submitter')->create([
+        'notes' => 'Submitted through the public event flow.',
+    ]);
+
+    $reportInstitution = Institution::factory()->create([
+        'name' => 'Masjid Lapor',
+        'status' => 'verified',
+    ]);
+
+    Report::factory()->create([
+        'reporter_id' => $user->id,
+        'entity_type' => $reportInstitution->getMorphClass(),
+        'entity_id' => $reportInstitution->id,
+        'status' => 'open',
+        'category' => 'wrong_info',
+        'description' => 'The contact details are outdated.',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(ContributionsIndex::class)
+        ->assertSee(__('Submit Event'))
+        ->assertSee(__('Submit Institution'))
+        ->assertSee(__('Submit Speaker'))
+        ->assertDontSee('bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700', false)
+        ->assertDontSee('xl:grid-cols-[1.15fr_0.85fr]', false)
+        ->assertSee(__('Event Submissions'))
+        ->assertSee(__('Contribution Requests'))
+        ->assertSee(__('Update Submissions'))
+        ->assertSee(__('Report Submissions'))
+        ->assertSee('Status Hantaran Majlis')
+        ->assertSee('Status Kemaskini')
+        ->assertSee('Status Hantaran Instititusi & Penceramah')
+        ->assertSee('Status Hantaran Laporan')
+        ->assertSee($createRequest->proposed_data['name'])
+        ->assertSee($updateRequest->entity->name)
+        ->assertSee(__('Event Submission'))
+        ->assertSee($event->title)
+        ->assertSee(__('Institution: :name', ['name' => $eventInstitution->display_name]))
+        ->assertSee(__('Speakers: :names', ['names' => $speaker->formatted_name]))
+        ->assertSee(__('References: :names', ['names' => $reference->title]))
+        ->assertSee(__('Report Submission'))
+        ->assertSee($reportInstitution->name)
+        ->assertDontSee(__('Pending Approvals'))
+        ->assertDontSee(__('Approve'))
+        ->assertDontSee(__('Reject'));
+});
+
+it('paginates contribution status sections when the lists grow', function () {
+    $user = User::factory()->create();
+    $requestInstitution = Institution::factory()->create([
+        'name' => 'Masjid Al-Huda',
+        'status' => 'verified',
+    ]);
+    $eventInstitution = Institution::factory()->create([
+        'name' => 'Masjid Al-Ihsan',
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($eventInstitution)->create([
+        'title' => 'Majlis Ilmu Paginate',
+        'status' => 'pending',
+        'visibility' => 'public',
+    ]);
+    $reportInstitution = Institution::factory()->create([
+        'name' => 'Masjid Lapor Paginate',
+        'status' => 'verified',
+    ]);
+
+    ContributionRequest::factory()->count(6)->create([
+        'type' => ContributionRequestType::Create,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => null,
+        'entity_id' => null,
+        'proposer_id' => $user->id,
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'name' => 'Masjid Al-Huda Baharu',
         ],
     ]);
 
-    assignInstitutionOwner($owner, $institution);
-    $this->actingAs($owner);
-
-    Livewire::test(ContributionsIndex::class)
-        ->set("reviewNotes.{$request->id}", 'Looks accurate.')
-        ->call('approve', $request->id);
-
-    expect($request->fresh()->status)->toBe(ContributionRequestStatus::Approved)
-        ->and($institution->fresh()->description)->toBe('After approval');
-});
-
-it('lets maintainers reject pending update requests from the contributions inbox', function () {
-    $owner = User::factory()->create();
-    $proposer = User::factory()->create();
-    $institution = Institution::factory()->create([
-        'description' => 'Keep this description',
-        'status' => 'verified',
+    ContributionRequest::factory()->count(6)->create([
+        'type' => ContributionRequestType::Update,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $requestInstitution->getMorphClass(),
+        'entity_id' => $requestInstitution->id,
+        'proposer_id' => $user->id,
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'name' => 'Masjid Al-Huda Baharu',
+        ],
+        'original_data' => [
+            'name' => 'Masjid Al-Huda',
+        ],
     ]);
-    $institution->contacts()->delete();
 
-    assignInstitutionOwner($owner, $institution);
+    EventSubmission::factory()->count(6)->for($event)->for($user, 'submitter')->create();
 
-    $this->actingAs($proposer);
+    Report::factory()->count(6)->create([
+        'reporter_id' => $user->id,
+        'entity_type' => $reportInstitution->getMorphClass(),
+        'entity_id' => $reportInstitution->id,
+        'status' => 'open',
+        'category' => 'wrong_info',
+    ]);
 
-    Livewire::test(SuggestUpdate::class, [
-        'subjectType' => 'institution',
-        'subjectId' => $institution->slug,
-    ])
-        ->set('data.description', 'Rejected description')
-        ->set('data.proposer_note', 'Please change this.')
-        ->call('submit')
-        ->assertHasNoErrors();
+    $this->actingAs($user);
 
-    $request = ContributionRequest::query()->latest('created_at')->firstOrFail();
+    $component = Livewire::test(ContributionsIndex::class)->instance();
 
-    $this->actingAs($owner);
-
-    Livewire::test(ContributionsIndex::class)
-        ->set("reviewNotes.{$request->id}", 'Need stronger evidence.')
-        ->set("rejectionReasons.{$request->id}", 'needs_more_evidence')
-        ->call('reject', $request->id);
-
-    expect($request->fresh()->status)->toBe(ContributionRequestStatus::Rejected)
-        ->and($request->fresh()->reviewer_note)->toBe('Need stronger evidence.')
-        ->and($request->fresh()->reason_code)->toBe('needs_more_evidence')
-        ->and($institution->fresh()->description)->toBe('Keep this description');
+    expect($component->submittedEvents->hasPages())->toBeTrue()
+        ->and($component->myRequests->hasPages())->toBeTrue()
+        ->and($component->myUpdateRequests->hasPages())->toBeTrue()
+        ->and($component->myReports->hasPages())->toBeTrue();
 });
 
 it('lets proposers cancel their own pending requests from the contributions inbox', function () {

@@ -158,9 +158,7 @@ class SpeakerContributionFormSchema
                             ->circleCropper()
                             ->avatar()
                             ->conversion('thumb')
-                            ->helperText(__('Recommended: a clear square image, at least 400x400px.'))
-                            ->extraAttributes(['class' => 'mx-auto w-full max-w-md'])
-                            ->columnSpanFull(),
+                            ->helperText(__('Recommended: a clear square image, at least 400x400px.')),
                         SpatieMediaLibraryFileUpload::make('cover')
                             ->label(__('Cover Image'))
                             ->collection('cover')

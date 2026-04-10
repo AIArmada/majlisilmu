@@ -2,16 +2,15 @@
 
 namespace App\Livewire\Pages\Contributions;
 
-use App\Actions\Contributions\ApproveContributionRequestAction;
 use App\Actions\Contributions\CancelContributionRequestAction;
-use App\Actions\Contributions\RejectContributionRequestAction;
 use App\Actions\Contributions\ResolveOwnContributionRequestAction;
-use App\Actions\Contributions\ResolvePendingContributionApprovalsAction;
-use App\Actions\Contributions\ResolveReviewableContributionRequestAction;
+use App\Enums\ContributionRequestType;
 use App\Enums\MemberSubjectType;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\ContributionRequest;
+use App\Models\EventSubmission;
 use App\Models\Institution;
+use App\Models\Report;
 use App\Models\Speaker;
 use App\Models\User;
 use Filament\Forms\Components\Select;
@@ -21,14 +20,15 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 use RuntimeException;
 
 #[Layout('layouts.app')]
@@ -37,6 +37,7 @@ class Index extends Component implements HasForms
 {
     use InteractsWithForms;
     use InteractsWithToasts;
+    use WithPagination;
 
     /** @var array<string, string> */
     public array $reviewNotes = [];
@@ -58,30 +59,91 @@ class Index extends Component implements HasForms
     }
 
     /**
-     * @return Collection<int, ContributionRequest>
+     * @return LengthAwarePaginator<int, ContributionRequest>
      */
     #[Computed]
-    public function myRequests(): Collection
+    public function myRequests(): LengthAwarePaginator
     {
         /** @var User $user */
         $user = auth()->user();
 
         return $user->contributionRequests()
+            ->where('type', ContributionRequestType::Create->value)
             ->with(['entity', 'reviewer'])
             ->latest('created_at')
-            ->get();
+            ->paginate(perPage: 5, pageName: 'my_requests_page');
     }
 
     /**
-     * @return Collection<int, ContributionRequest>
+     * @return LengthAwarePaginator<int, ContributionRequest>
      */
     #[Computed]
-    public function pendingApprovals(): Collection
+    public function myUpdateRequests(): LengthAwarePaginator
     {
         /** @var User $user */
         $user = auth()->user();
 
-        return app(ResolvePendingContributionApprovalsAction::class)->handle($user);
+        return $user->contributionRequests()
+            ->where('type', ContributionRequestType::Update->value)
+            ->with(['entity', 'reviewer'])
+            ->latest('created_at')
+            ->paginate(perPage: 5, pageName: 'my_update_requests_page');
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, EventSubmission>
+     */
+    #[Computed]
+    public function submittedEvents(): LengthAwarePaginator
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        return EventSubmission::query()
+            ->where('submitted_by', $user->id)
+            ->with([
+                'event' => fn ($query) => $query->with(['institution', 'speakers', 'references']),
+            ])
+            ->latest('created_at')
+            ->paginate(perPage: 5, pageName: 'submitted_events_page');
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Report>
+     */
+    #[Computed]
+    public function myReports(): LengthAwarePaginator
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        return $user->reports()
+            ->with(['entity', 'handler'])
+            ->latest('created_at')
+            ->paginate(perPage: 5, pageName: 'my_reports_page');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function eventSubmissionDetails(EventSubmission $submission): array
+    {
+        $event = $submission->event;
+        $details = [];
+
+        if (filled($event->institution?->display_name)) {
+            $details[] = __('Institution: :name', ['name' => $event->institution->display_name]);
+        }
+
+        if ($event->speakers->isNotEmpty()) {
+            $details[] = __('Speakers: :names', ['names' => $event->speakers->pluck('formatted_name')->join(', ')]);
+        }
+
+        if ($event->references->isNotEmpty()) {
+            $details[] = __('References: :names', ['names' => $event->references->pluck('title')->join(', ')]);
+        }
+
+        return $details;
     }
 
     public function form(Schema $schema): Schema
@@ -120,40 +182,6 @@ class Index extends Component implements HasForms
                     ])
                     ->columns(2),
             ]);
-    }
-
-    public function approve(
-        string $requestId,
-        ApproveContributionRequestAction $approveContributionRequestAction,
-        ResolveReviewableContributionRequestAction $resolveReviewableContributionRequestAction,
-    ): void {
-        /** @var User $user */
-        $user = auth()->user();
-
-        $request = $resolveReviewableContributionRequestAction->handle($user, $requestId);
-
-        $approveContributionRequestAction->handle($request, $user, $this->reviewNotes[$requestId] ?? null);
-        unset($this->reviewNotes[$requestId], $this->rejectionReasons[$requestId]);
-    }
-
-    public function reject(
-        string $requestId,
-        RejectContributionRequestAction $rejectContributionRequestAction,
-        ResolveReviewableContributionRequestAction $resolveReviewableContributionRequestAction,
-    ): void {
-        /** @var User $user */
-        $user = auth()->user();
-
-        $request = $resolveReviewableContributionRequestAction->handle($user, $requestId);
-
-        $rejectContributionRequestAction->handle(
-            $request,
-            $user,
-            $this->rejectionReasons[$requestId] ?: 'rejected_by_reviewer',
-            $this->reviewNotes[$requestId] ?? null,
-        );
-
-        unset($this->reviewNotes[$requestId], $this->rejectionReasons[$requestId]);
     }
 
     public function cancel(
