@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class EventController extends Controller
 {
@@ -292,7 +293,7 @@ class EventController extends Controller
             'views_count',
         ];
 
-        $events = QueryBuilder::for(Event::query()->with(['keyPeople.speaker']))
+        $events = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media']))
             ->allowedFilters(...$allowedFilters)
             ->allowedIncludes(...$allowedIncludes)
             ->allowedSorts(...$allowedSorts)
@@ -302,6 +303,10 @@ class EventController extends Controller
             ->where('visibility', 'public')
             ->paginate((int) $request->input('per_page', 20))
             ->appends($request->query());
+
+        $events->setCollection(
+            $events->getCollection()->map(fn (Event $event): array => $this->serializeEventPayload($event))
+        );
 
         $user = $request->user();
 
@@ -357,12 +362,49 @@ class EventController extends Controller
             404,
         );
 
-        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker']))
+        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media']))
             ->allowedIncludes(...$allowedIncludes)
             ->whereKey($event->getKey())
             ->firstOrFail();
 
-        return response()->json(['data' => $event]);
+        return response()->json(['data' => $this->serializeEventPayload($event)]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeEventPayload(Event $event): array
+    {
+        $posterUrl = $this->preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']);
+
+        return [
+            ...$event->toArray(),
+            'card_image_url' => $event->card_image_url,
+            'poster_url' => $posterUrl,
+            'has_poster' => $event->hasMedia('poster'),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $preferredConversions
+     */
+    private function preferredMediaUrl(?Media $media, array $preferredConversions = []): ?string
+    {
+        if (! $media instanceof Media) {
+            return null;
+        }
+
+        $availableUrl = $preferredConversions === []
+            ? $media->getUrl()
+            : $media->getAvailableUrl($preferredConversions);
+
+        if ($availableUrl !== '') {
+            return $availableUrl;
+        }
+
+        $originalUrl = $media->getUrl();
+
+        return $originalUrl !== '' ? $originalUrl : null;
     }
 
     private function parseDate(mixed $value, bool $endOfDay): ?Carbon
