@@ -67,6 +67,8 @@ it('renders the institution location picker when google places is enabled', func
         ->assertOk()
         ->assertSee(__('Find the institution location'))
         ->assertSee(__('Search for an institution or address'))
+        ->assertSee('mi-institution-location-picker-search', false)
+        ->assertSee('focus-within:ring-2', false)
         ->assertSee(__('Google Maps URL'));
 });
 

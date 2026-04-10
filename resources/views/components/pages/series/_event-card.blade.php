@@ -5,7 +5,7 @@
     $eventPosterAspectClass = match ($eventPosterAspectRatio) {
         '4:5' => 'aspect-[4/5]',
         '16:9' => 'aspect-[16/9]',
-        default => 'aspect-[3/2]',
+        default => 'aspect-[16/9]',
     };
     $seriesCardMediaClass = $eventHasPoster
         ? 'md:w-48 h-32 md:h-auto'

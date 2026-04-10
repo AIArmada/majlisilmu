@@ -258,7 +258,7 @@
                                     $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                                         '4:5' => 'aspect-[4/5]',
                                         '16:9' => 'aspect-[16/9]',
-                                        default => 'aspect-[3/2]',
+                                        default => 'aspect-[16/9]',
                                     };
                                     $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                                     $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;

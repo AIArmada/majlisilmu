@@ -4,6 +4,7 @@ namespace App\Livewire\Pages\Contributions;
 
 use App\Actions\Contributions\SubmitStagedContributionCreateAction;
 use App\Enums\ContributionSubjectType;
+use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerContributionFormSchema;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\Speaker;
@@ -35,7 +36,13 @@ class SubmitSpeaker extends Component implements HasActions, HasForms
     {
         $this->contributionForm()->fill([
             'gender' => 'male',
-            'state_id' => null,
+            'address' => [
+                'country_id' => SharedFormSchema::preferredPublicCountryId(),
+                'state_id' => null,
+                'district_id' => null,
+                'subdistrict_id' => null,
+                'cascade_reset_guard' => 0,
+            ],
         ]);
     }
 
@@ -44,7 +51,12 @@ class SubmitSpeaker extends Component implements HasActions, HasForms
         return $schema
             ->model(new Speaker)
             ->statePath('data')
-            ->components(SpeakerContributionFormSchema::components(includeMedia: true));
+            ->components(SpeakerContributionFormSchema::components(
+                includeMedia: true,
+                addressStatePath: 'address',
+                regionOnlyAddress: true,
+                showCountryField: false,
+            ));
     }
 
     public function submit(SubmitStagedContributionCreateAction $submitStagedContributionCreateAction): void
@@ -62,7 +74,7 @@ class SubmitSpeaker extends Component implements HasActions, HasForms
             },
         );
 
-        $this->successToast(__('Speaker submitted for review.'));
+        $this->successToast(__('Thank you. Your speaker submission has been received. We will notify you if it is approved or rejected.'));
 
         $this->redirect(route('contributions.index'), navigate: true);
     }

@@ -52,7 +52,7 @@ it('renders the dedicated institution contribution page', function () {
         ->assertSee(__('Add a New Institution'))
         ->assertSee(__('Address'))
         ->assertSee(__('Check the existing directory first'))
-        ->assertSee(__('Before you submit, please check the existing institutions directory and make sure the institution is not already listed. If it already exists, submit an update instead of creating a duplicate record.'))
+        ->assertSee(__('Before you submit, please check the existing institutions directory. If it already exists, submit an update instead of creating a new record.'))
         ->assertSee(__('Check Existing Institutions'))
         ->assertDontSee(__('Need to add a speaker instead?'))
         ->assertDontSee(__('Submit Speaker'))
@@ -70,10 +70,15 @@ it('renders the institution contribution page with translated copy when the loca
     $this->get(route('contributions.submit-institution'))
         ->assertOk()
         ->assertSee('Sumbangan Komuniti')
-        ->assertSee('Tambah Institusi Baharu')
+        ->assertSee('Tambah Institusi Baru')
+        ->assertSee('Hantar rekod institusi baru untuk direktori MajlisIlmu.')
+        ->assertDontSee('Tambah Institusi Baharu')
+        ->assertDontSee('Penyemak akan menilainya sebelum diterbitkan.')
         ->assertSee('Profil Institusi')
         ->assertSee('Alamat')
         ->assertSee('Semak direktori sedia ada dahulu')
+        ->assertSee('rekod baru')
+        ->assertDontSee('rekod pendua')
         ->assertSee('Semak Institusi Sedia Ada')
         ->assertDontSee('Apa yang berlaku seterusnya?')
         ->assertSee('Lihat Sumbangan Saya');
@@ -87,7 +92,38 @@ it('renders the dedicated speaker contribution page', function () {
     $this->get(route('contributions.submit-speaker'))
         ->assertOk()
         ->assertSee(__('Add a New Speaker'))
-        ->assertDontSee(__('Submission Note'));
+        ->assertSee(__('Address'))
+        ->assertSee(__('Check the existing directory first'))
+        ->assertSee(__('Before you submit, please check the existing speakers directory. If it already exists, submit an update instead of creating a new record.'))
+        ->assertSee(__('Check Existing Speakers'))
+        ->assertDontSee(__('Need to add an institution too?'))
+        ->assertDontSee(__('Submit Institution'))
+        ->assertDontSee(__('Review flow'))
+        ->assertDontSee(__('Submission Note'))
+        ->assertDontSee('lg:grid-cols-2', false);
+});
+
+it('renders the speaker contribution page with translated copy when the locale changes', function () {
+    $user = User::factory()->create();
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.submit-speaker'))
+        ->assertOk()
+        ->assertSee('Sumbangan Komuniti')
+        ->assertSee('Tambah Penceramah Baru')
+        ->assertSee('Hantar rekod penceramah baru untuk direktori MajlisIlmu.')
+        ->assertDontSee('Tambah Penceramah Baharu')
+        ->assertDontSee('Penyemak akan menilainya sebelum diterbitkan.')
+        ->assertSee('Pendidikan')
+        ->assertSee('Maklumat Perhubungan')
+        ->assertSee('Semak direktori sedia ada dahulu')
+        ->assertSee('Semak Penceramah Sedia Ada')
+        ->assertSee('rekod baru')
+        ->assertDontSee('Add a New Speaker')
+        ->assertDontSee('Education')
+        ->assertDontSee('Contact Details');
 });
 
 it('keeps reviewer context fields on update suggestion pages', function () {

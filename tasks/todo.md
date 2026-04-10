@@ -1,3 +1,128 @@
+# Uncommitted Worktree Audit
+
+- [x] Inventory all current uncommitted files and identify the main change groups
+- [x] Review directory search/cache changes for web/API parity and migration safety
+- [x] Review contribution form/schema/API changes for state-shape and localization regressions
+- [x] Review media ratio changes for stale 3:2 paths and card display drift
+- [x] Patch confirmed issues without reverting unrelated user work
+- [x] Run broad verification and document the audit result
+
+## Review
+
+- Scope audited:
+  - institution directory search/cache parity across `/institusi`, unified search, frontend catalog endpoints, and frontend API
+  - contribution form state shape, speaker region-only address handling, institution location picker presentation, and English/Malay copy changes
+  - institution/event/speaker media ratio changes across public forms, admin forms, cards, skeletons, and focused tests
+  - touched tests, translation files, and task notes, plus repo-level static analysis fallout
+- Confirmed issue fixed:
+  - full PHPStan exposed an always-true `is_string()` guard in `database/migrations/2026_04_09_000100_add_search_index_to_speakers.php`; the iterable branch is already typed as strings, so the mapper now trims string values directly
+- Notes:
+  - an initial concurrent run of two Livewire media-upload test files left invalid media temp directories and failed in Spatie image decoding; rerunning those files independently passed, and the generated temp directories were removed
+  - there is no `packages` directory in this checkout, so the migration constraint scan was rerun against `database` and `app/Models`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **33 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **26 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **7 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **20 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **25 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php` => **31 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventMediaTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **15 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **30 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/HomePageTest.php` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **5 passed**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `vendor/bin/pint --test ...` on all touched PHP/Blade/lang/task files => **pass**
+  - `vendor/bin/pint --test database/migrations/2026_04_09_000100_add_search_index_to_speakers.php` => **pass**
+  - `git diff --check` => **pass**
+  - `rg -n "3:2|aspect-\[3/2\]" app resources tests -g '*.php' -g '*.blade.php'` => no matches
+  - contribution-copy stale-string scan for `Penyemak...`, `Baharu`, and `rekod pendua` => only negative test assertions remain
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app/Models` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models` => no matches
+
+# Contribution Form Polish
+
+- [x] Set speaker contribution cover upload to 4:5
+- [x] Center the speaker avatar upload while keeping cover and gallery uploads side by side
+- [x] Keep the institution contribution intro/check copy on one line where space allows and update Malay copy from `rekod pendua` to `rekod baru`
+- [x] Improve the institution Google Maps location search field presentation
+- [x] Add/update focused tests and run targeted verification
+
+## Review
+
+- Root cause:
+  - the dedicated speaker contribution media section still treated the cover as a landscape image and forced gallery uploads onto their own row, so the media group did not match the requested portrait cover/gallery layout
+  - the institution contribution page constrained its intro/check copy to a narrower measure and the Malay duplicate-warning copy still used `rekod pendua`
+  - the Google Places autocomplete host used a plain bordered container, which made the search control feel unfinished compared with the rest of the contribution page shell
+- Fix:
+  - changed the speaker contribution cover upload to a locked `4:5` ratio, centered the avatar upload with a constrained full-width first row, and let cover plus gallery sit side by side in the two-column media section
+  - switched the institution duplicate-warning sentence to the shorter `new record` copy and updated Malay translations to `rekod baru`
+  - widened the institution intro/check copy containers and added a polished Google Maps picker wrapper with a search icon, focus ring, softer card treatment, and web-component styling hooks
+  - added focused regressions for the speaker media ratio/layout, the institution contribution copy, and the location picker search wrapper
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **26 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => **7 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **33 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SpeakerContributionFormSchema.php resources/views/filament/schemas/components/institution-location-picker.blade.php tests/Feature/ContributionPagesTest.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Forms/SpeakerContributionFormSchema.php resources/views/livewire/pages/contributions/submit-institution.blade.php resources/views/filament/schemas/components/institution-location-picker.blade.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json tests/Feature/ContributionPagesTest.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SharedFormSchemaTest.php tasks/todo.md` => **pass**
+  - `rg -n "rekod pendua" resources/views resources/lang app -g '*.php' -g '*.blade.php' -g '*.json'` => no matches
+
+# Media Ratio Alignment
+
+- [x] Verify and lock institution cover upload fields to 16:9 across public contribution, quick-create, direct-edit, and admin forms
+- [x] Keep `/institusi` listing cards on 16:9 cover presentation
+- [x] Remove `3:2` from public and admin event poster upload ratio options
+- [x] Restrict public event card display ratios on `/majlis` and home listings to `16:9` or `4:5`
+- [x] Add/update focused tests and run targeted verification
+
+## Review
+
+- Root cause:
+  - institution cover uploads and `/institusi` card presentation were already aligned to 16:9, but there was no focused test guard for the public/admin form surfaces
+  - event poster upload forms and fallback display logic still allowed `3:2`, so existing and unknown poster dimensions could render with a ratio that is no longer part of the desired public card set
+- Fix:
+  - locked public and admin event poster upload ratio options to `16:9` and `4:5`
+  - removed `3:2` from event poster display-ratio resolution and defaulted legacy/unknown poster dimensions to `16:9`
+  - updated `/majlis`, homepage featured cards, search cards, series cards, event detail poster framing, and event-card skeleton fallbacks to use `16:9` instead of `3:2`
+  - added focused assertions for institution cover form ratios, `/institusi` card `aspect-video`, event upload ratio options, and event model ratio mapping
+- Verification:
+  - `rg -n "3:2|aspect-\[3/2\]" app resources tests -g '*.php' -g '*.blade.php'` => no matches
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventMediaTest.php` => **3 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => **15 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php` => **31 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => **30 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/HomePageTest.php` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **5 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **20 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **32 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Filament/Resources/Events/Schemas/EventForm.php app/Models/Event.php tests/Feature/SubmitEventMediaTest.php tests/Feature/AdminEventsResourceTest.php tests/Feature/MediaConversionsTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Filament/Resources/Events/Schemas/EventForm.php app/Models/Event.php resources/views/components/pages/submit-event/create.blade.php resources/views/livewire/pages/events/index.blade.php resources/views/components/home/⚡featured-events.blade.php resources/views/livewire/pages/search/index.blade.php resources/views/components/pages/series/_event-card.blade.php resources/views/livewire/pages/events/show.blade.php resources/views/components/ui/skeleton/event-card-grid.blade.php tests/Feature/SubmitEventMediaTest.php tests/Feature/AdminEventsResourceTest.php tests/Feature/MediaConversionsTest.php tests/Feature/InstitutionIndexTest.php tests/Feature/SharedFormSchemaTest.php tasks/todo.md` => **pass**
+
+# Institution Directory Parity
+
+- [x] Add the mobile-visible institution total summary at the bottom of `/institusi`
+- [x] Remove the institution card `View Details` CTA and center the majlis counter
+- [x] Reuse `/penceramah` directory query/cache patterns where they fit `/institusi`, including the frontend API endpoint
+- [x] Add focused web/API regression coverage and run targeted verification
+
+## Review
+
+- Root cause:
+  - `/institusi` had drifted from the newer `/penceramah` directory pattern: the institution cards still had a secondary detail label, the directory had no bottom total summary, and the web/API institution collection queries still duplicated direct-search logic without a cached public search ID path or shared stable directory ordering
+  - the frontend institution API also parsed missing location filters as `0`, which could accidentally scope empty API collection queries when no location filter was supplied
+- Fix:
+  - added shared stable public-directory ordering helpers to [Institution.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Institution.php) and routed the `/institusi` page plus `GET /api/v1/institutions` through that ordering
+  - added [InstitutionSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Search/InstitutionSearchService.php) for cached public direct-search IDs, cached fuzzy-search IDs, shared direct-search predicates, and observer-driven cache busting from [InstitutionObserver.php](/Users/Saiffil/Herd/majlisilmu/app/Observers/InstitutionObserver.php)
+  - removed the institution card `View Details` label in [⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/⚡index.blade.php), centered the majlis counter, and added the bottom `Jumlah institusi` summary
+  - reused the shared institution search predicate in the unified search page, frontend search API, and frontend catalog service so web/API institution matching stays aligned
+  - added focused regressions for the institution bottom count, card footer, cached search refresh, shared stable directory ordering, and frontend API ordering
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **20 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **25 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/UnifiedSearchPageTest.php` => **5 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Models/Institution.php app/Support/Search/InstitutionSearchService.php app/Observers/InstitutionObserver.php app/Http/Controllers/Api/Frontend/SearchController.php app/Livewire/Pages/Search/Index.php app/Support/Api/Frontend/FrontendCatalogService.php tests/Feature/InstitutionIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Models/Institution.php app/Support/Search/InstitutionSearchService.php app/Observers/InstitutionObserver.php app/Http/Controllers/Api/Frontend/SearchController.php app/Livewire/Pages/Search/Index.php app/Support/Api/Frontend/FrontendCatalogService.php resources/views/components/pages/institutions/⚡index.blade.php tests/Feature/InstitutionIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tasks/todo.md` => **pass**
+
 # Audit Uncommitted Changes
 
 - [x] Inspect the full current uncommitted diff, including new files, for behavioral regressions, incomplete work, and API or docs drift
@@ -8816,3 +8941,25 @@
 - [ ] Rebuild the `mcp:token` command and focused automated coverage
 - [ ] Reconfigure OpenCode, Copilot CLI, and VS Code Insiders against `majlisilmu.test`
 - [ ] Verify repo tests, static analysis, and live client connectivity
+# Speaker Contribution Form Alignment
+
+- [x] Align the dedicated speaker contribution page with the institution contribution shell and copy
+- [x] Reduce the dedicated speaker submission address contract to region-only fields on web and API
+- [x] Tidy the speaker avatar upload presentation, verify with focused tests, and record the result
+
+## Review
+
+- Root cause:
+  - the dedicated `/sumbangan/penceramah/baru` flow was still using the older standalone page shell and a full-address schema, so it did not match the newer institution submission UX or the intended speaker data model
+  - the frontend speaker create API still validated and implicitly documented line-level address, postcode, and map URL fields, which drifted from the intended public submission contract
+- Fix:
+  - rebuilt [submit-speaker.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/contributions/submit-speaker.blade.php) to match the institution contribution shell, remove the old bottom blocks, and add a “check existing speakers first” warning with a directory link
+  - updated [SubmitSpeaker.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SubmitSpeaker.php), [SpeakerContributionFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/SpeakerContributionFormSchema.php), and [SharedFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/SharedFormSchema.php) so the dedicated speaker contribution form now uses a hidden preferred-country field plus only `state_id`, `district_id`, and `subdistrict_id`
+  - tightened [ContributionController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/ContributionController.php) and [FrontendFormContractService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Frontend/FrontendFormContractService.php) so the public speaker create API now accepts and documents the same region-only address payload, and returns the same review-notification message as the web flow
+  - tidied the avatar upload by promoting it to a full-width first field in a dedicated “Profile Photo & Media” section, then updated page, schema, and API tests accordingly
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **25 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **31 passed**
+  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='speaker|contribution contracts'` => **8 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Forms/SpeakerContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitSpeaker.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Support/Api/Frontend/FrontendFormContractService.php tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
+  - `vendor/bin/pint app/Forms/SharedFormSchema.php app/Forms/SpeakerContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitSpeaker.php resources/views/livewire/pages/contributions/submit-speaker.blade.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Support/Api/Frontend/FrontendFormContractService.php tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json tasks/todo.md` => **formatted cleanly**

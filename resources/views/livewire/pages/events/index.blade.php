@@ -899,7 +899,7 @@
                 <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                     @foreach(range(1, 6) as $index)
                         <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md animate-pulse">
-                            <div class="relative aspect-[3/2] bg-slate-200">
+                            <div class="relative aspect-[16/9] bg-slate-200">
                                 <div class="absolute left-4 top-4 h-14 w-14 rounded-xl bg-white/80"></div>
                                 <div class="absolute bottom-4 left-4 h-6 w-20 rounded-full bg-white/70"></div>
                             </div>
@@ -968,7 +968,7 @@
                             $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                                 '4:5' => 'aspect-[4/5]',
                                 '16:9' => 'aspect-[16/9]',
-                                default => 'aspect-[3/2]',
+                                default => 'aspect-[16/9]',
                             };
                             $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                             $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;

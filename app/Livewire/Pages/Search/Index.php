@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Services\EventSearchService;
+use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -189,19 +190,21 @@ class Index extends Component
      */
     private function institutionSearchQuery(string $search): Builder
     {
-        return Institution::query()
-            ->active()
-            ->where('status', 'verified')
-            ->withCount(['events' => function (Builder $query): void {
-                $query
-                    ->where('events.is_active', true)
-                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                    ->where('events.visibility', EventVisibility::Public)
-                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('events.starts_at', '>=', now());
-            }])
-            ->with(['address.state', 'address.district', 'address.subdistrict', 'media'])
-            ->searchNameOrNickname($search);
+        return app(InstitutionSearchService::class)->applySearch(
+            Institution::query()
+                ->active()
+                ->where('status', 'verified')
+                ->withCount(['events' => function (Builder $query): void {
+                    $query
+                        ->where('events.is_active', true)
+                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                        ->where('events.visibility', EventVisibility::Public)
+                        ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                        ->where('events.starts_at', '>=', now());
+                }])
+                ->with(['address.state', 'address.district', 'address.subdistrict', 'media']),
+            $search,
+        );
     }
 
     private function normalizedSearch(): ?string

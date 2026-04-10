@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use App\Support\Submission\EntitySubmissionAccess;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ use Nnjeim\World\Models\Language;
 class FrontendCatalogService
 {
     public function __construct(
+        private readonly InstitutionSearchService $institutionSearchService,
         private readonly SpeakerSearchService $speakerSearchService,
     ) {}
 
@@ -189,7 +191,7 @@ class FrontendCatalogService
         $normalizedSearch = trim((string) $search);
 
         if ($normalizedSearch !== '') {
-            $query->searchNameOrNickname($normalizedSearch);
+            $this->applyInstitutionSearch($query, $normalizedSearch);
         }
 
         return $query
@@ -285,7 +287,7 @@ class FrontendCatalogService
             MemberSubjectType::Institution => Institution::query()
                 ->where('status', 'verified')
                 ->where('is_active', true)
-                ->tap(fn (Builder $query): Builder => filled($search) ? $query->searchNameOrNickname($search) : $query)
+                ->tap(fn (Builder $query): Builder => $this->applyInstitutionSearch($query, $search))
                 ->orderBy('name')
                 ->limit(50)
                 ->get(['id', 'slug', 'name', 'nickname'])
@@ -325,7 +327,7 @@ class FrontendCatalogService
         $normalizedSearch = trim($search);
 
         if ($normalizedSearch !== '') {
-            $query->searchNameOrNickname($normalizedSearch);
+            $this->applyInstitutionSearch($query, $normalizedSearch);
         }
 
         return $query
@@ -354,6 +356,21 @@ class FrontendCatalogService
         app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
 
         return app(MemberRoleCatalog::class)->roleOptionsFor(MemberSubjectType::Institution);
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return Builder<Institution>
+     */
+    private function applyInstitutionSearch(Builder $query, string $search): Builder
+    {
+        $normalizedSearch = trim($search);
+
+        if ($normalizedSearch === '') {
+            return $query;
+        }
+
+        return $this->institutionSearchService->applySearch($query, $normalizedSearch);
     }
 
     /**

@@ -22,9 +22,14 @@ class SpeakerContributionFormSchema
     /**
      * @return array<int, Component>
      */
-    public static function components(bool $includeMedia = true, ?string $addressStatePath = null): array
-    {
+    public static function components(
+        bool $includeMedia = true,
+        ?string $addressStatePath = null,
+        bool $regionOnlyAddress = false,
+        ?bool $showCountryField = null,
+    ): array {
         $publicCountryId = SharedFormSchema::preferredPublicCountryId();
+        $showCountryField ??= true;
 
         $components = [
             Section::make(__('Profil Penceramah'))
@@ -76,22 +81,37 @@ class SpeakerContributionFormSchema
                         ->preload(),
                 ])
                 ->columns(2),
-            Section::make(__('Location / Base'))
+            Section::make($regionOnlyAddress ? __('Address') : __('Location / Base'))
                 ->schema([
-                    ...($addressStatePath === null
-                        ? SharedFormSchema::addressFields(
-                            includeCountryField: true,
-                            showCountryField: true,
-                            defaultCountryId: $publicCountryId,
-                            requireCountryField: true,
-                        )
-                        : [SharedFormSchema::addressGroup(
-                            statePath: $addressStatePath,
-                            includeCountryField: true,
-                            showCountryField: true,
-                            defaultCountryId: $publicCountryId,
-                            requireCountryField: true,
-                        )]),
+                    ...($regionOnlyAddress
+                        ? ($addressStatePath === null
+                            ? SharedFormSchema::regionAddressFields(
+                                includeCountryField: true,
+                                showCountryField: $showCountryField,
+                                defaultCountryId: $publicCountryId,
+                                requireCountryField: true,
+                            )
+                            : [SharedFormSchema::regionAddressGroup(
+                                statePath: $addressStatePath,
+                                includeCountryField: true,
+                                showCountryField: $showCountryField,
+                                defaultCountryId: $publicCountryId,
+                                requireCountryField: true,
+                            )])
+                        : ($addressStatePath === null
+                            ? SharedFormSchema::addressFields(
+                                includeCountryField: true,
+                                showCountryField: $showCountryField,
+                                defaultCountryId: $publicCountryId,
+                                requireCountryField: true,
+                            )
+                            : [SharedFormSchema::addressGroup(
+                                statePath: $addressStatePath,
+                                includeCountryField: true,
+                                showCountryField: $showCountryField,
+                                defaultCountryId: $publicCountryId,
+                                requireCountryField: true,
+                            )])),
                 ])
                 ->columns($addressStatePath === null ? 2 : 1),
             Section::make(__('Education'))
@@ -127,7 +147,8 @@ class SpeakerContributionFormSchema
 
         if ($includeMedia) {
             array_splice($components, 3, 0, [
-                Section::make(__('Media'))
+                Section::make(__('Profile Photo & Media'))
+                    ->description(__('Upload a clear square profile photo first. Cover and gallery images are optional.'))
                     ->schema([
                         SpatieMediaLibraryFileUpload::make('avatar')
                             ->label(__('Avatar'))
@@ -137,15 +158,17 @@ class SpeakerContributionFormSchema
                             ->circleCropper()
                             ->avatar()
                             ->conversion('thumb')
-                            ->helperText(__('Recommended: Square image, at least 400x400px')),
+                            ->helperText(__('Recommended: a clear square image, at least 400x400px.'))
+                            ->extraAttributes(['class' => 'mx-auto w-full max-w-md'])
+                            ->columnSpanFull(),
                         SpatieMediaLibraryFileUpload::make('cover')
                             ->label(__('Cover Image'))
                             ->collection('cover')
                             ->image()
                             ->imageEditor()
-                            ->imageAspectRatio('16:9')
+                            ->imageAspectRatio('4:5')
                             ->automaticallyOpenImageEditorForAspectRatio()
-                            ->imageEditorAspectRatioOptions(['16:9'])
+                            ->imageEditorAspectRatioOptions(['4:5'])
                             ->automaticallyCropImagesToAspectRatio()
                             ->responsiveImages()
                             ->conversion('banner')
@@ -158,7 +181,7 @@ class SpeakerContributionFormSchema
                             ->image()
                             ->responsiveImages()
                             ->conversion('gallery_thumb')
-                            ->columnSpanFull(),
+                            ->helperText(__('Additional images')),
                     ])
                     ->columns(2),
             ]);

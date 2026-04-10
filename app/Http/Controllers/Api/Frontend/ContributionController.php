@@ -152,7 +152,7 @@ class ContributionController extends FrontendController
 
     #[Endpoint(
         title: 'Create a speaker contribution',
-        description: 'Creates a new public speaker contribution request. '
+        description: 'Creates a new public speaker contribution request using a region-only address payload (`country_id`, `state_id`, `district_id`, `subdistrict_id`). '
             .'Fetch `GET /forms/contributions/speakers` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeSpeaker(
@@ -180,14 +180,6 @@ class ContributionController extends FrontendController
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
             'address.subdistrict_id' => ['nullable', 'integer'],
-            'address.line1' => ['nullable', 'string', 'max:255'],
-            'address.line2' => ['nullable', 'string', 'max:255'],
-            'address.postcode' => ['nullable', 'string', 'max:16'],
-            'address.lat' => ['nullable', 'numeric'],
-            'address.lng' => ['nullable', 'numeric'],
-            'address.google_maps_url' => ['nullable', 'url', 'max:255'],
-            'address.google_place_id' => ['nullable', 'string', 'max:255'],
-            'address.waze_url' => ['nullable', 'url', 'max:255'],
             'qualifications' => ['nullable', 'array'],
             'qualifications.*.institution' => ['required_with:qualifications.*.degree', 'nullable', 'string', 'max:255'],
             'qualifications.*.degree' => ['required_with:qualifications.*.institution', 'nullable', 'string', 'max:255'],
@@ -226,6 +218,7 @@ class ContributionController extends FrontendController
         );
 
         return response()->json([
+            'message' => __('Thank you. Your speaker submission has been received. We will notify you if it is approved or rejected.'),
             'data' => [
                 'speaker' => [
                     'id' => $speaker->getKey(),
