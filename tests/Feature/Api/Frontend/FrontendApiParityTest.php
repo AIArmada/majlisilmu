@@ -279,6 +279,36 @@ it('searches speakers api by formatted title parts used on the public directory'
         ->not->toContain((string) $otherSpeaker->id);
 });
 
+it('serializes event list payloads with card image metadata for mobile clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Poster API Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $event->addMedia(UploadedFile::fake()->image('event-poster.jpg', 1200, 1600))
+        ->toMediaCollection('poster');
+
+    $item = Closure::bind(
+        fn (): array => $this->eventListData($event->fresh(['institution.media', 'venue', 'speakers.media', 'keyPeople.speaker'])),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($item, 'has_poster'))->toBeTrue()
+        ->and(data_get($item, 'card_image_url'))->toBeString()->not->toBe('');
+});
+
 it('serializes institution directory payloads with card media aliases for mobile clients', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');

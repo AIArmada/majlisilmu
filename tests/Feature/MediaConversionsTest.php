@@ -131,6 +131,16 @@ it('uses thumb conversion in Event card_image_url accessor', function () {
     expect($cardUrl)->toContain('poster');
 });
 
+it('uses institution logo when Event has no poster', function () {
+    $institution = Institution::factory()->create();
+    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+        ->toMediaCollection('logo');
+
+    $event = Event::factory()->for($institution)->create();
+
+    expect($event->card_image_url)->toContain('logo');
+});
+
 it('falls back to placeholder in Event card_image_url when no media exists', function () {
     $event = Event::factory()->create();
 

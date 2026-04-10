@@ -989,6 +989,7 @@ class SearchController extends FrontendController
             'is_remote' => in_array($eventFormatValue, [EventFormat::Online->value, EventFormat::Hybrid->value], true),
             'is_pending' => $statusValue === 'pending',
             'is_cancelled' => $statusValue === 'cancelled',
+            'has_poster' => $event->hasMedia('poster'),
             'card_image_url' => $event->card_image_url,
             'institution' => $event->institution ? [
                 'id' => $event->institution->id,

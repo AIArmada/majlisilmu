@@ -928,18 +928,43 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function getCardImageUrlAttribute(): string
     {
-        // 1. Poster thumb conversion from Spatie Media Library
-        if ($this->hasMedia('poster')) {
-            return (string) $this->getFirstMedia('poster')?->getAvailableUrl(['card', 'preview', 'thumb']);
+        $posterUrl = $this->preferredMediaUrl($this->getFirstMedia('poster'), ['card', 'preview', 'thumb']);
+
+        if ($posterUrl !== null) {
+            return $posterUrl;
         }
 
-        // 2. Institution logo thumb
-        if ($this->institution && $this->institution->hasMedia('logo')) {
-            return $this->institution->getFirstMediaUrl('logo', 'thumb');
+        if ($this->institution?->hasMedia('logo')) {
+            $institutionLogoUrl = $this->preferredMediaUrl($this->institution->getFirstMedia('logo'), ['thumb']);
+
+            if ($institutionLogoUrl !== null) {
+                return $institutionLogoUrl;
+            }
         }
 
-        // 3. Global default (placeholder)
         return asset('images/placeholders/event.png');
+    }
+
+    /**
+     * @param  list<string>  $preferredConversions
+     */
+    private function preferredMediaUrl(?Media $media, array $preferredConversions = []): ?string
+    {
+        if (! $media instanceof Media) {
+            return null;
+        }
+
+        $availableUrl = $preferredConversions === []
+            ? $media->getUrl()
+            : $media->getAvailableUrl($preferredConversions);
+
+        if ($availableUrl !== '') {
+            return $availableUrl;
+        }
+
+        $originalUrl = $media->getUrl();
+
+        return $originalUrl !== '' ? $originalUrl : null;
     }
 
     public function getPosterDisplayAspectRatioAttribute(): string
