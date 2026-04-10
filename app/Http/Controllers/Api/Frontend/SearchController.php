@@ -1051,10 +1051,11 @@ class SearchController extends FrontendController
     {
         $logoUrl = $this->availableMediaUrl($institution->getFirstMedia('logo'), ['thumb']);
         $coverUrl = $this->availableMediaUrl($institution->getFirstMedia('cover'), ['banner']);
+        $logoFallbackUrl = $institution->getFallbackMediaUrl('logo', 'thumb');
 
         return [
-            'image_url' => $coverUrl ?? $logoUrl,
-            'logo_url' => $logoUrl,
+            'image_url' => $coverUrl ?? $logoUrl ?? ($logoFallbackUrl !== '' ? $logoFallbackUrl : null),
+            'logo_url' => $logoUrl ?? ($logoFallbackUrl !== '' ? $logoFallbackUrl : null),
             'cover_url' => $coverUrl,
         ];
     }

@@ -337,6 +337,36 @@ it('serializes institution directory payloads with card media aliases for mobile
         ->and(array_key_exists('location_text', $item))->toBeTrue();
 });
 
+it('keeps placeholder institution imagery when no real media exists', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+    $malaysiaId = ensureFrontendApiMalaysiaCountryExists();
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Tanpa Media',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->address()->create([
+        'country_id' => $malaysiaId,
+    ]);
+
+    $directoryInstitution = $institution->fresh(['address.state', 'address.district', 'address.subdistrict', 'media']);
+
+    expect($directoryInstitution)->not->toBeNull();
+
+    $item = Closure::bind(
+        fn (): array => $this->institutionListData($directoryInstitution),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($item, 'cover_url'))->toBeNull()
+        ->and(data_get($item, 'logo_url'))->toBeString()->toContain('/images/placeholders/institution.png')
+        ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'logo_url'));
+});
+
 it('rejects unsupported files on public contribution update suggestions', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
