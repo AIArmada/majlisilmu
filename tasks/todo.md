@@ -1,3 +1,18 @@
+# Event Detail Reference Ordering
+
+- [x] Move the reference subtitle above the location chip on the event detail hero
+- [x] Keep the reference and section heading translatable on the event detail page
+- [x] Add and run a focused event-detail regression test
+
+## Review
+
+- Added an optional hero reference block in the event detail hero so the book subtitle now renders before the location chip.
+- Reused existing translation keys for the hero label and switched the reference section heading to the shared `References` key so the page stays localized without introducing a new copy path.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **26 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `get_errors` on the touched hero, event-show, and test files => **no errors**
+
 # Contribution Hub Listing Follow-up
 
 - [x] Remove the shortcut-only update/report block from `/sumbangan`
