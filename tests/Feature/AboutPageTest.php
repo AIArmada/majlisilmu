@@ -22,6 +22,7 @@ it('renders the about page in each supported locale', function (string $locale, 
 })->with([
     ['en', 'Malaysia is not lacking majlis ilmu. What people need is a clearer way to find them.'],
     ['ms', 'Malaysia tak kurang majlis ilmu. Yang kurang cumalah cara untuk nampak.'],
+    ['ar', 'ماليزيا لا ينقصها مجلس علم. ما ينقص الناس هو طريق أوضح للوصول إليه.'],
     ['zh', '马来西亚不缺 majlis ilmu，缺的是一条让人找得到的路。'],
     ['ta', 'மலேசியாவில் majlis ilmu குறைவில்லை; அதை மக்கள் கண்டுபிடிக்கும் பாதைய்தான் குறைவு.'],
     ['jv', 'Malaysia dudu kekurangan majlis ilmu. Sing kerep kurang kuwi dalan supaya wong bisa nemokake.'],

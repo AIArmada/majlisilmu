@@ -90,9 +90,20 @@ return [
     'supported_locales' => [
         'ms' => 'Melayu',
         'en' => 'English',
+        'ar' => 'العربية',
         'zh' => '中文',
         'ta' => 'தமிழ்',
         'jv' => 'Jawa',
+    ],
+
+    'public_menu_locales' => [
+        'ms',
+        'en',
+        'jv',
+    ],
+
+    'rtl_locales' => [
+        'ar',
     ],
 
     /*
