@@ -12,6 +12,7 @@ use App\Models\Venue;
 use App\Support\Media\MediaFileNamer;
 use App\Support\Media\MediaPathGenerator;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileUnacceptableForCollection;
 use Spatie\MediaLibrary\Support\FileRemover\FileBaseFileRemover;
@@ -190,6 +191,41 @@ it('registers media conversions for Institution gallery collection', function ()
 
     expect($media)->not->toBeNull();
     expect($media->getMediaConversionNames())->toContain('gallery_thumb');
+});
+
+it('uses the institution logo as the public image when no cover exists', function () {
+    $institution = Institution::factory()->create();
+
+    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+        ->toMediaCollection('logo');
+
+    expect($institution->public_cover_url)->toBe('')
+        ->and($institution->public_logo_url)->toContain('logo')
+        ->and($institution->public_logo_url)->toContain('?v=')
+        ->and($institution->public_image_url)->toBe($institution->public_logo_url);
+});
+
+it('bumps the institution public image version when logo media is updated', function () {
+    Carbon::setTestNow(Carbon::create(2026, 1, 1, 10, 0, 0));
+
+    $institution = Institution::factory()->create();
+
+    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+        ->toMediaCollection('logo');
+
+    $initialUrl = $institution->fresh()->public_image_url;
+
+    Carbon::setTestNow(Carbon::create(2026, 1, 1, 10, 5, 0));
+
+    $institution->getFirstMedia('logo')?->touch();
+
+    $updatedUrl = $institution->fresh()->public_image_url;
+
+    Carbon::setTestNow();
+
+    expect($initialUrl)->toContain('?v=')
+        ->and($updatedUrl)->toContain('?v=')
+        ->and($updatedUrl)->not->toBe($initialUrl);
 });
 
 // ---------------------------------------------------------------

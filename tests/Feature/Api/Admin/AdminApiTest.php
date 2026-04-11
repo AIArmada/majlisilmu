@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 it('rejects users without admin panel access from the admin api manifest', function () {
     $user = User::factory()->create();
@@ -61,6 +62,66 @@ it('allows viewer-role users who can access the admin panel to reach the admin a
         ]);
 });
 
+it('does not elevate admin manifest access from bearer token abilities alone', function () {
+    $nonAdmin = User::factory()->create();
+    $nonAdminToken = $nonAdmin->createToken('non-admin-device', ['admin.manifest'])->plainTextToken;
+
+    $this->withToken($nonAdminToken)
+        ->getJson('/api/v1/admin/manifest')
+        ->assertForbidden();
+});
+
+it('uses the authenticated token user roles for admin manifest access without token abilities', function () {
+    $viewer = adminApiUser('viewer');
+    $viewerToken = $viewer->createToken('viewer-device', [])->plainTextToken;
+
+    $this->withToken($viewerToken)
+        ->getJson('/api/v1/admin/manifest')
+        ->assertOk()
+        ->assertJsonStructure([
+            'data' => [
+                'resources' => [
+                    ['key'],
+                ],
+            ],
+        ]);
+});
+
+it('reflects global admin role grants and removals on an existing bearer token', function () {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    if (! Role::query()->where('name', 'viewer')->where('guard_name', 'web')->exists()) {
+        $roleRecord = new Role;
+        $roleRecord->forceFill([
+            'id' => (string) Str::uuid(),
+            'name' => 'viewer',
+            'guard_name' => 'web',
+        ])->save();
+    }
+
+    $user = User::factory()->create();
+    $token = $user->createToken('role-drift-check', [])->plainTextToken;
+
+    $this->withToken($token)
+        ->getJson('/api/v1/admin/manifest')
+        ->assertForbidden();
+
+    $user->assignRole('viewer');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->withToken($token)
+        ->getJson('/api/v1/admin/manifest')
+        ->assertOk();
+
+    $user->syncRoles([]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->withToken($token)
+        ->getJson('/api/v1/admin/manifest')
+        ->assertForbidden();
+});
+
 it('returns admin speaker resource metadata and records', function () {
     $admin = adminApiUser('super_admin');
     $speaker = Speaker::factory()->create([
@@ -98,12 +159,17 @@ it('exposes admin speaker write schema and can create and update speakers throug
     $admin = adminApiUser('super_admin');
     Sanctum::actingAs($admin);
 
-    $this->getJson('/api/v1/admin/speakers/schema?operation=create')
+    $schema = $this->getJson('/api/v1/admin/speakers/schema?operation=create')
         ->assertOk()
         ->assertJsonPath('data.schema.resource_key', 'speakers')
         ->assertJsonPath('data.schema.method', 'POST')
         ->assertJsonPath('data.schema.slug_behavior', 'auto_managed')
-        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/speakers');
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/speakers')
+        ->json('data.schema');
+
+    expect(collect($schema['catalogs'] ?? [])->pluck('field')->all())
+        ->not->toContain('address.country_id')
+        ->toContain('address.state_id', 'address.district_id', 'address.subdistrict_id');
 
     $createResponse = $this->postJson('/api/v1/admin/speakers', [
         'name' => 'Admin API Created Speaker',
@@ -111,9 +177,7 @@ it('exposes admin speaker write schema and can create and update speakers throug
         'status' => 'verified',
         'is_freelance' => false,
         'is_active' => true,
-        'address' => [
-            'country_id' => 132,
-        ],
+        'address' => [],
     ])->assertCreated();
 
     $speakerId = (string) $createResponse->json('data.record.id');
@@ -135,33 +199,40 @@ it('exposes admin speaker write schema and can create and update speakers throug
         'job_title' => 'Imam',
         'is_active' => true,
         'allow_public_event_submission' => true,
-        'address' => [
-            'country_id' => 132,
-        ],
+        'address' => [],
     ])->assertOk()
         ->assertJsonPath('data.record.attributes.name', 'Admin API Updated Speaker')
         ->assertJsonPath('data.record.attributes.slug', 'prof-madya-dato-dr-admin-api-updated-speaker-phd-ba-hons-my')
         ->assertJsonPath('data.record.attributes.job_title', 'Imam');
 });
 
-it('requires address.country_id when creating speakers through the admin api', function () {
+it('prohibits country and detailed address fields when creating speakers through the admin api', function () {
     $admin = adminApiUser('super_admin');
 
     Sanctum::actingAs($admin);
 
     $this->postJson('/api/v1/admin/speakers', [
-        'name' => 'Admin API Missing Country Speaker',
+        'name' => 'Admin API Invalid Speaker Address',
         'gender' => 'male',
         'status' => 'verified',
         'is_freelance' => false,
         'is_active' => true,
-        'address' => [],
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Lama',
+            'google_maps_url' => 'https://maps.google.com/?q=1,1',
+        ],
     ])->assertUnprocessable()
-        ->assertJsonValidationErrors(['address.country_id']);
+        ->assertJsonValidationErrors([
+            'address.country_id',
+            'address.line1',
+            'address.google_maps_url',
+        ]);
 });
 
 it('returns fresh speaker address data on admin GET requests after updates', function () {
-    ensureAdminApiMalaysiaCountryExists();
+    $firstFixtures = ensureAdminApiSubdistrictFixtures();
+    $secondFixtures = ensureAdminApiSubdistrictFixtures();
 
     $admin = adminApiUser('super_admin');
     Sanctum::actingAs($admin);
@@ -173,8 +244,8 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         'is_freelance' => false,
         'is_active' => true,
         'address' => [
-            'country_id' => 132,
-            'line1' => 'Alamat Asal',
+            'state_id' => $firstFixtures['state_id'],
+            'district_id' => $firstFixtures['district_id'],
         ],
     ])->assertCreated();
 
@@ -182,8 +253,11 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
 
     $this->getJson('/api/v1/admin/speakers/'.$speakerId)
         ->assertOk()
-        ->assertJsonPath('data.record.attributes.address.country_id', 132)
-        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Asal');
+        ->assertJsonMissingPath('data.record.attributes.address.country_id')
+        ->assertJsonMissingPath('data.record.attributes.address.line1')
+        ->assertJsonMissingPath('data.record.attributes.address.google_maps_url')
+        ->assertJsonPath('data.record.attributes.address.state_id', $firstFixtures['state_id'])
+        ->assertJsonPath('data.record.attributes.address.district_id', $firstFixtures['district_id']);
 
     $this->putJson('/api/v1/admin/speakers/'.$speakerId, [
         'name' => 'Admin API Address Freshness Speaker',
@@ -192,22 +266,31 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         'is_freelance' => false,
         'is_active' => true,
         'address' => [
-            'country_id' => 132,
-            'line1' => 'Alamat Dikemas Kini',
+            'state_id' => $secondFixtures['state_id'],
+            'district_id' => $secondFixtures['district_id'],
         ],
     ])->assertOk()
-        ->assertJsonPath('data.record.attributes.address.country_id', 132)
-        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Dikemas Kini');
+        ->assertJsonMissingPath('data.record.attributes.address.country_id')
+        ->assertJsonMissingPath('data.record.attributes.address.line1')
+        ->assertJsonMissingPath('data.record.attributes.address.google_maps_url')
+        ->assertJsonPath('data.record.attributes.address.state_id', $secondFixtures['state_id'])
+        ->assertJsonPath('data.record.attributes.address.district_id', $secondFixtures['district_id']);
 
     $this->getJson('/api/v1/admin/speakers/'.$speakerId)
         ->assertOk()
-        ->assertJsonPath('data.record.attributes.address.country_id', 132)
-        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Dikemas Kini');
+        ->assertJsonMissingPath('data.record.attributes.address.country_id')
+        ->assertJsonMissingPath('data.record.attributes.address.line1')
+        ->assertJsonMissingPath('data.record.attributes.address.google_maps_url')
+        ->assertJsonPath('data.record.attributes.address.state_id', $secondFixtures['state_id'])
+        ->assertJsonPath('data.record.attributes.address.district_id', $secondFixtures['district_id']);
 
     $this->getJson('/api/v1/admin/speakers?search=Admin%20API%20Address%20Freshness%20Speaker')
         ->assertOk()
-        ->assertJsonPath('data.0.attributes.address.country_id', 132)
-        ->assertJsonPath('data.0.attributes.address.line1', 'Alamat Dikemas Kini');
+        ->assertJsonMissingPath('data.0.attributes.address.country_id')
+        ->assertJsonMissingPath('data.0.attributes.address.line1')
+        ->assertJsonMissingPath('data.0.attributes.address.google_maps_url')
+        ->assertJsonPath('data.0.attributes.address.state_id', $secondFixtures['state_id'])
+        ->assertJsonPath('data.0.attributes.address.district_id', $secondFixtures['district_id']);
 });
 
 it('exposes admin institution write schema and can create and update institutions through the api', function () {
@@ -867,6 +950,9 @@ function ensureAdminApiSubdistrictFixtures(): array
 
 function adminApiUser(string $role): User
 {
+    setPermissionsTeamId(null);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
     if (! Role::query()->where('name', $role)->where('guard_name', 'web')->exists()) {
         $roleRecord = new Role;
         $roleRecord->forceFill([
@@ -878,6 +964,7 @@ function adminApiUser(string $role): User
 
     $user = User::factory()->create();
     $user->assignRole($role);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     return $user;
 }

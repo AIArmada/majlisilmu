@@ -12,11 +12,11 @@ class PublicCountryRegistry
     protected ?array $countryIdsByIso2 = null;
 
     /**
-     * @return array<string, array{label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}>
+     * @return array<string, array{label: string, flag: string, iso2: string, default_timezone: string, timezones?: array<int, string>, enabled: bool, coming_soon: bool}>
      */
     public function all(): array
     {
-        /** @var array<string, array{label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}> $countries */
+        /** @var array<string, array{label: string, flag: string, iso2: string, default_timezone: string, timezones?: array<int, string>, enabled: bool, coming_soon: bool}> $countries */
         $countries = config('public-countries.countries', []);
 
         return $countries;
@@ -44,7 +44,7 @@ class PublicCountryRegistry
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, timezones: array<int, string>, enabled: bool, coming_soon: bool}
      */
     public function default(): array
     {
@@ -62,7 +62,7 @@ class PublicCountryRegistry
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}|null
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, timezones: array<int, string>, enabled: bool, coming_soon: bool}|null
      */
     public function find(string $key): ?array
     {
@@ -74,11 +74,16 @@ class PublicCountryRegistry
     }
 
     /**
-     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, enabled: bool, coming_soon: bool}
+     * @return array{key: string, label: string, flag: string, iso2: string, default_timezone: string, timezones: array<int, string>, enabled: bool, coming_soon: bool}
      */
     public function country(string $key): array
     {
         $country = $this->all()[$key];
+        $timezones = $country['timezones'] ?? [$country['default_timezone']];
+
+        if (! is_array($timezones) || $timezones === []) {
+            $timezones = [$country['default_timezone']];
+        }
 
         return [
             'key' => $key,
@@ -86,6 +91,10 @@ class PublicCountryRegistry
             'flag' => $country['flag'],
             'iso2' => strtoupper($country['iso2']),
             'default_timezone' => $country['default_timezone'],
+            'timezones' => array_values(array_filter(
+                $timezones,
+                static fn (string $timezone): bool => $timezone !== '',
+            )),
             'enabled' => (bool) $country['enabled'],
             'coming_soon' => (bool) $country['coming_soon'],
         ];
@@ -178,6 +187,36 @@ class PublicCountryRegistry
         }
 
         return $this->defaultTimezoneForKey($countryKey);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function timezonesForKey(string $key): array
+    {
+        return $this->country($this->normalizeCountryKey($key, enabledOnly: false))['timezones'];
+    }
+
+    public function singleTimezoneForKey(string $key): ?string
+    {
+        $timezones = $this->timezonesForKey($key);
+
+        if (count($timezones) !== 1) {
+            return null;
+        }
+
+        return $timezones[0];
+    }
+
+    public function singleTimezoneForCountryId(?int $countryId): ?string
+    {
+        $countryKey = is_int($countryId) ? $this->keyForCountryId($countryId) : null;
+
+        if ($countryKey === null) {
+            return $this->singleTimezoneForKey($this->defaultKey());
+        }
+
+        return $this->singleTimezoneForKey($countryKey);
     }
 
     /**

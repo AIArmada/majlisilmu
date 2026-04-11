@@ -50,7 +50,7 @@ it('can request verbose admin resource metadata through the MCP resource list to
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->has('data.resources', 5)
+            ->has('data.resources', 6)
             ->where('data.resources.0.resource_class', fn (string $resourceClass): bool => str_contains($resourceClass, 'Resource'))
             ->etc());
 });
@@ -187,9 +187,7 @@ it('creates and updates speakers through MCP write tools', function () {
                 'status' => 'verified',
                 'is_freelance' => false,
                 'is_active' => true,
-                'address' => [
-                    'country_id' => 132,
-                ],
+                'address' => [],
             ],
         ])
         ->assertOk();
@@ -213,9 +211,7 @@ it('creates and updates speakers through MCP write tools', function () {
                 'job_title' => 'Imam',
                 'is_active' => true,
                 'allow_public_event_submission' => true,
-                'address' => [
-                    'country_id' => 132,
-                ],
+                'address' => [],
             ],
         ])
         ->assertOk()

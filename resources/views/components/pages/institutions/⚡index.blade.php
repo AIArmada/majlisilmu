@@ -519,8 +519,7 @@ class extends Component
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($institutions as $institution)
                         @php
-                            $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
-                            $cardInstitutionImageUrl = $coverUrl ?: $institution->getFirstMediaUrl('logo');
+                            $cardInstitutionImageUrl = $institution->public_image_url;
                         @endphp
                         <a href="{{ route('institutions.show', $institution) }}" wire:navigate class="group relative bg-white rounded-3xl border border-slate-200 shadow-md hover:shadow-xl hover:shadow-emerald-900/8 hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden">
                             <!-- Banner Area (16:9, cover-first) -->

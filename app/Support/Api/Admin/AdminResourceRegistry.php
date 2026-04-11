@@ -2,6 +2,7 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Models\Speaker;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
@@ -213,7 +214,7 @@ class AdminResourceRegistry
             'id' => (string) $record->getKey(),
             'route_key' => (string) $record->getRouteKey(),
             'title' => $this->htmlableToString($resourceClass::getRecordTitle($record)),
-            'attributes' => $record->toArray(),
+            'attributes' => $this->serializeAttributes($record),
             'abilities' => $this->recordAbilities($resourceClass, $record),
             'panel_routes' => [
                 'view' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => $record], panel: 'admin') : null,
@@ -335,6 +336,26 @@ class AdminResourceRegistry
         if ($relations !== []) {
             $record->loadMissing($relations);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeAttributes(Model $record): array
+    {
+        $attributes = $record->toArray();
+
+        if ($record instanceof Speaker && is_array($attributes['address'] ?? null)) {
+            $speakerAddress = $attributes['address'];
+
+            $attributes['address'] = [
+                'state_id' => $speakerAddress['state_id'] ?? null,
+                'district_id' => $speakerAddress['district_id'] ?? null,
+                'subdistrict_id' => $speakerAddress['subdistrict_id'] ?? null,
+            ];
+        }
+
+        return $attributes;
     }
 
     /**

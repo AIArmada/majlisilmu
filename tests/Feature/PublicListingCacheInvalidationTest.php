@@ -33,9 +33,7 @@ beforeEach(function (): void {
 function primeMajlisListingCache(): array
 {
     $keys = [
-        'default_events_search',
         'default_events_search_v2',
-        'states_my_v2',
     ];
     $supportedLocales = array_keys(config('app.supported_locales', []));
 
@@ -44,10 +42,7 @@ function primeMajlisListingCache(): array
     }
 
     foreach ($supportedLocales as $locale) {
-        $keys[] = "events_topics_{$locale}";
-        $keys[] = "events_institutions_{$locale}";
         $keys[] = "events_institutions_{$locale}_v2";
-        $keys[] = "events_speakers_{$locale}";
         $keys[] = "events_speakers_{$locale}_v2";
         $keys[] = "events_disciplines_{$locale}_v2";
         $keys[] = "events_domains_{$locale}_v2";

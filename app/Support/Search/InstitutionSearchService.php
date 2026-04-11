@@ -12,7 +12,7 @@ class InstitutionSearchService
 {
     private const int PUBLIC_SEARCH_CACHE_TTL = 600;
 
-    private const string PUBLIC_SEARCH_CACHE_VERSION_KEY = 'institution_search_public_version_v1';
+    private const string PUBLIC_SEARCH_CACHE_VERSION_KEY = 'institution_search_public_version_v2';
 
     /**
      * @param  Builder<Institution>  $query
@@ -99,6 +99,8 @@ class InstitutionSearchService
             return [];
         }
 
+        $minimumScore = $this->minimumFuzzyScore($normalizedSearch);
+
         $cacheKey = sprintf(
             'institution_search_public_fuzzy:%s:%s',
             $this->publicSearchCacheVersion(),
@@ -106,7 +108,7 @@ class InstitutionSearchService
         );
 
         /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch, $minimumScore): array {
             return Institution::query()
                 ->active()
                 ->where('status', 'verified')
@@ -122,9 +124,7 @@ class InstitutionSearchService
                     $scoreCandidates = [];
 
                     foreach ($candidates as $candidate) {
-                        $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $candidate)
-                            ? $this->similarityScore($normalizedSearch, $candidate)
-                            : 0.0;
+                        $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $candidate);
 
                         $tokens = array_values(array_filter(
                             explode(' ', $candidate),
@@ -132,9 +132,7 @@ class InstitutionSearchService
                         ));
 
                         foreach ($tokens as $token) {
-                            $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $token)
-                                ? $this->similarityScore($normalizedSearch, $token)
-                                : 0.0;
+                            $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $token);
                         }
                     }
 
@@ -143,7 +141,7 @@ class InstitutionSearchService
                         'score' => $scoreCandidates === [] ? 0.0 : max($scoreCandidates),
                     ];
                 })
-                ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
+                ->filter(static fn (array $candidate): bool => $candidate['score'] >= $minimumScore)
                 ->sortByDesc('score')
                 ->pluck('id')
                 ->values()
@@ -174,13 +172,36 @@ class InstitutionSearchService
         return (int) Cache::get(self::PUBLIC_SEARCH_CACHE_VERSION_KEY, 1);
     }
 
+    private function fuzzyScore(string $search, string $candidate): float
+    {
+        if (! $this->fuzzyComparable($search, $candidate)) {
+            return 0.0;
+        }
+
+        return $this->similarityScore($search, $candidate);
+    }
+
     private function fuzzyComparable(string $search, string $candidate): bool
     {
         if ($search === '' || $candidate === '') {
             return false;
         }
 
-        return mb_substr($search, 0, 1) === mb_substr($candidate, 0, 1);
+        if (mb_substr($search, 0, 1) !== mb_substr($candidate, 0, 1)) {
+            return false;
+        }
+
+        return levenshtein($search, $candidate) <= $this->maximumFuzzyDistance($search);
+    }
+
+    private function minimumFuzzyScore(string $search): float
+    {
+        return mb_strlen($search) >= 6 ? 0.80 : 0.70;
+    }
+
+    private function maximumFuzzyDistance(string $search): int
+    {
+        return mb_strlen($search) >= 5 ? 2 : 1;
     }
 
     private function normalizeText(string $value): string

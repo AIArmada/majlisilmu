@@ -13,6 +13,7 @@ use App\Enums\ContributionSubjectType;
 use App\Forms\EventContributionFormSchema;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\ReferenceContributionFormSchema;
+use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerContributionFormSchema;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\ContributionRequest;
@@ -21,6 +22,8 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryRegistry;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -53,6 +56,9 @@ class SuggestUpdate extends Component implements HasActions, HasForms
     /** @var array<string, mixed> */
     public array $originalData = [];
 
+    /** @var list<string> */
+    public array $directEditMediaFields = [];
+
     /** @var array{subject_label: string, redirect_url: string} */
     public array $subjectPresentation = [
         'subject_label' => '',
@@ -74,13 +80,20 @@ class SuggestUpdate extends Component implements HasActions, HasForms
         $context = $resolveContributionUpdateContextAction->handle($this->subjectType, $subjectId);
 
         $this->entity = $context['entity'];
-        $this->originalData = $context['initial_state'];
+        $this->originalData = $this->comparableOriginalData($context['initial_state']);
         $this->subjectPresentation = $resolveContributionSubjectPresentationAction->handle($this->entity);
 
         $user = auth()->user();
 
         abort_unless($user instanceof User, 403);
         abort_unless($user->can('view', $this->entity), 403);
+
+        $this->directEditMediaFields = $user->can('update', $this->entity)
+            ? array_values(array_filter(
+                $context['contract']['direct_edit_media_fields'] ?? [],
+                static fn (string $field): bool => $field !== '',
+            ))
+            : [];
 
         if (! $user->canSubmitDirectoryFeedback()) {
             abort(403, $user->directoryFeedbackBanMessage());
@@ -95,7 +108,13 @@ class SuggestUpdate extends Component implements HasActions, HasForms
             return;
         }
 
-        $this->contributionForm()->fill($this->originalData);
+        $formState = $this->originalData;
+
+        if ($this->entity instanceof Event && ($fixedTimezone = $this->fixedEventTimezone()) !== null) {
+            $formState['timezone'] = $fixedTimezone;
+        }
+
+        $this->contributionForm()->fill($formState);
     }
 
     #[Computed]
@@ -155,9 +174,9 @@ class SuggestUpdate extends Component implements HasActions, HasForms
         $submissionState = $resolveContributionSubmissionStateAction->handle($this->contributionForm()->getState());
         $state = $submissionState['state'];
         $changes = $resolveContributionChangedPayloadAction->handle($state, $this->originalData);
-        $hasInstitutionCoverChange = $this->canDirectEdit() && $this->hasInstitutionCoverChange();
+        $hasDirectEditMediaChange = $this->canDirectEdit() && $this->hasDirectEditMediaChange();
 
-        if ($changes === [] && ! $hasInstitutionCoverChange) {
+        if ($changes === [] && ! $hasDirectEditMediaChange) {
             $this->addError('data', __('Make at least one change before continuing.'));
 
             return;
@@ -168,8 +187,8 @@ class SuggestUpdate extends Component implements HasActions, HasForms
                 $applyDirectContributionUpdateAction->handle($this->entity, $changes);
             }
 
-            if ($hasInstitutionCoverChange) {
-                $this->saveInstitutionCoverChanges($this->entity);
+            if ($hasDirectEditMediaChange) {
+                $this->saveDirectEditMediaChanges();
             }
 
             $this->redirect($this->subjectPresentation['redirect_url'], navigate: true);
@@ -201,13 +220,107 @@ class SuggestUpdate extends Component implements HasActions, HasForms
     {
         return match (true) {
             $this->entity instanceof Institution => $this->institutionSubjectSchema(),
-            $this->entity instanceof Speaker => SpeakerContributionFormSchema::components(
-                includeMedia: false,
-                addressStatePath: 'address',
-            ),
+            $this->entity instanceof Speaker => $this->speakerSubjectSchema(),
             $this->entity instanceof Reference => ReferenceContributionFormSchema::components(includeMedia: false),
-            default => EventContributionFormSchema::components(),
+            default => EventContributionFormSchema::components($this->fixedEventTimezone()),
         };
+    }
+
+    /**
+     * @return array<int, \Filament\Schemas\Components\Component>
+     */
+    private function speakerSubjectSchema(): array
+    {
+        $components = SpeakerContributionFormSchema::components(
+            includeMedia: false,
+            addressStatePath: 'address',
+            regionOnlyAddress: true,
+        );
+
+        if ($this->shouldShowDirectEditMediaSection()) {
+            array_splice($components, 3, 0, [$this->speakerDirectEditMediaSection()]);
+        }
+
+        return $components;
+    }
+
+    private function fixedEventTimezone(): ?string
+    {
+        $countryId = app(PreferredCountryResolver::class)->resolveId();
+
+        return app(PublicCountryRegistry::class)->singleTimezoneForCountryId($countryId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $initialState
+     * @return array<string, mixed>
+     */
+    private function comparableOriginalData(array $initialState): array
+    {
+        if (! $this->entity instanceof Speaker) {
+            return $initialState;
+        }
+
+        $speakerAddress = is_array($initialState['address'] ?? null)
+            ? $initialState['address']
+            : [];
+
+        $initialState['address'] = [
+            'country_id' => SharedFormSchema::normalizeLocationId($speakerAddress['country_id'] ?? null) ?? SharedFormSchema::preferredPublicCountryId(),
+            'state_id' => SharedFormSchema::normalizeLocationId($speakerAddress['state_id'] ?? null),
+        ];
+
+        if (($initialState['bio'] ?? null) === null) {
+            $initialState['bio'] = [
+                'type' => 'doc',
+                'content' => [[
+                    'type' => 'paragraph',
+                    'content' => [],
+                ]],
+            ];
+        }
+
+        if (($districtId = SharedFormSchema::normalizeLocationId($speakerAddress['district_id'] ?? null)) !== null) {
+            $initialState['address']['district_id'] = $districtId;
+        }
+
+        if (($subdistrictId = SharedFormSchema::normalizeLocationId($speakerAddress['subdistrict_id'] ?? null)) !== null) {
+            $initialState['address']['subdistrict_id'] = $subdistrictId;
+        }
+
+        $initialState['qualifications'] = array_map(
+            static function (mixed $qualification): mixed {
+                if (! is_array($qualification)) {
+                    return $qualification;
+                }
+
+                if (is_numeric($qualification['year'] ?? null)) {
+                    $qualification['year'] = (int) $qualification['year'];
+                }
+
+                return $qualification;
+            },
+            is_array($initialState['qualifications'] ?? null) ? $initialState['qualifications'] : [],
+        );
+
+        $initialState['contacts'] = array_map(
+            static function (mixed $contact): mixed {
+                if (! is_array($contact)) {
+                    return $contact;
+                }
+
+                $contact = SharedFormSchema::normalizeContactRowsForFill($contact);
+
+                if (SharedFormSchema::isPhoneContactCategory($contact['category'] ?? null)) {
+                    unset($contact['value']);
+                }
+
+                return $contact;
+            },
+            is_array($initialState['contacts'] ?? null) ? $initialState['contacts'] : [],
+        );
+
+        return $initialState;
     }
 
     private function pageHeading(): string
@@ -261,11 +374,16 @@ class SuggestUpdate extends Component implements HasActions, HasForms
             addressStatePath: 'address',
         );
 
-        if ($this->canDirectEdit()) {
+        if ($this->shouldShowDirectEditMediaSection()) {
             array_splice($components, 1, 0, [$this->institutionCoverSection()]);
         }
 
         return $components;
+    }
+
+    private function shouldShowDirectEditMediaSection(): bool
+    {
+        return $this->canDirectEdit() && $this->directEditMediaFields !== [];
     }
 
     private function institutionCoverSection(): Section
@@ -288,20 +406,70 @@ class SuggestUpdate extends Component implements HasActions, HasForms
             ]);
     }
 
-    private function hasInstitutionCoverChange(): bool
+    private function speakerDirectEditMediaSection(): Section
     {
-        if (! $this->entity instanceof Institution) {
+        $components = [];
+
+        if (in_array('avatar', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('avatar')
+                ->label(__('Avatar'))
+                ->collection('avatar')
+                ->image()
+                ->imageEditor()
+                ->circleCropper()
+                ->avatar()
+                ->conversion('thumb')
+                ->deletable(false)
+                ->helperText(__('Recommended: a clear square image, at least 400x400px.'));
+        }
+
+        if (in_array('cover', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Cover Image'))
+                ->collection('cover')
+                ->image()
+                ->imageEditor()
+                ->imageAspectRatio('4:5')
+                ->automaticallyOpenImageEditorForAspectRatio()
+                ->imageEditorAspectRatioOptions(['4:5'])
+                ->automaticallyCropImagesToAspectRatio()
+                ->responsiveImages()
+                ->conversion('banner')
+                ->deletable(false)
+                ->helperText(__('Cover image for speaker profile'));
+        }
+
+        return Section::make(__('Profile Photo & Media'))
+            ->description(__('Upload a clear square profile photo first. Cover image is optional.'))
+            ->schema($components)
+            ->columns(2);
+    }
+
+    private function hasDirectEditMediaChange(): bool
+    {
+        foreach ($this->directEditMediaFields as $field) {
+            if ($this->directEditMediaFieldChanged($field)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function directEditMediaFieldChanged(string $field): bool
+    {
+        if (! $this->entity instanceof Institution && ! $this->entity instanceof Speaker) {
             return false;
         }
 
-        $coverField = $this->institutionCoverField();
+        $mediaField = $this->directEditMediaField($field);
 
-        if (! $coverField instanceof SpatieMediaLibraryFileUpload) {
+        if (! $mediaField instanceof SpatieMediaLibraryFileUpload) {
             return false;
         }
 
-        $currentState = array_keys($this->currentInstitutionCoverState());
-        $submittedState = array_keys(is_array($coverField->getRawState()) ? $coverField->getRawState() : []);
+        $currentState = array_keys($this->currentDirectEditMediaState($field));
+        $submittedState = array_keys(is_array($mediaField->getRawState()) ? $mediaField->getRawState() : []);
 
         sort($currentState);
         sort($submittedState);
@@ -309,9 +477,9 @@ class SuggestUpdate extends Component implements HasActions, HasForms
         return $currentState !== $submittedState;
     }
 
-    private function institutionCoverField(): ?SpatieMediaLibraryFileUpload
+    private function directEditMediaField(string $field): ?SpatieMediaLibraryFileUpload
     {
-        $field = $this->contributionForm()->getFlatFields(withHidden: true)['cover'] ?? null;
+        $field = $this->contributionForm()->getFlatFields(withHidden: true)[$field] ?? null;
 
         return $field instanceof SpatieMediaLibraryFileUpload ? $field : null;
     }
@@ -319,22 +487,22 @@ class SuggestUpdate extends Component implements HasActions, HasForms
     /**
      * @return array<string, string>
      */
-    private function currentInstitutionCoverState(): array
+    private function currentDirectEditMediaState(string $field): array
     {
-        if (! $this->entity instanceof Institution) {
+        if (! $this->entity instanceof Institution && ! $this->entity instanceof Speaker) {
             return [];
         }
 
         return $this->entity
             ->load('media')
-            ->getMedia('cover')
+            ->getMedia($field)
             ->take(1)
             ->mapWithKeys(static fn ($media): array => [$media->uuid => $media->uuid])
             ->all();
     }
 
-    private function saveInstitutionCoverChanges(Institution $record): void
+    private function saveDirectEditMediaChanges(): void
     {
-        $this->contributionForm()->model($record)->saveRelationships();
+        $this->contributionForm()->model($this->entity)->saveRelationships();
     }
 }

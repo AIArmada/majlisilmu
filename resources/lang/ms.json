@@ -733,15 +733,15 @@
     "Event Submission": "Status Hantaran Majlis",
     "Thank you. Your institution submission has been received. We will notify you if it is approved or rejected.": "Terima kasih. Penyerahan institusi anda telah diterima. Kami akan memaklumkan anda jika ia diluluskan atau ditolak.",
     "Submission Received": "Sumbangan Diterima",
-    "Thank you for submitting a new institution.": "Terima kasih kerana menghantar institusi baharu.",
+    "Thank you for submitting a new institution.": "Terima kasih kerana menghantar institusi baru.",
     "Jejaki sumbangan anda dan statusnya.": "Jejaki sumbangan anda dan statusnya.",
     "Thank you for submitting a new speaker.": "Terima kasih kerana menghantar penceramah baru.",
     "We appreciate you taking the time to grow the MajlisIlmu directory. Our team will review your submission carefully.": "Kami menghargai masa anda untuk membantu mengembangkan direktori MajlisIlmu. Pasukan kami akan menyemak sumbangan anda dengan teliti.",
     "We will notify you once your submission has been approved or rejected.": "Kami akan memaklumkan anda sebaik sahaja sumbangan anda diluluskan atau ditolak.",
     "Your submission is now in our moderation queue.": "Sumbangan anda kini berada dalam giliran semakan moderator kami.",
-    "We review new institutions for accuracy, clarity, and duplicate records before publishing them.": "Kami menyemak institusi baharu untuk ketepatan, kejelasan, dan rekod pendua sebelum ia diterbitkan.",
-    "We review new speaker records for accuracy, clarity, and duplicate records before publishing them.": "Kami menyemak rekod penceramah baharu untuk ketepatan, kejelasan, dan rekod pendua sebelum ia diterbitkan.",
-    "We review each new submission carefully before publishing it.": "Kami menyemak setiap sumbangan baharu dengan teliti sebelum menerbitkannya.",
+    "We review new institutions for accuracy, clarity, and duplicate records before publishing them.": "Kami menyemak institusi baru untuk ketepatan, kejelasan, dan rekod pendua sebelum ia diterbitkan.",
+    "We review new speaker records for accuracy, clarity, and duplicate records before publishing them.": "Kami menyemak rekod penceramah baru untuk ketepatan, kejelasan, dan rekod pendua sebelum ia diterbitkan.",
+    "We review each new submission carefully before publishing it.": "Kami menyemak setiap sumbangan baru dengan teliti sebelum menerbitkannya.",
     "If anything needs clarification, our team will reach out using the details you provided.": "Jika ada apa-apa yang memerlukan penjelasan, pasukan kami akan menghubungi anda menggunakan butiran yang anda berikan.",
     "While you wait, keep exploring": "Sementara menunggu, teruskan meneroka",
     "Meanwhile, you can keep discovering records and activity across the MajlisIlmu community.": "Sementara itu, anda boleh terus meneroka rekod dan aktiviti di seluruh komuniti MajlisIlmu.",
@@ -1179,5 +1179,7 @@
     "Submit a new speaker record for the MajlisIlmu directory. We will notify you if it is approved or rejected.": "Hantar rekod penceramah baru untuk direktori MajlisIlmu. Kami akan memaklumkan anda jika ia diluluskan atau ditolak.",
     "Thank you. Your speaker submission has been received. We will notify you if it is approved or rejected.": "Terima kasih. Penyerahan penceramah anda telah diterima. Kami akan memaklumkan anda jika ia diluluskan atau ditolak.",
     "Profile Photo & Media": "Foto Profil & Media",
-    "Upload a clear square profile photo first. Cover and gallery images are optional.": "Muat naik foto profil segi empat yang jelas terlebih dahulu. Imej kulit dan galeri adalah pilihan."
+    "Upload a clear square profile photo first. Cover and gallery images are optional.": "Muat naik foto profil segi empat yang jelas terlebih dahulu. Imej kulit dan galeri adalah pilihan.",
+    "An institution with the same name, state, district, and subdistrict already exists. Please submit an update instead of creating a new record.": "Institusi dengan nama, negeri, daerah, dan mukim yang sama sudah wujud. Sila hantar kemas kini dan bukannya rekod baru.",
+    "A speaker with the same name, gender, honorifics, pre-nominals, and post-nominals already exists. Please submit an update instead of creating a new record.": "Penceramah dengan nama, jantina, gelaran kehormat, gelaran, dan gelaran akademik yang sama sudah wujud. Sila hantar kemas kini dan bukannya rekod baru."
 }

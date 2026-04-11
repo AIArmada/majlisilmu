@@ -26,6 +26,8 @@ use App\Models\Subdistrict;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Location\PublicCountryPreference;
+use App\Support\Location\PublicCountryRegistry;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +47,16 @@ function assignInstitutionOwner(User $user, Institution $institution): void
     $institution->members()->syncWithoutDetaching([$user->id]);
 
     Authz::withScope(app(MemberRoleScopes::class)->institution(), function () use ($user): void {
+        $user->syncRoles(['owner']);
+    }, $user);
+}
+
+function assignSpeakerOwner(User $user, Speaker $speaker): void
+{
+    app(ScopedMemberRoleSeeder::class)->ensureForSpeaker();
+    $speaker->members()->syncWithoutDetaching([$user->id]);
+
+    Authz::withScope(app(MemberRoleScopes::class)->speaker(), function () use ($user): void {
         $user->syncRoles(['owner']);
     }, $user);
 }
@@ -84,7 +96,9 @@ it('renders the institution contribution page with translated copy when the loca
         ->assertDontSee('Penyemak akan menilainya sebelum diterbitkan.')
         ->assertSee('Profil Institusi')
         ->assertSee('Alamat')
-        ->assertSee('Semak direktori sedia ada dahulu')
+        ->assertDontSee(__('Find the institution location'))
+        ->assertDontSee(__('Search like a ride-hailing destination, pick the correct place, then confirm it on the map before submitting.'))
+        ->assertDontSee(__('Search for an institution or address'))
         ->assertSee('rekod baru')
         ->assertDontSee('rekod pendua')
         ->assertSee('Semak Institusi Sedia Ada')
@@ -183,7 +197,7 @@ it('renders the institution contribution submission success page with translated
 
     $this->get(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Institution->publicRouteSegment()]))
         ->assertOk()
-        ->assertSee('Terima kasih kerana menghantar institusi baharu.')
+        ->assertSee(__('Thank you for submitting a new institution.'))
         ->assertSee('Jejaki sumbangan anda dan statusnya.')
         ->assertDontSee('Kami menghargai masa anda untuk membantu mengembangkan direktori MajlisIlmu. Pasukan kami akan menyemak sumbangan anda dengan teliti.')
         ->assertDontSee('Kami akan memaklumkan anda sebaik sahaja sumbangan anda diluluskan atau ditolak.')
@@ -248,6 +262,37 @@ it('shows the institution cover upload on the suggest update page only for maint
         'subjectId' => $institution->slug,
     ]))
         ->assertOk()
+        ->assertSee(__('Cover Image'));
+});
+
+it('shows the speaker avatar and cover uploads on the suggest update page only for maintainers', function () {
+    $owner = User::factory()->create();
+    $visitor = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'bio' => null,
+    ]);
+
+    $this->actingAs($visitor);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ]))
+        ->assertOk()
+        ->assertDontSee(__('Avatar'))
+        ->assertDontSee(__('Cover Image'));
+
+    assignSpeakerOwner($owner, $speaker);
+    $this->actingAs($owner);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ]))
+        ->assertOk()
+        ->assertSee(__('Avatar'))
         ->assertSee(__('Cover Image'));
 });
 
@@ -401,6 +446,76 @@ it('re-moderates approved events when maintainers apply sensitive direct edits f
 
     expect((string) $event->fresh()->status)->toBe('pending')
         ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('pins the event update timezone to the single-timezone public country scope', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Kelas Daurah Bersama Asatizah',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subDay(),
+        'timezone' => 'America/New_York',
+        'starts_at' => now()->addDays(7),
+    ]);
+
+    Livewire::withCookie(PublicCountryPreference::COOKIE_NAME, 'malaysia')
+        ->actingAs($user)
+        ->test(SuggestUpdate::class, [
+            'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+            'subjectId' => $event->slug,
+        ])
+        ->set('data.proposer_note', 'Pin timezone to the public country scope.')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $request = ContributionRequest::query()->latest('created_at')->first();
+
+    expect($request)->not->toBeNull()
+        ->and(data_get($request?->proposed_data, 'timezone'))->toBe('Asia/Kuala_Lumpur');
+});
+
+it('keeps the event update timezone editable for multi-timezone public countries', function () {
+    config()->set('public-countries.countries.indonesia.enabled', true);
+    config()->set('public-countries.countries.indonesia.coming_soon', false);
+
+    DB::table('countries')->insertGetId([
+        'iso2' => 'ID',
+        'name' => 'Indonesia',
+        'status' => 1,
+        'phone_code' => '62',
+        'iso3' => 'IDN',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+
+    app()->forgetInstance(PublicCountryRegistry::class);
+    app()->forgetInstance(PublicCountryPreference::class);
+
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Rentas Zon Indonesia',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subDay(),
+        'timezone' => 'Asia/Jayapura',
+        'starts_at' => now()->addDays(7),
+    ]);
+
+    Livewire::withCookie(PublicCountryPreference::COOKIE_NAME, 'indonesia')
+        ->actingAs($user)
+        ->test(SuggestUpdate::class, [
+            'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+            'subjectId' => $event->slug,
+        ])
+        ->assertFormFieldVisible('timezone')
+        ->assertSchemaComponentStateSet('timezone', 'Asia/Jayapura', 'form');
 });
 
 it('creates pending update requests for non-maintainer suggestions', function () {
@@ -838,6 +953,58 @@ it('resolves speaker slugs on the update suggestion page without uuid casting er
         'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
         'subjectId' => $speaker->slug,
     ])->assertSet('subjectType', 'speaker');
+});
+
+it('keeps speaker update suggestions on a region-only address form', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ]))
+        ->assertOk()
+        ->assertSee(__('Address'))
+        ->assertDontSee(__('Address Line 1'))
+        ->assertDontSee(__('Address Line 2'))
+        ->assertDontSee(__('Postcode'))
+        ->assertDontSee(__('Google Maps URL'))
+        ->assertDontSee(__('Waze URL'));
+});
+
+it('does not treat unchanged speaker update forms as changes when legacy address fields exist', function () {
+    $owner = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->address()->update([
+        'country_id' => 132,
+        'state_id' => null,
+        'district_id' => null,
+        'subdistrict_id' => null,
+        'line1' => 'Alamat Warisan',
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+    ]);
+
+    assignSpeakerOwner($owner, $speaker);
+
+    Livewire::actingAs($owner)
+        ->test(SuggestUpdate::class, [
+            'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+            'subjectId' => $speaker->slug,
+        ])
+        ->call('submit')
+        ->assertHasErrors(['data']);
+
+    expect($speaker->fresh('address')?->addressModel?->line1)->toBe('Alamat Warisan')
+        ->and($speaker->fresh('address')?->addressModel?->google_maps_url)->toBe('https://maps.google.com/?q=3.1390,101.6869');
 });
 
 it('resolves institution slugs on the report page without uuid casting errors', function () {

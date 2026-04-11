@@ -195,6 +195,8 @@ class SearchController extends FrontendController
 
         abort_unless($user instanceof User ? $user->can('view', $record) : $record->status === 'verified', 404);
 
+        $institutionMedia = $this->institutionCardMediaData($record);
+
         return response()->json([
             'data' => [
                 'institution' => [
@@ -207,8 +209,9 @@ class SearchController extends FrontendController
                     'status' => $record->status,
                     'is_following' => $user?->isFollowing($record) ?? false,
                     'media' => [
-                        'logo_url' => $record->getFirstMediaUrl('logo', 'thumb') ?: $record->getFirstMediaUrl('logo'),
-                        'cover_url' => $record->getFirstMediaUrl('cover', 'banner') ?: $record->getFirstMediaUrl('cover'),
+                        'public_image_url' => $institutionMedia['public_image_url'],
+                        'logo_url' => $institutionMedia['logo_url'],
+                        'cover_url' => $institutionMedia['cover_url'],
                     ],
                     'contacts' => $this->contactData($record->contacts),
                     'social_media' => $this->socialMediaData($record->socialMedia),
@@ -996,6 +999,7 @@ class SearchController extends FrontendController
                 'name' => $event->institution->name,
                 'slug' => $event->institution->slug,
                 'display_name' => $event->institution->display_name,
+                'public_image_url' => $event->institution->public_image_url,
                 'logo_url' => $event->institution->getFirstMediaUrl('logo', 'thumb') ?: $event->institution->getFirstMediaUrl('logo'),
             ] : null,
             'venue' => $event->venue ? [
@@ -1037,6 +1041,7 @@ class SearchController extends FrontendController
             'display_name' => $institution->display_name,
             'events_count' => $eventsCount,
             'event_count' => $eventsCount,
+            'public_image_url' => $media['public_image_url'],
             'image_url' => $media['image_url'],
             'logo_url' => $media['logo_url'],
             'cover_url' => $media['cover_url'],
@@ -1046,41 +1051,24 @@ class SearchController extends FrontendController
     }
 
     /**
-     * @return array{image_url: ?string, logo_url: ?string, cover_url: ?string}
+     * @return array{public_image_url: string, image_url: string, logo_url: string, cover_url: ?string}
      */
     private function institutionCardMediaData(Institution $institution): array
     {
-        $logoUrl = $this->availableMediaUrl($institution->getFirstMedia('logo'), ['thumb']);
-        $coverUrl = $this->availableMediaUrl($institution->getFirstMedia('cover'), ['banner']);
+        $publicImageUrl = $institution->public_image_url;
+        $logoUrl = $institution->public_logo_url;
+        $coverUrl = $institution->public_cover_url;
         $logoFallbackUrl = $institution->getFallbackMediaUrl('logo', 'thumb');
+        $resolvedLogoUrl = $logoUrl !== ''
+            ? $logoUrl
+            : ($logoFallbackUrl !== '' ? $logoFallbackUrl : $publicImageUrl);
 
         return [
-            'image_url' => $coverUrl ?? $logoUrl ?? ($logoFallbackUrl !== '' ? $logoFallbackUrl : null),
-            'logo_url' => $logoUrl ?? ($logoFallbackUrl !== '' ? $logoFallbackUrl : null),
-            'cover_url' => $coverUrl,
+            'public_image_url' => $publicImageUrl,
+            'image_url' => $publicImageUrl,
+            'logo_url' => $resolvedLogoUrl,
+            'cover_url' => $coverUrl !== '' ? $coverUrl : null,
         ];
-    }
-
-    /**
-     * @param  list<string>  $preferredConversions
-     */
-    private function availableMediaUrl(?Media $media, array $preferredConversions = []): ?string
-    {
-        if (! $media instanceof Media) {
-            return null;
-        }
-
-        $availableUrl = $preferredConversions === []
-            ? $media->getUrl()
-            : $media->getAvailableUrl($preferredConversions);
-
-        if ($availableUrl !== '') {
-            return $availableUrl;
-        }
-
-        $originalUrl = $media->getUrl();
-
-        return $originalUrl !== '' ? $originalUrl : null;
     }
 
     /**
@@ -1104,6 +1092,11 @@ class SearchController extends FrontendController
     private function inspirationData(Inspiration $inspiration): array
     {
         $category = $inspiration->category;
+
+        if (! $category instanceof InspirationCategory) {
+            $category = InspirationCategory::from((string) $category);
+        }
+
         $contentHtml = $inspiration->renderContentHtml();
         $contentText = trim(strip_tags($contentHtml));
         $thumbUrl = $inspiration->getFirstMediaUrl('main', 'thumb') ?: null;
@@ -1127,19 +1120,20 @@ class SearchController extends FrontendController
             'media' => [
                 'thumb_url' => $thumbUrl,
                 'full_url' => $fullUrl,
-                'has_media' => is_string($thumbUrl) && $thumbUrl !== '',
+                'has_media' => $thumbUrl !== null,
             ],
         ];
     }
 
     /**
-     * @return array{id: string, name: string, display_name: string, slug: string, position: ?string, is_primary: bool, logo_url: string, cover_url: string, chip_image_url: string}
+     * @return array{id: string, name: string, display_name: string, slug: string, position: ?string, is_primary: bool, public_image_url: string, logo_url: string, cover_url: ?string, chip_image_url: string}
      */
     private function speakerInstitutionData(Institution $institution): array
     {
         $media = $this->institutionCardMediaData($institution);
-        $logoUrl = $media['logo_url'] ?? '';
-        $coverUrl = $media['cover_url'] ?? '';
+        $logoUrl = $media['logo_url'];
+        $coverUrl = $media['cover_url'];
+        $publicImageUrl = $media['public_image_url'];
         $position = data_get($institution, 'pivot.position');
         $isPrimary = data_get($institution, 'pivot.is_primary');
 
@@ -1150,9 +1144,10 @@ class SearchController extends FrontendController
             'slug' => $institution->slug,
             'position' => is_string($position) && $position !== '' ? $position : null,
             'is_primary' => (bool) $isPrimary,
+            'public_image_url' => $publicImageUrl,
             'logo_url' => $logoUrl,
             'cover_url' => $coverUrl,
-            'chip_image_url' => $media['image_url'] ?? '',
+            'chip_image_url' => $publicImageUrl,
         ];
     }
 

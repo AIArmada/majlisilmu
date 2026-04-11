@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\EventAgeGroup;
-use App\Enums\TagType;
 use App\Livewire\Pages\Events\Index;
 use App\Models\Event;
 use App\Models\Tag;
@@ -12,7 +11,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
-use Nnjeim\World\Models\Language;
 
 it('hydrates the events index state cache into the current safe payload format', function () {
     config()->set('cache.default', 'database');
@@ -36,7 +34,7 @@ it('hydrates the events index state cache into the current safe payload format',
         ->toHaveCount(1);
 });
 
-it('updates the submit event livewire component even when legacy select option caches exist', function () {
+it('hydrates the submit event safe option caches into the current payload format', function () {
     config()->set('cache.default', 'database');
     app('cache')->setDefaultDriver('database');
     Cache::flush();
@@ -46,25 +44,6 @@ it('updates the submit event livewire component even when legacy select option c
         'status' => 'verified',
     ]);
 
-    Cache::put(
-        'submit_languages_v2',
-        Language::query()
-            ->whereIn('code', ['ms', 'en'])
-            ->get(),
-        now()->addHour(),
-    );
-
-    Cache::put(
-        'submit_tags_domain_ms',
-        Tag::query()
-            ->where('type', TagType::Domain)
-            ->whereIn('status', ['verified', 'pending'])
-            ->orderBy('order_column')
-            ->get()
-            ->mapWithKeys(fn (Tag $tag): array => [(string) $tag->id => $tag->getTranslation('name', 'ms')]),
-        now()->addHour(),
-    );
-
     Livewire::test('pages.submit-event.create')
         ->set('data.age_group', [EventAgeGroup::Children->value])
         ->assertSet('data.age_group', [EventAgeGroup::Children->value]);
@@ -73,32 +52,43 @@ it('updates the submit event livewire component even when legacy select option c
         ->and(Cache::get('submit_tags_domain_ms_safe_v1'))->toBeArray();
 });
 
-it('rehydrates the default events search cache safely from the database cache store', function () {
+it('rehydrates the current default events search cache safely from the database cache store', function () {
     config()->set('cache.default', 'database');
     app('cache')->setDefaultDriver('database');
     Cache::flush();
     config()->set('scout.driver', 'database');
 
-    Event::factory()->count(2)->create([
+    $firstEvent = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
         'published_at' => now(),
         'starts_at' => now()->addDay(),
     ]);
+    $secondEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDays(2),
+    ]);
 
     $service = app(EventSearchService::class);
 
     Cache::put(
-        'default_events_search',
-        $service->search(null, [], 12, 'time'),
+        'default_events_search_v2',
+        [
+            'ids' => [(string) $firstEvent->id, (string) $secondEvent->id],
+            'total' => 2,
+        ],
         now()->addMinute(),
     );
 
     $paginator = $service->search(null, [], 12, 'time');
 
     expect($paginator->total())->toBe(2)
-        ->and($paginator->items())->toHaveCount(2)
+        ->and(collect($paginator->items())->map(fn (Event $event): string => (string) $event->id)->all())
+        ->toBe([(string) $firstEvent->id, (string) $secondEvent->id])
         ->and(Cache::get('default_events_search_v2'))->toMatchArray([
+            'ids' => [(string) $firstEvent->id, (string) $secondEvent->id],
             'total' => 2,
         ]);
 });

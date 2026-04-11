@@ -16,9 +16,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class EventController extends Controller
 {
@@ -304,9 +304,11 @@ class EventController extends Controller
             ->paginate((int) $request->input('per_page', 20))
             ->appends($request->query());
 
-        $events->setCollection(
-            $events->getCollection()->map(fn (Event $event): array => $this->serializeEventPayload($event))
-        );
+        /** @var array<string, mixed> $payload */
+        $payload = $events->toArray();
+        $payload['data'] = $events->getCollection()
+            ->map(fn (Event $event): array => $this->serializeEventPayload($event))
+            ->all();
 
         $user = $request->user();
 
@@ -319,7 +321,7 @@ class EventController extends Controller
             resultCount: $events->total(),
         );
 
-        return response()->json($events);
+        return response()->json($payload);
     }
 
     /**

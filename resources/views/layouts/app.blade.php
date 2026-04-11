@@ -541,6 +541,7 @@
         </div>
     </div>
 
+        @stack('prelivewire-scripts')
     @livewireScripts
     @filamentScripts(['app'])
     @filamentScripts(['filament/support', 'filament/schemas', 'filament/forms', 'filament/actions', 'filament/notifications'])

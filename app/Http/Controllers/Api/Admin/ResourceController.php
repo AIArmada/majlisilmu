@@ -58,6 +58,7 @@ class ResourceController extends Controller
     #[Endpoint(
         title: 'Get admin write schema',
         description: 'Returns the exact create or update contract for a writable admin resource, including defaults, required flags, media state, and conditional rules. '
+            .'Treat this response as authoritative for the selected resource and operation, because fields may be intentionally absent or prohibited even if older clients previously sent them. '
             .'Use this endpoint before calling the generic admin create or update routes because those mutation payloads are resource-specific and not statically described in the OpenAPI body schema.',
     )]
     public function schema(Request $request, string $resourceKey): JsonResponse

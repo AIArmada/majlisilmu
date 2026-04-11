@@ -44,7 +44,7 @@
         : null;
 @endphp
 
-@push('scripts')
+@push('prelivewire-scripts')
     @filamentScripts(['filament/tables'])
 @endpush
 

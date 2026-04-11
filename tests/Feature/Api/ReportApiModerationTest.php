@@ -138,6 +138,52 @@ it('forbids users banned from directory feedback from api report submission', fu
         ->assertForbidden();
 });
 
+it('reflects direct feedback permissions on an existing bearer token', function () {
+    $user = User::factory()->create();
+    $firstEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+    $secondEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $token = $user->createToken('feedback-permission-drift-check', [])->plainTextToken;
+
+    $this->withToken($token)
+        ->postJson('/api/v1/reports', [
+            'entity_type' => 'event',
+            'entity_id' => $firstEvent->id,
+            'category' => 'wrong_info',
+        ])
+        ->assertCreated();
+
+    $user->givePermissionTo('feedback.blocked');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->withToken($token)
+        ->postJson('/api/v1/reports', [
+            'entity_type' => 'event',
+            'entity_id' => $secondEvent->id,
+            'category' => 'wrong_info',
+        ])
+        ->assertForbidden();
+
+    $user->revokePermissionTo('feedback.blocked');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->withToken($token)
+        ->postJson('/api/v1/reports', [
+            'entity_type' => 'event',
+            'entity_id' => $secondEvent->id,
+            'category' => 'wrong_info',
+        ])
+        ->assertCreated();
+});
+
 it('accepts shared reference report categories through the api controller', function () {
     $user = User::factory()->create();
     $reference = Reference::factory()->create();

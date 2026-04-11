@@ -388,8 +388,7 @@
                                 <div class="mt-8 grid gap-5 sm:grid-cols-2">
                                     @foreach($institutionMatches as $institution)
                                         @php
-                                            $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
-                                            $cardInstitutionImageUrl = $coverUrl !== '' ? $coverUrl : $institution->getFirstMediaUrl('logo');
+                                            $cardInstitutionImageUrl = $institution->public_image_url;
                                         @endphp
 
                                         <a href="{{ route('institutions.show', $institution) }}" wire:navigate class="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50/60 transition hover:-translate-y-1 hover:border-amber-200 hover:bg-white hover:shadow-lg hover:shadow-amber-900/10">

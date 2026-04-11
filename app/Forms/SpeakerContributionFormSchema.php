@@ -25,11 +25,11 @@ class SpeakerContributionFormSchema
     public static function components(
         bool $includeMedia = true,
         ?string $addressStatePath = null,
-        bool $regionOnlyAddress = false,
+        bool $regionOnlyAddress = true,
         ?bool $showCountryField = null,
     ): array {
         $publicCountryId = SharedFormSchema::preferredPublicCountryId();
-        $showCountryField ??= true;
+        $showCountryField ??= false;
 
         $components = [
             Section::make(__('Profil Penceramah'))
@@ -89,28 +89,28 @@ class SpeakerContributionFormSchema
                                 includeCountryField: true,
                                 showCountryField: $showCountryField,
                                 defaultCountryId: $publicCountryId,
-                                requireCountryField: true,
+                                requireCountryField: false,
                             )
                             : [SharedFormSchema::regionAddressGroup(
                                 statePath: $addressStatePath,
                                 includeCountryField: true,
                                 showCountryField: $showCountryField,
                                 defaultCountryId: $publicCountryId,
-                                requireCountryField: true,
+                                requireCountryField: false,
                             )])
                         : ($addressStatePath === null
                             ? SharedFormSchema::addressFields(
                                 includeCountryField: true,
                                 showCountryField: $showCountryField,
                                 defaultCountryId: $publicCountryId,
-                                requireCountryField: true,
+                                requireCountryField: false,
                             )
                             : [SharedFormSchema::addressGroup(
                                 statePath: $addressStatePath,
                                 includeCountryField: true,
                                 showCountryField: $showCountryField,
                                 defaultCountryId: $publicCountryId,
-                                requireCountryField: true,
+                                requireCountryField: false,
                             )])),
                 ])
                 ->columns($addressStatePath === null ? 2 : 1),

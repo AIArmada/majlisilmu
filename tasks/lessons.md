@@ -92,6 +92,8 @@
 - For `/majlis` event search, do not limit DB fallback to title/description; include institution, venue, and speaker names in direct matching and add typo-tolerant fuzzy fallback so behavior stays consistent when Typesense is unavailable.
 - When removing Laravel packages, clear and regenerate the exact PHPUnit cache targets (`APP_PACKAGES_CACHE`, `APP_SERVICES_CACHE`) instead of only running `php artisan package:discover` with `APP_ENV=testing`.
 - Parallel Pest runs can expose Blaze compiled-view race issues; keep `BLAZE_ENABLED=false` in `phpunit.xml` unless test-specific Blaze coverage is explicitly required.
+- When a user removes fields from a shared form flow, audit the matching frontend/admin API contracts and validators in the same pass; leaving `country_id` or legacy nested address keys accepted server-side means the UI change is not actually enforced.
+- When a user asks for UI/API authorization parity on bearer tokens, treat the token as identity only and verify that live role, scoped-role, and direct-permission changes take effect on existing API tokens without reissuance.
 - When users request "badges under About", confirm the target domain model (tag categories vs generic metadata) before expanding scope; prefer preserving existing taxonomy UI with fixed category ordering.
 - For avatar "cropping" complaints, verify the source file alpha/canvas first; if the asset is already circular PNG, solve with a dedicated flattened card conversion instead of only CSS container tweaks.
 - For single-speaker hero cards, "prominent avatar" usually requires layout changes (wider media pane + larger avatar block), not only image-fit adjustments.
@@ -248,3 +250,4 @@
 - For production-only public-route 404s, check whether any custom `Route::bind(...)` logic was registered inside `routes/*.php`; cached routes can leave those binders missing at runtime, so register them in a service provider that boots even when routes are cached.
 - When a production feature depends on a package service provider to load routes or boot behavior, do not rely on a transitive dev dependency being present in production; add the package as a direct runtime dependency and verify the deployed host is no longer serving a 404 fallback page.
 - When a user asks for frontend/API parity, audit authorization and scoped member-role behavior alongside required/optional/default field rules; matching validation alone is not sufficient for a usable mobile or agent contract.
+- When a Blade view is reused through Filament `View::make(...)`, keep every optional `viewData()` key null-safe inside the view; do not assume the caller will always provide title/description/label strings, or the page can crash on routes that only pass the minimum data.

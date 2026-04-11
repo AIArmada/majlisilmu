@@ -732,7 +732,7 @@ test('impact dashboard highlights event check-ins and submissions', function () 
         ->get(route('dashboard.dawah-impact'))
         ->assertOk()
         ->assertSee('Event Check-ins')
-        ->assertSee('Event Submissions');
+        ->assertSee(__('Event Submissions'));
 
     $this->actingAs($this->sharer)
         ->get(route('dashboard.dawah-impact.links.show', ['link' => $eventLink->id]))
@@ -742,7 +742,7 @@ test('impact dashboard highlights event check-ins and submissions', function () 
     $this->actingAs($this->sharer)
         ->get(route('dashboard.dawah-impact.links.show', ['link' => $submissionLink->id]))
         ->assertOk()
-        ->assertSee('Event Submissions');
+        ->assertSee(__('Event Submissions'));
 });
 
 test('impact dashboard top subjects use canonical affiliate subject fields', function () {

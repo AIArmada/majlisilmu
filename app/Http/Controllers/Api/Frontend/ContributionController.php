@@ -78,6 +78,7 @@ class ContributionController extends FrontendController
         title: 'Create an institution contribution',
         description: 'Creates a new public institution contribution request. '
             .'The proposer is not automatically added as an institution owner, admin, editor, or member; they only receive review outcome notifications. '
+            .'Duplicate institutions are rejected when the normalized name and locality match an existing institution. '
             .'Fetch `GET /forms/contributions/institutions` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeInstitution(
@@ -93,7 +94,7 @@ class ContributionController extends FrontendController
             'name' => ['required', 'string', 'max:255'],
             'nickname' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable'],
-            'address' => ['required', 'array'],
+            'address' => ['present', 'array'],
             'address.country_id' => ['required', 'integer'],
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
@@ -152,7 +153,8 @@ class ContributionController extends FrontendController
 
     #[Endpoint(
         title: 'Create a speaker contribution',
-        description: 'Creates a new public speaker contribution request using a region-only address payload (`country_id`, `state_id`, `district_id`, `subdistrict_id`). '
+        description: 'Creates a new public speaker contribution request using a region-only address payload (`state_id`, `district_id`, `subdistrict_id`). The speaker country follows the active country scope automatically. '
+            .'Clients must not send `address.country_id` or detailed street/map keys here. Duplicate speakers are rejected when the normalized name, gender, and title sets match an existing speaker. '
             .'Fetch `GET /forms/contributions/speakers` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeSpeaker(
@@ -176,10 +178,18 @@ class ContributionController extends FrontendController
             'post_nominal.*' => ['string', Rule::in(array_column(PostNominal::cases(), 'value'))],
             'bio' => ['nullable'],
             'address' => ['required', 'array'],
-            'address.country_id' => ['required', 'integer'],
+            'address.country_id' => ['prohibited'],
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
             'address.subdistrict_id' => ['nullable', 'integer'],
+            'address.line1' => ['prohibited'],
+            'address.line2' => ['prohibited'],
+            'address.postcode' => ['prohibited'],
+            'address.lat' => ['prohibited'],
+            'address.lng' => ['prohibited'],
+            'address.google_maps_url' => ['prohibited'],
+            'address.google_place_id' => ['prohibited'],
+            'address.waze_url' => ['prohibited'],
             'qualifications' => ['nullable', 'array'],
             'qualifications.*.institution' => ['required_with:qualifications.*.degree', 'nullable', 'string', 'max:255'],
             'qualifications.*.degree' => ['required_with:qualifications.*.institution', 'nullable', 'string', 'max:255'],
@@ -247,7 +257,7 @@ class ContributionController extends FrontendController
         title: 'Get editable contribution context',
         description: 'Returns the current editable state, presentation metadata, and permission flags for an existing subject. '
             .'Call this before submitting an update so you know whether the caller can edit directly, which sparse top-level fields are supported, and whether a pending request already exists. '
-            .'Only institution `cover` uploads are supported, and only when `can_direct_edit` is true.',
+            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover` and speaker `avatar`/`cover`.',
     )]
     public function suggestContext(
         string $subjectType,
@@ -262,6 +272,7 @@ class ContributionController extends FrontendController
 
         $context = $resolveContributionUpdateContextAction->handle($subjectType, $subject);
         $entity = $context['entity'];
+        $initialState = $this->apiInitialState($entity, $context['initial_state']);
         $canDirectEdit = $user->can('update', $entity);
 
         abort_unless($user->can('view', $entity), 403);
@@ -269,7 +280,7 @@ class ContributionController extends FrontendController
         return response()->json([
             'data' => [
                 'entity' => $this->entityData($entity),
-                'initial_state' => $context['initial_state'],
+                'initial_state' => $initialState,
                 'accepts_partial_updates' => $context['contract']['accepts_partial_updates'],
                 'fields' => $context['contract']['fields'],
                 'conditional_rules' => $context['contract']['conditional_rules'],
@@ -308,6 +319,7 @@ class ContributionController extends FrontendController
         title: 'Submit a contribution update',
         description: 'Submits a sparse top-level payload for an existing event, institution, speaker, or reference. '
             .'Fetch `GET /forms/contributions/{subjectType}/{subject}/suggest` first to discover the editable field contract and current values. '
+            .'Only files named in `direct_edit_media_fields` may be uploaded, and only when the current user can edit the subject directly. '
             .'If the caller can update the subject directly, the changes are applied immediately and the response `mode` is `direct_edit`; otherwise a contribution review request is created and the response `mode` is `review`.',
     )]
     public function suggestUpdate(
@@ -328,23 +340,25 @@ class ContributionController extends FrontendController
 
         $context = $resolveContributionUpdateContextAction->handle($subjectType, $subject);
         $entity = $context['entity'];
-        $originalData = $context['initial_state'];
+        $originalData = $this->apiInitialState($entity, $context['initial_state']);
         $canDirectEdit = $user->can('update', $entity);
-        $allowsInstitutionCoverUpload = $canDirectEdit && $entity instanceof Institution;
+        $directEditMediaFields = $canDirectEdit
+            ? array_values(array_filter(
+                $context['contract']['direct_edit_media_fields'] ?? [],
+                static fn (string $field): bool => $field !== '',
+            ))
+            : [];
 
         abort_unless($user->can('view', $entity), 403);
 
         $uploadedFiles = array_keys($request->allFiles());
 
         if ($uploadedFiles !== []) {
-            $unsupportedFileFields = array_values(array_filter(
-                $uploadedFiles,
-                static fn (string $field): bool => ! ($allowsInstitutionCoverUpload && $field === 'cover'),
-            ));
+            $unsupportedFileFields = array_values(array_diff($uploadedFiles, $directEditMediaFields));
 
             if ($unsupportedFileFields !== []) {
                 throw ValidationException::withMessages([
-                    'files' => [__('This update flow only supports institution cover uploads during direct edits.')],
+                    'files' => [__('This update flow only supports institution cover and speaker avatar or cover uploads during direct edits.')],
                 ]);
             }
         }
@@ -363,9 +377,10 @@ class ContributionController extends FrontendController
 
         $submissionState = $resolveContributionSubmissionStateAction->handle($validatedPayload);
         $changes = $resolveContributionChangedPayloadAction->handle($submissionState['state'], $originalData);
-        $hasInstitutionCoverChange = $canDirectEdit && $entity instanceof Institution && $request->hasFile('cover');
+        $hasDirectEditMediaChange = collect($directEditMediaFields)
+            ->contains(fn (string $field): bool => $request->hasFile($field));
 
-        if ($changes === [] && ! $hasInstitutionCoverChange) {
+        if ($changes === [] && ! $hasDirectEditMediaChange) {
             throw ValidationException::withMessages([
                 'data' => __('Make at least one change before continuing.'),
             ]);
@@ -376,8 +391,14 @@ class ContributionController extends FrontendController
                 $applyDirectContributionUpdateAction->handle($entity, $changes);
             }
 
-            if ($hasInstitutionCoverChange) {
-                $frontendMediaSyncService->syncSingle($entity, $request->file('cover'), 'cover');
+            if ($hasDirectEditMediaChange) {
+                foreach ($directEditMediaFields as $field) {
+                    if (! $request->hasFile($field)) {
+                        continue;
+                    }
+
+                    $frontendMediaSyncService->syncSingle($entity, $request->file($field), $field);
+                }
             }
 
             return response()->json([
@@ -499,6 +520,29 @@ class ContributionController extends FrontendController
         if (! $user->canSubmitDirectoryFeedback()) {
             abort(403, $user->directoryFeedbackBanMessage());
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $initialState
+     * @return array<string, mixed>
+     */
+    private function apiInitialState(Event|Institution|Reference|Speaker $entity, array $initialState): array
+    {
+        if (! $entity instanceof Speaker) {
+            return $initialState;
+        }
+
+        $speakerAddress = is_array($initialState['address'] ?? null)
+            ? $initialState['address']
+            : [];
+
+        $initialState['address'] = [
+            'state_id' => $speakerAddress['state_id'] ?? null,
+            'district_id' => $speakerAddress['district_id'] ?? null,
+            'subdistrict_id' => $speakerAddress['subdistrict_id'] ?? null,
+        ];
+
+        return $initialState;
     }
 
     /**

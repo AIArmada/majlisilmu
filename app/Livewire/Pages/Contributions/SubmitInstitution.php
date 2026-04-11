@@ -118,6 +118,7 @@ class SubmitInstitution extends Component implements HasActions, HasForms
             function (Institution $institution): void {
                 $this->contributionForm()->model($institution)->saveRelationships();
             },
+            'data',
         );
 
         if (is_string($submittedName) && filled($submittedName)) {

@@ -48,7 +48,8 @@ class ManifestController extends FrontendController
     #[Endpoint(
         title: 'Get institution contribution field contract',
         description: 'Returns the canonical field contract for authenticated public institution creation. '
-            .'Use this before calling `POST /contributions/institutions`.',
+            .'Use this before calling `POST /contributions/institutions`. '
+            .'Institution create still accepts a full institution address payload, including `address.country_id`.',
     )]
     public function submitInstitution(): JsonResponse
     {
@@ -60,7 +61,8 @@ class ManifestController extends FrontendController
     #[Endpoint(
         title: 'Get speaker contribution field contract',
         description: 'Returns the canonical field contract for authenticated public speaker creation. '
-            .'Use this before calling `POST /contributions/speakers`.',
+            .'Use this before calling `POST /contributions/speakers`. '
+            .'Speaker create uses a region-only address payload, so clients must not send `address.country_id` or detailed street/map keys.',
     )]
     public function submitSpeaker(): JsonResponse
     {

@@ -79,6 +79,24 @@ it('displays institution type badge', function () {
         ->assertSee(InstitutionType::Masjid->getLabel());
 });
 
+it('uses the institution logo as the public preview image when no cover exists', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'name' => 'Institusi Tanpa Cover',
+    ]);
+
+    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+        ->toMediaCollection('logo');
+
+    $this->get(route('institutions.show', $institution))
+        ->assertSuccessful()
+        ->assertSee('<meta property="og:image" content="'.$institution->public_image_url.'">', false)
+        ->assertSee('src="'.$institution->public_image_url.'"', false);
+});
+
 it('deduplicates matching district and subdistrict labels on institution show page', function () {
     $state = State::query()
         ->where('country_code', 'MY')

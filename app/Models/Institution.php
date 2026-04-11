@@ -88,6 +88,51 @@ class Institution extends Model implements AuditableContract, HasMedia
             : "{$normalizedName} ({$normalizedNickname})";
     }
 
+    public function getPublicLogoUrlAttribute(): string
+    {
+        return $this->preferredMediaUrl($this->getFirstMedia('logo'), ['thumb']) ?? '';
+    }
+
+    public function getPublicCoverUrlAttribute(): string
+    {
+        return $this->preferredMediaUrl($this->getFirstMedia('cover'), ['banner']) ?? '';
+    }
+
+    public function getPublicImageUrlAttribute(): string
+    {
+        if ($this->public_cover_url !== '') {
+            return $this->public_cover_url;
+        }
+
+        if ($this->public_logo_url !== '') {
+            return $this->public_logo_url;
+        }
+
+        return asset('images/placeholders/institution.png');
+    }
+
+    /**
+     * @param  list<string>  $preferredConversions
+     */
+    private function preferredMediaUrl(?Media $media, array $preferredConversions = []): ?string
+    {
+        if (! $media instanceof Media) {
+            return null;
+        }
+
+        $availableUrl = $preferredConversions === []
+            ? $media->getUrl()
+            : $media->getAvailableUrl($preferredConversions);
+
+        if ($availableUrl !== '') {
+            return $availableUrl;
+        }
+
+        $originalUrl = $media->getUrl();
+
+        return $originalUrl !== '' ? $originalUrl : null;
+    }
+
     /**
      * @return BelongsToMany<Space, $this>
      */

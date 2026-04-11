@@ -458,7 +458,7 @@ class SharedFormSchema
         bool $allowCountryOnly = false,
     ): void {
         $data = self::prepareAddressPersistenceData($data);
-        $countryId = self::normalizeLocationId($data['country_id'] ?? null);
+        $countryId = self::normalizeLocationId($data['country_id'] ?? null) ?? self::preferredPublicCountryId();
 
         if (
             ! empty($data['line1'])
@@ -466,14 +466,14 @@ class SharedFormSchema
             || ! empty($data['google_maps_url'])
             || ! empty($data['lat'])
             || ! empty($data['lng'])
-            || ($allowCountryOnly && $countryId !== null)
+            || $allowCountryOnly
         ) {
             $model->address()->create([
                 'type' => $type,
                 'line1' => $data['line1'] ?? null,
                 'line2' => $data['line2'] ?? null,
                 'postcode' => $data['postcode'] ?? null,
-                'country_id' => $countryId ?? PreferredCountryResolver::MALAYSIA_ID,
+                'country_id' => $countryId,
                 'state_id' => $data['state_id'] ?? null,
                 'district_id' => $data['district_id'] ?? null,
                 'subdistrict_id' => $data['subdistrict_id'] ?? null,

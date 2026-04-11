@@ -589,7 +589,7 @@ new class extends Component
                             @php
                                 $position = $inst->pivot->position;
                                 $isPrimary = $inst->pivot->is_primary;
-                                $institutionChipImageUrl = $inst->getFirstMediaUrl('cover', 'banner') ?: $inst->getFirstMediaUrl('logo');
+                                $institutionChipImageUrl = $inst->public_image_url;
                             @endphp
                             <a href="{{ route('institutions.show', $inst) }}" wire:navigate
                                class="group inline-flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-sm transition-all duration-200 hover:border-emerald-400/30 hover:bg-white/10">

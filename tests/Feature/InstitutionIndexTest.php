@@ -2,6 +2,7 @@
 
 use App\Enums\ContributionSubjectType;
 use App\Livewire\Pages\Contributions\SubmitInstitution;
+use App\Models\ContributionRequest;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Institution;
@@ -9,7 +10,9 @@ use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
 use App\Support\Search\InstitutionSearchService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 use function Pest\Laravel\get;
@@ -90,6 +93,24 @@ it('centers the institution card majlis counter without a view details label', f
         ->assertDontSee(__('View Details'));
 });
 
+it('renders the institution logo fallback image on cards when no cover exists', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Institusi Logo Kad',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+        ->toMediaCollection('logo');
+
+    get('/institusi?search='.urlencode('Institusi Logo Kad'))
+        ->assertSuccessful()
+        ->assertSee($institution->public_image_url, false);
+});
+
 it('uses a stable random institution order instead of alphabetical sorting', function () {
     $sessionSeed = 'institution-index-test-seed';
     session([Institution::PUBLIC_DIRECTORY_SESSION_KEY => $sessionSeed]);
@@ -161,21 +182,102 @@ it('allows users to submit a missing institution from institution index with pen
         ->and(abs(((float) $institution?->addressModel?->lng) - 101.6869))->toBeLessThan(0.000001);
 });
 
+it('rejects duplicate institution submissions when name and locality all match', function () {
+    $countryId = ensureMalaysiaCountryExists();
+    $user = User::factory()->create();
+
+    $stateId = DB::table('states')->insertGetId([
+        'country_id' => $countryId,
+        'name' => 'Negeri Ujian Pendua Institusi',
+        'country_code' => 'MY',
+    ]);
+    $state = State::query()->findOrFail($stateId);
+
+    $district = District::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Daerah Ujian Pendua Institusi',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => (int) $state->country_id,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Mukim Ujian Pendua Institusi',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al-Huda Pendua',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $institution->address()->update([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SubmitInstitution::class)
+        ->set('data.name', 'Masjid   Al-Huda   Pendua')
+        ->set('data.type', 'masjid')
+        ->set('data.address.country_id', $countryId)
+        ->set('data.address.state_id', (int) $state->id)
+        ->set('data.address.district_id', (int) $district->id)
+        ->set('data.address.subdistrict_id', (int) $subdistrict->id)
+        ->set('data.address.google_maps_url', 'https://maps.google.com/?q=3.1390,101.6869')
+        ->set('data.address.google_place_id', 'place_duplicate_institution')
+        ->set('data.address.lat', 3.1390)
+        ->set('data.address.lng', 101.6869)
+        ->call('submit')
+        ->assertHasErrors(['data.name']);
+
+    expect(Institution::query()->where('name', 'Masjid Al-Huda Pendua')->count())->toBe(1)
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
 it('supports fuzzy search with minor institution name typos', function () {
     Institution::factory()->create([
         'name' => 'Masjid Al Hidayah',
         'status' => 'verified',
+        'is_active' => true,
     ]);
 
     Institution::factory()->create([
         'name' => 'Pusat Pengajian An-Nur',
         'status' => 'verified',
+        'is_active' => true,
     ]);
 
     get('/institusi?search=Hidayh')
         ->assertSuccessful()
         ->assertSee('Masjid Al Hidayah')
         ->assertDontSee('Pusat Pengajian An-Nur');
+});
+
+it('shows the empty state when institution search only has unrelated fuzzy candidates', function () {
+    Institution::factory()->create([
+        'name' => 'Masjid Al Syariff',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Masjid As Shariff',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/institusi?search=saiffil')
+        ->assertSuccessful()
+        ->assertSee(__('No institutions found'))
+        ->assertSee(__('We couldn\'t find any institutions matching your search.'))
+        ->assertDontSee('Masjid Al Syariff')
+        ->assertDontSee('Masjid As Shariff')
+        ->assertDontSee('Jumlah institusi:');
 });
 
 it('matches institution nicknames on the institution index search', function () {

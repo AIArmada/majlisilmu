@@ -418,6 +418,25 @@ it('renders the institution dashboard picker as a searchable flux select', funct
         ->assertSee('Masjid Flux Pilihan');
 });
 
+it('loads filament table assets before livewire on the institution dashboard', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Table Assets']);
+
+    $institution->members()->syncWithoutDetaching([$user->id]);
+
+    $response = $this->actingAs($user)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+
+    $response->assertOk()
+        ->assertSee('/js/filament/tables/tables.js', false)
+        ->assertSee('data-update-uri=', false);
+
+    $html = $response->getContent();
+
+    expect($html)->toBeString();
+    expect(strpos($html, '/js/filament/tables/tables.js'))->toBeLessThan(strpos($html, 'data-update-uri='));
+});
+
 it('merges overlapping planner relationships into one calendar entry', function () {
     $user = User::factory()->create();
 

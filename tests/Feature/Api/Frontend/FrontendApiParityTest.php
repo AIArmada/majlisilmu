@@ -1,6 +1,7 @@
 <?php
 
 use AIArmada\FilamentAuthz\Facades\Authz;
+use App\Actions\Location\NormalizeGoogleMapsInputAction;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContactCategory;
 use App\Enums\EventFormat;
@@ -50,6 +51,16 @@ function assignInstitutionOwnerForFrontendApi(User $user, Institution $instituti
     $institution->members()->syncWithoutDetaching([$user->id]);
 
     Authz::withScope(app(MemberRoleScopes::class)->institution(), function () use ($user): void {
+        $user->syncRoles(['owner']);
+    }, $user);
+}
+
+function assignSpeakerOwnerForFrontendApi(User $user, Speaker $speaker): void
+{
+    app(ScopedMemberRoleSeeder::class)->ensureForSpeaker();
+    $speaker->members()->syncWithoutDetaching([$user->id]);
+
+    Authz::withScope(app(MemberRoleScopes::class)->speaker(), function () use ($user): void {
         $user->syncRoles(['owner']);
     }, $user);
 }
@@ -110,7 +121,10 @@ it('exposes corrected frontend contract metadata', function () {
         ->json('data');
     $speakerFields = collect($speakerContract['fields'] ?? [])->pluck('name')->all();
 
-    expect($speakerFields)->toContain('job_title', 'cover', 'address', 'qualifications')
+    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'qualifications')
+        ->not->toContain('address.country_id')
+        ->not->toContain('address.line1')
+        ->not->toContain('address.google_maps_url')
         ->not->toContain('position')
         ->not->toContain('main')
         ->not->toContain('institution_id');
@@ -156,6 +170,87 @@ it('exposes authenticated contribution update contracts and permission-gated dir
         ->and($fields->pluck('name')->all())->toContain('description', 'address', 'social_media')
         ->and($fields->firstWhere('name', 'type')['allowed_values'])->toContain('masjid')
         ->and($ownerResponse->json('data.initial_state.description'))->toBe('Community institution');
+});
+
+it('does not grant institution direct edit access from bearer token abilities alone', function () {
+    $visitor = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'description' => 'Community institution',
+    ]);
+
+    $visitorToken = $visitor->createToken('visitor-device', ['institution.update'])->plainTextToken;
+
+    $response = $this->withToken($visitorToken)
+        ->getJson(route('api.client.forms.contributions.suggest', [
+            'subjectType' => 'institusi',
+            'subject' => $institution->slug,
+        ]))->assertOk();
+
+    expect($response->json('data.can_direct_edit'))->toBeFalse()
+        ->and($response->json('data.direct_edit_media_fields'))->toBe([]);
+});
+
+it('allows institution direct edit access over bearer tokens without token abilities', function () {
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'description' => 'Community institution',
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+
+    $ownerToken = $owner->createToken('owner-device', [])->plainTextToken;
+
+    $response = $this->withToken($ownerToken)
+        ->getJson(route('api.client.forms.contributions.suggest', [
+            'subjectType' => 'institusi',
+            'subject' => $institution->slug,
+        ]))->assertOk();
+
+    expect($response->json('data.can_direct_edit'))->toBeTrue()
+        ->and($response->json('data.direct_edit_media_fields'))->toBe(['cover'])
+        ->and($response->json('data.initial_state.description'))->toBe('Community institution');
+});
+
+it('reflects scoped institution role grants and removals on an existing bearer token', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'description' => 'Community institution',
+    ]);
+
+    $token = $user->createToken('institution-role-drift-check', [])->plainTextToken;
+
+    $this->withToken($token)
+        ->getJson(route('api.client.forms.contributions.suggest', [
+            'subjectType' => 'institusi',
+            'subject' => $institution->slug,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('data.can_direct_edit', false);
+
+    assignInstitutionOwnerForFrontendApi($user, $institution);
+
+    $this->withToken($token)
+        ->getJson(route('api.client.forms.contributions.suggest', [
+            'subjectType' => 'institusi',
+            'subject' => $institution->slug,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('data.can_direct_edit', true);
+
+    Authz::withScope(app(MemberRoleScopes::class)->institution(), function () use ($user): void {
+        $user->syncRoles([]);
+    }, $user);
+
+    $this->withToken($token)
+        ->getJson(route('api.client.forms.contributions.suggest', [
+            'subjectType' => 'institusi',
+            'subject' => $institution->slug,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('data.can_direct_edit', false);
 });
 
 it('normalizes event update context to public organizer values and exposes lookup metadata', function () {
@@ -213,6 +308,291 @@ it('allows direct contribution updates to clear nullable institution fields', fu
         ->assertJsonPath('data.mode', 'direct_edit');
 
     expect($institution->fresh()->description)->toBeNull();
+});
+
+it('exposes speaker avatar direct edit media support for authorized public updaters', function () {
+    $owner = User::factory()->create();
+    $visitor = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+
+    Sanctum::actingAs($visitor);
+
+    $visitorResponse = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]))->assertOk();
+
+    Sanctum::actingAs($owner);
+
+    $ownerResponse = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]))->assertOk();
+
+    expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
+        ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
+        ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['avatar', 'cover']);
+});
+
+it('returns only region address keys in the speaker suggest context state', function () {
+    $owner = User::factory()->create();
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+
+    $state = State::query()->create([
+        'country_id' => $countryId,
+        'name' => 'Negeri Konteks Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'name' => 'Daerah Konteks Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->address()->update([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'line1' => 'Jalan Lama 1',
+        'line2' => 'Taman Lama',
+        'postcode' => '50000',
+        'lat' => 3.139,
+        'lng' => 101.6869,
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+        'google_place_id' => 'speaker-suggest-place',
+        'waze_url' => 'https://waze.com/ul?ll=3.1390,101.6869',
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $response = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]))->assertOk();
+
+    expect($response->json('data.initial_state.address'))->toBe([
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => null,
+    ]);
+});
+
+it('treats unchanged speaker region-only address round trips as no-op updates', function () {
+    $owner = User::factory()->create();
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+
+    $state = State::query()->create([
+        'country_id' => $countryId,
+        'name' => 'Negeri Pusing Balik Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'name' => 'Daerah Pusing Balik Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->address()->update([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'line1' => 'Alamat Warisan',
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $this->postJson(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]), [
+        'address' => [
+            'state_id' => (int) $state->id,
+            'district_id' => (int) $district->id,
+            'subdistrict_id' => null,
+        ],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['data']);
+
+    $speaker = $speaker->fresh('address');
+
+    expect($speaker?->addressModel?->line1)->toBe('Alamat Warisan')
+        ->and($speaker?->addressModel?->google_maps_url)->toBe('https://maps.google.com/?q=3.1390,101.6869');
+});
+
+it('preserves hidden speaker address details during region-only direct updates', function () {
+    $owner = User::factory()->create();
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+
+    $state = State::query()->create([
+        'country_id' => $countryId,
+        'name' => 'Negeri Kekal Butiran Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'name' => 'Daerah Kekal Butiran Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $updatedDistrict = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'name' => 'Daerah Baharu Penceramah API',
+        'country_code' => 'MY',
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Penceramah Lama API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->address()->update([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'line1' => 'Alamat Warisan',
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $this->postJson(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]), [
+        'name' => 'Penceramah Dikemas Kini API',
+        'address' => [
+            'state_id' => (int) $state->id,
+            'district_id' => (int) $updatedDistrict->id,
+            'subdistrict_id' => null,
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    $speaker = $speaker->fresh('address');
+
+    $expectedGoogleMapsUrl = app(NormalizeGoogleMapsInputAction::class)->handle([
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+    ])['google_maps_url'];
+
+    expect($speaker?->name)->toBe('Penceramah Dikemas Kini API')
+        ->and($speaker?->addressModel?->district_id)->toBe((int) $updatedDistrict->id)
+        ->and($speaker?->addressModel?->line1)->toBe('Alamat Warisan')
+        ->and($speaker?->addressModel?->google_maps_url)->toBe($expectedGoogleMapsUrl);
+});
+
+it('allows direct speaker avatar uploads on public contribution update suggestions', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $owner = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]), [
+        'avatar' => UploadedFile::fake()->image('speaker-avatar.jpg', 1200, 1200),
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    $speaker = $speaker->fresh(['media']);
+
+    expect($speaker?->hasMedia('avatar'))->toBeTrue()
+        ->and($speaker?->public_avatar_url)->not->toBe('');
+});
+
+it('allows direct speaker cover uploads on public contribution update suggestions', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $coverUpload = UploadedFile::fake()->createWithContent(
+        'speaker-cover.png',
+        file_get_contents(public_path('images/placeholders/speaker.png')) ?: '',
+    );
+
+    $owner = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]), [
+        'cover' => $coverUpload,
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    $speaker = $speaker->fresh(['media']);
+
+    expect($speaker?->hasMedia('cover'))->toBeTrue()
+        ->and($speaker?->getFirstMediaUrl('cover'))->not->toBe('');
+});
+
+it('rejects unsupported speaker media files on public contribution update suggestions', function () {
+    $owner = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]), [
+        'gallery' => [UploadedFile::fake()->image('speaker-gallery.jpg')],
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['files']);
 });
 
 it('maps public event organizer values back to persistence classes during direct updates', function () {
@@ -399,9 +779,11 @@ it('serializes institution directory payloads with card media aliases for mobile
     expect(data_get($item, 'display_name'))->toBe($institution->display_name)
         ->and(data_get($item, 'events_count'))->toBe(1)
         ->and(data_get($item, 'event_count'))->toBe(1)
+        ->and(data_get($item, 'public_image_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'logo_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'cover_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'image_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'public_image_url'))->toBe(data_get($item, 'image_url'))
         ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'cover_url'))
         ->and(data_get($item, 'image_url'))->not->toBe(data_get($item, 'logo_url'))
         ->and(array_key_exists('location', $item))->toBeTrue()
@@ -435,7 +817,29 @@ it('keeps placeholder institution imagery when no real media exists', function (
 
     expect(data_get($item, 'cover_url'))->toBeNull()
         ->and(data_get($item, 'logo_url'))->toBeString()->toContain('/images/placeholders/institution.png')
+        ->and(data_get($item, 'public_image_url'))->toBe(data_get($item, 'logo_url'))
         ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'logo_url'));
+});
+
+it('exposes the institution public image url in the frontend institution detail payload', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Detail API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->addMedia(UploadedFile::fake()->image('detail-logo.jpg', 800, 800))
+        ->toMediaCollection('logo');
+
+    $response = $this->getJson(route('api.client.institutions.show', ['institutionKey' => $institution->slug]))
+        ->assertOk();
+
+    expect($response->json('data.institution.media.public_image_url'))->toBe($institution->public_image_url)
+        ->and($response->json('data.institution.media.cover_url'))->toBeNull()
+        ->and($response->json('data.institution.media.public_image_url'))->toBe($response->json('data.institution.media.logo_url'));
 });
 
 it('rejects unsupported files on public contribution update suggestions', function () {
@@ -479,8 +883,14 @@ it('uses the inferred preferred country for submit-event contract defaults', fun
         ->assertOk()
         ->json('data');
 
+    $submitInstitution = $this->withHeader('X-Timezone', 'Asia/Singapore')
+        ->getJson(route('api.client.forms.contributions.institutions'))
+        ->assertOk()
+        ->json('data');
+
     expect(data_get($submitEvent, 'defaults.submission_country_id'))->toBe($singaporeId)
-        ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])->toContain($singaporeId);
+        ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])->toContain($singaporeId)
+        ->and(data_get($submitInstitution, 'defaults.address.country_id'))->toBe($singaporeId);
 });
 
 it('creates institution contribution requests through the frontend api', function () {
@@ -508,17 +918,65 @@ it('creates institution contribution requests through the frontend api', functio
         ->and(ContributionRequest::query()->where('entity_id', $institution->getKey())->exists())->toBeTrue();
 });
 
-it('requires address.country_id when creating speakers through the frontend api', function () {
+it('creates speaker contribution requests through the frontend api using the inferred country scope', function () {
+    $user = User::factory()->create();
+
+    config()->set('public-countries.countries.singapore.enabled', true);
+
+    $singaporeId = DB::table('countries')->insertGetId([
+        'iso2' => 'SG',
+        'name' => 'Singapore',
+        'status' => 1,
+        'phone_code' => '65',
+        'iso3' => 'SGP',
+        'region' => 'Asia',
+        'subregion' => 'South-Eastern Asia',
+    ]);
+
+    app()->forgetInstance(PublicCountryRegistry::class);
+    app()->forgetInstance(PublicCountryPreference::class);
+
+    Sanctum::actingAs($user);
+
+    $this->withHeader('X-Timezone', 'Asia/Singapore')
+        ->postJson(route('api.client.contributions.speakers.store'), [
+            'name' => 'Frontend API Scoped Country Speaker',
+            'gender' => 'male',
+            'address' => [
+                'state_id' => null,
+            ],
+        ])->assertCreated()
+        ->assertJsonPath('data.speaker.name', 'Frontend API Scoped Country Speaker');
+
+    $speaker = Speaker::query()
+        ->with('address')
+        ->where('name', 'Frontend API Scoped Country Speaker')
+        ->firstOrFail();
+
+    expect($speaker->addressModel?->country_id)->toBe($singaporeId)
+        ->and($speaker->slug)->toEndWith('-sg')
+        ->and(ContributionRequest::query()->where('entity_id', $speaker->getKey())->exists())->toBeTrue();
+});
+
+it('prohibits country and detailed address fields when creating speakers through the frontend api', function () {
     $user = User::factory()->create();
 
     Sanctum::actingAs($user);
 
     $this->postJson(route('api.client.contributions.speakers.store'), [
-        'name' => 'Frontend API Missing Country Speaker',
+        'name' => 'Frontend API Invalid Speaker Address',
         'gender' => 'male',
-        'address' => [],
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Lama',
+            'google_maps_url' => 'https://maps.google.com/?q=1,1',
+        ],
     ])->assertUnprocessable()
-        ->assertJsonValidationErrors(['address.country_id']);
+        ->assertJsonValidationErrors([
+            'address.country_id',
+            'address.line1',
+            'address.google_maps_url',
+        ]);
 });
 
 it('returns profile-quality speaker avatar urls from the frontend search api', function () {
@@ -672,6 +1130,42 @@ it('enforces institution workspace member management permissions', function () {
         'email' => $newMember->email,
         'role_id' => 'viewer',
     ])
+        ->assertCreated()
+        ->assertJsonPath('data.member.email', $newMember->email);
+
+    expect($institution->members()->whereKey($newMember->getKey())->exists())->toBeTrue();
+});
+
+it('forbids institution member management over bearer tokens for viewers even with token abilities', function () {
+    $institution = Institution::factory()->create();
+    $viewer = User::factory()->create();
+    $newMember = User::factory()->create();
+
+    app(AddMemberToSubject::class)->handle($institution, $viewer, 'viewer');
+
+    $viewerToken = $viewer->createToken('viewer-device', ['institution.manage-members'])->plainTextToken;
+
+    $this->withToken($viewerToken)
+        ->postJson(route('api.client.institution-workspace.members.store', ['institutionId' => $institution->getKey()]), [
+            'email' => $newMember->email,
+            'role_id' => 'viewer',
+        ])->assertForbidden();
+});
+
+it('allows institution member management over bearer tokens for admins without token abilities', function () {
+    $institution = Institution::factory()->create();
+    $admin = User::factory()->create();
+    $newMember = User::factory()->create();
+
+    app(AddMemberToSubject::class)->handle($institution, $admin, 'admin');
+
+    $adminToken = $admin->createToken('admin-device', [])->plainTextToken;
+
+    $this->withToken($adminToken)
+        ->postJson(route('api.client.institution-workspace.members.store', ['institutionId' => $institution->getKey()]), [
+            'email' => $newMember->email,
+            'role_id' => 'viewer',
+        ])
         ->assertCreated()
         ->assertJsonPath('data.member.email', $newMember->email);
 
@@ -1149,6 +1643,8 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->and($response->json('data.speaker.institutions.0.name'))->toBe('Madrasah API')
         ->and($response->json('data.speaker.institutions.0.position'))->toBe('Mudarris')
         ->and($response->json('data.speaker.institutions.0.is_primary'))->toBeTrue()
+        ->and($response->json('data.speaker.institutions.0.public_image_url'))->not->toBeEmpty()
+        ->and($response->json('data.speaker.institutions.0.public_image_url'))->toBe($response->json('data.speaker.institutions.0.chip_image_url'))
         ->and($response->json('data.speaker.institutions.0.chip_image_url'))->not->toBeEmpty()
         ->and($response->json('data.upcoming_events.0.reference_study_subtitle'))->toBe('Kitab API')
         ->and($response->json('data.upcoming_events.0.event_type_label'))->toBe(EventType::KuliahCeramah->getLabel())
@@ -1159,6 +1655,7 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->and($response->json('data.upcoming_events.0.is_remote'))->toBeTrue()
         ->and($response->json('data.upcoming_events.0.is_pending'))->toBeTrue()
         ->and($response->json('data.upcoming_events.0.is_cancelled'))->toBeFalse()
+        ->and($response->json('data.upcoming_events.0.institution.public_image_url'))->toBe($institution->public_image_url)
         ->and($response->json('data.other_role_upcoming_total'))->toBe(1)
         ->and($response->json('data.other_role_past_total'))->toBe(0)
         ->and($response->json('data.other_role_upcoming_participations.0.role'))->toBe('moderator')

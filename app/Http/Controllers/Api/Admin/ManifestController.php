@@ -18,6 +18,7 @@ class ManifestController extends Controller
     #[Endpoint(
         title: 'List admin resources and write support',
         description: 'Returns the authenticated admin resource manifest. '
+            .'Access follows the same live admin-panel access rule as the Filament UI, so bearer token abilities do not grant admin access by themselves. '
             .'Use the `write_support` flags here to discover which resources expose schema, create, and update support through the generic admin API.',
     )]
     public function __invoke(): JsonResponse

@@ -5,6 +5,7 @@ namespace App\Actions\Speakers;
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Country;
 use App\Models\Speaker;
+use App\Support\Location\PreferredCountryResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -198,6 +199,10 @@ class GenerateSpeakerSlugAction
             $address = $payload['address'];
             $countryCode ??= $this->resolveCountryCode($address);
             $countryId ??= $this->integerValue($address['country_id'] ?? null);
+        }
+
+        if ($countryId === null) {
+            $countryId = app(PreferredCountryResolver::class)->resolveId();
         }
 
         if ($countryCode === null) {

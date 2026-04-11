@@ -82,9 +82,7 @@ new
             $orderedIds = $this->speakerSearchService()->publicFuzzySearchIds($search);
 
             if ($orderedIds === []) {
-                return $this->baseSpeakersQuery()
-                    ->publicDirectoryOrder()
-                    ->paginate(12);
+                return $this->emptyPaginator();
             }
 
             $currentPage = max(1, (int) $this->getPage());

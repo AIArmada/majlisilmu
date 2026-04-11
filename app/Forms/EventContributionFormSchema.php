@@ -18,6 +18,7 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\Venue;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Textarea;
@@ -33,7 +34,7 @@ class EventContributionFormSchema
     /**
      * @return array<int, Component>
      */
-    public static function components(): array
+    public static function components(?string $fixedTimezone = null): array
     {
         return [
             Section::make(__('Maklumat Majlis'))
@@ -60,10 +61,7 @@ class EventContributionFormSchema
                     DateTimePicker::make('ends_at')
                         ->label(__('Ends At'))
                         ->seconds(false),
-                    TextInput::make('timezone')
-                        ->label(__('Timezone'))
-                        ->required()
-                        ->maxLength(64),
+                    self::timezoneField($fixedTimezone),
                     Select::make('event_format')
                         ->label(__('Format Majlis'))
                         ->options(EventFormat::class)
@@ -276,6 +274,24 @@ class EventContributionFormSchema
                 ])
                 ->columns(1),
         ];
+    }
+
+    private static function timezoneField(?string $fixedTimezone): Component
+    {
+        if (! is_string($fixedTimezone) || $fixedTimezone === '') {
+            return TextInput::make('timezone')
+                ->label(__('Timezone'))
+                ->required()
+                ->maxLength(64);
+        }
+
+        return Hidden::make('timezone')
+            ->default($fixedTimezone)
+            ->required()
+            ->afterStateHydrated(static function (Hidden $component) use ($fixedTimezone): void {
+                $component->state($fixedTimezone);
+            })
+            ->dehydrateStateUsing(static fn (): string => $fixedTimezone);
     }
 
     /**

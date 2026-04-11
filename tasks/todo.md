@@ -1,4 +1,244 @@
+# Speaker Direct-Edit Media Follow-up
+
+- [x] Extend public speaker direct-edit media support to include `cover` alongside `avatar`
+- [x] Update the public suggest-update page so speaker maintainers see direct-edit media uploads on the web flow too
+- [x] Add focused API and page regressions and rerun verification
+
+## Review
+
+- Root cause: the first speaker media follow-up only exposed `avatar` in the shared direct-edit contract, and the web suggest-update page still had an institution-cover-only media section.
+- Fix: updated [app/Services/ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php) so speaker direct edits expose `['avatar', 'cover']`, refreshed the direct-edit API copy in [app/Http/Controllers/Api/Frontend/ContributionController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/ContributionController.php), and replaced the institution-only web media path in [app/Livewire/Pages/Contributions/SuggestUpdate.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SuggestUpdate.php) with shared direct-edit media handling for institution and speaker flows.
+- Result: authorized speaker owners can now upload `cover` through the authenticated public update API, and the web suggest-update page now surfaces speaker `avatar` and `cover` fields for direct editors while keeping them hidden from ordinary visitors.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='(exposes speaker avatar direct edit media support for authorized public updaters|allows direct speaker avatar uploads on public contribution update suggestions|allows direct speaker cover uploads on public contribution update suggestions|rejects unsupported speaker media files on public contribution update suggestions)'` => **4 passed (17 assertions)**
+  - `vendor/bin/pest --parallel tests/Feature/ContributionPagesTest.php --filter='(shows the institution cover upload on the suggest update page only for maintainers|shows the speaker avatar and cover uploads on the suggest update page only for maintainers|applies direct institution edits for owner maintainers from the suggest update page)'` => **3 passed (14 assertions)**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `vendor/bin/phpstan analyse --ansi app/Services/ContributionEntityMutationService.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/ContributionPagesTest.php` => **pass**
+
+# Public Speaker Avatar Update API
+
+- [x] Trace the authenticated public contribution update flow and confirm why speaker avatar uploads are rejected
+- [x] Allow speaker avatar uploads for direct editors in the public contribution update API contract and controller
+- [x] Add focused frontend API regressions and run formatter, tests, and PHPStan
+
+## Review
+
+- Root cause: public speaker creation already accepted `avatar`, but the authenticated update flow hardcoded institution-cover-only file handling and exposed no speaker media fields in `direct_edit_media_fields`.
+- Fix: updated [app/Services/ContributionEntityMutationService.php](app/Services/ContributionEntityMutationService.php) so speaker update contracts expose `direct_edit_media_fields: ['avatar']`, and generalized [app/Http/Controllers/Api/Frontend/ContributionController.php](app/Http/Controllers/Api/Frontend/ContributionController.php) to allow only the media fields declared by that contract during direct edits.
+- Result: authorized speaker owners/editors can now upload a new avatar through `POST /api/v1/contributions/penceramah/{subject}/suggest`, while unsupported files like speaker `cover` remain rejected.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='corrected frontend contract metadata|authenticated contribution update contracts and permission-gated direct edit media support|speaker avatar direct edit media support|direct speaker avatar uploads|unsupported files on public contribution update suggestions|unsupported speaker media files'` => **6 passed (58 assertions)**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Http/Controllers/Api/Frontend/ContributionController.php app/Services/ContributionEntityMutationService.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **pass**
+
+# Institution Frontend API Image Normalization
+
+- [x] Trace institution-shaped public API payloads and identify which ones still force clients to reconstruct cover-or-logo fallback logic
+- [x] Expose a canonical resolved `public_image_url` field while keeping existing image fields for compatibility
+- [x] Extend focused frontend API regressions and run targeted verification
+
+## Review
+
+- Reused the existing institution media resolution path in [app/Http/Controllers/Api/Frontend/SearchController.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Controllers/Api/Frontend/SearchController.php) so public API consumers get the same cover -> logo -> placeholder result the UI already uses.
+- Added `public_image_url` to institution list items, institution detail media payloads, speaker institution chips, and nested institution data inside upcoming event payloads, while preserving `image_url`, `logo_url`, `cover_url`, and `chip_image_url` for compatibility.
+- Removed the now-dead local controller helper that manually resolved raw Spatie media URLs, keeping institution image selection anchored to the model-backed accessors instead of duplicating fallback rules in the API layer.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='serializes institution directory payloads with card media aliases for mobile clients'` => **1 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='placeholder institution imagery|institution public image url in the frontend institution detail payload|mirrors the public speaker page payload for app clients'` => **3 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Legacy Cache Key Cleanup
+
+# Institution Listing Image Fallback
+
+- [x] Audit public speaker, institution, majlis, and homepage image URL caching behavior
+- [x] Confirm whether public listing caches store image payloads or only ids
+- [x] Fix institution public pages to fall back from real cover media to real logo media instead of stopping at collection fallback placeholders
+- [x] Add focused regressions and run targeted verification
+
+## Review
+
+- Confirmed uploaded media is globally served with `Cache-Control: public, max-age=31536000, immutable` in [app/Providers/AppServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/AppServiceProvider.php), and Spatie media URLs are versioned with `?v=<media updated_at timestamp>` via [config/media-library.php](/Users/Saiffil/Herd/majlisilmu/config/media-library.php) and [vendor/spatie/laravel-medialibrary/src/Support/UrlGenerator/BaseUrlGenerator.php](/Users/Saiffil/Herd/majlisilmu/vendor/spatie/laravel-medialibrary/src/Support/UrlGenerator/BaseUrlGenerator.php).
+- Confirmed the public search/list caches for speakers, institutions, and default majlis cards cache ids rather than serialized image URLs, so media refreshes are not blocked by those caches.
+- Found one real public-surface bug: institution pages that tried to do `cover or logo` fallback used `getFirstMediaUrl(...)`, which already returns collection fallback placeholders when no real cover exists. That made the intended logo fallback unreachable.
+- Fixed that by adding explicit `public_cover_url`, `public_logo_url`, and `public_image_url` accessors on [app/Models/Institution.php](/Users/Saiffil/Herd/majlisilmu/app/Models/Institution.php) and switching the affected public institution surfaces to use them in [resources/views/components/pages/institutions/⚡index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/%E2%9A%A1index.blade.php), [resources/views/components/pages/institutions/⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/institutions/%E2%9A%A1show.blade.php), [resources/views/components/pages/speakers/⚡show.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/speakers/%E2%9A%A1show.blade.php), and [resources/views/livewire/pages/search/index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/search/index.blade.php).
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php --filter='uses the institution logo as the public image when no cover exists|bumps the institution public image version when logo media is updated'` => **2 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php --filter='renders the institution logo fallback image on cards when no cover exists'` => **1 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionShowPageTest.php --filter='uses the institution logo as the public preview image when no cover exists'` => **1 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+- [x] Confirm which public listing cache keys no longer have runtime readers or writers
+- [x] Remove dead legacy invalidation references while keeping active `_v2` paths intact
+- [x] Tighten cache regressions around the current event search payload key
+- [x] Run focused verification and record the result
+
+## Review
+
+- Confirmed these keys were dead in runtime code and only remained in invalidation/tests: `default_events_search`, `states_my_v2`, `events_topics_{locale}`, `events_institutions_{locale}`, and `events_speakers_{locale}`.
+- Removed those legacy-only references from [app/Support/Cache/PublicListingsCache.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Cache/PublicListingsCache.php) and updated the focused cache tests to track only active keys.
+- Tightened [tests/Feature/Laravel13CacheSerializationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Laravel13CacheSerializationTest.php) so it now proves the current `default_events_search_v2` payload can be rehydrated safely from the database cache store without relying on a deprecated key.
+- Verification:
+  - `tests/Feature/PublicListingCacheInvalidationTest.php` => **4 passed**
+  - `tests/Feature/Laravel13CacheSerializationTest.php` => **3 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Submit Event Cache Key Cleanup
+
+- [x] Confirm the submit-event option caches now use only `*_safe_v1` at runtime
+- [x] Remove legacy unsuffixed / `_v2` submit-option cache references from test scaffolding
+- [x] Run focused verification and record the result
+
+## Review
+
+- Confirmed the submit-event page currently writes only `submit_languages_safe_v1`, `submit_tags_*_safe_v1`, and `submit_venues_safe_v1` via [resources/views/components/pages/submit-event/create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/components/pages/submit-event/create.blade.php).
+- Removed dead test-only cleanup for `submit_languages_v2`, `submit_venues`, and unsuffixed `submit_tags_*_{locale}` keys from [tests/Pest.php](/Users/Saiffil/Herd/majlisilmu/tests/Pest.php).
+- Tightened [tests/Feature/Laravel13CacheSerializationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Laravel13CacheSerializationTest.php) so it now verifies the active safe submit-option caches directly instead of seeding deprecated cache names.
+- Verification:
+  - `tests/Feature/Laravel13CacheSerializationTest.php` => **2 passed**
+  - `get_errors` on [tests/Pest.php](/Users/Saiffil/Herd/majlisilmu/tests/Pest.php) and [tests/Feature/Laravel13CacheSerializationTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Laravel13CacheSerializationTest.php) => **no errors**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Event Update Timezone Scope
+
+- [x] Detect whether the active public country scope resolves to exactly one timezone
+- [x] Fix the public event suggest-update form to hide and pin timezone when the scope is single-timezone
+- [x] Add focused regressions and run targeted verification
+
+## Review
+
+- Root cause: the first implementation used PHP's country-level timezone identifiers, but Malaysia resolves to multiple IANA names there even though this product treats Malaysia as a single public timezone scope.
+- Fix: moved single-vs-multi timezone detection to explicit `public-countries` config, pinned the event suggest-update form state to the configured single timezone during mount, and switched the event contribution schema to a hidden timezone field whenever the scoped country exposes exactly one configured timezone.
+- Result: `/sumbangan/majlis/.../kemas-kini` now auto-fixes and hides timezone for Malaysia-style single-timezone scopes, while keeping the field visible for multi-timezone scopes like Indonesia.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='pins the event update timezone|keeps the event update timezone editable'` => **pass**
+  - `vendor/bin/pest --parallel --compact tests/Unit/PublicCountryRegistryTest.php` => **pass**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Support/Location/PublicCountryRegistry.php app/Forms/EventContributionFormSchema.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php tests/Unit/PublicCountryRegistryTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Speaker Country Scope Enforcement
+
+- [x] Hide the speaker country selector across public, quick-create, and admin speaker forms
+- [x] Stop accepting speaker `country_id` and detailed address fields in public/admin speaker APIs
+- [x] Derive speaker country from the active scope or the existing speaker record during persistence and slug generation
+- [x] Update focused speaker web/API regressions and rerun verification
+
+## Review
+
+- Root cause: the earlier speaker form cleanup removed the visible detailed address inputs, but speaker `country_id` still leaked through some form surfaces and both the frontend and admin APIs still required or accepted `country_id`, `line1`, postcode, and map-link payloads.
+- Fix: hid the speaker country field everywhere it was still visible, removed speaker `country_id` and detailed address keys from the public/admin API contracts and validators, switched admin speaker schema catalogs to use a server-derived country scope, and injected the scoped or existing country server-side when creating speaker addresses and slugs.
+- Result: speaker web forms now stay on region-only state/district/subdistrict inputs, public/admin APIs reject the removed speaker address keys, and new speaker creates still persist the scoped country even when clients omit `country_id`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **33 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **17 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='speaker|SuggestUpdate|update suggestions on a region-only address form'` => **7 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='speaker|frontend contract metadata|submit-event contract defaults'` => **10 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php --filter='speaker'` => **5 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Forms/SpeakerContributionFormSchema.php app/Filament/Resources/Speakers/Schemas/SpeakerForm.php app/Forms/SharedFormSchema.php app/Actions/Speakers/GenerateSpeakerSlugAction.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Support/Api/Frontend/FrontendFormContractService.php app/Support/Api/Admin/AdminResourceMutationService.php app/Services/ContributionEntityMutationService.php tests/Feature/SpeakerIndexTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/SharedFormSchemaTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Speaker Form Address Simplification
+
+- [x] Trace which speaker form surfaces still expose detailed address fields
+- [x] Remove line1/line2/postcode/Google Maps/Waze fields from speaker update, quick-create, and admin forms
+- [x] Update focused schema and contribution page regressions
+- [x] Run focused verification and record the result
+
+## Review
+
+- Root cause: the public speaker create contract was already region-only, but the speaker update suggestion form, quick-create speaker form, and admin speaker resource still used broader address schemas that exposed line1/line2/postcode and map-link inputs.
+- Fix: switched the shared speaker contribution schema to region-only by default, made the speaker suggest-update page use the reduced address contract explicitly, and simplified the admin speaker resource location section to country/state/district/subdistrict only.
+- Added regressions covering the public speaker update page and the quick-create/admin schema contracts so the detailed address fields do not reappear.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **33 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php --filter='speaker|SuggestUpdate|update suggestions on a region-only address form'` => **7 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Forms/SpeakerContributionFormSchema.php app/Forms/SpeakerFormSchema.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Filament/Resources/Speakers/Schemas/SpeakerForm.php tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Institution Search False Positives
+
+- [x] Reproduce the public institution search false positive and isolate the fuzzy-match score causing it
+- [x] Tighten institution fuzzy matching so unrelated long queries no longer match `Shariff`-style names
+- [x] Add a regression for `/institusi?search=saiffil` returning the empty state
+- [x] Run focused verification and record the result
+
+## Review
+
+- Root cause: the institution fuzzy fallback accepted any same-first-letter token above a flat `0.70` similarity score, so `saiffil` incorrectly matched `syariff` and `shariff` tokens.
+- Fix: tightened institution fuzzy matching with a query-length-aware edit-distance gate, kept typo support for near matches such as `Hidayh`, and bumped the institution public search cache version so stale fuzzy result sets do not survive deployment.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **22 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Support/Search/InstitutionSearchService.php tests/Feature/InstitutionIndexTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - Browser verification on `https://majlisilmu.test/institusi?search=saiffil` => **empty state rendered, no false-positive institutions**
+
+# Institution Picker Defaults
+
+- [x] Inspect missing institution picker view data
+- [x] Restore safe defaults for optional picker labels
+- [x] Verify the institution contribution page renders
+
+## Review
+
+- Restored null-safe defaults in the institution location picker Blade so the contribution page no longer throws when callers only provide the API key.
+- Kept the contribution-page layout unchanged by defaulting missing title, description, and field-label values to empty strings instead of injecting new visible copy.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **31 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `get_errors` on the touched Blade and test files => **no errors**
+
+# Speaker Search Empty State
+
+- [x] Inspect no-match fallback on speakers page
+- [x] Return empty paginator when no matches exist
+- [x] Add regression for the ammar search case
+- [x] Run focused verification
+
+## Review
+
+- Fixed the speakers directory fallback so searches with no public matches now render the empty state instead of falling back to the full 12-card directory.
+- Added a focused regression covering the `ammar` case with only a pending speaker record present, which proves the page no longer surfaces unrelated speakers when the search has no public matches.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **17 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `get_errors` on the touched Blade and test files => **no errors**
+
+# Report Subject Title Fallback
+
+- [x] Inspect report presenter null fallback
+- [x] Patch donation channel subject title handling
+- [x] Add regression for missing donation channel label
+- [x] Run focused verification
+
+## Review
+
+- Fixed `ReportPresenter::entityTitle()` so donation channels with a missing label fall back to the account name or entity id instead of returning null and crashing the reports index.
+- Added a focused admin resource regression that exercises a report tied to a donation channel with a null label and verifies the reports page still renders the subject title.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ReportAdminResourceTest.php` => **2 passed**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `get_errors` on the touched presenter and test files => **no errors**
+
 # Event Detail Reference Ordering
+
+# Speaker / Institution Duplicate Submission Guard
+
+- [x] Trace the public speaker and institution create-submission flow and identify the shared validation/persistence entrypoint
+- [x] Reject duplicate speaker submissions when name, gender, gelaran, gelaran kehormat, and gelaran akademik all exactly match an existing speaker
+- [x] Reject duplicate institution submissions when name, state, district, and subdistrict all exactly match an existing institution
+- [x] Add focused Pest coverage for both submission pages and run targeted verification
+
+## Review
+
+- Added a shared `EnsureUniqueContributionCreateAction` guard to the staged public create-submission workflow so duplicate speaker and institution submissions are rejected before any pending record or contribution request is created.
+- Speaker duplicates now require the same normalized name, gender, honorifics, pre-nominals, and effective post-nominals, while institution duplicates require the same normalized name plus the same state, district, and subdistrict.
+- Wired both public Livewire submission pages to pass the `data.` validation prefix so Filament surfaces the duplicate error on the form, and added Malay locale strings for the new rejection messages.
+- Added focused page-level regressions proving duplicate speaker and institution submissions are blocked without creating extra entities or contribution requests.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature --filter='(SpeakerIndexTest|InstitutionIndexTest)'` => **37 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Actions/Contributions/EnsureUniqueContributionCreateAction.php app/Actions/Contributions/SubmitStagedContributionCreateAction.php app/Livewire/Pages/Contributions/SubmitSpeaker.php app/Livewire/Pages/Contributions/SubmitInstitution.php tests/Feature/SpeakerIndexTest.php tests/Feature/InstitutionIndexTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `get_errors` on the touched action, Livewire, and test files => **no errors**
 
 - [x] Move the reference subtitle above the location chip on the event detail hero
 - [x] Keep the reference and section heading translatable on the event detail page

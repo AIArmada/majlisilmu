@@ -19,14 +19,17 @@ class ReportPresenter
     public static function entityTitle(Report $report): string
     {
         $entity = $report->entity;
+        $fallbackTitle = (string) $report->entity_id;
 
         return match (true) {
-            $entity instanceof Event => $entity->title,
-            $entity instanceof Institution => $entity->name,
-            $entity instanceof Speaker => $entity->formatted_name,
-            $entity instanceof Reference => $entity->title,
-            $entity instanceof DonationChannel => $entity->label !== '' ? $entity->label : $entity->account_name,
-            default => (string) $report->entity_id,
+            $entity instanceof Event => filled($entity->title) ? $entity->title : $fallbackTitle,
+            $entity instanceof Institution => filled($entity->name) ? $entity->name : $fallbackTitle,
+            $entity instanceof Speaker => filled($entity->formatted_name) ? $entity->formatted_name : $fallbackTitle,
+            $entity instanceof Reference => filled($entity->title) ? $entity->title : $fallbackTitle,
+            $entity instanceof DonationChannel => filled($entity->label)
+                ? $entity->label
+                : (filled($entity->account_name) ? $entity->account_name : $fallbackTitle),
+            default => $fallbackTitle,
         };
     }
 
