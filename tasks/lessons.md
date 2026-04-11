@@ -1,5 +1,7 @@
 # Lessons
 
+- When a user asks for public navigation wording or selector presentation, treat it as a layout-level UX correction: preserve runtime locale/country support unless they explicitly ask to remove it, and change only the visible menu chrome (for example title-case labels or flag-only selectors).
+- When asserting layout order on event detail pages, prefer dedicated DOM hooks or raw HTML positions over venue URLs or titles; schema and metadata blocks can appear earlier in the response and make broad order checks fail for the wrong reason.
 - When changing public directory ordering or browsing behavior, audit the matching public API collection endpoints in the same pass; do not assume a page-only change is sufficient if clients can browse the same resource over the API.
 - When a contributions hub is meant to list user activity, remove shortcut CTAs and show the persisted submissions directly; if multiple histories can grow, paginate each list independently.
 - When a user asks about `Status Kemaskini`, split create and update histories explicitly instead of leaving update requests buried in a generic contribution list.

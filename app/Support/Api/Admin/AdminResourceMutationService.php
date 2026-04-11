@@ -7,6 +7,7 @@ use App\Actions\Institutions\SaveInstitutionAction;
 use App\Actions\References\SaveReferenceAction;
 use App\Actions\Speakers\SaveSpeakerAction;
 use App\Actions\Subdistricts\SaveSubdistrictAction;
+use App\Actions\Venues\SaveVenueAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
 use App\Enums\EventAgeGroup;
@@ -24,17 +25,20 @@ use App\Enums\PreNominal;
 use App\Enums\ReferenceType;
 use App\Enums\RegistrationMode;
 use App\Enums\SocialMediaPlatform;
+use App\Enums\VenueType;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Filament\Resources\References\ReferenceResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Filament\Resources\Subdistricts\SubdistrictResource;
+use App\Filament\Resources\Venues\VenueResource;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\Subdistrict;
 use App\Models\User;
+use App\Models\Venue;
 use App\Services\ContributionEntityMutationService;
 use App\Support\Location\FederalTerritoryLocation;
 use BackedEnum;
@@ -51,6 +55,7 @@ class AdminResourceMutationService
         private readonly SaveReferenceAction $saveReferenceAction,
         private readonly SaveSpeakerAction $saveSpeakerAction,
         private readonly SaveSubdistrictAction $saveSubdistrictAction,
+        private readonly SaveVenueAction $saveVenueAction,
     ) {}
 
     /**
@@ -64,6 +69,7 @@ class AdminResourceMutationService
             ReferenceResource::class,
             SpeakerResource::class,
             SubdistrictResource::class,
+            VenueResource::class,
         ], true);
     }
 
@@ -144,6 +150,21 @@ class AdminResourceMutationService
                     ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
                 ],
             ],
+            VenueResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'auto_managed',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof Venue ? $this->mediaState($record, ['cover', 'gallery']) : null,
+                'fields' => $this->venueFields(),
+                'catalogs' => $this->addressCatalogs('address'),
+                'conditional_rules' => [],
+            ],
             SubdistrictResource::class => [
                 'resource_key' => $resourceKey,
                 'operation' => $operation,
@@ -176,6 +197,7 @@ class AdminResourceMutationService
             ReferenceResource::class => $this->referenceRules($updating),
             SpeakerResource::class => $this->speakerRules($updating),
             SubdistrictResource::class => $this->subdistrictRules($updating),
+            VenueResource::class => $this->venueRules($updating),
             default => [],
         };
     }
@@ -192,6 +214,7 @@ class AdminResourceMutationService
             ReferenceResource::class => $this->saveReferenceAction->handle($validated),
             SpeakerResource::class => $this->saveSpeakerAction->handle($validated, $actor),
             SubdistrictResource::class => $this->saveSubdistrictAction->handle($validated),
+            VenueResource::class => $this->saveVenueAction->handle($validated),
             default => throw new \RuntimeException('Unsupported admin write resource.'),
         };
     }
@@ -218,6 +241,9 @@ class AdminResourceMutationService
             SubdistrictResource::class => $record instanceof Subdistrict
                 ? $this->saveSubdistrictAction->handle($validated, $record)
                 : throw new \RuntimeException('Expected subdistrict record.'),
+            VenueResource::class => $record instanceof Venue
+                ? $this->saveVenueAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected venue record.'),
             default => throw new \RuntimeException('Unsupported admin write resource.'),
         };
     }
@@ -258,6 +284,17 @@ class AdminResourceMutationService
                     'country_id' => 132,
                 ],
                 'clear_avatar' => false,
+                'clear_cover' => false,
+                'clear_gallery' => false,
+            ],
+            VenueResource::class => [
+                'type' => VenueType::Dewan->value,
+                'status' => 'verified',
+                'is_active' => true,
+                'facilities' => [],
+                'address' => [
+                    'country_id' => 132,
+                ],
                 'clear_cover' => false,
                 'clear_gallery' => false,
             ],
@@ -304,6 +341,13 @@ class AdminResourceMutationService
 
         if ($record instanceof Event) {
             $defaults = $this->saveAdminEventAction->formStateForRecord($record);
+        }
+
+        if ($record instanceof Venue) {
+            $defaults['status'] = $record->status;
+            $defaults['is_active'] = (bool) $record->is_active;
+            $defaults['clear_cover'] = false;
+            $defaults['clear_gallery'] = false;
         }
 
         if ($record instanceof Subdistrict) {
@@ -405,6 +449,27 @@ class AdminResourceMutationService
             $this->field('gallery', 'array<file>', required: false),
             $this->field('clear_front_cover', 'boolean', required: false, default: false),
             $this->field('clear_back_cover', 'boolean', required: false, default: false),
+            $this->field('clear_gallery', 'boolean', required: false, default: false),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function venueFields(): array
+    {
+        return [
+            $this->field('name', 'string', required: true, maxLength: 255),
+            $this->field('type', 'string', required: true, default: VenueType::Dewan->value, allowedValues: $this->enumValues(VenueType::class)),
+            $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['unverified', 'pending', 'verified', 'rejected']),
+            $this->field('is_active', 'boolean', required: false, default: true),
+            $this->field('facilities', 'array<string>', required: false, allowedValues: $this->venueFacilityValues()),
+            $this->field('address', 'object', required: true),
+            $this->field('contacts', 'array<object>', required: false),
+            $this->field('social_media', 'array<object>', required: false),
+            $this->field('cover', 'file', required: false),
+            $this->field('gallery', 'array<file>', required: false),
+            $this->field('clear_cover', 'boolean', required: false, default: false),
             $this->field('clear_gallery', 'boolean', required: false, default: false),
         ];
     }
@@ -729,6 +794,51 @@ class AdminResourceMutationService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function venueRules(bool $updating): array
+    {
+        $addressRule = $updating ? ['sometimes', 'array'] : ['required', 'array'];
+        $required = $updating ? 'sometimes' : 'required';
+
+        return [
+            'name' => [$required, 'string', 'max:255'],
+            'type' => [$required, Rule::enum(VenueType::class)],
+            'status' => [$required, Rule::in(['unverified', 'pending', 'verified', 'rejected'])],
+            'is_active' => ['sometimes', 'boolean'],
+            'facilities' => ['nullable', 'array'],
+            'facilities.*' => ['string', Rule::in($this->venueFacilityValues())],
+            'address' => $addressRule,
+            'address.country_id' => [$updating ? 'sometimes' : 'required', 'integer', 'exists:countries,id'],
+            'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
+            'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
+            'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
+            'address.line1' => ['nullable', 'string', 'max:255'],
+            'address.line2' => ['nullable', 'string', 'max:255'],
+            'address.postcode' => ['nullable', 'string', 'max:16'],
+            'address.lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'address.lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'address.google_maps_url' => ['nullable', 'url', 'max:2048'],
+            'address.google_place_id' => ['nullable', 'string', 'max:255'],
+            'address.waze_url' => ['nullable', 'url', 'max:255'],
+            'contacts' => ['nullable', 'array'],
+            'contacts.*.category' => ['required_with:contacts.*.value', Rule::enum(ContactCategory::class)],
+            'contacts.*.value' => ['required_with:contacts.*.category', 'string', 'max:255'],
+            'contacts.*.type' => ['nullable', Rule::enum(ContactType::class)],
+            'contacts.*.is_public' => ['sometimes', 'boolean'],
+            'social_media' => ['nullable', 'array'],
+            'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::enum(SocialMediaPlatform::class)],
+            'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
+            'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
+            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'gallery' => ['nullable', 'array'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'clear_cover' => ['sometimes', 'boolean'],
+            'clear_gallery' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
      * @param  Model&HasMedia  $record
      * @param  list<string>  $collections
      * @return array<string, mixed>
@@ -821,5 +931,18 @@ class AdminResourceMutationService
     private function federalTerritoryStateIds(): array
     {
         return array_keys(FederalTerritoryLocation::stateIds());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function venueFacilityValues(): array
+    {
+        return [
+            'parking',
+            'oku',
+            'women_section',
+            'ablution_area',
+        ];
     }
 }

@@ -2,6 +2,7 @@
     'event',
     'formatLabel',
     'scheduleKindLabel' => null,
+    'heroReferenceTitle' => null,
     'showHeroLocationChip' => false,
     'heroLocationIcon' => 'map-pin',
     'heroLocationTitle' => null,
@@ -112,6 +113,22 @@
     {{ $event->title }}
 </h1>
 
+@if($heroReferenceTitle)
+    <div data-testid="event-hero-reference" class="mt-6 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] p-3 shadow-lg shadow-black/20 backdrop-blur-md animate-fade-in-up"
+        style="--reveal-d: 300ms;">
+        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 shadow-inner">
+            <svg class="size-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M17.25 3.75H6.75A2.25 2.25 0 004.5 6v15l7.5-4.5 7.5 4.5V6a2.25 2.25 0 00-2.25-2.25z" />
+            </svg>
+        </div>
+        <div class="min-w-0">
+            <p class="text-xs font-bold uppercase tracking-widest text-white/60">{{ __('References') }}</p>
+            <p class="mt-0.5 text-sm font-bold text-white">{{ $heroReferenceTitle }}</p>
+        </div>
+    </div>
+@endif
+
 <div class="mt-7 flex flex-wrap gap-3 animate-fade-in-up" style="--reveal-d: 400ms;">
     @if($event->starts_at)
         <div
@@ -141,7 +158,7 @@
     @endif
 
     @if($showHeroLocationChip)
-        <div
+        <div data-testid="event-hero-location"
             class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] p-3 backdrop-blur-md shadow-lg shadow-black/20">
             <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 shadow-inner">
                 @if($heroLocationIcon === 'globe')

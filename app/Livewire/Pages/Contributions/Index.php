@@ -13,6 +13,7 @@ use App\Models\Institution;
 use App\Models\Report;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Location\AddressHierarchyFormatter;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -101,6 +102,14 @@ class Index extends Component implements HasForms
 
         return EventSubmission::query()
             ->where('submitted_by', $user->id)
+            ->whereHas('event', function (Builder $query) use ($user): void {
+                $query->where(function (Builder $eventQuery) use ($user): void {
+                    $eventQuery->whereNull('institution_id')
+                        ->orWhereDoesntHave('institution.members', function (Builder $memberQuery) use ($user): void {
+                            $memberQuery->where('users.id', $user->getKey());
+                        });
+                });
+            })
             ->with([
                 'event' => fn ($query) => $query->with(['institution', 'speakers', 'references']),
             ])
@@ -161,6 +170,7 @@ class Index extends Component implements HasForms
                                 MemberSubjectType::Speaker->value => __('Penceramah'),
                             ])
                             ->required()
+                            ->columnSpan(1)
                             ->live()
                             ->afterStateUpdated(function (Set $set): void {
                                 $set('subject_slug', null);
@@ -178,9 +188,13 @@ class Index extends Component implements HasForms
                                 subjectType: $this->normalizeNullableString($get('subject_type')),
                                 subjectSlug: is_string($value) ? $value : null,
                             ))
+                            ->columnSpan(2)
                             ->helperText(__('Hanya rekod institusi dan penceramah yang aktif dipaparkan di sini.')),
                     ])
-                    ->columns(2),
+                    ->columns([
+                        'default' => 1,
+                        'md' => 3,
+                    ]),
             ]);
     }
 
@@ -234,10 +248,11 @@ class Index extends Component implements HasForms
                 ->where('status', 'verified')
                 ->where('is_active', true)
                 ->tap(fn (Builder $query): Builder => filled($search) ? $query->searchNameOrNickname($search) : $query)
+                ->with(['address.state', 'address.district', 'address.subdistrict'])
                 ->orderBy('name')
                 ->limit(50)
                 ->get(['id', 'slug', 'name', 'nickname'])
-                ->mapWithKeys(fn (Institution $institution): array => [$institution->slug => $institution->display_name])
+                ->mapWithKeys(fn (Institution $institution): array => [$institution->slug => $this->institutionMembershipClaimLabel($institution)])
                 ->all(),
             MemberSubjectType::Speaker => Speaker::query()
                 ->where('status', 'verified')
@@ -259,12 +274,7 @@ class Index extends Component implements HasForms
         }
 
         return match (MemberSubjectType::tryFrom((string) $subjectType)) {
-            MemberSubjectType::Institution => Institution::query()
-                ->where('status', 'verified')
-                ->where('is_active', true)
-                ->where('slug', $subjectSlug)
-                ->first(['id', 'name', 'nickname'])
-                ?->display_name,
+            MemberSubjectType::Institution => $this->resolveInstitutionMembershipClaimOptionLabel($subjectSlug),
             MemberSubjectType::Speaker => Speaker::query()
                 ->where('status', 'verified')
                 ->where('is_active', true)
@@ -305,5 +315,32 @@ class Index extends Component implements HasForms
         $normalized = trim($value);
 
         return $normalized !== '' ? $normalized : null;
+    }
+
+    private function institutionMembershipClaimLabel(Institution $institution): string
+    {
+        $location = AddressHierarchyFormatter::format($institution->address);
+
+        if ($location === '') {
+            return $institution->display_name;
+        }
+
+        return "{$institution->display_name} - {$location}";
+    }
+
+    private function resolveInstitutionMembershipClaimOptionLabel(string $subjectSlug): ?string
+    {
+        $institution = Institution::query()
+            ->where('status', 'verified')
+            ->where('is_active', true)
+            ->where('slug', $subjectSlug)
+            ->with(['address.state', 'address.district', 'address.subdistrict'])
+            ->first(['id', 'name', 'nickname']);
+
+        if (! $institution instanceof Institution) {
+            return null;
+        }
+
+        return $this->institutionMembershipClaimLabel($institution);
     }
 }
