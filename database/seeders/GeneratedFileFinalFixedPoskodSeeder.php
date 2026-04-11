@@ -190,15 +190,13 @@ class GeneratedFileFinalFixedPoskodSeeder extends Seeder
                     ])->saveQuietly();
                 });
             } else {
-                $institution = Institution::withoutEvents(function () use ($slug, $record): Institution {
-                    return Institution::query()->create([
-                        'slug' => $slug,
-                        'name' => $record['Nama'],
-                        'type' => InstitutionType::Masjid->value,
-                        'status' => 'verified',
-                        'is_active' => true,
-                    ]);
-                });
+                $institution = Institution::withoutEvents(fn (): Institution => Institution::query()->create([
+                    'slug' => $slug,
+                    'name' => $record['Nama'],
+                    'type' => InstitutionType::Masjid->value,
+                    'status' => 'verified',
+                    'is_active' => true,
+                ]));
             }
 
             Address::withoutEvents(function () use ($institution, $line1, $postcode, $state, $district, $subdistrict): void {

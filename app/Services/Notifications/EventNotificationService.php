@@ -509,7 +509,6 @@ class EventNotificationService
             });
 
         foreach ($matchesByUser as $matchData) {
-            /** @var User $user */
             $user = $matchData['user'];
             /** @var array<int, SavedSearch> $searches */
             $searches = $matchData['searches'];

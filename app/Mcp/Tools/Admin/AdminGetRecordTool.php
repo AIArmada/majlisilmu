@@ -45,6 +45,7 @@ class AdminGetRecordTool extends AbstractAdminTool
     /**
      * @return array<string, Type>
      */
+    #[\Override]
     public function schema(JsonSchema $schema): array
     {
         return [

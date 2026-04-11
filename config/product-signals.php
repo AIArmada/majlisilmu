@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     // Add future Filament or non-public panel IDs here using the panel ID as the key.
     'panels' => [

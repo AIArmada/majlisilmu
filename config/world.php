@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Nnjeim\World\Models\City;
 use Nnjeim\World\Models\Country;
 use Nnjeim\World\Models\Currency;

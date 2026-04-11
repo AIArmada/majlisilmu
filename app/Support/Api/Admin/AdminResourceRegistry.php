@@ -54,7 +54,7 @@ class AdminResourceRegistry
     {
         return array_values(array_filter(
             $this->resources(),
-            fn (string $resourceClass): bool => $this->canAccessResource($resourceClass),
+            $this->canAccessResource(...),
         ));
     }
 
@@ -389,7 +389,7 @@ class AdminResourceRegistry
             return $value instanceof \BackedEnum ? (string) $value->value : $value->name;
         }
 
-        return filled($value) ? (string) $value : null;
+        return filled($value) ? $value : null;
     }
 
     private function htmlableToString(Htmlable|string|null $value): ?string
@@ -398,6 +398,6 @@ class AdminResourceRegistry
             return $value->toHtml();
         }
 
-        return $value !== null ? (string) $value : null;
+        return $value;
     }
 }

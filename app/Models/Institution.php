@@ -288,7 +288,7 @@ class Institution extends Model implements AuditableContract, HasMedia
     protected function publicDirectoryOrder(Builder $query): void
     {
         $offset = self::publicDirectoryOrderOffset(self::publicDirectorySessionSeed());
-        $idExpression = self::publicDirectoryOrderIdExpression($query);
+        $idExpression = $this->publicDirectoryOrderIdExpression($query);
 
         $query->orderByRaw("substr({$idExpression}, {$offset}, 32)")
             ->orderByRaw($idExpression.' asc');
@@ -297,7 +297,7 @@ class Institution extends Model implements AuditableContract, HasMedia
     public static function publicDirectoryOrderOffset(?string $sessionSeed = null, ?CarbonInterface $at = null): int
     {
         if (is_string($sessionSeed) && $sessionSeed !== '') {
-            return (abs((int) crc32($sessionSeed)) % 24) + 1;
+            return (abs(crc32($sessionSeed)) % 24) + 1;
         }
 
         return (((int) ($at ?? now())->format('z')) % 24) + 1;
@@ -345,7 +345,7 @@ class Institution extends Model implements AuditableContract, HasMedia
     /**
      * @param  Builder<self>  $query
      */
-    private static function publicDirectoryOrderIdExpression(Builder $query): string
+    private function publicDirectoryOrderIdExpression(Builder $query): string
     {
         $driver = DB::connection($query->getModel()->getConnectionName())->getDriverName();
 

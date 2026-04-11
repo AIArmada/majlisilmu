@@ -737,13 +737,9 @@ it('formats institution membership claim options with the location hierarchy', f
 
     $component = Livewire::actingAs($user)->test(ContributionsIndex::class);
 
-    $searchOptions = Closure::bind(function () {
-        return $this->membershipClaimSearchOptions(MemberSubjectType::Institution->value, 'Payung');
-    }, $component->instance(), ContributionsIndex::class)();
+    $searchOptions = Closure::bind(fn () => $this->membershipClaimSearchOptions(MemberSubjectType::Institution->value, 'Payung'), $component->instance(), ContributionsIndex::class)();
 
-    $selectedLabel = Closure::bind(function () use ($institution) {
-        return $this->membershipClaimOptionLabel(MemberSubjectType::Institution->value, $institution->slug);
-    }, $component->instance(), ContributionsIndex::class)();
+    $selectedLabel = Closure::bind(fn () => $this->membershipClaimOptionLabel(MemberSubjectType::Institution->value, $institution->slug), $component->instance(), ContributionsIndex::class)();
 
     expect($searchOptions)->toHaveKey($institution->slug)
         ->and($searchOptions[$institution->slug])->toBe('Masjid Payung - Shah Alam, Petaling, Selangor')
@@ -982,6 +978,20 @@ it('does not treat unchanged speaker update forms as changes when legacy address
     $speaker = Speaker::factory()->create([
         'status' => 'verified',
         'is_active' => true,
+    ]);
+
+    $speaker->contacts()->delete();
+    $speaker->contacts()->create([
+        'category' => ContactCategory::Email->value,
+        'type' => ContactType::Work->value,
+        'value' => 'speaker@example.test',
+        'is_public' => true,
+    ]);
+    $speaker->contacts()->create([
+        'category' => ContactCategory::Phone->value,
+        'type' => ContactType::Work->value,
+        'value' => '+1-878-669-9223',
+        'is_public' => true,
     ]);
 
     $speaker->address()->update([

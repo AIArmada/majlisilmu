@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Middleware\SetFilamentTimezone;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TrackDawahShareAttribution;

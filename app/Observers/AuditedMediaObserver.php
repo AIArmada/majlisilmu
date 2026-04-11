@@ -57,7 +57,7 @@ class AuditedMediaObserver extends MediaObserver
 
             $sameContext = $this->sameAuditContext($sourceOwner, $destinationOwner, $sourceField, $destinationField);
 
-            self::pendingUpdateSnapshots()[$media] = [
+            $this->pendingUpdateSnapshots()[$media] = [
                 'source_owner' => $sourceOwner,
                 'source_field' => $sourceField,
                 'source_before' => $sourceOwner instanceof Model
@@ -79,7 +79,7 @@ class AuditedMediaObserver extends MediaObserver
     {
         parent::updated($media);
 
-        $pendingSnapshots = self::pendingUpdateSnapshots();
+        $pendingSnapshots = $this->pendingUpdateSnapshots();
         $snapshot = $pendingSnapshots[$media] ?? null;
 
         unset($pendingSnapshots[$media]);
@@ -143,7 +143,7 @@ class AuditedMediaObserver extends MediaObserver
             return;
         }
 
-        self::pendingDeleteSnapshots()[$media] = [
+        $this->pendingDeleteSnapshots()[$media] = [
             'owner' => $owner,
             'field' => MediaCollectionAuditSnapshot::field($media->collection_name),
             'before' => MediaCollectionAuditSnapshot::forOwner($owner, $media->collection_name),
@@ -155,7 +155,7 @@ class AuditedMediaObserver extends MediaObserver
     {
         parent::deleted($media);
 
-        $pendingSnapshots = self::pendingDeleteSnapshots();
+        $pendingSnapshots = $this->pendingDeleteSnapshots();
         $snapshot = $pendingSnapshots[$media] ?? null;
 
         unset($pendingSnapshots[$media]);
@@ -164,7 +164,6 @@ class AuditedMediaObserver extends MediaObserver
             return;
         }
 
-        /** @var Model&AuditableContract $owner */
         $owner = $snapshot['owner'];
         $field = $snapshot['field'];
 
@@ -239,7 +238,7 @@ class AuditedMediaObserver extends MediaObserver
     /**
      * @return WeakMap<Media, array<string, mixed>>
      */
-    private static function pendingUpdateSnapshots(): WeakMap
+    private function pendingUpdateSnapshots(): WeakMap
     {
         /** @var WeakMap<Media, array<string, mixed>> $snapshots */
         $snapshots = self::$pendingUpdateSnapshots ?? new WeakMap;
@@ -252,7 +251,7 @@ class AuditedMediaObserver extends MediaObserver
     /**
      * @return WeakMap<Media, array<string, mixed>>
      */
-    private static function pendingDeleteSnapshots(): WeakMap
+    private function pendingDeleteSnapshots(): WeakMap
     {
         /** @var WeakMap<Media, array<string, mixed>> $snapshots */
         $snapshots = self::$pendingDeleteSnapshots ?? new WeakMap;

@@ -20,7 +20,7 @@ class NormalizeMcpAcceptHeader
         $accept = $request->header('Accept', '');
 
         $values = array_values(array_filter(
-            array_map('trim', explode(',', is_string($accept) ? $accept : '')),
+            array_map(trim(...), explode(',', is_string($accept) ? $accept : '')),
             static fn (string $value): bool => $value !== ''
         ));
 

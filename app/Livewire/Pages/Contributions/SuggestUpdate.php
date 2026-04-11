@@ -309,13 +309,7 @@ class SuggestUpdate extends Component implements HasActions, HasForms
                     return $contact;
                 }
 
-                $contact = SharedFormSchema::normalizeContactRowsForFill($contact);
-
-                if (SharedFormSchema::isPhoneContactCategory($contact['category'] ?? null)) {
-                    unset($contact['value']);
-                }
-
-                return $contact;
+                return SharedFormSchema::normalizeContactRowsForComparison($contact);
             },
             is_array($initialState['contacts'] ?? null) ? $initialState['contacts'] : [],
         );
@@ -447,13 +441,7 @@ class SuggestUpdate extends Component implements HasActions, HasForms
 
     private function hasDirectEditMediaChange(): bool
     {
-        foreach ($this->directEditMediaFields as $field) {
-            if ($this->directEditMediaFieldChanged($field)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->directEditMediaFields, fn ($field) => $this->directEditMediaFieldChanged($field));
     }
 
     private function directEditMediaFieldChanged(string $field): bool

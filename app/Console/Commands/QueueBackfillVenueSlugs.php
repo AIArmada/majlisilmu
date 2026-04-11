@@ -17,7 +17,7 @@ class QueueBackfillVenueSlugs extends Command
 
     public const LOCK_KEY = 'venue-slug-backfill';
 
-    private const LOCK_TTL_SECONDS = 3600;
+    private const int LOCK_TTL_SECONDS = 3600;
 
     protected $signature = 'venues:queue-slug-backfill';
 

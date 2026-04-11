@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\Venues\RelationManagers;
 
 use App\Filament\Resources\Events\EventResource;

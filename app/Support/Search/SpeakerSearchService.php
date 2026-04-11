@@ -147,18 +147,16 @@ class SpeakerSearchService
         );
 
         /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
-            return Speaker::query()
-                ->active()
-                ->where('status', 'verified')
-                ->select('speakers.id')
-                ->tap(fn (Builder $query): Builder => $this->applyIndexedSearch($query, $normalizedSearch))
-                ->orderBy('name')
-                ->pluck('speakers.id')
-                ->map(static fn (mixed $id): string => (string) $id)
-                ->values()
-                ->all();
-        });
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, fn (): array => Speaker::query()
+            ->active()
+            ->where('status', 'verified')
+            ->select('speakers.id')
+            ->tap(fn (Builder $query): Builder => $this->applyIndexedSearch($query, $normalizedSearch))
+            ->orderBy('name')
+            ->pluck('speakers.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all());
 
         return $ids;
     }

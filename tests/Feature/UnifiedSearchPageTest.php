@@ -172,5 +172,5 @@ it('renders the book title only on book-backed search result cards without paren
         ->toContain('Fiqh Carian Artikel')
         ->toContain('Matan Abi Syuja')
         ->not->toContain('(Matan Abi Syuja)')
-        ->and(substr_count($html, 'Matan Abi Syuja'))->toBe(1);
+        ->and(substr_count((string) $html, 'Matan Abi Syuja'))->toBe(1);
 });

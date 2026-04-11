@@ -400,7 +400,7 @@ it('renders institution event cards with localized prayer timing stacked speaker
 
         $html = $response->getContent();
 
-        preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($event->id, '/').'"[^>]*>.*?<\/a>/s', $html, $matches);
+        preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($event->id, '/').'"[^>]*>.*?<\/a>/s', (string) $html, $matches);
 
         $eventCard = $matches[0] ?? null;
 
@@ -464,8 +464,8 @@ it('renders the book title on institution event cards without parentheses', func
 
     $html = $response->getContent();
 
-    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($bookEvent->id, '/').'"[^>]*>.*?<\/a>/s', $html, $bookMatches);
-    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($articleEvent->id, '/').'"[^>]*>.*?<\/a>/s', $html, $articleMatches);
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($bookEvent->id, '/').'"[^>]*>.*?<\/a>/s', (string) $html, $bookMatches);
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($articleEvent->id, '/').'"[^>]*>.*?<\/a>/s', (string) $html, $articleMatches);
 
     $bookEventCard = $bookMatches[0] ?? null;
     $articleEventCard = $articleMatches[0] ?? null;
@@ -507,7 +507,7 @@ it('renders institution event cards cleanly when an event has no speakers', func
 
     $html = $response->getContent();
 
-    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($event->id, '/').'"[^>]*>.*?<\/a>/s', $html, $matches);
+    preg_match('/<a[^>]*wire:key="upcoming-'.preg_quote($event->id, '/').'"[^>]*>.*?<\/a>/s', (string) $html, $matches);
 
     $eventCard = $matches[0] ?? null;
 

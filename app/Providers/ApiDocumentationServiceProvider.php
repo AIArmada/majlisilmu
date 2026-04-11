@@ -21,13 +21,9 @@ class ApiDocumentationServiceProvider extends ServiceProvider
         $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');
         $docsViewPath = base_path('vendor/dedoc/scramble/resources/views/docs.blade.php');
         $docsMiddleware = config('scramble.middleware', []);
-        $configureDocs = static function () use ($apiPath) {
-            return Scramble::configure()
-                ->useConfig(config('scramble'))
-                ->routes(static function (IlluminateRoute $route) use ($apiPath): bool {
-                    return $apiPath === '' || Str::startsWith($route->uri(), $apiPath);
-                });
-        };
+        $configureDocs = (static fn () => Scramble::configure()
+            ->useConfig(config('scramble'))
+            ->routes(static fn (IlluminateRoute $route): bool => $apiPath === '' || Str::startsWith($route->uri(), $apiPath)));
 
         $this->app->booted(function () use ($apiDomain, $configureDocs, $docsMiddleware, $docsViewPath): void {
             $registerDocsRoutes = function () use ($configureDocs, $docsMiddleware, $docsViewPath): void {

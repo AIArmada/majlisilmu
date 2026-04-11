@@ -53,9 +53,7 @@ return new class extends Migration
             ->get();
 
         $rows
-            ->groupBy(function (object $row) use ($groupTypeColumn, $groupIdColumn): string {
-                return ($row->{$groupTypeColumn} ?? '').'|'.($row->{$groupIdColumn} ?? '');
-            })
+            ->groupBy(fn (object $row): string => ($row->{$groupTypeColumn} ?? '').'|'.($row->{$groupIdColumn} ?? ''))
             ->each(function (Collection $groupRows) use ($table): void {
                 $order = 1;
 

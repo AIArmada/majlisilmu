@@ -18,7 +18,7 @@ it('uses the configured api domain for docs and base urls', function () {
 });
 
 it('falls back to the current app origin when running on localhost without a configured api domain', function () {
-    config()->set('scramble.api_domain', null);
+    config()->set('scramble.api_domain');
     config()->set('scramble.api_path', 'api/v1');
     config()->set('app.url', 'http://localhost');
     app()->instance('request', Request::create('http://localhost/docs', 'GET'));

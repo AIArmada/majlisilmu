@@ -542,16 +542,14 @@ class EventSeeder extends Seeder
             ->get();
 
         if (is_string($speakerName) && $speakerName !== '') {
-            $matchedEvent = $matchingEvents->first(function (Event $event) use ($speakerName): bool {
-                return $event->keyPeople
-                    ->where('role', EventKeyPersonRole::Speaker->value)
-                    ->contains(function (mixed $keyPerson) use ($speakerName): bool {
-                        $speaker = $keyPerson->speaker;
+            $matchedEvent = $matchingEvents->first(fn (Event $event): bool => $event->keyPeople
+                ->where('role', EventKeyPersonRole::Speaker->value)
+                ->contains(function (mixed $keyPerson) use ($speakerName): bool {
+                    $speaker = $keyPerson->speaker;
 
-                        return (is_string($keyPerson->name) && $keyPerson->name === $speakerName)
-                            || ($speaker instanceof Speaker && $speaker->name === $speakerName);
-                    });
-            });
+                    return (is_string($keyPerson->name) && $keyPerson->name === $speakerName)
+                        || ($speaker instanceof Speaker && $speaker->name === $speakerName);
+                }));
 
             if ($matchedEvent instanceof Event) {
                 return $matchedEvent;
@@ -573,11 +571,9 @@ class EventSeeder extends Seeder
         }
 
         if (! is_string($speakerName) || $speakerName === '') {
-            $noSpeakerEvent = $matchingEvents->first(function (Event $event): bool {
-                return $event->keyPeople
-                    ->where('role', EventKeyPersonRole::Speaker->value)
-                    ->isEmpty();
-            });
+            $noSpeakerEvent = $matchingEvents->first(fn (Event $event): bool => $event->keyPeople
+                ->where('role', EventKeyPersonRole::Speaker->value)
+                ->isEmpty());
 
             if ($noSpeakerEvent instanceof Event) {
                 return $noSpeakerEvent;

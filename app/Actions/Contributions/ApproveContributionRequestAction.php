@@ -87,7 +87,7 @@ class ApproveContributionRequestAction
         }
 
         return match ($request->subject_type) {
-            ContributionSubjectType::Institution => $this->createInstitutionFromRequest($request, $payload),
+            ContributionSubjectType::Institution => $this->createInstitutionFromRequest($payload),
             ContributionSubjectType::Speaker => $this->createSpeakerFromRequest($request, $payload),
             default => throw new RuntimeException('Unsupported create request subject.'),
         };
@@ -113,14 +113,14 @@ class ApproveContributionRequestAction
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function createInstitutionFromRequest(ContributionRequest $request, array $payload): Institution
+    private function createInstitutionFromRequest(array $payload): Institution
     {
         $address = $this->addressPayload($payload);
 
         $institution = Institution::create([
             'name' => (string) ($payload['name'] ?? 'Institution'),
-            'nickname' => is_string($payload['nickname'] ?? null) && trim((string) $payload['nickname']) !== ''
-                ? trim((string) $payload['nickname'])
+            'nickname' => is_string($payload['nickname'] ?? null) && trim($payload['nickname']) !== ''
+                ? trim($payload['nickname'])
                 : null,
             'slug' => $this->generateInstitutionSlugAction->handle(
                 (string) ($payload['name'] ?? 'Institution'),
