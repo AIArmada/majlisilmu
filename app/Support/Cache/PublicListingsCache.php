@@ -26,6 +26,24 @@ class PublicListingsCache
             Cache::forget("events_issues_{$locale}_v2");
             Cache::forget("events_references_{$locale}_v2");
             Cache::forget("events_venues_{$locale}_v2");
+            
+            // Public speaker listings
+            Cache::forget("public_speakers_{$locale}");
+            Cache::forget("public_speakers_{$locale}_v2");
+        }
+    }
+
+    /**
+     * Bust only speaker-related cache.
+     * Call this after creating/updating/deleting speakers.
+     */
+    public function bustSpeakers(): void
+    {
+        foreach ($this->supportedLocales() as $locale) {
+            Cache::forget("events_speakers_{$locale}");
+            Cache::forget("events_speakers_{$locale}_v2");
+            Cache::forget("public_speakers_{$locale}");
+            Cache::forget("public_speakers_{$locale}_v2");
         }
     }
 
