@@ -90,8 +90,8 @@ class InstitutionFormSchema
 
         $institution = Institution::create([
             'name' => $data['name'],
-            'nickname' => is_string($data['nickname'] ?? null) && trim((string) $data['nickname']) !== ''
-                ? trim((string) $data['nickname'])
+            'nickname' => is_string($data['nickname'] ?? null) && trim($data['nickname']) !== ''
+                ? trim($data['nickname'])
                 : null,
             'slug' => app(GenerateInstitutionSlugAction::class)->handle((string) $data['name'], $addressData),
             'type' => $data['type'],

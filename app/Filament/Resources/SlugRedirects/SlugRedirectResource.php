@@ -37,21 +37,25 @@ class SlugRedirectResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'System';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return SlugRedirectForm::configure($schema);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return SlugRedirectInfolist::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return SlugRedirectsTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [
@@ -59,6 +63,7 @@ class SlugRedirectResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -161,7 +166,6 @@ class SlugRedirectResource extends Resource
         }
 
         if (class_exists($type) && is_subclass_of($type, Model::class)) {
-            /** @var Model $model */
             $model = new $type;
 
             return $model->getMorphClass();

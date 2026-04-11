@@ -184,7 +184,7 @@ class ContributionRequestNotificationService
         return match (true) {
             $entity instanceof Institution => $entity->name,
             $entity instanceof Speaker => $entity->name,
-            is_string(data_get($request->proposed_data, 'name')) && trim((string) data_get($request->proposed_data, 'name')) !== '' => trim((string) data_get($request->proposed_data, 'name')),
+            is_string(data_get($request->proposed_data, 'name')) && trim(data_get($request->proposed_data, 'name')) !== '' => trim(data_get($request->proposed_data, 'name')),
             default => $this->subjectLabel($request),
         };
     }

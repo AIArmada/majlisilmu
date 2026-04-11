@@ -79,6 +79,7 @@ class SocialMedia extends Model implements AuditableContract
     /**
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [

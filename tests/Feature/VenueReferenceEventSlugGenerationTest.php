@@ -239,9 +239,7 @@ it('splits venue slug backfill batches by chunk size without overlapping ids', f
         }
 
         $queuedIds = collect($batch->jobs)
-            ->flatMap(function (mixed $job): array {
-                return $job instanceof BackfillVenueSlugs ? $job->venueIds : [];
-            })
+            ->flatMap(fn (mixed $job): array => $job instanceof BackfillVenueSlugs ? $job->venueIds : [])
             ->sort()
             ->values();
 
@@ -284,7 +282,7 @@ it('only backfills the venues assigned to a chunk job', function () {
         geography: $geography,
     );
 
-    (new BackfillVenueSlugs([(string) $first->getKey(), (string) $second->getKey()]))
+    new BackfillVenueSlugs([(string) $first->getKey(), (string) $second->getKey()])
         ->handle(app(GenerateVenueSlugAction::class));
 
     expect($first->fresh()?->slug)->not->toBe('legacy-subset-1')

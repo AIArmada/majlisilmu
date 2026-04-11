@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\Spaces\Tables;
 
 use App\Filament\Resources\Spaces\SpaceResource;

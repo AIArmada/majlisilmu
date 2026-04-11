@@ -981,10 +981,10 @@ class ContributionEntityMutationService
                 $category = $this->normalizeContactCategory($contact['category'] ?? null);
                 $value = match ($category) {
                     ContactCategory::Phone, ContactCategory::WhatsApp => is_string($contact['phone_value'] ?? null)
-                        ? trim((string) $contact['phone_value'])
-                        : (is_string($contact['value'] ?? null) ? trim((string) $contact['value']) : null),
+                        ? trim($contact['phone_value'])
+                        : (is_string($contact['value'] ?? null) ? trim($contact['value']) : null),
                     default => is_string($contact['value'] ?? null)
-                        ? trim((string) $contact['value'])
+                        ? trim($contact['value'])
                         : null,
                 };
                 $type = $this->normalizeContactType($contact['type'] ?? null);

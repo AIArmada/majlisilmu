@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
 use Spatie\Permission\DefaultTeamResolver;

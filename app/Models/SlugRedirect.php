@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -62,7 +63,8 @@ class SlugRedirect extends Model
     /**
      * @param  Builder<self>  $query
      */
-    public function scopeForRedirectable(Builder $query, Model $model): void
+    #[Scope]
+    protected function forRedirectable(Builder $query, Model $model): void
     {
         $query
             ->where('redirectable_type', $model->getMorphClass())

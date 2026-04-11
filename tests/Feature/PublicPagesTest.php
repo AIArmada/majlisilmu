@@ -446,14 +446,14 @@ it('renders the book title on public event and series cards without parentheses'
         ->toContain('Kuliah Indeks Artikel')
         ->toContain('Bulugh al-Maram')
         ->not->toContain('(Bulugh al-Maram)')
-        ->and(substr_count($eventsIndexHtml, 'Bulugh al-Maram'))->toBe(1);
+        ->and(substr_count((string) $eventsIndexHtml, 'Bulugh al-Maram'))->toBe(1);
 
     expect($seriesPageHtml)
         ->toContain('Kuliah Indeks Kitab')
         ->toContain('Kuliah Indeks Artikel')
         ->toContain('Bulugh al-Maram')
         ->not->toContain('(Bulugh al-Maram)')
-        ->and(substr_count($seriesPageHtml, 'Bulugh al-Maram'))->toBe(1);
+        ->and(substr_count((string) $seriesPageHtml, 'Bulugh al-Maram'))->toBe(1);
 });
 
 it('renders threads in public share modals instead of line', function () {
