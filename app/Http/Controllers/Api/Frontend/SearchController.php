@@ -128,10 +128,24 @@ class SearchController extends FrontendController
     {
         $search = $this->normalizedString($request->query('search'));
         $perPage = $request->integer('per_page', 12);
+        $gender = in_array($request->query('gender'), ['male', 'female'], true)
+            ? $request->query('gender')
+            : null;
+        $sort = $request->query('sort') === 'upcoming' ? 'upcoming' : null;
+
+        $baseQuery = $this->baseSpeakerQuery();
+
+        if ($gender !== null) {
+            $baseQuery->where('speakers.gender', $gender);
+        }
+
+        if ($sort === 'upcoming') {
+            $baseQuery->orderBy('events_count', 'desc');
+        }
 
         $speakers = $search === null
-            ? $this->baseSpeakerQuery()->publicDirectoryOrder()->paginate($perPage)
-            : $this->speakerDirectorySearchPaginator($request, $search, $perPage);
+            ? $baseQuery->when($sort === null, fn ($q) => $q->publicDirectoryOrder())->paginate($perPage)
+            : $this->speakerDirectorySearchPaginatorWithBase($request, $search, $perPage, $baseQuery, $sort);
 
         return response()->json([
             'data' => collect($speakers->items())->map(fn (Speaker $speaker): array => $this->speakerListData($speaker))->all(),
@@ -838,17 +852,21 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @param  Builder<Speaker>  $base
      * @return LengthAwarePaginator<int, Speaker>
      */
-    private function speakerDirectorySearchPaginator(Request $request, string $search, int $perPage): LengthAwarePaginator
+    private function speakerDirectorySearchPaginatorWithBase(Request $request, string $search, int $perPage, Builder $base, ?string $sort): LengthAwarePaginator
     {
         $matchingIds = $this->speakerSearchService->publicSearchIds($search);
 
         if ($matchingIds !== []) {
-            return $this->baseSpeakerQuery()
-                ->whereIn('speakers.id', $matchingIds)
-                ->publicDirectoryOrder()
-                ->paginate($perPage);
+            $query = (clone $base)->whereIn('speakers.id', $matchingIds);
+
+            if ($sort !== 'upcoming') {
+                $query->publicDirectoryOrder();
+            }
+
+            return $query->paginate($perPage);
         }
 
         if (mb_strlen($search) < 3) {
@@ -874,7 +892,7 @@ class SearchController extends FrontendController
             );
         }
 
-        $speakers = $this->baseSpeakerQuery()
+        $speakers = (clone $base)
             ->whereIn('speakers.id', $paginatedIds)
             ->get()
             ->sortBy(static function (Speaker $speaker) use ($paginatedIds): int {
