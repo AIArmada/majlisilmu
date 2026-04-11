@@ -3,8 +3,17 @@
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
+use Mockery;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    config()->set('services.google.client_id', 'google-client-id');
+    config()->set('services.google.client_secret', 'google-client-secret');
+    config()->set('services.google.redirect', 'https://majlisilmu.test/oauth/google/callback');
+});
 
 it('registers an api user and returns a bearer token', function () {
     $response = $this->postJson(route('api.auth.register'), [
@@ -58,6 +67,99 @@ it('rejects invalid api login credentials', function () {
         'device_name' => 'Pixel 9',
     ])->assertUnprocessable()
         ->assertJsonValidationErrors(['login']);
+});
+
+it('logs in through google api token exchange and returns a bearer token', function () {
+    $provider = Mockery::mock();
+    $provider->shouldReceive('stateless')->once()->andReturnSelf();
+    $provider->shouldReceive('userFromToken')->once()->with('google-access-token')->andReturn(
+        (new SocialiteUser)->map([
+            'id' => 'google-api-123',
+            'name' => 'Mobile Google User',
+            'email' => 'google-mobile@example.test',
+            'avatar' => 'https://example.com/google-mobile.jpg',
+        ])
+    );
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->postJson(route('api.auth.social.google'), [
+        'access_token' => 'google-access-token',
+        'device_name' => 'iPhone 16',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('message', 'API Google login successful.')
+        ->assertJsonPath('data.token_type', 'Bearer')
+        ->assertJsonPath('data.user.email', 'google-mobile@example.test')
+        ->assertJsonPath('data.access_token', fn (string $token) => filled($token));
+
+    $this->assertDatabaseHas('socialite', [
+        'provider' => 'google',
+        'provider_id' => 'google-api-123',
+        'avatar_url' => 'https://example.com/google-mobile.jpg',
+    ]);
+});
+
+it('links an existing user during google api token exchange', function () {
+    $user = User::factory()->unverified()->create([
+        'email' => 'existing-google@example.test',
+        'name' => 'Existing Google User',
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('stateless')->once()->andReturnSelf();
+    $provider->shouldReceive('userFromToken')->once()->with('google-access-token')->andReturn(
+        (new SocialiteUser)->map([
+            'id' => 'google-api-456',
+            'name' => 'Existing Google User',
+            'email' => 'existing-google@example.test',
+            'avatar' => 'https://example.com/existing-google.jpg',
+        ])
+    );
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $this->postJson(route('api.auth.social.google'), [
+        'access_token' => 'google-access-token',
+        'device_name' => 'Pixel 10',
+    ])->assertOk()
+        ->assertJsonPath('data.user.email', 'existing-google@example.test');
+
+    expect(User::query()->where('email', 'existing-google@example.test')->count())->toBe(1);
+    expect($user->fresh()?->email_verified_at)->not->toBeNull();
+
+    $this->assertDatabaseHas('socialite', [
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_id' => 'google-api-456',
+    ]);
+});
+
+it('rejects google api token exchange when the provider is not configured', function () {
+    config()->set('services.google.client_id', '');
+    config()->set('services.google.client_secret', '');
+    config()->set('services.google.redirect', '');
+
+    $this->postJson(route('api.auth.social.google'), [
+        'access_token' => 'google-access-token',
+        'device_name' => 'iPhone 16',
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['provider']);
+});
+
+it('rejects invalid google api access tokens', function () {
+    $provider = Mockery::mock();
+    $provider->shouldReceive('stateless')->once()->andReturnSelf();
+    $provider->shouldReceive('userFromToken')->once()->with('bad-google-access-token')->andThrow(new RuntimeException('invalid token'));
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $this->postJson(route('api.auth.social.google'), [
+        'access_token' => 'bad-google-access-token',
+        'device_name' => 'Pixel 10',
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['access_token']);
 });
 
 it('revokes the current api token on logout', function () {

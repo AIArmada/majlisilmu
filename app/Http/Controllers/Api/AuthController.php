@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\Auth\AuthenticateApiUserAction;
+use App\Actions\Auth\AuthenticateSocialiteApiUserAction;
 use App\Actions\Auth\RegisterApiUserAction;
 use App\Actions\Auth\RevokeCurrentApiTokenAction;
 use App\Actions\Fortify\ResetUserPassword;
@@ -69,6 +70,34 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'API login successful.',
+            'data' => [
+                'access_token' => $result['access_token'],
+                'token_type' => 'Bearer',
+                'user' => $this->userData($result['user']),
+            ],
+        ]);
+    }
+
+    /**
+     * Exchange a Google provider token for a Sanctum bearer token.
+     */
+    #[Group('Authentication')]
+    public function google(Request $request, AuthenticateSocialiteApiUserAction $authenticateSocialiteApiUserAction): JsonResponse
+    {
+        $validated = $request->validate([
+            'access_token' => ['required', 'string'],
+            'device_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $result = $authenticateSocialiteApiUserAction->handle(
+            'google',
+            (string) $validated['access_token'],
+            (string) $validated['device_name'],
+            $request,
+        );
+
+        return response()->json([
+            'message' => 'API Google login successful.',
             'data' => [
                 'access_token' => $result['access_token'],
                 'token_type' => 'Bearer',
