@@ -21,6 +21,9 @@
 /storage/phpstan
 /storage/pail
 /vendor
+/caddy
+frankenphp
+frankenphp-worker.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
