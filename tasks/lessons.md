@@ -1,5 +1,6 @@
 # Lessons
 
+- When asserting layout order on event detail pages, prefer dedicated DOM hooks or raw HTML positions over venue URLs or titles; schema and metadata blocks can appear earlier in the response and make broad order checks fail for the wrong reason.
 - When changing public directory ordering or browsing behavior, audit the matching public API collection endpoints in the same pass; do not assume a page-only change is sufficient if clients can browse the same resource over the API.
 - When a contributions hub is meant to list user activity, remove shortcut CTAs and show the persisted submissions directly; if multiple histories can grow, paginate each list independently.
 - When a user asks about `Status Kemaskini`, split create and update histories explicitly instead of leaving update requests buried in a generic contribution list.

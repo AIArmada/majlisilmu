@@ -319,10 +319,41 @@ describe('Event Show Page Location & Contact Info', function () {
         $response = $this->get(route('events.show', $event));
 
         $response->assertOk()
-            ->assertSee('Reference Materials')
+            ->assertSee(__('References'))
             ->assertSee('Matan Al-Arbain')
             ->assertSee('class="grid gap-5"', false)
             ->assertDontSee('class="grid gap-5 sm:grid-cols-2"', false);
+    });
+
+    it('renders the reference subtitle before the location chip in the hero', function () {
+        $venue = Venue::factory()->create([
+            'name' => 'Masjid Al-Hidayah',
+        ]);
+
+        $reference = Reference::factory()->create([
+            'title' => 'Al-Hikam',
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'venue_id' => $venue->id,
+        ]);
+
+        $event->references()->attach($reference->id);
+
+        $response = $this->get(route('events.show', $event));
+
+        $response->assertOk()
+            ->assertSee(__('References'))
+            ->assertSee('Al-Hikam');
+
+        $html = (string) $response->getContent();
+
+        expect(strpos($html, 'data-testid="event-hero-reference"'))
+            ->toBeLessThan(strpos($html, 'data-testid="event-hero-location"'));
     });
 
     it('does not use speaker images as hero background when location media is missing', function () {
