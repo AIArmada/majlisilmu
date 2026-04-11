@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Venues\Pages;
 
-use App\Actions\Venues\GenerateVenueSlugAction;
+use App\Actions\Venues\SaveVenueAction;
 use App\Filament\Resources\Venues\VenueResource;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -17,9 +17,6 @@ class CreateVenue extends CreateRecord
     #[\Override]
     protected function handleRecordCreation(array $data): Model
     {
-        $address = is_array($this->data['address'] ?? null) ? $this->data['address'] : [];
-        $data['slug'] = app(GenerateVenueSlugAction::class)->handle((string) ($data['name'] ?? 'Venue'), $address);
-
-        return parent::handleRecordCreation($data);
+        return app(SaveVenueAction::class)->handle($data);
     }
 }

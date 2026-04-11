@@ -31,6 +31,7 @@ use App\Models\SocialMedia;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
+use App\Models\Venue;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -57,6 +58,7 @@ class ContributionEntityMutationService
             $entity instanceof Speaker => $this->speakerState($entity),
             $entity instanceof Reference => $this->referenceState($entity),
             $entity instanceof Event => $this->eventState($entity),
+            $entity instanceof Venue => $this->venueState($entity),
             default => throw new RuntimeException('Unsupported contribution entity type.'),
         };
     }
@@ -712,6 +714,28 @@ class ContributionEntityMutationService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function venueState(Venue $venue): array
+    {
+        $venue->loadMissing(['address', 'contacts', 'socialMedia']);
+
+        return [
+            'name' => $venue->name,
+            'type' => $venue->type instanceof BackedEnum ? $venue->type->value : (string) $venue->type,
+            'facilities' => collect((array) $venue->facilities)
+                ->filter(static fn (mixed $enabled): bool => (bool) $enabled)
+                ->keys()
+                ->map(static fn (mixed $key): string => (string) $key)
+                ->values()
+                ->all(),
+            'address' => $this->addressState($venue->addressModel),
+            'contacts' => $this->contactsState($venue->contacts),
+            'social_media' => $this->socialMediaState($venue->socialMedia),
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function syncInstitutionRelations(Institution $institution, array $payload): void
@@ -760,6 +784,24 @@ class ContributionEntityMutationService
     {
         if (array_key_exists('social_media', $payload)) {
             $this->syncSocialMedia($reference, $payload['social_media']);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function syncVenueRelations(Venue $venue, array $payload): void
+    {
+        if (array_key_exists('address', $payload)) {
+            $this->syncAddress($venue, $payload['address'], allowCountryOnly: true);
+        }
+
+        if (array_key_exists('contacts', $payload)) {
+            $this->syncContacts($venue, $payload['contacts']);
+        }
+
+        if (array_key_exists('social_media', $payload)) {
+            $this->syncSocialMedia($venue, $payload['social_media']);
         }
     }
 

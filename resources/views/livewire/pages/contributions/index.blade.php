@@ -63,44 +63,53 @@
                             $event = $submission->event;
                             $eventStatus = str(class_basename($event->status))->snake()->toString();
                             $eventDetails = $this->eventSubmissionDetails($submission);
+                            $eventUrl = route('events.show', $event);
                         @endphp
 
-                        <article class="rounded-2xl border border-slate-200 p-5">
-                            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                                <div class="space-y-2">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                            {{ __('Event Submission') }}
-                                        </span>
-                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($eventStatus) }}">
-                                            {{ $eventStatusLabel($event->status) }}
-                                        </span>
-                                    </div>
-
-                                    <p class="text-sm text-slate-600">
-                                        {{ __('Submitted :date', ['date' => $submission->created_at?->diffForHumans()]) }}
-                                    </p>
-
-                                    <p class="text-base font-semibold text-slate-900">
-                                        {{ $event->title }}
-                                    </p>
-
-                                    @if(filled($submission->notes))
-                                        <p class="text-sm leading-6 text-slate-700">{{ $submission->notes }}</p>
-                                    @endif
-
-                                    @if($eventDetails !== [])
-                                        <div class="flex flex-wrap gap-2 pt-1">
-                                            @foreach($eventDetails as $detail)
-                                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                                                    {{ $detail }}
-                                                </span>
-                                            @endforeach
+                        <a href="{{ $eventUrl }}" wire:navigate
+                            class="block rounded-2xl border border-slate-200 p-5 transition hover:border-emerald-300 hover:bg-emerald-50/40">
+                            <article>
+                                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                    <div class="space-y-2">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                {{ __('Event Submission') }}
+                                            </span>
+                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($eventStatus) }}">
+                                                {{ $eventStatusLabel($event->status) }}
+                                            </span>
                                         </div>
-                                    @endif
+
+                                        <p class="text-sm text-slate-600">
+                                            {{ __('Submitted :date', ['date' => $submission->created_at?->diffForHumans()]) }}
+                                        </p>
+
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <p class="text-base font-semibold text-slate-900">
+                                                {{ $event->title }}
+                                            </p>
+                                            <span class="text-sm font-medium text-emerald-700">
+                                                {{ __('Open event') }}
+                                            </span>
+                                        </div>
+
+                                        @if(filled($submission->notes))
+                                            <p class="text-sm leading-6 text-slate-700">{{ $submission->notes }}</p>
+                                        @endif
+
+                                        @if($eventDetails !== [])
+                                            <div class="flex flex-wrap gap-2 pt-1">
+                                                @foreach($eventDetails as $detail)
+                                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                                                        {{ $detail }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
-                            </div>
-                        </article>
+                            </article>
+                        </a>
                     @empty
                         <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
                             <p class="text-base font-semibold text-slate-700">{{ __('No event submissions yet.') }}</p>
@@ -311,11 +320,7 @@
         <section class="mt-8 rounded-4xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-2xl">
-                    <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">{{ __('Membership') }}</p>
-                    <h2 class="mt-3 font-heading text-2xl font-bold text-slate-900">{{ __('Tuntut Keahlian') }}</h2>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                        {{ __('Jika anda benar-benar mengurus institusi atau penceramah tertentu, cari rekodnya di sini dan teruskan ke borang tuntutan. Laluan ini diletakkan di halaman sumbangan kerana ia hanya relevan kepada sebilangan kecil pengguna.') }}
-                    </p>
+                    <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">{{ __('Institution & Speaker Management') }}</p>
                 </div>
 
                 <a href="{{ route('membership-claims.index') }}" wire:navigate

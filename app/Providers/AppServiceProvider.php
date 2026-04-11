@@ -149,7 +149,7 @@ class AppServiceProvider extends ServiceProvider
 
         if (! self::$languageSwitchConfigured) {
             LanguageSwitch::configureUsing(function (LanguageSwitch $switch): void {
-                $switch->locales(['en', 'ms', 'jv', 'ta', 'zh']);
+                $switch->locales(['en', 'ms', 'ar', 'jv', 'ta', 'zh']);
             });
             self::$languageSwitchConfigured = true;
         }

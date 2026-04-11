@@ -71,6 +71,40 @@ it('requires justification and evidence on the public claim form', function () {
         ]);
 });
 
+it('renders the public membership claim page in Malay without a side-by-side layout', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'name' => 'Ustaz Kazim Elias',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('membership-claims.create', [
+        'subjectType' => MemberSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ]))
+        ->assertOk()
+        ->assertSee('Pengurusan')
+        ->assertSee('Tuntut Pengurusan')
+        ->assertSee('Gunakan borang ini apabila anda benar-benar terlibat dengan rekod ini dan memerlukan akses untuk membantu menguruskannya. Tuntutan ini akan disemak oleh moderator sebelum pengurusan diberikan.')
+        ->assertSee('Rekod Dipilih')
+        ->assertSee('Menuntut akses untuk penceramah ini')
+        ->assertSee('Sila sahkan bahawa ini ialah penceramah yang anda mahu tuntut sebelum menghantar.')
+        ->assertSee('Hantar Tuntutan')
+        ->assertSee('Tuntutan Saya')
+        ->assertSee('Nota semakan')
+        ->assertSee('Tuntutan tidak memberi akses serta-merta')
+        ->assertSee('Penyemak menentukan peranan akhir')
+        ->assertSee('Mengapa anda patut ditambah?')
+        ->assertSee('Fail Bukti')
+        ->assertDontSee('Use this form when you belong to this record and need access to help maintain it. Claims are reviewed by moderators before membership is granted.')
+        ->assertDontSee('Review notes')
+        ->assertDontSee('lg:grid-cols-[1.1fr_0.9fr]', false);
+});
+
 it('lets claimants cancel pending claims from the history page', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create();
@@ -133,11 +167,11 @@ it('does not show membership claim call to action on public institution and spea
         ->get(route('institutions.show', $institution))
         ->assertSuccessful()
         ->assertDontSee($institutionClaimUrl, false)
-        ->assertDontSee('Tuntut Keahlian');
+        ->assertDontSee('Tuntut Pengurusan');
 
     $this->actingAs($user)
         ->get(route('speakers.show', $speaker))
         ->assertSuccessful()
         ->assertDontSee($speakerClaimUrl, false)
-        ->assertDontSee('Tuntut Keahlian');
+        ->assertDontSee('Tuntut Pengurusan');
 });

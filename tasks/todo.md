@@ -218,12 +218,88 @@
   - added [ReindexSpeakerSearch.php](/Users/Saiffil/Herd/majlisilmu/app/Console/Commands/ReindexSpeakerSearch.php) with `speakers:reindex-search` and a `--chunk` option
   - extended [SpeakerSearchService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Search/SpeakerSearchService.php) with a bulk `reindexAll()` path plus a schema-readiness check so the command fails cleanly before migrations and only busts cached public search IDs once at the end
   - added [ReindexSpeakerSearchCommandTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Console/ReindexSpeakerSearchCommandTest.php) to prove the command rebuilds stale `searchable_name` values and `speaker_search_terms`
+
+# Admin API Venue Write Support
+
+- [x] Add venue admin API write support to the mutation whitelist, schema, defaults, rules, and create/update dispatch
+- [x] Introduce a shared venue save action so admin API writes reuse the same relation/media orchestration as the panel resource
+- [x] Add focused admin API regression coverage for venue manifest/meta/schema and `is_active` updates
+- [x] Run targeted verification and document the result here
+
+## Review
+
+- Root cause:
+  - the generic admin API mutation layer only whitelisted `events`, `institutions`, `references`, `speakers`, and `subdistricts`, so `venues` exposed read metadata through Filament but had no write schema or `store`/`update` support
+  - venue persistence also lacked a dedicated save action, leaving the admin API without a safe place to orchestrate slug generation, address/contact/social syncing, and media updates the same way the Filament venue pages already needed
+- Fix:
+  - added [SaveVenueAction.php](/Users/Saiffil/Herd/majlisilmu/app/Actions/Venues/SaveVenueAction.php) to normalize venue payloads, generate slugs on create, sync address/contacts/social media, and manage `cover`/`gallery` media plus `is_active` and facilities state
+  - extended [ContributionEntityMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php) with venue state serialization and `syncVenueRelations()` so update-schema defaults and admin API writes can reuse the existing address/contact/social helpers
+  - enabled `venues` in [AdminResourceMutationService.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Api/Admin/AdminResourceMutationService.php), including write support metadata, schema fields/defaults, validation rules, and create/update dispatch
+  - switched [CreateVenue.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Venues/Pages/CreateVenue.php) and [EditVenue.php](/Users/Saiffil/Herd/majlisilmu/app/Filament/Resources/Venues/Pages/EditVenue.php) to the same save action so venue panel writes and admin API writes now go through one persistence path
+  - added focused admin API regressions in [AdminApiTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/Api/Admin/AdminApiTest.php) for manifest visibility, venue meta/schema exposure, create/update flows, and `is_active` toggling
 - Verification:
-  - `vendor/bin/pest --parallel --compact tests/Feature/Console/ReindexSpeakerSearchCommandTest.php` => **1 passed**
-  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => **14 passed**
-  - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='searches speakers api by formatted title parts used on the public directory|uses the same stable public directory ordering in the frontend speaker api'` => **2 passed**
-  - `vendor/bin/phpstan analyse --ansi app/Console/Commands/ReindexSpeakerSearch.php app/Support/Search/SpeakerSearchService.php tests/Feature/Console/ReindexSpeakerSearchCommandTest.php` => **No errors**
-  - `vendor/bin/pint --test app/Console/Commands/ReindexSpeakerSearch.php app/Support/Search/SpeakerSearchService.php tests/Feature/Console/ReindexSpeakerSearchCommandTest.php tasks/todo.md` => **pass**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **17 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **35 passed**
+  - `vendor/bin/pest --parallel --compact --filter="admins create venues in filament" tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **1 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Actions/Venues/SaveVenueAction.php app/Filament/Resources/Venues/Pages/CreateVenue.php app/Filament/Resources/Venues/Pages/EditVenue.php app/Services/ContributionEntityMutationService.php app/Support/Api/Admin/AdminResourceMutationService.php tests/Feature/Api/Admin/AdminApiTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Actions/Venues/SaveVenueAction.php app/Filament/Resources/Venues/Pages/CreateVenue.php app/Filament/Resources/Venues/Pages/EditVenue.php app/Services/ContributionEntityMutationService.php app/Support/Api/Admin/AdminResourceMutationService.php tests/Feature/Api/Admin/AdminApiTest.php` => **pass**
+  - `git diff --check` => **pass**
+
+# Public Menu Language And Country Chrome
+
+- [x] Update the public language menu to keep labels visually title-cased instead of forced uppercase
+- [x] Change the public country selector to flag-only presentation while keeping accessible labels/tooltips
+- [x] Refresh focused public menu regression coverage
+- [x] Run targeted verification and document the result here
+
+## Review
+
+- Root cause:
+  - the public header language switcher forced locale labels through uppercase styling, so `Melayu`, `English`, and `Jawa` rendered as all-caps even though the configured labels were already correct
+  - the country selector spent horizontal space on repeated country names in both desktop and mobile menus, even though the requirement had narrowed to a compact flag-only picker
+- Fix:
+  - updated [app.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/layouts/app.blade.php) so the language switcher no longer uses the `uppercase` class and now exposes stable `data-language-switcher-*` hooks for regression checks
+  - changed the desktop and mobile country selector UI to render only the country flag while preserving `aria-label` and `title` text for accessibility/tooltips, plus added `data-country-selector-style="flag-only"` hooks
+  - refreshed [PublicCountrySelectorTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicCountrySelectorTest.php) to assert the new flag-only country markup and the removal of forced uppercase from the public language switcher
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicCountrySelectorTest.php` => **4 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AboutPageTest.php` => **8 passed**
+  - `vendor/bin/pint --test resources/views/layouts/app.blade.php tests/Feature/PublicCountrySelectorTest.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `git diff --check` => **pass**
+
+# Uncommitted Worktree Audit
+
+- [x] Audit all current uncommitted changes by change group and identify concrete regressions or risky gaps
+- [x] Fix confirmed issues without reverting unrelated user work
+- [x] Run focused verification across the touched change groups
+- [x] Record the audit result and commands here
+
+## Review
+
+- Scope audited:
+  - Arabic locale registration and RTL shell changes across the public/auth/error layouts
+  - `/sumbangan` contribution inbox, membership-claim layout/copy changes, and translation-file updates
+  - admin venue API write support, shared venue save flow, and related test coverage
+  - public language/country header chrome on desktop and mobile
+- Confirmed issue fixed:
+  - the public language menu still rendered every `supported_locales` entry, so Arabic/Chinese/Tamil remained visible in the header dropdown even after the UI requirement narrowed the public menu to `Melayu`, `English`, and `Jawa`
+  - fixed this by introducing `public_menu_locales` in [config/app.php](/Users/Saiffil/Herd/majlisilmu/config/app.php), updating [app.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/layouts/app.blade.php) to render only that subset, and extending [PublicCountrySelectorTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicCountrySelectorTest.php) to prove `ar`, `zh`, and `ta` are absent from the public menu while flag-only country presentation remains intact
+- Notes:
+  - the broader venue/admin and contribution locale changes held up under focused manual diff review; no additional functional regressions surfaced after the public-menu locale leak was corrected
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AboutPageTest.php` => **8 passed (19 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicCountrySelectorTest.php` => **4 passed (41 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventTranslationCoverageTest.php` => **2 passed (31 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **31 passed (218 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/MembershipClaimPagesTest.php` => **7 passed (43 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **17 passed (245 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **35 passed (86 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Middleware/SetLocale.php app/Providers/AppServiceProvider.php app/Livewire/Pages/Contributions/Index.php app/Services/ContributionEntityMutationService.php app/Support/Api/Admin/AdminResourceMutationService.php app/Filament/Resources/Venues/Pages/CreateVenue.php app/Filament/Resources/Venues/Pages/EditVenue.php app/Actions/Venues/SaveVenueAction.php tests/Feature/AboutPageTest.php tests/Feature/PublicCountrySelectorTest.php tests/Feature/SubmitEventTranslationCoverageTest.php tests/Feature/ContributionPagesTest.php tests/Feature/MembershipClaimPagesTest.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/VenueReferenceEventSlugGenerationTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Http/Middleware/SetLocale.php app/Providers/AppServiceProvider.php app/Livewire/Pages/Contributions/Index.php app/Services/ContributionEntityMutationService.php app/Support/Api/Admin/AdminResourceMutationService.php app/Filament/Resources/Venues/Pages/CreateVenue.php app/Filament/Resources/Venues/Pages/EditVenue.php app/Actions/Venues/SaveVenueAction.php config/app.php resources/views/layouts/app.blade.php resources/views/layouts/auth.blade.php resources/views/components/layouts/auth/simple.blade.php resources/views/welcome.blade.php resources/views/errors/404.blade.php resources/views/errors/500.blade.php resources/views/livewire/pages/contributions/index.blade.php resources/views/livewire/pages/membership-claims/create.blade.php tests/Feature/AboutPageTest.php tests/Feature/PublicCountrySelectorTest.php tests/Feature/SubmitEventTranslationCoverageTest.php tests/Feature/ContributionPagesTest.php tests/Feature/MembershipClaimPagesTest.php tests/Feature/Api/Admin/AdminApiTest.php tests/Feature/VenueReferenceEventSlugGenerationTest.php tasks/todo.md tasks/lessons.md` => **pass**
+  - `php -r '$files=["resources/lang/en.json","resources/lang/ms.json","resources/lang/ms_MY.json","resources/lang/ar.json"]; foreach($files as $file){$json=file_get_contents($file); json_decode($json,true,512,JSON_THROW_ON_ERROR); echo $file,": OK\n";}'` => **all JSON files valid**
+  - `git diff --check` => **pass**
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app/Models` => **no matches**
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models` => **no matches**
 
 # Speaker Detail API Web Parity
 
@@ -9012,3 +9088,78 @@
   - `php artisan test tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='speaker|contribution contracts'` => **8 passed**
   - `vendor/bin/phpstan analyse --ansi app/Forms/SharedFormSchema.php app/Forms/SpeakerContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitSpeaker.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Support/Api/Frontend/FrontendFormContractService.php tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **No errors**
   - `vendor/bin/pint app/Forms/SharedFormSchema.php app/Forms/SpeakerContributionFormSchema.php app/Livewire/Pages/Contributions/SubmitSpeaker.php resources/views/livewire/pages/contributions/submit-speaker.blade.php app/Http/Controllers/Api/Frontend/ContributionController.php app/Support/Api/Frontend/FrontendFormContractService.php tests/Feature/ContributionPagesTest.php tests/Feature/SharedFormSchemaTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json tasks/todo.md` => **formatted cleanly**
+
+# Contributions Inbox Cleanup Todo
+
+- [x] Inspect the `/sumbangan` page data sources, card copy, and membership claim form layout
+- [x] Limit `Status Hantaran Majlis` to event submissions outside the user's institution memberships and make each entry link to the event
+- [x] Update the institution/speaker empty state and membership section copy/layout, including wider institution record labels with location context
+- [x] Add focused regressions and verify with targeted Pest, formatting, and diff checks
+
+## Review
+- Root cause:
+  - the `/sumbangan` inbox listed every event submission by `submitted_by`, so users still saw submissions for institutions they already manage even though those records already have a home in the institution dashboard
+  - event submission cards were plain text blocks with no direct route back to the underlying event, which made the status list harder to act on
+  - the membership section still used the older headline/body copy and the institution search labels stopped at the institution name without the geography context users need to distinguish similar records
+- Fix:
+  - scoped `submittedEvents()` in [Index.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/Index.php) so `/sumbangan` now excludes submissions whose event institution already contains the current user as a member, while still keeping events without an institution in the list
+  - made each event submission card in [index.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/contributions/index.blade.php) a `wire:navigate` link to `route('events.show', $event)` and refreshed the membership block copy to the new “Pengurusan Institusi & Penceramah” treatment
+  - widened the membership claim form layout to a 1:2 record-type vs record selector split, and reused `AddressHierarchyFormatter` so institution options now read like `Masjid Payung - Shah Alam, Petaling, Selangor`
+  - updated Malay translation copy in [ms.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms.json) and [ms_MY.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms_MY.json), plus matching English keys in [en.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/en.json)
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **31 passed (218 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/MembershipClaimPagesTest.php` => **6 passed (26 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Contributions/Index.php tests/Feature/ContributionPagesTest.php tests/Feature/MembershipClaimPagesTest.php` => **No errors**
+  - `php -r 'foreach (["resources/lang/en.json", "resources/lang/ms.json", "resources/lang/ms_MY.json"] as $file) { json_decode(file_get_contents($file), true); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.": ".json_last_error_msg().PHP_EOL); exit(1); } } echo "json ok\n";'` => **json ok**
+  - `vendor/bin/pint app/Livewire/Pages/Contributions/Index.php resources/views/livewire/pages/contributions/index.blade.php tests/Feature/ContributionPagesTest.php tests/Feature/MembershipClaimPagesTest.php` => **formatted cleanly**
+  - `vendor/bin/pint --test app/Livewire/Pages/Contributions/Index.php resources/views/livewire/pages/contributions/index.blade.php tests/Feature/ContributionPagesTest.php tests/Feature/MembershipClaimPagesTest.php` => **pass**
+  - `git diff --check -- app/Livewire/Pages/Contributions/Index.php resources/views/livewire/pages/contributions/index.blade.php tests/Feature/ContributionPagesTest.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json tasks/todo.md` => **No diff formatting issues**
+
+# Membership Claim Page Layout And Translation Todo
+
+- [x] Inspect the public membership claim page layout and identify untranslated copy
+- [x] Stack the page sections vertically instead of rendering them side by side
+- [x] Add the missing locale strings so the page is fully translated in Malay
+- [x] Add focused regression coverage and verify with targeted Pest, formatting, and diff checks
+
+## Review
+- Root cause:
+  - the public membership-claim page still used a responsive two-column grid, so the claim form and review-notes panel sat side by side on larger screens even though this flow reads better as a single vertical progression
+  - most of the page strings were wrapped in `__()` but had no matching Malay translations, so `/tuntut-keahlian/...` still rendered a mixed Malay-English page
+- Fix:
+  - changed [create.blade.php](/Users/Saiffil/Herd/majlisilmu/resources/views/livewire/pages/membership-claims/create.blade.php) so the main claim card and the review-notes panel now stack vertically with a simple `mt-8` separation instead of an `lg:grid-cols-[1.1fr_0.9fr]` split
+  - added the missing claim-page locale keys in [en.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/en.json), [ms.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms.json), and [ms_MY.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ms_MY.json), including the new `Tuntut Pengurusan` wording and the rest of the form/review-note copy
+  - extended [MembershipClaimPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/MembershipClaimPagesTest.php) with an `ms`-locale page assertion that checks the translated content and confirms the old side-by-side grid class is gone
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/MembershipClaimPagesTest.php` => **7 passed (43 assertions)**
+  - `vendor/bin/pint --test resources/views/livewire/pages/membership-claims/create.blade.php tests/Feature/MembershipClaimPagesTest.php` => **pass**
+  - `php -r 'foreach (["resources/lang/en.json", "resources/lang/ms.json", "resources/lang/ms_MY.json"] as $file) { json_decode(file_get_contents($file), true); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.": ".json_last_error_msg().PHP_EOL); exit(1); } } echo "json ok\n";'` => **json ok**
+  - `git diff --check -- resources/views/livewire/pages/membership-claims/create.blade.php tests/Feature/MembershipClaimPagesTest.php resources/lang/en.json resources/lang/ms.json resources/lang/ms_MY.json tasks/todo.md` => **No diff formatting issues**
+
+# Arabic Locale Support Todo
+
+- [x] Register Arabic as a supported application locale and expose it in the language switchers
+- [x] Add RTL-aware rendering for Arabic on the public layouts
+- [x] Add Arabic locale resources for shared public copy and structured content
+- [x] Extend locale coverage tests and verify the new language end to end
+
+## Review
+- Root cause:
+  - the public locale system already knew about Arabic in peripheral places like seeded test languages, but the actual application `supported_locales` list and Filament language switch still excluded `ar`, so users could not select Arabic as a first-class UI locale
+  - the public Blade shells had some `rtl:` utility usage, but the root `<html>` tags never set `dir="rtl"`, so Arabic would still render with left-to-right document flow
+  - if Arabic reused the project's default Malay fallback, untranslated keys would leak Malay copy into an Arabic session instead of degrading cleanly to English
+- Fix:
+  - added `ar => العربية` to [config/app.php](/Users/Saiffil/Herd/majlisilmu/config/app.php), registered `ar` in the Filament language switch inside [AppServiceProvider.php](/Users/Saiffil/Herd/majlisilmu/app/Providers/AppServiceProvider.php), and declared `rtl_locales` for shared view logic
+  - updated [SetLocale.php](/Users/Saiffil/Herd/majlisilmu/app/Http/Middleware/SetLocale.php) so Arabic requests use English as their fallback locale, preventing missing Arabic keys from falling through to Malay
+  - added `dir="rtl"` handling to the public, auth, welcome, and error layout roots so Arabic sessions activate proper RTL rendering throughout the main shell
+  - added Arabic resource files in [ar.json](/Users/Saiffil/Herd/majlisilmu/resources/lang/ar.json), [ar/about.php](/Users/Saiffil/Herd/majlisilmu/resources/lang/ar/about.php), and [ar/notifications.php](/Users/Saiffil/Herd/majlisilmu/resources/lang/ar/notifications.php) so the public shell and About page have Arabic copy while long-tail untranslated keys degrade to English instead of Malay
+  - extended [AboutPageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/AboutPageTest.php), [PublicCountrySelectorTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/PublicCountrySelectorTest.php), and [SubmitEventTranslationCoverageTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/SubmitEventTranslationCoverageTest.php) to cover Arabic locale registration, RTL rendering, and JSON coverage
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AboutPageTest.php` => **8 passed (19 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicCountrySelectorTest.php` => **4 passed (30 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventTranslationCoverageTest.php` => **2 passed (31 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Http/Middleware/SetLocale.php app/Providers/AppServiceProvider.php tests/Feature/AboutPageTest.php tests/Feature/PublicCountrySelectorTest.php tests/Feature/SubmitEventTranslationCoverageTest.php` => **No errors**
+  - `vendor/bin/pint --test app/Http/Middleware/SetLocale.php app/Providers/AppServiceProvider.php resources/views/layouts/app.blade.php resources/views/layouts/auth.blade.php resources/views/components/layouts/auth/simple.blade.php resources/views/errors/404.blade.php resources/views/errors/500.blade.php resources/views/welcome.blade.php resources/lang/ar/about.php resources/lang/ar/notifications.php tests/Feature/AboutPageTest.php tests/Feature/PublicCountrySelectorTest.php tests/Feature/SubmitEventTranslationCoverageTest.php` => **pass**
+  - `php -l app/Http/Middleware/SetLocale.php && php -l app/Providers/AppServiceProvider.php && php -l resources/lang/ar/about.php && php -l resources/lang/ar/notifications.php` => **No syntax errors**
+  - `php -r 'foreach (["resources/lang/en.json", "resources/lang/ms.json", "resources/lang/ms_MY.json", "resources/lang/ar.json"] as $file) { json_decode(file_get_contents($file), true); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.": ".json_last_error_msg().PHP_EOL); exit(1); } } echo "json ok\n";'` => **json ok**
+  - `git diff --check -- config/app.php app/Providers/AppServiceProvider.php app/Http/Middleware/SetLocale.php resources/views/layouts/app.blade.php resources/views/layouts/auth.blade.php resources/views/components/layouts/auth/simple.blade.php resources/views/errors/404.blade.php resources/views/errors/500.blade.php resources/views/welcome.blade.php resources/lang/ar.json resources/lang/ar/about.php resources/lang/ar/notifications.php tests/Feature/AboutPageTest.php tests/Feature/PublicCountrySelectorTest.php tests/Feature/SubmitEventTranslationCoverageTest.php tasks/todo.md` => **No diff formatting issues**
