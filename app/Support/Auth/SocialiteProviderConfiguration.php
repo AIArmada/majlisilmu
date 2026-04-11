@@ -6,23 +6,48 @@ final class SocialiteProviderConfiguration
 {
     public static function isConfigured(string $provider): bool
     {
-        $config = config("services.{$provider}");
+        $config = self::serviceConfig($provider);
 
-        if (! is_array($config)) {
-            return false;
-        }
-
-        $isConfigured = filled($config['client_id'] ?? null)
-            && filled($config['client_secret'] ?? null)
-            && filled($config['redirect'] ?? null);
-
-        if (! $isConfigured) {
+        if (! self::hasRequiredConfiguration($config)) {
             return false;
         }
 
         // Google OAuth does not accept arbitrary `.test` callback domains, so do not
         // expose a broken social login CTA on local Herd-style environments.
         return ! (app()->environment('local') && self::usesUnsupportedLocalRedirect($config['redirect'] ?? null));
+    }
+
+    public static function supportsTokenExchange(string $provider): bool
+    {
+        return self::hasRequiredConfiguration(self::serviceConfig($provider));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function serviceConfig(string $provider): ?array
+    {
+        $config = config("services.{$provider}");
+
+        if (! is_array($config)) {
+            return null;
+        }
+
+        return $config;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $config
+     */
+    private static function hasRequiredConfiguration(?array $config): bool
+    {
+        if ($config === null) {
+            return false;
+        }
+
+        return filled($config['client_id'] ?? null)
+            && filled($config['client_secret'] ?? null)
+            && filled($config['redirect'] ?? null);
     }
 
     private static function usesUnsupportedLocalRedirect(mixed $redirect): bool

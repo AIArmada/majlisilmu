@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Auth\ResolveSocialiteUserAction;
 use App\Http\Controllers\Controller;
-use App\Models\SocialAccount;
-use App\Models\User;
 use App\Services\ShareTrackingService;
 use App\Services\Signals\ProductSignalsService;
 use App\Support\Auth\IntendedRedirect;
@@ -35,7 +34,7 @@ class SocialiteController extends Controller
     /**
      * Handle the OAuth callback.
      */
-    public function callback(string $provider): RedirectResponse
+    public function callback(string $provider, ResolveSocialiteUserAction $resolveSocialiteUserAction): RedirectResponse
     {
         if (! SocialiteProviderConfiguration::isConfigured($provider)) {
             return redirect()->route('login')->with('toast', [
@@ -53,43 +52,9 @@ class SocialiteController extends Controller
             ]);
         }
 
-        $account = SocialAccount::query()
-            ->where('provider', $provider)
-            ->where('provider_id', $socialUser->getId())
-            ->first();
-
-        if ($account) {
-            $account->update([
-                'avatar_url' => $socialUser->getAvatar(),
-            ]);
-
-            $user = $account->user;
-            $createdFromShare = false;
-        } else {
-            $user = User::query()->where('email', $socialUser->getEmail())->first();
-            $createdFromShare = false;
-
-            if (! $user) {
-                $user = User::query()->create([
-                    'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'User',
-                    'email' => $socialUser->getEmail(),
-                    'email_verified_at' => now(),
-                ]);
-                $createdFromShare = true;
-            }
-
-            SocialAccount::query()->updateOrCreate([
-                'user_id' => $user->id,
-                'provider' => $provider,
-            ], [
-                'provider_id' => $socialUser->getId(),
-                'avatar_url' => $socialUser->getAvatar(),
-            ]);
-        }
-
-        if (! $user->hasVerifiedEmail() && filled($socialUser->getEmail())) {
-            $user->markEmailAsVerified();
-        }
+        $result = $resolveSocialiteUserAction->handle($provider, $socialUser);
+        $user = $result['user'];
+        $createdFromShare = $result['created_account'];
 
         Auth::login($user, remember: true);
         app(ProductSignalsService::class)->recordLogin($user, request(), $provider, $createdFromShare);
