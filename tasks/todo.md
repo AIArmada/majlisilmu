@@ -7,9 +7,10 @@
 ## Review
 
 - Added an optional hero reference block in the event detail hero so the book subtitle now renders before the location chip.
+- Moved the full references section ahead of the location section in the main event-detail column and added stable DOM hooks so the order is regression-tested directly.
 - Reused existing translation keys for the hero label and switched the reference section heading to the shared `References` key so the page stays localized without introducing a new copy path.
 - Verification:
-  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **26 passed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => **27 passed**
   - `vendor/bin/pint --dirty --format agent` => **pass**
   - `get_errors` on the touched hero, event-show, and test files => **no errors**
 

@@ -356,6 +356,40 @@ describe('Event Show Page Location & Contact Info', function () {
             ->toBeLessThan(strpos($html, 'data-testid="event-hero-location"'));
     });
 
+    it('renders the references section before the location section in the main content', function () {
+        $venue = Venue::factory()->create([
+            'name' => 'Masjid Al-Hidayah',
+        ]);
+
+        $venue->addMedia(UploadedFile::fake()->image('venue-cover.jpg', 1600, 900))
+            ->toMediaCollection('cover');
+
+        $reference = Reference::factory()->create([
+            'title' => 'Al-Hikam',
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'venue_id' => $venue->id,
+        ]);
+
+        $event->references()->attach($reference->id);
+
+        $response = $this->get(route('events.show', $event));
+
+        $response->assertOk()
+            ->assertSee(__('References'))
+            ->assertSee(__('Location'));
+
+        $html = (string) $response->getContent();
+
+        expect(strpos($html, 'data-testid="event-detail-references-section"'))
+            ->toBeLessThan(strpos($html, 'data-testid="event-detail-location-section"'));
+    });
+
     it('does not use speaker images as hero background when location media is missing', function () {
         $speaker = Speaker::factory()->create();
         $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg', 800, 800))

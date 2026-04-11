@@ -1006,9 +1006,71 @@
                 </section>
             @endif
 
+            {{-- REFERENCES --}}
+            @if($event->references->isNotEmpty())
+                <section data-testid="event-detail-references-section" class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="mb-6 flex items-center gap-3">
+                        <div class="flex size-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                        </div>
+                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('References') }}</h2>
+                    </div>
+
+                    <div @class([
+                        'grid gap-5',
+                        'sm:grid-cols-2' => $event->references->count() > 1,
+                    ])>
+                        @foreach($event->references as $reference)
+                            <a href="{{ route('references.show', $reference) }}" wire:navigate wire:key="ref-{{ $reference->id }}"
+                                class="group flex gap-5 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-100">
+                                @php $coverUrl = $reference->getFirstMediaUrl('front_cover', 'thumb'); @endphp
+                                @if($coverUrl)
+                                    <div
+                                        class="w-20 shrink-0 overflow-hidden rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105">
+                                        <img src="{{ $coverUrl }}" alt="{{ $reference->title }}" class="h-28 w-full object-cover"
+                                            loading="lazy">
+                                    </div>
+                                @else
+                                    <div
+                                        class="flex w-20 shrink-0 items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100">
+                                        <svg class="size-8 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                        </svg>
+                                    </div>
+                                @endif
+                                <div class="min-w-0 flex-1 py-1">
+                                    <h4
+                                        class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-indigo-700">
+                                        {{ $reference->title }}
+                                    </h4>
+                                    @if($reference->author)
+                                        <p class="mt-1.5 text-sm font-medium text-slate-600">{{ $reference->author }}</p>
+                                    @endif
+                                    @if($reference->publisher)
+                                        <p class="mt-1 text-xs text-slate-400">{{ $reference->publisher }}</p>
+                                    @endif
+                                </div>
+                                <div class="flex shrink-0 items-center">
+                                    <div
+                                        class="flex size-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all duration-300 group-hover:bg-indigo-100 group-hover:text-indigo-600">
+                                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             {{-- Location cover (institution/venue) --}}
             @if($locationCover)
-                    <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
+                    <section data-testid="event-detail-location-section" class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
                         <div class="mb-5 flex items-center gap-3">
                             <div class="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
                                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1248,68 +1310,6 @@
             </div>
             </section>
         @endif
-
-    {{-- REFERENCES --}}
-    @if($event->references->isNotEmpty())
-        <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
-            <div class="mb-6 flex items-center gap-3">
-                <div class="flex size-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-                    <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                </div>
-                <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('References') }}</h2>
-            </div>
-
-            <div @class([
-                'grid gap-5',
-                'sm:grid-cols-2' => $event->references->count() > 1,
-            ])>
-                @foreach($event->references as $reference)
-                    <a href="{{ route('references.show', $reference) }}" wire:navigate wire:key="ref-{{ $reference->id }}"
-                        class="group flex gap-5 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-100">
-                        @php $coverUrl = $reference->getFirstMediaUrl('front_cover', 'thumb'); @endphp
-                        @if($coverUrl)
-                            <div
-                                class="w-20 shrink-0 overflow-hidden rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105">
-                                <img src="{{ $coverUrl }}" alt="{{ $reference->title }}" class="h-28 w-full object-cover"
-                                    loading="lazy">
-                            </div>
-                        @else
-                            <div
-                                class="flex w-20 shrink-0 items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100">
-                                <svg class="size-8 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                            </div>
-                        @endif
-                        <div class="min-w-0 flex-1 py-1">
-                            <h4
-                                class="font-heading text-base font-bold text-slate-900 transition-colors group-hover:text-indigo-700">
-                                {{ $reference->title }}
-                            </h4>
-                            @if($reference->author)
-                                <p class="mt-1.5 text-sm font-medium text-slate-600">{{ $reference->author }}</p>
-                            @endif
-                            @if($reference->publisher)
-                                <p class="mt-1 text-xs text-slate-400">{{ $reference->publisher }}</p>
-                            @endif
-                        </div>
-                        <div class="flex shrink-0 items-center">
-                            <div
-                                class="flex size-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all duration-300 group-hover:bg-indigo-100 group-hover:text-indigo-600">
-                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                                </svg>
-                            </div>
-                        </div>
-                    </a>
-                @endforeach
-            </div>
-        </section>
-    @endif
 
     {{-- SERIES CONTEXT --}}
     @if($event->series->isNotEmpty())
