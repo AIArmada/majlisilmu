@@ -1184,7 +1184,7 @@ it('keeps the institution contribution country field hidden while still storing 
     expect($components->get('country_id'))->toBeInstanceOf(Hidden::class);
 });
 
-it('uses a reduced region-only address contract on the dedicated speaker contribution form', function () {
+it('uses a reduced region-only address contract across speaker create and contribution forms', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -1237,11 +1237,12 @@ it('uses a reduced region-only address contract on the dedicated speaker contrib
     }
 
     foreach (['state_id', 'district_id', 'subdistrict_id'] as $field) {
+        expect($quickCreateComponents->has($field))->toBeTrue();
         expect($contributionComponents->has($field))->toBeTrue();
     }
 
     foreach (['line1', 'line2', 'postcode', 'google_maps_url', 'waze_url', 'lat', 'lng'] as $field) {
-        expect($quickCreateComponents->has($field))->toBeTrue();
+        expect($quickCreateComponents->has($field))->toBeFalse();
         expect($contributionComponents->has($field))->toBeFalse();
     }
 });
@@ -1265,9 +1266,7 @@ it('stores structured speaker quick-create details when creating a speaker via q
             'year' => '2020',
         ]],
         'language_ids' => [$language->id],
-        'line1' => 'Jalan Hikmah 8',
         'state_id' => 1,
-        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
         'contacts' => [[
             'category' => 'phone',
             'value' => '0123456789',
@@ -1288,15 +1287,17 @@ it('stores structured speaker quick-create details when creating a speaker via q
         ->findOrFail($speakerId);
 
     expect($speaker->qualifications)->toBeArray()
-        ->and($speaker->addressModel?->line1)->toBe('Jalan Hikmah 8')
-        ->and($speaker->addressModel?->google_maps_url)->toBe('https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869')
+        ->and($speaker->addressModel?->country_id)->toBe(132)
+        ->and($speaker->addressModel?->state_id)->toBe(1)
+        ->and($speaker->addressModel?->line1)->toBeNull()
+        ->and($speaker->addressModel?->google_maps_url)->toBeNull()
         ->and($speaker->contacts->pluck('value')->all())->toContain('0123456789')
         ->and($speaker->socialMedia->pluck('platform')->all())->toEqual(['facebook', 'youtube'])
         ->and($speaker->socialMedia->pluck('order_column')->all())->toEqual([1, 2])
         ->and($speaker->languages->pluck('id')->all())->toContain($language->id);
 });
 
-it('requires country fields in speaker public creation forms', function () {
+it('hides country fields in speaker public creation forms', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -1343,13 +1344,11 @@ it('requires country fields in speaker public creation forms', function () {
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
         ->get('country_id');
 
-    expect($quickCreateCountry)->toBeInstanceOf(Select::class)
+    expect($quickCreateCountry)->toBeInstanceOf(Hidden::class)
         ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
-    expect(method_exists($quickCreateCountry, 'isRequired'))->toBeTrue();
-    expect($quickCreateCountry?->isRequired())->toBeTrue();
 });
 
-it('requires country fields in the admin speaker form', function () {
+it('hides country fields in the admin speaker form', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -1384,13 +1383,19 @@ it('requires country fields in the admin speaker form', function () {
         return $flattened;
     };
 
-    $country = collect($flatten(AdminSpeakerForm::configure(Schema::make())->getComponents()))
-        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
-        ->get('country_id');
+    $adminComponents = collect($flatten(AdminSpeakerForm::configure(Schema::make())->getComponents()))
+        ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
+    $country = $adminComponents->get('country_id');
 
-    expect($country)->toBeInstanceOf(Select::class);
-    expect(method_exists($country, 'isRequired'))->toBeTrue();
-    expect($country?->isRequired())->toBeTrue();
+    expect($country)->toBeInstanceOf(Hidden::class);
+
+    foreach (['state_id', 'district_id', 'subdistrict_id'] as $field) {
+        expect($adminComponents->has($field))->toBeTrue();
+    }
+
+    foreach (['line1', 'line2', 'postcode', 'google_maps_url', 'waze_url', 'lat', 'lng'] as $field) {
+        expect($adminComponents->has($field))->toBeFalse();
+    }
 });
 
 it('requires country fields in the admin institution and venue forms', function () {

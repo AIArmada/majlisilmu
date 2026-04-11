@@ -154,7 +154,7 @@ new class extends Component
 @section('meta_description', \Illuminate\Support\Str::limit(trim(strip_tags((string) $this->institution->description)) ?: __('Lihat profil, lokasi, saluran sumbangan, dan majlis akan datang oleh :name di :app.', ['name' => $this->institution->name, 'app' => config('app.name')]), 160))
 @section('meta_robots', $this->institution->status === 'verified' ? 'index, follow' : 'noindex, nofollow')
 @section('og_url', route('institutions.show', $this->institution))
-@section('og_image', $this->institution->getFirstMediaUrl('cover', 'banner') ?: ($this->institution->getFirstMediaUrl('logo', 'thumb') ?: asset('images/placeholders/institution.png')))
+@section('og_image', $this->institution->public_image_url)
 @section('og_image_alt', __('Profil institusi :name', ['name' => $this->institution->name]))
 
 <style>
@@ -184,15 +184,11 @@ new class extends Component
         ];
     })->values();
 
-    $coverUrl = $institution->getFirstMediaUrl('cover', 'banner');
-    $logoUrl = $institution->getFirstMediaUrl('logo', 'thumb');
-    $heroInstitutionImageUrl = $coverUrl ?: $institution->getFirstMediaUrl('logo');
+    $coverUrl = $institution->public_cover_url;
+    $logoUrl = $institution->public_logo_url;
+    $heroInstitutionImageUrl = $institution->public_image_url;
     $sharePreviewHasCover = $institution->hasMedia('cover');
-    $sharePreviewImage = $sharePreviewHasCover
-        ? ($institution->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? $institution->getFirstMediaUrl('cover'))
-        : ($institution->hasMedia('logo')
-            ? ($institution->getFirstMedia('logo')?->getAvailableUrl(['thumb']) ?? $institution->getFirstMediaUrl('logo'))
-            : asset('images/placeholders/institution.png'));
+    $sharePreviewImage = $institution->public_image_url;
     $gallery = $institution->getMedia('gallery');
     $speakers = $institution->speakers;
     $spaces = $institution->spaces;

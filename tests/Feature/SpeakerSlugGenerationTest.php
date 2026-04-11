@@ -586,8 +586,8 @@ it('updates related event slugs when a speaker address change changes the speake
 
     $speaker->address()->firstOrFail()->delete();
 
-    expect($speaker->fresh()?->slug)->toBe('ustaz-ahmad-fauzi')
-        ->and($event->fresh()?->slug)->toBe("forum-alamat-penceramah-ustaz-ahmad-fauzi-{$expectedSuffix}");
+    expect($speaker->fresh()?->slug)->toBe('ustaz-ahmad-fauzi-my')
+        ->and($event->fresh()?->slug)->toBe("forum-alamat-penceramah-ustaz-ahmad-fauzi-my-{$expectedSuffix}");
 });
 
 it('queues the speaker slug backfill command', function () {
@@ -600,11 +600,11 @@ it('queues the speaker slug backfill command', function () {
     Queue::assertPushed(BackfillSpeakerSlugs::class);
 });
 
-it('skips the country suffix when speaker country data is missing', function () {
+it('falls back to the preferred country suffix when speaker country data is missing', function () {
     $country = createSpeakerSlugCountry();
     $generator = app(GenerateSpeakerSlugAction::class);
 
-    expect($generator->handle('Ustaz Tanpa Negara'))->toBe('ustaz-tanpa-negara')
+    expect($generator->handle('Ustaz Tanpa Negara'))->toBe('ustaz-tanpa-negara-my')
         ->and($generator->handle('Ustaz Malaysia', [
             'country_id' => (string) $country->getKey(),
         ]))->toBe('ustaz-malaysia-my')

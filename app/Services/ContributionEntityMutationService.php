@@ -106,7 +106,7 @@ class ContributionEntityMutationService
                     $this->field('social_media', 'array<object>'),
                 ],
                 'conditional_rules' => [],
-                'direct_edit_media_fields' => [],
+                'direct_edit_media_fields' => ['avatar', 'cover'],
             ],
             $entity instanceof Reference => [
                 'accepts_partial_updates' => true,
@@ -209,18 +209,18 @@ class ContributionEntityMutationService
                 'post_nominal.*' => ['string', Rule::in($this->enumValues(PostNominal::class))],
                 'bio' => ['nullable'],
                 'address' => ['sometimes', 'array'],
-                'address.country_id' => ['sometimes', 'integer', 'exists:countries,id'],
+                'address.country_id' => ['prohibited'],
                 'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
                 'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
                 'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
-                'address.line1' => ['nullable', 'string', 'max:255'],
-                'address.line2' => ['nullable', 'string', 'max:255'],
-                'address.postcode' => ['nullable', 'string', 'max:16'],
-                'address.lat' => ['nullable', 'numeric', 'between:-90,90'],
-                'address.lng' => ['nullable', 'numeric', 'between:-180,180'],
-                'address.google_maps_url' => ['nullable', 'url', 'max:255'],
-                'address.google_place_id' => ['nullable', 'string', 'max:255'],
-                'address.waze_url' => ['nullable', 'url', 'max:255'],
+                'address.line1' => ['prohibited'],
+                'address.line2' => ['prohibited'],
+                'address.postcode' => ['prohibited'],
+                'address.lat' => ['prohibited'],
+                'address.lng' => ['prohibited'],
+                'address.google_maps_url' => ['prohibited'],
+                'address.google_place_id' => ['prohibited'],
+                'address.waze_url' => ['prohibited'],
                 'qualifications' => ['sometimes', 'array'],
                 'qualifications.*.institution' => ['required_with:qualifications.*.degree', 'nullable', 'string', 'max:255'],
                 'qualifications.*.degree' => ['required_with:qualifications.*.institution', 'nullable', 'string', 'max:255'],
@@ -761,6 +761,11 @@ class ContributionEntityMutationService
         $addressPayload = $this->speakerAddressPayload($payload);
 
         if (is_array($addressPayload)) {
+            $addressPayload = $this->preserveHiddenSpeakerAddressFields($speaker, $addressPayload);
+            $addressPayload['country_id'] = SharedFormSchema::normalizeLocationId($addressPayload['country_id'] ?? null)
+                ?? $speaker->address()->value('country_id')
+                ?? SharedFormSchema::preferredPublicCountryId();
+
             $this->syncAddress($speaker, $addressPayload, allowCountryOnly: true);
         }
 
@@ -878,14 +883,6 @@ class ContributionEntityMutationService
             'state_id',
             'district_id',
             'subdistrict_id',
-            'line1',
-            'line2',
-            'postcode',
-            'lat',
-            'lng',
-            'google_maps_url',
-            'google_place_id',
-            'waze_url',
         ];
 
         if (! collect($addressKeys)->contains(fn (string $key): bool => array_key_exists($key, $payload))) {
@@ -901,6 +898,38 @@ class ContributionEntityMutationService
         }
 
         return $address;
+    }
+
+    /**
+     * @param  array<string, mixed>  $addressPayload
+     * @return array<string, mixed>
+     */
+    private function preserveHiddenSpeakerAddressFields(Speaker $speaker, array $addressPayload): array
+    {
+        $speaker->loadMissing('address');
+
+        $existingAddress = $speaker->addressModel;
+
+        if (! $existingAddress instanceof Address) {
+            return $addressPayload;
+        }
+
+        foreach ([
+            'line1',
+            'line2',
+            'postcode',
+            'lat',
+            'lng',
+            'google_maps_url',
+            'google_place_id',
+            'waze_url',
+        ] as $field) {
+            if (! array_key_exists($field, $addressPayload)) {
+                $addressPayload[$field] = $existingAddress->{$field};
+            }
+        }
+
+        return $addressPayload;
     }
 
     /**

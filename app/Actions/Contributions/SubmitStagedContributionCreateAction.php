@@ -17,6 +17,7 @@ class SubmitStagedContributionCreateAction
 
     public function __construct(
         protected ContributionEntityMutationService $contributionEntityMutationService,
+        protected EnsureUniqueContributionCreateAction $ensureUniqueContributionCreateAction,
         protected ResolveContributionSubmissionStateAction $resolveContributionSubmissionStateAction,
         protected SubmitContributionCreateRequestAction $submitContributionCreateRequestAction,
     ) {}
@@ -30,9 +31,12 @@ class SubmitStagedContributionCreateAction
         array $state,
         User $user,
         ?callable $persistRelationships = null,
+        string $validationKeyPrefix = '',
     ): Institution|Speaker {
         $submissionState = $this->resolveContributionSubmissionStateAction->handle($state);
         $state = $submissionState['state'];
+
+        $this->ensureUniqueContributionCreateAction->handle($subjectType, $state, $validationKeyPrefix);
 
         $entity = match ($subjectType) {
             ContributionSubjectType::Institution => $this->contributionEntityMutationService->createInstitution($state, $user),

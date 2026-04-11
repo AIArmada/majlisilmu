@@ -2,6 +2,7 @@
 
 use App\Enums\ContributionSubjectType;
 use App\Livewire\Pages\Contributions\SubmitSpeaker;
+use App\Models\ContributionRequest;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
@@ -203,6 +204,20 @@ it('supports fuzzy search with minor typos', function () {
         ->assertDontSee('Sulaiman');
 });
 
+it('shows the empty state when speaker search has no public matches', function () {
+    Speaker::factory()->create([
+        'name' => 'Ammar',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    get('/penceramah?search=ammar')
+        ->assertSuccessful()
+        ->assertSee(__('No speakers found'))
+        ->assertSee("We couldn't find any speakers matching your search.")
+        ->assertDontSee('Jumlah penceramah:');
+});
+
 it('updates search results live when query changes', function () {
     Speaker::factory()->create([
         'name' => 'Samad Al-Bakri',
@@ -253,28 +268,72 @@ it('refreshes cached speaker title search results after speaker updates', functi
 });
 
 it('allows users to submit a missing speaker from speaker index with pending status', function () {
-    $speakerName = 'Ustaz Cadangan Baru';
+    $speakerName = 'Cadangan Baru';
+    $expectedDisplayName = Speaker::formatDisplayedName(
+        $speakerName,
+        ['dato'],
+        ['ustaz'],
+        ['PhD'],
+    );
+
     $user = User::factory()->create();
-    $countryId = ensureSpeakerIndexMalaysiaCountryExists();
+    ensureSpeakerIndexMalaysiaCountryExists();
 
     Livewire::actingAs($user)
         ->test(SubmitSpeaker::class)
         ->set('data.name', $speakerName)
         ->set('data.gender', 'male')
-        ->set('data.country_id', (string) $countryId)
+        ->set('data.honorific', ['dato'])
+        ->set('data.pre_nominal', ['ustaz'])
+        ->set('data.post_nominal', ['PhD'])
         ->call('submit')
         ->assertRedirect(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment()]))
         ->assertHasNoErrors();
 
-    expect(session('contribution_submission_name'))->toBe($speakerName);
+    expect(session('contribution_submission_name'))->toBe($expectedDisplayName);
+
+    get(route('contributions.submission-success', ['subjectType' => ContributionSubjectType::Speaker->publicRouteSegment()]))
+        ->assertOk()
+        ->assertSee($expectedDisplayName);
 
     $speaker = Speaker::query()
         ->where('name', $speakerName)
+        ->with('address')
         ->first();
 
     expect($speaker)->not->toBeNull()
         ->and($speaker?->status)->toBe('pending')
-        ->and($speaker?->is_active)->toBeTrue();
+        ->and($speaker?->is_active)->toBeTrue()
+        ->and($speaker?->addressModel?->country_id)->toBe(132);
+});
+
+it('rejects duplicate speaker submissions when name gender and titles all match', function () {
+    $user = User::factory()->create();
+    ensureSpeakerIndexMalaysiaCountryExists();
+
+    Speaker::factory()->create([
+        'name' => 'Ustaz Samad Hassan',
+        'gender' => 'male',
+        'honorific' => ['dato'],
+        'pre_nominal' => ['ustaz'],
+        'post_nominal' => ['PhD'],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SubmitSpeaker::class)
+        ->set('data.name', 'Ustaz   Samad   Hassan')
+        ->set('data.gender', 'male')
+        ->set('data.honorific', ['dato'])
+        ->set('data.pre_nominal', ['ustaz'])
+        ->set('data.post_nominal', ['PhD'])
+        ->call('submit')
+        ->assertHasErrors(['data.name']);
+
+    expect(Speaker::query()->where('name', 'Ustaz Samad Hassan')->count())->toBe(1)
+        ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
 it('redirects guests to login when opening add speaker form', function () {

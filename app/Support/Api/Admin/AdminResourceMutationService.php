@@ -41,6 +41,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Services\ContributionEntityMutationService;
 use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Location\PreferredCountryResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
@@ -145,7 +146,10 @@ class AdminResourceMutationService
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Speaker ? $this->mediaState($record, ['avatar', 'cover', 'gallery']) : null,
                 'fields' => $this->speakerFields($updating),
-                'catalogs' => $this->addressCatalogs('address'),
+                'catalogs' => $this->speakerAddressCatalogs(
+                    'address',
+                    $this->speakerCatalogCountryId($record instanceof Speaker ? $record : null),
+                ),
                 'conditional_rules' => [
                     ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
                 ],
@@ -281,7 +285,9 @@ class AdminResourceMutationService
                 'is_freelance' => false,
                 'is_active' => true,
                 'address' => [
-                    'country_id' => 132,
+                    'state_id' => null,
+                    'district_id' => null,
+                    'subdistrict_id' => null,
                 ],
                 'clear_avatar' => false,
                 'clear_cover' => false,
@@ -322,6 +328,20 @@ class AdminResourceMutationService
         }
 
         if ($record instanceof Speaker) {
+            if (is_array($defaults['address'] ?? null)) {
+                unset(
+                    $defaults['address']['country_id'],
+                    $defaults['address']['line1'],
+                    $defaults['address']['line2'],
+                    $defaults['address']['postcode'],
+                    $defaults['address']['lat'],
+                    $defaults['address']['lng'],
+                    $defaults['address']['google_maps_url'],
+                    $defaults['address']['google_place_id'],
+                    $defaults['address']['waze_url'],
+                );
+            }
+
             $defaults['status'] = $record->status;
             $defaults['is_active'] = (bool) $record->is_active;
             $defaults['allow_public_event_submission'] = (bool) $record->allow_public_event_submission;
@@ -722,7 +742,7 @@ class AdminResourceMutationService
      */
     private function speakerRules(bool $updating): array
     {
-        $addressRule = $updating ? ['sometimes', 'array'] : ['required', 'array'];
+        $addressRule = $updating ? ['sometimes', 'array'] : ['present', 'array'];
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -747,18 +767,18 @@ class AdminResourceMutationService
             'is_active' => ['sometimes', 'boolean'],
             'allow_public_event_submission' => $updating ? ['sometimes', 'boolean'] : ['prohibited'],
             'address' => $addressRule,
-            'address.country_id' => [$updating ? 'sometimes' : 'required', 'integer', 'exists:countries,id'],
+            'address.country_id' => ['prohibited'],
             'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
             'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
             'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
-            'address.line1' => ['nullable', 'string', 'max:255'],
-            'address.line2' => ['nullable', 'string', 'max:255'],
-            'address.postcode' => ['nullable', 'string', 'max:16'],
-            'address.lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'address.lng' => ['nullable', 'numeric', 'between:-180,180'],
-            'address.google_maps_url' => ['nullable', 'url', 'max:2048'],
-            'address.google_place_id' => ['nullable', 'string', 'max:255'],
-            'address.waze_url' => ['nullable', 'url', 'max:255'],
+            'address.line1' => ['prohibited'],
+            'address.line2' => ['prohibited'],
+            'address.postcode' => ['prohibited'],
+            'address.lat' => ['prohibited'],
+            'address.lng' => ['prohibited'],
+            'address.google_maps_url' => ['prohibited'],
+            'address.google_place_id' => ['prohibited'],
+            'address.waze_url' => ['prohibited'],
             'contacts' => ['nullable', 'array'],
             'contacts.*.category' => ['required_with:contacts.*.value', Rule::enum(ContactCategory::class)],
             'contacts.*.value' => ['required_with:contacts.*.category', 'string', 'max:255'],
@@ -890,6 +910,46 @@ class AdminResourceMutationService
                 ],
             ),
         ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function speakerAddressCatalogs(string $prefix, int $countryId): array
+    {
+        return [
+            $this->catalog(
+                $prefix.'.state_id',
+                route('api.admin.catalogs.states', [], false),
+                ['country_id' => (string) $countryId],
+            ),
+            $this->catalog(
+                $prefix.'.district_id',
+                route('api.admin.catalogs.districts', [], false),
+                ['state_id' => '{'.$prefix.'.state_id}'],
+            ),
+            $this->catalog(
+                $prefix.'.subdistrict_id',
+                route('api.admin.catalogs.subdistricts', [], false),
+                [
+                    'state_id' => '{'.$prefix.'.state_id}',
+                    'district_id' => '{'.$prefix.'.district_id}',
+                ],
+            ),
+        ];
+    }
+
+    private function speakerCatalogCountryId(?Speaker $speaker): int
+    {
+        if ($speaker instanceof Speaker) {
+            $speaker->loadMissing('address');
+
+            if (is_int($speaker->addressModel?->country_id)) {
+                return (int) $speaker->addressModel->country_id;
+            }
+        }
+
+        return app(PreferredCountryResolver::class)->resolveId();
     }
 
     /**

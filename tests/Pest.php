@@ -76,8 +76,6 @@ pest()->extend(TestCase::class)
 
         // Clear tag option caches to prevent stale data in tests
         foreach (['domain', 'discipline', 'source', 'issue'] as $type) {
-            Cache::forget("submit_tags_{$type}_ms");
-            Cache::forget("submit_tags_{$type}_en");
             Cache::forget("submit_tags_{$type}_ms_safe_v1");
             Cache::forget("submit_tags_{$type}_en_safe_v1");
         }
@@ -87,9 +85,7 @@ pest()->extend(TestCase::class)
             Cache::forget("submit_tags_{$type}_verified_en_safe_v1");
         }
 
-        Cache::forget('submit_languages_v2');
         Cache::forget('submit_languages_safe_v1');
-        Cache::forget('submit_venues');
         Cache::forget('submit_venues_safe_v1');
 
         app(PublicListingsCache::class)->bustMajlisListing();

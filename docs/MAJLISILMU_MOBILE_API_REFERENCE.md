@@ -1,8 +1,9 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-03
+**Last Updated:** 2026-04-12
 **Audience:** Android and iOS application developers  
-**Base Path:** `/api/v1`
+**Public Base Path:** `/api/v1`
+**Admin Base Path:** `/api/v1/admin`
 
 This is the current mobile-facing API contract. It reflects the live routes and controllers, including the Action-class refactors and the new native-client endpoints for auth tokens, going, registration, and check-in.
 
@@ -13,6 +14,13 @@ Use this document as the source of truth for mobile integrations.
 ## 1. Authentication
 
 Authenticated endpoints use Laravel Sanctum bearer tokens.
+
+Critical authorization rule:
+
+- Bearer tokens identify the current user. They do not grant extra permissions beyond the user account behind the token.
+- Public and admin authorization is recalculated from the live user state on every request.
+- If you add or remove global roles, scoped roles, or direct permissions from a user, existing bearer tokens immediately reflect that change.
+- Do not rely on Sanctum token abilities such as `tokenCan()` to predict whether a request will be allowed. The application policy and role system is the source of truth.
 
 Required header:
 
@@ -67,6 +75,12 @@ Notes:
 - `login` accepts either email or phone.
 - Response includes `access_token`, `token_type`, and `user`.
 
+Public vs admin routing:
+
+- Public/mobile flows live under `/api/v1/...`.
+- Admin-panel parity flows live under `/api/v1/admin/...`.
+- Do not send public contribution payloads to `/api/v1/admin`, and do not expect admin schemas from `/api/v1/forms/...`.
+
 ---
 
 ## 2. Response Conventions
@@ -109,7 +123,7 @@ Validation failures return Laravel JSON validation responses with HTTP `422`.
 
 For native clients and AI agents that need to mirror the current web client behavior rather than the lower-level REST resources, use the high-level client surface under `/api/v1`.
 
-Interactive local API docs are available at [https://api.majlisilmu.test/docs](https://api.majlisilmu.test/docs), with the generated OpenAPI JSON at [https://api.majlisilmu.test/docs.json](https://api.majlisilmu.test/docs.json).
+Interactive local API docs are available at [https://majlisilmu.test/docs](https://majlisilmu.test/docs), with the generated OpenAPI JSON at [https://majlisilmu.test/docs.json](https://majlisilmu.test/docs.json).
 
 ### Discovery and contracts
 
@@ -143,6 +157,7 @@ Interactive local API docs are available at [https://api.majlisilmu.test/docs](h
 Notes:
 
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
+- Institution payloads now expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews unless you explicitly need the raw compatibility aliases (`image_url`, `logo_url`, `cover_url`, `chip_image_url`).
 - The inspiration endpoint returns `title`, plain-text `content`, `content_html`, `preview_text`, `source`, category metadata, and both thumb/full media URLs when an image exists.
 - `speakerKey`, `venueKey`, `institutionKey`, and `referenceKey` intentionally bypass the app-wide public-slug route binders so the API can safely resolve slug or UUID itself.
 
@@ -175,7 +190,73 @@ Notes:
 Authorization note:
 
 - These endpoints intentionally mirror the current web client policy and role checks.
+- `can_direct_edit`, `direct_edit_media_fields`, institution workspace access, and approval abilities all come from live policy and role evaluation for the authenticated user, not from bearer-token abilities.
 - Institution workspace permissions currently follow the existing app model where scoped member roles are assigned per subject type, not per individual institution. The API matches that behavior exactly.
+
+### Public contribution rules you must follow
+
+#### `GET /forms/contributions/institutions`
+
+- Use this as the authoritative create contract for public institution submissions.
+- Institution create still accepts a full address payload, including `address.country_id`.
+- If the same normalized institution name plus the same `state_id`, `district_id`, and `subdistrict_id` already exists, create will fail with HTTP `422` on `name`.
+
+#### `GET /forms/contributions/speakers`
+
+- Use this as the authoritative create contract for public speaker submissions.
+- Speaker create is region-only. Send only:
+  - `address.state_id`
+  - `address.district_id`
+  - `address.subdistrict_id`
+- Do not send:
+  - `address.country_id`
+  - `address.line1`
+  - `address.line2`
+  - `address.postcode`
+  - `address.lat`
+  - `address.lng`
+  - `address.google_maps_url`
+  - `address.google_place_id`
+  - `address.waze_url`
+- The server infers the speaker country from the active public country scope.
+- Public speaker create accepts media fields `avatar`, `cover`, and `gallery`.
+- If the same normalized speaker identity already exists, create will fail with HTTP `422` on `name`. The duplicate check compares normalized `name`, `gender`, `honorific`, `pre_nominal`, and effective `post_nominal` values.
+
+#### `GET /forms/contributions/{subjectType}/{subject}/suggest`
+
+- Call this before every update screen.
+- `can_direct_edit = true` means the caller can apply changes immediately.
+- `can_direct_edit = false` means the same endpoint will create a review request instead.
+- `direct_edit_media_fields` is the only allowed file-upload contract for direct edits.
+- Current direct-edit media sets are:
+  - Institutions: `['cover']`
+  - Speakers: `['avatar', 'cover']`
+  - Everyone else or non-maintainers: `[]`
+
+#### `POST /contributions/{subjectType}/{subject}/suggest`
+
+- This endpoint is sparse-update only. Send only changed top-level keys plus optional `proposer_note`.
+- File uploads are allowed only when `can_direct_edit = true` and only for field names listed in `direct_edit_media_fields`.
+- Unsupported upload fields return HTTP `422` with a `files` validation error.
+- Direct-edit response mode:
+
+```json
+{
+  "data": {
+    "mode": "direct_edit"
+  }
+}
+```
+
+- Review-request response mode:
+
+```json
+{
+  "data": {
+    "mode": "review"
+  }
+}
+```
 
 ---
 
@@ -212,9 +293,28 @@ Current limitation:
 Authorization note:
 
 - The admin API now follows the same top-level access rule as the Filament admin panel: any authenticated user with application admin-panel access can reach it.
+- Bearer token abilities do not elevate a non-admin user into this surface.
 - Within that surface, per-resource create/view and per-record update/view/delete abilities are still computed from the underlying Laravel policies, so the payload advertises what the current user can actually do.
 - For `speakers` and `institutions`, the API write path now reuses the same save actions as the Filament create/edit pages, including address/contact/social sync, media handling, and public-submission toggle rules.
 - Slugs for these write-capable resources are treated as auto-managed by the API contract. Clients should not attempt to persist custom slugs through these endpoints.
+
+### Admin write-contract rules you must follow
+
+- Always fetch `/admin/{resourceKey}/schema` before `POST` or `PUT`.
+- Treat the returned schema as authoritative for allowed and prohibited fields.
+- For `speakers`, admin write contracts now use the same region-only address model as the public speaker flows.
+- Admin speaker create/update clients must not send:
+  - `address.country_id`
+  - `address.line1`
+  - `address.line2`
+  - `address.postcode`
+  - `address.lat`
+  - `address.lng`
+  - `address.google_maps_url`
+  - `address.google_place_id`
+  - `address.waze_url`
+- Admin speaker clients should send only regional location keys such as `address.state_id`, `address.district_id`, and `address.subdistrict_id`.
+- The server resolves the effective speaker country from the existing record or the active preferred country scope.
 
 ---
 

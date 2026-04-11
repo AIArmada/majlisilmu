@@ -25,7 +25,10 @@ class SpeakerFormSchema
      */
     public static function createOptionForm(): array
     {
-        $components = SpeakerContributionFormSchema::components(includeMedia: true);
+        $components = SpeakerContributionFormSchema::components(
+            includeMedia: true,
+            regionOnlyAddress: true,
+        );
 
         array_splice($components, 2, 0, [
             Section::make(__('Affiliated Institution'))
