@@ -42,7 +42,7 @@ it('lists accessible admin resources for privileged users', function () {
 
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 
-    expect($resourceKeys)->toContain('speakers', 'events', 'institutions', 'references', 'subdistricts');
+    expect($resourceKeys)->toContain('speakers', 'events', 'institutions', 'references', 'subdistricts', 'venues');
 });
 
 it('allows viewer-role users who can access the admin panel to reach the admin api manifest', function () {
@@ -253,6 +253,122 @@ it('exposes admin institution write schema and can create and update institution
     ])->assertOk()
         ->assertJsonPath('data.record.attributes.name', 'Admin API Institution Updated')
         ->assertJsonPath('data.record.attributes.nickname', 'API Masjid');
+});
+
+it('exposes admin venue write schema and can create and update venues through the api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/venues/meta')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'venues')
+        ->assertJsonPath('data.resource.write_support.schema', true)
+        ->assertJsonPath('data.resource.write_support.store', true)
+        ->assertJsonPath('data.resource.write_support.update', true)
+        ->assertJsonPath('data.resource.api_routes.collection', '/api/v1/admin/venues')
+        ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/venues/schema');
+
+    $this->getJson('/api/v1/admin/venues/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.schema.resource_key', 'venues')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/venues')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.defaults.type', 'dewan')
+        ->assertJsonPath('data.schema.defaults.is_active', true)
+        ->assertJsonPath('data.schema.catalogs.0.field', 'address.country_id');
+
+    $createResponse = $this->postJson('/api/v1/admin/venues', [
+        'name' => 'Admin API Venue',
+        'type' => 'dewan',
+        'status' => 'verified',
+        'is_active' => true,
+        'facilities' => ['parking', 'oku'],
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Dewan Serbaguna API',
+        ],
+        'contacts' => [
+            [
+                'category' => 'phone',
+                'value' => '0312345678',
+                'type' => 'main',
+                'is_public' => true,
+            ],
+        ],
+        'social_media' => [
+            [
+                'platform' => 'website',
+                'url' => 'https://example.com/venues/admin-api-venue',
+            ],
+        ],
+    ])->assertCreated();
+
+    $venueId = (string) $createResponse->json('data.record.id');
+    $venue = Venue::query()->with(['address', 'contacts', 'socialMedia'])->findOrFail($venueId);
+
+    expect($venue->name)->toBe('Admin API Venue')
+        ->and($venue->slug)->toBe('admin-api-venue-my')
+        ->and($venue->status)->toBe('verified')
+        ->and($venue->is_active)->toBeTrue()
+        ->and($venue->facilities)->toBe([
+            'parking' => true,
+            'oku' => true,
+        ])
+        ->and($venue->addressModel?->country_id)->toBe(132)
+        ->and($venue->contacts)->toHaveCount(1)
+        ->and($venue->contacts->first()?->value)->toBe('0312345678')
+        ->and($venue->socialMedia)->toHaveCount(1)
+        ->and($venue->socialMedia->first()?->platform)->toBe('website');
+
+    $this->putJson('/api/v1/admin/venues/'.$venueId, [
+        'name' => 'Admin API Venue Updated',
+        'type' => 'auditorium',
+        'status' => 'pending',
+        'is_active' => false,
+        'facilities' => ['women_section', 'ablution_area'],
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Auditorium API Baharu',
+        ],
+        'contacts' => [
+            [
+                'category' => 'whatsapp',
+                'value' => '60123456789',
+                'type' => 'work',
+                'is_public' => false,
+            ],
+        ],
+        'social_media' => [
+            [
+                'platform' => 'facebook',
+                'url' => 'https://facebook.com/admin-api-venue-updated',
+            ],
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Venue Updated')
+        ->assertJsonPath('data.record.attributes.slug', 'admin-api-venue-updated-my')
+        ->assertJsonPath('data.record.attributes.type', 'auditorium')
+        ->assertJsonPath('data.record.attributes.is_active', false);
+
+    $venue->refresh()->load(['address', 'contacts', 'socialMedia']);
+
+    expect($venue->name)->toBe('Admin API Venue Updated')
+        ->and($venue->slug)->toBe('admin-api-venue-updated-my')
+        ->and($venue->getRawOriginal('type'))->toBe('auditorium')
+        ->and($venue->status)->toBe('pending')
+        ->and($venue->is_active)->toBeFalse()
+        ->and($venue->facilities)->toBe([
+            'women_section' => true,
+            'ablution_area' => true,
+        ])
+        ->and($venue->addressModel?->line1)->toBe('Auditorium API Baharu')
+        ->and($venue->contacts)->toHaveCount(1)
+        ->and($venue->contacts->first()?->getRawOriginal('category'))->toBe('whatsapp')
+        ->and($venue->socialMedia)->toHaveCount(1)
+        ->and($venue->socialMedia->first()?->getRawOriginal('platform'))->toBe('facebook');
 });
 
 it('lists admin geography catalogs and exposes catalog metadata through admin write schemas', function () {

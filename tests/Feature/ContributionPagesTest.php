@@ -7,23 +7,28 @@ use App\Enums\ContactType;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
+use App\Enums\MemberSubjectType;
 use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
 use App\Livewire\Pages\Contributions\SubmitInstitution;
 use App\Livewire\Pages\Contributions\SubmitSpeaker;
 use App\Livewire\Pages\Contributions\SuggestUpdate;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Models\ContributionRequest;
+use App\Models\District;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Report;
 use App\Models\Speaker;
+use App\Models\State;
+use App\Models\Subdistrict;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -462,6 +467,10 @@ it('renders contribution requests and event submissions without approval control
         'name' => 'Masjid Al-Ihsan',
         'status' => 'verified',
     ]);
+    $ownedEventInstitution = Institution::factory()->create([
+        'name' => 'Masjid Ahli',
+        'status' => 'verified',
+    ]);
     $speaker = Speaker::factory()->create([
         'name' => 'Ustaz Ahmad',
         'status' => 'verified',
@@ -504,6 +513,11 @@ it('renders contribution requests and event submissions without approval control
         'status' => 'pending',
         'visibility' => 'public',
     ]);
+    $ownedEvent = Event::factory()->for($ownedEventInstitution)->create([
+        'title' => 'Majlis Institusi Sendiri',
+        'status' => 'pending',
+        'visibility' => 'public',
+    ]);
 
     $event->speakers()->syncWithoutDetaching([$speaker->id]);
     $event->references()->syncWithoutDetaching([$reference->id]);
@@ -511,6 +525,11 @@ it('renders contribution requests and event submissions without approval control
     EventSubmission::factory()->for($event)->for($user, 'submitter')->create([
         'notes' => 'Submitted through the public event flow.',
     ]);
+    EventSubmission::factory()->for($ownedEvent)->for($user, 'submitter')->create([
+        'notes' => 'This one should move to the institution dashboard.',
+    ]);
+
+    assignInstitutionOwner($user, $ownedEventInstitution);
 
     $reportInstitution = Institution::factory()->create([
         'name' => 'Masjid Lapor',
@@ -542,10 +561,16 @@ it('renders contribution requests and event submissions without approval control
         ->assertSee('Status Kemaskini')
         ->assertSee('Status Hantaran Instititusi & Penceramah')
         ->assertSee('Status Hantaran Laporan')
+        ->assertSee('Pengurusan Institusi & Penceramah')
+        ->assertSee('Tuntut Pengurusan')
+        ->assertDontSee('Jika anda benar-benar mengurus institusi atau penceramah tertentu, cari rekodnya di sini dan teruskan ke borang tuntutan. Laluan ini diletakkan di halaman sumbangan kerana ia hanya relevan kepada sebilangan kecil pengguna.')
         ->assertSee($createRequest->proposed_data['name'])
         ->assertSee($updateRequest->entity->name)
         ->assertSee(__('Event Submission'))
         ->assertSee($event->title)
+        ->assertDontSee($ownedEvent->title)
+        ->assertSee(route('events.show', $event), false)
+        ->assertDontSee(route('events.show', $ownedEvent), false)
         ->assertSee(__('Institution: :name', ['name' => $eventInstitution->display_name]))
         ->assertSee(__('Speakers: :names', ['names' => $speaker->formatted_name]))
         ->assertSee(__('References: :names', ['names' => $reference->title]))
@@ -554,6 +579,60 @@ it('renders contribution requests and event submissions without approval control
         ->assertDontSee(__('Pending Approvals'))
         ->assertDontSee(__('Approve'))
         ->assertDontSee(__('Reject'));
+});
+
+it('formats institution membership claim options with the location hierarchy', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Payung',
+        'nickname' => null,
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $countryId = (int) $institution->address()->value('country_id');
+
+    $state = State::query()->findOrFail(
+        DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Selangor',
+            'country_code' => 'MY',
+        ])
+    );
+
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->getKey(),
+        'country_code' => 'MY',
+        'name' => 'Petaling',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->getKey(),
+        'district_id' => (int) $district->getKey(),
+        'country_code' => 'MY',
+        'name' => 'Shah Alam',
+    ]);
+
+    $institution->address()->update([
+        'state_id' => (int) $state->getKey(),
+        'district_id' => (int) $district->getKey(),
+        'subdistrict_id' => (int) $subdistrict->getKey(),
+    ]);
+
+    $component = Livewire::actingAs($user)->test(ContributionsIndex::class);
+
+    $searchOptions = Closure::bind(function () {
+        return $this->membershipClaimSearchOptions(MemberSubjectType::Institution->value, 'Payung');
+    }, $component->instance(), ContributionsIndex::class)();
+
+    $selectedLabel = Closure::bind(function () use ($institution) {
+        return $this->membershipClaimOptionLabel(MemberSubjectType::Institution->value, $institution->slug);
+    }, $component->instance(), ContributionsIndex::class)();
+
+    expect($searchOptions)->toHaveKey($institution->slug)
+        ->and($searchOptions[$institution->slug])->toBe('Masjid Payung - Shah Alam, Petaling, Selangor')
+        ->and($selectedLabel)->toBe('Masjid Payung - Shah Alam, Petaling, Selangor');
 });
 
 it('paginates contribution status sections when the lists grow', function () {

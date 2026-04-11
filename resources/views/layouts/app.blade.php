@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+    dir="{{ in_array(app()->getLocale(), config('app.rtl_locales', []), true) ? 'rtl' : 'ltr' }}" class="scroll-smooth">
 
 <head>
     <meta charset="utf-8">
@@ -132,6 +133,10 @@
         <div class="relative z-10 flex flex-col min-h-screen">
             @php
                 $supportedLocales = config('app.supported_locales', []);
+                $publicMenuLocaleKeys = config('app.public_menu_locales', ['ms', 'en', 'jv']);
+                $publicMenuLocales = collect($supportedLocales)
+                    ->only($publicMenuLocaleKeys)
+                    ->all();
                 $currentLocale = app()->getLocale();
                 $publicCountries = app(\App\Support\Location\PublicCountryRegistry::class)->all();
                 $currentPublicCountry = app(\App\Support\Location\PublicCountryPreference::class)->current();
@@ -187,12 +192,13 @@
                         </button>
 
                         <!-- Country Switcher -->
-                        <div class="relative group z-50 hidden sm:block">
+                        <div class="relative group z-50 hidden sm:block" data-country-selector-style="flag-only">
                             <button
+                                data-country-switcher-trigger="desktop"
                                 class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold tracking-wider text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-all"
-                                aria-label="{{ __('Country') }}">
+                                aria-label="{{ __('Country').': '.$currentPublicCountry['label'] }}"
+                                title="{{ $currentPublicCountry['label'] }}">
                                 <span class="text-sm" aria-hidden="true">{{ $currentPublicCountry['flag'] }}</span>
-                                <span>{{ $currentPublicCountry['label'] }}</span>
                                 <svg class="h-3 w-3 text-slate-400 group-hover:text-emerald-500" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -204,19 +210,18 @@
                                 @foreach ($publicCountries as $countryKey => $country)
                                     @if ($country['enabled'])
                                         <a href="{{ route('country.switch', $countryKey) }}"
-                                            class="flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold tracking-wider {{ $countryKey === $currentPublicCountry['key'] ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
-                                            <span class="flex items-center gap-2">
-                                                <span aria-hidden="true">{{ $country['flag'] }}</span>
-                                                <span>{{ $country['label'] }}</span>
-                                            </span>
+                                            data-country-option="{{ $countryKey }}"
+                                            aria-label="{{ $country['label'] }}"
+                                            title="{{ $country['label'] }}"
+                                            class="flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold tracking-wider {{ $countryKey === $currentPublicCountry['key'] ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                            <span aria-hidden="true">{{ $country['flag'] }}</span>
                                         </a>
                                     @else
-                                        <span title="{{ __('Coming soon') }}"
-                                            class="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-slate-400">
-                                            <span class="flex items-center gap-2">
-                                                <span aria-hidden="true">{{ $country['flag'] }}</span>
-                                                <span>{{ $country['label'] }}</span>
-                                            </span>
+                                        <span data-country-option="{{ $countryKey }}"
+                                            title="{{ $country['label'].' - '.__('Coming soon') }}"
+                                            aria-label="{{ $country['label'].' - '.__('Coming soon') }}"
+                                            class="flex cursor-not-allowed items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold tracking-wider text-slate-400">
+                                            <span aria-hidden="true">{{ $country['flag'] }}</span>
                                         </span>
                                     @endif
                                 @endforeach
@@ -224,10 +229,11 @@
                         </div>
 
                         <!-- Language Switcher -->
-                        <div class="relative group z-50 hidden sm:block">
+                        <div class="relative group z-50 hidden sm:block" data-language-switcher-case="title">
                             <button
-                                class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-all">
-                                {{ $supportedLocales[$currentLocale] ?? strtoupper($currentLocale) }}
+                                data-language-switcher-trigger="desktop"
+                                class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold tracking-wider text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-all">
+                                {{ $publicMenuLocales[$currentLocale] ?? $supportedLocales[$currentLocale] ?? strtoupper($currentLocale) }}
                                 <svg class="h-3 w-3 text-slate-400 group-hover:text-emerald-500" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -236,9 +242,10 @@
                             </button>
                             <div
                                 class="absolute right-0 top-full mt-2 w-32 origin-top-right scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
-                                @foreach ($supportedLocales as $locale => $label)
+                                @foreach ($publicMenuLocales as $locale => $label)
                                     <a href="{{ route('locale.switch', $locale) }}"
-                                        class="flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider {{ $locale === $currentLocale ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                                        data-language-switcher-option="{{ $locale }}"
+                                        class="flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold tracking-wider {{ $locale === $currentLocale ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                                         {{ $label }}
                                     </a>
                                 @endforeach
@@ -415,7 +422,7 @@
                             @endguest
                         </div>
                         <!-- Mobile Language Switcher -->
-                        <div class="border-t border-slate-100 pt-4">
+                        <div class="border-t border-slate-100 pt-4" data-country-selector-style="flag-only" data-language-switcher-case="title">
                             <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                                 {{ __('Country') }}
                             </p>
@@ -423,18 +430,20 @@
                                 @foreach ($publicCountries as $countryKey => $country)
                                     @if ($country['enabled'])
                                         <a href="{{ route('country.switch', $countryKey) }}"
-                                            class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium {{ $countryKey === $currentPublicCountry['key'] ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'border-slate-100 text-slate-600' }}">
+                                            data-country-switcher-trigger="mobile"
+                                            data-country-option="{{ $countryKey }}"
+                                            aria-label="{{ $country['label'] }}"
+                                            title="{{ $country['label'] }}"
+                                            class="inline-flex items-center justify-center rounded-full border px-3 py-1.5 text-sm font-medium {{ $countryKey === $currentPublicCountry['key'] ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'border-slate-100 text-slate-600' }}">
                                             <span aria-hidden="true">{{ $country['flag'] }}</span>
-                                            <span>{{ $country['label'] }}</span>
                                         </a>
                                     @else
                                         <span
-                                            class="inline-flex items-center gap-2 rounded-full border border-slate-100 px-3 py-1.5 text-xs font-medium text-slate-400">
+                                            data-country-option="{{ $countryKey }}"
+                                            aria-label="{{ $country['label'].' - '.__('Coming soon') }}"
+                                            title="{{ $country['label'].' - '.__('Coming soon') }}"
+                                            class="inline-flex items-center justify-center rounded-full border border-slate-100 px-3 py-1.5 text-sm font-medium text-slate-400">
                                             <span aria-hidden="true">{{ $country['flag'] }}</span>
-                                            <span>{{ $country['label'] }}</span>
-                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                                {{ __('Coming soon') }}
-                                            </span>
                                         </span>
                                     @endif
                                 @endforeach
@@ -444,8 +453,9 @@
                                 {{ __('Language') }}
                             </p>
                             <div class="flex flex-wrap gap-2">
-                                @foreach ($supportedLocales as $locale => $label)
+                                @foreach ($publicMenuLocales as $locale => $label)
                                     <a href="{{ route('locale.switch', $locale) }}"
+                                        data-language-switcher-option="{{ $locale }}"
                                         class="px-3 py-1.5 rounded-full text-xs font-medium border {{ $locale === $currentLocale ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'border-slate-100 text-slate-600' }}">
                                         {{ $label }}
                                     </a>
