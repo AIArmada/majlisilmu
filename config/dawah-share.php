@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     'query_parameter' => 'mi_share',
 

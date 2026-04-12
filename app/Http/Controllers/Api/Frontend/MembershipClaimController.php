@@ -111,7 +111,7 @@ class MembershipClaimController extends FrontendController
 
         try {
             $claim = $cancelMembershipClaimAction->handle($claim, $user);
-        } catch (RuntimeException $exception) {
+        } catch (RuntimeException) {
             throw ValidationException::withMessages([
                 'claim' => __('Only pending claims can be cancelled.'),
             ]);

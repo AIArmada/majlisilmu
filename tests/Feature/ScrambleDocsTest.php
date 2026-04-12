@@ -110,7 +110,7 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('GET /admin/manifest')
         ->toContain('GET /admin/{resourceKey}/schema?operation=create')
         ->toContain('GET /admin/catalogs/*')
-        ->toContain('Current admin write support includes events, institutions, speakers, references, and subdistricts.');
+        ->toContain('Current admin write support includes events, institutions, speakers, references, venues, and subdistricts.');
 });
 
 it('adds workflow summaries to public contract and mutation endpoints', function () {
@@ -127,6 +127,7 @@ it('adds workflow summaries to public contract and mutation endpoints', function
         ->and($paths['/contributions/institutions']['post']['summary'] ?? null)->toBe('Create an institution contribution')
         ->and($paths['/contributions/speakers']['post']['summary'] ?? null)->toBe('Create a speaker contribution')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['summary'] ?? null)->toBe('Get editable contribution context')
+        ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['description'] ?? null)->toContain('event `poster`/`gallery`')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['summary'] ?? null)->toBe('Submit a contribution update')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('direct_edit')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('review');
@@ -146,4 +147,14 @@ it('documents admin schema-driven writes and dynamic payload discovery', functio
         ->and($paths['/admin/{resourceKey}']['post']['description'] ?? null)->toContain('fetch `GET /admin/{resourceKey}/schema?operation=create` first')
         ->and($paths['/admin/{resourceKey}/{recordKey}']['put']['summary'] ?? null)->toBe('Update an admin resource record')
         ->and($paths['/admin/{resourceKey}/{recordKey}']['put']['description'] ?? null)->toContain('schema?operation=update&recordKey={recordKey}');
+});
+
+it('includes the mobile api reference in the docs description for ai and mobile consumers', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    expect((string) $response->json('info.description'))
+        ->toContain('Majlisilmu Mobile API Reference')
+        ->toContain('Android, iOS application developers, and AI agents');
 });

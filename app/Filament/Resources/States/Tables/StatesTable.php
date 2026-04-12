@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\States\Tables;
 
 use App\Filament\Resources\States\StateResource;

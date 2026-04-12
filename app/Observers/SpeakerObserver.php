@@ -31,7 +31,7 @@ class SpeakerObserver
             $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($speaker->name);
             $this->generateEventSlugAction->syncEventSlugsForSpeakerName($speaker->name);
 
-            if ($previousName !== null && $previousName !== '' && $previousName !== $speaker->name) {
+            if (! in_array($previousName, [null, '', $speaker->name], true)) {
                 $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($previousName);
                 $this->generateEventSlugAction->syncEventSlugsForSpeakerName($previousName);
             }

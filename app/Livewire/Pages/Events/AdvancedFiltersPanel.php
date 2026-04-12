@@ -245,7 +245,7 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                         'data-testid' => 'advanced-nearby-radius',
                                         'x-cloak' => true,
                                         'x-bind:hidden' => '! geolocationPermitted',
-                                        ...(! app(PublicGeolocationPermission::class)->isGranted() ? ['hidden' => 'hidden'] : []),
+                                        ...(app(PublicGeolocationPermission::class)->isGranted() ? [] : ['hidden' => 'hidden']),
                                     ])
                                     ->suffix(__('km'))
                                     ->visible(fn (Get $get): bool => filled($get('lat')) && filled($get('lng')))

@@ -3,6 +3,7 @@
 namespace App\Actions\Slugs;
 
 use AIArmada\Signals\Models\SignalEvent;
+use AIArmada\Signals\Models\TrackedProperty;
 use App\Models\SlugRedirect;
 use App\Services\Signals\SignalsTracker;
 use App\Support\Slugs\PublicSlugPathResolver;
@@ -102,7 +103,7 @@ final readonly class SyncSlugRedirectAction
     {
         $trackedProperty = $this->signalsTracker->defaultTrackedProperty();
 
-        if ($trackedProperty === null) {
+        if (! $trackedProperty instanceof TrackedProperty) {
             return null;
         }
 

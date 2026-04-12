@@ -24,7 +24,7 @@ class VenueObserver
 
             $this->generateVenueSlugAction->syncVenueSlugsForName($venue->name);
 
-            if ($previousName !== null && $previousName !== '' && $previousName !== $venue->name) {
+            if (! in_array($previousName, [null, '', $venue->name], true)) {
                 $this->generateVenueSlugAction->syncVenueSlugsForName($previousName);
             }
         }

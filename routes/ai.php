@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Controllers\Mcp\AdminMcpController;
 use App\Http\Middleware\EnsureAdminApiAccess;
 use App\Http\Middleware\NormalizeMcpAcceptHeader;

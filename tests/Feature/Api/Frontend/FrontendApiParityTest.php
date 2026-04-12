@@ -255,6 +255,8 @@ it('reflects scoped institution role grants and removals on an existing bearer t
 
 it('normalizes event update context to public organizer values and exposes lookup metadata', function () {
     $user = User::factory()->create();
+    $startsAt = now()->addDays(3)->setTime(20, 15);
+    $endsAt = now()->addDays(3)->setTime(21, 30);
     $institution = Institution::factory()->create([
         'status' => 'verified',
         'is_active' => true,
@@ -266,11 +268,14 @@ it('normalizes event update context to public organizer values and exposes looku
         'is_active' => true,
         'organizer_type' => Institution::class,
         'organizer_id' => $institution->getKey(),
+        'institution_id' => $institution->getKey(),
         'event_type' => ['kuliah_ceramah'],
         'gender' => 'all',
         'age_group' => ['all_ages'],
         'event_format' => 'physical',
         'visibility' => 'public',
+        'starts_at' => $startsAt,
+        'ends_at' => $endsAt,
     ]);
 
     Sanctum::actingAs($user);
@@ -280,12 +285,112 @@ it('normalizes event update context to public organizer values and exposes looku
         'subject' => $event->slug,
     ]))->assertOk();
 
+    $initialStateKeys = array_keys($response->json('data.initial_state'));
     $fields = collect($response->json('data.fields'));
+    $fieldNames = $fields->pluck('name')->all();
 
     expect($response->json('data.initial_state.organizer_type'))->toBe('institution')
+        ->and($response->json('data.initial_state.organizer_institution_id'))->toBe((string) $institution->getKey())
+        ->and($response->json('data.initial_state.event_date'))->toBe($event->fresh()->starts_at?->timezone('Asia/Kuala_Lumpur')->toDateString())
+        ->and($response->json('data.initial_state.custom_time'))->toBe($event->fresh()->starts_at?->timezone('Asia/Kuala_Lumpur')->format('H:i'))
         ->and($fields->firstWhere('name', 'organizer_type')['allowed_values'])->toBe(['institution', 'speaker'])
         ->and($fields->firstWhere('name', 'language_ids')['catalog'])->toContain('/api/v1/catalogs/languages')
-        ->and($fields->firstWhere('name', 'speaker_ids')['catalog'])->toContain('/api/v1/catalogs/submit-speakers');
+        ->and($fields->firstWhere('name', 'speaker_ids')['catalog'])->toContain('/api/v1/catalogs/submit-speakers')
+        ->and($fieldNames)->toContain(
+            'event_date',
+            'prayer_time',
+            'custom_time',
+            'end_time',
+            'organizer_institution_id',
+            'organizer_speaker_id',
+            'location_same_as_institution',
+            'location_type',
+            'location_institution_id',
+            'location_venue_id',
+        )
+        ->and($fieldNames)->not->toContain('starts_at', 'ends_at', 'organizer_id', 'institution_id', 'venue_id', 'timing_mode', 'prayer_reference', 'prayer_offset', 'prayer_display_text')
+        ->and($initialStateKeys)->not->toContain('starts_at', 'ends_at', 'organizer_id', 'institution_id', 'venue_id', 'timing_mode', 'prayer_reference', 'prayer_offset', 'prayer_display_text');
+});
+
+it('exposes event direct edit media support for authorized public updaters', function () {
+    $owner = User::factory()->create();
+    $visitor = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->getKey(),
+        'institution_id' => $institution->getKey(),
+        'starts_at' => now()->addDays(4)->setTime(20, 0),
+        'ends_at' => now()->addDays(4)->setTime(21, 0),
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+
+    Sanctum::actingAs($visitor);
+
+    $visitorResponse = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]))->assertOk();
+
+    Sanctum::actingAs($owner);
+
+    $ownerResponse = $this->getJson(route('api.client.forms.contributions.suggest', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]))->assertOk();
+
+    expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
+        ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
+        ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['poster', 'gallery']);
+});
+
+it('accepts helper-shaped event timing updates on public contribution suggestions', function () {
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->getKey(),
+        'institution_id' => $institution->getKey(),
+        'starts_at' => now()->addDays(2)->setTime(19, 0),
+        'ends_at' => now()->addDays(2)->setTime(20, 0),
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+    Sanctum::actingAs($owner);
+
+    $targetDate = now()->addDays(5)->toDateString();
+
+    $this->postJson(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]), [
+        'event_date' => $targetDate,
+        'prayer_time' => 'lain_waktu',
+        'custom_time' => '20:15',
+        'end_time' => '21:30',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    $event = $event->fresh();
+
+    expect($event->starts_at?->timezone('Asia/Kuala_Lumpur')->toDateString())->toBe($targetDate)
+        ->and($event->starts_at?->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('20:15')
+        ->and($event->ends_at?->timezone('Asia/Kuala_Lumpur')->format('H:i'))->toBe('21:30');
 });
 
 it('allows direct contribution updates to clear nullable institution fields', function () {
@@ -626,7 +731,7 @@ it('maps public event organizer values back to persistence classes during direct
         'subject' => $event->slug,
     ]), [
         'organizer_type' => 'speaker',
-        'organizer_id' => $speaker->getKey(),
+        'organizer_speaker_id' => $speaker->getKey(),
         'live_url' => null,
     ])
         ->assertOk()
@@ -635,6 +740,45 @@ it('maps public event organizer values back to persistence classes during direct
     expect($event->fresh()->organizer_type)->toBe(Speaker::class)
         ->and($event->fresh()->organizer_id)->toBe($speaker->getKey())
         ->and($event->fresh()->live_url)->toBeNull();
+});
+
+it('allows direct event poster and gallery uploads on public contribution update suggestions', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->getKey(),
+        'institution_id' => $institution->getKey(),
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]), [
+        'poster' => UploadedFile::fake()->image('event-poster.jpg', 1200, 1600),
+        'gallery' => [UploadedFile::fake()->image('event-gallery.jpg', 1200, 800)],
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    $event = $event->fresh(['media']);
+
+    expect($event?->getMedia('poster'))->toHaveCount(1)
+        ->and($event?->getMedia('gallery'))->toHaveCount(1);
 });
 
 it('searches speakers api by formatted title parts used on the public directory', function () {

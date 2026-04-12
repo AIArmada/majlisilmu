@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use AIArmada\Affiliates\AffiliatesServiceProvider;
 use AIArmada\CommerceSupport\SupportServiceProvider;
 use App\Providers\ApiDocumentationServiceProvider;

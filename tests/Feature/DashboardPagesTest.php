@@ -434,7 +434,7 @@ it('loads filament table assets before livewire on the institution dashboard', f
     $html = $response->getContent();
 
     expect($html)->toBeString();
-    expect(strpos($html, '/js/filament/tables/tables.js'))->toBeLessThan(strpos($html, 'data-update-uri='));
+    expect(strpos((string) $html, '/js/filament/tables/tables.js'))->toBeLessThan(strpos((string) $html, 'data-update-uri='));
 });
 
 it('merges overlapping planner relationships into one calendar entry', function () {

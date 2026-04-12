@@ -277,7 +277,7 @@ class Event extends Model implements AuditableContract, HasMedia
 
     public function hasBookReference(): bool
     {
-        return $this->bookReference() !== null;
+        return $this->bookReference() instanceof Reference;
     }
 
     public function getReferenceStudySubtitleAttribute(): ?string
@@ -878,8 +878,8 @@ class Event extends Model implements AuditableContract, HasMedia
             $dimensions = @getimagesize($posterPath);
 
             if (is_array($dimensions)) {
-                $width = (int) $dimensions[0];
-                $height = (int) $dimensions[1];
+                $width = $dimensions[0];
+                $height = $dimensions[1];
             }
         }
 
@@ -889,8 +889,8 @@ class Event extends Model implements AuditableContract, HasMedia
                 $dimensions = @getimagesizefromstring($posterContents);
 
                 if (is_array($dimensions)) {
-                    $width = (int) $dimensions[0];
-                    $height = (int) $dimensions[1];
+                    $width = $dimensions[0];
+                    $height = $dimensions[1];
                 }
             } catch (\Throwable) {
             }

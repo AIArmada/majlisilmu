@@ -108,13 +108,11 @@ final readonly class EnsureUniqueContributionCreateAction
             ->whereIn('status', ['verified', 'pending'])
             ->where('gender', $gender)
             ->get(['name', 'gender', 'honorific', 'pre_nominal', 'post_nominal'])
-            ->contains(function (Speaker $speaker) use ($name, $gender, $honorific, $preNominal, $postNominal): bool {
-                return $this->normalizeComparableString($speaker->name) === $name
-                    && $this->normalizeComparableString($speaker->gender) === $gender
-                    && $this->normalizeStringSet($speaker->honorific ?? []) === $honorific
-                    && $this->normalizeStringSet($speaker->pre_nominal ?? []) === $preNominal
-                    && $this->normalizeStringSet($speaker->post_nominal ?? []) === $postNominal;
-            });
+            ->contains(fn (Speaker $speaker): bool => $this->normalizeComparableString($speaker->name) === $name
+                && $this->normalizeComparableString($speaker->gender) === $gender
+                && $this->normalizeStringSet($speaker->honorific ?? []) === $honorific
+                && $this->normalizeStringSet($speaker->pre_nominal ?? []) === $preNominal
+                && $this->normalizeStringSet($speaker->post_nominal ?? []) === $postNominal);
     }
 
     /**

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
 use App\Models\User;
@@ -11,6 +13,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     /**
      * Bootstrap any application services.
      */
+    #[\Override]
     public function boot(): void
     {
         parent::boot();
@@ -25,10 +28,9 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
      *
      * This gate determines who can access Horizon in non-local environments.
      */
+    #[\Override]
     protected function gate(): void
     {
-        Gate::define('viewHorizon', function (User $user): bool {
-            return $user->hasGlobalAdminAccess();
-        });
+        Gate::define('viewHorizon', fn (User $user): bool => $user->hasGlobalAdminAccess());
     }
 }

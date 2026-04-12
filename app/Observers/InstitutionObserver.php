@@ -25,7 +25,7 @@ class InstitutionObserver
 
         $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($institution->name);
 
-        if ($previousName !== null && $previousName !== '' && $previousName !== $institution->name) {
+        if (! in_array($previousName, [null, '', $institution->name], true)) {
             $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($previousName);
         }
 

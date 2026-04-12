@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Actions\Contributions;
 
+use App\Forms\SharedFormSchema;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ResolveContributionSubmissionStateAction
@@ -19,6 +22,10 @@ class ResolveContributionSubmissionStateAction
             : null;
 
         unset($state['proposer_note']);
+
+        if (is_array($state['contacts'] ?? null)) {
+            $state['contacts'] = SharedFormSchema::normalizeContactRowsForComparison($state['contacts']);
+        }
 
         return [
             'state' => $state,
