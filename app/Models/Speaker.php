@@ -623,9 +623,9 @@ class Speaker extends Model implements AuditableContract, HasMedia
      * @param  Builder<self>  $query
      */
     #[Scope]
-    protected function publicDirectoryOrder(Builder $query): void
+    protected function publicDirectoryOrder(Builder $query, ?string $sessionSeed = null): void
     {
-        $offset = self::publicDirectoryOrderOffset(self::publicDirectorySessionSeed());
+        $offset = self::publicDirectoryOrderOffset($sessionSeed ?? self::publicDirectorySessionSeed());
         $idExpression = self::publicDirectoryOrderIdExpression($query);
 
         $query->orderByRaw("substr({$idExpression}, {$offset}, 32)")
