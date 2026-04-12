@@ -1,3 +1,18 @@
+# Account Settings Profile Cleanup
+
+- [x] Remove the API Access section from the profile tab
+- [x] Update the Friday prayer helper copy in Malay
+- [x] Add focused account-settings regressions and verify the page
+
+## Review
+
+- Removed the account-settings API Access block from [resources/views/livewire/pages/dashboard/account-settings.blade.php](resources/views/livewire/pages/dashboard/account-settings.blade.php) and dropped the no-longer-needed token plumbing from [app/Livewire/Pages/Dashboard/AccountSettings.php](app/Livewire/Pages/Dashboard/AccountSettings.php).
+- Replaced the Malay helper copy for the Friday prayer institution field in [resources/lang/ms.json](resources/lang/ms.json) and [resources/lang/ms_MY.json](resources/lang/ms_MY.json) with the new mosque/surau wording.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => 13 tests, 119 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php` => pass
+
 # Scramble Docs Paragraph Break
 
 - [x] Split the API docs description into readable markdown paragraphs
