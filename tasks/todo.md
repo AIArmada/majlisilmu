@@ -1,3 +1,33 @@
+# Scramble Docs Paragraph Break
+
+- [x] Split the API docs description into readable markdown paragraphs
+- [x] Add a regression that checks the opening paragraph break
+- [x] Verify the generated docs contract and docs test
+
+## Review
+
+- Reworked the Scramble description in [config/scramble.php](config/scramble.php) so the `/docs` landing copy now renders as separate markdown paragraphs instead of a single run-on block.
+- Added a focused docs regression in [tests/Feature/ScrambleDocsTest.php](tests/Feature/ScrambleDocsTest.php) that asserts the description contains the opening paragraph break and the major section boundaries.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw config/scramble.php tests/Feature/ScrambleDocsTest.php` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => 11 passed
+
+# Report Page Polish
+
+- [x] Remove the moderation notes block from the shared report page
+- [x] Translate the remaining report copy and locale strings
+- [x] Tighten the report page mobile layout and add regressions
+
+## Review
+
+- Removed the shared moderation notes aside from [resources/views/livewire/pages/reports/create.blade.php](resources/views/livewire/pages/reports/create.blade.php) and tightened the layout to a single-column, mobile-first surface.
+- Moved the report copy into locale strings in [resources/lang/ms.json](resources/lang/ms.json) and [resources/lang/en.json](resources/lang/en.json), including the title, section labels, CTA text, and validation copy.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 50 passed
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Reports/Create.php app/Actions/Reports/ResolveReportFormContextAction.php app/Actions/Contributions/ResolveContributionSubjectPresentationAction.php` => pass
+
 # Suggest Update Form Copy and Mobile Polish
 
 - [x] Remove the contributions shortcut from the suggest-update page

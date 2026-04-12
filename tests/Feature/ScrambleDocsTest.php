@@ -103,6 +103,9 @@ it('documents public and admin mutation capability boundaries in the api overvie
     ])->assertOk();
 
     expect((string) $response->json('info.description'))
+        ->toContain("Canonical API documentation for Majlis Ilmu client and platform integrations.\n\nGet an access token")
+        ->toContain("\n\nROUTING SURFACES:\n")
+        ->toContain("\n\nTIMEZONE:\n")
         ->toContain('Public create flows currently exist for events, institutions, and speakers.')
         ->toContain('Public update flows currently exist for events, institutions, speakers, and references')
         ->toContain('does not currently include creating references, venues, or series')
