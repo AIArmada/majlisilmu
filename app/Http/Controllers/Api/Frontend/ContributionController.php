@@ -155,6 +155,7 @@ class ContributionController extends FrontendController
     #[Endpoint(
         title: 'Create a speaker contribution',
         description: 'Creates a new public speaker contribution request using a region-only address payload (`state_id`, `district_id`, `subdistrict_id`). The speaker country follows the active country scope automatically. '
+            .'The payload may also set one affiliated institution and an optional position label. '
             .'Clients must not send `address.country_id` or detailed street/map keys here. Duplicate speakers are rejected when the normalized name, gender, and title sets match an existing speaker. '
             .'Fetch `GET /forms/contributions/speakers` first to discover required fields, defaults, media support, and conditional rules.',
     )]
@@ -178,6 +179,8 @@ class ContributionController extends FrontendController
             'post_nominal' => ['nullable', 'array'],
             'post_nominal.*' => ['string', Rule::in(array_column(PostNominal::cases(), 'value'))],
             'bio' => ['nullable'],
+            'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
+            'institution_position' => ['nullable', 'string', 'max:255'],
             'address' => ['required', 'array'],
             'address.country_id' => ['prohibited'],
             'address.state_id' => ['nullable', 'integer'],
@@ -258,7 +261,7 @@ class ContributionController extends FrontendController
         title: 'Get editable contribution context',
         description: 'Returns the current editable state, presentation metadata, and permission flags for an existing subject. '
             .'Call this before submitting an update so you know whether the caller can edit directly, which sparse top-level fields are supported, and whether a pending request already exists. '
-            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover`, speaker `avatar`/`cover`, and event `poster`/`gallery`.',
+            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover`/`gallery`, speaker `avatar`/`cover`/`gallery`, and event `poster`/`gallery`.',
     )]
     public function suggestContext(
         string $subjectType,

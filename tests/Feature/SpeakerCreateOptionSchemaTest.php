@@ -94,5 +94,6 @@ it('stores biography and institution pivot position when creating a speaker via 
         ->and($speaker->post_nominal)->toBe(['PhD', 'MSc'])
         ->and($speaker->status)->toBe('pending')
         ->and($linkedInstitution)->not->toBeNull()
-        ->and($linkedInstitution?->pivot?->position)->toBe('Mudir');
+        ->and($linkedInstitution?->pivot?->position)->toBe('Mudir')
+        ->and((bool) $linkedInstitution?->pivot?->is_primary)->toBeTrue();
 });

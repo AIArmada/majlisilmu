@@ -374,10 +374,11 @@ class SuggestUpdate extends Component implements HasActions, HasForms
         $components = InstitutionContributionFormSchema::components(
             includeMedia: false,
             addressStatePath: 'address',
+            includeLocationPicker: true,
         );
 
         if ($this->shouldShowDirectEditMediaSection()) {
-            array_splice($components, 1, 0, [$this->institutionCoverSection()]);
+            array_splice($components, 1, 0, [$this->institutionDirectEditMediaSection()]);
         }
 
         return $components;
@@ -388,24 +389,41 @@ class SuggestUpdate extends Component implements HasActions, HasForms
         return $this->canDirectEdit() && $this->directEditMediaFields !== [];
     }
 
-    private function institutionCoverSection(): Section
+    private function institutionDirectEditMediaSection(): Section
     {
+        $components = [];
+
+        if (in_array('cover', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Cover Image'))
+                ->collection('cover')
+                ->image()
+                ->imageEditor()
+                ->imageAspectRatio('16:9')
+                ->automaticallyOpenImageEditorForAspectRatio()
+                ->imageEditorAspectRatioOptions(['16:9'])
+                ->automaticallyCropImagesToAspectRatio()
+                ->conversion('banner')
+                ->responsiveImages()
+                ->deletable(false)
+                ->columnSpanFull();
+        }
+
+        if (in_array('gallery', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('gallery')
+                ->label(__('Gallery'))
+                ->collection('gallery')
+                ->multiple()
+                ->reorderable()
+                ->image()
+                ->conversion('gallery_thumb')
+                ->responsiveImages()
+                ->columnSpanFull();
+        }
+
         return Section::make(__('Media'))
-            ->schema([
-                SpatieMediaLibraryFileUpload::make('cover')
-                    ->label(__('Cover Image'))
-                    ->collection('cover')
-                    ->image()
-                    ->imageEditor()
-                    ->imageAspectRatio('16:9')
-                    ->automaticallyOpenImageEditorForAspectRatio()
-                    ->imageEditorAspectRatioOptions(['16:9'])
-                    ->automaticallyCropImagesToAspectRatio()
-                    ->conversion('banner')
-                    ->responsiveImages()
-                    ->deletable(false)
-                    ->columnSpanFull(),
-            ]);
+            ->schema($components)
+            ->columns(['default' => 1, 'sm' => 2]);
     }
 
     private function speakerDirectEditMediaSection(): Section
@@ -441,10 +459,22 @@ class SuggestUpdate extends Component implements HasActions, HasForms
                 ->helperText(__('Cover image for speaker profile'));
         }
 
+        if (in_array('gallery', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('gallery')
+                ->label(__('Gallery'))
+                ->collection('gallery')
+                ->multiple()
+                ->reorderable()
+                ->image()
+                ->responsiveImages()
+                ->conversion('gallery_thumb')
+                ->helperText(__('Additional images'));
+        }
+
         return Section::make(__('Profile Photo & Media'))
-            ->description(__('Upload a clear square profile photo first. Cover image is optional.'))
+            ->description(__('Upload a clear square profile photo first. Cover and gallery images are optional.'))
             ->schema($components)
-            ->columns(2);
+            ->columns(['default' => 1, 'sm' => 2]);
     }
 
     private function eventDirectEditMediaSection(): Section

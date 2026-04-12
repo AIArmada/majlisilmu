@@ -119,6 +119,7 @@ class SearchController extends FrontendController
                     'per_page' => $institutions->perPage(),
                     'total' => $institutions->total(),
                 ],
+                'cache' => $this->institutionDirectoryCacheData(),
             ],
         ]);
     }
@@ -833,6 +834,22 @@ class SearchController extends FrontendController
         return [
             'path' => $request->url(),
             'query' => $request->query(),
+        ];
+    }
+
+    /**
+     * @return array{version: string}
+     */
+    private function institutionDirectoryCacheData(): array
+    {
+        $institutionFingerprints = $this->baseInstitutionQuery()
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Institution $institution): array => $this->institutionListData($institution))
+            ->all();
+
+        return [
+            'version' => sha1(json_encode($institutionFingerprints) ?: ''),
         ];
     }
 

@@ -1,4 +1,66 @@
+# Suggest Update Form Copy and Mobile Polish
+
+- [x] Remove the contributions shortcut from the suggest-update page
+- [x] Keep the direct-edit notice on a single responsive line and tighten the direct-edit media layout
+- [x] Update locale strings and add focused regressions
+
+## Review
+
+- Removed the `View My Contributions` CTA from the shared suggest-update surface and kept the direct-edit notice on a wider responsive container so it stays readable without the extra shortcut button.
+- Made the institution and speaker direct-edit media sections use responsive columns on small screens and changed the direct-edit Malay heading from `Laksanakan Kemas Kini` to `Cadangan Kemas Kini`.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => **pass**
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **49 passed**
+
 # Event Update Field Parity Follow-up
+
+# Speaker and Institution Directory Cache Parity
+
+- [x] Add institution directory cache version metadata alongside the existing speaker cache contract
+- [x] Make the institution cache version reflect the rendered listing payload, not only image URLs
+- [x] Add focused cache regression tests and rerun verification
+
+## Review
+
+- Speaker directory cache metadata already tracked the rendered listing payload through `meta.cache.version`; I left that contract intact and added the missing institution parity.
+- The institution index now exposes `meta.cache.version`, and the version is derived from the rendered list payload so record, location, and media changes all move the cache contract.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='(serializes institution directory payloads with card media aliases for mobile clients|bumps the institution directory cache version when institution records change|bumps the institution directory cache version when institution media changes|bumps the speaker directory cache version when speaker records change|bumps the speaker directory cache version when speaker media changes)'` => **5 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **pass**
+  - `vendor/bin/pint --format agent app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => **pass**
+
+# Event Form Country Scope Unification
+
+- [x] Hide the venue country selector inside the shared event organizer/location quick-add flow so the public scope owns country selection
+- [x] Keep `/hantar-majlis` and majlis suggest-update aligned by changing the shared venue quick-add schema used by both pages
+- [x] Update focused schema regressions and rerun verification
+
+## Review
+
+- The remaining event-form mismatch was in the shared venue quick-add modal: both `/hantar-majlis` and `/sumbangan/majlis/.../kemas-kini` reuse [app/Forms/VenueFormSchema.php](/Users/Saiffil/Herd/majlisilmu/app/Forms/VenueFormSchema.php), and that modal still showed a manual country selector even though the public country scope should own it.
+- Updated the shared venue address schema so `country_id` is hidden in both manual and picker modes, which brings the event organizer/location flow in line with the scoped-country behavior already used elsewhere.
+- Verification:
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **33 passed**
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/EventContributionQuickAddTest.php` => **3 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Forms/VenueFormSchema.php tests/Feature/SharedFormSchemaTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Institution Country Scope Unification
+
+- [x] Hide the institution country selector across quick-add, contribution, and update flows so the public scope owns country selection
+- [x] Reuse the institution location picker path on the suggest-update form for institution updates
+- [x] Update focused schema and page regressions, then rerun verification
+
+## Review
+
+- Institution quick-add now hides `country_id` and relies on the scoped public country, matching the dedicated institution contribution flow instead of exposing a manual country selector.
+- The institution suggest-update form now opts into the same location-picker schema path as the dedicated institution contribution page, so quick-add, create, and update all share the same address UX.
+- Verification:
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/SharedFormSchemaTest.php` => **33 passed**
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => **48 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Forms/InstitutionFormSchema.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/SharedFormSchemaTest.php tests/Feature/ContributionPagesTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
 
 - [x] Audit the event suggest-update form field by field against the public submit-event flow
 - [x] Mirror the remaining high-signal event behaviors that were still missing on the update page
