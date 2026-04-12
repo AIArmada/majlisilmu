@@ -393,6 +393,7 @@ class EventController extends Controller
                 ->map(fn (Speaker $speaker): array => [
                     'id' => $speaker->id,
                     'name' => $speaker->name,
+                    'formatted_name' => $speaker->formatted_name,
                     'slug' => $speaker->slug,
                     'avatar_url' => $speaker->public_avatar_url,
                 ])
