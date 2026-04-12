@@ -11,6 +11,7 @@ use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\Gender;
@@ -127,8 +128,10 @@ class ContributionEntityMutationService
                 'fields' => [
                     $this->field('title', 'string', maxLength: 255),
                     $this->field('description', 'rich_text'),
-                    $this->field('starts_at', 'datetime'),
-                    $this->field('ends_at', 'datetime'),
+                    $this->field('event_date', 'date'),
+                    $this->field('prayer_time', 'string', allowedValues: $this->enumValues(EventPrayerTime::class)),
+                    $this->field('custom_time', 'time'),
+                    $this->field('end_time', 'time'),
                     $this->field('timezone', 'timezone'),
                     $this->field('event_type', 'array<string>', allowedValues: $this->enumValues(EventType::class)),
                     $this->field('gender', 'string', allowedValues: $this->enumValues(EventGenderRestriction::class)),
@@ -141,9 +144,12 @@ class ContributionEntityMutationService
                     $this->field('live_url', 'url'),
                     $this->field('recording_url', 'url'),
                     $this->field('organizer_type', 'string', allowedValues: ['institution', 'speaker']),
-                    $this->field('organizer_id', 'uuid'),
-                    $this->field('institution_id', 'uuid', catalog: route('api.client.catalogs.submit-institutions')),
-                    $this->field('venue_id', 'uuid', catalog: route('api.client.catalogs.venues')),
+                    $this->field('organizer_institution_id', 'uuid', catalog: route('api.client.catalogs.submit-institutions')),
+                    $this->field('organizer_speaker_id', 'uuid', catalog: route('api.client.catalogs.submit-speakers')),
+                    $this->field('location_same_as_institution', 'boolean'),
+                    $this->field('location_type', 'string', allowedValues: ['institution', 'venue']),
+                    $this->field('location_institution_id', 'uuid', catalog: route('api.client.catalogs.submit-institutions')),
+                    $this->field('location_venue_id', 'uuid', catalog: route('api.client.catalogs.venues')),
                     $this->field('space_id', 'uuid', catalog: route('api.client.catalogs.spaces')),
                     $this->field('language_ids', 'array<int>', catalog: route('api.client.catalogs.languages')),
                     $this->field('domain_tags', 'array<string>', catalog: route('api.client.catalogs.tags', ['type' => TagType::Domain->value])),
@@ -155,8 +161,16 @@ class ContributionEntityMutationService
                     $this->field('speaker_ids', 'array<string>', catalog: route('api.client.catalogs.submit-speakers')),
                     $this->field('other_key_people', 'array<object>'),
                 ],
-                'conditional_rules' => [],
-                'direct_edit_media_fields' => [],
+                'conditional_rules' => [
+                    ['field' => 'custom_time', 'required_when' => ['prayer_time' => [EventPrayerTime::LainWaktu->value]]],
+                    ['field' => 'organizer_institution_id', 'required_when' => ['organizer_type' => ['institution']]],
+                    ['field' => 'organizer_speaker_id', 'required_when' => ['organizer_type' => ['speaker']]],
+                    ['field' => 'location_type', 'required_when' => ['organizer_type' => ['speaker']]],
+                    ['field' => 'location_type', 'required_when' => ['location_same_as_institution' => [false]]],
+                    ['field' => 'location_institution_id', 'required_when' => ['location_type' => ['institution']]],
+                    ['field' => 'location_venue_id', 'required_when' => ['location_type' => ['venue']]],
+                ],
+                'direct_edit_media_fields' => ['poster', 'gallery'],
             ],
             default => throw new RuntimeException('Unsupported contribution entity type.'),
         };
@@ -253,8 +267,10 @@ class ContributionEntityMutationService
             $entity instanceof Event => [
                 'title' => ['sometimes', 'string', 'max:255'],
                 'description' => ['nullable'],
-                'starts_at' => ['sometimes', 'date'],
-                'ends_at' => ['nullable', 'date'],
+                'event_date' => ['sometimes', 'date'],
+                'prayer_time' => ['sometimes', Rule::in($this->enumValues(EventPrayerTime::class))],
+                'custom_time' => ['nullable', 'date_format:H:i'],
+                'end_time' => ['nullable', 'date_format:H:i'],
                 'timezone' => ['sometimes', 'timezone'],
                 'event_type' => ['sometimes', 'array'],
                 'event_type.*' => ['string', Rule::in($this->enumValues(EventType::class))],
@@ -270,9 +286,12 @@ class ContributionEntityMutationService
                 'recording_url' => ['nullable', 'url', 'max:255'],
                 'organizer_type' => ['sometimes', Rule::in(['institution', 'speaker', Institution::class, Speaker::class])],
                 'organizer_id' => ['nullable', 'uuid'],
-                'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
-                'venue_id' => ['nullable', 'uuid', 'exists:venues,id'],
-                'space_id' => ['nullable', 'uuid', 'exists:spaces,id'],
+                'organizer_institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
+                'organizer_speaker_id' => ['nullable', 'uuid', 'exists:speakers,id'],
+                'location_same_as_institution' => ['sometimes', 'boolean'],
+                'location_type' => ['sometimes', 'string', Rule::in(['institution', 'venue'])],
+                'location_institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
+                'location_venue_id' => ['nullable', 'uuid', 'exists:venues,id'],
                 'language_ids' => ['sometimes', 'array'],
                 'language_ids.*' => ['integer', 'exists:languages,id'],
                 'domain_tags' => ['sometimes', 'array'],
@@ -530,6 +549,12 @@ class ContributionEntityMutationService
             'starts_at' => array_key_exists('starts_at', $payload) ? $payload['starts_at'] : $event->starts_at,
             'ends_at' => array_key_exists('ends_at', $payload) ? $payload['ends_at'] : $event->ends_at,
             'timezone' => array_key_exists('timezone', $payload) ? $payload['timezone'] : $event->timezone,
+            'timing_mode' => array_key_exists('timing_mode', $payload) ? $payload['timing_mode'] : $event->timing_mode,
+            'prayer_reference' => array_key_exists('prayer_reference', $payload) ? $payload['prayer_reference'] : $event->prayer_reference,
+            'prayer_offset' => array_key_exists('prayer_offset', $payload) ? $payload['prayer_offset'] : $event->prayer_offset,
+            'prayer_display_text' => array_key_exists('prayer_display_text', $payload)
+                ? $this->normalizeOptionalString($payload['prayer_display_text'])
+                : $event->prayer_display_text,
             'event_type' => array_key_exists('event_type', $payload) ? $this->normalizeStringArray($payload['event_type']) : $event->event_type,
             'gender' => array_key_exists('gender', $payload) ? $payload['gender'] : $event->gender,
             'age_group' => array_key_exists('age_group', $payload) ? $this->normalizeStringArray($payload['age_group']) : $event->age_group,
@@ -671,6 +696,16 @@ class ContributionEntityMutationService
             'starts_at' => $event->starts_at?->toDateTimeString(),
             'ends_at' => $event->ends_at?->toDateTimeString(),
             'timezone' => $event->timezone,
+            'timing_mode' => $event->timing_mode instanceof BackedEnum
+                ? $event->timing_mode->value
+                : (is_string($event->timing_mode) && $event->timing_mode !== '' ? $event->timing_mode : null),
+            'prayer_reference' => $event->prayer_reference instanceof BackedEnum
+                ? $event->prayer_reference->value
+                : (is_string($event->prayer_reference) && $event->prayer_reference !== '' ? $event->prayer_reference : null),
+            'prayer_offset' => $event->prayer_offset instanceof BackedEnum
+                ? $event->prayer_offset->value
+                : (is_string($event->prayer_offset) && $event->prayer_offset !== '' ? $event->prayer_offset : null),
+            'prayer_display_text' => $event->prayer_display_text,
             'event_type' => $this->enumCollectionValues($event->event_type),
             'gender' => $event->gender instanceof BackedEnum ? $event->gender->value : (string) $event->gender,
             'age_group' => $this->enumCollectionValues($event->age_group),

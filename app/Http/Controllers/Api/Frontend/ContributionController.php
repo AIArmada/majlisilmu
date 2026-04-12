@@ -31,6 +31,7 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
 use App\Support\Api\Frontend\FrontendMediaSyncService;
+use App\Support\Events\EventContributionUpdateStateMapper;
 use Dedoc\Scramble\Attributes\BodyParameter;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -257,7 +258,7 @@ class ContributionController extends FrontendController
         title: 'Get editable contribution context',
         description: 'Returns the current editable state, presentation metadata, and permission flags for an existing subject. '
             .'Call this before submitting an update so you know whether the caller can edit directly, which sparse top-level fields are supported, and whether a pending request already exists. '
-            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover` and speaker `avatar`/`cover`.',
+            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover`, speaker `avatar`/`cover`, and event `poster`/`gallery`.',
     )]
     public function suggestContext(
         string $subjectType,
@@ -340,7 +341,10 @@ class ContributionController extends FrontendController
 
         $context = $resolveContributionUpdateContextAction->handle($subjectType, $subject);
         $entity = $context['entity'];
-        $originalData = $this->apiInitialState($entity, $context['initial_state']);
+        $publicInitialState = $this->apiInitialState($entity, $context['initial_state']);
+        $comparableOriginalData = $entity instanceof Event
+            ? $context['initial_state']
+            : $publicInitialState;
         $canDirectEdit = $user->can('update', $entity);
         $directEditMediaFields = $canDirectEdit
             ? array_values(array_filter(
@@ -358,13 +362,15 @@ class ContributionController extends FrontendController
 
             if ($unsupportedFileFields !== []) {
                 throw ValidationException::withMessages([
-                    'files' => [__('This update flow only supports institution cover and speaker avatar or cover uploads during direct edits.')],
+                    'files' => [__('This update flow only supports the direct-edit media fields exposed by the contract for this subject.')],
                 ]);
             }
+
+            validator($request->all(), $this->directEditMediaValidationRules($directEditMediaFields))->validate();
         }
 
         $payload = collect($request->all())
-            ->only(array_merge(array_keys($originalData), ['proposer_note']))
+            ->only(array_merge(array_keys($publicInitialState), ['proposer_note']))
             ->all();
 
         $validatedPayload = validator(
@@ -376,7 +382,10 @@ class ContributionController extends FrontendController
         )->validate();
 
         $submissionState = $resolveContributionSubmissionStateAction->handle($validatedPayload);
-        $changes = $resolveContributionChangedPayloadAction->handle($submissionState['state'], $originalData);
+        $normalizedState = $entity instanceof Event && $submissionState['state'] !== []
+            ? EventContributionUpdateStateMapper::toPersistenceState(array_replace_recursive($publicInitialState, $submissionState['state']))
+            : $submissionState['state'];
+        $changes = $resolveContributionChangedPayloadAction->handle($normalizedState, $comparableOriginalData);
         $hasDirectEditMediaChange = collect($directEditMediaFields)
             ->contains(fn (string $field): bool => $request->hasFile($field));
 
@@ -392,13 +401,7 @@ class ContributionController extends FrontendController
             }
 
             if ($hasDirectEditMediaChange) {
-                foreach ($directEditMediaFields as $field) {
-                    if (! $request->hasFile($field)) {
-                        continue;
-                    }
-
-                    $frontendMediaSyncService->syncSingle($entity, $request->file($field), $field);
-                }
+                $this->syncDirectEditMediaChanges($entity, $request, $frontendMediaSyncService, $directEditMediaFields);
             }
 
             return response()->json([
@@ -528,6 +531,24 @@ class ContributionController extends FrontendController
      */
     private function apiInitialState(Event|Institution|Reference|Speaker $entity, array $initialState): array
     {
+        if ($entity instanceof Event) {
+            $helperState = EventContributionUpdateStateMapper::toHelperState($initialState);
+
+            unset(
+                $helperState['starts_at'],
+                $helperState['ends_at'],
+                $helperState['timing_mode'],
+                $helperState['prayer_reference'],
+                $helperState['prayer_offset'],
+                $helperState['prayer_display_text'],
+                $helperState['organizer_id'],
+                $helperState['institution_id'],
+                $helperState['venue_id'],
+            );
+
+            return $helperState;
+        }
+
         if (! $entity instanceof Speaker) {
             return $initialState;
         }
@@ -543,6 +564,63 @@ class ContributionController extends FrontendController
         ];
 
         return $initialState;
+    }
+
+    /**
+     * @param  list<string>  $directEditMediaFields
+     * @return array<string, mixed>
+     */
+    private function directEditMediaValidationRules(array $directEditMediaFields): array
+    {
+        $rules = [];
+
+        if (in_array('avatar', $directEditMediaFields, true)) {
+            $rules['avatar'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'];
+        }
+
+        if (in_array('cover', $directEditMediaFields, true)) {
+            $rules['cover'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'];
+        }
+
+        if (in_array('poster', $directEditMediaFields, true)) {
+            $rules['poster'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'];
+        }
+
+        if (in_array('gallery', $directEditMediaFields, true)) {
+            $rules['gallery'] = ['nullable', 'array'];
+            $rules['gallery.*'] = ['image', 'mimes:jpg,jpeg,png,webp'];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @param  list<string>  $directEditMediaFields
+     */
+    private function syncDirectEditMediaChanges(
+        Event|Institution|Reference|Speaker $entity,
+        Request $request,
+        FrontendMediaSyncService $frontendMediaSyncService,
+        array $directEditMediaFields,
+    ): void {
+        foreach ($directEditMediaFields as $field) {
+            if (! $request->hasFile($field)) {
+                continue;
+            }
+
+            if ($field === 'gallery') {
+                $frontendMediaSyncService->syncMultiple(
+                    $entity,
+                    is_array($request->file('gallery')) ? $request->file('gallery') : null,
+                    'gallery',
+                    replace: true,
+                );
+
+                continue;
+            }
+
+            $frontendMediaSyncService->syncSingle($entity, $request->file($field), $field);
+        }
     }
 
     /**
