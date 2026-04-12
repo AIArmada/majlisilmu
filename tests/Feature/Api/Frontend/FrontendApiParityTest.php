@@ -997,6 +997,73 @@ it('returns profile-quality speaker avatar urls from the frontend search api', f
         ->assertJsonPath('data.0.avatar_url', $speaker->public_avatar_url);
 });
 
+it('returns authenticated follow state in the frontend speaker api', function () {
+    $user = User::factory()->create();
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Kazim Follow Speaker',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($speaker);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.speakers.index', ['search' => 'Kazim Follow Speaker']))
+        ->assertOk()
+        ->assertJsonPath('data.0.is_following', true);
+});
+
+it('bumps the speaker directory cache version when speaker records change', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Cache Version',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $speaker->update([
+        'job_title' => 'Pensyarah Kanan',
+    ]);
+
+    $updatedVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($initialVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
+it('bumps the speaker directory cache version when speaker media changes', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Cache Media',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $speaker->addMedia(UploadedFile::fake()->image('speaker-cache-media.jpg', 1200, 1200))
+        ->toMediaCollection('avatar');
+
+    $updatedVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
 it('uses the same stable public directory ordering in the frontend speaker api', function () {
     $firstSpeaker = Speaker::factory()->create([
         'name' => 'Adam Speaker API',
@@ -1035,6 +1102,95 @@ it('uses the same stable public directory ordering in the frontend speaker api',
         ->intersect([$firstSpeaker->id, $secondSpeaker->id])
         ->values()
         ->all())->toBe($expectedOrder);
+});
+
+it('uses an explicit mobile directory seed for speaker ordering', function () {
+    $seedPairs = collect(['mobile-seed-a', 'mobile-seed-b', 'mobile-seed-c', 'mobile-seed-d'])
+        ->crossJoin(['mobile-seed-a', 'mobile-seed-b', 'mobile-seed-c', 'mobile-seed-d'])
+        ->first(function (array $pair): bool {
+            return $pair[0] !== $pair[1]
+                && Speaker::publicDirectoryOrderOffset($pair[0]) !== Speaker::publicDirectoryOrderOffset($pair[1]);
+        });
+
+    expect($seedPairs)->not->toBeNull();
+
+    [$firstSeed, $secondSeed] = $seedPairs;
+
+    $firstOffset = Speaker::publicDirectoryOrderOffset($firstSeed);
+    $secondOffset = Speaker::publicDirectoryOrderOffset($secondSeed);
+
+    $speakerId = static function (string $firstChar, string $secondChar) use ($firstOffset, $secondOffset): string {
+        $characters = array_fill(0, 32, '0');
+        $characters[$firstOffset - 1] = $firstChar;
+        $characters[$secondOffset - 1] = $secondChar;
+        $normalized = implode('', $characters);
+
+        return sprintf(
+            '%s-%s-%s-%s-%s',
+            substr($normalized, 0, 8),
+            substr($normalized, 8, 4),
+            substr($normalized, 12, 4),
+            substr($normalized, 16, 4),
+            substr($normalized, 20, 12),
+        );
+    };
+
+    $speakers = collect([
+        ['id' => $speakerId('f', '0'), 'name' => 'Speaker Seed A'],
+        ['id' => $speakerId('0', 'f'), 'name' => 'Speaker Seed B'],
+        ['id' => $speakerId('8', '1'), 'name' => 'Speaker Seed C'],
+        ['id' => $speakerId('1', '8'), 'name' => 'Speaker Seed D'],
+    ])->map(fn (array $attributes) => Speaker::factory()->create([
+        ...$attributes,
+        'status' => 'verified',
+        'is_active' => true,
+    ]));
+
+    $firstResponse = $this->getJson(route('api.client.speakers.index', [
+        'per_page' => 12,
+        'directory_seed' => $firstSeed,
+    ]))->assertOk();
+
+    $secondResponse = $this->getJson(route('api.client.speakers.index', [
+        'per_page' => 12,
+        'directory_seed' => $secondSeed,
+    ]))->assertOk();
+
+    $speakerIds = $speakers->pluck('id')->all();
+    $expectedFirstOrder = $speakerIds;
+    $expectedSecondOrder = $speakerIds;
+
+    usort($expectedFirstOrder, static function (string $left, string $right) use ($firstSeed): int {
+        $leftParts = Speaker::publicDirectorySortParts($left, $firstSeed);
+        $rightParts = Speaker::publicDirectorySortParts($right, $firstSeed);
+
+        $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
+
+        if ($primaryComparison !== 0) {
+            return $primaryComparison;
+        }
+
+        return $leftParts['secondary'] <=> $rightParts['secondary'];
+    });
+
+    usort($expectedSecondOrder, static function (string $left, string $right) use ($secondSeed): int {
+        $leftParts = Speaker::publicDirectorySortParts($left, $secondSeed);
+        $rightParts = Speaker::publicDirectorySortParts($right, $secondSeed);
+
+        $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
+
+        if ($primaryComparison !== 0) {
+            return $primaryComparison;
+        }
+
+        return $leftParts['secondary'] <=> $rightParts['secondary'];
+    });
+
+    expect(collect($firstResponse->json('data'))->pluck('id')->intersect($speakerIds)->values()->all())
+        ->toBe($expectedFirstOrder)
+        ->and(collect($secondResponse->json('data'))->pluck('id')->intersect($speakerIds)->values()->all())
+        ->toBe($expectedSecondOrder)
+        ->and($expectedFirstOrder)->not->toBe($expectedSecondOrder);
 });
 
 it('returns random inspiration payloads with category and media metadata for mobile clients', function () {

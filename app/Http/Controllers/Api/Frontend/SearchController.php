@@ -79,7 +79,7 @@ class SearchController extends FrontendController
                     'total' => $eventPaginator->total(),
                 ],
                 'speakers' => [
-                    'items' => $speakerQuery->orderBy('name')->limit(4)->get()->map(fn (Speaker $speaker): array => $this->speakerListData($speaker))->all(),
+                    'items' => $speakerQuery->orderBy('name')->limit(4)->get()->map(fn (Speaker $speaker): array => $this->speakerListData($speaker, $user))->all(),
                     'total' => (clone $speakerQuery)->count(),
                 ],
                 'institutions' => [
@@ -126,14 +126,16 @@ class SearchController extends FrontendController
     #[Group('Speaker')]
     public function speakers(Request $request): JsonResponse
     {
+        $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
+        $directorySeed = $this->normalizedString($request->query('directory_seed'));
         $perPage = $request->integer('per_page', 12);
         $gender = in_array($request->query('gender'), ['male', 'female'], true)
             ? $request->query('gender')
             : null;
         $sort = $request->query('sort') === 'upcoming' ? 'upcoming' : null;
 
-        $baseQuery = $this->baseSpeakerQuery();
+        $baseQuery = $this->baseSpeakerQuery($user);
 
         if ($gender !== null) {
             $baseQuery->where('speakers.gender', $gender);
@@ -144,17 +146,19 @@ class SearchController extends FrontendController
         }
 
         $speakers = $search === null
-            ? $baseQuery->when($sort === null, fn ($q) => $q->publicDirectoryOrder())->paginate($perPage)
+            ? $baseQuery->when($sort === null, fn ($q) => $q->publicDirectoryOrder($directorySeed))->paginate($perPage)
             : $this->speakerDirectorySearchPaginatorWithBase($request, $search, $perPage, $baseQuery, $sort);
+        $speakerDirectoryCache = $this->speakerDirectoryCacheData();
 
         return response()->json([
-            'data' => collect($speakers->items())->map(fn (Speaker $speaker): array => $this->speakerListData($speaker))->all(),
+            'data' => collect($speakers->items())->map(fn (Speaker $speaker): array => $this->speakerListData($speaker, $user))->all(),
             'meta' => [
                 'pagination' => [
                     'page' => $speakers->currentPage(),
                     'per_page' => $speakers->perPage(),
                     'total' => $speakers->total(),
                 ],
+                'cache' => $speakerDirectoryCache,
             ],
         ]);
     }
@@ -833,12 +837,63 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @return array{version: string}
+     */
+    private function speakerDirectoryCacheData(): array
+    {
+        $speakerQuery = Speaker::query()
+            ->active()
+            ->where('status', 'verified');
+
+        $speakerFingerprints = (clone $speakerQuery)
+            ->orderBy('id')
+            ->get(['id', 'slug', 'name', 'gender', 'job_title', 'status', 'is_active', 'updated_at'])
+            ->map(fn (Speaker $speaker): array => $speaker->getAttributes())
+            ->all();
+        $speakerMediaFingerprints = Media::query()
+            ->where('model_type', (new Speaker)->getMorphClass())
+            ->whereIn('collection_name', ['avatar', 'cover'])
+            ->whereIn('model_id', (clone $speakerQuery)->select('id'))
+            ->orderBy('id')
+            ->get(['id', 'model_id', 'collection_name', 'file_name', 'updated_at'])
+            ->map(fn (Media $media): array => $media->getAttributes())
+            ->all();
+        $eventFingerprints = Event::query()
+            ->where('events.is_active', true)
+            ->whereIn('events.status', Event::PUBLIC_STATUSES)
+            ->where('events.visibility', EventVisibility::Public)
+            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+            ->where('events.starts_at', '>=', now())
+            ->orderBy('id')
+            ->get(['id', 'starts_at', 'status', 'visibility', 'event_structure', 'updated_at'])
+            ->map(fn (Event $event): array => $event->getAttributes())
+            ->all();
+
+        return [
+            'version' => sha1(json_encode([
+                'speakers' => $speakerFingerprints,
+                'media' => $speakerMediaFingerprints,
+                'events' => $eventFingerprints,
+            ]) ?: ''),
+        ];
+    }
+
+    /**
      * @return Builder<Speaker>
      */
-    private function baseSpeakerQuery(): Builder
+    private function baseSpeakerQuery(?User $user = null): Builder
     {
-        return Speaker::query()
-            ->active()
+        $query = Speaker::query();
+
+        if ($user instanceof User) {
+            $query->select('speakers.*')
+                ->selectRaw(
+                    'exists(select 1 from followings where followings.user_id = ? and followings.followable_id = speakers.id and followings.followable_type = ?) as is_following',
+                    [$user->id, (new Speaker)->getMorphClass()],
+                );
+        }
+
+        return $query->active()
             ->where('status', 'verified')
             ->withCount(['events' => function (Builder $query): void {
                 $query
@@ -1092,8 +1147,13 @@ class SearchController extends FrontendController
     /**
      * @return array<string, mixed>
      */
-    private function speakerListData(Speaker $speaker): array
+    private function speakerListData(Speaker $speaker, ?User $user = null): array
     {
+        $attributes = $speaker->getAttributes();
+        $isFollowing = array_key_exists('is_following', $attributes)
+            ? (bool) $attributes['is_following']
+            : ($user?->isFollowing($speaker) ?? false);
+
         return [
             'id' => $speaker->id,
             'slug' => $speaker->slug,
@@ -1101,6 +1161,7 @@ class SearchController extends FrontendController
             'formatted_name' => $speaker->formatted_name,
             'events_count' => (int) ($speaker->events_count ?? 0),
             'avatar_url' => $speaker->public_avatar_url,
+            'is_following' => $isFollowing,
         ];
     }
 
