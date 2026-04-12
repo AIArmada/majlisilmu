@@ -379,12 +379,24 @@ class EventController extends Controller
     {
         $posterUrl = $this->preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']);
 
-        return [
+        $payload = [
             ...$event->toArray(),
             'card_image_url' => $event->card_image_url,
             'poster_url' => $posterUrl,
             'has_poster' => $event->hasMedia('poster'),
         ];
+
+        if ($event->relationLoaded('speakers') && is_array($payload['speakers'] ?? null)) {
+            $event->speakers->loadMissing('media');
+            $payload['speakers'] = $event->speakers
+                ->map(fn ($speaker) => [
+                    ...$speaker->toArray(),
+                    'avatar_url' => $speaker->public_avatar_url,
+                ])
+                ->all();
+        }
+
+        return $payload;
     }
 
     /**
