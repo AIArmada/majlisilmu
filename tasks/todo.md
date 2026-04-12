@@ -1,3 +1,35 @@
+# Event Update Field Parity Follow-up
+
+- [x] Audit the event suggest-update form field by field against the public submit-event flow
+- [x] Mirror the remaining high-signal event behaviors that were still missing on the update page
+- [x] Add rendered and Livewire regressions, then rerun verification
+
+## Review
+
+- Confirmed the update schema already contained `Waktu`, then tightened parity so the public update page now behaves closer to `/hantar-majlis` for event timing, age-group handling, speaker/reference inline creation, and organizer-speaker selection.
+- Made `Waktu` date-aware on the update page too, so Friday- and Ramadhan-specific prayer-time options only appear when the selected event date supports them.
+- Added a rendered page regression proving the event update page shows `Waktu`, plus stabilized the organizer/location tests by pinning those fixtures to physical events when they exercise venue selection.
+- Verification:
+  - `tests/Feature/ContributionPagesTest.php` => **41 passed**
+  - `vendor/bin/phpstan analyse --ansi app/Forms/EventContributionFormSchema.php tests/Feature/ContributionPagesTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
+# Event Update Organizer/Location Parity
+
+- [x] Mirror the submit-event organizer/location flow on the event suggest-update page
+- [x] Normalize submit-style organizer/location state back to persisted event fields before diffing and saving
+- [x] Add focused event update regressions and rerun verification
+
+## Review
+
+- Replaced the event update page's single `organizer_id` / `institution_id` / `venue_id` controls with the fuller public submit-event organizer and location flow, including separate organizer pickers, the same-as-institution toggle, location type switching, and institution/venue quick-create paths.
+- Kept the persistence contract stable by mapping those public helper fields back into `organizer_id`, `institution_id`, `venue_id`, and `space_id` inside [app/Livewire/Pages/Contributions/SuggestUpdate.php](/Users/Saiffil/Herd/majlisilmu/app/Livewire/Pages/Contributions/SuggestUpdate.php) before diffing or saving, and by injecting the helper fields when the update form is prefilled from the existing event.
+- Added focused regressions in [tests/Feature/ContributionPagesTest.php](/Users/Saiffil/Herd/majlisilmu/tests/Feature/ContributionPagesTest.php) covering the new organizer/location prefill and direct-edit normalization paths.
+- Verification:
+  - `tests/Feature/ContributionPagesTest.php` => **40 passed**
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Forms/EventContributionFormSchema.php app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => **pass**
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+
 # Speaker Direct-Edit Media Follow-up
 
 - [x] Extend public speaker direct-edit media support to include `cover` alongside `avatar`

@@ -21,13 +21,13 @@ class AdminEventTimeMapper
         $timezone = (string) ($data['timezone'] ?? 'Asia/Kuala_Lumpur');
 
         if (! empty($data['starts_at'])) {
-            $startsAt = Carbon::parse((string) $data['starts_at'])->setTimezone($timezone);
+            $startsAt = Carbon::parse((string) $data['starts_at'], 'UTC')->setTimezone($timezone);
             $data['event_date'] = $startsAt->toDateString();
             $data['custom_time'] = $startsAt->format('H:i');
         }
 
         if (! empty($data['ends_at'])) {
-            $endsAt = Carbon::parse((string) $data['ends_at'])->setTimezone($timezone);
+            $endsAt = Carbon::parse((string) $data['ends_at'], 'UTC')->setTimezone($timezone);
             $data['end_time'] = $endsAt->format('H:i');
         }
 

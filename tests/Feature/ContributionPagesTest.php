@@ -7,6 +7,9 @@ use App\Enums\ContactType;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
+use App\Enums\EventFormat;
+use App\Enums\EventPrayerTime;
+use App\Enums\EventType;
 use App\Enums\MemberSubjectType;
 use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
 use App\Livewire\Pages\Contributions\SubmitInstitution;
@@ -24,6 +27,7 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\User;
+use App\Models\Venue;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Location\PublicCountryPreference;
@@ -234,8 +238,73 @@ it('keeps reviewer context fields on update suggestion pages', function () {
 
     $this->get(route('contributions.suggest-update', ['subjectType' => 'institusi', 'subjectId' => $institution->slug]))
         ->assertOk()
-        ->assertSee(__('Context for reviewers'))
-        ->assertSee(__('Explain the change'));
+        ->assertSee(__('Explain the change'))
+        ->assertSee(__('Optional: add context that helps maintainers review your update faster.'));
+});
+
+it('renders the action modal stack on event update pages for create-option fields', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Dengan Modal Tindakan',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'event_type' => [EventType::Iftar->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+        'starts_at' => now()->addDays(3)->setTime(20, 0),
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ]))
+        ->assertOk()
+        ->assertSee('wire:partial="action-modals"', false)
+        ->assertSee('filamentActionModals({', false);
+});
+
+it('renders the suggest update page with translated event form copy when the locale changes', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Terjemahan',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now()->subMinute(),
+        'event_type' => [EventType::Iftar->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+        'starts_at' => now()->addDays(3)->setTime(20, 0),
+    ]);
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ]))
+        ->assertOk()
+        ->assertSee('Cadangan Komuniti')
+        ->assertSee('Cadangkan Kemas Kini')
+        ->assertSee('Terangkan perubahan')
+        ->assertSee('Audiens & Bahasa')
+        ->assertSee('Penganjur & Lokasi')
+        ->assertDontSee('Community Suggestion')
+        ->assertDontSee('Suggest an Update')
+        ->assertDontSee('Explain the change')
+        ->assertDontSee('Audience & Language')
+        ->assertDontSee('Organizer & Location');
 });
 
 it('shows the institution cover upload on the suggest update page only for maintainers', function () {
@@ -429,8 +498,9 @@ it('re-moderates approved events when maintainers apply sensitive direct edits f
     $event = Event::factory()->for($institution)->create([
         'title' => 'Majlis Sensitif',
         'status' => 'approved',
-        'starts_at' => now()->addDays(4),
-        'ends_at' => now()->addDays(4)->addHour(),
+        'event_type' => [EventType::Iftar->value],
+        'starts_at' => now()->addDays(4)->setTime(20, 0),
+        'ends_at' => now()->addDays(4)->setTime(21, 0),
     ]);
 
     assignInstitutionOwner($user, $institution);
@@ -440,12 +510,178 @@ it('re-moderates approved events when maintainers apply sensitive direct edits f
         'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
         'subjectId' => $event->slug,
     ])
-        ->set('data.starts_at', now()->addDays(8)->toDateTimeString())
+        ->set('data.event_date', now()->addDays(8)->toDateString())
+        ->set('data.prayer_time', EventPrayerTime::LainWaktu->value)
+        ->set('data.custom_time', '20:00')
+        ->set('data.end_time', '21:00')
         ->call('submit')
         ->assertHasNoErrors();
 
     expect((string) $event->fresh()->status)->toBe('pending')
         ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('shows the richer event update controls for maintainers', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Dengan Media',
+        'status' => 'approved',
+        'event_type' => [EventType::Iftar->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+        'starts_at' => now()->addDays(4)->setTime(20, 0),
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ])
+        ->assertFormFieldVisible('event_date')
+        ->assertFormFieldVisible('prayer_time')
+        ->assertFormFieldVisible('organizer_institution_id')
+        ->assertFormFieldVisible('poster')
+        ->assertFormFieldVisible('gallery');
+});
+
+it('renders the submit-style waktu field on the event update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Ada Waktu',
+        'status' => 'approved',
+        'event_type' => [EventType::Iftar->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+        'starts_at' => now()->addDays(3)->setTime(20, 0),
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ]))
+        ->assertOk()
+        ->assertSee(__('Waktu'))
+        ->assertSee(__('Masa Mula'))
+        ->assertSee(__('Jenis Penganjur'));
+});
+
+it('prefills submit-style organizer and location fields on the event update page', function () {
+    $user = User::factory()->create();
+    $organizerInstitution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $venue = Venue::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->create([
+        'title' => 'Majlis Dengan Lokasi Venue',
+        'status' => 'approved',
+        'event_format' => EventFormat::Physical,
+        'organizer_type' => Institution::class,
+        'organizer_id' => $organizerInstitution->id,
+        'institution_id' => null,
+        'venue_id' => $venue->id,
+        'starts_at' => now()->addDays(4)->setTime(20, 0),
+    ]);
+
+    assignInstitutionOwner($user, $organizerInstitution);
+
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ])
+        ->assertSet('data.organizer_type', 'institution')
+        ->assertSet('data.organizer_institution_id', $organizerInstitution->id)
+        ->assertSet('data.location_same_as_institution', false)
+        ->assertSet('data.location_type', 'venue')
+        ->assertSet('data.location_venue_id', $venue->id);
+});
+
+it('normalizes submit-style organizer and location changes on the event update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+    ]);
+    $venue = Venue::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Tukar Penganjur',
+        'status' => 'approved',
+        'event_type' => [EventType::Iftar->value],
+        'event_format' => EventFormat::Physical,
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+        'venue_id' => null,
+        'starts_at' => now()->addDays(5)->setTime(20, 0),
+        'ends_at' => now()->addDays(5)->setTime(21, 0),
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ])
+        ->set('data.organizer_type', 'speaker')
+        ->set('data.organizer_speaker_id', $speaker->id)
+        ->set('data.location_same_as_institution', false)
+        ->set('data.location_type', 'venue')
+        ->set('data.location_venue_id', $venue->id)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()->organizer_type)->toBe(Speaker::class)
+        ->and($event->fresh()->organizer_id)->toBe($speaker->id)
+        ->and($event->fresh()->institution_id)->toBeNull()
+        ->and($event->fresh()->venue_id)->toBe($venue->id)
+        ->and($event->fresh()->space_id)->toBeNull()
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('removes the workflow explainer from the event update page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Komuniti',
+        'status' => 'approved',
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ]))
+        ->assertOk()
+        ->assertDontSee(__('Structured change set'))
+        ->assertDontSee(__('Owner or admin review'))
+        ->assertDontSee(__('History is preserved'));
 });
 
 it('pins the event update timezone to the single-timezone public country scope', function () {
@@ -458,8 +694,13 @@ it('pins the event update timezone to the single-timezone public country scope',
         'status' => 'approved',
         'visibility' => 'public',
         'published_at' => now()->subDay(),
+        'event_type' => [EventType::Iftar->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
         'timezone' => 'America/New_York',
-        'starts_at' => now()->addDays(7),
+        'starts_at' => now()->addDays(7)->setTime(19, 0),
+        'ends_at' => now()->addDays(7)->setTime(20, 0),
     ]);
 
     Livewire::withCookie(PublicCountryPreference::COOKIE_NAME, 'malaysia')
@@ -567,7 +808,7 @@ it('shows the latest pending request notice on the suggest update page', functio
         'subjectId' => $institution->slug,
     ])
         ->assertSee(__('Pending Request'))
-        ->assertSee('You already have a pending update request for this record from');
+        ->assertSee('Anda sudah mempunyai permintaan kemas kini yang masih menunggu untuk rekod ini sejak');
 });
 
 it('renders contribution requests and event submissions without approval controls', function () {

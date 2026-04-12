@@ -127,6 +127,7 @@ it('adds workflow summaries to public contract and mutation endpoints', function
         ->and($paths['/contributions/institutions']['post']['summary'] ?? null)->toBe('Create an institution contribution')
         ->and($paths['/contributions/speakers']['post']['summary'] ?? null)->toBe('Create a speaker contribution')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['summary'] ?? null)->toBe('Get editable contribution context')
+        ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['description'] ?? null)->toContain('event `poster`/`gallery`')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['summary'] ?? null)->toBe('Submit a contribution update')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('direct_edit')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('review');
