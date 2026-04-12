@@ -12,6 +12,7 @@ use App\Enums\InspirationCategory;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
+use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Inspiration;
@@ -228,7 +229,7 @@ class SearchController extends FrontendController
                     'display_name' => $record->display_name,
                     'description' => $record->description,
                     'status' => $record->status,
-                    'type_label' => $record->type?->getLabel(),
+                    'type_label' => $record->type instanceof HasLabel ? $record->type->getLabel() : null,
                     'address_line' => $this->addressLocation($record->addressModel),
                     'map_url' => $record->addressModel?->google_maps_url,
                     'followers_count' => $record->followersCount(),
@@ -252,6 +253,29 @@ class SearchController extends FrontendController
                     ],
                     'contacts' => $this->contactData($record->contacts),
                     'social_media' => $this->socialMediaData($record->socialMedia),
+                    'waze_url' => $record->addressModel?->waze_url,
+                    'donation_channels' => $record->donationChannels
+                        ->where('status', 'verified')
+                        ->sortByDesc('is_default')
+                        ->map(fn (DonationChannel $channel): array => [
+                            'id' => $channel->id,
+                            'label' => $channel->label,
+                            'method' => $channel->method,
+                            'method_display' => $channel->method_display,
+                            'recipient' => $channel->recipient,
+                            'payment_details' => $channel->payment_details,
+                            'bank_name' => $channel->bank_name,
+                            'bank_code' => $channel->bank_code,
+                            'account_number' => $channel->account_number,
+                            'duitnow_type' => $channel->duitnow_type,
+                            'duitnow_value' => $channel->duitnow_value,
+                            'ewallet_provider' => $channel->ewallet_provider,
+                            'ewallet_handle' => $channel->ewallet_handle,
+                            'is_default' => $channel->is_default,
+                            'qr_url' => $channel->getFirstMediaUrl('qr', 'thumb') ?: $channel->getFirstMediaUrl('qr') ?: null,
+                        ])
+                        ->values()
+                        ->all(),
                 ],
                 'upcoming_events' => $record->events()
                     ->active()
