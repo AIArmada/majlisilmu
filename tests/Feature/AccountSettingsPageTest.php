@@ -18,9 +18,6 @@ it('renders the account settings page with profile and notifications tabs', func
 
     $user = User::factory()->create();
 
-    config()->set('scramble.api_domain', 'api.majlisilmu.my');
-    config()->set('app.url', 'https://admin.majlisilmu.my');
-
     $response = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
         ->get(route('dashboard.account-settings'));
@@ -30,11 +27,9 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('Profile')
         ->assertSee('Notifications')
         ->assertSee('Profile Details')
-        ->assertSee('API Access')
-        ->assertSee('Create Token')
-        ->assertSee('Authorization: Bearer')
-        ->assertSee('https://api.majlisilmu.my/docs')
-        ->assertSee('POST https://api.majlisilmu.my/api/v1/auth/login')
+        ->assertDontSee('API Access')
+        ->assertDontSee('Create Token')
+        ->assertDontSee('Authorization: Bearer')
         ->assertDontSee('Device Preferences')
         ->assertDontSee('Show country selector on public search pages')
         ->assertSee('Prayer Institutions')
@@ -46,26 +41,17 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('fi-fo-phone-input', false);
 });
 
-it('creates and revokes personal api access tokens from account settings', function () {
+it('renders the account settings profile tab in Malay with the updated friday helper copy', function () {
     $user = User::factory()->create();
 
-    $component = Livewire::actingAs($user)
-        ->test(AccountSettings::class)
-        ->set('apiTokenName', 'Partner App')
-        ->call('createApiToken')
-        ->assertHasNoErrors()
-        ->assertSet('apiTokenName', '')
-        ->assertSet('newApiToken', fn (?string $token): bool => is_string($token) && $token !== '');
-
-    $tokenId = $user->fresh()->tokens()->value('id');
-
-    expect($user->fresh()->tokens()->pluck('name')->all())->toBe(['Partner App']);
-
-    $component
-        ->call('revokeApiToken', $tokenId)
-        ->assertHasNoErrors();
-
-    expect($user->fresh()->tokens()->count())->toBe(0);
+    $this->withSession(['locale' => 'ms'])
+        ->actingAs($user)
+        ->get(route('dashboard.account-settings'))
+        ->assertOk()
+        ->assertSee('Tetapan Akaun')
+        ->assertSee('Masjid atau surau yang biasa anda hadiri untuk solat Jumaat.')
+        ->assertDontSee('Biarkan kosong jika anda tidak mahu menyimpan lokasi Jumaat yang berasingan.')
+        ->assertDontSee('API Access');
 });
 
 it('renders the notifications tab in Malay without leaking raw translation keys', function () {

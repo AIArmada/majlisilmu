@@ -1,3 +1,48 @@
+# Account Settings Profile Cleanup
+
+- [x] Remove the API Access section from the profile tab
+- [x] Update the Friday prayer helper copy in Malay
+- [x] Add focused account-settings regressions and verify the page
+
+## Review
+
+- Removed the account-settings API Access block from [resources/views/livewire/pages/dashboard/account-settings.blade.php](resources/views/livewire/pages/dashboard/account-settings.blade.php) and dropped the no-longer-needed token plumbing from [app/Livewire/Pages/Dashboard/AccountSettings.php](app/Livewire/Pages/Dashboard/AccountSettings.php).
+- Replaced the Malay helper copy for the Friday prayer institution field in [resources/lang/ms.json](resources/lang/ms.json) and [resources/lang/ms_MY.json](resources/lang/ms_MY.json) with the new mosque/surau wording.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => 13 tests, 119 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php` => pass
+
+# Scramble Docs Paragraph Break
+
+- [x] Split the API docs description into readable markdown paragraphs
+- [x] Add a regression that checks the opening paragraph break
+- [x] Verify the generated docs contract and docs test
+
+## Review
+
+- Reworked the Scramble description in [config/scramble.php](config/scramble.php) so the `/docs` landing copy now renders as separate markdown paragraphs instead of a single run-on block.
+- Added a focused docs regression in [tests/Feature/ScrambleDocsTest.php](tests/Feature/ScrambleDocsTest.php) that asserts the description contains the opening paragraph break and the major section boundaries.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw config/scramble.php tests/Feature/ScrambleDocsTest.php` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => 11 passed
+
+# Report Page Polish
+
+- [x] Remove the moderation notes block from the shared report page
+- [x] Translate the remaining report copy and locale strings
+- [x] Tighten the report page mobile layout and add regressions
+
+## Review
+
+- Removed the shared moderation notes aside from [resources/views/livewire/pages/reports/create.blade.php](resources/views/livewire/pages/reports/create.blade.php) and tightened the layout to a single-column, mobile-first surface.
+- Moved the report copy into locale strings in [resources/lang/ms.json](resources/lang/ms.json) and [resources/lang/en.json](resources/lang/en.json), including the title, section labels, CTA text, and validation copy.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 50 passed
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Reports/Create.php app/Actions/Reports/ResolveReportFormContextAction.php app/Actions/Contributions/ResolveContributionSubjectPresentationAction.php` => pass
+
 # Suggest Update Form Copy and Mobile Polish
 
 - [x] Remove the contributions shortcut from the suggest-update page
