@@ -110,7 +110,7 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('GET /admin/manifest')
         ->toContain('GET /admin/{resourceKey}/schema?operation=create')
         ->toContain('GET /admin/catalogs/*')
-        ->toContain('Current admin write support includes events, institutions, speakers, references, and subdistricts.');
+        ->toContain('Current admin write support includes events, institutions, speakers, references, venues, and subdistricts.');
 });
 
 it('adds workflow summaries to public contract and mutation endpoints', function () {
