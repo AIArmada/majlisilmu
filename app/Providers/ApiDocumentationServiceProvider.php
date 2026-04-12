@@ -22,12 +22,15 @@ class ApiDocumentationServiceProvider extends ServiceProvider
         $docsViewPath = base_path('vendor/dedoc/scramble/resources/views/docs.blade.php');
         $docsMiddleware = config('scramble.middleware', []);
         $mobileRefPath = base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md');
-        $configureDocs = static function () use ($apiPath, $mobileRefPath): mixed {
+        $configureDocs = static function () use ($apiPath, $mobileRefPath) {
             $config = config('scramble');
             if (file_exists($mobileRefPath)) {
-                $config['info']['description'] = ($config['info']['description'] ?? '')
-                    ."\n\n---\n\n"
-                    .file_get_contents($mobileRefPath);
+                $mobileRefContent = file_get_contents($mobileRefPath);
+                if ($mobileRefContent !== false) {
+                    $config['info']['description'] = ($config['info']['description'] ?? '')
+                        ."\n\n---\n\n"
+                        .$mobileRefContent;
+                }
             }
 
             return Scramble::configure()
