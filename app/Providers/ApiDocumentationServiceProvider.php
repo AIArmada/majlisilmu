@@ -21,9 +21,22 @@ class ApiDocumentationServiceProvider extends ServiceProvider
         $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');
         $docsViewPath = base_path('vendor/dedoc/scramble/resources/views/docs.blade.php');
         $docsMiddleware = config('scramble.middleware', []);
-        $configureDocs = (static fn () => Scramble::configure()
-            ->useConfig(config('scramble'))
-            ->routes(static fn (IlluminateRoute $route): bool => $apiPath === '' || Str::startsWith($route->uri(), $apiPath)));
+        $mobileRefPath = base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md');
+        $configureDocs = static function () use ($apiPath, $mobileRefPath) {
+            $config = config('scramble');
+            if (file_exists($mobileRefPath)) {
+                $mobileRefContent = file_get_contents($mobileRefPath);
+                if ($mobileRefContent !== false) {
+                    $config['info']['description'] = ($config['info']['description'] ?? '')
+                        ."\n\n---\n\n"
+                        .$mobileRefContent;
+                }
+            }
+
+            return Scramble::configure()
+                ->useConfig($config)
+                ->routes(static fn (IlluminateRoute $route): bool => $apiPath === '' || Str::startsWith($route->uri(), $apiPath));
+        };
 
         $this->app->booted(function () use ($apiDomain, $configureDocs, $docsMiddleware, $docsViewPath): void {
             $registerDocsRoutes = function () use ($configureDocs, $docsMiddleware, $docsViewPath): void {
