@@ -1525,6 +1525,36 @@ it('shows the reported event clearly on the public report page', function () {
         ->assertSeeText($viewEventLabel);
 });
 
+it('renders translated report copy on mobile without the moderation notes block', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Kompleks Islam Senawang',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('reports.create', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertSeeText('Keselamatan & Kepercayaan')
+        ->assertSeeText('Lapor Rekod')
+        ->assertSeeText('Rekod dipilih: institusi')
+        ->assertSeeText('Laporkan institusi ini')
+        ->assertSeeText('Jenis Isu')
+        ->assertSeeText('Tambah konteks jika isu tidak jelas.')
+        ->assertSeeText('Lihat institusi ini')
+        ->assertSeeText('Hantar Laporan')
+        ->assertDontSee('Moderation notes')
+        ->assertDontSee('Reports are reviewed, not auto-hidden')
+        ->assertDontSee('Duplicate reports are limited')
+        ->assertDontSee('lg:grid-cols-[1.1fr_0.9fr]');
+});
+
 it('redirects uuid-based reference contribution and report pages to the canonical slug url', function () {
     $user = User::factory()->create();
     $reference = Reference::factory()->create([
