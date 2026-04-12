@@ -339,6 +339,8 @@ class FrontendFormContractService
                 $this->field('is_freelance', 'boolean', required: false, default: false),
                 $this->field('job_title', 'string', required: false, maxLength: 255),
                 $this->field('bio', 'rich_text', required: false),
+                $this->field('institution_id', 'uuid', required: false, catalog: route('api.client.catalogs.submit-institutions')),
+                $this->field('institution_position', 'string', required: false, maxLength: 255),
                 $this->field('address', 'object', required: true),
                 $this->field('address.state_id', 'integer', required: false),
                 $this->field('address.district_id', 'integer', required: false),

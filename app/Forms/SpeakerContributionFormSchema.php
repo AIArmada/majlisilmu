@@ -6,6 +6,8 @@ use App\Enums\Gender;
 use App\Enums\Honorific;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Forms\Components\Select as QuickAddSelect;
+use App\Models\Institution;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -15,6 +17,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Nnjeim\World\Models\Language;
 
 class SpeakerContributionFormSchema
@@ -184,6 +187,32 @@ class SpeakerContributionFormSchema
                     ->columns(2),
             ]);
         }
+
+        array_splice($components, 2, 0, [
+            Section::make(__('Affiliated Institution'))
+                ->schema([
+                    QuickAddSelect::make('institution_id')
+                        ->label(__('Affiliated Institution'))
+                        ->options(fn (): array => Institution::query()
+                            ->whereIn('status', ['verified', 'pending'])
+                            ->orderBy('name')
+                            ->get(['id', 'name', 'nickname'])
+                            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
+                            ->all())
+                        ->searchable()
+                        ->preload()
+                        ->live()
+                        ->closeOnSelect()
+                        ->createOptionForm(InstitutionFormSchema::createOptionForm(includeLocationPicker: true))
+                        ->createOptionUsing(fn (array $data, ?Schema $schema = null): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
+                    TextInput::make('institution_position')
+                        ->label(__('Position'))
+                        ->maxLength(255)
+                        ->placeholder(__('e.g., Imam, Mudir, Committee Member'))
+                        ->visible(fn (Get $get): bool => filled($get('institution_id'))),
+                ])
+                ->columns(2),
+        ]);
 
         return $components;
     }

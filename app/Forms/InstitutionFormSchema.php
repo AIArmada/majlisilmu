@@ -127,7 +127,7 @@ class InstitutionFormSchema
             return SharedFormSchema::addressFields(
                 requireGoogleMaps: true,
                 includeCountryField: true,
-                showCountryField: true,
+                showCountryField: false,
                 defaultCountryId: $publicCountryId,
                 requireCountryField: true,
             );
@@ -154,7 +154,7 @@ class InstitutionFormSchema
                     enableGoogleMapsNormalization: true,
                     enableGoogleMapsRemoteLookup: $shouldRenderLocationPicker,
                     includeCountryField: true,
-                    showCountryField: true,
+                    showCountryField: false,
                     defaultCountryId: $publicCountryId,
                     requireCountryField: true,
                 ),

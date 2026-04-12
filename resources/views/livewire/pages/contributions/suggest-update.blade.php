@@ -28,7 +28,11 @@
                 <h1 class="mt-3 font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">
                     {{ $canDirectEdit ? __('Apply an Update') : __('Suggest an Update') }}
                 </h1>
-                <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
+                <p @class([
+                    'mt-3 text-sm leading-6 text-slate-600 sm:text-base',
+                    'max-w-3xl' => ! $canDirectEdit,
+                    'max-w-none' => $canDirectEdit,
+                ])>
                     {{ $canDirectEdit
                         ? __('You already have edit access for this record, so changes from this form will be applied immediately.')
                         : __('Submit a structured change request so the owner or admin team can review it without losing the current record history.') }}
@@ -41,15 +45,11 @@
                         <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ $message }}</div>
                     @enderror
 
-                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <button type="submit"
                             class="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 sm:w-auto">
                             {{ $canDirectEdit ? __('Save Changes') : __('Submit Update Request') }}
                         </button>
-                        <a href="{{ route('contributions.index') }}" wire:navigate
-                            class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:w-auto">
-                            {{ __('View My Contributions') }}
-                        </a>
                     </div>
                 </form>
             </section>

@@ -154,6 +154,63 @@ it('renders the speaker contribution page with translated copy when the locale c
         ->assertDontSee('Contact Details');
 });
 
+it('shows speaker affiliation fields on the dedicated create and update forms', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SubmitSpeaker::class)
+        ->assertFormFieldVisible('institution_id')
+        ->set('data.institution_id', $institution->id)
+        ->assertFormFieldVisible('institution_position');
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ])
+        ->assertFormFieldVisible('institution_id')
+        ->set('data.institution_id', $institution->id)
+        ->assertFormFieldVisible('institution_position');
+});
+
+it('stores speaker affiliations from the dedicated speaker contribution page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(SubmitSpeaker::class)
+        ->fillForm([
+            'name' => 'Ustaz Pautan Institusi',
+            'gender' => 'male',
+            'institution_id' => $institution->id,
+            'institution_position' => 'Mudir',
+        ])
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $speaker = Speaker::query()
+        ->with('institutions')
+        ->where('name', 'Ustaz Pautan Institusi')
+        ->firstOrFail();
+
+    $affiliatedInstitution = $speaker->institutions->firstWhere('id', $institution->id);
+
+    expect($speaker->status)->toBe('pending')
+        ->and($affiliatedInstitution)->not->toBeNull()
+        ->and($affiliatedInstitution?->pivot?->position)->toBe('Mudir')
+        ->and((bool) $affiliatedInstitution?->pivot?->is_primary)->toBeTrue();
+});
+
 it('renders the institution contribution submission success page', function () {
     $user = User::factory()->create();
 
@@ -307,7 +364,29 @@ it('renders the suggest update page with translated event form copy when the loc
         ->assertDontSee('Organizer & Location');
 });
 
-it('shows the institution cover upload on the suggest update page only for maintainers', function () {
+it('renders the institution suggest update page with translated direct-edit copy when the locale changes', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertSee('Cadangan Kemas Kini')
+        ->assertSee('Anda sudah mempunyai akses suntingan untuk rekod ini, jadi perubahan daripada borang ini akan diterapkan serta-merta.')
+        ->assertDontSee('Laksanakan Kemas Kini')
+        ->assertDontSee(__('View My Contributions'));
+});
+
+it('shows the institution media uploads on the suggest update page only for maintainers', function () {
     $owner = User::factory()->create();
     $visitor = User::factory()->create();
     $institution = Institution::factory()->create([
@@ -321,7 +400,9 @@ it('shows the institution cover upload on the suggest update page only for maint
         'subjectId' => $institution->slug,
     ]))
         ->assertOk()
-        ->assertDontSee(__('Cover Image'));
+        ->assertDontSee(__('View My Contributions'))
+        ->assertDontSee(__('Cover Image'))
+        ->assertDontSee(__('Gallery'));
 
     assignInstitutionOwner($owner, $institution);
     $this->actingAs($owner);
@@ -331,10 +412,33 @@ it('shows the institution cover upload on the suggest update page only for maint
         'subjectId' => $institution->slug,
     ]))
         ->assertOk()
-        ->assertSee(__('Cover Image'));
+        ->assertDontSee(__('View My Contributions'))
+        ->assertSee(__('Cover Image'))
+        ->assertSee(__('Gallery'));
 });
 
-it('shows the speaker avatar and cover uploads on the suggest update page only for maintainers', function () {
+it('uses the institution location picker on the suggest update page when google places is enabled', function () {
+    config()->set('services.google.maps_api_key', 'test-maps-key');
+    config()->set('services.google.places_enabled', true);
+
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertSee(__('Find the institution location'))
+        ->assertSee(__('Search for an institution or address'));
+});
+
+it('shows the speaker media uploads on the suggest update page only for maintainers', function () {
     $owner = User::factory()->create();
     $visitor = User::factory()->create();
     $speaker = Speaker::factory()->create([
@@ -350,8 +454,10 @@ it('shows the speaker avatar and cover uploads on the suggest update page only f
         'subjectId' => $speaker->slug,
     ]))
         ->assertOk()
+        ->assertDontSee(__('View My Contributions'))
         ->assertDontSee(__('Avatar'))
-        ->assertDontSee(__('Cover Image'));
+        ->assertDontSee(__('Cover Image'))
+        ->assertDontSee(__('Gallery'));
 
     assignSpeakerOwner($owner, $speaker);
     $this->actingAs($owner);
@@ -361,8 +467,62 @@ it('shows the speaker avatar and cover uploads on the suggest update page only f
         'subjectId' => $speaker->slug,
     ]))
         ->assertOk()
+        ->assertDontSee(__('View My Contributions'))
         ->assertSee(__('Avatar'))
-        ->assertSee(__('Cover Image'));
+        ->assertSee(__('Cover Image'))
+        ->assertSee(__('Gallery'));
+});
+
+it('applies direct speaker affiliation edits for owner maintainers from the suggest update page', function () {
+    $user = User::factory()->create();
+    $currentInstitution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $secondaryInstitution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $newInstitution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->institutions()->detach();
+
+    $speaker->institutions()->attach($currentInstitution->id, [
+        'position' => 'Imam',
+        'is_primary' => true,
+    ]);
+    $speaker->institutions()->attach($secondaryInstitution->id, [
+        'position' => 'Advisor',
+        'is_primary' => false,
+    ]);
+
+    assignSpeakerOwner($user, $speaker);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ])
+        ->set('data.institution_id', $newInstitution->id)
+        ->set('data.institution_position', 'Mudir')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $speaker = $speaker->fresh('institutions');
+    $newAffiliation = $speaker?->institutions->firstWhere('id', $newInstitution->id);
+    $secondaryAffiliation = $speaker?->institutions->firstWhere('id', $secondaryInstitution->id);
+
+    expect($speaker?->institutions->pluck('id')->all())->toContain($newInstitution->id, $secondaryInstitution->id)
+        ->not->toContain($currentInstitution->id)
+        ->and($newAffiliation)->not->toBeNull()
+        ->and($newAffiliation?->pivot?->position)->toBe('Mudir')
+        ->and((bool) $newAffiliation?->pivot?->is_primary)->toBeTrue()
+        ->and((bool) $secondaryAffiliation?->pivot?->is_primary)->toBeFalse()
+        ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
 it('exposes Filament action handlers required by public contribution media uploads', function () {
@@ -487,6 +647,32 @@ it('applies direct institution cover edits for owner maintainers from the sugges
 
     expect($institution->fresh()->getMedia('cover'))->toHaveCount(1)
         ->and($institution->fresh()->getFirstMedia('cover'))->not->toBeNull()
+        ->and(ContributionRequest::query()->count())->toBe(0);
+});
+
+it('applies direct institution gallery edits for owner maintainers from the suggest update page', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ])
+        ->fillForm([
+            'gallery' => [UploadedFile::fake()->image('institution-gallery.jpg', 1600, 900)],
+        ])
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($institution->fresh()->getMedia('gallery'))->toHaveCount(1)
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 

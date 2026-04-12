@@ -254,7 +254,7 @@ it('defaults address country_id to malaysia when null is submitted directly to t
     expect($institution->fresh()->addressModel?->country_id)->toBe(132);
 });
 
-it('requires country fields in institution and venue public creation forms', function () {
+it('pins hidden country fields in institution and venue public creation forms', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -305,13 +305,9 @@ it('requires country fields in institution and venue public creation forms', fun
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null)
         ->get('country_id');
 
-    expect($institutionCountry)->toBeInstanceOf(Select::class)
-        ->and($venueCountry)->toBeInstanceOf(Select::class)
+    expect($institutionCountry)->toBeInstanceOf(Hidden::class)
+        ->and($venueCountry)->toBeInstanceOf(Hidden::class)
         ->and($contributionCountry)->toBeInstanceOf(Hidden::class);
-    expect(method_exists($institutionCountry, 'isRequired'))->toBeTrue();
-    expect(method_exists($venueCountry, 'isRequired'))->toBeTrue();
-    expect($institutionCountry?->isRequired())->toBeTrue();
-    expect($venueCountry?->isRequired())->toBeTrue();
 });
 
 it('requires google maps url in institution and venue quick-create forms', function () {
@@ -1223,7 +1219,7 @@ it('uses a reduced region-only address contract across speaker create and contri
     )))
         ->keyBy(fn (mixed $component): ?string => method_exists($component, 'getName') ? $component->getName() : null);
 
-    foreach (['bio', 'language_ids', 'qualifications', 'contacts', 'social_media', 'avatar', 'cover', 'gallery'] as $field) {
+    foreach (['bio', 'language_ids', 'institution_id', 'institution_position', 'qualifications', 'contacts', 'social_media', 'avatar', 'cover', 'gallery'] as $field) {
         expect($quickCreateComponents->has($field))->toBeTrue();
         expect($contributionComponents->has($field))->toBeTrue();
     }

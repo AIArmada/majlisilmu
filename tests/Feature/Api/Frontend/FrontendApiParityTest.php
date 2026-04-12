@@ -121,13 +121,12 @@ it('exposes corrected frontend contract metadata', function () {
         ->json('data');
     $speakerFields = collect($speakerContract['fields'] ?? [])->pluck('name')->all();
 
-    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'qualifications')
+    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'qualifications', 'institution_id', 'institution_position')
         ->not->toContain('address.country_id')
         ->not->toContain('address.line1')
         ->not->toContain('address.google_maps_url')
         ->not->toContain('position')
-        ->not->toContain('main')
-        ->not->toContain('institution_id');
+        ->not->toContain('main');
 
     $institutionContract = $this->getJson(route('api.client.forms.contributions.institutions'))
         ->assertOk()
@@ -166,7 +165,7 @@ it('exposes authenticated contribution update contracts and permission-gated dir
     expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
         ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
         ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
-        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['cover'])
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['cover', 'gallery'])
         ->and($fields->pluck('name')->all())->toContain('description', 'address', 'social_media')
         ->and($fields->firstWhere('name', 'type')['allowed_values'])->toContain('masjid')
         ->and($ownerResponse->json('data.initial_state.description'))->toBe('Community institution');
@@ -209,7 +208,7 @@ it('allows institution direct edit access over bearer tokens without token abili
         ]))->assertOk();
 
     expect($response->json('data.can_direct_edit'))->toBeTrue()
-        ->and($response->json('data.direct_edit_media_fields'))->toBe(['cover'])
+        ->and($response->json('data.direct_edit_media_fields'))->toBe(['cover', 'gallery'])
         ->and($response->json('data.initial_state.description'))->toBe('Community institution');
 });
 
@@ -442,7 +441,33 @@ it('exposes speaker avatar direct edit media support for authorized public updat
     expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
         ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
         ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
-        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['avatar', 'cover']);
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['avatar', 'cover', 'gallery']);
+});
+
+it('allows direct institution gallery uploads on public contribution update suggestions', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'institusi',
+        'subject' => $institution->slug,
+    ]), [
+        'gallery' => [UploadedFile::fake()->image('institution-gallery.jpg', 1600, 900)],
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    expect($institution->fresh()?->getMedia('gallery'))->toHaveCount(1);
 });
 
 it('returns only region address keys in the speaker suggest context state', function () {
@@ -678,6 +703,33 @@ it('allows direct speaker cover uploads on public contribution update suggestion
         ->and($speaker?->getFirstMediaUrl('cover'))->not->toBe('');
 });
 
+it('allows direct speaker gallery uploads on public contribution update suggestions', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $owner = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    assignSpeakerOwnerForFrontendApi($owner, $speaker);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'penceramah',
+        'subject' => $speaker->slug,
+    ]), [
+        'gallery' => [UploadedFile::fake()->image('speaker-gallery.jpg', 1200, 1200)],
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.mode', 'direct_edit');
+
+    expect($speaker->fresh()?->getMedia('gallery'))->toHaveCount(1);
+});
+
 it('rejects unsupported speaker media files on public contribution update suggestions', function () {
     $owner = User::factory()->create();
     $speaker = Speaker::factory()->create([
@@ -692,7 +744,7 @@ it('rejects unsupported speaker media files on public contribution update sugges
         'subjectType' => 'penceramah',
         'subject' => $speaker->slug,
     ]), [
-        'gallery' => [UploadedFile::fake()->image('speaker-gallery.jpg')],
+        'poster' => UploadedFile::fake()->image('speaker-poster.jpg'),
     ], [
         'Accept' => 'application/json',
     ])
@@ -932,6 +984,56 @@ it('serializes institution directory payloads with card media aliases for mobile
         ->and(data_get($item, 'image_url'))->not->toBe(data_get($item, 'logo_url'))
         ->and(array_key_exists('location', $item))->toBeTrue()
         ->and(array_key_exists('location_text', $item))->toBeTrue();
+});
+
+it('bumps the institution directory cache version when institution records change', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Institution Cache Version',
+        'nickname' => 'ICV',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $institution->update([
+        'nickname' => 'ICV Updated',
+    ]);
+
+    $updatedVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($initialVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
+it('bumps the institution directory cache version when institution media changes', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Institution Cache Media',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $institution->addMedia(UploadedFile::fake()->image('institution-cache-logo.jpg', 800, 800))
+        ->toMediaCollection('logo');
+
+    $updatedVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
 });
 
 it('keeps placeholder institution imagery when no real media exists', function () {

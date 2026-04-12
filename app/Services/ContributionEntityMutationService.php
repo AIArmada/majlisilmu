@@ -87,7 +87,7 @@ class ContributionEntityMutationService
                     $this->field('social_media', 'array<object>'),
                 ],
                 'conditional_rules' => [],
-                'direct_edit_media_fields' => ['cover'],
+                'direct_edit_media_fields' => ['cover', 'gallery'],
             ],
             $entity instanceof Speaker => [
                 'accepts_partial_updates' => true,
@@ -102,12 +102,14 @@ class ContributionEntityMutationService
                     $this->field('bio', 'rich_text'),
                     $this->field('qualifications', 'array<object>'),
                     $this->field('language_ids', 'array<int>', catalog: route('api.client.catalogs.languages')),
+                    $this->field('institution_id', 'uuid', catalog: route('api.client.catalogs.submit-institutions')),
+                    $this->field('institution_position', 'string', maxLength: 255),
                     $this->field('address', 'object'),
                     $this->field('contacts', 'array<object>'),
                     $this->field('social_media', 'array<object>'),
                 ],
                 'conditional_rules' => [],
-                'direct_edit_media_fields' => ['avatar', 'cover'],
+                'direct_edit_media_fields' => ['avatar', 'cover', 'gallery'],
             ],
             $entity instanceof Reference => [
                 'accepts_partial_updates' => true,
@@ -222,6 +224,8 @@ class ContributionEntityMutationService
                 'post_nominal' => ['sometimes', 'array'],
                 'post_nominal.*' => ['string', Rule::in($this->enumValues(PostNominal::class))],
                 'bio' => ['nullable'],
+                'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
+                'institution_position' => ['nullable', 'string', 'max:255'],
                 'address' => ['sometimes', 'array'],
                 'address.country_id' => ['prohibited'],
                 'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
@@ -646,6 +650,8 @@ class ContributionEntityMutationService
     {
         $speaker->loadMissing(['address', 'contacts', 'socialMedia', 'languages']);
 
+        $affiliatedInstitution = $this->currentSpeakerAffiliation($speaker);
+
         return [
             'name' => $speaker->name,
             'gender' => (string) $speaker->gender,
@@ -657,6 +663,8 @@ class ContributionEntityMutationService
             'bio' => $speaker->bio,
             'qualifications' => $this->normalizeQualificationEntries($speaker->qualifications ?? []),
             'language_ids' => $speaker->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all(),
+            'institution_id' => $affiliatedInstitution?->getKey(),
+            'institution_position' => $affiliatedInstitution?->pivot?->position,
             'address' => $this->addressState($speaker->addressModel),
             'contacts' => $this->contactsState($speaker->contacts),
             'social_media' => $this->socialMediaState($speaker->socialMedia),
@@ -815,6 +823,128 @@ class ContributionEntityMutationService
         if (array_key_exists('language_ids', $payload)) {
             $speaker->syncLanguages($this->normalizeIntegerArray($payload['language_ids']));
         }
+
+        $this->syncSpeakerAffiliation($speaker, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function syncSpeakerAffiliation(Speaker $speaker, array $payload): void
+    {
+        if (! array_key_exists('institution_id', $payload) && ! array_key_exists('institution_position', $payload)) {
+            return;
+        }
+
+        $beforeAffiliations = $this->speakerAffiliationAuditState($speaker);
+        $currentAffiliation = $this->currentSpeakerAffiliation($speaker);
+        $currentAffiliationId = $currentAffiliation?->getKey();
+
+        $institutionId = array_key_exists('institution_id', $payload)
+            ? $this->normalizeOptionalString($payload['institution_id'])
+            : (is_string($currentAffiliationId) ? $currentAffiliationId : null);
+
+        if ($institutionId === null) {
+            if ($currentAffiliation instanceof Institution) {
+                $speaker->institutions()->detach($currentAffiliation->getKey());
+            }
+
+            $this->recordSpeakerAffiliationAudit($speaker, $beforeAffiliations);
+
+            return;
+        }
+
+        $position = array_key_exists('institution_position', $payload)
+            ? $this->normalizeOptionalString($payload['institution_position'])
+            : $this->normalizeOptionalString($currentAffiliation?->pivot?->position);
+
+        if ($currentAffiliation instanceof Institution && (string) $currentAffiliation->getKey() !== $institutionId) {
+            $speaker->institutions()->detach($currentAffiliation->getKey());
+        }
+
+        $speaker->institutions()
+            ->newPivotStatement()
+            ->where('speaker_id', $speaker->getKey())
+            ->where('institution_id', '!=', $institutionId)
+            ->update([
+                'is_primary' => false,
+                'updated_at' => now(),
+            ]);
+
+        $alreadyAttached = $speaker->institutions()
+            ->where('institutions.id', $institutionId)
+            ->exists();
+
+        if ($alreadyAttached) {
+            $speaker->institutions()->updateExistingPivot($institutionId, [
+                'position' => $position,
+                'is_primary' => true,
+            ]);
+
+            $this->recordSpeakerAffiliationAudit($speaker, $beforeAffiliations);
+
+            return;
+        }
+
+        $speaker->institutions()->attach($institutionId, [
+            'position' => $position,
+            'is_primary' => true,
+        ]);
+
+        $this->recordSpeakerAffiliationAudit($speaker, $beforeAffiliations);
+    }
+
+    private function currentSpeakerAffiliation(Speaker $speaker): ?Institution
+    {
+        /** @var Institution|null $institution */
+        $institution = $speaker->institutions()
+            ->orderByPivot('is_primary', 'desc')
+            ->orderBy('institutions.name')
+            ->first();
+
+        return $institution;
+    }
+
+    /**
+     * @return list<array{id: string, name: string, position: ?string, is_primary: bool}>
+     */
+    private function speakerAffiliationAuditState(Speaker $speaker): array
+    {
+        return $speaker->institutions()
+            ->orderByPivot('is_primary', 'desc')
+            ->orderBy('institutions.name')
+            ->get()
+            ->map(static function (Institution $institution): array {
+                return [
+                    'id' => (string) $institution->getKey(),
+                    'name' => $institution->name,
+                    'position' => is_string($institution->pivot?->position) && $institution->pivot?->position !== ''
+                        ? $institution->pivot?->position
+                        : null,
+                    'is_primary' => (bool) $institution->pivot?->is_primary,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array{id: string, name: string, position: ?string, is_primary: bool}>  $beforeAffiliations
+     */
+    private function recordSpeakerAffiliationAudit(Speaker $speaker, array $beforeAffiliations): void
+    {
+        $speaker->load('institutions');
+        $afterAffiliations = $this->speakerAffiliationAuditState($speaker);
+
+        if ($beforeAffiliations === $afterAffiliations) {
+            return;
+        }
+
+        $speaker->recordCustomAuditDifferences(
+            'sync',
+            ['institutions' => $beforeAffiliations],
+            ['institutions' => $afterAffiliations],
+        );
     }
 
     /**

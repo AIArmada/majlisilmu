@@ -5,16 +5,11 @@ namespace App\Forms;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Enums\Gender;
-use App\Forms\Components\Select;
-use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\User;
-use Filament\Forms\Components\TextInput;
+use App\Services\ContributionEntityMutationService;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 class SpeakerFormSchema
 {
@@ -25,38 +20,10 @@ class SpeakerFormSchema
      */
     public static function createOptionForm(): array
     {
-        $components = SpeakerContributionFormSchema::components(
+        return SpeakerContributionFormSchema::components(
             includeMedia: true,
             regionOnlyAddress: true,
         );
-
-        array_splice($components, 2, 0, [
-            Section::make(__('Affiliated Institution'))
-                ->schema([
-                    Select::make('institution_id')
-                        ->label(__('Affiliated Institution'))
-                        ->options(fn () => Institution::query()
-                            ->whereIn('status', ['verified', 'pending'])
-                            ->orderBy('name')
-                            ->get(['id', 'name', 'nickname'])
-                            ->mapWithKeys(fn (Institution $institution): array => [(string) $institution->id => $institution->display_name])
-                            ->all())
-                        ->searchable()
-                        ->preload()
-                        ->live()
-                        ->closeOnSelect()
-                        ->createOptionForm(InstitutionFormSchema::createOptionForm())
-                        ->createOptionUsing(fn (array $data, Schema $schema): string => InstitutionFormSchema::createOptionUsing($data, $schema)),
-                    TextInput::make('institution_position')
-                        ->label(__('Position'))
-                        ->maxLength(255)
-                        ->placeholder(__('e.g., Imam, Mudir, Committee Member'))
-                        ->visible(fn (Get $get): bool => filled($get('institution_id'))),
-                ])
-                ->columns(2),
-        ]);
-
-        return $components;
     }
 
     /**
@@ -89,43 +56,7 @@ class SpeakerFormSchema
         // Save media uploads (avatar/cover) via Filament's relationship-saving mechanism
         $schema?->model($speaker)->saveRelationships();
 
-        if (array_key_exists('language_ids', $data)) {
-            $speaker->languages()->sync(self::normalizeIntegerIds((array) $data['language_ids']));
-        }
-
-        SharedFormSchema::createAddressFromData($speaker, $data, allowCountryOnly: true);
-        SharedFormSchema::createContactsFromData($speaker, $data);
-        SharedFormSchema::createSocialMediaFromData($speaker, $data);
-
-        $institutionIds = [];
-
-        if (filled($data['institution_id'] ?? null)) {
-            $institutionIds[] = (string) $data['institution_id'];
-        } elseif (! empty($data['institutions'])) {
-            $institutionIds = array_filter(
-                array_map(
-                    fn (mixed $institutionId): ?string => filled($institutionId) ? (string) $institutionId : null,
-                    (array) $data['institutions']
-                )
-            );
-        }
-
-        if ($institutionIds !== []) {
-            $position = filled($data['institution_position'] ?? null) ? $data['institution_position'] : null;
-            $institutionData = [];
-
-            foreach ($institutionIds as $institutionId) {
-                $institutionData[$institutionId] = [
-                    'position' => $position,
-                ];
-            }
-
-            if ($speaker instanceof AuditableContract && method_exists($speaker, 'auditSync')) {
-                $speaker->auditSync('institutions', $institutionData, false, ['institutions.id', 'institutions.name']);
-            } else {
-                $speaker->institutions()->attach($institutionData);
-            }
-        }
+        app(ContributionEntityMutationService::class)->syncSpeakerRelations($speaker, $data);
 
         return (string) $speaker->getKey();
     }
@@ -159,20 +90,6 @@ class SpeakerFormSchema
                 ];
             })
             ->filter()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @param  iterable<int, mixed>  $values
-     * @return list<int>
-     */
-    private static function normalizeIntegerIds(iterable $values): array
-    {
-        return collect($values)
-            ->map(fn (mixed $value): ?int => is_numeric($value) ? (int) $value : null)
-            ->filter(fn (?int $value): bool => $value !== null)
-            ->unique()
             ->values()
             ->all();
     }
