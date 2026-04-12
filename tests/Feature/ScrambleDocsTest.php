@@ -147,3 +147,13 @@ it('documents admin schema-driven writes and dynamic payload discovery', functio
         ->and($paths['/admin/{resourceKey}/{recordKey}']['put']['summary'] ?? null)->toBe('Update an admin resource record')
         ->and($paths['/admin/{resourceKey}/{recordKey}']['put']['description'] ?? null)->toContain('schema?operation=update&recordKey={recordKey}');
 });
+
+it('includes the mobile api reference in the docs description for ai and mobile consumers', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    expect((string) $response->json('info.description'))
+        ->toContain('Majlisilmu Mobile API Reference')
+        ->toContain('Android, iOS application developers, and AI agents');
+});
