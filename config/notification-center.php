@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     'defaults' => [
         'digest_delivery_time' => '08:00:00',

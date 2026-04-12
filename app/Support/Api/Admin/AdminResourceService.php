@@ -27,7 +27,7 @@ class AdminResourceService
     {
         $resources = array_values(array_filter(
             array_map(
-                fn (string $resourceClass): array => $this->registry->metadata($resourceClass),
+                $this->registry->metadata(...),
                 $this->registry->accessibleResources(),
             ),
             fn (array $resource): bool => ! $writableOnly || $resource['write_support']['schema'] === true,
@@ -125,7 +125,7 @@ class AdminResourceService
         } else {
             abort_unless(is_string($recordKey) && trim($recordKey) !== '', 422);
 
-            $record = $this->registry->resolveRecord($resourceClass, trim($recordKey));
+            $record = $this->registry->resolveRecord($resourceClass, trim((string) $recordKey));
             abort_unless($actor->can('update', $record), 403);
         }
 

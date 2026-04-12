@@ -147,7 +147,7 @@ class InstitutionWorkspaceController extends FrontendController
     ): JsonResponse {
         $user = $this->requireUser($request);
         $institution = $this->selectedInstitutionOrAbort($user, $institutionId);
-        $this->ensureCanManageMembers($user, $institution);
+        $this->ensureCanManageMembers($user);
 
         $validated = $request->validate([
             'email' => ['required', 'email'],
@@ -189,7 +189,7 @@ class InstitutionWorkspaceController extends FrontendController
     ): JsonResponse {
         $user = $this->requireUser($request);
         $institution = $this->selectedInstitutionOrAbort($user, $institutionId);
-        $this->ensureCanManageMembers($user, $institution);
+        $this->ensureCanManageMembers($user);
 
         $member = $institution->members()->whereKey($memberId)->first();
         abort_unless($member instanceof User, 404);
@@ -229,7 +229,7 @@ class InstitutionWorkspaceController extends FrontendController
     ): JsonResponse {
         $user = $this->requireUser($request);
         $institution = $this->selectedInstitutionOrAbort($user, $institutionId);
-        $this->ensureCanManageMembers($user, $institution);
+        $this->ensureCanManageMembers($user);
 
         $member = $institution->members()->whereKey($memberId)->first();
         abort_unless($member instanceof User, 404);
@@ -242,7 +242,7 @@ class InstitutionWorkspaceController extends FrontendController
 
         try {
             $removeMemberFromSubject->handle($institution, $member);
-        } catch (RuntimeException $exception) {
+        } catch (RuntimeException) {
             throw ValidationException::withMessages([
                 'member' => __('Owner roles can only be changed from the global roles screen.'),
             ]);
@@ -312,7 +312,7 @@ class InstitutionWorkspaceController extends FrontendController
         return $institution;
     }
 
-    private function ensureCanManageMembers(User $user, Institution $institution): void
+    private function ensureCanManageMembers(User $user): void
     {
         abort_unless($this->userHasInstitutionManagementRole($user), 403);
     }

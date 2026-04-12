@@ -97,7 +97,7 @@ class AdminResourceMutationService
                 'slug_behavior' => 'auto_managed',
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Event ? $this->mediaState($record, ['poster', 'gallery']) : null,
-                'fields' => $this->eventFields($updating),
+                'fields' => $this->eventFields(),
                 'catalogs' => [],
                 'conditional_rules' => [
                     ['field' => 'custom_time', 'required_when' => ['prayer_time' => [EventPrayerTime::LainWaktu->value]]],
@@ -510,7 +510,7 @@ class AdminResourceMutationService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function eventFields(bool $updating): array
+    private function eventFields(): array
     {
         return [
             $this->field('title', 'string', required: true, maxLength: 255),

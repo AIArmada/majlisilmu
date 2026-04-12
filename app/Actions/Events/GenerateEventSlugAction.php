@@ -207,10 +207,8 @@ class GenerateEventSlugAction
             ->where('events.title', $title)
             ->with(['speakers:id,slug'])
             ->get()
-            ->filter(function (Event $event) use ($dateSuffix, $speakerSlugs): bool {
-                return $this->dateSuffixForEvent($event) === $dateSuffix
-                    && $this->speakerSlugSegmentsForEvent($event) === $speakerSlugs;
-            });
+            ->filter(fn (Event $event): bool => $this->dateSuffixForEvent($event) === $dateSuffix
+                && $this->speakerSlugSegmentsForEvent($event) === $speakerSlugs);
 
         return $matchingEvents->count() + 1;
     }

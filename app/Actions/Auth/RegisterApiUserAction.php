@@ -24,7 +24,6 @@ final readonly class RegisterApiUserAction
      */
     public function handle(array $input, string $deviceName, Request $request): array
     {
-        /** @var User $user */
         $user = $this->createNewUser->create($input);
 
         event(new Registered($user));

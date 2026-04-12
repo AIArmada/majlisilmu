@@ -146,9 +146,7 @@ class GenerateInstitutionSlugAction
                 'address.subdistrict',
             ])
             ->get()
-            ->filter(function (Institution $institution) use ($locationSuffix): bool {
-                return $this->locationSuffixForInstitution($institution) === $locationSuffix;
-            });
+            ->filter(fn (Institution $institution): bool => $this->locationSuffixForInstitution($institution) === $locationSuffix);
 
         if ($ignoreInstitutionId !== null && $ignoreInstitutionId !== '') {
             $existingSequence = $this->existingInstitutionSequence($matchingInstitutions, $ignoreInstitutionId);
@@ -216,11 +214,11 @@ class GenerateInstitutionSlugAction
         $countryCode = $this->resolveCountryCode($address);
 
         if ($subdistrict instanceof Subdistrict) {
-            if ($district === null && $subdistrict->district_id !== null) {
+            if (! $district instanceof District && $subdistrict->district_id !== null) {
                 $district = District::query()->find($subdistrict->district_id);
             }
 
-            if ($state === null && $subdistrict->state_id !== null) {
+            if (! $state instanceof State && $subdistrict->state_id !== null) {
                 $state = State::query()->find($subdistrict->state_id);
             }
         }

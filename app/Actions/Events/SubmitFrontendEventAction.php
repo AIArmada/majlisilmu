@@ -282,7 +282,7 @@ class SubmitFrontendEventAction
             return $validated;
         }
 
-        if ($validated['location_same_as_institution'] === true) {
+        if ($validated['location_same_as_institution']) {
             $validated['location_type'] = 'institution';
             $validated['location_institution_id'] = $scopedInstitution->getKey();
             $validated['location_venue_id'] = null;
@@ -363,20 +363,16 @@ class SubmitFrontendEventAction
         $organizerSpeakerId = (string) ($validated['organizer_speaker_id'] ?? '');
         $locationInstitutionId = (string) ($validated['location_institution_id'] ?? '');
 
-        if ($organizerType === 'institution' && $organizerInstitutionId !== '') {
-            if (! $this->entitySubmissionAccess->canUseInstitution($submitter, $organizerInstitutionId)) {
-                throw ValidationException::withMessages([
-                    $this->validationKey('organizer_institution_id', $validationKeyPrefix) => __('Anda tidak dibenarkan memilih institusi ini untuk penghantaran majlis.'),
-                ]);
-            }
+        if ($organizerType === 'institution' && $organizerInstitutionId !== '' && ! $this->entitySubmissionAccess->canUseInstitution($submitter, $organizerInstitutionId)) {
+            throw ValidationException::withMessages([
+                $this->validationKey('organizer_institution_id', $validationKeyPrefix) => __('Anda tidak dibenarkan memilih institusi ini untuk penghantaran majlis.'),
+            ]);
         }
 
-        if ($organizerType === 'speaker' && $organizerSpeakerId !== '') {
-            if (! $this->entitySubmissionAccess->canUseSpeaker($submitter, $organizerSpeakerId)) {
-                throw ValidationException::withMessages([
-                    $this->validationKey('organizer_speaker_id', $validationKeyPrefix) => __('Anda tidak dibenarkan memilih penceramah ini untuk penghantaran majlis.'),
-                ]);
-            }
+        if ($organizerType === 'speaker' && $organizerSpeakerId !== '' && ! $this->entitySubmissionAccess->canUseSpeaker($submitter, $organizerSpeakerId)) {
+            throw ValidationException::withMessages([
+                $this->validationKey('organizer_speaker_id', $validationKeyPrefix) => __('Anda tidak dibenarkan memilih penceramah ini untuk penghantaran majlis.'),
+            ]);
         }
 
         $eventFormat = $this->normalizeEnumValue($validated['event_format'] ?? null, EventFormat::Physical->value);
@@ -385,12 +381,10 @@ class SubmitFrontendEventAction
             && $requiresLocationChoice
             && (($validated['location_type'] ?? 'institution') === 'institution');
 
-        if ($usesLocationInstitution && $locationInstitutionId !== '') {
-            if (! $this->entitySubmissionAccess->canUseInstitution($submitter, $locationInstitutionId)) {
-                throw ValidationException::withMessages([
-                    $this->validationKey('location_institution_id', $validationKeyPrefix) => __('Anda tidak dibenarkan memilih institusi lokasi ini.'),
-                ]);
-            }
+        if ($usesLocationInstitution && $locationInstitutionId !== '' && ! $this->entitySubmissionAccess->canUseInstitution($submitter, $locationInstitutionId)) {
+            throw ValidationException::withMessages([
+                $this->validationKey('location_institution_id', $validationKeyPrefix) => __('Anda tidak dibenarkan memilih institusi lokasi ini.'),
+            ]);
         }
 
         $speakerIds = collect(array_merge(
@@ -447,7 +441,7 @@ class SubmitFrontendEventAction
             : EventPrayerTime::tryFrom((string) $prayerTimeValue);
 
         if ($prayerTime?->isCustomTime() && ! empty($validated['custom_time'])) {
-            $time = Carbon::parse((string) $validated['custom_time']);
+            $time = Carbon::parse($validated['custom_time']);
 
             return $eventDate->setTime($time->hour, $time->minute)->utc();
         }

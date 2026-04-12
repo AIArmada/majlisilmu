@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\States\EventStatus;
 
 use App\Models\Event;

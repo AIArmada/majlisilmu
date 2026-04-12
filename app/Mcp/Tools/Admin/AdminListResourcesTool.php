@@ -45,6 +45,7 @@ class AdminListResourcesTool extends AbstractAdminTool
     /**
      * @return array<string, Type>
      */
+    #[\Override]
     public function schema(JsonSchema $schema): array
     {
         return [

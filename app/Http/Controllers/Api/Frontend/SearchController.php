@@ -92,7 +92,7 @@ class SearchController extends FrontendController
                 'lat' => $lat,
                 'lng' => $lng,
                 'radius_km' => $radius,
-                'authenticated' => $user !== null,
+                'authenticated' => $user instanceof User,
             ],
         ]);
     }

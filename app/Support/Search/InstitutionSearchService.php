@@ -72,18 +72,16 @@ class InstitutionSearchService
         );
 
         /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
-            return Institution::query()
-                ->active()
-                ->where('status', 'verified')
-                ->select('institutions.id')
-                ->tap(fn (Builder $query): Builder => $this->applySearch($query, $normalizedSearch))
-                ->orderBy('name')
-                ->pluck('institutions.id')
-                ->map(static fn (mixed $id): string => (string) $id)
-                ->values()
-                ->all();
-        });
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, fn (): array => Institution::query()
+            ->active()
+            ->where('status', 'verified')
+            ->select('institutions.id')
+            ->tap(fn (Builder $query): Builder => $this->applySearch($query, $normalizedSearch))
+            ->orderBy('name')
+            ->pluck('institutions.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all());
 
         return $ids;
     }
@@ -108,45 +106,43 @@ class InstitutionSearchService
         );
 
         /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch, $minimumScore): array {
-            return Institution::query()
-                ->active()
-                ->where('status', 'verified')
-                ->select(['id', 'name', 'nickname', 'description'])
-                ->get()
-                ->map(function (Institution $institution) use ($normalizedSearch): array {
-                    $candidates = array_values(array_filter([
-                        $this->normalizeText((string) $institution->name),
-                        $this->normalizeText((string) $institution->nickname),
-                        $this->normalizeText((string) $institution->description),
-                    ], static fn (string $candidate): bool => $candidate !== ''));
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, fn (): array => Institution::query()
+            ->active()
+            ->where('status', 'verified')
+            ->select(['id', 'name', 'nickname', 'description'])
+            ->get()
+            ->map(function (Institution $institution) use ($normalizedSearch): array {
+                $candidates = array_values(array_filter([
+                    $this->normalizeText((string) $institution->name),
+                    $this->normalizeText((string) $institution->nickname),
+                    $this->normalizeText((string) $institution->description),
+                ], static fn (string $candidate): bool => $candidate !== ''));
 
-                    $scoreCandidates = [];
+                $scoreCandidates = [];
 
-                    foreach ($candidates as $candidate) {
-                        $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $candidate);
+                foreach ($candidates as $candidate) {
+                    $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $candidate);
 
-                        $tokens = array_values(array_filter(
-                            explode(' ', $candidate),
-                            static fn (string $token): bool => mb_strlen($token) >= 2
-                        ));
+                    $tokens = array_values(array_filter(
+                        explode(' ', $candidate),
+                        static fn (string $token): bool => mb_strlen($token) >= 2
+                    ));
 
-                        foreach ($tokens as $token) {
-                            $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $token);
-                        }
+                    foreach ($tokens as $token) {
+                        $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $token);
                     }
+                }
 
-                    return [
-                        'id' => (string) $institution->id,
-                        'score' => $scoreCandidates === [] ? 0.0 : max($scoreCandidates),
-                    ];
-                })
-                ->filter(static fn (array $candidate): bool => $candidate['score'] >= $minimumScore)
-                ->sortByDesc('score')
-                ->pluck('id')
-                ->values()
-                ->all();
-        });
+                return [
+                    'id' => (string) $institution->id,
+                    'score' => $scoreCandidates === [] ? 0.0 : max($scoreCandidates),
+                ];
+            })
+            ->filter(static fn (array $candidate): bool => $candidate['score'] >= $minimumScore)
+            ->sortByDesc('score')
+            ->pluck('id')
+            ->values()
+            ->all());
 
         return $ids;
     }

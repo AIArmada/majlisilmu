@@ -341,7 +341,7 @@ class SharedFormSchema
     public static function normalizeContactRowsForFill(array $data): array
     {
         if (array_is_list($data)) {
-            return array_map(fn (array $contact): array => self::normalizeContactRowForFill($contact), $data);
+            return array_map(self::normalizeContactRowForFill(...), $data);
         }
 
         return self::normalizeContactRowForFill($data);
@@ -354,10 +354,23 @@ class SharedFormSchema
     public static function normalizeContactRowsForSave(array $data): array
     {
         if (array_is_list($data)) {
-            return array_map(fn (array $contact): array => self::normalizeContactRowForSave($contact), $data);
+            return array_map(self::normalizeContactRowForSave(...), $data);
         }
 
         return self::normalizeContactRowForSave($data);
+    }
+
+    /**
+     * @param  array<string, mixed>|list<array<string, mixed>>  $data
+     * @return array<string, mixed>|list<array<string, mixed>>
+     */
+    public static function normalizeContactRowsForComparison(array $data): array
+    {
+        if (array_is_list($data)) {
+            return array_map(self::normalizeContactRowForComparison(...), $data);
+        }
+
+        return self::normalizeContactRowForComparison($data);
     }
 
     /**
@@ -404,6 +417,30 @@ class SharedFormSchema
         return $contact;
     }
 
+    /**
+     * @param  array<string, mixed>  $contact
+     * @return array<string, mixed>
+     */
+    private static function normalizeContactRowForComparison(array $contact): array
+    {
+        $contact = self::normalizeContactRowForSave($contact);
+        $contact = self::normalizeContactRowForFill($contact);
+
+        if (! self::isPhoneContactCategory($contact['category'] ?? null)) {
+            return $contact;
+        }
+
+        $value = self::normalizedComparablePhoneValue($contact['phone_value'] ?? ($contact['value'] ?? null));
+
+        if ($value !== null) {
+            $contact['phone_value'] = $value;
+        }
+
+        unset($contact['value']);
+
+        return $contact;
+    }
+
     public static function isPhoneContactCategory(mixed $category): bool
     {
         $categoryValue = $category instanceof ContactCategory
@@ -422,6 +459,23 @@ class SharedFormSchema
         $value = trim($value);
 
         return $value !== '' ? $value : null;
+    }
+
+    public static function normalizedComparablePhoneValue(mixed $value): ?string
+    {
+        $value = self::normalizedContactValue($value);
+
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value);
+
+        if (! is_string($digits) || $digits === '') {
+            return null;
+        }
+
+        return str_starts_with($value, '+') ? '+'.$digits : $digits;
     }
 
     /**

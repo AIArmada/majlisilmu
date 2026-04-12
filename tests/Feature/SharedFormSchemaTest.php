@@ -587,14 +587,10 @@ it('locks the dedicated institution contribution google maps url after picker se
         return $flattened;
     };
 
-    $findGoogleMapsField = function (Schema $schema) use ($flatten): ?TextInput {
-        return collect($flatten($schema->getComponents()))
-            ->first(function (mixed $component): bool {
-                return $component instanceof TextInput
-                    && method_exists($component, 'getName')
-                    && $component->getName() === 'google_maps_url';
-            });
-    };
+    $findGoogleMapsField = (fn (Schema $schema): ?TextInput => collect($flatten($schema->getComponents()))
+        ->first(fn (mixed $component): bool => $component instanceof TextInput
+            && method_exists($component, 'getName')
+            && $component->getName() === 'google_maps_url'));
 
     $schema = Schema::make($livewire)
         ->statePath('data')
@@ -827,14 +823,10 @@ it('configures contact and social media repeaters to persist drag ordering', fun
         return $flattened;
     };
 
-    $findRepeater = function (array $components, string $name) use ($flatten): ?Repeater {
-        return collect($flatten($components))
-            ->first(function (mixed $component) use ($name): bool {
-                return $component instanceof Repeater
-                    && method_exists($component, 'getName')
-                    && $component->getName() === $name;
-            });
-    };
+    $findRepeater = (fn (array $components, string $name): ?Repeater => collect($flatten($components))
+        ->first(fn (mixed $component): bool => $component instanceof Repeater
+            && method_exists($component, 'getName')
+            && $component->getName() === $name));
 
     $institutionSchema = AdminInstitutionForm::configure(Schema::make($livewire))->getComponents();
     $speakerSchema = AdminSpeakerForm::configure(Schema::make($livewire))->getComponents();

@@ -126,10 +126,8 @@ class GenerateSpeakerSlugAction
                 'address.country',
             ])
             ->get()
-            ->filter(function (Speaker $speaker) use ($countrySuffix, $displayName): bool {
-                return $this->countrySuffixForSpeaker($speaker) === $countrySuffix
-                    && $this->displayNameForSpeaker($speaker) === $displayName;
-            });
+            ->filter(fn (Speaker $speaker): bool => $this->countrySuffixForSpeaker($speaker) === $countrySuffix
+                && $this->displayNameForSpeaker($speaker) === $displayName);
 
         if ($ignoreSpeakerId !== null && $ignoreSpeakerId !== '') {
             $existingSequence = $this->existingSpeakerSequence($matchingSpeakers, $ignoreSpeakerId);
@@ -205,12 +203,10 @@ class GenerateSpeakerSlugAction
             $countryId = app(PreferredCountryResolver::class)->resolveId();
         }
 
-        if ($countryCode === null) {
-            if ($countryId !== null) {
-                $countryCode = Country::query()
-                    ->whereKey($countryId)
-                    ->value('iso2');
-            }
+        if ($countryCode === null && $countryId !== null) {
+            $countryCode = Country::query()
+                ->whereKey($countryId)
+                ->value('iso2');
         }
 
         return $this->countryCodeSegment($countryCode) ?? '';

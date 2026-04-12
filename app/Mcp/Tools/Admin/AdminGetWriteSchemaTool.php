@@ -44,6 +44,7 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
     /**
      * @return array<string, Type>
      */
+    #[\Override]
     public function schema(JsonSchema $schema): array
     {
         return [

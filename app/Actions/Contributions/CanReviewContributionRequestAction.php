@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Actions\Contributions;
 
 use App\Enums\ContributionRequestType;

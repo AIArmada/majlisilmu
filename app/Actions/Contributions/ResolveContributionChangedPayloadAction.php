@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Actions\Contributions;
 
 use Illuminate\Contracts\Support\Arrayable;
@@ -79,6 +81,6 @@ class ResolveContributionChangedPayloadAction
         return is_string($key)
             && str_ends_with($key, '_id')
             && is_string($value)
-            && preg_match('/^[1-9][0-9]*$/', $value) === 1;
+            && preg_match('/^[1-9]\d*$/', $value) === 1;
     }
 }

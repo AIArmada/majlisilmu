@@ -143,9 +143,7 @@ class GenerateVenueSlugAction
                 'address.subdistrict',
             ])
             ->get()
-            ->filter(function (Venue $venue) use ($locationSuffix): bool {
-                return $this->locationSuffixForVenue($venue) === $locationSuffix;
-            });
+            ->filter(fn (Venue $venue): bool => $this->locationSuffixForVenue($venue) === $locationSuffix);
 
         if ($ignoreVenueId !== null && $ignoreVenueId !== '') {
             $existingSequence = $this->existingVenueSequence($matchingVenues, $ignoreVenueId);
@@ -213,11 +211,11 @@ class GenerateVenueSlugAction
         $countryCode = $this->resolveCountryCode($address);
 
         if ($subdistrict instanceof Subdistrict) {
-            if ($district === null && $subdistrict->district_id !== null) {
+            if (! $district instanceof District && $subdistrict->district_id !== null) {
                 $district = District::query()->find($subdistrict->district_id);
             }
 
-            if ($state === null && $subdistrict->state_id !== null) {
+            if (! $state instanceof State && $subdistrict->state_id !== null) {
                 $state = State::query()->find($subdistrict->state_id);
             }
         }

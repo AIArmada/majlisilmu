@@ -206,7 +206,6 @@ class DonationChannelForm
     private static function normalizeOwnerType(string $ownerType): string
     {
         if (class_exists($ownerType) && is_subclass_of($ownerType, Model::class)) {
-            /** @var Model $model */
             $model = new $ownerType;
 
             return (string) $model->getMorphClass();
