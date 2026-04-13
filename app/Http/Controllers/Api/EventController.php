@@ -385,6 +385,10 @@ class EventController extends Controller
             'card_image_url' => $event->card_image_url,
             'poster_url' => $posterUrl,
             'has_poster' => $event->hasMedia('poster'),
+            'timing_display' => $event->timing_display,
+            'end_time_display' => $event->ends_at instanceof \DateTimeInterface
+                ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
+                : null,
         ];
 
         if ($event->relationLoaded('speakers')) {
