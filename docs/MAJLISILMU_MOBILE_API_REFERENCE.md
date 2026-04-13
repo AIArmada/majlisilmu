@@ -153,6 +153,23 @@ Most endpoints return:
 
 Mutation endpoints may also include a top-level `message`.
 
+For backward compatibility, some mutation endpoints may also mirror that same success text at `data.message`. New clients should prefer the top-level `message`.
+
+Application and domain errors return a stable top-level `error` envelope:
+
+```json
+{
+  "message": "The requested resource could not be found.",
+  "error": {
+    "code": "not_found",
+    "message": "The requested resource could not be found."
+  },
+  "meta": {
+    "request_id": "uuid"
+  }
+}
+```
+
 Paginated list endpoints generally return:
 
 ```json
@@ -168,9 +185,34 @@ Paginated list endpoints generally return:
 }
 ```
 
-The event index uses Laravel paginator JSON, so it returns `data`, `links`, and `meta`.
+`meta.pagination` is the canonical pagination bag for new clients. Some list endpoints may still retain the native Laravel paginator keys such as `current_page`, `per_page`, `total`, and `links` at the top level for backward compatibility.
 
-Validation failures return Laravel JSON validation responses with HTTP `422`.
+Validation failures use the same `error` envelope with a field-level bag preserved for direct form binding:
+
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "email": [
+      "The email field is required."
+    ]
+  },
+  "error": {
+    "code": "validation_error",
+    "message": "The given data was invalid.",
+    "details": {
+      "fields": {
+        "email": [
+          "The email field is required."
+        ]
+      }
+    }
+  },
+  "meta": {
+    "request_id": "uuid"
+  }
+}
+```
 
 ---
 
@@ -254,18 +296,22 @@ Authorization note:
 #### `GET /forms/contributions/institutions`
 
 - Use this as the authoritative create contract for public institution submissions.
-- Institution create still accepts a full address payload, including `address.country_id`.
+- Institution create requires an explicit address country.
+- You may send one of:
+  - `address.country_id`
+  - `address.country_code`
+  - `address.country_key`
 - If the same normalized institution name plus the same `state_id`, `district_id`, and `subdistrict_id` already exists, create will fail with HTTP `422` on `name`.
 
 #### `GET /forms/contributions/speakers`
 
 - Use this as the authoritative create contract for public speaker submissions.
-- Speaker create is region-only. Send only:
+- Speaker create requires an explicit country plus region selectors. Send:
+  - one of `address.country_id`, `address.country_code`, or `address.country_key`
   - `address.state_id`
   - `address.district_id`
   - `address.subdistrict_id`
 - Do not send:
-  - `address.country_id`
   - `address.line1`
   - `address.line2`
   - `address.postcode`
@@ -274,9 +320,8 @@ Authorization note:
   - `address.google_maps_url`
   - `address.google_place_id`
   - `address.waze_url`
-- The server infers the speaker country from the active public country scope.
 - Public speaker create accepts media fields `avatar`, `cover`, and `gallery`.
-- If the same normalized speaker identity already exists, create will fail with HTTP `422` on `name`. The duplicate check compares normalized `name`, `gender`, `honorific`, `pre_nominal`, and effective `post_nominal` values.
+- If the same normalized speaker identity already exists in the same country, create will fail with HTTP `422` on `name`. The duplicate check compares normalized `name`, `gender`, `honorific`, `pre_nominal`, effective `post_nominal`, and country values.
 
 #### `GET /forms/contributions/{subjectType}/{subject}/suggest`
 
@@ -397,15 +442,15 @@ Institution `PUT` is also a full-replacement PUT for core identity fields. The f
 | `name` | `string` | Required on both create and update |
 | `type` | `string` | Required on both create and update |
 | `status` | `string` | `unverified`, `pending`, `verified`, or `rejected`. Required on both create and update |
-| `address.country_id` | `integer` | Required on create; `sometimes` on update |
+| `address.country_id` | `integer` | Canonical country field. Required unless `address.country_code` or `address.country_key` is provided |
 
 ### Admin write-contract rules you must follow
 
 - Always fetch `/admin/{resourceKey}/schema` before `POST` or `PUT`.
 - Treat the returned schema as authoritative for allowed and prohibited fields.
-- For `speakers`, admin write contracts now use the same region-only address model as the public speaker flows.
+- For `speakers`, admin write contracts now require the same explicit country plus region address model as the public speaker flows.
+- Admin speaker create/update clients may send one of `address.country_id`, `address.country_code`, or `address.country_key`.
 - Admin speaker create/update clients must not send:
-  - `address.country_id`
   - `address.line1`
   - `address.line2`
   - `address.postcode`
@@ -414,8 +459,7 @@ Institution `PUT` is also a full-replacement PUT for core identity fields. The f
   - `address.google_maps_url`
   - `address.google_place_id`
   - `address.waze_url`
-- Admin speaker clients should send only regional location keys such as `address.state_id`, `address.district_id`, and `address.subdistrict_id`.
-- The server resolves the effective speaker country from the existing record or the active preferred country scope.
+- Admin speaker clients should send the explicit country field plus regional location keys such as `address.state_id`, `address.district_id`, and `address.subdistrict_id`.
 - The `allow_public_event_submission` field is only accepted on `PUT` (update), not on `POST` (create). Sending it on create returns `422`.
 
 ### Example: full admin speaker create/update flow
@@ -802,6 +846,6 @@ All timestamps in API responses end in `Z` (UTC). To display "local time" for Ma
 ### Prohibited address fields for speakers
 
 Never send any of the following for speaker create or update (both public contribution and admin):
-`address.country_id`, `address.line1`, `address.line2`, `address.postcode`, `address.lat`, `address.lng`, `address.google_maps_url`, `address.google_place_id`, `address.waze_url`
+`address.line1`, `address.line2`, `address.postcode`, `address.lat`, `address.lng`, `address.google_maps_url`, `address.google_place_id`, `address.waze_url`
 
-The server will reject them with HTTP `422`. Send only: `address.state_id`, `address.district_id`, `address.subdistrict_id`.
+The server will reject them with HTTP `422`. Send an explicit country via `address.country_id`, `address.country_code`, or `address.country_key`, then optionally add `address.state_id`, `address.district_id`, and `address.subdistrict_id`.

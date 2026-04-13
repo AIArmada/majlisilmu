@@ -26,8 +26,6 @@ use App\Services\EventKeyPersonSyncService;
 use App\Services\ModerationService;
 use App\Services\ShareTrackingService;
 use App\States\EventStatus\Pending;
-use App\Support\Location\PreferredCountryResolver;
-use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
 use App\Support\Submission\EntitySubmissionAccess;
 use BackedEnum;
@@ -533,12 +531,14 @@ class SubmitFrontendEventAction
     }
 
     /**
-     * @param  array{submission_country_id?: int|string|null}  $validated
+     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
     private function assertValidSubmissionCountryId(array $validated, string $validationKeyPrefix): void
     {
-        if ($this->submissionCountryIdInput($validated) === null) {
-            return;
+        if (! $this->submissionCountryInputProvided($validated)) {
+            throw ValidationException::withMessages([
+                $this->validationKey('submission_country_id', $validationKeyPrefix) => __('The submission country is required.'),
+            ]);
         }
 
         if ($this->normalizedSubmissionCountryId($validated) !== null) {
@@ -551,102 +551,62 @@ class SubmitFrontendEventAction
     }
 
     /**
-     * @param  array{submission_country_id?: int|string|null, timezone?: string|null}  $validated
+     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
     private function resolveSubmissionCountryId(array $validated, Request $request): int
     {
-        $registry = app(PublicCountryRegistry::class);
         $normalizedCountryId = $this->normalizedSubmissionCountryId($validated);
 
         if (is_int($normalizedCountryId)) {
             return $normalizedCountryId;
         }
 
-        if ($this->submissionCountryIdInput($validated) === null) {
-            $legacyTimezone = $this->legacySubmissionTimezone($validated);
-
-            if ($legacyTimezone !== null) {
-                $legacyCountryId = $registry->normalizeCountryId(
-                    app(PreferredCountryResolver::class)->countryIdFromTimezone($legacyTimezone),
-                );
-
-                if (is_int($legacyCountryId)) {
-                    return $legacyCountryId;
-                }
-            }
-        }
-
-        $currentCountryId = $registry->countryIdForKey(app(PublicCountryPreference::class)->currentKey($request));
-
-        if (is_int($currentCountryId)) {
-            return $currentCountryId;
-        }
-
-        return $registry->countryIdForKey($registry->defaultKey())
-            ?? $registry->countryIdFromIso2('MY')
-            ?? 132;
+        throw ValidationException::withMessages([
+            'submission_country_id' => __('The selected country is invalid.'),
+        ]);
     }
 
     /**
-     * @param  array{submission_country_id?: int|string|null, timezone?: string|null}  $validated
+     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
     private function resolveSubmissionTimezone(array $validated, Request $request, ?int $submissionCountryId = null): string
     {
-        if ($this->submissionCountryIdInput($validated) === null) {
-            $legacyTimezone = $this->legacySubmissionTimezone($validated);
-
-            if ($legacyTimezone !== null) {
-                return $legacyTimezone;
-            }
-        }
-
         $resolvedCountryId = $submissionCountryId ?? $this->resolveSubmissionCountryId($validated, $request);
 
         return app(PublicCountryRegistry::class)->defaultTimezoneForCountryId($resolvedCountryId);
     }
 
     /**
-     * @param  array{submission_country_id?: int|string|null}  $validated
+     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
-    private function submissionCountryIdInput(array $validated): ?string
+    private function submissionCountryInputProvided(array $validated): bool
     {
-        $countryId = $validated['submission_country_id'] ?? null;
+        foreach (['submission_country_id', 'submission_country_code', 'submission_country_key'] as $field) {
+            $value = $validated[$field] ?? null;
 
-        if (is_int($countryId)) {
-            return (string) $countryId;
+            if (is_int($value)) {
+                return true;
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return true;
+            }
         }
 
-        if (! is_string($countryId)) {
-            return null;
-        }
-
-        $countryId = trim($countryId);
-
-        return $countryId !== '' ? $countryId : null;
+        return false;
     }
 
     /**
-     * @param  array{submission_country_id?: int|string|null}  $validated
+     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
     private function normalizedSubmissionCountryId(array $validated): ?int
     {
-        $countryId = $this->submissionCountryIdInput($validated);
-
-        if ($countryId === null || ! ctype_digit($countryId)) {
-            return null;
-        }
-
-        return app(PublicCountryRegistry::class)->normalizeCountryId((int) $countryId);
-    }
-
-    /**
-     * @param  array{timezone?: string|null}  $validated
-     */
-    private function legacySubmissionTimezone(array $validated): ?string
-    {
-        $timezone = trim((string) ($validated['timezone'] ?? ''));
-
-        return $timezone !== '' ? $timezone : null;
+        return app(PublicCountryRegistry::class)->resolveCountryId(
+            $validated['submission_country_id'] ?? null,
+            $validated['submission_country_code'] ?? null,
+            $validated['submission_country_key'] ?? null,
+            enabledOnly: true,
+        );
     }
 
     /**

@@ -17,7 +17,9 @@ test('authenticated user can save an event', function () {
     ]);
 
     $response->assertStatus(201)
-        ->assertJsonPath('data.message', 'Event saved successfully.');
+        ->assertJsonPath('message', 'Event saved successfully.')
+        ->assertJsonPath('data.message', 'Event saved successfully.')
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $this->assertDatabaseHas('event_saves', [
         'user_id' => $this->user->id,
@@ -58,7 +60,9 @@ test('authenticated user can unsave an event', function () {
     $response = $this->deleteJson(route('api.event-saves.destroy', $this->event->id));
 
     $response->assertStatus(200)
-        ->assertJsonPath('data.message', 'Event unsaved successfully.');
+        ->assertJsonPath('message', 'Event unsaved successfully.')
+        ->assertJsonPath('data.message', 'Event unsaved successfully.')
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $this->assertDatabaseMissing('event_saves', [
         'user_id' => $this->user->id,

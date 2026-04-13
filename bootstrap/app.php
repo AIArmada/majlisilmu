@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\NormalizeApiJsonResponse;
 use App\Http\Middleware\SetFilamentTimezone;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TrackDawahShareAttribution;
+use App\Support\Api\ApiJsonResponseNormalizer;
+use App\Support\Api\ApiResponseFactory;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicGeolocationPermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -28,6 +32,10 @@ return Application::configure(basePath: dirname(__DIR__))
             PublicGeolocationPermission::COOKIE_NAME,
         ]);
 
+        $middleware->api(append: [
+            NormalizeApiJsonResponse::class,
+        ]);
+
         $middleware->web(append: [
             SetLocale::class,
             TrackDawahShareAttribution::class,
@@ -37,5 +45,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SetFilamentTimezone::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->shouldRenderJsonWhen(static function (Request $request): bool {
+            return ApiResponseFactory::isApiRequest($request) || $request->expectsJson();
+        });
+
+        $exceptions->respond(static function ($response, Throwable $exception, Request $request) {
+            return app(ApiJsonResponseNormalizer::class)->normalize($request, $response);
+        });
     })->create();

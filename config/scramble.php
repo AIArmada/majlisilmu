@@ -66,9 +66,9 @@ return [
 
     For public update suggestions specifically, fetch GET /forms/contributions/{subjectType}/{subject}/suggest first to get the current state, sparse editable fields, and direct-edit media capabilities.
 
-    Speaker address is region-only: send only address.state_id, address.district_id, address.subdistrict_id.
+    Public institution, speaker, and submit-event writes must include an explicit country selection. Canonical fields remain *_country_id, while *_country_code and *_country_key are accepted aliases.
 
-    Sending address.country_id, address.line1, address.line2, address.postcode, address.lat, address.lng, or any google/waze map fields for a speaker returns HTTP 422.
+    Speaker create/update still forbids detailed street or map fields: address.line1, address.line2, address.postcode, address.lat, address.lng, address.google_maps_url, address.google_place_id, and address.waze_url return HTTP 422 on speaker contribution flows.
 
     ADMIN FLOWS:
 

@@ -3,6 +3,7 @@
 namespace App\Actions\Institutions;
 
 use App\Actions\Membership\AddMemberToSubject;
+use App\Forms\SharedFormSchema;
 use App\Models\Institution;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
@@ -32,9 +33,30 @@ final readonly class SaveInstitutionAction
     public function handle(array $data, User $actor, ?Institution $institution = null, string $validationErrorKey = 'allow_public_event_submission'): Institution
     {
         $creating = ! $institution instanceof Institution;
-        $institution ??= new Institution();
+        $institution ??= new Institution;
 
         $address = is_array($data['address'] ?? null) ? $data['address'] : [];
+        $addressProvided = array_key_exists('address', $data) && is_array($data['address'] ?? null);
+
+        if ($addressProvided) {
+            $countryProvided = SharedFormSchema::countrySelectionProvided($address);
+            $address = SharedFormSchema::prepareAddressPersistenceData($address);
+
+            if (! $countryProvided) {
+                throw ValidationException::withMessages([
+                    'address.country_id' => __('The address country is required.'),
+                ]);
+            }
+
+            if (! is_int($address['country_id'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'address.country_id' => __('The selected country is invalid.'),
+                ]);
+            }
+
+            $data['address'] = $address;
+        }
+
         $currentPublicSubmission = $creating ? true : (bool) $institution->allow_public_event_submission;
         $requestedPublicSubmission = $creating
             ? true

@@ -61,6 +61,26 @@ it('groups other public directory endpoints under dedicated entity tags in scram
         ->and($paths['/series/{series}']['get']['tags'] ?? null)->toContain('Series');
 });
 
+it('publishes named speaker and institution schemas for the public directory endpoints', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    $paths = $response->json('paths');
+    $schemas = $response->json('components.schemas');
+
+    expect($schemas)->toHaveKeys([
+        'Speaker',
+        'SpeakerListItem',
+        'Institution',
+        'InstitutionListItem',
+    ])
+        ->and(data_get($paths, '/speakers.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/speakers/{speakerKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/institutions.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/institutions/{institutionKey}.get.responses.200.content.application/json.schema'))->not->toBeNull();
+});
+
 it('exposes the admin api foundation in scramble docs under dedicated admin tags', function () {
     $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
         'Host' => 'api.majlisilmu.test',
@@ -107,6 +127,7 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain("\n\nROUTING SURFACES:\n")
         ->toContain("\n\nTIMEZONE:\n")
         ->toContain('Public create flows currently exist for events, institutions, and speakers.')
+        ->toContain('must include an explicit country selection')
         ->toContain('Public update flows currently exist for events, institutions, speakers, and references')
         ->toContain('does not currently include creating references, venues, or series')
         ->toContain('GET /forms/*')
@@ -127,8 +148,11 @@ it('adds workflow summaries to public contract and mutation endpoints', function
         ->and($paths['/forms/submit-event']['get']['summary'] ?? null)->toBe('Get submit-event field contract')
         ->and($paths['/submit-event']['post']['summary'] ?? null)->toBe('Submit a public event')
         ->and($paths['/submit-event']['post']['description'] ?? null)->toContain('This route is create-only')
+        ->and($paths['/submit-event']['post']['description'] ?? null)->toContain('submission_country_code')
         ->and($paths['/contributions/institutions']['post']['summary'] ?? null)->toBe('Create an institution contribution')
+        ->and($paths['/contributions/institutions']['post']['description'] ?? null)->toContain('address.country_code')
         ->and($paths['/contributions/speakers']['post']['summary'] ?? null)->toBe('Create a speaker contribution')
+        ->and($paths['/contributions/speakers']['post']['description'] ?? null)->toContain('address.country_code')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['summary'] ?? null)->toBe('Get editable contribution context')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['description'] ?? null)->toContain('event `poster`/`gallery`')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['summary'] ?? null)->toBe('Submit a contribution update')

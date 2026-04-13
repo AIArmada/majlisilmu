@@ -7,7 +7,9 @@ use App\Models\User;
 use App\Notifications\Auth\VerifyEmailNotification;
 use App\Services\Notifications\NotificationSettingsManager;
 use Filament\Forms\Components\Select as FormSelect;
+use Filament\Forms\Components\TextInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
@@ -27,11 +29,15 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('Profile')
         ->assertSee('Notifications')
         ->assertSee('Profile Details')
+        ->assertSee('New Password')
+        ->assertSee('Confirm Password')
         ->assertDontSee('API Access')
         ->assertDontSee('Create Token')
         ->assertDontSee('Authorization: Bearer')
         ->assertDontSee('Device Preferences')
         ->assertDontSee('Show country selector on public search pages')
+        ->assertDontSee('Changes to email or phone reset their verification status until they are confirmed again.')
+        ->assertDontSee('Prayer institution preferences are private and only saved to your account for now.')
         ->assertSee('Prayer Institutions')
         ->assertSee('Daily Prayer Institution')
         ->assertSee('Friday Prayer Institution')
@@ -41,7 +47,24 @@ it('renders the account settings page with profile and notifications tabs', func
         ->assertSee('fi-fo-phone-input', false);
 });
 
-it('renders the account settings profile tab in Malay with the updated friday helper copy', function () {
+it('places the password fields side by side on desktop', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->assertFormFieldExists('password', function (TextInput $input): bool {
+            expect($input->getColumnSpan('default'))->toBe(1);
+
+            return true;
+        })
+        ->assertFormFieldExists('password_confirmation', function (TextInput $input): bool {
+            expect($input->getColumnSpan('default'))->toBe(1);
+
+            return true;
+        });
+});
+
+it('renders the account settings profile tab in Malay with password labels and no helper callouts', function () {
     $user = User::factory()->create();
 
     $this->withSession(['locale' => 'ms'])
@@ -49,9 +72,25 @@ it('renders the account settings profile tab in Malay with the updated friday he
         ->get(route('dashboard.account-settings'))
         ->assertOk()
         ->assertSee('Tetapan Akaun')
-        ->assertSee('Masjid atau surau yang biasa anda hadiri untuk solat Jumaat.')
-        ->assertDontSee('Biarkan kosong jika anda tidak mahu menyimpan lokasi Jumaat yang berasingan.')
+        ->assertSee('Kata laluan baharu')
+        ->assertSee('Sahkan kata laluan')
+        ->assertDontSee('Jika e-mel atau nombor telefon diubah, status pengesahannya akan ditetapkan semula sehingga disahkan semula.')
+        ->assertDontSee('Pilihan institusi solat adalah peribadi dan buat masa ini hanya disimpan pada akaun anda.')
         ->assertDontSee('API Access');
+});
+
+it('formats timezone options with offsets and timezone identifiers', function () {
+    $user = User::factory()->create();
+
+    $options = Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->instance()
+        ->timezoneOptions();
+
+    expect($options)->toHaveKey('Asia/Kuala_Lumpur')
+        ->and($options['Asia/Kuala_Lumpur'])->toBe('Asia/Kuala_Lumpur (GMT+8)')
+        ->and($options)->toHaveKey('UTC')
+        ->and($options['UTC'])->toBe('UTC (GMT)');
 });
 
 it('renders the notifications tab in Malay without leaking raw translation keys', function () {
@@ -145,6 +184,32 @@ it('updates account settings and resets verification when contact details change
     expect($notificationState['settings']['timezone'])->toBe('Asia/Jakarta');
 
     Notification::assertSentTo($user->fresh(), VerifyEmailNotification::class);
+});
+
+it('updates the account password when the confirmation matches', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->set('formData.password', 'new-password')
+        ->set('formData.password_confirmation', 'new-password')
+        ->call('saveAccountSettings')
+        ->assertHasNoErrors();
+
+    expect(Hash::check('new-password', $user->fresh()->password))->toBeTrue();
+});
+
+it('rejects password changes when the confirmation does not match', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(AccountSettings::class)
+        ->set('formData.password', 'new-password')
+        ->set('formData.password_confirmation', 'different-password')
+        ->call('saveAccountSettings')
+        ->assertHasErrors([
+            'formData.password' => 'confirmed',
+        ]);
 });
 
 it('saves trigger overrides and fallback channels from account settings', function () {

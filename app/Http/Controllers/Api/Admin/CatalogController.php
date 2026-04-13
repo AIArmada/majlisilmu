@@ -23,7 +23,7 @@ class CatalogController extends Controller
 
     #[Endpoint(
         title: 'List admin countries catalog',
-        description: 'Returns country options for admin write flows that require a `country_id`.',
+        description: 'Returns country options for admin write flows that require a `country_id`. Each option also includes `iso2` and the configured public `key` when available.',
     )]
     public function countries(): JsonResponse
     {

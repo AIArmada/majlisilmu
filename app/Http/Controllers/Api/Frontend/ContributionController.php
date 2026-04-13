@@ -23,6 +23,7 @@ use App\Enums\InstitutionType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Filament\Resources\ContributionRequests\Support\ContributionRequestPresenter;
+use App\Forms\SharedFormSchema;
 use App\Models\ContributionRequest;
 use App\Models\Event;
 use App\Models\Institution;
@@ -80,6 +81,7 @@ class ContributionController extends FrontendController
         description: 'Creates a new public institution contribution request. '
             .'The proposer is not automatically added as an institution owner, admin, editor, or member; they only receive review outcome notifications. '
             .'Duplicate institutions are rejected when the normalized name and locality match an existing institution. '
+            .'Institution payloads must include an explicit address country via `address.country_id`, `address.country_code`, or `address.country_key`. '
             .'Fetch `GET /forms/contributions/institutions` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeInstitution(
@@ -96,7 +98,9 @@ class ContributionController extends FrontendController
             'nickname' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable'],
             'address' => ['present', 'array'],
-            'address.country_id' => ['required', 'integer'],
+            'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
+            'address.country_code' => ['nullable', 'string', 'size:2'],
+            'address.country_key' => ['nullable', 'string', 'max:255'],
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
             'address.subdistrict_id' => ['nullable', 'integer'],
@@ -121,6 +125,7 @@ class ContributionController extends FrontendController
             'gallery' => ['nullable', 'array'],
             'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
         ]);
+        $validated = $this->normalizeContributionAddressPayload($validated);
 
         $institution = $submitStagedContributionCreateAction->handle(
             ContributionSubjectType::Institution,
@@ -154,9 +159,10 @@ class ContributionController extends FrontendController
 
     #[Endpoint(
         title: 'Create a speaker contribution',
-        description: 'Creates a new public speaker contribution request using a region-only address payload (`state_id`, `district_id`, `subdistrict_id`). The speaker country follows the active country scope automatically. '
+        description: 'Creates a new public speaker contribution request using a region-level address payload plus an explicit country selection. '
             .'The payload may also set one affiliated institution and an optional position label. '
-            .'Clients must not send `address.country_id` or detailed street/map keys here. Duplicate speakers are rejected when the normalized name, gender, and title sets match an existing speaker. '
+            .'Clients may send `address.country_id`, `address.country_code`, or `address.country_key`, but must not send detailed street or map keys here. '
+            .'Duplicate speakers are rejected when the normalized name, gender, title set, and country match an existing speaker. '
             .'Fetch `GET /forms/contributions/speakers` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeSpeaker(
@@ -182,7 +188,9 @@ class ContributionController extends FrontendController
             'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
             'institution_position' => ['nullable', 'string', 'max:255'],
             'address' => ['required', 'array'],
-            'address.country_id' => ['prohibited'],
+            'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
+            'address.country_code' => ['nullable', 'string', 'size:2'],
+            'address.country_key' => ['nullable', 'string', 'max:255'],
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
             'address.subdistrict_id' => ['nullable', 'integer'],
@@ -215,6 +223,7 @@ class ContributionController extends FrontendController
             'gallery' => ['nullable', 'array'],
             'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
         ]);
+        $validated = $this->normalizeContributionAddressPayload($validated);
 
         $speaker = $submitStagedContributionCreateAction->handle(
             ContributionSubjectType::Speaker,
@@ -383,6 +392,7 @@ class ContributionController extends FrontendController
                 ['proposer_note' => ['sometimes', 'nullable', 'string', 'max:2000']],
             ),
         )->validate();
+        $validatedPayload = $this->normalizeSuggestionPayload($entity, $validatedPayload);
 
         $submissionState = $resolveContributionSubmissionStateAction->handle($validatedPayload);
         $normalizedState = $entity instanceof Event && $submissionState['state'] !== []
@@ -561,12 +571,59 @@ class ContributionController extends FrontendController
             : [];
 
         $initialState['address'] = [
+            'country_id' => $speakerAddress['country_id'] ?? null,
             'state_id' => $speakerAddress['state_id'] ?? null,
             'district_id' => $speakerAddress['district_id'] ?? null,
             'subdistrict_id' => $speakerAddress['subdistrict_id'] ?? null,
         ];
 
         return $initialState;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function normalizeContributionAddressPayload(array $payload): array
+    {
+        if (! is_array($payload['address'] ?? null)) {
+            return $payload;
+        }
+
+        $address = $payload['address'];
+        $countryProvided = SharedFormSchema::countrySelectionProvided($address);
+        $payload['address'] = SharedFormSchema::prepareAddressPersistenceData($address);
+
+        if (! $countryProvided) {
+            throw ValidationException::withMessages([
+                'address.country_id' => __('The address country is required.'),
+            ]);
+        }
+
+        if (! is_int($payload['address']['country_id'] ?? null)) {
+            throw ValidationException::withMessages([
+                'address.country_id' => __('The selected country is invalid.'),
+            ]);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function normalizeSuggestionPayload(Event|Institution|Reference|Speaker $entity, array $payload): array
+    {
+        if (! $entity instanceof Institution && ! $entity instanceof Speaker) {
+            return $payload;
+        }
+
+        if (! array_key_exists('address', $payload)) {
+            return $payload;
+        }
+
+        return $this->normalizeContributionAddressPayload($payload);
     }
 
     /**
