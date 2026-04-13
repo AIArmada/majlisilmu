@@ -232,6 +232,8 @@ class SearchController extends FrontendController
                     'type_label' => $record->type instanceof HasLabel ? $record->type->getLabel() : null,
                     'address_line' => $this->addressLocation($record->addressModel),
                     'map_url' => $record->addressModel?->google_maps_url,
+                    'map_lat' => $record->addressModel?->lat,
+                    'map_lng' => $record->addressModel?->lng,
                     'followers_count' => $record->followersCount(),
                     'speaker_count' => DB::table('event_key_people')
                         ->where('role', EventKeyPersonRole::Speaker->value)
