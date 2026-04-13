@@ -1022,6 +1022,21 @@ it('bumps the institution directory cache version when institution records chang
         ->and($updatedVersion)->not->toBe($initialVersion);
 });
 
+it('serves the institution directory cache metadata without requiring country timestamps', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    Institution::factory()->create([
+        'name' => 'Institution Cache Metadata',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk();
+
+    expect($response->json('meta.cache.version'))->toBeString()->not->toBe('');
+});
+
 it('bumps the institution directory cache version when institution media changes', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
@@ -1149,6 +1164,104 @@ it('exposes the institution public image url in the frontend institution detail 
     expect($response->json('data.institution.media.public_image_url'))->toBe($institution->public_image_url)
         ->and($response->json('data.institution.media.cover_url'))->toBeNull()
         ->and($response->json('data.institution.media.public_image_url'))->toBe($response->json('data.institution.media.logo_url'));
+});
+
+it('exposes 7-item institution detail lists with address display lines and qr urls', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $malaysiaId = ensureFrontendApiMalaysiaCountryExists();
+
+    $stateId = DB::table('states')->insertGetId([
+        'country_id' => $malaysiaId,
+        'country_code' => 'MY',
+        'name' => 'Selangor',
+    ]);
+    $state = State::query()->findOrFail($stateId);
+    $district = District::query()->create([
+        'country_id' => $malaysiaId,
+        'state_id' => (int) $state->id,
+        'country_code' => 'MY',
+        'name' => 'Petaling',
+    ]);
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $malaysiaId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'country_code' => 'MY',
+        'name' => 'Shah Alam',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Detail Payload',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->address()->update([
+        'line1' => 'Persiaran Masjid',
+        'line2' => 'Seksyen 14',
+        'postcode' => '40000',
+        'country_id' => $malaysiaId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+        'lat' => 3.0733,
+        'lng' => 101.5185,
+        'google_maps_url' => 'https://www.google.com/maps/search/?api=1&query=3.0733%2C101.5185',
+        'waze_url' => 'https://www.waze.com/ul?ll=3.0733,101.5185&navigate=yes',
+    ]);
+
+    $channel = $institution->donationChannels()->create([
+        'method' => 'bank_account',
+        'bank_code' => 'BIMB',
+        'bank_name' => 'Bank Islam',
+        'account_number' => '123456789012',
+        'recipient' => 'Tabung Masjid Detail',
+        'label' => 'QR Infaq',
+        'status' => 'verified',
+    ]);
+
+    $channel->addMedia(UploadedFile::fake()->image('qr.png', 300, 300))
+        ->toMediaCollection('qr');
+
+    foreach (range(1, 8) as $index) {
+        Event::factory()->create([
+            'institution_id' => $institution->id,
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public->value,
+            'is_active' => true,
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDays($index),
+        ]);
+    }
+
+    foreach (range(1, 8) as $index) {
+        Event::factory()->create([
+            'institution_id' => $institution->id,
+            'status' => 'approved',
+            'visibility' => EventVisibility::Public->value,
+            'is_active' => true,
+            'published_at' => now()->subDays(2),
+            'starts_at' => now()->subDays($index),
+        ]);
+    }
+
+    $response = $this->getJson(route('api.client.institutions.show', [
+        'institutionKey' => $institution->slug,
+        'upcoming_per_page' => 7,
+        'past_per_page' => 7,
+    ]))->assertOk();
+
+    expect($response->json('data.institution.street_address_line'))->toBe('Persiaran Masjid, Seksyen 14')
+        ->and($response->json('data.institution.locality_address_line'))->toBe('Shah Alam, 40000')
+        ->and($response->json('data.institution.regional_address_line'))->toBe('Petaling, Selangor')
+        ->and($response->json('data.institution.donation_channels.0.qr_url'))->toBeString()
+        ->and($response->json('data.institution.donation_channels.0.qr_full_url'))->toBe($channel->getFirstMediaUrl('qr'))
+        ->and(count($response->json('data.upcoming_events')))->toBe(7)
+        ->and(count($response->json('data.past_events')))->toBe(7)
+        ->and($response->json('data.upcoming_total'))->toBe(8)
+        ->and($response->json('data.past_total'))->toBe(8);
 });
 
 it('rejects unsupported files on public contribution update suggestions', function () {
