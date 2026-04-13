@@ -219,6 +219,8 @@ class SearchController extends FrontendController
 
         $institutionMedia = $this->institutionCardMediaData($record);
 
+        $addressLines = $this->addressDisplayLines($record->addressModel);
+
         return response()->json([
             'data' => [
                 'institution' => [
@@ -231,6 +233,9 @@ class SearchController extends FrontendController
                     'status' => $record->status,
                     'type_label' => $record->type instanceof HasLabel ? $record->type->getLabel() : null,
                     'address_line' => $this->addressLocation($record->addressModel),
+                    'street_address_line' => $addressLines['street'],
+                    'locality_address_line' => $addressLines['locality'],
+                    'regional_address_line' => $addressLines['regional'],
                     'map_url' => $record->addressModel?->google_maps_url,
                     'map_lat' => $record->addressModel?->lat,
                     'map_lng' => $record->addressModel?->lng,
@@ -275,6 +280,7 @@ class SearchController extends FrontendController
                             'ewallet_handle' => $channel->ewallet_handle,
                             'is_default' => $channel->is_default,
                             'qr_url' => $channel->getFirstMediaUrl('qr', 'thumb') ?: $channel->getFirstMediaUrl('qr') ?: null,
+                            'qr_full_url' => $channel->getFirstMediaUrl('qr') ?: null,
                         ])
                         ->values()
                         ->all(),
@@ -1654,6 +1660,46 @@ class SearchController extends FrontendController
         }
 
         return $items;
+    }
+
+    /**
+     * @return array{street: ?string, locality: ?string, regional: ?string}
+     */
+    private function addressDisplayLines(?Address $address): array
+    {
+        if (! $address instanceof Address) {
+            return [
+                'street' => null,
+                'locality' => null,
+                'regional' => null,
+            ];
+        }
+
+        $locationHierarchyParts = AddressHierarchyFormatter::parts($address);
+        $streetAddressLine = implode(', ', array_filter([
+            $address->line1,
+            $address->line2,
+        ]));
+
+        if ($locationHierarchyParts !== []) {
+            $localityAddressLine = implode(', ', array_filter([
+                array_shift($locationHierarchyParts),
+                $address->postcode,
+            ]));
+            $regionalAddressLine = $locationHierarchyParts === [] ? '' : implode(', ', $locationHierarchyParts);
+        } else {
+            $localityAddressLine = implode(', ', array_filter([
+                $address->city?->name,
+                $address->postcode,
+            ]));
+            $regionalAddressLine = filled($address->state?->name) ? (string) $address->state->name : '';
+        }
+
+        return [
+            'street' => $streetAddressLine !== '' ? $streetAddressLine : null,
+            'locality' => $localityAddressLine !== '' ? $localityAddressLine : null,
+            'regional' => $regionalAddressLine !== '' ? $regionalAddressLine : null,
+        ];
     }
 
     private function addressLocation(?Address $address): ?string
