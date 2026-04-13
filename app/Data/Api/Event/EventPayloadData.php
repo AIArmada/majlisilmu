@@ -25,6 +25,7 @@ class EventPayloadData extends Data
         /** @var array<string, mixed> $payload */
         $payload = [
             ...$event->toArray(),
+            'reference_study_subtitle' => $event->reference_study_subtitle,
             'card_image_url' => $event->card_image_url,
             'poster_url' => self::preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']),
             'has_poster' => $event->hasMedia('poster'),

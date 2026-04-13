@@ -3,8 +3,10 @@
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\ReferenceType;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
@@ -307,6 +309,30 @@ it('filters events by key person roles and role-specific linked speakers', funct
     expect($speakerEventIds)
         ->toContain($moderatedEvent->id)
         ->not()->toContain($imamEvent->id);
+});
+
+it('includes reference study subtitle in the generic paginated events payload', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    $bookReference = Reference::factory()->create([
+        'title' => 'Al-Misbah Al-Munir',
+        'type' => ReferenceType::Book->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $event->references()->attach($bookReference->id);
+
+    $response = $this->getJson('/api/v1/events?filter[institution_id]='.$event->institution_id.'&filter[status]=approved&include=speakers&page=1&per_page=15&sort=starts_at');
+
+    $response->assertOk()
+        ->assertJsonPath('data.0.id', $event->id)
+        ->assertJsonPath('data.0.reference_study_subtitle', 'Al-Misbah Al-Munir');
 });
 
 it('includes key person data in the event api response', function () {
