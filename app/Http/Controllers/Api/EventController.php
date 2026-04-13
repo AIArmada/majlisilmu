@@ -293,7 +293,7 @@ class EventController extends Controller
             'views_count',
         ];
 
-        $events = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media']))
+        $events = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references']))
             ->allowedFilters(...$allowedFilters)
             ->allowedIncludes(...$allowedIncludes)
             ->allowedSorts(...$allowedSorts)
@@ -364,7 +364,7 @@ class EventController extends Controller
             404,
         );
 
-        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media']))
+        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references']))
             ->allowedIncludes(...$allowedIncludes)
             ->whereKey($event->getKey())
             ->firstOrFail();
