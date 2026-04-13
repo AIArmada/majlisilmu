@@ -1,3 +1,42 @@
+# Account Settings Password Layout Follow-up
+
+- [x] Move the new password and confirmation fields side by side on desktop
+- [x] Keep the password confirmation validation working inside the nested form state
+- [x] Re-run the focused account settings verification
+
+## Review
+
+- Removed the full-width span from the password fields in [app/Livewire/Pages/Dashboard/AccountSettings.php](app/Livewire/Pages/Dashboard/AccountSettings.php) so the `Profile Details` section can place them in the existing two-column grid.
+- Kept the built-in Filament confirmation pattern on the password field and added a regression in [tests/Feature/AccountSettingsPageTest.php](tests/Feature/AccountSettingsPageTest.php) to assert both password inputs stay at a single default column span.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => 17 passed
+
+# Account Settings Password and Timezone
+
+- [x] Remove the profile helper callouts from the account settings page
+- [x] Add password fields with conditional validation and timezone offset labels
+- [x] Extend account settings regressions and verify the page
+
+## Review
+
+- Removed the profile helper callouts from [resources/views/livewire/pages/dashboard/account-settings.blade.php](resources/views/livewire/pages/dashboard/account-settings.blade.php), dropped the current-password field from [app/Livewire/Pages/Dashboard/AccountSettings.php](app/Livewire/Pages/Dashboard/AccountSettings.php), and kept only the matching password and confirmation fields so the new password stays masked and hashed on save.
+- Switched the timezone select labels to the zone-first format, so entries now render like [Asia/Kuala_Lumpur (GMT+8)](app/Livewire/Pages/Dashboard/AccountSettings.php).
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => 16 passed
+
+## Review
+
+- Removed the two profile helper callouts from [resources/views/livewire/pages/dashboard/account-settings.blade.php](resources/views/livewire/pages/dashboard/account-settings.blade.php), added current-password/new-password/confirm-password fields in [app/Livewire/Pages/Dashboard/AccountSettings.php](app/Livewire/Pages/Dashboard/AccountSettings.php), and switched the timezone select to offset-prefixed labels like `GMT+8 (Asia/Kuala_Lumpur)`.
+- Localized the new account-settings labels in [resources/lang/en.json](resources/lang/en.json), [resources/lang/ms.json](resources/lang/ms.json), and [resources/lang/ms_MY.json](resources/lang/ms_MY.json).
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Dashboard/AccountSettings.php tests/Feature/AccountSettingsPageTest.php` => pass
+  - `CI=1 vendor/bin/pest --parallel --compact tests/Feature/AccountSettingsPageTest.php` => 16 passed
+
 # Account Settings Profile Cleanup
 
 - [x] Remove the API Access section from the profile tab
