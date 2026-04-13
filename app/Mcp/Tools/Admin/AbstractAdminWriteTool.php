@@ -6,6 +6,7 @@ namespace App\Mcp\Tools\Admin;
 
 use App\Models\User;
 use App\Support\Api\Admin\AdminResourceService;
+use App\Support\Location\PreferredCountryResolver;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 
@@ -29,6 +30,23 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function normalizePayloadForWriteTool(string $resourceKey, array $payload): array
+    {
+        if ($resourceKey !== 'speakers' || ! is_array($payload['address'] ?? null) || $payload['address'] !== []) {
+            return $payload;
+        }
+
+        $payload['address'] = [
+            'country_id' => app(PreferredCountryResolver::class)->resolveId(),
+        ];
+
+        return $payload;
     }
 
     public function shouldRegister(Request $request, AdminResourceService $resourceService): bool

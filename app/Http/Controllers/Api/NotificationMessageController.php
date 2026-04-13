@@ -4,14 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Notifications\MarkAllNotificationMessagesReadAction;
 use App\Actions\Notifications\MarkNotificationMessageReadAction;
-use App\Enums\NotificationFamily;
-use App\Enums\NotificationPriority;
-use App\Enums\NotificationTrigger;
+use App\Data\Api\Notification\NotificationMessageData as NotificationMessagePayloadData;
+use App\Data\Api\Notification\NotificationReadAllResultData;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationMessage;
 use App\Models\User;
 use App\Support\Notifications\NotificationCatalog;
-use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,7 +32,7 @@ class NotificationMessageController extends Controller
 
         return response()->json([
             'data' => collect($notifications->items())
-                ->map(fn (NotificationMessage $message): array => $this->messageData($message))
+                ->map(fn (NotificationMessage $message): array => NotificationMessagePayloadData::fromModel($message)->toArray())
                 ->all(),
             'meta' => [
                 'unread_count' => $user->notificationMessages()->visibleInInbox()->whereNull('read_at')->count(),
@@ -56,7 +54,7 @@ class NotificationMessageController extends Controller
 
         return response()->json([
             'message' => __('notifications.api.read_success'),
-            'data' => $this->messageData($notification),
+            'data' => NotificationMessagePayloadData::fromModel($notification)->toArray(),
         ]);
     }
 
@@ -66,7 +64,7 @@ class NotificationMessageController extends Controller
 
         return response()->json([
             'message' => __('notifications.api.read_all_success'),
-            'data' => ['updated_count' => $updated],
+            'data' => NotificationReadAllResultData::fromCount($updated)->toArray(),
         ]);
     }
 
@@ -77,33 +75,5 @@ class NotificationMessageController extends Controller
         abort_unless($user instanceof User, 403);
 
         return $user->fresh() ?? $user;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function messageData(NotificationMessage $message): array
-    {
-        $family = $message->family;
-        $trigger = $message->trigger;
-        $priority = $message->priority;
-        $occurredAt = $message->occurred_at;
-        $readAt = $message->read_at;
-
-        return [
-            'id' => $message->id,
-            'family' => $family instanceof NotificationFamily ? $family->value : (string) $family,
-            'trigger' => $trigger instanceof NotificationTrigger ? $trigger->value : (string) $trigger,
-            'title' => $message->title,
-            'body' => $message->body,
-            'action_url' => $message->action_url,
-            'entity_type' => $message->entity_type,
-            'entity_id' => $message->entity_id,
-            'priority' => $priority instanceof NotificationPriority ? $priority->value : (string) $priority,
-            'occurred_at' => $occurredAt instanceof CarbonInterface ? $occurredAt->toIso8601String() : null,
-            'read_at' => $readAt instanceof CarbonInterface ? $readAt->toIso8601String() : null,
-            'channels_attempted' => $message->channels_attempted ?? [],
-            'meta' => $message->meta ?? [],
-        ];
     }
 }

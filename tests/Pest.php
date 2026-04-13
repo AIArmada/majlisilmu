@@ -134,6 +134,39 @@ function something()
     // ..
 }
 
+function fakeGeneratedImageUpload(string $name = 'image.png', int $width = 1200, int $height = 800): UploadedFile
+{
+    $image = imagecreatetruecolor($width, $height);
+
+    if ($image === false) {
+        throw new RuntimeException('Unable to create image fixture.');
+    }
+
+    $background = imagecolorallocate($image, 24, 90, 160);
+    $overlay = imagecolorallocate($image, 245, 248, 250);
+
+    imagefill($image, 0, 0, $background);
+    imagefilledrectangle(
+        $image,
+        (int) ($width * 0.12),
+        (int) ($height * 0.12),
+        (int) ($width * 0.88),
+        (int) ($height * 0.88),
+        $overlay,
+    );
+
+    ob_start();
+    imagepng($image);
+    $contents = ob_get_clean();
+    imagedestroy($image);
+
+    if (! is_string($contents) || $contents === '') {
+        throw new RuntimeException('Unable to encode image fixture.');
+    }
+
+    return UploadedFile::fake()->createWithContent($name, $contents);
+}
+
 function fakePrayerTimesApi(): void
 {
     // Submit-event feature tests do not exercise real notification delivery.

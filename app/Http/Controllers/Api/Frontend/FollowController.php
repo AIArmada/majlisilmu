@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Frontend;
 
+use App\Data\Api\Frontend\Follow\FollowStateData;
 use App\Enums\DawahShareOutcomeType;
 use App\Models\Institution;
 use App\Models\Reference;
@@ -167,12 +168,7 @@ class FollowController extends FrontendController
      */
     private function followData(Institution|Speaker|Reference|Series $record, User $user): array
     {
-        return [
-            'type' => strtolower(class_basename($record)),
-            'id' => $record->getKey(),
-            'slug' => $record->slug,
-            'is_following' => $user->isFollowing($record),
-        ];
+        return FollowStateData::fromModel($record, $user)->toArray();
     }
 
     private function followOutcomeType(Institution|Speaker|Reference|Series $record): DawahShareOutcomeType

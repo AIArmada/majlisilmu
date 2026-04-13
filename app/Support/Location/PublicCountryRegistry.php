@@ -20,7 +20,7 @@ class PublicCountryRegistry
         mixed $countryKey = null,
         bool $enabledOnly = false,
     ): ?int {
-        $resolvedCountryId = is_numeric($countryId) ? (int) $countryId : null;
+        $resolvedCountryId = $this->normalizeCountryIdInput($countryId);
 
         if ($resolvedCountryId === null) {
             $normalizedCountryCode = $this->normalizeLookupString($countryCode);
@@ -311,5 +311,24 @@ class PublicCountryRegistry
         $normalizedValue = strtoupper(trim($value));
 
         return $normalizedValue !== '' ? $normalizedValue : null;
+    }
+
+    private function normalizeCountryIdInput(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalizedValue = trim($value);
+
+        if ($normalizedValue === '' || preg_match('/^\d+$/', $normalizedValue) !== 1) {
+            return null;
+        }
+
+        return (int) $normalizedValue;
     }
 }

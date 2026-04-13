@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -53,6 +54,57 @@ it('logs in an api user with phone credentials and returns a bearer token', func
         ->assertJsonPath('data.token_type', 'Bearer')
         ->assertJsonPath('data.user.phone', '+60111222333')
         ->assertJsonPath('data.access_token', fn (string $token) => filled($token));
+});
+
+it('serializes the auth user payload with verification timestamps and timezone', function () {
+    $emailVerifiedAt = now()->startOfSecond();
+    $phoneVerifiedAt = now()->addMinute()->startOfSecond();
+
+    $user = User::factory()->create([
+        'email' => 'verified-auth@example.test',
+        'phone' => '+60119998877',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'email_verified_at' => $emailVerifiedAt,
+        'phone_verified_at' => $phoneVerifiedAt,
+        'password' => 'password',
+    ]);
+
+    $this->postJson(route('api.auth.login'), [
+        'login' => 'verified-auth@example.test',
+        'password' => 'password',
+        'device_name' => 'Galaxy S30',
+    ])->assertOk()
+        ->assertJsonPath('data.user.id', $user->id)
+        ->assertJsonPath('data.user.email', 'verified-auth@example.test')
+        ->assertJsonPath('data.user.phone', '+60119998877')
+        ->assertJsonPath('data.user.timezone', 'Asia/Kuala_Lumpur')
+        ->assertJsonPath('data.user.email_verified_at', $emailVerifiedAt->format(DateTimeInterface::ATOM))
+        ->assertJsonPath('data.user.phone_verified_at', $phoneVerifiedAt->format(DateTimeInterface::ATOM));
+});
+
+it('preserves the authenticated user endpoint payload contract', function () {
+    $dailyPrayerInstitutionId = (string) str()->uuid();
+    $fridayPrayerInstitutionId = (string) str()->uuid();
+
+    $user = User::factory()->create([
+        'name' => 'Current User',
+        'email' => 'current-user@example.test',
+        'phone' => '+60115550000',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'daily_prayer_institution_id' => $dailyPrayerInstitutionId,
+        'friday_prayer_institution_id' => $fridayPrayerInstitutionId,
+        'email_verified_at' => now()->subHour()->startOfSecond(),
+        'phone_verified_at' => now()->subMinutes(30)->startOfSecond(),
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $response = $this->getJson(route('api.user.show'));
+
+    $response->assertOk()
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+
+    expect($response->json('data'))->toEqual($user->fresh()->toArray());
 });
 
 it('rejects invalid api login credentials', function () {

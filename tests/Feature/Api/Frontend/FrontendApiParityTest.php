@@ -14,12 +14,14 @@ use App\Http\Controllers\Api\Frontend\SearchController;
 use App\Models\ContributionRequest;
 use App\Models\Country;
 use App\Models\District;
+use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\MembershipClaim;
 use App\Models\Reference;
+use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
@@ -680,10 +682,7 @@ it('allows direct speaker cover uploads on public contribution update suggestion
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
 
-    $coverUpload = UploadedFile::fake()->createWithContent(
-        'speaker-cover.png',
-        file_get_contents(public_path('images/placeholders/speaker.png')) ?: '',
-    );
+    $coverUpload = fakeGeneratedImageUpload('speaker-cover.png', 1200, 1200);
 
     $owner = User::factory()->create();
     $speaker = Speaker::factory()->create([
@@ -1181,6 +1180,113 @@ it('exposes the institution public image url in the frontend institution detail 
         ->and($response->json('data.institution.media.public_image_url'))->toBe($response->json('data.institution.media.logo_url'));
 });
 
+it('serializes institution detail payloads with address and donation metadata for mobile clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+    $user = User::factory()->create();
+
+    $state = State::query()->create([
+        'country_id' => $countryId,
+        'name' => 'Pahang Detail API',
+        'country_code' => 'MY',
+    ]);
+
+    $district = District::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'name' => 'Temerloh Detail API',
+        'country_code' => 'MY',
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'name' => 'Lanchang Detail API',
+        'country_code' => 'MY',
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Detail DTO',
+        'status' => 'verified',
+        'is_active' => true,
+        'description' => 'Institution detail serializer coverage',
+    ]);
+
+    $institution->addMedia(UploadedFile::fake()->image('detail-dto-logo.jpg', 800, 800))
+        ->toMediaCollection('logo');
+    $institution->addMedia(UploadedFile::fake()->image('detail-dto-cover.jpg', 1600, 900))
+        ->toMediaCollection('cover');
+
+    $institution->address()->updateOrCreate([], [
+        'country_id' => $countryId,
+        'state_id' => (int) $state->id,
+        'district_id' => (int) $district->id,
+        'subdistrict_id' => (int) $subdistrict->id,
+        'line1' => 'Jalan Masjid 1',
+        'postcode' => '28000',
+        'lat' => 3.4501,
+        'lng' => 102.4194,
+        'google_maps_url' => 'https://maps.google.com/?q=3.4501,102.4194',
+        'waze_url' => 'https://waze.com/ul?ll=3.4501,102.4194',
+    ]);
+
+    $donationChannel = $institution->donationChannels()->create(DonationChannel::factory()->raw([
+        'label' => 'Tabung Utama',
+        'recipient' => 'Masjid Detail DTO',
+        'method' => 'bank_account',
+        'bank_name' => 'Maybank',
+        'bank_code' => 'MBB',
+        'account_number' => '1234567890',
+        'status' => 'verified',
+        'is_default' => true,
+    ]));
+
+    $donationChannel->addMedia(UploadedFile::fake()->image('institution-qr.png', 600, 600))
+        ->toMediaCollection('qr');
+
+    $user->follow($institution);
+
+    $detailInstitution = $institution->fresh([
+        'media',
+        'address.state',
+        'address.city',
+        'address.district',
+        'address.subdistrict',
+        'address.country',
+        'contacts',
+        'socialMedia',
+        'donationChannels.media',
+    ]);
+
+    expect($detailInstitution)->not->toBeNull();
+
+    $item = Closure::bind(
+        fn (): array => $this->institutionDetailData($detailInstitution, $user),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($item, 'address.country_id'))->toBe($countryId)
+        ->and(data_get($item, 'country.iso2'))->toBe('MY')
+        ->and(data_get($item, 'country.key'))->toBe('malaysia')
+        ->and(data_get($item, 'map_lat'))->toBe(3.4501)
+        ->and(data_get($item, 'map_lng'))->toBe(102.4194)
+        ->and(data_get($item, 'is_following'))->toBeTrue()
+        ->and(data_get($item, 'speaker_count'))->toBe(0)
+        ->and(data_get($item, 'media.public_image_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'media.logo_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'media.cover_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'donation_channels'))->toHaveCount(1)
+        ->and(data_get($item, 'donation_channels.0.label'))->toBe('Tabung Utama')
+        ->and(data_get($item, 'donation_channels.0.method_display'))->toBe('Bank Account')
+        ->and(data_get($item, 'donation_channels.0.is_default'))->toBeTrue()
+        ->and(data_get($item, 'donation_channels.0.qr_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'waze_url'))->toContain('waze.com');
+});
+
 it('exposes 7-item institution detail lists with address display lines and qr urls', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
@@ -1546,6 +1652,39 @@ it('supports server-side filtering to only followed speakers in the frontend spe
         ->assertJsonPath('data.0.is_following', true)
         ->assertJsonPath('meta.pagination.total', 1)
         ->assertJsonPath('meta.following.total', 1);
+});
+
+it('serializes speaker directory payloads with country and follow metadata for mobile clients', function () {
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+    $user = User::factory()->create();
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Directory DTO',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->address()->updateOrCreate([], [
+        'country_id' => $countryId,
+    ]);
+
+    $user->follow($speaker);
+
+    $directorySpeaker = $speaker->fresh();
+
+    expect($directorySpeaker)->not->toBeNull();
+
+    $item = Closure::bind(
+        fn (): array => $this->speakerListData($directorySpeaker, $user),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($item, 'formatted_name'))->toBe($speaker->formatted_name)
+        ->and(data_get($item, 'avatar_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'country.id'))->toBe($countryId)
+        ->and(data_get($item, 'country.key'))->toBe('malaysia')
+        ->and(data_get($item, 'is_following'))->toBeTrue();
 });
 
 it('bumps the speaker directory cache version when speaker records change', function () {
@@ -2279,6 +2418,111 @@ it('mirrors public detail media and public contact payloads', function () {
 
     $speakerResponse->assertJsonMissingPath('data.speaker.media.main_url');
     $referenceResponse->assertJsonMissingPath('data.reference.media.cover_url');
+});
+
+it('serializes venue and reference detail payloads with core metadata for mobile clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $user = User::factory()->create();
+
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan DTO API',
+        'description' => 'Venue detail serializer coverage',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $venue->contacts()->create([
+        'category' => ContactCategory::Phone->value,
+        'value' => '+60399887766',
+        'is_public' => true,
+    ]);
+    $venue->socialMedia()->create([
+        'platform' => 'website',
+        'url' => 'https://venue.example.test',
+    ]);
+    $venue->addMedia(UploadedFile::fake()->image('venue-dto-cover.jpg', 1600, 900))->toMediaCollection('cover');
+
+    $reference = Reference::factory()->create([
+        'title' => 'Rujukan DTO API',
+        'author' => 'Penulis API',
+        'type' => 'book',
+        'publisher' => 'Penerbit API',
+        'publication_year' => 2024,
+        'description' => 'Reference detail serializer coverage',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference->socialMedia()->create([
+        'platform' => 'website',
+        'url' => 'https://reference-dto.example.test',
+    ]);
+    $reference->addMedia(UploadedFile::fake()->image('reference-front.jpg', 1200, 1600))->toMediaCollection('front_cover');
+    $reference->addMedia(UploadedFile::fake()->image('reference-back.jpg', 1200, 1600))->toMediaCollection('back_cover');
+
+    $user->follow($reference);
+
+    $detailVenue = $venue->fresh(['media', 'contacts', 'socialMedia']);
+    $detailReference = $reference->fresh(['media', 'socialMedia']);
+
+    expect($detailVenue)->not->toBeNull()
+        ->and($detailReference)->not->toBeNull();
+
+    $venueItem = Closure::bind(
+        fn (): array => $this->venueDetailData($detailVenue),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    $referenceItem = Closure::bind(
+        fn (): array => $this->referenceDetailData($detailReference, $user),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($venueItem, 'name'))->toBe('Dewan DTO API')
+        ->and(data_get($venueItem, 'status'))->toBe('verified')
+        ->and(data_get($venueItem, 'is_active'))->toBeTrue()
+        ->and(data_get($venueItem, 'media.cover_url'))->toBeString()->not->toBe('')
+        ->and(data_get($venueItem, 'contacts.0.value'))->toBe('+60399887766')
+        ->and(data_get($venueItem, 'social_media.0.resolved_url'))->toBe('https://venue.example.test')
+        ->and(data_get($referenceItem, 'title'))->toBe('Rujukan DTO API')
+        ->and(data_get($referenceItem, 'author'))->toBe('Penulis API')
+        ->and(data_get($referenceItem, 'publication_year'))->toBe('2024')
+        ->and(data_get($referenceItem, 'is_following'))->toBeTrue()
+        ->and(data_get($referenceItem, 'media.front_cover_url'))->toBeString()->not->toBe('')
+        ->and(data_get($referenceItem, 'media.back_cover_url'))->toBeString()->not->toBe('')
+        ->and(data_get($referenceItem, 'social_media.0.resolved_url'))->toBe('https://reference-dto.example.test');
+});
+
+it('serializes series detail payloads with follow and media metadata for mobile clients', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $user = User::factory()->create();
+
+    $series = Series::factory()->create([
+        'title' => 'Siri DTO API',
+        'description' => 'Series detail serializer coverage',
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $series->addMedia(UploadedFile::fake()->image('series-cover.jpg', 1600, 900))->toMediaCollection('cover');
+
+    $user->follow($series);
+
+    Sanctum::actingAs($user);
+
+    $response = $this->getJson(route('api.client.series.show', ['series' => $series->slug]))
+        ->assertOk();
+
+    expect($response->json('data.series.title'))->toBe('Siri DTO API')
+        ->and($response->json('data.series.visibility'))->toBe('public')
+        ->and($response->json('data.series.is_following'))->toBeTrue()
+        ->and($response->json('data.series.media.cover_url'))->toBeString()->not->toBe('')
+        ->and($response->json('data.upcoming_total'))->toBe(0)
+        ->and($response->json('data.past_total'))->toBe(0);
 });
 
 it('mirrors the public speaker page payload for app clients', function () {

@@ -61,6 +61,11 @@ function submitEventMediaFormData(array $fixtures, array $overrides = []): array
     ], $overrides);
 }
 
+function submitEventMediaUpload(string $targetName): UploadedFile
+{
+    return fakeGeneratedImageUpload($targetName, 1600, 900);
+}
+
 it('stores poster and gallery uploads when submitting an event', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
@@ -74,10 +79,10 @@ it('stores poster and gallery uploads when submitting an event', function () {
 
     $component
         ->fillForm([
-            'poster' => UploadedFile::fake()->image('poster.jpg', 1600, 900),
+            'poster' => submitEventMediaUpload('poster.png'),
             'gallery' => [
-                UploadedFile::fake()->image('gallery-1.jpg', 1200, 800),
-                UploadedFile::fake()->image('gallery-2.jpg', 1200, 800),
+                submitEventMediaUpload('gallery-1.png'),
+                submitEventMediaUpload('gallery-2.png'),
             ],
         ])
         ->call('submit')

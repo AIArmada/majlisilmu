@@ -3,6 +3,7 @@
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\EventSettings;
+use App\Models\Registration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -35,27 +36,54 @@ it('allows an authenticated user to register through the api', function () {
         'name' => 'Registered Mobile User',
     ]);
 
+    $registration = Registration::query()
+        ->where('event_id', $event->id)
+        ->where('user_id', $user->id)
+        ->latest('created_at')
+        ->firstOrFail();
+
     $response->assertCreated()
+        ->assertJsonPath('data.id', $registration->id)
         ->assertJsonPath('data.event_id', $event->id)
         ->assertJsonPath('data.user_id', $user->id)
-        ->assertJsonPath('data.status', 'registered');
+        ->assertJsonPath('data.name', 'Registered Mobile User')
+        ->assertJsonPath('data.status', 'registered')
+        ->assertJsonPath('data.created_at', $registration->created_at?->toIso8601String())
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $this->getJson(route('api.events.registrations.status', $event))
         ->assertOk()
         ->assertJsonPath('data.is_registered', true)
-        ->assertJsonPath('data.registration.user_id', $user->id);
+        ->assertJsonPath('data.registration.id', $registration->id)
+        ->assertJsonPath('data.registration.event_id', $event->id)
+        ->assertJsonPath('data.registration.user_id', $user->id)
+        ->assertJsonPath('data.registration.name', 'Registered Mobile User')
+        ->assertJsonPath('data.registration.created_at', $registration->created_at?->toIso8601String())
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
 it('allows a guest to register through the api when contact info is provided', function () {
     $event = registrationReadyEvent();
 
-    $this->postJson(route('api.events.registrations.store', $event), [
+    $response = $this->postJson(route('api.events.registrations.store', $event), [
         'name' => 'Guest Registrant',
         'email' => 'guest@example.test',
-    ])->assertCreated()
+    ]);
+
+    $registration = Registration::query()
+        ->where('event_id', $event->id)
+        ->where('email', 'guest@example.test')
+        ->latest('created_at')
+        ->firstOrFail();
+
+    $response->assertCreated()
+        ->assertJsonPath('data.id', $registration->id)
         ->assertJsonPath('data.name', 'Guest Registrant')
         ->assertJsonPath('data.email', 'guest@example.test')
-        ->assertJsonPath('data.user_id', null);
+        ->assertJsonPath('data.phone', null)
+        ->assertJsonPath('data.user_id', null)
+        ->assertJsonPath('data.created_at', $registration->created_at?->toIso8601String())
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
 it('rejects guest registration without email or phone', function () {

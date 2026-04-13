@@ -34,11 +34,13 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
 
             /** @var array<string, mixed> $payload */
             $payload = $validated['payload'];
+            $resourceKey = (string) $validated['resource_key'];
 
             $this->ensureMediaUploadsAreUnsupported($payload);
+            $payload = $this->normalizePayloadForWriteTool($resourceKey, $payload);
 
             return $this->resourceService->updateRecord(
-                resourceKey: (string) $validated['resource_key'],
+                resourceKey: $resourceKey,
                 recordKey: (string) $validated['record_key'],
                 payload: $payload,
                 actor: $actor,

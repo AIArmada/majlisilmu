@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Frontend;
 
+use App\Data\Api\Frontend\AccountSettings\AccountProfileData;
 use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
@@ -24,7 +25,7 @@ class AccountSettingsController extends FrontendController
 
         return response()->json([
             'data' => [
-                'profile' => $this->profileData($user),
+                'profile' => AccountProfileData::fromModel($user)->toArray(),
             ],
             'meta' => [
                 'request_id' => $this->requestId($request),
@@ -93,7 +94,7 @@ class AccountSettingsController extends FrontendController
 
         return response()->json([
             'data' => [
-                'profile' => $this->profileData($freshUser),
+                'profile' => AccountProfileData::fromModel($freshUser)->toArray(),
                 'message' => __('Account settings updated.'),
             ],
             'meta' => [
@@ -136,22 +137,5 @@ class AccountSettingsController extends FrontendController
         $trimmed = trim($value);
 
         return $trimmed !== '' ? $trimmed : null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function profileData(User $user): array
-    {
-        return [
-            'name' => $user->name,
-            'email' => (string) ($user->email ?? ''),
-            'phone' => (string) ($user->phone ?? ''),
-            'timezone' => (string) ($user->timezone ?? ''),
-            'daily_prayer_institution_id' => (string) ($user->daily_prayer_institution_id ?? ''),
-            'friday_prayer_institution_id' => (string) ($user->friday_prayer_institution_id ?? ''),
-            'email_verified_at' => $this->optionalDateTimeString($user->email_verified_at),
-            'phone_verified_at' => $this->optionalDateTimeString($user->phone_verified_at),
-        ];
     }
 }

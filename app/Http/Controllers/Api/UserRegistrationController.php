@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Data\Api\UserRegistration\UserRegistrationItemData;
 use App\Http\Controllers\Controller;
+use App\Models\Registration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -28,7 +30,9 @@ class UserRegistrationController extends Controller
             ->paginate($request->integer('per_page', 20));
 
         return response()->json([
-            'data' => $registrations->items(),
+            'data' => collect($registrations->items())
+                ->map(fn (Registration $registration): array => UserRegistrationItemData::fromModel($registration)->toArray())
+                ->all(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [

@@ -4,6 +4,7 @@ namespace App\Actions\Speakers;
 
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Speaker;
+use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryRegistry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -190,6 +191,7 @@ class GenerateSpeakerSlugAction
     {
         $registry = app(PublicCountryRegistry::class);
         $countryCode = $this->resolveCountryCode($payload);
+        $countryProvided = $this->countrySelectionProvided($payload);
         $countryId = $registry->resolveCountryId(
             $payload['country_id'] ?? null,
             $countryCode,
@@ -199,6 +201,7 @@ class GenerateSpeakerSlugAction
         if (($countryCode === null || $countryId === null) && is_array($payload['address'] ?? null)) {
             /** @var array<string, mixed> $address */
             $address = $payload['address'];
+            $countryProvided = $countryProvided || $this->countrySelectionProvided($address);
             $countryCode ??= $this->resolveCountryCode($address);
             $countryId ??= $registry->resolveCountryId(
                 $address['country_id'] ?? null,
@@ -207,11 +210,35 @@ class GenerateSpeakerSlugAction
             );
         }
 
+        if (! $countryProvided && $countryCode === null && $countryId === null) {
+            $countryId = $registry->normalizeCountryId(app(PreferredCountryResolver::class)->resolveId());
+        }
+
         if ($countryCode === null && $countryId !== null) {
             $countryCode = $registry->countryDataForId($countryId)['iso2'] ?? null;
         }
 
         return $this->countryCodeSegment($countryCode) ?? '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function countrySelectionProvided(array $payload): bool
+    {
+        foreach (['country_id', 'country_code', 'country_key'] as $field) {
+            $value = $payload[$field] ?? null;
+
+            if (is_int($value)) {
+                return true;
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function countrySuffixForSpeaker(Speaker $speaker): string

@@ -12,6 +12,7 @@ use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -330,4 +331,48 @@ it('includes key person data in the event api response', function () {
         ->assertJsonPath('data.key_people.0.role', EventKeyPersonRole::Imam->value)
         ->assertJsonPath('data.key_people.0.speaker.id', $imamSpeaker->id)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+});
+
+it('serializes event detail payloads with poster metadata and included speakers', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'ends_at' => Carbon::parse('2026-03-14 22:15:00', 'UTC'),
+    ]);
+
+    $event->addMedia(fakeGeneratedImageUpload('event-poster.png', 1600, 900))
+        ->toMediaCollection('poster');
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-avatar.png', 800, 800))
+        ->toMediaCollection('avatar');
+
+    $event->speakers()->attach($speaker->id);
+
+    $response = $this->getJson('/api/v1/events/'.$event->id.'?include=speakers');
+
+    $response->assertOk()
+        ->assertJsonPath('data.id', $event->id)
+        ->assertJsonPath('data.has_poster', true)
+        ->assertJsonPath('data.speakers.0.id', $speaker->id)
+        ->assertJsonPath('data.speakers.0.name', $speaker->name)
+        ->assertJsonPath('data.speakers.0.formatted_name', $speaker->formatted_name)
+        ->assertJsonPath('data.speakers.0.slug', $speaker->slug)
+        ->assertJsonPath('data.speakers.0.avatar_url', $speaker->public_avatar_url);
+
+    $payload = $response->json('data');
+
+    expect(data_get($payload, 'poster_url'))->toBeString()->not->toBe('')
+        ->and(data_get($payload, 'card_image_url'))->toBeString()->not->toBe('')
+        ->and(data_get($payload, 'end_time_display'))->toBe('10:15 PM')
+        ->and(is_array(data_get($payload, 'speakers.0')))->toBeTrue()
+        ->and(array_key_exists('pivot', data_get($payload, 'speakers.0')))->toBeFalse();
 });

@@ -28,7 +28,9 @@ it('uses moderation transition when a high risk event report is submitted', func
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('data.id', fn ($value) => is_string($value) && $value !== '');
+        ->assertJsonPath('data.id', fn ($value) => is_string($value) && $value !== '')
+        ->assertJsonPath('data.message', 'Report submitted successfully. Our team will review it.')
+        ->assertJsonPath('meta.request_id', fn ($value) => is_string($value) && $value !== '');
 
     $event->refresh();
 
