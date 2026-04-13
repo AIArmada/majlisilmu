@@ -167,9 +167,13 @@ it('exposes admin speaker write schema and can create and update speakers throug
         ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/speakers')
         ->json('data.schema');
 
+    $speakerFields = collect($schema['fields'] ?? [])->pluck('name')->all();
+
     expect(collect($schema['catalogs'] ?? [])->pluck('field')->all())
-        ->not->toContain('address.country_id')
-        ->toContain('address.state_id', 'address.district_id', 'address.subdistrict_id');
+        ->toContain('address.country_id')
+        ->toContain('address.state_id', 'address.district_id', 'address.subdistrict_id')
+        ->and($speakerFields)->toContain('address.country_id', 'address.country_code', 'address.country_key')
+        ->and(collect($schema['conditional_rules'] ?? [])->pluck('field')->all())->toContain('address.country_id');
 
     $createResponse = $this->postJson('/api/v1/admin/speakers', [
         'name' => 'Admin API Created Speaker',
@@ -177,7 +181,9 @@ it('exposes admin speaker write schema and can create and update speakers throug
         'status' => 'verified',
         'is_freelance' => false,
         'is_active' => true,
-        'address' => [],
+        'address' => [
+            'country_id' => 132,
+        ],
     ])->assertCreated();
 
     $speakerId = (string) $createResponse->json('data.record.id');
@@ -199,17 +205,31 @@ it('exposes admin speaker write schema and can create and update speakers throug
         'job_title' => 'Imam',
         'is_active' => true,
         'allow_public_event_submission' => true,
-        'address' => [],
+        'address' => [
+            'country_id' => 132,
+        ],
     ])->assertOk()
         ->assertJsonPath('data.record.attributes.name', 'Admin API Updated Speaker')
         ->assertJsonPath('data.record.attributes.slug', 'prof-madya-dato-dr-admin-api-updated-speaker-phd-ba-hons-my')
         ->assertJsonPath('data.record.attributes.job_title', 'Imam');
 });
 
-it('prohibits country and detailed address fields when creating speakers through the admin api', function () {
+it('requires explicit country and still prohibits detailed address fields when creating speakers through the admin api', function () {
     $admin = adminApiUser('super_admin');
 
     Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/speakers', [
+        'name' => 'Admin API Missing Speaker Country',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'is_active' => true,
+        'address' => [],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'address.country_id',
+        ]);
 
     $this->postJson('/api/v1/admin/speakers', [
         'name' => 'Admin API Invalid Speaker Address',
@@ -224,7 +244,6 @@ it('prohibits country and detailed address fields when creating speakers through
         ],
     ])->assertUnprocessable()
         ->assertJsonValidationErrors([
-            'address.country_id',
             'address.line1',
             'address.google_maps_url',
         ]);
@@ -244,6 +263,7 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         'is_freelance' => false,
         'is_active' => true,
         'address' => [
+            'country_id' => $firstFixtures['country_id'],
             'state_id' => $firstFixtures['state_id'],
             'district_id' => $firstFixtures['district_id'],
         ],
@@ -253,7 +273,7 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
 
     $this->getJson('/api/v1/admin/speakers/'.$speakerId)
         ->assertOk()
-        ->assertJsonMissingPath('data.record.attributes.address.country_id')
+        ->assertJsonPath('data.record.attributes.address.country_id', $firstFixtures['country_id'])
         ->assertJsonMissingPath('data.record.attributes.address.line1')
         ->assertJsonMissingPath('data.record.attributes.address.google_maps_url')
         ->assertJsonPath('data.record.attributes.address.state_id', $firstFixtures['state_id'])
@@ -266,11 +286,12 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         'is_freelance' => false,
         'is_active' => true,
         'address' => [
+            'country_id' => $secondFixtures['country_id'],
             'state_id' => $secondFixtures['state_id'],
             'district_id' => $secondFixtures['district_id'],
         ],
     ])->assertOk()
-        ->assertJsonMissingPath('data.record.attributes.address.country_id')
+        ->assertJsonPath('data.record.attributes.address.country_id', $secondFixtures['country_id'])
         ->assertJsonMissingPath('data.record.attributes.address.line1')
         ->assertJsonMissingPath('data.record.attributes.address.google_maps_url')
         ->assertJsonPath('data.record.attributes.address.state_id', $secondFixtures['state_id'])
@@ -278,7 +299,7 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
 
     $this->getJson('/api/v1/admin/speakers/'.$speakerId)
         ->assertOk()
-        ->assertJsonMissingPath('data.record.attributes.address.country_id')
+        ->assertJsonPath('data.record.attributes.address.country_id', $secondFixtures['country_id'])
         ->assertJsonMissingPath('data.record.attributes.address.line1')
         ->assertJsonMissingPath('data.record.attributes.address.google_maps_url')
         ->assertJsonPath('data.record.attributes.address.state_id', $secondFixtures['state_id'])
@@ -286,11 +307,46 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
 
     $this->getJson('/api/v1/admin/speakers?search=Admin%20API%20Address%20Freshness%20Speaker')
         ->assertOk()
-        ->assertJsonMissingPath('data.0.attributes.address.country_id')
+        ->assertJsonPath('data.0.attributes.address.country_id', $secondFixtures['country_id'])
         ->assertJsonMissingPath('data.0.attributes.address.line1')
         ->assertJsonMissingPath('data.0.attributes.address.google_maps_url')
         ->assertJsonPath('data.0.attributes.address.state_id', $secondFixtures['state_id'])
         ->assertJsonPath('data.0.attributes.address.district_id', $secondFixtures['district_id']);
+});
+
+it('allows sparse venue address updates without resending the existing country through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/venues', [
+        'name' => 'Admin API Sparse Venue Country',
+        'type' => 'dewan',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Asal',
+        ],
+    ])->assertCreated();
+
+    $venueId = (string) $createResponse->json('data.record.id');
+
+    $this->putJson('/api/v1/admin/venues/'.$venueId, [
+        'name' => 'Admin API Sparse Venue Country',
+        'type' => 'dewan',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'line1' => 'Alamat Terkini Tanpa Country',
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.address.country_id', 132)
+        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Terkini Tanpa Country');
+
+    expect(Venue::query()->findOrFail($venueId)->addressModel?->country_id)->toBe(132)
+        ->and(Venue::query()->findOrFail($venueId)->addressModel?->line1)->toBe('Alamat Terkini Tanpa Country');
 });
 
 it('exposes admin institution write schema and can create and update institutions through the api', function () {
@@ -299,11 +355,16 @@ it('exposes admin institution write schema and can create and update institution
     $admin = adminApiUser('super_admin');
     Sanctum::actingAs($admin);
 
-    $this->getJson('/api/v1/admin/institutions/schema?operation=create')
+    $institutionSchema = $this->getJson('/api/v1/admin/institutions/schema?operation=create')
         ->assertOk()
         ->assertJsonPath('data.schema.resource_key', 'institutions')
         ->assertJsonPath('data.schema.method', 'POST')
-        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/institutions');
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/institutions')
+        ->json('data.schema');
+
+    expect(collect($institutionSchema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('address.country_id', 'address.country_code', 'address.country_key')
+        ->and(collect($institutionSchema['conditional_rules'] ?? [])->pluck('field')->all())->toContain('address.country_id');
 
     $createResponse = $this->postJson('/api/v1/admin/institutions', [
         'name' => 'Admin API Institution',
@@ -473,6 +534,8 @@ it('lists admin geography catalogs and exposes catalog metadata through admin wr
         ->assertJsonFragment([
             'id' => $fixtures['country_id'],
             'label' => 'Malaysia',
+            'iso2' => 'MY',
+            'key' => 'malaysia',
         ]);
 
     $this->getJson('/api/v1/admin/catalogs/states?country_id='.$fixtures['country_id'])

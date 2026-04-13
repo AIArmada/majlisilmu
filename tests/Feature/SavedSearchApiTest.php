@@ -64,7 +64,9 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson('/api/v1/saved-searches', []);
 
                 $response->assertUnprocessable()
-                    ->assertJsonValidationErrors(['name', 'notify']);
+                    ->assertJsonValidationErrors(['name', 'notify'])
+                    ->assertJsonPath('error.code', 'validation_error')
+                    ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
             });
 
             it('validates notify options', function () {
@@ -99,7 +101,8 @@ describe('Saved Search API Endpoints', function () {
                 ]);
 
                 $response->assertStatus(422)
-                    ->assertJsonPath('error.code', 'validation_error');
+                    ->assertJsonPath('error.code', 'validation_error')
+                    ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
             });
 
             it('requires lat/lng when radius_km is provided', function () {
@@ -230,7 +233,9 @@ describe('Saved Search API Endpoints', function () {
                 $response = $this->postJson("/api/v1/saved-searches/{$search->id}/execute");
 
                 $response->assertOk()
-                    ->assertJsonStructure(['data', 'meta']);
+                    ->assertJsonStructure(['data', 'meta'])
+                    ->assertJsonPath('meta.pagination.page', 1)
+                    ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
             });
         });
     });

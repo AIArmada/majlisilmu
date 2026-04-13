@@ -17,6 +17,7 @@ use App\Models\Subdistrict;
 use App\Models\Venue;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryRegistry;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -27,6 +28,7 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 
@@ -137,7 +139,7 @@ class SharedFormSchema
     }
 
     /**
-     * Region-only address group for public speaker submissions.
+     * Country-plus-region address group for public speaker submissions.
      */
     public static function regionAddressGroup(
         ?string $statePath = null,
@@ -162,7 +164,7 @@ class SharedFormSchema
     }
 
     /**
-     * Region-only address fields for public speaker submissions.
+     * Country-plus-region address fields for public speaker submissions.
      *
      * @return array<int, Component>
      */
@@ -511,33 +513,54 @@ class SharedFormSchema
         string $type = 'main',
         bool $allowCountryOnly = false,
     ): void {
+        $countryProvided = self::countrySelectionProvided($data);
         $data = self::prepareAddressPersistenceData($data);
-        $countryId = self::normalizeLocationId($data['country_id'] ?? null) ?? self::preferredPublicCountryId();
+        $countryId = self::normalizeLocationId($data['country_id'] ?? null);
+        $hasAddressContent = collect([
+            $data['line1'] ?? null,
+            $data['line2'] ?? null,
+            $data['postcode'] ?? null,
+            $data['state_id'] ?? null,
+            $data['district_id'] ?? null,
+            $data['subdistrict_id'] ?? null,
+            $data['google_maps_url'] ?? null,
+            $data['google_place_id'] ?? null,
+            $data['waze_url'] ?? null,
+            $data['lat'] ?? null,
+            $data['lng'] ?? null,
+        ])->contains(static fn (mixed $value): bool => filled($value));
 
-        if (
-            ! empty($data['line1'])
-            || ! empty($data['state_id'])
-            || ! empty($data['google_maps_url'])
-            || ! empty($data['lat'])
-            || ! empty($data['lng'])
-            || $allowCountryOnly
-        ) {
-            $model->address()->create([
-                'type' => $type,
-                'line1' => $data['line1'] ?? null,
-                'line2' => $data['line2'] ?? null,
-                'postcode' => $data['postcode'] ?? null,
-                'country_id' => $countryId,
-                'state_id' => $data['state_id'] ?? null,
-                'district_id' => $data['district_id'] ?? null,
-                'subdistrict_id' => $data['subdistrict_id'] ?? null,
-                'lat' => isset($data['lat']) && $data['lat'] !== '' ? (float) $data['lat'] : null,
-                'lng' => isset($data['lng']) && $data['lng'] !== '' ? (float) $data['lng'] : null,
-                'google_maps_url' => $data['google_maps_url'] ?? null,
-                'google_place_id' => $data['google_place_id'] ?? null,
-                'waze_url' => $data['waze_url'] ?? null,
+        if (! $hasAddressContent && ! ($allowCountryOnly && ($countryProvided || $countryId !== null))) {
+            return;
+        }
+
+        if ($countryId === null && ! $countryProvided && $hasAddressContent) {
+            $countryId = self::preferredPublicCountryId();
+        }
+
+        if ($countryId === null) {
+            throw ValidationException::withMessages([
+                'address.country_id' => $countryProvided
+                    ? __('The selected country is invalid.')
+                    : __('The address country is required.'),
             ]);
         }
+
+        $model->address()->create([
+            'type' => $type,
+            'line1' => $data['line1'] ?? null,
+            'line2' => $data['line2'] ?? null,
+            'postcode' => $data['postcode'] ?? null,
+            'country_id' => $countryId,
+            'state_id' => $data['state_id'] ?? null,
+            'district_id' => $data['district_id'] ?? null,
+            'subdistrict_id' => $data['subdistrict_id'] ?? null,
+            'lat' => isset($data['lat']) && $data['lat'] !== '' ? (float) $data['lat'] : null,
+            'lng' => isset($data['lng']) && $data['lng'] !== '' ? (float) $data['lng'] : null,
+            'google_maps_url' => $data['google_maps_url'] ?? null,
+            'google_place_id' => $data['google_place_id'] ?? null,
+            'waze_url' => $data['waze_url'] ?? null,
+        ]);
     }
 
     /**
@@ -577,6 +600,7 @@ class SharedFormSchema
     public static function prepareAddressPersistenceData(array $data): array
     {
         $normalized = self::normalizeAddressFormState($data);
+        $normalized['country_id'] = self::normalizeCountrySelection($normalized);
 
         if (FederalTerritoryLocation::isFederalTerritoryStateId($normalized['state_id'] ?? null)) {
             $normalized['district_id'] = null;
@@ -596,6 +620,39 @@ class SharedFormSchema
             'google_place_id',
             'waze_url',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function countrySelectionProvided(array $data): bool
+    {
+        foreach (['country_id', 'country_code', 'country_key'] as $field) {
+            $value = $data[$field] ?? null;
+
+            if (is_int($value)) {
+                return true;
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function normalizeCountrySelection(array $data, bool $enabledOnly = false): ?int
+    {
+        return app(PublicCountryRegistry::class)->resolveCountryId(
+            $data['country_id'] ?? null,
+            $data['country_code'] ?? null,
+            $data['country_key'] ?? null,
+            $enabledOnly,
+        );
     }
 
     /**

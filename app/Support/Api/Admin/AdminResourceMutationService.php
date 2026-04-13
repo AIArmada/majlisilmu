@@ -32,6 +32,7 @@ use App\Filament\Resources\References\ReferenceResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Filament\Resources\Subdistricts\SubdistrictResource;
 use App\Filament\Resources\Venues\VenueResource;
+use App\Forms\SharedFormSchema;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
@@ -45,6 +46,7 @@ use App\Support\Location\PreferredCountryResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\HasMedia;
 
 class AdminResourceMutationService
@@ -117,7 +119,9 @@ class AdminResourceMutationService
                 'current_media' => $record instanceof Institution ? $this->mediaState($record, ['logo', 'cover', 'gallery']) : null,
                 'fields' => $this->institutionFields($updating),
                 'catalogs' => $this->addressCatalogs('address'),
-                'conditional_rules' => [],
+                'conditional_rules' => [
+                    ['field' => 'address.country_id', 'required_when_missing' => ['address.country_code', 'address.country_key']],
+                ],
             ],
             ReferenceResource::class => [
                 'resource_key' => $resourceKey,
@@ -146,11 +150,9 @@ class AdminResourceMutationService
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Speaker ? $this->mediaState($record, ['avatar', 'cover', 'gallery']) : null,
                 'fields' => $this->speakerFields($updating),
-                'catalogs' => $this->speakerAddressCatalogs(
-                    'address',
-                    $this->speakerCatalogCountryId($record instanceof Speaker ? $record : null),
-                ),
+                'catalogs' => $this->addressCatalogs('address'),
                 'conditional_rules' => [
+                    ['field' => 'address.country_id', 'required_when_missing' => ['address.country_code', 'address.country_key']],
                     ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
                 ],
             ],
@@ -209,6 +211,39 @@ class AdminResourceMutationService
     /**
      * @param  class-string  $resourceClass
      * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    public function normalizeValidatedPayload(string $resourceClass, array $validated): array
+    {
+        if (! in_array($resourceClass, [InstitutionResource::class, SpeakerResource::class], true)) {
+            return $validated;
+        }
+
+        if (! is_array($validated['address'] ?? null)) {
+            return $validated;
+        }
+
+        $countryProvided = SharedFormSchema::countrySelectionProvided($validated['address']);
+        $validated['address'] = SharedFormSchema::prepareAddressPersistenceData($validated['address']);
+
+        if (! $countryProvided) {
+            throw ValidationException::withMessages([
+                'address.country_id' => __('The address country is required.'),
+            ]);
+        }
+
+        if (! is_int($validated['address']['country_id'] ?? null)) {
+            throw ValidationException::withMessages([
+                'address.country_id' => __('The selected country is invalid.'),
+            ]);
+        }
+
+        return $validated;
+    }
+
+    /**
+     * @param  class-string  $resourceClass
+     * @param  array<string, mixed>  $validated
      */
     public function store(string $resourceClass, array $validated, User $actor): Model
     {
@@ -258,13 +293,15 @@ class AdminResourceMutationService
      */
     private function defaultsForCreate(string $resourceClass): array
     {
+        $defaultCountryId = app(PreferredCountryResolver::class)->resolveId();
+
         return match ($resourceClass) {
             EventResource::class => $this->saveAdminEventAction->defaultsForCreate(),
             InstitutionResource::class => [
                 'type' => InstitutionType::Masjid->value,
                 'is_active' => true,
                 'address' => [
-                    'country_id' => 132,
+                    'country_id' => $defaultCountryId,
                 ],
                 'clear_logo' => false,
                 'clear_cover' => false,
@@ -285,6 +322,7 @@ class AdminResourceMutationService
                 'is_freelance' => false,
                 'is_active' => true,
                 'address' => [
+                    'country_id' => $defaultCountryId,
                     'state_id' => null,
                     'district_id' => null,
                     'subdistrict_id' => null,
@@ -330,7 +368,6 @@ class AdminResourceMutationService
         if ($record instanceof Speaker) {
             if (is_array($defaults['address'] ?? null)) {
                 unset(
-                    $defaults['address']['country_id'],
                     $defaults['address']['line1'],
                     $defaults['address']['line2'],
                     $defaults['address']['postcode'],
@@ -395,6 +432,9 @@ class AdminResourceMutationService
             $this->field('status', 'string', required: true, allowedValues: ['unverified', 'pending', 'verified', 'rejected']),
             $this->field('is_active', 'boolean', required: false, default: true),
             $this->field('address', 'object', required: true),
+            $this->field('address.country_id', 'integer', required: false, default: SharedFormSchema::preferredPublicCountryId()),
+            $this->field('address.country_code', 'string', required: false),
+            $this->field('address.country_key', 'string', required: false),
             $this->field('contacts', 'array<object>', required: false),
             $this->field('social_media', 'array<object>', required: false),
             $this->field('logo', 'file', required: false),
@@ -431,6 +471,9 @@ class AdminResourceMutationService
             $this->field('status', 'string', required: true, allowedValues: ['pending', 'verified', 'rejected']),
             $this->field('is_active', 'boolean', required: false, default: true),
             $this->field('address', 'object', required: true),
+            $this->field('address.country_id', 'integer', required: false, default: SharedFormSchema::preferredPublicCountryId()),
+            $this->field('address.country_code', 'string', required: false),
+            $this->field('address.country_key', 'string', required: false),
             $this->field('contacts', 'array<object>', required: false),
             $this->field('social_media', 'array<object>', required: false),
             $this->field('avatar', 'file', required: false),
@@ -607,7 +650,9 @@ class AdminResourceMutationService
             'is_active' => ['sometimes', 'boolean'],
             'allow_public_event_submission' => $updating ? ['sometimes', 'boolean'] : ['prohibited'],
             'address' => $addressRule,
-            'address.country_id' => [$updating ? 'sometimes' : 'required', 'integer', 'exists:countries,id'],
+            'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
+            'address.country_code' => ['nullable', 'string', 'size:2'],
+            'address.country_key' => ['nullable', 'string', 'max:255'],
             'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
             'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
             'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
@@ -767,7 +812,9 @@ class AdminResourceMutationService
             'is_active' => ['sometimes', 'boolean'],
             'allow_public_event_submission' => $updating ? ['sometimes', 'boolean'] : ['prohibited'],
             'address' => $addressRule,
-            'address.country_id' => ['prohibited'],
+            'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
+            'address.country_code' => ['nullable', 'string', 'size:2'],
+            'address.country_key' => ['nullable', 'string', 'max:255'],
             'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
             'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
             'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
@@ -910,46 +957,6 @@ class AdminResourceMutationService
                 ],
             ),
         ];
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function speakerAddressCatalogs(string $prefix, int $countryId): array
-    {
-        return [
-            $this->catalog(
-                $prefix.'.state_id',
-                route('api.admin.catalogs.states', [], false),
-                ['country_id' => (string) $countryId],
-            ),
-            $this->catalog(
-                $prefix.'.district_id',
-                route('api.admin.catalogs.districts', [], false),
-                ['state_id' => '{'.$prefix.'.state_id}'],
-            ),
-            $this->catalog(
-                $prefix.'.subdistrict_id',
-                route('api.admin.catalogs.subdistricts', [], false),
-                [
-                    'state_id' => '{'.$prefix.'.state_id}',
-                    'district_id' => '{'.$prefix.'.district_id}',
-                ],
-            ),
-        ];
-    }
-
-    private function speakerCatalogCountryId(?Speaker $speaker): int
-    {
-        if ($speaker instanceof Speaker) {
-            $speaker->loadMissing('address');
-
-            if (is_int($speaker->addressModel?->country_id)) {
-                return (int) $speaker->addressModel->country_id;
-            }
-        }
-
-        return app(PreferredCountryResolver::class)->resolveId();
     }
 
     /**

@@ -33,7 +33,8 @@ it('registers an api user and returns a bearer token', function () {
     $this->withToken($token)
         ->getJson('/api/v1/user')
         ->assertOk()
-        ->assertJsonPath('email', 'mobile@example.test');
+        ->assertJsonPath('data.email', 'mobile@example.test')
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
 it('logs in an api user with phone credentials and returns a bearer token', function () {
@@ -65,7 +66,9 @@ it('rejects invalid api login credentials', function () {
         'password' => 'wrong-password',
         'device_name' => 'Pixel 9',
     ])->assertUnprocessable()
-        ->assertJsonValidationErrors(['login']);
+        ->assertJsonValidationErrors(['login'])
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
 it('logs in through google api token exchange and returns a bearer token', function () {
@@ -144,7 +147,8 @@ it('rejects google api token exchange when the provider is not configured', func
         'access_token' => 'google-access-token',
         'device_name' => 'iPhone 16',
     ])->assertUnprocessable()
-        ->assertJsonValidationErrors(['provider']);
+        ->assertJsonValidationErrors(['provider'])
+        ->assertJsonPath('error.code', 'validation_error');
 });
 
 it('rejects invalid google api access tokens', function () {
@@ -158,7 +162,8 @@ it('rejects invalid google api access tokens', function () {
         'access_token' => 'bad-google-access-token',
         'device_name' => 'Pixel 10',
     ])->assertUnprocessable()
-        ->assertJsonValidationErrors(['access_token']);
+        ->assertJsonValidationErrors(['access_token'])
+        ->assertJsonPath('error.code', 'validation_error');
 });
 
 it('revokes the current api token on logout', function () {

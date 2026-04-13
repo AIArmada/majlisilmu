@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
+use App\Support\ApiDocumentation\ApiExceptionToResponseExtension;
+use App\Support\ApiDocumentation\PublicDirectorySchemasTransformer;
 use App\Support\ApiDocumentation\ReconnectCachedDatabaseConnections;
 use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
@@ -16,6 +18,7 @@ class ApiDocumentationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Scramble::ignoreDefaultRoutes();
+        Scramble::registerExtension(ApiExceptionToResponseExtension::class);
 
         $apiDomain = app(ApiDocumentationUrlResolver::class)->apiDomain();
         $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');
@@ -35,6 +38,7 @@ class ApiDocumentationServiceProvider extends ServiceProvider
 
             return Scramble::configure()
                 ->useConfig($config)
+                ->withDocumentTransformers(PublicDirectorySchemasTransformer::class)
                 ->routes(static fn (IlluminateRoute $route): bool => $apiPath === '' || Str::startsWith($route->uri(), $apiPath));
         };
 

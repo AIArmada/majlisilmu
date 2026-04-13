@@ -39,6 +39,19 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     FederalTerritoryLocation::flushStateIdCache();
+
+    Country::query()->firstOrCreate(
+        ['id' => 132],
+        [
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ],
+    );
 });
 
 it('creates an address when only a google maps url is provided', function () {
@@ -46,6 +59,7 @@ it('creates an address when only a google maps url is provided', function () {
     $institution->address()->delete();
 
     SharedFormSchema::createAddressFromData($institution, [
+        'country_id' => 132,
         'google_maps_url' => 'https://www.google.com/maps/@3.139003,101.686855,17z',
     ]);
 
@@ -62,6 +76,7 @@ it('preserves explicit google place metadata when creating an address from form 
     $institution->address()->delete();
 
     SharedFormSchema::createAddressFromData($institution, [
+        'country_id' => 132,
         'line1' => 'Persiaran Masjid',
         'google_maps_url' => 'https://www.google.com/maps/place/?q=place_id:place_123',
         'google_place_id' => 'place_123',
@@ -85,6 +100,7 @@ it('preserves raw google maps urls without enrichment when normalization is disa
     Http::fake();
 
     SharedFormSchema::createAddressFromData($institution, [
+        'country_id' => 132,
         'google_maps_url' => 'https://maps.app.goo.gl/KWFQuuxAmSK3kRFM8',
         'google_maps_normalization_enabled' => false,
     ]);
@@ -124,6 +140,7 @@ it('still canonicalizes google maps urls locally when remote lookup is disabled'
     ]);
 
     SharedFormSchema::createAddressFromData($institution, [
+        'country_id' => 132,
         'google_maps_url' => 'https://maps.app.goo.gl/KWFQuuxAmSK3kRFM8',
         'google_maps_remote_lookup_enabled' => false,
     ]);
@@ -689,6 +706,7 @@ it('stores description and contacts when creating an institution via quick-creat
         'name' => 'Masjid Quick Create',
         'nickname' => 'Masjid QC',
         'type' => 'masjid',
+        'country_id' => 132,
         'description' => '<p>Institusi komuniti yang aktif.</p>',
         'contacts' => [[
             'category' => 'phone',
@@ -851,6 +869,7 @@ it('stores nested institution quick-create address data when picker mode is used
         'name' => 'Masjid Event Quick Create',
         'type' => 'masjid',
         'address' => [
+            'country_id' => 132,
             'google_maps_url' => 'https://maps.app.goo.gl/KWFQuuxAmSK3kRFM8',
             'google_maps_remote_lookup_enabled' => false,
         ],
@@ -882,6 +901,7 @@ it('stores nested venue quick-create address data when picker mode is used', fun
         'name' => 'Dewan Event Quick Create',
         'type' => 'dewan',
         'address' => [
+            'country_id' => 132,
             'google_maps_url' => 'https://maps.app.goo.gl/KWFQuuxAmSK3kRFM8',
             'google_maps_remote_lookup_enabled' => false,
         ],
@@ -1172,7 +1192,7 @@ it('keeps the institution contribution country field hidden while still storing 
     expect($components->get('country_id'))->toBeInstanceOf(Hidden::class);
 });
 
-it('uses a reduced region-only address contract across speaker create and contribution forms', function () {
+it('uses a reduced country-plus-region address contract across speaker create and contribution forms', function () {
     $flatten = function (array $components) use (&$flatten): array {
         $flattened = [];
 
@@ -1224,7 +1244,7 @@ it('uses a reduced region-only address contract across speaker create and contri
         expect($contributionComponents->has($field))->toBeTrue();
     }
 
-    foreach (['state_id', 'district_id', 'subdistrict_id'] as $field) {
+    foreach (['country_id', 'state_id', 'district_id', 'subdistrict_id'] as $field) {
         expect($quickCreateComponents->has($field))->toBeTrue();
         expect($contributionComponents->has($field))->toBeTrue();
     }
@@ -1246,6 +1266,7 @@ it('stores structured speaker quick-create details when creating a speaker via q
     $speakerId = SpeakerFormSchema::createOptionUsing([
         'name' => 'Ustaz Quick Create',
         'gender' => 'male',
+        'country_id' => 132,
         'bio' => ['type' => 'doc', 'content' => []],
         'qualifications' => [[
             'institution' => 'Universiti Islam',

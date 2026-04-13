@@ -3,9 +3,8 @@
 namespace App\Actions\Speakers;
 
 use App\Actions\Slugs\SyncSlugRedirectAction;
-use App\Models\Country;
 use App\Models\Speaker;
-use App\Support\Location\PreferredCountryResolver;
+use App\Support\Location\PublicCountryRegistry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -189,24 +188,27 @@ class GenerateSpeakerSlugAction
      */
     private function countrySuffix(array $payload): string
     {
+        $registry = app(PublicCountryRegistry::class);
         $countryCode = $this->resolveCountryCode($payload);
-        $countryId = $this->integerValue($payload['country_id'] ?? null);
+        $countryId = $registry->resolveCountryId(
+            $payload['country_id'] ?? null,
+            $countryCode,
+            $payload['country_key'] ?? null,
+        );
 
         if (($countryCode === null || $countryId === null) && is_array($payload['address'] ?? null)) {
             /** @var array<string, mixed> $address */
             $address = $payload['address'];
             $countryCode ??= $this->resolveCountryCode($address);
-            $countryId ??= $this->integerValue($address['country_id'] ?? null);
-        }
-
-        if ($countryId === null) {
-            $countryId = app(PreferredCountryResolver::class)->resolveId();
+            $countryId ??= $registry->resolveCountryId(
+                $address['country_id'] ?? null,
+                $countryCode,
+                $address['country_key'] ?? null,
+            );
         }
 
         if ($countryCode === null && $countryId !== null) {
-            $countryCode = Country::query()
-                ->whereKey($countryId)
-                ->value('iso2');
+            $countryCode = $registry->countryDataForId($countryId)['iso2'] ?? null;
         }
 
         return $this->countryCodeSegment($countryCode) ?? '';
@@ -285,26 +287,5 @@ class GenerateSpeakerSlugAction
         $segment = Str::lower(trim($value));
 
         return $segment !== '' ? $segment : null;
-    }
-
-    private function integerValue(mixed $value): ?int
-    {
-        if (is_int($value)) {
-            return $value > 0 ? $value : null;
-        }
-
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $trimmed = trim($value);
-
-        if ($trimmed === '' || ! ctype_digit($trimmed)) {
-            return null;
-        }
-
-        $integer = (int) $trimmed;
-
-        return $integer > 0 ? $integer : null;
     }
 }
