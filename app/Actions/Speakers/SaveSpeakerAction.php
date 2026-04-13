@@ -4,6 +4,7 @@ namespace App\Actions\Speakers;
 
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\Gender;
+use App\Forms\SharedFormSchema;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ContributionEntityMutationService;
@@ -37,6 +38,27 @@ final readonly class SaveSpeakerAction
         $speaker ??= new Speaker;
 
         $address = is_array($data['address'] ?? null) ? $data['address'] : [];
+        $addressProvided = array_key_exists('address', $data) && is_array($data['address'] ?? null);
+
+        if ($addressProvided) {
+            $countryProvided = SharedFormSchema::countrySelectionProvided($address);
+            $address = SharedFormSchema::prepareAddressPersistenceData($address);
+
+            if (! $countryProvided) {
+                throw ValidationException::withMessages([
+                    'address.country_id' => __('The address country is required.'),
+                ]);
+            }
+
+            if (! is_int($address['country_id'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'address.country_id' => __('The selected country is invalid.'),
+                ]);
+            }
+
+            $data['address'] = $address;
+        }
+
         $currentPublicSubmission = $creating ? true : (bool) $speaker->allow_public_event_submission;
         $requestedPublicSubmission = $creating
             ? true

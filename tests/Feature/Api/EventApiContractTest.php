@@ -54,7 +54,10 @@ it('lists only active public visible statuses (approved, pending, cancelled)', f
 
     $response = $this->getJson(route('api.events.index'));
 
-    $response->assertOk();
+    $response->assertOk()
+        ->assertJsonPath('total', 3)
+        ->assertJsonPath('meta.pagination.total', 3)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $eventIds = collect($response->json('data'))->pluck('id')->all();
 
@@ -325,5 +328,6 @@ it('includes key person data in the event api response', function () {
 
     $response->assertOk()
         ->assertJsonPath('data.key_people.0.role', EventKeyPersonRole::Imam->value)
-        ->assertJsonPath('data.key_people.0.speaker.id', $imamSpeaker->id);
+        ->assertJsonPath('data.key_people.0.speaker.id', $imamSpeaker->id)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });

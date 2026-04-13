@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationCatalog;
+use DateTimeImmutable;
 use DateTimeZone;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -42,6 +43,8 @@ class AccountSettings extends Component implements HasForms
      *     email: string,
      *     phone: string,
      *     timezone: string,
+     *     password: string,
+     *     password_confirmation: string,
      *     daily_prayer_institution_id: string,
      *     friday_prayer_institution_id: string
      * }
@@ -51,6 +54,8 @@ class AccountSettings extends Component implements HasForms
         'email' => '',
         'phone' => '',
         'timezone' => '',
+        'password' => '',
+        'password_confirmation' => '',
         'daily_prayer_institution_id' => '',
         'friday_prayer_institution_id' => '',
     ];
@@ -140,7 +145,7 @@ class AccountSettings extends Component implements HasForms
     public function timezoneOptions(): array
     {
         return collect(DateTimeZone::listIdentifiers())
-            ->mapWithKeys(fn (string $timezone): array => [$timezone => $timezone])
+            ->mapWithKeys(fn (string $timezone): array => [$timezone => $this->timezoneLabel($timezone)])
             ->all();
     }
 
@@ -196,6 +201,19 @@ class AccountSettings extends Component implements HasForms
                             ->columnSpanFull()
                             ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalString($state))
                             ->rule(Rule::in($this->allowedTimezones())),
+                        TextInput::make('password')
+                            ->label(__('New Password'))
+                            ->password()
+                            ->confirmed()
+                            ->rules(['nullable', 'min:8'])
+                            ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalPassword($state))
+                            ->maxLength(255),
+                        TextInput::make('password_confirmation')
+                            ->label(__('Confirm Password'))
+                            ->password()
+                            ->rules(['nullable'])
+                            ->mutateStateForValidationUsing(fn (mixed $state): ?string => $this->normalizeOptionalPassword($state))
+                            ->maxLength(255),
                     ]),
                 Section::make(__('Prayer Institutions'))
                     ->description(__('Save the institutions you usually attend for daily prayers and Friday prayers. Friday can be the same as your daily institution.'))
@@ -234,6 +252,7 @@ class AccountSettings extends Component implements HasForms
         $normalizedEmail = $this->normalizeOptionalString($validated['email'] ?? null);
         $normalizedPhone = $this->normalizeOptionalPhone($validated['phone'] ?? null);
         $normalizedTimezone = $this->normalizeOptionalString($validated['timezone'] ?? null);
+        $normalizedPassword = $this->normalizeOptionalPassword($validated['password'] ?? null);
         $dailyPrayerInstitutionId = $this->normalizeOptionalString($validated['daily_prayer_institution_id'] ?? null);
         $fridayPrayerInstitutionId = $this->normalizeOptionalString($validated['friday_prayer_institution_id'] ?? null);
 
@@ -251,7 +270,7 @@ class AccountSettings extends Component implements HasForms
             'formData.friday_prayer_institution_id',
         );
 
-        $user->forceFill([
+        $forceFill = [
             'name' => $normalizedName,
             'email' => $normalizedEmail,
             'phone' => $normalizedPhone,
@@ -260,7 +279,13 @@ class AccountSettings extends Component implements HasForms
             'friday_prayer_institution_id' => $fridayPrayerInstitutionId,
             'email_verified_at' => $emailChanged ? null : $user->email_verified_at,
             'phone_verified_at' => $phoneChanged ? null : $user->phone_verified_at,
-        ])->save();
+        ];
+
+        if ($normalizedPassword !== null) {
+            $forceFill['password'] = $normalizedPassword;
+        }
+
+        $user->forceFill($forceFill)->save();
 
         $this->accountSettingsForm()->fill($this->initialFormData($user));
 
@@ -361,6 +386,8 @@ class AccountSettings extends Component implements HasForms
      *     email: string,
      *     phone: string,
      *     timezone: string,
+     *     password: string,
+     *     password_confirmation: string,
      *     daily_prayer_institution_id: string,
      *     friday_prayer_institution_id: string
      * }
@@ -372,6 +399,8 @@ class AccountSettings extends Component implements HasForms
             'email' => (string) ($user->email ?? ''),
             'phone' => (string) ($user->phone ?? ''),
             'timezone' => (string) ($user->timezone ?? ''),
+            'password' => '',
+            'password_confirmation' => '',
             'daily_prayer_institution_id' => (string) ($user->daily_prayer_institution_id ?? ''),
             'friday_prayer_institution_id' => (string) ($user->friday_prayer_institution_id ?? ''),
         ];
@@ -459,6 +488,38 @@ class AccountSettings extends Component implements HasForms
     protected function normalizeOptionalPhone(mixed $value): ?string
     {
         return $this->normalizeOptionalString($value);
+    }
+
+    protected function normalizeOptionalPassword(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return $value;
+    }
+
+    protected function timezoneLabel(string $timezone): string
+    {
+        return sprintf('%s (%s)', $timezone, $this->timezoneOffsetLabel($timezone));
+    }
+
+    protected function timezoneOffsetLabel(string $timezone): string
+    {
+        $offsetSeconds = (new DateTimeZone($timezone))->getOffset(new DateTimeImmutable);
+
+        if ($offsetSeconds === 0) {
+            return 'GMT';
+        }
+
+        $sign = $offsetSeconds < 0 ? '-' : '+';
+        $absoluteOffset = abs($offsetSeconds);
+        $hours = intdiv($absoluteOffset, 3600);
+        $minutes = intdiv($absoluteOffset % 3600, 60);
+
+        return $minutes === 0
+            ? sprintf('GMT%s%d', $sign, $hours)
+            : sprintf('GMT%s%d:%02d', $sign, $hours, $minutes);
     }
 
     protected function normalizeTab(string $tab): string

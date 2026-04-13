@@ -152,6 +152,12 @@ class AdminResourceService
             $this->mutationService->rules($resourceClass),
         )->validate();
 
+        if (is_array($payload['address'] ?? null) && ! array_key_exists('address', $validated)) {
+            $validated['address'] = $payload['address'];
+        }
+
+        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated);
+
         $record = $this->mutationService->store($resourceClass, $validated, $actor);
 
         return [
@@ -179,6 +185,12 @@ class AdminResourceService
             $payload,
             $this->mutationService->rules($resourceClass, updating: true),
         )->validate();
+
+        if (is_array($payload['address'] ?? null) && ! array_key_exists('address', $validated)) {
+            $validated['address'] = $payload['address'];
+        }
+
+        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated);
 
         $record = $this->mutationService->update($resourceClass, $record, $validated, $actor);
 

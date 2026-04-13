@@ -23,6 +23,7 @@ it('allows an authenticated user to mark going for an event', function () {
     $response = $this->postJson(route('api.events.going.store', $this->event));
 
     $response->assertCreated()
+        ->assertJsonPath('message', 'Going recorded successfully.')
         ->assertJsonPath('data.message', 'Going recorded successfully.')
         ->assertJsonPath('data.going_count', 1);
 
@@ -71,6 +72,7 @@ it('allows an authenticated user to remove a going record', function () {
 
     $this->deleteJson(route('api.events.going.destroy', $this->event))
         ->assertOk()
+        ->assertJsonPath('message', 'Going removed successfully.')
         ->assertJsonPath('data.message', 'Going removed successfully.')
         ->assertJsonPath('data.going_count', 0);
 

@@ -1,0 +1,3 @@
+Note: Using configuration file /Users/Saiffil/Herd/majlisilmu/phpstan.neon.
+/Users/Saiffil/Herd/majlisilmu/app/Services/ContributionEntityMutationService.php:1037:Ternary operator condition is always true.
+/Users/Saiffil/Herd/majlisilmu/app/Support/ApiDocumentation/PublicDirectorySchemasTransformer.php:22:Method App\Support\ApiDocumentation\PublicDirectorySchemasTransformer::handle() has no return type specified.

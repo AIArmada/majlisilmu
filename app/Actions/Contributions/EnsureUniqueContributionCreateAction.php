@@ -4,6 +4,7 @@ namespace App\Actions\Contributions;
 
 use App\Enums\ContributionSubjectType;
 use App\Enums\PostNominal;
+use App\Forms\SharedFormSchema;
 use App\Models\Institution;
 use App\Models\Speaker;
 use BackedEnum;
@@ -39,7 +40,7 @@ final readonly class EnsureUniqueContributionCreateAction
 
         throw ValidationException::withMessages([
             $this->validationKey('name', $validationKeyPrefix) => __(
-                'An institution with the same name, state, district, and subdistrict already exists. Please submit an update instead of creating a new record.'
+                'An institution with the same name and locality already exists in the same country. Please submit an update instead of creating a new record.'
             ),
         ]);
     }
@@ -55,7 +56,7 @@ final readonly class EnsureUniqueContributionCreateAction
 
         throw ValidationException::withMessages([
             $this->validationKey('name', $validationKeyPrefix) => __(
-                'A speaker with the same name, gender, honorifics, pre-nominals, and post-nominals already exists. Please submit an update instead of creating a new record.'
+                'A speaker with the same name, gender, title set, and country already exists. Please submit an update instead of creating a new record.'
             ),
         ]);
     }
@@ -71,15 +72,19 @@ final readonly class EnsureUniqueContributionCreateAction
             return false;
         }
 
-        $address = is_array($state['address'] ?? null) ? $state['address'] : [];
+        $address = is_array($state['address'] ?? null)
+            ? SharedFormSchema::prepareAddressPersistenceData($state['address'])
+            : [];
 
+        $countryId = $this->normalizeNullableInteger($address['country_id'] ?? null);
         $stateId = $this->normalizeNullableInteger($address['state_id'] ?? null);
         $districtId = $this->normalizeNullableInteger($address['district_id'] ?? null);
         $subdistrictId = $this->normalizeNullableInteger($address['subdistrict_id'] ?? null);
 
         return Institution::query()
             ->whereIn('status', ['verified', 'pending'])
-            ->whereHas('address', function (Builder $query) use ($stateId, $districtId, $subdistrictId): void {
+            ->whereHas('address', function (Builder $query) use ($countryId, $stateId, $districtId, $subdistrictId): void {
+                $this->applyNullableIntegerMatch($query, 'country_id', $countryId);
                 $this->applyNullableIntegerMatch($query, 'state_id', $stateId);
                 $this->applyNullableIntegerMatch($query, 'district_id', $districtId);
                 $this->applyNullableIntegerMatch($query, 'subdistrict_id', $subdistrictId);
@@ -100,6 +105,15 @@ final readonly class EnsureUniqueContributionCreateAction
             return false;
         }
 
+        $address = is_array($state['address'] ?? null)
+            ? SharedFormSchema::prepareAddressPersistenceData($state['address'])
+            : [];
+        $countryId = $this->normalizeNullableInteger($address['country_id'] ?? null);
+
+        if ($countryId === null) {
+            return false;
+        }
+
         $honorific = $this->normalizeStringSet($state['honorific'] ?? []);
         $preNominal = $this->normalizeStringSet($state['pre_nominal'] ?? []);
         $postNominal = $this->effectivePostNominalSet($state);
@@ -107,6 +121,7 @@ final readonly class EnsureUniqueContributionCreateAction
         return Speaker::query()
             ->whereIn('status', ['verified', 'pending'])
             ->where('gender', $gender)
+            ->whereHas('address', fn (Builder $query): Builder => $query->where('country_id', $countryId))
             ->get(['name', 'gender', 'honorific', 'pre_nominal', 'post_nominal'])
             ->contains(fn (Speaker $speaker): bool => $this->normalizeComparableString($speaker->name) === $name
                 && $this->normalizeComparableString($speaker->gender) === $gender

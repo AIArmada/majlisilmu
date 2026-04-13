@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use App\Support\Submission\EntitySubmissionAccess;
@@ -30,19 +31,22 @@ class FrontendCatalogService
     public function __construct(
         private readonly InstitutionSearchService $institutionSearchService,
         private readonly SpeakerSearchService $speakerSearchService,
+        private readonly PublicCountryRegistry $publicCountryRegistry,
     ) {}
 
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, iso2: string, key: ?string}>
      */
     public function countries(): array
     {
         return Country::query()
             ->orderBy('name')
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'iso2'])
             ->map(fn (Country $country): array => [
                 'id' => (int) $country->id,
                 'label' => (string) $country->name,
+                'iso2' => strtoupper((string) $country->iso2),
+                'key' => $this->publicCountryRegistry->keyForCountryId((int) $country->id),
             ])
             ->all();
     }

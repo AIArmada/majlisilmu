@@ -12,6 +12,7 @@ use App\Enums\EventVisibility;
 use App\Enums\InspirationCategory;
 use App\Http\Controllers\Api\Frontend\SearchController;
 use App\Models\ContributionRequest;
+use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
@@ -86,6 +87,8 @@ function ensureFrontendApiMalaysiaCountryExists(): int
 }
 
 it('exposes corrected frontend contract metadata', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
     $manifest = $this->getJson(route('api.client.manifest'))
         ->assertOk()
         ->json('data');
@@ -103,10 +106,11 @@ it('exposes corrected frontend contract metadata', function () {
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
-        ->and($submitEventFields)->toContain('submission_country_id')
+        ->and($submitEventFields)->toContain('submission_country_id', 'submission_country_code', 'submission_country_key')
         ->not->toContain('timezone')
         ->and($submitEventConditionalRules->pluck('field')->all())->not->toContain('live_url')
-        ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])->toContain(132)
+        ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])
+        ->toContain(data_get($submitEvent, 'defaults.submission_country_id'))
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'notes')['max_length'])->toBe(1000)
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'captcha_token')['required'])->toBeFalse()
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'submitter_email')['required'])->toBeFalse()
@@ -121,8 +125,7 @@ it('exposes corrected frontend contract metadata', function () {
         ->json('data');
     $speakerFields = collect($speakerContract['fields'] ?? [])->pluck('name')->all();
 
-    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'qualifications', 'institution_id', 'institution_position')
-        ->not->toContain('address.country_id')
+    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'address.country_id', 'address.country_code', 'address.country_key', 'qualifications', 'institution_id', 'institution_position')
         ->not->toContain('address.line1')
         ->not->toContain('address.google_maps_url')
         ->not->toContain('position')
@@ -515,6 +518,7 @@ it('returns only region address keys in the speaker suggest context state', func
     ]))->assertOk();
 
     expect($response->json('data.initial_state.address'))->toBe([
+        'country_id' => $countryId,
         'state_id' => (int) $state->id,
         'district_id' => (int) $district->id,
         'subdistrict_id' => null,
@@ -559,17 +563,20 @@ it('treats unchanged speaker region-only address round trips as no-op updates', 
         'subject' => $speaker->slug,
     ]), [
         'address' => [
+            'country_id' => $countryId,
             'state_id' => (int) $state->id,
             'district_id' => (int) $district->id,
             'subdistrict_id' => null,
         ],
-    ])->assertUnprocessable()
-        ->assertJsonValidationErrors(['data']);
+    ])->assertOk();
 
     $speaker = $speaker->fresh('address');
+    $expectedGoogleMapsUrl = app(NormalizeGoogleMapsInputAction::class)->handle([
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+    ])['google_maps_url'];
 
     expect($speaker?->addressModel?->line1)->toBe('Alamat Warisan')
-        ->and($speaker?->addressModel?->google_maps_url)->toBe('https://maps.google.com/?q=3.1390,101.6869');
+        ->and($speaker?->addressModel?->google_maps_url)->toBe($expectedGoogleMapsUrl);
 });
 
 it('preserves hidden speaker address details during region-only direct updates', function () {
@@ -619,6 +626,7 @@ it('preserves hidden speaker address details during region-only direct updates',
     ]), [
         'name' => 'Penceramah Dikemas Kini API',
         'address' => [
+            'country_id' => $countryId,
             'state_id' => (int) $state->id,
             'district_id' => (int) $updatedDistrict->id,
             'subdistrict_id' => null,
@@ -767,6 +775,9 @@ it('maps public event organizer values back to persistence classes during direct
         'is_active' => true,
         'organizer_type' => Institution::class,
         'organizer_id' => $institution->getKey(),
+        'starts_at' => now()->setTimezone('Asia/Kuala_Lumpur')->startOfDay()->addHours(10)->utc(),
+        'ends_at' => now()->setTimezone('Asia/Kuala_Lumpur')->startOfDay()->addHours(12)->utc(),
+        'timezone' => 'Asia/Kuala_Lumpur',
         'live_url' => 'https://live.example.test/watch',
         'event_type' => ['kuliah_ceramah'],
         'gender' => 'all',
@@ -1193,6 +1204,7 @@ it('uses the inferred preferred country for submit-event contract defaults', fun
 
 it('creates institution contribution requests through the frontend api', function () {
     $user = User::factory()->create();
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
     Sanctum::actingAs($user);
 
     $this->postJson(route('api.client.contributions.institutions.store'), [
@@ -1201,7 +1213,7 @@ it('creates institution contribution requests through the frontend api', functio
         'nickname' => 'API',
         'description' => '<p>Institution description</p>',
         'address' => [
-            'country_id' => 132,
+            'country_id' => $countryId,
             'google_maps_url' => 'https://maps.google.com/?q=masjid+api',
         ],
     ])
@@ -1216,7 +1228,7 @@ it('creates institution contribution requests through the frontend api', functio
         ->and(ContributionRequest::query()->where('entity_id', $institution->getKey())->exists())->toBeTrue();
 });
 
-it('creates speaker contribution requests through the frontend api using the inferred country scope', function () {
+it('creates speaker contribution requests through the frontend api with an explicit country alias', function () {
     $user = User::factory()->create();
 
     config()->set('public-countries.countries.singapore.enabled', true);
@@ -1241,6 +1253,7 @@ it('creates speaker contribution requests through the frontend api using the inf
             'name' => 'Frontend API Scoped Country Speaker',
             'gender' => 'male',
             'address' => [
+                'country_code' => 'SG',
                 'state_id' => null,
             ],
         ])->assertCreated()
@@ -1256,10 +1269,19 @@ it('creates speaker contribution requests through the frontend api using the inf
         ->and(ContributionRequest::query()->where('entity_id', $speaker->getKey())->exists())->toBeTrue();
 });
 
-it('prohibits country and detailed address fields when creating speakers through the frontend api', function () {
+it('requires explicit country and still prohibits detailed address fields when creating speakers through the frontend api', function () {
     $user = User::factory()->create();
 
     Sanctum::actingAs($user);
+
+    $this->postJson(route('api.client.contributions.speakers.store'), [
+        'name' => 'Frontend API Missing Speaker Country',
+        'gender' => 'male',
+        'address' => [
+            'state_id' => null,
+        ],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['address.country_id']);
 
     $this->postJson(route('api.client.contributions.speakers.store'), [
         'name' => 'Frontend API Invalid Speaker Address',
@@ -1271,7 +1293,6 @@ it('prohibits country and detailed address fields when creating speakers through
         ],
     ])->assertUnprocessable()
         ->assertJsonValidationErrors([
-            'address.country_id',
             'address.line1',
             'address.google_maps_url',
         ]);
@@ -1293,6 +1314,38 @@ it('returns profile-quality speaker avatar urls from the frontend search api', f
     $this->getJson(route('api.client.speakers.index', ['search' => 'kazim']))
         ->assertOk()
         ->assertJsonPath('data.0.avatar_url', $speaker->public_avatar_url);
+});
+
+it('exposes explicit country data and country filters on frontend institution and speaker reads', function () {
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+
+    $institution = Institution::factory()->create([
+        'name' => 'Country Filter Institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $institution->address()->update([
+        'country_id' => $countryId,
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Country Filter Speaker',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker->address()->update([
+        'country_id' => $countryId,
+    ]);
+
+    $this->getJson(route('api.client.institutions.index', ['country_code' => 'MY', 'search' => 'Country Filter Institution']))
+        ->assertOk()
+        ->assertJsonPath('data.0.country.iso2', 'MY')
+        ->assertJsonPath('data.0.country.key', 'malaysia');
+
+    $this->getJson(route('api.client.speakers.index', ['country_key' => 'malaysia', 'search' => 'Country Filter Speaker']))
+        ->assertOk()
+        ->assertJsonPath('data.0.country.iso2', 'MY')
+        ->assertJsonPath('data.0.country.key', 'malaysia');
 });
 
 it('returns authenticated follow state in the frontend speaker api', function () {
@@ -1360,6 +1413,75 @@ it('bumps the speaker directory cache version when speaker media changes', funct
 
     expect($updatedVersion)->toBeString()->not->toBe('')
         ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
+it('bumps the speaker directory cache version when speaker addresses change', function () {
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Cache Address',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $speaker->address()->create([
+        'country_id' => $countryId,
+        'state_id' => null,
+        'district_id' => null,
+        'subdistrict_id' => null,
+    ]);
+
+    $updatedVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
+it('bumps public directory cache versions when country metadata changes', function () {
+    $countryId = ensureFrontendApiMalaysiaCountryExists();
+
+    $institution = Institution::factory()->create([
+        'name' => 'Institution Cache Country Metadata',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $institution->address()->updateOrCreate([], ['country_id' => $countryId]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Cache Country Metadata',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker->address()->updateOrCreate([], ['country_id' => $countryId]);
+
+    $initialInstitutionVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+    $initialSpeakerVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    Country::query()->whereKey($countryId)->update([
+        'name' => 'Malaysia Baru',
+    ]);
+
+    $updatedInstitutionVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+    $updatedSpeakerVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedInstitutionVersion)->toBeString()->not->toBe('')
+        ->and($updatedInstitutionVersion)->not->toBe($initialInstitutionVersion)
+        ->and($updatedSpeakerVersion)->toBeString()->not->toBe('')
+        ->and($updatedSpeakerVersion)->not->toBe($initialSpeakerVersion);
 });
 
 it('bumps the speaker directory cache version when speaker event participation changes', function () {
@@ -1709,7 +1831,7 @@ it('submits events with media through the frontend api', function () {
         ->and($event->getMedia('gallery'))->toHaveCount(1);
 });
 
-it('still accepts legacy timezone-only event submissions through the frontend api', function () {
+it('requires explicit country input for frontend event submissions and accepts aliases', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
         'status' => 'verified',
@@ -1725,7 +1847,7 @@ it('still accepts legacy timezone-only event submissions through the frontend ap
 
     Sanctum::actingAs($user);
 
-    $this->postJson(route('api.client.submit-event.store'), [
+    $payload = [
         'title' => 'Frontend API Legacy Timezone Event',
         'description' => 'API description',
         'event_type' => ['kuliah_ceramah'],
@@ -1741,8 +1863,15 @@ it('still accepts legacy timezone-only event submissions through the frontend ap
         'organizer_type' => 'institution',
         'organizer_institution_id' => $institution->getKey(),
         'speakers' => [$speaker->getKey()],
-        'timezone' => 'Asia/Kuala_Lumpur',
-    ])
+    ];
+
+    $this->postJson(route('api.client.submit-event.store'), $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['submission_country_id']);
+
+    $this->postJson(route('api.client.submit-event.store'), array_merge($payload, [
+        'submission_country_key' => 'malaysia',
+    ]))
         ->assertCreated()
         ->assertJsonPath('data.event.title', 'Frontend API Legacy Timezone Event');
 
@@ -2118,6 +2247,9 @@ it('mirrors the public speaker page payload for app clients', function () {
 
     expect($response->json('data.speaker.job_title'))->toBe('Penasihat Dakwah')
         ->and($response->json('data.speaker.is_freelance'))->toBeTrue()
+        ->and($response->json('data.speaker.address.country_id'))->toBe($countryId)
+        ->and($response->json('data.speaker.country.iso2'))->toBe('MY')
+        ->and($response->json('data.speaker.country.key'))->toBe('malaysia')
         ->and($response->json('data.speaker.location'))->toBe('Temerloh, Pahang')
         ->and($response->json('data.speaker.bio_text'))->toContain('Biodata speaker aplikasi ini panjang')
         ->and($response->json('data.speaker.bio_html'))->toContain('<p')

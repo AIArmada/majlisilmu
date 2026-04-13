@@ -38,6 +38,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class ContributionEntityMutationService
@@ -83,6 +84,9 @@ class ContributionEntityMutationService
                     $this->field('type', 'string', allowedValues: $this->enumValues(InstitutionType::class)),
                     $this->field('description', 'rich_text'),
                     $this->field('address', 'object'),
+                    $this->field('address.country_id', 'integer', catalog: route('api.client.catalogs.countries')),
+                    $this->field('address.country_code', 'string'),
+                    $this->field('address.country_key', 'string'),
                     $this->field('contacts', 'array<object>'),
                     $this->field('social_media', 'array<object>'),
                 ],
@@ -105,6 +109,9 @@ class ContributionEntityMutationService
                     $this->field('institution_id', 'uuid', catalog: route('api.client.catalogs.submit-institutions')),
                     $this->field('institution_position', 'string', maxLength: 255),
                     $this->field('address', 'object'),
+                    $this->field('address.country_id', 'integer', catalog: route('api.client.catalogs.countries')),
+                    $this->field('address.country_code', 'string'),
+                    $this->field('address.country_key', 'string'),
                     $this->field('contacts', 'array<object>'),
                     $this->field('social_media', 'array<object>'),
                 ],
@@ -191,6 +198,8 @@ class ContributionEntityMutationService
                 'description' => ['nullable'],
                 'address' => ['sometimes', 'array'],
                 'address.country_id' => ['sometimes', 'integer', 'exists:countries,id'],
+                'address.country_code' => ['nullable', 'string', 'size:2'],
+                'address.country_key' => ['nullable', 'string', 'max:255'],
                 'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
                 'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
                 'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
@@ -227,7 +236,9 @@ class ContributionEntityMutationService
                 'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
                 'institution_position' => ['nullable', 'string', 'max:255'],
                 'address' => ['sometimes', 'array'],
-                'address.country_id' => ['prohibited'],
+                'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
+                'address.country_code' => ['nullable', 'string', 'size:2'],
+                'address.country_key' => ['nullable', 'string', 'max:255'],
                 'address.state_id' => ['nullable', 'integer', 'exists:states,id'],
                 'address.district_id' => ['nullable', 'integer', 'exists:districts,id'],
                 'address.subdistrict_id' => ['nullable', 'integer', 'exists:subdistricts,id'],
@@ -664,7 +675,7 @@ class ContributionEntityMutationService
             'qualifications' => $this->normalizeQualificationEntries($speaker->qualifications ?? []),
             'language_ids' => $speaker->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all(),
             'institution_id' => $affiliatedInstitution?->getKey(),
-            'institution_position' => $affiliatedInstitution?->pivot?->position,
+            'institution_position' => $this->institutionPivotPosition($affiliatedInstitution),
             'address' => $this->addressState($speaker->addressModel),
             'contacts' => $this->contactsState($speaker->contacts),
             'social_media' => $this->socialMediaState($speaker->socialMedia),
@@ -805,10 +816,6 @@ class ContributionEntityMutationService
 
         if (is_array($addressPayload)) {
             $addressPayload = $this->preserveHiddenSpeakerAddressFields($speaker, $addressPayload);
-            $addressPayload['country_id'] = SharedFormSchema::normalizeLocationId($addressPayload['country_id'] ?? null)
-                ?? $speaker->address()->value('country_id')
-                ?? SharedFormSchema::preferredPublicCountryId();
-
             $this->syncAddress($speaker, $addressPayload, allowCountryOnly: true);
         }
 
@@ -856,7 +863,7 @@ class ContributionEntityMutationService
 
         $position = array_key_exists('institution_position', $payload)
             ? $this->normalizeOptionalString($payload['institution_position'])
-            : $this->normalizeOptionalString($currentAffiliation?->pivot?->position);
+            : $this->institutionPivotPosition($currentAffiliation);
 
         if ($currentAffiliation instanceof Institution && (string) $currentAffiliation->getKey() !== $institutionId) {
             $speaker->institutions()->detach($currentAffiliation->getKey());
@@ -894,6 +901,22 @@ class ContributionEntityMutationService
         $this->recordSpeakerAffiliationAudit($speaker, $beforeAffiliations);
     }
 
+    private static function institutionPivotPosition(?Institution $institution): ?string
+    {
+        if (! $institution instanceof Institution) {
+            return null;
+        }
+
+        $position = data_get($institution->getRelations(), 'pivot.position');
+
+        return is_string($position) && $position !== '' ? $position : null;
+    }
+
+    private static function institutionPivotIsPrimary(Institution $institution): bool
+    {
+        return (bool) data_get($institution->getRelations(), 'pivot.is_primary', false);
+    }
+
     private function currentSpeakerAffiliation(Speaker $speaker): ?Institution
     {
         /** @var Institution|null $institution */
@@ -918,10 +941,8 @@ class ContributionEntityMutationService
                 return [
                     'id' => (string) $institution->getKey(),
                     'name' => $institution->name,
-                    'position' => is_string($institution->pivot?->position) && $institution->pivot?->position !== ''
-                        ? $institution->pivot?->position
-                        : null,
-                    'is_primary' => (bool) $institution->pivot?->is_primary,
+                    'position' => self::institutionPivotPosition($institution),
+                    'is_primary' => self::institutionPivotIsPrimary($institution),
                 ];
             })
             ->values()
@@ -994,7 +1015,7 @@ class ContributionEntityMutationService
             $payload['google_maps_url'] ?? null,
             $payload['google_place_id'] ?? null,
             $payload['waze_url'] ?? null,
-            $allowCountryOnly ? ($payload['country_id'] ?? null) : null,
+            $allowCountryOnly ? ($payload['country_id'] ?? $payload['country_code'] ?? $payload['country_key'] ?? null) : null,
         ])->contains(fn (mixed $value): bool => filled($value));
 
         /** @var Address|null $existingAddress */
@@ -1006,11 +1027,27 @@ class ContributionEntityMutationService
             return;
         }
 
+        $countryProvided = SharedFormSchema::countrySelectionProvided($payload);
         $payload = SharedFormSchema::prepareAddressPersistenceData($payload);
+        $countryId = SharedFormSchema::normalizeLocationId($payload['country_id'] ?? null);
+
+        if ($countryId === null && ! $countryProvided) {
+            $countryId = is_numeric($existingAddress?->country_id)
+                ? (int) $existingAddress->country_id
+                : SharedFormSchema::preferredPublicCountryId();
+        }
+
+        if ($countryId === null) {
+            throw ValidationException::withMessages([
+                'address.country_id' => $countryProvided
+                    ? __('The selected country is invalid.')
+                    : __('The address country is required.'),
+            ]);
+        }
 
         $attributes = [
             'type' => 'main',
-            'country_id' => isset($payload['country_id']) ? (int) $payload['country_id'] : 132,
+            'country_id' => $countryId,
             'state_id' => isset($payload['state_id']) && $payload['state_id'] !== '' ? (int) $payload['state_id'] : null,
             'district_id' => isset($payload['district_id']) && $payload['district_id'] !== '' ? (int) $payload['district_id'] : null,
             'subdistrict_id' => isset($payload['subdistrict_id']) && $payload['subdistrict_id'] !== '' ? (int) $payload['subdistrict_id'] : null,
@@ -1089,7 +1126,7 @@ class ContributionEntityMutationService
             'google_place_id',
             'waze_url',
         ] as $field) {
-            if (! array_key_exists($field, $addressPayload)) {
+            if (! array_key_exists($field, $addressPayload) || $addressPayload[$field] === null) {
                 $addressPayload[$field] = $existingAddress->{$field};
             }
         }
@@ -1412,9 +1449,11 @@ class ContributionEntityMutationService
      */
     private function addressState(?Address $address): array
     {
+        $defaultCountryId = SharedFormSchema::preferredPublicCountryId();
+
         if (! $address instanceof Address) {
             return SharedFormSchema::hydrateAddressFormState([
-                'country_id' => 132,
+                'country_id' => $defaultCountryId,
                 'state_id' => null,
                 'district_id' => null,
                 'subdistrict_id' => null,
@@ -1430,7 +1469,7 @@ class ContributionEntityMutationService
         }
 
         return SharedFormSchema::hydrateAddressFormState([
-            'country_id' => $address->country_id ?? 132,
+            'country_id' => $address->country_id ?? $defaultCountryId,
             'state_id' => $address->state_id,
             'district_id' => $address->district_id,
             'subdistrict_id' => $address->subdistrict_id,
