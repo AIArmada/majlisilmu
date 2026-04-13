@@ -12,7 +12,7 @@ final readonly class SpeakerDirectoryResponse implements Arrayable
 {
     /**
      * @param  list<SpeakerListItem>  $data
-     * @param  array{pagination: array{page: int, per_page: int, total: int}, cache: array{version: string}, request_id: string}  $meta
+     * @param  array{pagination: array{page: int, per_page: int, total: int}, following: array{total: int}, cache: array{version: string}, request_id: string}  $meta
      */
     public function __construct(
         public array $data,
@@ -20,7 +20,7 @@ final readonly class SpeakerDirectoryResponse implements Arrayable
     ) {}
 
     /**
-     * @return array{data: list<SpeakerListItem>, meta: array{pagination: array{page: int, per_page: int, total: int}, cache: array{version: string}, request_id: string}}
+     * @return array{data: list<SpeakerListItem>, meta: array{pagination: array{page: int, per_page: int, total: int}, following: array{total: int}, cache: array{version: string}, request_id: string}}
      */
     public function toArray(): array
     {

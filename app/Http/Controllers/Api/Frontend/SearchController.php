@@ -159,6 +159,7 @@ class SearchController extends FrontendController
             ? $request->query('gender')
             : null;
         $sort = $request->query('sort') === 'upcoming' ? 'upcoming' : null;
+        $followingOnly = $request->boolean('following');
 
         $baseQuery = $this->baseSpeakerQuery($user);
 
@@ -170,6 +171,16 @@ class SearchController extends FrontendController
 
         if ($sort === 'upcoming') {
             $baseQuery->orderBy('events_count', 'desc');
+        }
+
+        $followedSpeakerQuery = clone $baseQuery;
+
+        $this->applySpeakerFollowingScope($followedSpeakerQuery, $user);
+
+        $followingTotal = $this->speakerDirectoryTotalWithBase($request, $search, $followedSpeakerQuery, $sort);
+
+        if ($followingOnly) {
+            $this->applySpeakerFollowingScope($baseQuery, $user);
         }
 
         $speakers = $search === null
@@ -184,6 +195,9 @@ class SearchController extends FrontendController
                     'page' => $speakers->currentPage(),
                     'per_page' => $speakers->perPage(),
                     'total' => $speakers->total(),
+                ],
+                'following' => [
+                    'total' => $followingTotal,
                 ],
                 'cache' => $speakerDirectoryCache,
             ],
@@ -1295,6 +1309,39 @@ class SearchController extends FrontendController
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  Builder<Speaker>  $base
+     */
+    private function speakerDirectoryTotalWithBase(Request $request, ?string $search, Builder $base, ?string $sort): int
+    {
+        if ($search === null) {
+            return (clone $base)->count();
+        }
+
+        return $this->speakerDirectorySearchPaginatorWithBase($request, $search, 1, $base, $sort)->total();
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     */
+    private function applySpeakerFollowingScope(Builder $query, ?User $user): void
+    {
+        if (! $user instanceof User) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereExists(function ($followingQuery) use ($user): void {
+            $followingQuery
+                ->selectRaw('1')
+                ->from('followings')
+                ->where('followings.user_id', $user->id)
+                ->where('followings.followable_type', (new Speaker)->getMorphClass())
+                ->whereColumn('followings.followable_id', 'speakers.id');
+        });
     }
 
     /**
