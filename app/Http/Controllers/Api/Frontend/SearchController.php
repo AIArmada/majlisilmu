@@ -1028,7 +1028,7 @@ class SearchController extends FrontendController
         $latestQuery = (clone $query)->reorder();
         $updatedAtColumn = $model->getUpdatedAtColumn();
 
-        if (is_string($updatedAtColumn) && $updatedAtColumn !== '') {
+        if ($model->usesTimestamps() && is_string($updatedAtColumn) && $updatedAtColumn !== '') {
             $latestQuery->orderByDesc($updatedAtColumn);
         }
 

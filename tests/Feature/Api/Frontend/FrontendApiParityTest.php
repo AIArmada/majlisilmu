@@ -1037,6 +1037,21 @@ it('serves the institution directory cache metadata without requiring country ti
     expect($response->json('meta.cache.version'))->toBeString()->not->toBe('');
 });
 
+it('serves the speaker directory cache metadata without requiring country timestamps', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    Speaker::factory()->create([
+        'name' => 'Speaker Cache Metadata',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk();
+
+    expect($response->json('meta.cache.version'))->toBeString()->not->toBe('');
+});
+
 it('bumps the institution directory cache version when institution media changes', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
