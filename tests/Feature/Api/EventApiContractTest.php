@@ -3,7 +3,9 @@
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\PrayerReference;
 use App\Enums\ReferenceType;
+use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
 use App\Models\Reference;
@@ -258,6 +260,139 @@ it('filters events by prayer_time keyword', function () {
     expect($eventIds)
         ->toContain($maghribEvent->id)
         ->not()->toContain($subuhEvent->id);
+});
+
+it('filters events by grouped prayer buckets for before and after prayer labels', function (string $group, PrayerReference $reference, string $beforeLabel, string $afterLabel) {
+    $otherPrayerReference = $reference === PrayerReference::Maghrib
+        ? PrayerReference::Asr
+        : PrayerReference::Maghrib;
+    $otherPrayerLabel = $otherPrayerReference === PrayerReference::Asr
+        ? 'Selepas Asar'
+        : 'Selepas Maghrib';
+
+    $beforeEvent = Event::factory()->create([
+        'title' => "{$beforeLabel} Match",
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => $reference,
+        'prayer_display_text' => $beforeLabel,
+    ]);
+
+    $afterEvent = Event::factory()->create([
+        'title' => "{$afterLabel} Match",
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(3),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => $reference,
+        'prayer_display_text' => $afterLabel,
+    ]);
+
+    $otherPrayerEvent = Event::factory()->create([
+        'title' => 'Other Prayer Event',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(4),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => $otherPrayerReference,
+        'prayer_display_text' => $otherPrayerLabel,
+    ]);
+
+    $response = $this->getJson('/api/v1/events?filter[prayer_time]='.$group);
+
+    $response->assertOk();
+
+    $eventIds = collect($response->json('data'))->pluck('id')->all();
+
+    expect($eventIds)
+        ->toContain($beforeEvent->id)
+        ->toContain($afterEvent->id)
+        ->not()->toContain($otherPrayerEvent->id);
+})->with([
+    'subuh' => ['subuh', PrayerReference::Fajr, 'Sebelum Subuh', 'Selepas Subuh'],
+    'jumaat' => ['jumaat', PrayerReference::FridayPrayer, 'Sebelum Jumaat', 'Selepas Jumaat'],
+    'zuhur' => ['zuhur', PrayerReference::Dhuhr, 'Sebelum Zuhur', 'Selepas Zuhur'],
+    'asar' => ['asar', PrayerReference::Asr, 'Sebelum Asar', 'Selepas Asar'],
+    'maghrib' => ['maghrib', PrayerReference::Maghrib, 'Sebelum Maghrib', 'Selepas Maghrib'],
+    'isya' => ['isya', PrayerReference::Isha, 'Sebelum Isyak', 'Selepas Isyak'],
+]);
+
+it('filters events by the dhuha group using morning events while excluding subuh and jumaat or zuhur buckets', function () {
+    $absoluteMorningEvent = Event::factory()->create([
+        'title' => 'Kuliah Dhuha Pagi',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => Carbon::parse('2026-04-20 09:15:00', 'Asia/Kuala_Lumpur')->utc(),
+        'timing_mode' => TimingMode::Absolute,
+        'prayer_reference' => null,
+        'prayer_display_text' => null,
+    ]);
+
+    $relativeDhuhaEvent = Event::factory()->create([
+        'title' => 'Kuliah Dhuha Khas',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(3),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => null,
+        'prayer_display_text' => 'Majlis Dhuha',
+    ]);
+
+    $subuhEvent = Event::factory()->create([
+        'title' => 'Kuliah Selepas Subuh',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => PrayerReference::Fajr,
+        'prayer_display_text' => 'Selepas Subuh',
+    ]);
+
+    $jumaatEvent = Event::factory()->create([
+        'title' => 'Forum Sebelum Jumaat',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => PrayerReference::FridayPrayer,
+        'prayer_display_text' => 'Sebelum Jumaat',
+    ]);
+
+    $zuhurEvent = Event::factory()->create([
+        'title' => 'Kuliah Selepas Zuhur',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+        'timing_mode' => TimingMode::PrayerRelative,
+        'prayer_reference' => PrayerReference::Dhuhr,
+        'prayer_display_text' => 'Selepas Zuhur',
+    ]);
+
+    $response = $this
+        ->withHeader('X-Timezone', 'Asia/Kuala_Lumpur')
+        ->getJson('/api/v1/events?filter[prayer_time]=dhuha');
+
+    $response->assertOk();
+
+    $eventIds = collect($response->json('data'))->pluck('id')->all();
+
+    expect($eventIds)
+        ->toContain($absoluteMorningEvent->id)
+        ->toContain($relativeDhuhaEvent->id)
+        ->not()->toContain($subuhEvent->id)
+        ->not()->toContain($jumaatEvent->id)
+        ->not()->toContain($zuhurEvent->id);
 });
 
 it('filters events by key person roles and role-specific linked speakers', function () {

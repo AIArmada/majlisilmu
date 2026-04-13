@@ -6,6 +6,8 @@ use App\Data\Api\Event\EventPayloadData;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventVisibility;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
@@ -234,10 +236,18 @@ class EventController extends Controller
                         ->orWhereRaw($this->descriptionSearchSql($operator), ["%{$searchTerm}%"]);
                 });
             }),
-            AllowedFilter::callback('prayer_time', function (Builder $query, mixed $value): void {
+            AllowedFilter::callback('prayer_time', function (Builder $query, mixed $value) use ($request): void {
                 $prayerTime = is_string($value) ? trim($value) : '';
 
                 if ($prayerTime === '') {
+                    return;
+                }
+
+                $prayerTimeGroup = $this->normalizePrayerTimeGroup($prayerTime);
+
+                if ($prayerTimeGroup !== null) {
+                    $this->applyPrayerTimeGroupFilter($query, $prayerTimeGroup, $request);
+
                     return;
                 }
 
@@ -416,6 +426,102 @@ class EventController extends Controller
         return null;
     }
 
+    private function normalizePrayerTimeGroup(string $prayerTime): ?string
+    {
+        $normalized = Str::lower(trim($prayerTime));
+
+        return match (true) {
+            in_array($normalized, ['subuh', 'fajr'], true) => 'subuh',
+            $normalized === 'dhuha' => 'dhuha',
+            in_array($normalized, ['jumaat', 'friday'], true) => 'jumaat',
+            in_array($normalized, ['zuhur', 'zohor', 'dhuhr'], true) => 'zuhur',
+            in_array($normalized, ['asar', 'asr'], true) => 'asar',
+            $normalized === 'maghrib' => 'maghrib',
+            in_array($normalized, ['isya', 'isyak', 'isha'], true) => 'isya',
+            default => null,
+        };
+    }
+
+    /**
+     * @param  Builder<Event>  $query
+     */
+    private function applyPrayerTimeGroupFilter(Builder $query, string $group, Request $request): void
+    {
+        match ($group) {
+            'subuh' => $this->applyPrayerReferenceOrLabelFilter($query, PrayerReference::Fajr, ['subuh', 'fajr']),
+            'jumaat' => $this->applyPrayerReferenceOrLabelFilter($query, PrayerReference::FridayPrayer, ['jumaat', 'friday']),
+            'zuhur' => $this->applyPrayerReferenceOrLabelFilter($query, PrayerReference::Dhuhr, ['zohor', 'zuhur', 'dhuhr']),
+            'asar' => $this->applyPrayerReferenceOrLabelFilter($query, PrayerReference::Asr, ['asar', 'asr']),
+            'maghrib' => $this->applyPrayerReferenceOrLabelFilter($query, PrayerReference::Maghrib, ['maghrib']),
+            'isya' => $this->applyPrayerReferenceOrLabelFilter($query, PrayerReference::Isha, ['isya', 'isyak', 'isha']),
+            'dhuha' => $this->applyDhuhaPrayerTimeFilter($query, $request),
+            default => null,
+        };
+    }
+
+    /**
+     * @param  list<string>  $terms
+     */
+    /**
+     * @param  Builder<Event>  $query
+     * @param  list<string>  $terms
+     */
+    private function applyPrayerReferenceOrLabelFilter(Builder $query, PrayerReference $reference, array $terms): void
+    {
+        $operator = $this->databaseLikeOperator();
+
+        $query->where(function (Builder $prayerQuery) use ($reference, $terms, $operator): void {
+            $prayerQuery->where('prayer_reference', $reference->value)
+                ->orWhere(function (Builder $labelQuery) use ($terms, $operator): void {
+                    foreach ($terms as $index => $term) {
+                        if ($index === 0) {
+                            $labelQuery->whereRaw('LOWER(prayer_display_text) '.$operator.' ?', ["%{$term}%"]);
+
+                            continue;
+                        }
+
+                        $labelQuery->orWhereRaw('LOWER(prayer_display_text) '.$operator.' ?', ["%{$term}%"]);
+                    }
+                });
+        });
+    }
+
+    /**
+     * @param  Builder<Event>  $query
+     */
+    private function applyDhuhaPrayerTimeFilter(Builder $query, Request $request): void
+    {
+        $operator = $this->databaseLikeOperator();
+        $startsAtUserTimeSql = $this->startsAtUserTimeSqlExpression($this->userUtcOffsetMinutes($request));
+
+        $query->where(function (Builder $dhuhaQuery) use ($operator, $startsAtUserTimeSql): void {
+            $dhuhaQuery
+                ->where(function (Builder $relativeQuery) use ($operator): void {
+                    $relativeQuery
+                        ->where('timing_mode', TimingMode::PrayerRelative->value)
+                        ->where(function (Builder $labelQuery) use ($operator): void {
+                            $labelQuery->whereRaw('LOWER(prayer_display_text) '.$operator.' ?', ['%dhuha%'])
+                                ->orWhereRaw('LOWER(prayer_display_text) '.$operator.' ?', ['%pagi%'])
+                                ->orWhereRaw('LOWER(prayer_display_text) '.$operator.' ?', ['%morning%']);
+                        })
+                        ->where(function (Builder $excludeQuery): void {
+                            $excludeQuery->whereNull('prayer_reference')
+                                ->orWhereNotIn('prayer_reference', [
+                                    PrayerReference::Fajr->value,
+                                    PrayerReference::Dhuhr->value,
+                                    PrayerReference::FridayPrayer->value,
+                                ]);
+                        });
+                })
+                ->orWhere(function (Builder $absoluteQuery) use ($startsAtUserTimeSql): void {
+                    $absoluteQuery
+                        ->where('timing_mode', TimingMode::Absolute->value)
+                        ->whereRaw("{$startsAtUserTimeSql} >= ?", ['07:30'])
+                        ->whereRaw("{$startsAtUserTimeSql} < ?", ['11:30']);
+                });
+        });
+    }
+
     /**
      * @return list<string>
      */
@@ -470,5 +576,21 @@ class EventController extends Controller
         $connection = Event::query()->getConnection();
 
         return $connection->getDriverName();
+    }
+
+    private function startsAtUserTimeSqlExpression(int $offsetMinutes): string
+    {
+        $safeOffsetMinutes = $offsetMinutes;
+
+        return match ($this->databaseDriver()) {
+            'pgsql' => "to_char(events.starts_at + interval '{$safeOffsetMinutes} minutes', 'HH24:MI')",
+            'mysql', 'mariadb' => "DATE_FORMAT(DATE_ADD(events.starts_at, INTERVAL {$safeOffsetMinutes} MINUTE), '%H:%i')",
+            default => "strftime('%H:%M', datetime(events.starts_at, '{$safeOffsetMinutes} minutes'))",
+        };
+    }
+
+    private function userUtcOffsetMinutes(?Request $request = null): int
+    {
+        return now(UserDateTimeFormatter::resolveTimezone($request))->utcOffset();
     }
 }
