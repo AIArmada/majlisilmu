@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Speaker;
 
 return [
 
@@ -46,7 +49,12 @@ return [
     |
     */
 
-    'queue' => env('SCOUT_QUEUE', false),
+    'queue' => env('SCOUT_QUEUE', false)
+        ? [
+            'connection' => env('SCOUT_QUEUE_CONNECTION', env('QUEUE_CONNECTION', 'database')),
+            'queue' => env('SCOUT_QUEUE_NAME'),
+        ]
+        : false,
 
     /*
     |--------------------------------------------------------------------------
@@ -59,7 +67,7 @@ return [
     |
     */
 
-    'after_commit' => false,
+    'after_commit' => env('SCOUT_AFTER_COMMIT', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -221,6 +229,77 @@ return [
                 ],
                 'search-parameters' => [
                     'query_by' => 'title,description,speaker_names,institution_name,venue_name',
+                ],
+            ],
+            Speaker::class => [
+                'collection-schema' => [
+                    'fields' => [
+                        ['name' => 'id', 'type' => 'string'],
+                        ['name' => 'name', 'type' => 'string'],
+                        ['name' => 'formatted_name', 'type' => 'string'],
+                        ['name' => 'search_text', 'type' => 'string'],
+                        ['name' => 'job_title', 'type' => 'string', 'optional' => true],
+                        ['name' => 'slug', 'type' => 'string'],
+                        ['name' => 'status', 'type' => 'string', 'facet' => true],
+                        ['name' => 'is_active', 'type' => 'bool', 'facet' => true],
+                        ['name' => 'gender', 'type' => 'string', 'optional' => true, 'facet' => true],
+                        ['name' => 'country_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'state_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'district_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'subdistrict_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'updated_at', 'type' => 'int64'],
+                    ],
+                    'default_sorting_field' => 'updated_at',
+                ],
+                'search-parameters' => [
+                    'query_by' => 'formatted_name,search_text,name,job_title',
+                ],
+            ],
+            Institution::class => [
+                'collection-schema' => [
+                    'fields' => [
+                        ['name' => 'id', 'type' => 'string'],
+                        ['name' => 'type', 'type' => 'string', 'optional' => true, 'facet' => true],
+                        ['name' => 'name', 'type' => 'string'],
+                        ['name' => 'display_name', 'type' => 'string'],
+                        ['name' => 'nickname', 'type' => 'string', 'optional' => true],
+                        ['name' => 'description', 'type' => 'string', 'optional' => true],
+                        ['name' => 'search_text', 'type' => 'string'],
+                        ['name' => 'slug', 'type' => 'string'],
+                        ['name' => 'status', 'type' => 'string', 'facet' => true],
+                        ['name' => 'is_active', 'type' => 'bool', 'facet' => true],
+                        ['name' => 'country_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'state_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'district_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'subdistrict_id', 'type' => 'int32', 'optional' => true, 'facet' => true],
+                        ['name' => 'updated_at', 'type' => 'int64'],
+                    ],
+                    'default_sorting_field' => 'updated_at',
+                ],
+                'search-parameters' => [
+                    'query_by' => 'display_name,name,nickname,description,search_text',
+                ],
+            ],
+            Reference::class => [
+                'collection-schema' => [
+                    'fields' => [
+                        ['name' => 'id', 'type' => 'string'],
+                        ['name' => 'title', 'type' => 'string'],
+                        ['name' => 'author', 'type' => 'string', 'optional' => true],
+                        ['name' => 'type', 'type' => 'string', 'optional' => true, 'facet' => true],
+                        ['name' => 'publication_year', 'type' => 'int32', 'optional' => true],
+                        ['name' => 'publisher', 'type' => 'string', 'optional' => true],
+                        ['name' => 'description', 'type' => 'string', 'optional' => true],
+                        ['name' => 'search_text', 'type' => 'string'],
+                        ['name' => 'slug', 'type' => 'string'],
+                        ['name' => 'status', 'type' => 'string', 'facet' => true],
+                        ['name' => 'is_active', 'type' => 'bool', 'facet' => true],
+                        ['name' => 'updated_at', 'type' => 'int64'],
+                    ],
+                    'default_sorting_field' => 'updated_at',
+                ],
+                'search-parameters' => [
+                    'query_by' => 'title,author,publisher,description,search_text',
                 ],
             ],
         ],

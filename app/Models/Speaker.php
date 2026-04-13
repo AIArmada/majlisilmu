@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -44,7 +45,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
     public const string PUBLIC_DIRECTORY_SESSION_KEY = 'public_speakers_directory_seed';
 
     /** @use HasFactory<SpeakerFactory> */
-    use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     public $incrementing = false;
 
@@ -85,6 +86,89 @@ class Speaker extends Model implements AuditableContract, HasMedia
             'allow_public_event_submission' => 'boolean',
             'public_submission_locked_at' => 'datetime',
         ];
+    }
+
+    public function shouldBeSearchable(): bool
+    {
+        return $this->is_active
+            && in_array((string) $this->status, ['verified', 'pending'], true);
+    }
+
+    public function searchIndexShouldBeUpdated(): bool
+    {
+        return $this->wasRecentlyCreated || $this->wasChanged([
+            'name',
+            'honorific',
+            'pre_nominal',
+            'post_nominal',
+            'job_title',
+            'slug',
+            'status',
+            'is_active',
+            'gender',
+        ]);
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     * @return Builder<Speaker>
+     */
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query
+            ->with('address')
+            ->where('speakers.is_active', true)
+            ->whereIn('speakers.status', ['verified', 'pending']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        if ($this->usesScoutDatabaseDriver()) {
+            return $this->toScoutDatabaseSearchableArray();
+        }
+
+        $this->loadMissing('address');
+
+        $address = $this->addressModel;
+        $updatedAt = $this->updated_at ?? now();
+
+        return [
+            'id' => (string) $this->getKey(),
+            'name' => (string) $this->name,
+            'formatted_name' => $this->formatted_name,
+            'search_text' => $this->searchableText(),
+            'job_title' => filled($this->job_title) ? (string) $this->job_title : null,
+            'slug' => (string) $this->slug,
+            'status' => (string) $this->status,
+            'is_active' => (bool) $this->is_active,
+            'gender' => filled($this->gender) ? (string) $this->gender : null,
+            'country_id' => $address?->country_id,
+            'state_id' => $address?->state_id,
+            'district_id' => $address?->district_id,
+            'subdistrict_id' => $address?->subdistrict_id,
+            'updated_at' => $updatedAt->timestamp,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function toScoutDatabaseSearchableArray(): array
+    {
+        return array_filter([
+            'name' => (string) $this->name,
+            'searchable_name' => filled($this->searchable_name) ? (string) $this->searchable_name : null,
+            'job_title' => filled($this->job_title) ? (string) $this->job_title : null,
+            'slug' => (string) $this->slug,
+        ], static fn (mixed $value): bool => is_string($value) && $value !== '');
+    }
+
+    private function usesScoutDatabaseDriver(): bool
+    {
+        return (string) config('scout.driver') === 'database';
     }
 
     #[\Override]
@@ -208,6 +292,24 @@ class Speaker extends Model implements AuditableContract, HasMedia
         }
 
         return $formatted;
+    }
+
+    private function searchableText(): string
+    {
+        $rawDecorations = collect([
+            ...self::normalizedStringValues($this->honorific),
+            ...self::normalizedStringValues($this->pre_nominal),
+            ...self::normalizedStringValues($this->post_nominal),
+        ])
+            ->map(static fn (string $value): string => str_replace(['_', '-'], ' ', $value))
+            ->implode(' ');
+
+        return trim(implode(' ', array_filter([
+            trim($this->formatted_name),
+            trim((string) $this->name),
+            trim($rawDecorations),
+            trim((string) $this->job_title),
+        ])));
     }
 
     /**

@@ -2,30 +2,23 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Event;
+use App\Models\Reference;
 use Illuminate\Console\Command;
 
-class IndexEventsToTypesense extends Command
+class IndexReferencesToTypesense extends Command
 {
     /**
-     * The name and signature of the console command.
-     *
      * @var string
      */
-    protected $signature = 'search:index-events 
-                            {--fresh : Drop existing index and recreate}
+    protected $signature = 'search:index-references
+                            {--fresh : Flush the current Scout index before importing}
                             {--chunk=500 : Number of records to process per chunk}';
 
     /**
-     * The console command description.
-     *
      * @var string
      */
-    protected $description = 'Import all searchable events into the configured Scout driver';
+    protected $description = 'Import all searchable references into the configured Scout driver';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
         $driver = (string) config('scout.driver');
@@ -37,10 +30,10 @@ class IndexEventsToTypesense extends Command
             return self::FAILURE;
         }
 
-        $this->info("Starting event Scout import using the {$driver} driver...");
+        $this->info("Starting reference Scout import using the {$driver} driver...");
 
         $status = $this->call('scout:import', [
-            'model' => Event::class,
+            'model' => Reference::class,
             '--fresh' => (bool) $this->option('fresh'),
             '--chunk' => (string) $this->option('chunk'),
         ]);
@@ -49,7 +42,7 @@ class IndexEventsToTypesense extends Command
             return $status;
         }
 
-        $this->info('Event Scout import completed.');
+        $this->info('Reference Scout import completed.');
 
         return self::SUCCESS;
     }

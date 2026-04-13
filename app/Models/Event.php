@@ -297,6 +297,46 @@ class Event extends Model implements AuditableContract, HasMedia
             && $this->visibility === EventVisibility::Public;
     }
 
+    public function searchIndexShouldBeUpdated(): bool
+    {
+        return $this->wasRecentlyCreated || $this->wasChanged([
+            'title',
+            'description',
+            'slug',
+            'event_structure',
+            'parent_event_id',
+            'starts_at',
+            'ends_at',
+            'language',
+            'event_type',
+            'gender',
+            'age_group',
+            'children_allowed',
+            'event_format',
+            'status',
+            'visibility',
+            'institution_id',
+            'venue_id',
+            'saves_count',
+            'registrations_count',
+            'is_active',
+        ]);
+    }
+
+    /**
+     * @param  Builder<Event>  $query
+     * @return Builder<Event>
+     */
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query
+            ->with(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references'])
+            ->where('events.is_active', true)
+            ->whereIn('events.status', self::PUBLIC_STATUSES)
+            ->where('events.visibility', EventVisibility::Public)
+            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
+    }
+
     /**
      * Get the indexable data array for the model.
      * Schema matches documentation B8.
@@ -305,6 +345,10 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function toSearchableArray(): array
     {
+        if ($this->usesScoutDatabaseDriver()) {
+            return $this->toScoutDatabaseSearchableArray();
+        }
+
         $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references']);
         $venueAddress = $this->venue?->addressModel;
         $institutionAddress = $this->institution?->addressModel;
@@ -467,6 +511,25 @@ class Event extends Model implements AuditableContract, HasMedia
         }
 
         return $array;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function toScoutDatabaseSearchableArray(): array
+    {
+        $description = trim(strip_tags((string) $this->description));
+
+        return array_filter([
+            'title' => (string) $this->title,
+            'description' => $description !== '' ? $description : null,
+            'slug' => (string) $this->slug,
+        ], static fn (mixed $value): bool => is_string($value) && $value !== '');
+    }
+
+    private function usesScoutDatabaseDriver(): bool
+    {
+        return (string) config('scout.driver') === 'database';
     }
 
     /**

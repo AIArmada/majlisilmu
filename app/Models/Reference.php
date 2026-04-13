@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\MediaLibrary\HasMedia;
@@ -25,7 +26,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Reference extends Model implements AuditableContract, HasMedia
 {
     /** @use HasFactory<ReferenceFactory> */
-    use AuditsModelChanges, HasFactory, HasFollowers, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use AuditsModelChanges, HasFactory, HasFollowers, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     #[\Override]
     protected static function booted(): void
@@ -86,6 +87,102 @@ class Reference extends Model implements AuditableContract, HasMedia
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    public function shouldBeSearchable(): bool
+    {
+        return $this->is_active
+            && in_array((string) $this->status, ['verified', 'pending'], true);
+    }
+
+    public function searchIndexShouldBeUpdated(): bool
+    {
+        return $this->wasRecentlyCreated || $this->wasChanged([
+            'title',
+            'author',
+            'type',
+            'publication_year',
+            'publisher',
+            'description',
+            'slug',
+            'status',
+            'is_active',
+        ]);
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     * @return Builder<Reference>
+     */
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query
+            ->where('references.is_active', true)
+            ->whereIn('references.status', ['verified', 'pending']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        if ($this->usesScoutDatabaseDriver()) {
+            return $this->toScoutDatabaseSearchableArray();
+        }
+
+        $updatedAt = $this->updated_at ?? now();
+        $publicationYear = $this->publication_year;
+        $normalizedPublicationYear = is_numeric($publicationYear) ? (int) $publicationYear : null;
+        $description = trim(strip_tags((string) $this->description));
+
+        return [
+            'id' => (string) $this->getKey(),
+            'title' => (string) $this->title,
+            'author' => filled($this->author) ? (string) $this->author : null,
+            'type' => filled($this->type) ? (string) $this->type : null,
+            'publication_year' => $normalizedPublicationYear,
+            'publisher' => filled($this->publisher) ? (string) $this->publisher : null,
+            'description' => $description !== '' ? $description : null,
+            'search_text' => $this->searchableText(),
+            'slug' => (string) $this->slug,
+            'status' => (string) $this->status,
+            'is_active' => (bool) $this->is_active,
+            'updated_at' => $updatedAt->timestamp,
+        ];
+    }
+
+    /**
+     * @return array<string, string|int>
+     */
+    private function toScoutDatabaseSearchableArray(): array
+    {
+        $description = trim(strip_tags((string) $this->description));
+        $publicationYear = is_numeric($this->publication_year) ? (int) $this->publication_year : null;
+
+        return array_filter([
+            'title' => (string) $this->title,
+            'author' => filled($this->author) ? (string) $this->author : null,
+            'type' => filled($this->type) ? (string) $this->type : null,
+            'publication_year' => $publicationYear,
+            'publisher' => filled($this->publisher) ? (string) $this->publisher : null,
+            'description' => $description !== '' ? $description : null,
+            'slug' => (string) $this->slug,
+        ], static fn (mixed $value): bool => (is_string($value) && $value !== '') || is_int($value));
+    }
+
+    private function usesScoutDatabaseDriver(): bool
+    {
+        return (string) config('scout.driver') === 'database';
+    }
+
+    private function searchableText(): string
+    {
+        return trim(implode(' ', array_filter([
+            trim((string) $this->title),
+            trim((string) $this->author),
+            trim((string) $this->publisher),
+            trim(strip_tags((string) $this->description)),
+        ])));
     }
 
     /**

@@ -21,6 +21,7 @@ use App\Models\Institution;
 use App\Models\MediaLink;
 use App\Models\MemberInvitation;
 use App\Models\MembershipClaim;
+use App\Models\ModerationReview;
 use App\Models\Reference;
 use App\Models\Registration;
 use App\Models\Report;
@@ -173,6 +174,7 @@ class AppServiceProvider extends ServiceProvider
             'event_settings' => EventSettings::class,
             'contribution_request' => ContributionRequest::class,
             'membership_claim' => MembershipClaim::class,
+            'moderation_review' => ModerationReview::class,
             'institution' => Institution::class,
             'media_link' => MediaLink::class,
             'member_invitation' => MemberInvitation::class,

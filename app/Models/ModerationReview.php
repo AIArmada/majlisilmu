@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsModelChanges;
 use Database\Factories\ModerationReviewFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-class ModerationReview extends Model
+class ModerationReview extends Model implements AuditableContract
 {
     /** @use HasFactory<ModerationReviewFactory> */
-    use HasFactory, HasUuids;
+    use AuditsModelChanges, HasFactory, HasUuids;
 
     public $incrementing = false;
 

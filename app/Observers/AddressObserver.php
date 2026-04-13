@@ -7,10 +7,12 @@ use App\Actions\Institutions\GenerateInstitutionSlugAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Actions\Venues\GenerateVenueSlugAction;
 use App\Models\Address;
+use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Venue;
 use App\Support\Cache\PublicListingsCache;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 class AddressObserver
 {
@@ -40,6 +42,8 @@ class AddressObserver
 
         if ($addressable instanceof Institution) {
             $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($addressable->name);
+            $this->syncSearchableModel($addressable);
+            $this->syncSearchableEvents($addressable->events()->get(['events.*']));
             $this->publicListingsCache->bustMajlisListing();
 
             return;
@@ -48,6 +52,7 @@ class AddressObserver
         if ($addressable instanceof Speaker) {
             $this->generateSpeakerSlugAction->syncSpeakerSlugsForName($addressable->name);
             $this->generateEventSlugAction->syncEventSlugsForSpeakerName($addressable->name);
+            $this->syncSearchableModel($addressable);
             $this->publicListingsCache->bustMajlisListing();
 
             return;
@@ -55,7 +60,41 @@ class AddressObserver
 
         if ($addressable instanceof Venue) {
             $this->generateVenueSlugAction->syncVenueSlugsForName($addressable->name);
+            $this->syncSearchableEvents($addressable->events()->get(['events.*']));
             $this->publicListingsCache->bustMajlisListing();
+        }
+    }
+
+    private function syncSearchableModel(Institution|Speaker $model): void
+    {
+        if ($model->shouldBeSearchable()) {
+            $model->searchable();
+
+            return;
+        }
+
+        $model->unsearchable();
+    }
+
+    /**
+     * @param  EloquentCollection<int, Event>  $events
+     */
+    private function syncSearchableEvents(EloquentCollection $events): void
+    {
+        $searchableEvents = $events
+            ->filter(fn (Event $event): bool => $event->shouldBeSearchable())
+            ->values();
+
+        if ($searchableEvents->isNotEmpty()) {
+            $searchableEvents->searchable();
+        }
+
+        $unsearchableEvents = $events
+            ->reject(fn (Event $event): bool => $event->shouldBeSearchable())
+            ->values();
+
+        if ($unsearchableEvents->isNotEmpty()) {
+            $unsearchableEvents->unsearchable();
         }
     }
 }

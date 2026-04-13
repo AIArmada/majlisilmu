@@ -6,6 +6,8 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
+use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -58,6 +60,62 @@ it('shows grouped event speaker and institution matches on the unified search pa
         ->assertSee(route('events.show', $event), false)
         ->assertSee(route('speakers.show', $speaker), false)
         ->assertSee(route('institutions.show', $institution), false);
+});
+
+it('falls back to local speaker and institution search on the unified search page when typesense fails', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Nur Hikmah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nur Hikmah Hassan',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($speaker);
+    config()->set('scout.driver', 'typesense');
+
+    $this->app->bind(SpeakerSearchService::class, fn (): SpeakerSearchService => new class extends SpeakerSearchService
+    {
+        protected function shouldUseScoutSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $this->app->bind(InstitutionSearchService::class, fn (): InstitutionSearchService => new class extends InstitutionSearchService
+    {
+        protected function shouldUseScoutSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $this->get(route('search.index', ['search' => 'Nur Hikmah']))
+        ->assertOk()
+        ->assertSee('Nur Hikmah Hassan')
+        ->assertSee('Masjid Nur Hikmah');
 });
 
 it('shows nearby event matches on the unified search page when location is present', function () {
