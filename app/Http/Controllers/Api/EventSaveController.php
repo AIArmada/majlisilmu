@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Events\SaveEventAction;
 use App\Actions\Events\UnsaveEventAction;
+use App\Data\Api\EventEngagement\EventEngagementListItemData;
+use App\Data\Api\EventSave\EventSaveResultData;
+use App\Data\Api\EventSave\EventSaveStateData;
 use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -29,7 +32,9 @@ class EventSaveController extends Controller
             ->paginate($request->input('per_page', 20));
 
         return response()->json([
-            'data' => $savedEvents->items(),
+            'data' => collect($savedEvents->items())
+                ->map(fn (Event $event): array => EventEngagementListItemData::fromModel($event)->payload())
+                ->all(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [
@@ -94,9 +99,7 @@ class EventSaveController extends Controller
         }
 
         return response()->json([
-            'data' => [
-                'message' => 'Event saved successfully.',
-            ],
+            'data' => EventSaveResultData::fromMessage('Event saved successfully.')->toArray(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -122,9 +125,7 @@ class EventSaveController extends Controller
         }
 
         return response()->json([
-            'data' => [
-                'message' => 'Event unsaved successfully.',
-            ],
+            'data' => EventSaveResultData::fromMessage('Event unsaved successfully.')->toArray(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -142,9 +143,7 @@ class EventSaveController extends Controller
             ->exists();
 
         return response()->json([
-            'data' => [
-                'is_saved' => $isSaved,
-            ],
+            'data' => EventSaveStateData::fromState($isSaved)->toArray(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],

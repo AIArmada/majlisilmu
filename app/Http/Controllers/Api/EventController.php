@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Data\Api\Event\EventPayloadData;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\Speaker;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
 use App\Support\Timezone\UserDateTimeFormatter;
@@ -17,7 +17,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -378,56 +377,7 @@ class EventController extends Controller
      */
     private function serializeEventPayload(Event $event): array
     {
-        $posterUrl = $this->preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']);
-
-        $payload = [
-            ...$event->toArray(),
-            'card_image_url' => $event->card_image_url,
-            'poster_url' => $posterUrl,
-            'has_poster' => $event->hasMedia('poster'),
-            'timing_display' => $event->timing_display,
-            'end_time_display' => $event->ends_at instanceof \DateTimeInterface
-                ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
-                : null,
-        ];
-
-        if ($event->relationLoaded('speakers')) {
-            $event->speakers->loadMissing('media');
-            $payload['speakers'] = $event->speakers
-                ->map(fn (Speaker $speaker): array => [
-                    'id' => $speaker->id,
-                    'name' => $speaker->name,
-                    'formatted_name' => $speaker->formatted_name,
-                    'slug' => $speaker->slug,
-                    'avatar_url' => $speaker->public_avatar_url,
-                ])
-                ->values()
-                ->all();
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @param  list<string>  $preferredConversions
-     */
-    private function preferredMediaUrl(?Media $media, array $preferredConversions = []): ?string
-    {
-        if (! $media instanceof Media) {
-            return null;
-        }
-
-        $availableUrl = $preferredConversions === []
-            ? $media->getUrl()
-            : $media->getAvailableUrl($preferredConversions);
-
-        if ($availableUrl !== '') {
-            return $availableUrl;
-        }
-
-        $originalUrl = $media->getUrl();
-
-        return $originalUrl !== '' ? $originalUrl : null;
+        return EventPayloadData::fromModel($event)->toArray();
     }
 
     private function parseDate(mixed $value, bool $endOfDay): ?Carbon

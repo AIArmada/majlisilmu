@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Data\Api\Notification\NotificationDestinationData as NotificationDestinationPayloadData;
 use App\Enums\NotificationChannel;
 use App\Enums\NotificationDestinationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationDestination;
 use App\Models\User;
-use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -37,7 +37,7 @@ class NotificationDestinationController extends Controller
 
         return response()->json([
             'message' => __('notifications.api.push_registered'),
-            'data' => $this->pushDestinationData($destination),
+            'data' => NotificationDestinationPayloadData::fromModel($destination)->toArray(),
         ], 201);
     }
 
@@ -60,7 +60,7 @@ class NotificationDestinationController extends Controller
 
         return response()->json([
             'message' => __('notifications.api.push_updated'),
-            'data' => $this->pushDestinationData($destination->fresh()),
+            'data' => NotificationDestinationPayloadData::fromModel($destination->fresh() ?? $destination)->toArray(),
         ]);
     }
 
@@ -109,26 +109,6 @@ class NotificationDestinationController extends Controller
             'locale' => (string) ($validated['locale'] ?? ''),
             'timezone' => (string) ($validated['timezone'] ?? ''),
             'last_seen_at' => isset($validated['last_seen_at']) ? (string) $validated['last_seen_at'] : now()->toIso8601String(),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function pushDestinationData(NotificationDestination $destination): array
-    {
-        $verifiedAt = $destination->verified_at;
-
-        return [
-            'id' => $destination->id,
-            'installation_id' => $destination->address,
-            'platform' => (string) data_get($destination->meta, 'platform', ''),
-            'device_label' => (string) data_get($destination->meta, 'device_label', ''),
-            'app_version' => (string) data_get($destination->meta, 'app_version', ''),
-            'locale' => (string) data_get($destination->meta, 'locale', ''),
-            'timezone' => (string) data_get($destination->meta, 'timezone', ''),
-            'last_seen_at' => (string) data_get($destination->meta, 'last_seen_at', ''),
-            'verified_at' => $verifiedAt instanceof CarbonInterface ? $verifiedAt->toIso8601String() : null,
         ];
     }
 

@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Speaker;
 use App\Models\User;
+use App\Models\Venue;
 use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
@@ -84,14 +87,18 @@ test('can check if event is saved', function () {
 
     // Initially not saved
     $this->getJson(route('api.event-saves.show', $this->event->id))
-        ->assertJsonPath('data.is_saved', false);
+        ->assertOk()
+        ->assertJsonPath('data.is_saved', false)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     // Save it
     $this->postJson(route('api.event-saves.store'), ['event_id' => $this->event->id]);
 
     // Now saved
     $this->getJson(route('api.event-saves.show', $this->event->id))
-        ->assertJsonPath('data.is_saved', true);
+        ->assertOk()
+        ->assertJsonPath('data.is_saved', true)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
 test('saving an event recalculates stale saves_count from source rows', function () {
@@ -113,17 +120,58 @@ test('saving an event recalculates stale saves_count from source rows', function
 test('saved events index still includes cancelled events', function () {
     Sanctum::actingAs($this->user);
 
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Saved',
+        'slug' => 'masjid-saved',
+    ]);
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan Saved',
+    ]);
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Saved',
+        'slug' => 'speaker-saved',
+    ]);
+
+    $savedEvent = Event::factory()->create([
+        'title' => 'Saved Event One',
+        'slug' => 'saved-event-one',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(5),
+        'institution_id' => $institution->id,
+        'venue_id' => $venue->id,
+    ]);
+
     $cancelledEvent = Event::factory()->create([
         'status' => 'cancelled',
         'visibility' => 'public',
         'starts_at' => now()->addDays(10),
     ]);
 
-    $this->user->savedEvents()->attach($this->event->id);
+    $savedEvent->speakers()->attach($speaker->id);
+
+    $this->user->savedEvents()->attach($savedEvent->id);
     $this->user->savedEvents()->attach($cancelledEvent->id);
 
     $response = $this->getJson(route('api.event-saves.index'));
 
     $response->assertOk()
-        ->assertJsonPath('meta.pagination.total', 2);
+        ->assertJsonPath('meta.pagination.total', 2)
+        ->assertJsonPath('data.0.id', $savedEvent->id)
+        ->assertJsonPath('data.0.title', 'Saved Event One')
+        ->assertJsonPath('data.0.slug', 'saved-event-one')
+        ->assertJsonPath('data.0.status', 'approved')
+        ->assertJsonPath('data.0.visibility', 'public')
+        ->assertJsonPath('data.0.institution.id', $institution->id)
+        ->assertJsonPath('data.0.institution.name', 'Masjid Saved')
+        ->assertJsonPath('data.0.institution.slug', $institution->slug)
+        ->assertJsonPath('data.0.venue.id', $venue->id)
+        ->assertJsonPath('data.0.venue.name', 'Dewan Saved')
+        ->assertJsonPath('data.0.speakers.0.id', $speaker->id)
+        ->assertJsonPath('data.0.speakers.0.name', 'Speaker Saved')
+        ->assertJsonPath('data.0.speakers.0.slug', $speaker->slug)
+        ->assertJsonPath('data.0.speakers.0.pivot.event_id', $savedEvent->id)
+        ->assertJsonPath('data.0.pivot.event_id', $savedEvent->id)
+        ->assertJsonPath('data.0.pivot.user_id', $this->user->id)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });

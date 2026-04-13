@@ -2279,9 +2279,12 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
     {
         $registry = app(PublicCountryRegistry::class);
 
-        $normalizedCountryId = is_numeric($countryId)
-            ? $registry->normalizeCountryId((int) $countryId)
-            : null;
+        $normalizedCountryId = $registry->resolveCountryId(
+            $countryId,
+            null,
+            null,
+            enabledOnly: true,
+        );
 
         if (is_int($normalizedCountryId)) {
             return $normalizedCountryId;

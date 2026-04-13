@@ -6,6 +6,7 @@ use App\Actions\Reports\ResolveReportCategoryOptionsAction;
 use App\Actions\Reports\ResolveReportEntityMetadataAction;
 use App\Actions\Reports\ResolveReporterFingerprintAction;
 use App\Actions\Reports\SubmitReportAction;
+use App\Data\Api\Report\ReportSubmissionData;
 use App\Http\Controllers\Controller;
 use App\Models\Report;
 use App\Models\User;
@@ -81,10 +82,7 @@ class ReportController extends Controller
         }
 
         return response()->json([
-            'data' => [
-                'id' => $report->id,
-                'message' => 'Report submitted successfully. Our team will review it.',
-            ],
+            'data' => ReportSubmissionData::fromModel($report)->toArray(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],

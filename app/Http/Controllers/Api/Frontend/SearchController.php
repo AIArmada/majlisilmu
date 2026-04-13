@@ -2,11 +2,22 @@
 
 namespace App\Http\Controllers\Api\Frontend;
 
+use App\Data\Api\Frontend\Search\CountryData;
+use App\Data\Api\Frontend\Search\EventListData;
+use App\Data\Api\Frontend\Search\InstitutionDetailData;
+use App\Data\Api\Frontend\Search\InstitutionDonationChannelData;
+use App\Data\Api\Frontend\Search\InstitutionListData;
+use App\Data\Api\Frontend\Search\ReferenceDetailData;
+use App\Data\Api\Frontend\Search\SeriesDetailData;
+use App\Data\Api\Frontend\Search\SpeakerDetailData;
+use App\Data\Api\Frontend\Search\SpeakerDetailMediaData;
+use App\Data\Api\Frontend\Search\SpeakerGalleryItemData;
+use App\Data\Api\Frontend\Search\SpeakerInstitutionData;
+use App\Data\Api\Frontend\Search\SpeakerListData;
+use App\Data\Api\Frontend\Search\VenueDetailData;
 use App\Enums\ContactCategory;
-use App\Enums\EventFormat;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
-use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\InspirationCategory;
 use App\Enums\SocialMediaPlatform;
@@ -33,17 +44,14 @@ use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
-use App\Support\Timezone\UserDateTimeFormatter;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\Response;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
-use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -259,76 +267,9 @@ class SearchController extends FrontendController
 
         abort_unless($user instanceof User ? $user->can('view', $record) : $record->status === 'verified', 404);
 
-        $institutionMedia = $this->institutionCardMediaData($record);
-
-        $addressLines = $this->addressDisplayLines($record->addressModel);
-
         return response()->json([
             'data' => [
-                'institution' => [
-                    'id' => $record->id,
-                    'slug' => $record->slug,
-                    'name' => $record->name,
-                    'nickname' => $record->nickname,
-                    'display_name' => $record->display_name,
-                    'description' => $record->description,
-                    'status' => $record->status,
-                    'type_label' => $record->type instanceof HasLabel ? $record->type->getLabel() : null,
-                    'address_line' => $this->addressLocation($record->addressModel),
-                    'street_address_line' => $addressLines['street'],
-                    'locality_address_line' => $addressLines['locality'],
-                    'regional_address_line' => $addressLines['regional'],
-                    'address' => $this->addressFilterData($record->addressModel),
-                    'country' => $this->countryData($record->addressModel),
-                    'map_url' => $record->addressModel?->google_maps_url,
-                    'map_lat' => $record->addressModel?->lat,
-                    'map_lng' => $record->addressModel?->lng,
-                    'followers_count' => $record->followersCount(),
-                    'speaker_count' => DB::table('event_key_people')
-                        ->where('role', EventKeyPersonRole::Speaker->value)
-                        ->whereNotNull('speaker_id')
-                        ->whereIn('event_id', function ($sub) use ($record): void {
-                            $sub->select('id')
-                                ->from('events')
-                                ->where('institution_id', $record->id)
-                                ->where('is_active', true)
-                                ->where('starts_at', '>=', now());
-                        })
-                        ->distinct('speaker_id')
-                        ->count(),
-                    'is_following' => $user?->isFollowing($record) ?? false,
-                    'media' => [
-                        'public_image_url' => $institutionMedia['public_image_url'],
-                        'logo_url' => $institutionMedia['logo_url'],
-                        'cover_url' => $institutionMedia['cover_url'],
-                    ],
-                    'contacts' => $this->contactData($record->contacts),
-                    'social_media' => $this->socialMediaData($record->socialMedia),
-                    'waze_url' => $record->addressModel?->waze_url,
-                    'donation_channels' => $record->donationChannels
-                        ->where('status', 'verified')
-                        ->sortByDesc('is_default')
-                        ->map(fn (DonationChannel $channel): array => [
-                            'id' => $channel->id,
-                            'label' => $channel->label,
-                            'method' => $channel->method,
-                            'method_display' => $channel->method_display,
-                            'recipient' => $channel->recipient,
-                            'payment_details' => $channel->payment_details,
-                            'bank_name' => $channel->bank_name,
-                            'bank_code' => $channel->bank_code,
-                            'account_number' => $channel->account_number,
-                            'duitnow_type' => $channel->duitnow_type,
-                            'duitnow_value' => $channel->duitnow_value,
-                            'ewallet_provider' => $channel->ewallet_provider,
-                            'ewallet_handle' => $channel->ewallet_handle,
-                            'is_default' => $channel->is_default,
-                            'qr_url' => $channel->getFirstMediaUrl('qr', 'thumb') ?: $channel->getFirstMediaUrl('qr') ?: null,
-                            'qr_full_url' => $channel->getFirstMediaUrl('qr') ?: null,
-                        ])
-                        ->values()
-                        ->all(),
-                ],
+                'institution' => $this->institutionDetailData($record, $user),
                 'upcoming_events' => $record->events()
                     ->active()
                     ->where('starts_at', '>=', now())
@@ -531,19 +472,7 @@ class SearchController extends FrontendController
 
         return response()->json([
             'data' => [
-                'venue' => [
-                    'id' => $record->id,
-                    'slug' => $record->slug,
-                    'name' => $record->name,
-                    'description' => $record->description,
-                    'status' => $record->status,
-                    'is_active' => (bool) $record->is_active,
-                    'media' => [
-                        'cover_url' => $record->getFirstMediaUrl('cover', 'banner') ?: $record->getFirstMediaUrl('cover'),
-                    ],
-                    'contacts' => $this->contactData($record->contacts),
-                    'social_media' => $this->socialMediaData($record->socialMedia),
-                ],
+                'venue' => $this->venueDetailData($record),
                 'upcoming_events' => $record->events()
                     ->active()
                     ->where('starts_at', '>=', now())
@@ -606,23 +535,7 @@ class SearchController extends FrontendController
 
         return response()->json([
             'data' => [
-                'reference' => [
-                    'id' => $record->id,
-                    'slug' => $record->slug,
-                    'title' => $record->title,
-                    'author' => $record->author,
-                    'type' => $record->type,
-                    'publisher' => $record->publisher,
-                    'publication_year' => $record->publication_year,
-                    'description' => $record->description,
-                    'is_active' => (bool) $record->is_active,
-                    'is_following' => $user?->isFollowing($record) ?? false,
-                    'media' => [
-                        'front_cover_url' => $record->getFirstMediaUrl('front_cover', 'thumb') ?: $record->getFirstMediaUrl('front_cover'),
-                        'back_cover_url' => $record->getFirstMediaUrl('back_cover', 'thumb') ?: $record->getFirstMediaUrl('back_cover'),
-                    ],
-                    'social_media' => $this->socialMediaData($record->socialMedia),
-                ],
+                'reference' => $this->referenceDetailData($record, $user),
                 'upcoming_events' => $record->events()
                     ->active()
                     ->where('starts_at', '>=', now())
@@ -688,17 +601,7 @@ class SearchController extends FrontendController
 
         return response()->json([
             'data' => [
-                'series' => [
-                    'id' => $record->id,
-                    'slug' => $record->slug,
-                    'title' => $record->title,
-                    'description' => $record->description,
-                    'visibility' => $record->visibility,
-                    'is_following' => $user?->isFollowing($record) ?? false,
-                    'media' => [
-                        'cover_url' => $record->getFirstMediaUrl('cover', 'thumb') ?: $record->getFirstMediaUrl('cover'),
-                    ],
-                ],
+                'series' => $this->seriesDetailData($record, $user),
                 'upcoming_events' => $record->events()
                     ->active()
                     ->where('starts_at', '>=', now())
@@ -1358,44 +1261,87 @@ class SearchController extends FrontendController
     /**
      * @return array<string, mixed>
      */
+    private function venueDetailData(Venue $venue): array
+    {
+        return VenueDetailData::fromModel(
+            venue: $venue,
+            contacts: $this->contactData($venue->contacts),
+            socialMedia: $this->socialMediaData($venue->socialMedia),
+        )->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function referenceDetailData(Reference $reference, ?User $user): array
+    {
+        return ReferenceDetailData::fromModel(
+            reference: $reference,
+            user: $user,
+            socialMedia: $this->socialMediaData($reference->socialMedia),
+        )->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function seriesDetailData(Series $series, ?User $user): array
+    {
+        return SeriesDetailData::fromModel($series, $user)->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function institutionDetailData(Institution $institution, ?User $user): array
+    {
+        $addressModel = $institution->addressModel;
+        $institutionMedia = $this->institutionCardMediaData($institution);
+        $addressLines = $this->addressDisplayLines($addressModel);
+
+        return InstitutionDetailData::fromModel(
+            institution: $institution,
+            user: $user,
+            addressLines: $addressLines,
+            address: $this->addressFilterData($addressModel),
+            country: $this->countryData($addressModel),
+            addressLine: $this->addressLocation($addressModel),
+            media: $institutionMedia,
+            speakerCount: $this->institutionSpeakerCount($institution),
+            contacts: $this->contactData($institution->contacts),
+            socialMedia: $this->socialMediaData($institution->socialMedia),
+            donationChannels: $institution->donationChannels
+                ->where('status', 'verified')
+                ->sortByDesc('is_default')
+                ->map(fn (DonationChannel $channel): array => $this->institutionDonationChannelData($channel))
+                ->values()
+                ->all(),
+        )->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function speakerDetailData(Speaker $speaker, ?User $user): array
     {
         $bio = $this->speakerBioData($speaker);
         $coverUrl = $speaker->getFirstMediaUrl('cover', 'banner') ?: $speaker->getFirstMediaUrl('cover');
 
-        return [
-            'id' => $speaker->id,
-            'slug' => $speaker->slug,
-            'name' => $speaker->name,
-            'formatted_name' => $speaker->formatted_name,
-            'job_title' => $speaker->job_title,
-            'is_freelance' => (bool) $speaker->is_freelance,
-            'bio' => $speaker->bio,
-            'bio_html' => $bio['html'],
-            'bio_text' => $bio['text'],
-            'bio_excerpt' => $bio['excerpt'],
-            'should_collapse_bio' => $bio['should_collapse'],
-            'qualifications' => is_array($speaker->qualifications) ? array_values($speaker->qualifications) : [],
-            'address' => $this->addressFilterData($speaker->addressModel),
-            'country' => $this->countryData($speaker->addressModel),
-            'location' => $this->addressLocation($speaker->addressModel),
-            'status' => $speaker->status,
-            'is_active' => (bool) $speaker->is_active,
-            'is_following' => $user?->isFollowing($speaker) ?? false,
-            'media' => [
-                'avatar_url' => $speaker->public_avatar_url,
-                'cover_url' => $coverUrl,
-                'share_image_url' => $speaker->hasMedia('avatar')
-                    ? $speaker->public_avatar_url
-                    : ($coverUrl !== '' ? $coverUrl : $speaker->default_avatar_url),
-            ],
-            'gallery' => $this->speakerGalleryData($speaker),
-            'institutions' => $speaker->institutions
+        return SpeakerDetailData::fromModel(
+            speaker: $speaker,
+            user: $user,
+            bio: $bio,
+            address: $this->addressFilterData($speaker->addressModel),
+            country: $this->countryData($speaker->addressModel),
+            location: $this->addressLocation($speaker->addressModel),
+            media: SpeakerDetailMediaData::fromModel($speaker, $coverUrl)->toArray(),
+            gallery: $this->speakerGalleryData($speaker),
+            institutions: $speaker->institutions
                 ->map(fn (Institution $institution): array => $this->speakerInstitutionData($institution))
                 ->all(),
-            'contacts' => $this->contactData($speaker->contacts),
-            'social_media' => $this->socialMediaData($speaker->socialMedia),
-        ];
+            contacts: $this->contactData($speaker->contacts),
+            socialMedia: $this->socialMediaData($speaker->socialMedia),
+        )->toArray();
     }
 
     /**
@@ -1403,58 +1349,7 @@ class SearchController extends FrontendController
      */
     private function eventListData(Event $event): array
     {
-        $eventTypeValues = $this->eventTypeValues($event);
-        $eventFormat = $event->event_format;
-        $eventFormatValue = $this->enumValue($eventFormat);
-        $status = $event->status;
-        $statusValue = (string) $status;
-
-        return [
-            'id' => $event->id,
-            'slug' => $event->slug,
-            'title' => $event->title,
-            'starts_at' => $this->optionalDateTimeString($event->starts_at),
-            'ends_at' => $this->optionalDateTimeString($event->ends_at),
-            'timing_display' => $event->timing_display,
-            'prayer_display_text' => $event->prayer_display_text,
-            'end_time_display' => $event->ends_at instanceof \DateTimeInterface
-                ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
-                : null,
-            'visibility' => $this->enumValue($event->visibility),
-            'status' => $statusValue,
-            'status_label' => $status instanceof HasLabel ? $status->getLabel() : Str::headline($statusValue),
-            'event_type' => $eventTypeValues,
-            'event_type_label' => $this->eventTypeLabel($eventTypeValues),
-            'event_format' => $eventFormatValue,
-            'event_format_label' => $this->eventFormatLabel($eventFormatValue),
-            'reference_study_subtitle' => $event->reference_study_subtitle,
-            'location' => $this->eventLocation($event),
-            'is_remote' => in_array($eventFormatValue, [EventFormat::Online->value, EventFormat::Hybrid->value], true),
-            'is_pending' => $statusValue === 'pending',
-            'is_cancelled' => $statusValue === 'cancelled',
-            'has_poster' => $event->hasMedia('poster'),
-            'card_image_url' => $event->card_image_url,
-            'institution' => $event->institution ? [
-                'id' => $event->institution->id,
-                'name' => $event->institution->name,
-                'slug' => $event->institution->slug,
-                'display_name' => $event->institution->display_name,
-                'public_image_url' => $event->institution->public_image_url,
-                'logo_url' => $event->institution->getFirstMediaUrl('logo', 'thumb') ?: $event->institution->getFirstMediaUrl('logo'),
-            ] : null,
-            'venue' => $event->venue ? [
-                'id' => $event->venue->id,
-                'name' => $event->venue->name,
-                'slug' => $event->venue->slug,
-            ] : null,
-            'speakers' => $event->speakers->map(fn (Speaker $speaker): array => [
-                'id' => $speaker->id,
-                'name' => $speaker->name,
-                'formatted_name' => $speaker->formatted_name,
-                'slug' => $speaker->slug,
-                'avatar_url' => $speaker->public_avatar_url,
-            ])->values()->all(),
-        ];
+        return EventListData::fromModel($event)->toArray();
     }
 
     /**
@@ -1476,26 +1371,7 @@ class SearchController extends FrontendController
      */
     private function institutionListData(Institution $institution): array
     {
-        $eventsCount = (int) ($institution->events_count ?? 0);
-        $media = $this->institutionCardMediaData($institution);
-        $location = $this->addressLocation($institution->address);
-
-        return [
-            'id' => $institution->id,
-            'slug' => $institution->slug,
-            'name' => $institution->name,
-            'nickname' => $institution->nickname,
-            'display_name' => $institution->display_name,
-            'events_count' => $eventsCount,
-            'event_count' => $eventsCount,
-            'public_image_url' => $media['public_image_url'],
-            'image_url' => $media['image_url'],
-            'logo_url' => $media['logo_url'],
-            'cover_url' => $media['cover_url'],
-            'country' => $this->countryData($institution->address),
-            'location' => $location,
-            'location_text' => $location,
-        ];
+        return InstitutionListData::fromModel($institution)->toArray();
     }
 
     /**
@@ -1524,21 +1400,7 @@ class SearchController extends FrontendController
      */
     private function speakerListData(Speaker $speaker, ?User $user = null): array
     {
-        $attributes = $speaker->getAttributes();
-        $isFollowing = array_key_exists('is_following', $attributes)
-            ? (bool) $attributes['is_following']
-            : ($user?->isFollowing($speaker) ?? false);
-
-        return [
-            'id' => $speaker->id,
-            'slug' => $speaker->slug,
-            'name' => $speaker->name,
-            'formatted_name' => $speaker->formatted_name,
-            'events_count' => (int) ($speaker->events_count ?? 0),
-            'avatar_url' => $speaker->public_avatar_url,
-            'country' => $this->countryData($speaker->addressModel),
-            'is_following' => $isFollowing,
-        ];
+        return SpeakerListData::fromModel($speaker, $user)->toArray();
     }
 
     /**
@@ -1585,25 +1447,7 @@ class SearchController extends FrontendController
      */
     private function speakerInstitutionData(Institution $institution): array
     {
-        $media = $this->institutionCardMediaData($institution);
-        $logoUrl = $media['logo_url'];
-        $coverUrl = $media['cover_url'];
-        $publicImageUrl = $media['public_image_url'];
-        $position = data_get($institution, 'pivot.position');
-        $isPrimary = data_get($institution, 'pivot.is_primary');
-
-        return [
-            'id' => $institution->id,
-            'name' => $institution->name,
-            'display_name' => $institution->display_name,
-            'slug' => $institution->slug,
-            'position' => is_string($position) && $position !== '' ? $position : null,
-            'is_primary' => (bool) $isPrimary,
-            'public_image_url' => $publicImageUrl,
-            'logo_url' => $logoUrl,
-            'cover_url' => $coverUrl,
-            'chip_image_url' => $publicImageUrl,
-        ];
+        return SpeakerInstitutionData::fromModel($institution, $this->institutionCardMediaData($institution))->toArray();
     }
 
     /**
@@ -1612,13 +1456,16 @@ class SearchController extends FrontendController
     private function speakerGalleryData(Speaker $speaker): array
     {
         return $speaker->getMedia('gallery')
-            ->map(fn (Media $media): array => [
-                'id' => (string) $media->getKey(),
-                'name' => $media->name,
-                'url' => $media->getUrl(),
-                'thumb_url' => $media->getAvailableUrl(['gallery_thumb']) ?: $media->getUrl(),
-            ])
+            ->map(fn (Media $media): array => SpeakerGalleryItemData::fromModel($media)->toArray())
             ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function institutionDonationChannelData(DonationChannel $channel): array
+    {
+        return InstitutionDonationChannelData::fromModel($channel)->toArray();
     }
 
     /**
@@ -1643,76 +1490,6 @@ class SearchController extends FrontendController
             'excerpt' => $text !== '' ? Str::limit($text, 180) : null,
             'should_collapse' => Str::length($text) > 680,
         ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function eventTypeValues(Event $event): array
-    {
-        $eventType = $event->event_type;
-
-        if ($eventType instanceof Collection) {
-            return $eventType
-                ->map(fn (EventType $value): string => $value->value)
-                ->filter(fn (string $value): bool => $value !== '')
-                ->values()
-                ->all();
-        }
-
-        if (is_array($eventType)) {
-            return array_values(array_filter(array_map(strval(...), $eventType), static fn (string $value): bool => $value !== ''));
-        }
-
-        $value = $this->enumValue($eventType);
-
-        return $value !== '' ? [$value] : [];
-    }
-
-    /**
-     * @param  list<string>  $eventTypeValues
-     */
-    private function eventTypeLabel(array $eventTypeValues): string
-    {
-        $value = $eventTypeValues[0] ?? null;
-
-        if (! is_string($value) || $value === '') {
-            return __('Umum');
-        }
-
-        return EventType::tryFrom($value)?->getLabel() ?? __('Umum');
-    }
-
-    private function eventFormatLabel(string $eventFormatValue): string
-    {
-        if ($eventFormatValue === '') {
-            return EventFormat::Physical->getLabel();
-        }
-
-        return EventFormat::tryFrom($eventFormatValue)?->getLabel() ?? Str::headline($eventFormatValue);
-    }
-
-    private function eventLocation(Event $event): ?string
-    {
-        $venue = $event->venue;
-        $institution = $event->institution;
-        $primaryLocationName = $venue?->name ?: $institution?->name;
-        $address = $venue?->addressModel;
-
-        if (! $address instanceof Address) {
-            $address = $institution?->addressModel;
-        }
-
-        $parts = array_values(array_filter([
-            $primaryLocationName,
-            ...AddressHierarchyFormatter::parts($address),
-        ], static fn (mixed $value): bool => is_string($value) && $value !== ''));
-
-        if ($parts === []) {
-            return null;
-        }
-
-        return implode(', ', $parts);
     }
 
     private function keyPersonRoleLabel(mixed $role): string
@@ -1798,22 +1575,7 @@ class SearchController extends FrontendController
      */
     private function countryData(?Address $address): ?array
     {
-        if (! $address instanceof Address || ! is_numeric($address->country_id)) {
-            return null;
-        }
-
-        $address->loadMissing('country');
-
-        if ($address->country === null) {
-            return null;
-        }
-
-        return [
-            'id' => (int) $address->country->id,
-            'name' => (string) $address->country->name,
-            'iso2' => strtoupper((string) $address->country->iso2),
-            'key' => app(PublicCountryRegistry::class)->keyForCountryId((int) $address->country->id),
-        ];
+        return CountryData::fromAddress($address)?->toArray();
     }
 
     /**
@@ -1922,5 +1684,21 @@ class SearchController extends FrontendController
         $location = AddressHierarchyFormatter::format($address);
 
         return $location !== '' ? $location : null;
+    }
+
+    private function institutionSpeakerCount(Institution $institution): int
+    {
+        return (int) DB::table('event_key_people')
+            ->where('role', EventKeyPersonRole::Speaker->value)
+            ->whereNotNull('speaker_id')
+            ->whereIn('event_id', function ($sub) use ($institution): void {
+                $sub->select('id')
+                    ->from('events')
+                    ->where('institution_id', $institution->id)
+                    ->where('is_active', true)
+                    ->where('starts_at', '>=', now());
+            })
+            ->distinct('speaker_id')
+            ->count();
     }
 }

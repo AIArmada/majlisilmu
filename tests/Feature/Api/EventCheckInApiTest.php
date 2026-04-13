@@ -23,21 +23,39 @@ it('returns check-in state and records a self-reported check-in for open events'
 
     Sanctum::actingAs($user);
 
-    $this->getJson(route('api.events.check-in-state.show', $event))
+    $stateResponse = $this->getJson(route('api.events.check-in-state.show', $event));
+
+    $stateResponse
         ->assertOk()
+        ->assertJsonPath('data.is_checked_in', false)
         ->assertJsonPath('data.available', true)
-        ->assertJsonPath('data.method', 'self_reported');
+        ->assertJsonPath('data.reason', null)
+        ->assertJsonPath('data.method', 'self_reported')
+        ->assertJsonPath('data.registration_id', null)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
-    $this->postJson(route('api.events.check-ins.store', $event))
+    $storeResponse = $this->postJson(route('api.events.check-ins.store', $event));
+
+    $storeResponse
         ->assertCreated()
+        ->assertJsonPath('message', 'Check-in recorded successfully.')
         ->assertJsonPath('data.status', 'created')
-        ->assertJsonPath('data.checkin.method', 'self_reported');
+        ->assertJsonPath('data.checkin.event_id', $event->id)
+        ->assertJsonPath('data.checkin.user_id', $user->id)
+        ->assertJsonPath('data.checkin.registration_id', null)
+        ->assertJsonPath('data.checkin.method', 'self_reported')
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
-    expect(EventCheckin::query()
+    $checkin = EventCheckin::query()
         ->where('event_id', $event->id)
         ->where('user_id', $user->id)
         ->where('method', 'self_reported')
-        ->count())->toBe(1);
+        ->firstOrFail();
+
+    $storeResponse->assertJsonPath('data.checkin.id', $checkin->id)
+        ->assertJsonPath('data.checkin.checked_in_at', $checkin->checked_in_at?->format(DateTimeInterface::ATOM));
+
+    expect($checkin->registration_id)->toBeNull();
 });
 
 it('requires registration before check-in when the event requires registration', function () {
@@ -123,9 +141,18 @@ it('returns a duplicate status instead of creating a second check-in', function 
     $this->postJson(route('api.events.check-ins.store', $event))
         ->assertCreated();
 
+    $existingCheckin = EventCheckin::query()
+        ->where('event_id', $event->id)
+        ->where('user_id', $user->id)
+        ->firstOrFail();
+
     $this->postJson(route('api.events.check-ins.store', $event))
         ->assertOk()
-        ->assertJsonPath('data.status', 'duplicate');
+        ->assertJsonPath('message', 'You have already checked in for this event.')
+        ->assertJsonPath('data.status', 'duplicate')
+        ->assertJsonPath('data.checkin.id', $existingCheckin->id)
+        ->assertJsonPath('data.checkin.method', 'self_reported')
+        ->assertJsonPath('data.checkin.checked_in_at', $existingCheckin->checked_in_at?->format(DateTimeInterface::ATOM));
 
     expect(EventCheckin::query()
         ->where('event_id', $event->id)

@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Events\RecordEventCheckInAction;
 use App\Actions\Events\ResolveEventCheckInStateAction;
+use App\Data\Api\EventCheckIn\EventCheckInData;
+use App\Data\Api\EventCheckIn\EventCheckInStateData;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\User;
-use DateTimeInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -26,13 +27,7 @@ class EventCheckInController extends Controller
             ->exists();
 
         return response()->json([
-            'data' => [
-                'is_checked_in' => $isCheckedIn,
-                'available' => $state['available'],
-                'reason' => $state['reason'],
-                'method' => $state['method'],
-                'registration_id' => $state['registration_id'],
-            ],
+            'data' => EventCheckInStateData::fromState($isCheckedIn, $state)->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -74,7 +69,7 @@ class EventCheckInController extends Controller
             'message' => $message,
             'data' => [
                 'status' => $result['status'],
-                'checkin' => $this->checkinData($result['checkin']),
+                'checkin' => EventCheckInData::fromModel($result['checkin'])->toArray(),
             ],
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
@@ -89,22 +84,5 @@ class EventCheckInController extends Controller
         abort_unless($user instanceof User, 403);
 
         return $user->fresh() ?? $user;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function checkinData(EventCheckin $checkin): array
-    {
-        return [
-            'id' => $checkin->id,
-            'event_id' => $checkin->event_id,
-            'user_id' => $checkin->user_id,
-            'registration_id' => $checkin->registration_id,
-            'method' => $checkin->method,
-            'checked_in_at' => $checkin->checked_in_at instanceof DateTimeInterface
-                ? $checkin->checked_in_at->format(DateTimeInterface::ATOM)
-                : null,
-        ];
     }
 }

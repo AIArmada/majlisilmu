@@ -70,6 +70,18 @@ Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - Before adding a new action, check whether the behavior is already covered by an existing action and extend that path instead of duplicating orchestration
 - Keep controllers and Livewire components focused on HTTP/UI concerns when a workflow is substantial enough to extract
 
+### 8. Spatie Laravel Data Adoption
+
+- Use `spatie/laravel-data` as a boundary-contract layer, not as a default application pattern.
+- Prefer Data objects for API response DTOs when controllers build large nested arrays, the same payload shape is reused across endpoints, or public/mobile contracts need stronger consistency.
+- Consider Data objects for controller-to-action payloads only when the request state is large, nested, reused, or shared across multiple entrypoints.
+- Start with output-only refactors when introducing Data on existing public APIs. Keep keys, nullability, nesting, status codes, and error shapes unchanged, and lock parity with focused tests.
+- Treat input and validation refactors as externally observable behavior changes unless proven otherwise. Add request/response contract tests before widening Data usage on writes.
+- Do not adopt Data broadly in Livewire or Filament form state by default. Prefer native array state unless a specific component proves a clear hydration or reuse benefit.
+- Do not rewrite simple internal readonly DTOs or tiny mutation endpoints just for consistency.
+- For dynamic catalog/config payloads and small one-off arrays, prefer plain arrays or readonly PHP objects over Data classes.
+- When in doubt, use fewer Data classes and place them on stable boundaries such as public/mobile API serializers.
+
 ## Task Management
 
 1. *Plan First*: Write plan to 'tasks/todo.md' with checkable items

@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Events\MarkEventGoingAction;
 use App\Actions\Events\RemoveEventGoingAction;
+use App\Data\Api\EventEngagement\EventEngagementListItemData;
+use App\Data\Api\EventGoing\EventGoingResultData;
+use App\Data\Api\EventGoing\EventGoingStateData;
 use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -26,7 +29,9 @@ class EventGoingController extends Controller
             ->paginate($request->integer('per_page', 20));
 
         return response()->json([
-            'data' => $goingEvents->items(),
+            'data' => collect($goingEvents->items())
+                ->map(fn (Event $event): array => EventEngagementListItemData::fromModel($event)->payload())
+                ->all(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [
@@ -46,10 +51,7 @@ class EventGoingController extends Controller
             ->exists();
 
         return response()->json([
-            'data' => [
-                'is_going' => $isGoing,
-                'going_count' => (int) ($event->going_count ?? 0),
-            ],
+            'data' => EventGoingStateData::fromState($isGoing, (int) ($event->going_count ?? 0))->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -88,10 +90,7 @@ class EventGoingController extends Controller
         }
 
         return response()->json([
-            'data' => [
-                'message' => 'Going recorded successfully.',
-                'going_count' => $goingState['going_count'],
-            ],
+            'data' => EventGoingResultData::fromOutcome('Going recorded successfully.', $goingState['going_count'])->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -112,10 +111,7 @@ class EventGoingController extends Controller
         }
 
         return response()->json([
-            'data' => [
-                'message' => 'Going removed successfully.',
-                'going_count' => $result['going_count'],
-            ],
+            'data' => EventGoingResultData::fromOutcome('Going removed successfully.', $result['going_count'])->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],

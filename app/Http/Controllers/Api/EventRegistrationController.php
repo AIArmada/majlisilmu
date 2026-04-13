@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\Events\RegisterForEventAction;
+use App\Data\Api\EventRegistration\EventRegistrationData;
+use App\Data\Api\EventRegistration\EventRegistrationStatusData;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\Registration;
@@ -31,7 +33,7 @@ class EventRegistrationController extends Controller
         );
 
         return response()->json([
-            'data' => $this->registrationData($registration),
+            'data' => EventRegistrationData::fromModel($registration)->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -47,13 +49,12 @@ class EventRegistrationController extends Controller
             ->latest('created_at')
             ->first();
 
+        $registrationData = $registration instanceof Registration
+            ? EventRegistrationData::fromModel($registration)
+            : null;
+
         return response()->json([
-            'data' => [
-                'is_registered' => $registration instanceof Registration,
-                'registration' => $registration instanceof Registration
-                    ? $this->registrationData($registration)
-                    : null,
-            ],
+            'data' => EventRegistrationStatusData::fromNullableRegistration($registrationData)->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
@@ -67,22 +68,5 @@ class EventRegistrationController extends Controller
         abort_unless($user instanceof User, 403);
 
         return $user->fresh() ?? $user;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function registrationData(Registration $registration): array
-    {
-        return [
-            'id' => $registration->id,
-            'event_id' => $registration->event_id,
-            'user_id' => $registration->user_id,
-            'name' => $registration->name,
-            'email' => $registration->email,
-            'phone' => $registration->phone,
-            'status' => $registration->status,
-            'created_at' => $registration->created_at?->toIso8601String(),
-        ];
     }
 }

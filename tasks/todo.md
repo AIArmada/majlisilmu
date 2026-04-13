@@ -1,3 +1,14 @@
+# Laravel Data Adoption Guidance
+
+- [x] Audit current `spatie/laravel-data` usage and candidate surfaces
+- [x] Add selective-adoption rules to the guideline sources
+- [x] Propose the safest first implementation slice with exact scope
+
+## Review
+
+- Added selective `spatie/laravel-data` adoption rules to [/Users/Saiffil/Herd/majlisilmu/.ai/guidelines/general.blade.php](/Users/Saiffil/Herd/majlisilmu/.ai/guidelines/general.blade.php), [/Users/Saiffil/Herd/majlisilmu/AGENTS.md](/Users/Saiffil/Herd/majlisilmu/AGENTS.md), and [/Users/Saiffil/Herd/majlisilmu/.github/copilot-instructions.md](/Users/Saiffil/Herd/majlisilmu/.github/copilot-instructions.md).
+- Recommended the first implementation slice as output-only API serializers centered on the public event/search payloads, with request payload DTOs deferred until parity tests exist.
+
 # API Country Contract Redesign
 
 - [x] Normalize explicit country input across public and admin APIs using `country_id` as canonical and `country_code` / `country_key` as aliases

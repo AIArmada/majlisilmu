@@ -7,9 +7,9 @@ use App\Actions\Auth\AuthenticateSocialiteApiUserAction;
 use App\Actions\Auth\RegisterApiUserAction;
 use App\Actions\Auth\RevokeCurrentApiTokenAction;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Data\Api\Auth\AuthTokenData;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use DateTimeInterface;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -37,11 +37,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'API account registered successfully.',
-            'data' => [
-                'access_token' => $result['access_token'],
-                'token_type' => 'Bearer',
-                'user' => $this->userData($result['user']),
-            ],
+            'data' => AuthTokenData::fromToken($result['access_token'], $result['user'])->toArray(),
         ], 201);
     }
 
@@ -70,11 +66,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'API login successful.',
-            'data' => [
-                'access_token' => $result['access_token'],
-                'token_type' => 'Bearer',
-                'user' => $this->userData($result['user']),
-            ],
+            'data' => AuthTokenData::fromToken($result['access_token'], $result['user'])->toArray(),
         ]);
     }
 
@@ -98,11 +90,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'API Google login successful.',
-            'data' => [
-                'access_token' => $result['access_token'],
-                'token_type' => 'Bearer',
-                'user' => $this->userData($result['user']),
-            ],
+            'data' => AuthTokenData::fromToken($result['access_token'], $result['user'])->toArray(),
         ]);
     }
 
@@ -212,25 +200,5 @@ class AuthController extends Controller
     protected function passwordBroker(): string
     {
         return (string) config('fortify.passwords', 'users');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function userData(User $user): array
-    {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'timezone' => $user->timezone,
-            'email_verified_at' => $user->email_verified_at instanceof DateTimeInterface
-                ? $user->email_verified_at->format(DateTimeInterface::ATOM)
-                : null,
-            'phone_verified_at' => $user->phone_verified_at instanceof DateTimeInterface
-                ? $user->phone_verified_at->format(DateTimeInterface::ATOM)
-                : null,
-        ];
     }
 }
