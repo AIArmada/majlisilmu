@@ -936,7 +936,7 @@ class SearchController extends FrontendController
             ),
             'countries' => $this->queryVersionSegment(
                 Country::query(),
-                ['id', 'name', 'iso2', 'updated_at'],
+                ['id', 'name', 'iso2'],
             ),
             'public_countries' => app(PublicCountryRegistry::class)->all(),
             'addresses' => $this->queryVersionSegment(
@@ -968,7 +968,7 @@ class SearchController extends FrontendController
             ),
             'countries' => $this->queryVersionSegment(
                 Country::query(),
-                ['id', 'name', 'iso2', 'updated_at'],
+                ['id', 'name', 'iso2'],
             ),
             'public_countries' => app(PublicCountryRegistry::class)->all(),
             'addresses' => $this->queryVersionSegment(
