@@ -1036,6 +1036,58 @@ it('bumps the institution directory cache version when institution media changes
         ->and($updatedVersion)->not->toBe($initialVersion);
 });
 
+it('bumps the institution directory cache version when institution addresses change', function () {
+    $malaysiaId = ensureFrontendApiMalaysiaCountryExists();
+
+    $institution = Institution::factory()->create([
+        'name' => 'Institution Cache Address',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $institution->address()->create([
+        'country_id' => $malaysiaId,
+        'line1' => 'Alamat Direktori Baharu',
+    ]);
+
+    $updatedVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
+it('bumps the institution directory cache version when public institution events change', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Institution Cache Event',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'event_structure' => EventStructure::Standalone,
+        'is_active' => true,
+    ]);
+
+    $updatedVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
 it('keeps placeholder institution imagery when no real media exists', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
@@ -1301,6 +1353,38 @@ it('bumps the speaker directory cache version when speaker media changes', funct
 
     $speaker->addMedia(UploadedFile::fake()->image('speaker-cache-media.jpg', 1200, 1200))
         ->toMediaCollection('avatar');
+
+    $updatedVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedVersion)->toBeString()->not->toBe('')
+        ->and($updatedVersion)->not->toBe($initialVersion);
+});
+
+it('bumps the speaker directory cache version when speaker event participation changes', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Speaker Cache Event',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $initialVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'event_structure' => EventStructure::Standalone,
+        'is_active' => true,
+        'starts_at' => now()->addDays(3)->setTime(19, 0),
+    ]);
+
+    EventKeyPerson::factory()
+        ->for($event, 'event')
+        ->for($speaker, 'speaker')
+        ->create();
 
     $updatedVersion = $this->getJson(route('api.client.speakers.index'))
         ->assertOk()

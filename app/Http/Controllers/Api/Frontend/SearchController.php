@@ -12,6 +12,7 @@ use App\Enums\InspirationCategory;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
+use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Inspiration;
@@ -31,10 +32,12 @@ use Dedoc\Scramble\Attributes\Group;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -226,6 +229,22 @@ class SearchController extends FrontendController
                     'display_name' => $record->display_name,
                     'description' => $record->description,
                     'status' => $record->status,
+                    'type_label' => $record->type instanceof HasLabel ? $record->type->getLabel() : null,
+                    'address_line' => $this->addressLocation($record->addressModel),
+                    'map_url' => $record->addressModel?->google_maps_url,
+                    'followers_count' => $record->followersCount(),
+                    'speaker_count' => DB::table('event_key_people')
+                        ->where('role', EventKeyPersonRole::Speaker->value)
+                        ->whereNotNull('speaker_id')
+                        ->whereIn('event_id', function ($sub) use ($record): void {
+                            $sub->select('id')
+                                ->from('events')
+                                ->where('institution_id', $record->id)
+                                ->where('is_active', true)
+                                ->where('starts_at', '>=', now());
+                        })
+                        ->distinct('speaker_id')
+                        ->count(),
                     'is_following' => $user?->isFollowing($record) ?? false,
                     'media' => [
                         'public_image_url' => $institutionMedia['public_image_url'],
@@ -234,6 +253,29 @@ class SearchController extends FrontendController
                     ],
                     'contacts' => $this->contactData($record->contacts),
                     'social_media' => $this->socialMediaData($record->socialMedia),
+                    'waze_url' => $record->addressModel?->waze_url,
+                    'donation_channels' => $record->donationChannels
+                        ->where('status', 'verified')
+                        ->sortByDesc('is_default')
+                        ->map(fn (DonationChannel $channel): array => [
+                            'id' => $channel->id,
+                            'label' => $channel->label,
+                            'method' => $channel->method,
+                            'method_display' => $channel->method_display,
+                            'recipient' => $channel->recipient,
+                            'payment_details' => $channel->payment_details,
+                            'bank_name' => $channel->bank_name,
+                            'bank_code' => $channel->bank_code,
+                            'account_number' => $channel->account_number,
+                            'duitnow_type' => $channel->duitnow_type,
+                            'duitnow_value' => $channel->duitnow_value,
+                            'ewallet_provider' => $channel->ewallet_provider,
+                            'ewallet_handle' => $channel->ewallet_handle,
+                            'is_default' => $channel->is_default,
+                            'qr_url' => $channel->getFirstMediaUrl('qr', 'thumb') ?: $channel->getFirstMediaUrl('qr') ?: null,
+                        ])
+                        ->values()
+                        ->all(),
                 ],
                 'upcoming_events' => $record->events()
                     ->active()
@@ -842,15 +884,26 @@ class SearchController extends FrontendController
      */
     private function institutionDirectoryCacheData(): array
     {
-        $institutionFingerprints = $this->baseInstitutionQuery()
-            ->orderBy('id')
-            ->get()
-            ->map(fn (Institution $institution): array => $this->institutionListData($institution))
-            ->all();
+        $institutionQuery = $this->institutionDirectoryInstitutionQuery();
 
-        return [
-            'version' => sha1(json_encode($institutionFingerprints) ?: ''),
-        ];
+        return $this->directoryCacheVersion([
+            'institutions' => $this->queryVersionSegment(
+                $institutionQuery,
+                ['id', 'type', 'name', 'nickname', 'slug', 'status', 'is_active', 'updated_at'],
+            ),
+            'addresses' => $this->queryVersionSegment(
+                $this->institutionDirectoryAddressQuery($institutionQuery),
+                ['id', 'addressable_id', 'country_id', 'state_id', 'district_id', 'subdistrict_id', 'city_id', 'line1', 'postcode', 'updated_at'],
+            ),
+            'media' => $this->queryVersionSegment(
+                $this->directoryMediaQuery((new Institution)->getMorphClass(), ['logo', 'cover'], $institutionQuery),
+                ['id', 'model_id', 'collection_name', 'file_name', 'updated_at'],
+            ),
+            'events' => $this->queryVersionSegment(
+                $this->institutionDirectoryEventQuery($institutionQuery),
+                ['id', 'institution_id', 'status', 'visibility', 'event_structure', 'is_active', 'updated_at'],
+            ),
+        ]);
     }
 
     /**
@@ -858,41 +911,165 @@ class SearchController extends FrontendController
      */
     private function speakerDirectoryCacheData(): array
     {
-        $speakerQuery = Speaker::query()
+        $speakerQuery = $this->speakerDirectorySpeakerQuery();
+
+        return $this->directoryCacheVersion([
+            'speakers' => $this->queryVersionSegment(
+                $speakerQuery,
+                ['id', 'slug', 'name', 'gender', 'honorific', 'pre_nominal', 'post_nominal', 'job_title', 'status', 'is_active', 'updated_at'],
+            ),
+            'media' => $this->queryVersionSegment(
+                $this->directoryMediaQuery((new Speaker)->getMorphClass(), ['avatar', 'cover'], $speakerQuery),
+                ['id', 'model_id', 'collection_name', 'file_name', 'updated_at'],
+            ),
+            'event_key_people' => $this->queryVersionSegment(
+                $this->speakerDirectoryEventKeyPersonQuery($speakerQuery),
+                ['id', 'event_id', 'speaker_id', 'updated_at'],
+            ),
+            'events' => $this->queryVersionSegment(
+                $this->speakerDirectoryEventQuery($speakerQuery),
+                ['id', 'status', 'visibility', 'event_structure', 'is_active', 'starts_at', 'updated_at'],
+            ),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $segments
+     * @return array{version: string}
+     */
+    private function directoryCacheVersion(array $segments): array
+    {
+        return [
+            'version' => sha1(json_encode($segments) ?: ''),
+        ];
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  list<string>  $columns
+     * @return array{count: int, latest: string}
+     */
+    private function queryVersionSegment(Builder $query, array $columns): array
+    {
+        return [
+            'count' => (clone $query)->count(),
+            'latest' => $this->latestFingerprint($query, $columns),
+        ];
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  list<string>  $columns
+     */
+    private function latestFingerprint(Builder $query, array $columns): string
+    {
+        $model = $query->getModel();
+        $latestQuery = (clone $query)->reorder();
+        $updatedAtColumn = $model->getUpdatedAtColumn();
+
+        if (is_string($updatedAtColumn) && $updatedAtColumn !== '') {
+            $latestQuery->orderByDesc($updatedAtColumn);
+        }
+
+        $latestQuery->orderByDesc($model->getKeyName());
+
+        $record = $latestQuery->first($columns);
+
+        if (! $record instanceof Model) {
+            return '';
+        }
+
+        return sha1(json_encode($record->getAttributes()) ?: '');
+    }
+
+    /**
+     * @return Builder<Institution>
+     */
+    private function institutionDirectoryInstitutionQuery(): Builder
+    {
+        return Institution::query()
             ->active()
             ->where('status', 'verified');
+    }
 
-        $speakerFingerprints = (clone $speakerQuery)
-            ->orderBy('id')
-            ->get(['id', 'slug', 'name', 'gender', 'job_title', 'status', 'is_active', 'updated_at'])
-            ->map(fn (Speaker $speaker): array => $speaker->getAttributes())
-            ->all();
-        $speakerMediaFingerprints = Media::query()
-            ->where('model_type', (new Speaker)->getMorphClass())
-            ->whereIn('collection_name', ['avatar', 'cover'])
-            ->whereIn('model_id', (clone $speakerQuery)->select('id'))
-            ->orderBy('id')
-            ->get(['id', 'model_id', 'collection_name', 'file_name', 'updated_at'])
-            ->map(fn (Media $media): array => $media->getAttributes())
-            ->all();
-        $eventFingerprints = Event::query()
+    /**
+     * @param  Builder<Institution>  $institutionQuery
+     * @return Builder<Address>
+     */
+    private function institutionDirectoryAddressQuery(Builder $institutionQuery): Builder
+    {
+        return Address::query()
+            ->where('addressable_type', (new Institution)->getMorphClass())
+            ->whereIn('addressable_id', (clone $institutionQuery)->select('id'));
+    }
+
+    /**
+     * @param  Builder<Institution>  $institutionQuery
+     * @return Builder<Event>
+     */
+    private function institutionDirectoryEventQuery(Builder $institutionQuery): Builder
+    {
+        return Event::query()
+            ->whereIn('institution_id', (clone $institutionQuery)->select('id'))
+            ->where('events.is_active', true)
+            ->whereIn('events.status', Event::PUBLIC_STATUSES)
+            ->where('events.visibility', EventVisibility::Public)
+            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
+    }
+
+    /**
+     * @return Builder<Speaker>
+     */
+    private function speakerDirectorySpeakerQuery(): Builder
+    {
+        return Speaker::query()
+            ->active()
+            ->where('status', 'verified');
+    }
+
+    /**
+     * @param  Builder<Speaker>  $speakerQuery
+     * @return Builder<Event>
+     */
+    private function speakerDirectoryEventQuery(Builder $speakerQuery): Builder
+    {
+        return Event::query()
+            ->whereIn('events.id', EventKeyPerson::query()
+                ->select('event_id')
+                ->whereIn('speaker_id', (clone $speakerQuery)->select('id')))
             ->where('events.is_active', true)
             ->whereIn('events.status', Event::PUBLIC_STATUSES)
             ->where('events.visibility', EventVisibility::Public)
             ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-            ->where('events.starts_at', '>=', now())
-            ->orderBy('id')
-            ->get(['id', 'starts_at', 'status', 'visibility', 'event_structure', 'updated_at'])
-            ->map(fn (Event $event): array => $event->getAttributes())
-            ->all();
+            ->where('events.starts_at', '>=', now());
+    }
 
-        return [
-            'version' => sha1(json_encode([
-                'speakers' => $speakerFingerprints,
-                'media' => $speakerMediaFingerprints,
-                'events' => $eventFingerprints,
-            ]) ?: ''),
-        ];
+    /**
+     * @param  Builder<Speaker>  $speakerQuery
+     * @return Builder<EventKeyPerson>
+     */
+    private function speakerDirectoryEventKeyPersonQuery(Builder $speakerQuery): Builder
+    {
+        return EventKeyPerson::query()
+            ->whereIn('speaker_id', (clone $speakerQuery)->select('id'))
+            ->whereIn('event_id', $this->speakerDirectoryEventQuery($speakerQuery)->select('events.id'));
+    }
+
+    /**
+     * @param  Builder<Institution>|Builder<Speaker>  $directoryQuery
+     * @param  list<string>  $collections
+     * @return Builder<Media>
+     */
+    private function directoryMediaQuery(string $modelType, array $collections, Builder $directoryQuery): Builder
+    {
+        return Media::query()
+            ->where('model_type', $modelType)
+            ->whereIn('collection_name', $collections)
+            ->whereIn('model_id', (clone $directoryQuery)->select('id'));
     }
 
     /**
@@ -1067,6 +1244,7 @@ class SearchController extends FrontendController
             'starts_at' => $this->optionalDateTimeString($event->starts_at),
             'ends_at' => $this->optionalDateTimeString($event->ends_at),
             'timing_display' => $event->timing_display,
+            'prayer_display_text' => $event->prayer_display_text,
             'end_time_display' => $event->ends_at instanceof \DateTimeInterface
                 ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
                 : null,
@@ -1097,6 +1275,13 @@ class SearchController extends FrontendController
                 'name' => $event->venue->name,
                 'slug' => $event->venue->slug,
             ] : null,
+            'speakers' => $event->speakers->map(fn (Speaker $speaker): array => [
+                'id' => $speaker->id,
+                'name' => $speaker->name,
+                'formatted_name' => $speaker->formatted_name,
+                'slug' => $speaker->slug,
+                'avatar_url' => $speaker->public_avatar_url,
+            ])->values()->all(),
         ];
     }
 

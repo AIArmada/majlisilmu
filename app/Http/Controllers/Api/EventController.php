@@ -7,6 +7,7 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\Speaker;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
 use App\Support\Timezone\UserDateTimeFormatter;
@@ -379,12 +380,28 @@ class EventController extends Controller
     {
         $posterUrl = $this->preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']);
 
-        return [
+        $payload = [
             ...$event->toArray(),
             'card_image_url' => $event->card_image_url,
             'poster_url' => $posterUrl,
             'has_poster' => $event->hasMedia('poster'),
         ];
+
+        if ($event->relationLoaded('speakers')) {
+            $event->speakers->loadMissing('media');
+            $payload['speakers'] = $event->speakers
+                ->map(fn (Speaker $speaker): array => [
+                    'id' => $speaker->id,
+                    'name' => $speaker->name,
+                    'formatted_name' => $speaker->formatted_name,
+                    'slug' => $speaker->slug,
+                    'avatar_url' => $speaker->public_avatar_url,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $payload;
     }
 
     /**
