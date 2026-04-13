@@ -1494,6 +1494,60 @@ it('returns authenticated follow state in the frontend speaker api', function ()
         ->assertJsonPath('data.0.is_following', true);
 });
 
+it('returns the total followed speaker count for the full speaker query, not just the current page', function () {
+    $user = User::factory()->create();
+
+    $followedSpeakers = Speaker::factory()->count(3)->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $unfollowedSpeaker = Speaker::factory()->create([
+        'name' => 'Unfollowed Speaker',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    foreach ($followedSpeakers as $speaker) {
+        $user->follow($speaker);
+    }
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.speakers.index', ['per_page' => 1]))
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.total', 4)
+        ->assertJsonPath('meta.following.total', 3);
+});
+
+it('supports server-side filtering to only followed speakers in the frontend speaker api', function () {
+    $user = User::factory()->create();
+
+    $followedSpeaker = Speaker::factory()->create([
+        'name' => 'Followed Speaker Only',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Speaker::factory()->create([
+        'name' => 'Not Followed Speaker',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($followedSpeaker);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.speakers.index', ['following' => 1]))
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', $followedSpeaker->slug)
+        ->assertJsonPath('data.0.is_following', true)
+        ->assertJsonPath('meta.pagination.total', 1)
+        ->assertJsonPath('meta.following.total', 1);
+});
+
 it('bumps the speaker directory cache version when speaker records change', function () {
     $speaker = Speaker::factory()->create([
         'name' => 'Speaker Cache Version',
