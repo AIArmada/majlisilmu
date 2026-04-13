@@ -1,3 +1,10 @@
+# API Country Contract Redesign
+
+- [x] Normalize explicit country input across public and admin APIs using `country_id` as canonical and `country_code` / `country_key` as aliases
+- [x] Remove implicit speaker-country and legacy submit-event country fallback behavior while keeping hidden UI defaults intact
+- [x] Expose explicit country data on institution and speaker API reads and add missing country filters
+- [x] Update Scramble descriptions, mobile API docs, and focused API tests, then rerun verification
+
 # Account Settings Password Layout Follow-up
 
 - [x] Move the new password and confirmation fields side by side on desktop

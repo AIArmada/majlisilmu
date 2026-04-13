@@ -12,6 +12,7 @@ use App\Enums\InspirationCategory;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
+use App\Models\Country;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
@@ -24,11 +25,17 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use App\Support\ApiDocumentation\Schemas\InstitutionDetailResponse;
+use App\Support\ApiDocumentation\Schemas\InstitutionDirectoryResponse;
+use App\Support\ApiDocumentation\Schemas\SpeakerDetailResponse;
+use App\Support\ApiDocumentation\Schemas\SpeakerDirectoryResponse;
 use App\Support\Location\AddressHierarchyFormatter;
+use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\Response;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
@@ -101,10 +108,15 @@ class SearchController extends FrontendController
     }
 
     #[Group('Institution')]
+    #[Response(
+        status: 200,
+        description: 'Institution directory response.',
+        type: InstitutionDirectoryResponse::class,
+    )]
     public function institutions(Request $request): JsonResponse
     {
         $search = $this->normalizedString($request->query('search'));
-        $countryId = $this->normalizedInt($request->query('country_id'));
+        $countryId = $this->requestedCountryId($request);
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
         $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
@@ -128,18 +140,29 @@ class SearchController extends FrontendController
     }
 
     #[Group('Speaker')]
+    #[Response(
+        status: 200,
+        description: 'Speaker directory response.',
+        type: SpeakerDirectoryResponse::class,
+    )]
     public function speakers(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
         $directorySeed = $this->normalizedString($request->query('directory_seed'));
         $perPage = $request->integer('per_page', 12);
+        $countryId = $this->requestedCountryId($request);
+        $stateId = $this->normalizedInt($request->query('state_id'));
+        $districtId = $this->normalizedInt($request->query('district_id'));
+        $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
         $gender = in_array($request->query('gender'), ['male', 'female'], true)
             ? $request->query('gender')
             : null;
         $sort = $request->query('sort') === 'upcoming' ? 'upcoming' : null;
 
         $baseQuery = $this->baseSpeakerQuery($user);
+
+        $this->applySpeakerLocationScope($baseQuery, $countryId, $stateId, $districtId, $subdistrictId);
 
         if ($gender !== null) {
             $baseQuery->where('speakers.gender', $gender);
@@ -187,6 +210,11 @@ class SearchController extends FrontendController
     }
 
     #[Group('Institution')]
+    #[Response(
+        status: 200,
+        description: 'Institution detail response.',
+        type: InstitutionDetailResponse::class,
+    )]
     public function showInstitution(Request $request, string $institutionKey): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -231,6 +259,8 @@ class SearchController extends FrontendController
                     'status' => $record->status,
                     'type_label' => $record->type instanceof HasLabel ? $record->type->getLabel() : null,
                     'address_line' => $this->addressLocation($record->addressModel),
+                    'address' => $this->addressFilterData($record->addressModel),
+                    'country' => $this->countryData($record->addressModel),
                     'map_url' => $record->addressModel?->google_maps_url,
                     'map_lat' => $record->addressModel?->lat,
                     'map_lng' => $record->addressModel?->lng,
@@ -304,6 +334,11 @@ class SearchController extends FrontendController
     }
 
     #[Group('Speaker')]
+    #[Response(
+        status: 200,
+        description: 'Speaker detail response.',
+        type: SpeakerDetailResponse::class,
+    )]
     public function showSpeaker(Request $request, string $speakerKey): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -711,7 +746,7 @@ class SearchController extends FrontendController
                         ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
                         ->where('events.starts_at', '>=', now());
                 }])
-                ->with(['address.state', 'address.district', 'address.subdistrict', 'media']),
+                ->with(['address.country', 'address.state', 'address.district', 'address.subdistrict', 'media']),
             $search,
         );
     }
@@ -731,7 +766,7 @@ class SearchController extends FrontendController
                     ->where('events.visibility', EventVisibility::Public)
                     ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
             }])
-            ->with(['address.state', 'address.district', 'address.subdistrict', 'media']);
+            ->with(['address.country', 'address.state', 'address.district', 'address.subdistrict', 'media']);
 
         $this->applyInstitutionLocationScope($query, $countryId, $stateId, $districtId, $subdistrictId);
 
@@ -893,6 +928,11 @@ class SearchController extends FrontendController
                 $institutionQuery,
                 ['id', 'type', 'name', 'nickname', 'slug', 'status', 'is_active', 'updated_at'],
             ),
+            'countries' => $this->queryVersionSegment(
+                Country::query(),
+                ['id', 'name', 'iso2', 'updated_at'],
+            ),
+            'public_countries' => app(PublicCountryRegistry::class)->all(),
             'addresses' => $this->queryVersionSegment(
                 $this->institutionDirectoryAddressQuery($institutionQuery),
                 ['id', 'addressable_id', 'country_id', 'state_id', 'district_id', 'subdistrict_id', 'city_id', 'line1', 'postcode', 'updated_at'],
@@ -919,6 +959,15 @@ class SearchController extends FrontendController
             'speakers' => $this->queryVersionSegment(
                 $speakerQuery,
                 ['id', 'slug', 'name', 'gender', 'honorific', 'pre_nominal', 'post_nominal', 'job_title', 'status', 'is_active', 'updated_at'],
+            ),
+            'countries' => $this->queryVersionSegment(
+                Country::query(),
+                ['id', 'name', 'iso2', 'updated_at'],
+            ),
+            'public_countries' => app(PublicCountryRegistry::class)->all(),
+            'addresses' => $this->queryVersionSegment(
+                $this->speakerDirectoryAddressQuery($speakerQuery),
+                ['id', 'addressable_id', 'country_id', 'state_id', 'district_id', 'subdistrict_id', 'updated_at'],
             ),
             'media' => $this->queryVersionSegment(
                 $this->directoryMediaQuery((new Speaker)->getMorphClass(), ['avatar', 'cover'], $speakerQuery),
@@ -1035,6 +1084,17 @@ class SearchController extends FrontendController
 
     /**
      * @param  Builder<Speaker>  $speakerQuery
+     * @return Builder<Address>
+     */
+    private function speakerDirectoryAddressQuery(Builder $speakerQuery): Builder
+    {
+        return Address::query()
+            ->where('addressable_type', (new Speaker)->getMorphClass())
+            ->whereIn('addressable_id', (clone $speakerQuery)->select('id'));
+    }
+
+    /**
+     * @param  Builder<Speaker>  $speakerQuery
      * @return Builder<Event>
      */
     private function speakerDirectoryEventQuery(Builder $speakerQuery): Builder
@@ -1099,7 +1159,7 @@ class SearchController extends FrontendController
                     ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
                     ->where('events.starts_at', '>=', now());
             }])
-            ->with('media');
+            ->with(['media', 'address.country']);
     }
 
     /**
@@ -1124,7 +1184,7 @@ class SearchController extends FrontendController
             return $this->emptySpeakerPaginator($request, $perPage);
         }
 
-        $orderedIds = $this->speakerSearchService->publicFuzzySearchIds($search);
+        $orderedIds = $this->filterSpeakerSearchIds($base, $this->speakerSearchService->publicFuzzySearchIds($search));
 
         if ($orderedIds === []) {
             return $this->emptySpeakerPaginator($request, $perPage);
@@ -1177,6 +1237,61 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @param  Builder<Speaker>  $query
+     */
+    private function applySpeakerLocationScope(Builder $query, ?int $countryId, ?int $stateId, ?int $districtId, ?int $subdistrictId): void
+    {
+        if ($countryId === null && $stateId === null && $districtId === null && $subdistrictId === null) {
+            return;
+        }
+
+        $query->whereHas('address', function (Builder $addressQuery) use ($countryId, $stateId, $districtId, $subdistrictId): void {
+            if ($countryId !== null) {
+                $addressQuery->where('country_id', $countryId);
+            }
+
+            if ($stateId !== null) {
+                $addressQuery->where('state_id', $stateId);
+            }
+
+            if ($districtId !== null) {
+                $addressQuery->where('district_id', $districtId);
+            }
+
+            if ($subdistrictId !== null) {
+                $addressQuery->where('subdistrict_id', $subdistrictId);
+            }
+        });
+    }
+
+    /**
+     * @param  Builder<Speaker>  $base
+     * @param  list<string>  $orderedIds
+     * @return list<string>
+     */
+    private function filterSpeakerSearchIds(Builder $base, array $orderedIds): array
+    {
+        if ($orderedIds === []) {
+            return [];
+        }
+
+        $scopedIds = (clone $base)
+            ->whereIn('speakers.id', $orderedIds)
+            ->pluck('speakers.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+
+        return collect($scopedIds)
+            ->sortBy(static function (string $id) use ($orderedIds): int {
+                $position = array_search($id, $orderedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array{path: string, query: array<string, mixed>}
      */
     private function speakerPaginatorOptions(Request $request): array
@@ -1208,6 +1323,8 @@ class SearchController extends FrontendController
             'bio_excerpt' => $bio['excerpt'],
             'should_collapse_bio' => $bio['should_collapse'],
             'qualifications' => is_array($speaker->qualifications) ? array_values($speaker->qualifications) : [],
+            'address' => $this->addressFilterData($speaker->addressModel),
+            'country' => $this->countryData($speaker->addressModel),
             'location' => $this->addressLocation($speaker->addressModel),
             'status' => $speaker->status,
             'is_active' => (bool) $speaker->is_active,
@@ -1322,6 +1439,7 @@ class SearchController extends FrontendController
             'image_url' => $media['image_url'],
             'logo_url' => $media['logo_url'],
             'cover_url' => $media['cover_url'],
+            'country' => $this->countryData($institution->address),
             'location' => $location,
             'location_text' => $location,
         ];
@@ -1365,6 +1483,7 @@ class SearchController extends FrontendController
             'formatted_name' => $speaker->formatted_name,
             'events_count' => (int) ($speaker->events_count ?? 0),
             'avatar_url' => $speaker->public_avatar_url,
+            'country' => $this->countryData($speaker->addressModel),
             'is_following' => $isFollowing,
         ];
     }
@@ -1593,6 +1712,55 @@ class SearchController extends FrontendController
         }
 
         return (int) $normalized;
+    }
+
+    private function requestedCountryId(Request $request): ?int
+    {
+        return app(PublicCountryRegistry::class)->resolveCountryId(
+            $request->query('country_id'),
+            $request->query('country_code'),
+            $request->query('country_key'),
+        );
+    }
+
+    /**
+     * @return array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null
+     */
+    private function addressFilterData(?Address $address): ?array
+    {
+        if (! $address instanceof Address) {
+            return null;
+        }
+
+        return [
+            'country_id' => is_numeric($address->country_id) ? (int) $address->country_id : null,
+            'state_id' => is_numeric($address->state_id) ? (int) $address->state_id : null,
+            'district_id' => is_numeric($address->district_id) ? (int) $address->district_id : null,
+            'subdistrict_id' => is_numeric($address->subdistrict_id) ? (int) $address->subdistrict_id : null,
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, iso2: string, key: ?string}|null
+     */
+    private function countryData(?Address $address): ?array
+    {
+        if (! $address instanceof Address || ! is_numeric($address->country_id)) {
+            return null;
+        }
+
+        $address->loadMissing('country');
+
+        if ($address->country === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $address->country->id,
+            'name' => (string) $address->country->name,
+            'iso2' => strtoupper((string) $address->country->iso2),
+            'key' => app(PublicCountryRegistry::class)->keyForCountryId((int) $address->country->id),
+        ];
     }
 
     /**

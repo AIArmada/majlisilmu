@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
 use App\Http\Controllers\Api\UserRegistrationController;
 use App\Http\Middleware\EnsureAdminApiAccess;
+use App\Support\Api\ApiResponseFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -175,7 +176,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->name('api.reports.store');
 
     // User
-    Route::get('/user', fn (Request $request) => $request->user());
+    Route::get('/user', fn (Request $request) => response()->json([
+        'data' => $request->user(),
+        'meta' => [
+            'request_id' => ApiResponseFactory::requestId($request),
+        ],
+    ]))->name('api.user.show');
     Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
         ->name('api.user.registrations.index');
     Route::get('/user/going-events', [EventGoingController::class, 'index'])

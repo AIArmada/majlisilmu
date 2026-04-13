@@ -12,6 +12,77 @@ class PublicCountryRegistry
     protected ?array $countryIdsByIso2 = null;
 
     /**
+     * @param  int|string|null  $countryId
+     */
+    public function resolveCountryId(
+        mixed $countryId = null,
+        mixed $countryCode = null,
+        mixed $countryKey = null,
+        bool $enabledOnly = false,
+    ): ?int {
+        $resolvedCountryId = is_numeric($countryId) ? (int) $countryId : null;
+
+        if ($resolvedCountryId === null) {
+            $normalizedCountryCode = $this->normalizeLookupString($countryCode);
+
+            if ($normalizedCountryCode !== null) {
+                $resolvedCountryId = $this->countryIdFromIso2($normalizedCountryCode);
+            }
+        }
+
+        if ($resolvedCountryId === null) {
+            $normalizedCountryKey = is_string($countryKey)
+                ? strtolower(trim($countryKey))
+                : null;
+
+            if ($normalizedCountryKey !== null && $normalizedCountryKey !== '' && $this->has($normalizedCountryKey)) {
+                if ($enabledOnly && ! $this->isEnabled($normalizedCountryKey)) {
+                    return null;
+                }
+
+                $resolvedCountryId = $this->countryIdForKey($normalizedCountryKey);
+            }
+        }
+
+        if (! is_int($resolvedCountryId)) {
+            return null;
+        }
+
+        if ($enabledOnly) {
+            return $this->normalizeCountryId($resolvedCountryId);
+        }
+
+        return Country::query()->whereKey($resolvedCountryId)->exists()
+            ? $resolvedCountryId
+            : null;
+    }
+
+    /**
+     * @return array{id: int, name: string, iso2: string, key: ?string}|null
+     */
+    public function countryDataForId(?int $countryId): ?array
+    {
+        if (! is_int($countryId)) {
+            return null;
+        }
+
+        $country = Country::query()
+            ->whereKey($countryId)
+            ->first(['id', 'name', 'iso2']);
+
+        if (! $country instanceof Country) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $country->id,
+            'name' => (string) $country->name,
+            'iso2' => strtoupper((string) $country->iso2),
+            'key' => $this->keyForCountryId((int) $country->id),
+        ];
+    }
+
+    /**
      * @return array<string, array{label: string, flag: string, iso2: string, default_timezone: string, timezones?: array<int, string>, enabled: bool, coming_soon: bool}>
      */
     public function all(): array
@@ -162,15 +233,7 @@ class PublicCountryRegistry
             return null;
         }
 
-        $countryId = $this->countryIdsByIso2()[$normalizedIso2] ?? null;
-
-        if (is_int($countryId)) {
-            return $countryId;
-        }
-
-        return $normalizedIso2 === 'MY'
-            ? PreferredCountryResolver::MALAYSIA_ID
-            : null;
+        return $this->countryIdsByIso2()[$normalizedIso2] ?? null;
     }
 
     public function defaultTimezoneForKey(string $key): string
@@ -228,25 +291,25 @@ class PublicCountryRegistry
             return $this->countryIdsByIso2;
         }
 
-        $iso2s = collect($this->all())
-            ->pluck('iso2')
-            ->map(static fn (mixed $iso2): string => strtoupper((string) $iso2))
-            ->unique()
-            ->values()
+        $this->countryIdsByIso2 = Country::query()
+            ->whereNotNull('iso2')
+            ->get(['id', 'iso2'])
+            ->mapWithKeys(static fn (Country $country): array => [
+                strtoupper((string) $country->iso2) => (int) $country->id,
+            ])
             ->all();
-
-        $resolved = Country::query()
-            ->whereIn('iso2', $iso2s)
-            ->pluck('id', 'iso2')
-            ->mapWithKeys(static fn (mixed $id, mixed $iso2): array => [strtoupper((string) $iso2) => is_numeric($id) ? (int) $id : null])
-            ->all();
-
-        if (! array_key_exists('MY', $resolved)) {
-            $resolved['MY'] = PreferredCountryResolver::MALAYSIA_ID;
-        }
-
-        $this->countryIdsByIso2 = $resolved;
 
         return $this->countryIdsByIso2;
+    }
+
+    private function normalizeLookupString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalizedValue = strtoupper(trim($value));
+
+        return $normalizedValue !== '' ? $normalizedValue : null;
     }
 }

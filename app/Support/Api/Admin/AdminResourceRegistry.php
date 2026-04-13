@@ -9,6 +9,7 @@ use Filament\Resources\Resource;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use UnitEnum;
@@ -346,13 +347,12 @@ class AdminResourceRegistry
         $attributes = $record->toArray();
 
         if ($record instanceof Speaker && is_array($attributes['address'] ?? null)) {
-            $speakerAddress = $attributes['address'];
-
-            $attributes['address'] = [
-                'state_id' => $speakerAddress['state_id'] ?? null,
-                'district_id' => $speakerAddress['district_id'] ?? null,
-                'subdistrict_id' => $speakerAddress['subdistrict_id'] ?? null,
-            ];
+            $attributes['address'] = Arr::only($attributes['address'], [
+                'country_id',
+                'state_id',
+                'district_id',
+                'subdistrict_id',
+            ]);
         }
 
         return $attributes;
