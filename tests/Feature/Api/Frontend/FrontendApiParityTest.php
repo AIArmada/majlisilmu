@@ -32,6 +32,8 @@ use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
+use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\SpeakerSearchService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -863,6 +865,129 @@ it('searches speakers api by formatted title parts used on the public directory'
     expect(collect($response->json('data'))->pluck('id')->all())
         ->toContain((string) $matchingSpeaker->id)
         ->not->toContain((string) $otherSpeaker->id);
+});
+
+it('falls back to local speaker and institution search on the frontend unified search api when typesense fails', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Nur Hikmah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nur Hikmah Hassan',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($speaker);
+    config()->set('scout.driver', 'typesense');
+
+    $this->app->bind(SpeakerSearchService::class, fn (): SpeakerSearchService => new class extends SpeakerSearchService
+    {
+        protected function shouldUseScoutSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $this->app->bind(InstitutionSearchService::class, fn (): InstitutionSearchService => new class extends InstitutionSearchService
+    {
+        protected function shouldUseScoutSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $response = $this->getJson('/api/v1/search?search='.urlencode('Nur Hikmah'))
+        ->assertOk();
+
+    expect(collect($response->json('data.speakers.items'))->pluck('id')->all())
+        ->toContain((string) $speaker->id)
+        ->and(collect($response->json('data.institutions.items'))->pluck('id')->all())
+        ->toContain((string) $institution->id);
+});
+
+it('falls back to local speaker directory search when typesense fails', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Aisyah Binti Hassan',
+        'honorific' => null,
+        'pre_nominal' => ['syeikhul_maqari'],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($speaker);
+    config()->set('scout.driver', 'typesense');
+
+    $this->app->bind(SpeakerSearchService::class, fn (): SpeakerSearchService => new class extends SpeakerSearchService
+    {
+        protected function shouldUseScoutSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $this->getJson('/api/v1/speakers?search='.urlencode('syeikhul maqari'))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', (string) $speaker->id);
+});
+
+it('falls back to database institution directory search when typesense fails', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => 'Masjid Biru',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    config()->set('scout.driver', 'typesense');
+
+    $this->app->bind(InstitutionSearchService::class, fn (): InstitutionSearchService => new class extends InstitutionSearchService
+    {
+        protected function shouldUseScoutSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $this->getJson('/api/v1/institutions?search='.urlencode('Masjid Biru'))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', (string) $institution->id);
 });
 
 it('serializes event list payloads with card image metadata for mobile clients', function () {

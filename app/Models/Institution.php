@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
 use Spatie\Image\Enums\Fit;
@@ -35,7 +36,7 @@ class Institution extends Model implements AuditableContract, HasMedia
     public const string PUBLIC_DIRECTORY_SESSION_KEY = 'public_institutions_directory_seed';
 
     /** @use HasFactory<InstitutionFactory> */
-    use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels;
+    use AuditsModelChanges, HasAddress, HasContacts, HasDonationChannels, HasFactory, HasFollowers, HasLanguages, HasSocialMedia, HasUuids, InteractsWithMedia, KeepsDeletedModels, Searchable;
 
     public $incrementing = false;
 
@@ -69,6 +70,89 @@ class Institution extends Model implements AuditableContract, HasMedia
         ];
     }
 
+    public function shouldBeSearchable(): bool
+    {
+        return $this->is_active
+            && in_array((string) $this->status, ['verified', 'pending'], true);
+    }
+
+    public function searchIndexShouldBeUpdated(): bool
+    {
+        return $this->wasRecentlyCreated || $this->wasChanged([
+            'type',
+            'name',
+            'nickname',
+            'description',
+            'slug',
+            'status',
+            'is_active',
+        ]);
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return Builder<Institution>
+     */
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query
+            ->with('address')
+            ->where('institutions.is_active', true)
+            ->whereIn('institutions.status', ['verified', 'pending']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        if ($this->usesScoutDatabaseDriver()) {
+            return $this->toScoutDatabaseSearchableArray();
+        }
+
+        $this->loadMissing('address');
+
+        $address = $this->addressModel;
+        $type = $this->type;
+        $updatedAt = $this->updated_at ?? now();
+
+        return [
+            'id' => (string) $this->getKey(),
+            'type' => $type instanceof InstitutionType ? $type->value : (is_string($type) ? $type : null),
+            'name' => (string) $this->name,
+            'display_name' => $this->display_name,
+            'nickname' => filled($this->nickname) ? (string) $this->nickname : null,
+            'description' => $this->searchableDescriptionText(),
+            'search_text' => $this->searchableText(),
+            'slug' => (string) $this->slug,
+            'status' => (string) $this->status,
+            'is_active' => (bool) $this->is_active,
+            'country_id' => $address?->country_id,
+            'state_id' => $address?->state_id,
+            'district_id' => $address?->district_id,
+            'subdistrict_id' => $address?->subdistrict_id,
+            'updated_at' => $updatedAt->timestamp,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function toScoutDatabaseSearchableArray(): array
+    {
+        return array_filter([
+            'name' => (string) $this->name,
+            'nickname' => filled($this->nickname) ? (string) $this->nickname : null,
+            'description' => filled($this->description) ? (string) $this->description : null,
+            'slug' => (string) $this->slug,
+        ], static fn (mixed $value): bool => is_string($value) && $value !== '');
+    }
+
+    private function usesScoutDatabaseDriver(): bool
+    {
+        return (string) config('scout.driver') === 'database';
+    }
+
     public function getDisplayNameAttribute(): string
     {
         return self::formatDisplayName($this->name, $this->nickname);
@@ -86,6 +170,23 @@ class Institution extends Model implements AuditableContract, HasMedia
         return $normalizedName === ''
             ? $normalizedNickname
             : "{$normalizedName} ({$normalizedNickname})";
+    }
+
+    private function searchableText(): string
+    {
+        return trim(implode(' ', array_filter([
+            trim($this->display_name),
+            trim((string) $this->name),
+            trim((string) $this->nickname),
+            $this->searchableDescriptionText(),
+        ])));
+    }
+
+    private function searchableDescriptionText(): ?string
+    {
+        $description = trim(strip_tags((string) $this->description));
+
+        return $description !== '' ? $description : null;
     }
 
     public function getPublicLogoUrlAttribute(): string

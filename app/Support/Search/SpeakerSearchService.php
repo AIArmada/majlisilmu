@@ -6,6 +6,7 @@ use App\Models\Speaker;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -77,10 +78,33 @@ class SpeakerSearchService
      */
     public function applyIndexedSearch(Builder $query, string $search): Builder
     {
-        if (! $this->hasSpeakerSearchTermsTable()) {
-            return $this->applyLegacySearch($query, $search);
+        $normalizedSearch = $this->normalizedSearch($search);
+
+        if ($normalizedSearch === null) {
+            return $query->whereRaw('1 = 0');
         }
 
+        if ($this->shouldUseScoutSearch()) {
+            try {
+                return $this->applyScoutSearch($query, $normalizedSearch);
+            } catch (\Throwable $exception) {
+                $this->logScoutFallback('Speaker Typesense search failed, falling back to local search', $exception, $normalizedSearch);
+            }
+        }
+
+        if (! $this->hasSpeakerSearchTermsTable()) {
+            return $this->applyLegacySearch($query, $normalizedSearch);
+        }
+
+        return $this->applyIndexedSearchWithLocalIndex($query, $normalizedSearch);
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     * @return Builder<Speaker>
+     */
+    private function applyIndexedSearchWithLocalIndex(Builder $query, string $search): Builder
+    {
         $searchTokens = $this->searchTokens($search);
 
         if ($searchTokens === []) {
@@ -127,6 +151,59 @@ class SpeakerSearchService
             return [];
         }
 
+        $cacheKey = sprintf(
+            'speaker_search_public:%s:%s',
+            $this->publicSearchCacheVersion(),
+            md5($normalizedSearch),
+        );
+
+        /** @var list<string> $ids */
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
+            if ($this->shouldUseTypesenseSearch()) {
+                try {
+                    return $this->searchIdsWithScout($normalizedSearch, [
+                        'filter_by' => 'is_active:=true && status:=verified',
+                        'num_typos' => 0,
+                    ]);
+                } catch (\Throwable $exception) {
+                    $this->logScoutFallback('Speaker Typesense public search failed, falling back to local search', $exception, $normalizedSearch);
+                }
+            }
+
+            if ($this->shouldUseScoutDatabaseSearch()) {
+                return $this->publicSearchIdsFromScoutDatabase($normalizedSearch);
+            }
+
+            return $this->publicSearchIdsFromLocalSearch($normalizedSearch);
+        });
+
+        return $ids;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicSearchIdsFromScoutDatabase(string $normalizedSearch): array
+    {
+        return Speaker::search($normalizedSearch)
+            ->query(function (Builder $query): Builder {
+                return $query
+                    ->where('speakers.is_active', true)
+                    ->where('status', 'verified')
+                    ->limit($this->typesenseResultLimit());
+            })
+            ->get()
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicSearchIdsFromLocalSearch(string $normalizedSearch): array
+    {
         if (! $this->hasSpeakerSearchTermsTable()) {
             return Speaker::query()
                 ->active()
@@ -140,25 +217,16 @@ class SpeakerSearchService
                 ->all();
         }
 
-        $cacheKey = sprintf(
-            'speaker_search_public:%s:%s',
-            $this->publicSearchCacheVersion(),
-            md5($normalizedSearch),
-        );
-
-        /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, fn (): array => Speaker::query()
+        return Speaker::query()
             ->active()
             ->where('status', 'verified')
             ->select('speakers.id')
-            ->tap(fn (Builder $query): Builder => $this->applyIndexedSearch($query, $normalizedSearch))
+            ->tap(fn (Builder $query): Builder => $this->applyIndexedSearchWithLocalIndex($query, $normalizedSearch))
             ->orderBy('name')
             ->pluck('speakers.id')
             ->map(static fn (mixed $id): string => (string) $id)
             ->values()
-            ->all());
-
-        return $ids;
+            ->all();
     }
 
     /**
@@ -180,6 +248,17 @@ class SpeakerSearchService
 
         /** @var list<string> $ids */
         $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
+            if ($this->shouldUseTypesenseSearch()) {
+                try {
+                    return $this->searchIdsWithScout($normalizedSearch, [
+                        'filter_by' => 'is_active:=true && status:=verified',
+                        'prioritize_exact_match' => true,
+                    ]);
+                } catch (\Throwable $exception) {
+                    $this->logScoutFallback('Speaker Typesense fuzzy search failed, falling back to local fuzzy search', $exception, $normalizedSearch);
+                }
+            }
+
             $speakerQuery = Speaker::query()
                 ->active()
                 ->where('status', 'verified')
@@ -230,6 +309,92 @@ class SpeakerSearchService
         });
 
         return $ids;
+    }
+
+    protected function shouldUseScoutSearch(): bool
+    {
+        return in_array($this->scoutDriver(), ['typesense', 'database'], true);
+    }
+
+    protected function shouldUseTypesenseSearch(): bool
+    {
+        return $this->scoutDriver() === 'typesense';
+    }
+
+    protected function shouldUseScoutDatabaseSearch(): bool
+    {
+        return $this->scoutDriver() === 'database';
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     * @return Builder<Speaker>
+     */
+    protected function applyScoutSearch(Builder $query, string $search): Builder
+    {
+        $ids = $this->searchIdsWithScout($search, [
+            'num_typos' => 0,
+        ]);
+
+        if ($ids === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn($query->getModel()->qualifyColumn('id'), $ids);
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return list<string>
+     */
+    protected function searchIdsWithScout(string $search, array $options = []): array
+    {
+        if ($this->scoutDriver() === 'database') {
+            return Speaker::search($search)
+                ->query(fn (Builder $query): Builder => $query->limit($this->typesenseResultLimit()))
+                ->get()
+                ->pluck('id')
+                ->map(static fn (mixed $id): string => (string) $id)
+                ->values()
+                ->all();
+        }
+
+        $rawResults = Speaker::search($search)
+            ->options([
+                'query_by' => 'formatted_name,search_text,name,job_title',
+                'per_page' => $this->typesenseResultLimit(),
+                ...$options,
+            ])
+            ->raw();
+
+        /** @var array<int, array<string, mixed>> $hits */
+        $hits = is_array($rawResults) && is_array($rawResults['hits'] ?? null)
+            ? $rawResults['hits']
+            : [];
+
+        return collect($hits)
+            ->pluck('document.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    protected function typesenseResultLimit(): int
+    {
+        return max(50, (int) (config('scout.typesense.max_total_results') ?? 250));
+    }
+
+    protected function logScoutFallback(string $message, \Throwable $exception, string $search): void
+    {
+        Log::warning($message, [
+            'error' => $exception->getMessage(),
+            'search' => $search,
+        ]);
+    }
+
+    protected function scoutDriver(): string
+    {
+        return (string) config('scout.driver');
     }
 
     public function syncIndex(Speaker $speaker): void

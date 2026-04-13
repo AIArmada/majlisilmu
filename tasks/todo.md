@@ -248,6 +248,54 @@
 # Institution Listing Image Fallback
 
 - [x] Audit public speaker, institution, majlis, and homepage image URL caching behavior
+
+# Model Contract and Trait Audit
+
+- [x] Inventory every model's parent class, implemented interfaces, and reusable traits
+- [x] Classify which patterns are globally useful versus intentionally selective
+- [x] Validate high-risk outliers for auditing, deleted-model retention, media, auth, and search behavior
+- [x] Summarize concrete missing candidates and explicitly call out intentional exclusions
+
+## Review
+
+- Audited all first-party models under app/Models for parent class, contracts, and reusable traits.
+- Confirmed there are no generic-type mismatches for `HasFactory` docblocks and no UUID-string models missing `HasUuids`.
+- Confirmed `AuditableContract` is consistently paired with `AuditsModelChanges`, and `HasMedia` is consistently paired with `InteractsWithMedia`.
+- Identified one clear structural inconsistency: [app/Models/Subdistrict.php](app/Models/Subdistrict.php) is the only first-party geography model beside [app/Models/District.php](app/Models/District.php) without `HasFactory` or a factory.
+- Identified one workflow-level candidate to review, not auto-fix: [app/Models/ModerationReview.php](app/Models/ModerationReview.php) is a first-party moderation history record with its own factory and creation flow, but it does not participate in auditing.
+- Treated [app/Models/EventSubmission.php](app/Models/EventSubmission.php) as a lower-confidence review item rather than a clear gap; it is a first-party UUID workflow record, but current usage looks append-only and lightweight.
+- Confirmed `KeepsDeletedModels` is intentionally selective to member/public-managed subject models like Event, Institution, Speaker, Venue, and Reference rather than a general rule for every content model.
+
+# Moderation Review Auditing
+
+- [x] Add the standard auditing contract and trait pair to ModerationReview
+- [x] Add a focused regression that proves moderation reviews create audit records
+- [x] Run formatter and focused verification
+
+## Review
+
+- Added the standard `AuditableContract` plus `AuditsModelChanges` pair to [app/Models/ModerationReview.php](app/Models/ModerationReview.php).
+- Registered the `moderation_review` morph alias in [app/Providers/AppServiceProvider.php](app/Providers/AppServiceProvider.php) so the audit package can resolve the model safely.
+- Added a focused regression in [tests/Feature/AdminAuditIntegrationTest.php](tests/Feature/AdminAuditIntegrationTest.php) to prove moderation review creation writes a `created` audit row and extended the morph alias coverage to include ModerationReview.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Models/ModerationReview.php app/Providers/AppServiceProvider.php tests/Feature/AdminAuditIntegrationTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminAuditIntegrationTest.php --filter='records moderation review creation in audits|registers morph aliases for audited models'` => 2 passed
+
+# Event Submission Auditing
+
+- [x] Add the standard auditing contract and trait pair to EventSubmission
+- [x] Add a focused regression that proves event submissions create audit records
+- [x] Run formatter and focused verification
+
+## Review
+
+- Added the standard `AuditableContract` plus `AuditsModelChanges` pair to [app/Models/EventSubmission.php](app/Models/EventSubmission.php).
+- Reused the existing `event_submission` morph alias and extended [tests/Feature/AdminAuditIntegrationTest.php](tests/Feature/AdminAuditIntegrationTest.php) so EventSubmission is covered by both the morph-map assertion and a focused `created` audit regression.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Models/EventSubmission.php tests/Feature/AdminAuditIntegrationTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminAuditIntegrationTest.php --filter='records event submission creation in audits|registers morph aliases for audited models'` => 2 passed
 - [x] Confirm whether public listing caches store image payloads or only ids
 - [x] Fix institution public pages to fall back from real cover media to real logo media instead of stopping at collection fallback placeholders
 - [x] Add focused regressions and run targeted verification

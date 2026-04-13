@@ -31,11 +31,13 @@ use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\EventSettings;
+use App\Models\EventSubmission;
 use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\MediaLink;
 use App\Models\MemberInvitation;
 use App\Models\MembershipClaim;
+use App\Models\ModerationReview;
 use App\Models\Reference;
 use App\Models\Registration;
 use App\Models\Report;
@@ -55,7 +57,9 @@ beforeEach(function () {
     config()->set('audit.console', true);
 
     Event::observe(AuditableObserver::class);
+    EventSubmission::observe(AuditableObserver::class);
     Institution::observe(AuditableObserver::class);
+    ModerationReview::observe(AuditableObserver::class);
     Speaker::observe(AuditableObserver::class);
     Tag::observe(AuditableObserver::class);
     Venue::observe(AuditableObserver::class);
@@ -142,12 +146,14 @@ it('registers morph aliases for audited models', function () {
         DonationChannel::class,
         Event::class,
         EventKeyPerson::class,
+        EventSubmission::class,
         EventSettings::class,
         Inspiration::class,
         Institution::class,
         MediaLink::class,
         MemberInvitation::class,
         MembershipClaim::class,
+        ModerationReview::class,
         Reference::class,
         Registration::class,
         Report::class,
@@ -195,6 +201,67 @@ it('records array-backed tag edits in audits', function () {
             'en' => 'Usul Fiqh',
             'ms' => 'Usul Fiqh',
         ]);
+});
+
+it('records moderation review creation in audits', function () {
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create();
+
+    $this->actingAs($administrator);
+
+    $review = ModerationReview::query()->create([
+        'event_id' => $event->getKey(),
+        'moderator_id' => $administrator->getKey(),
+        'decision' => 'rejected',
+        'note' => 'Schedule details are incomplete.',
+        'reason_code' => 'details_incomplete',
+    ]);
+
+    $audit = $review->audits()
+        ->where('event', 'created')
+        ->latest('created_at')
+        ->first();
+
+    expect($audit)->not->toBeNull()
+        ->and($audit?->user_id)->toBe($administrator->getKey())
+        ->and($audit?->event)->toBe('created')
+        ->and($audit?->new_values['decision'] ?? null)->toBe('rejected')
+        ->and($audit?->new_values['reason_code'] ?? null)->toBe('details_incomplete')
+        ->and($audit?->new_values['moderator_id'] ?? null)->toBe($administrator->getKey())
+        ->and($audit?->auditable_type)->toBe($review->getMorphClass())
+        ->and($audit?->auditable_id)->toBe($review->getKey());
+});
+
+it('records event submission creation in audits', function () {
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create();
+
+    $this->actingAs($administrator);
+
+    $submission = EventSubmission::query()->create([
+        'event_id' => $event->getKey(),
+        'submitted_by' => $administrator->getKey(),
+        'submitter_name' => $administrator->name,
+        'notes' => 'Submitted from the public contribution flow.',
+    ]);
+
+    $audit = $submission->audits()
+        ->where('event', 'created')
+        ->latest('created_at')
+        ->first();
+
+    expect($audit)->not->toBeNull()
+        ->and($audit?->user_id)->toBe($administrator->getKey())
+        ->and($audit?->event)->toBe('created')
+        ->and($audit?->new_values['submitted_by'] ?? null)->toBe($administrator->getKey())
+        ->and($audit?->new_values['submitter_name'] ?? null)->toBe($administrator->name)
+        ->and($audit?->new_values['notes'] ?? null)->toBe('Submitted from the public contribution flow.')
+        ->and($audit?->auditable_type)->toBe($submission->getMorphClass())
+        ->and($audit?->auditable_id)->toBe($submission->getKey());
 });
 
 it('redacts sensitive user fields in audits', function () {

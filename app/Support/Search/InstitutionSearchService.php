@@ -6,6 +6,7 @@ use App\Models\Institution;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class InstitutionSearchService
@@ -25,6 +26,24 @@ class InstitutionSearchService
         if ($normalizedSearch === null) {
             return $query->whereRaw('1 = 0');
         }
+
+        if ($this->shouldUseScoutSearch()) {
+            try {
+                return $this->applyScoutSearch($query, $normalizedSearch);
+            } catch (\Throwable $exception) {
+                $this->logScoutFallback('Institution Typesense search failed, falling back to database search', $exception, $normalizedSearch);
+            }
+        }
+
+        return $this->applyDatabaseSearch($query, $normalizedSearch);
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return Builder<Institution>
+     */
+    private function applyDatabaseSearch(Builder $query, string $normalizedSearch): Builder
+    {
 
         $operator = DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
         $collapsedWildcardSearch = '%'.str_replace(' ', '%', $normalizedSearch).'%';
@@ -72,18 +91,62 @@ class InstitutionSearchService
         );
 
         /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, fn (): array => Institution::query()
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
+            if ($this->shouldUseTypesenseSearch()) {
+                try {
+                    return $this->searchIdsWithScout($normalizedSearch, [
+                        'filter_by' => 'is_active:=true && status:=verified',
+                        'num_typos' => 0,
+                    ]);
+                } catch (\Throwable $exception) {
+                    $this->logScoutFallback('Institution Typesense public search failed, falling back to database search', $exception, $normalizedSearch);
+                }
+            }
+
+            if ($this->shouldUseScoutDatabaseSearch()) {
+                return $this->publicSearchIdsFromScoutDatabase($normalizedSearch);
+            }
+
+            return $this->publicSearchIdsFromDatabase($normalizedSearch);
+        });
+
+        return $ids;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicSearchIdsFromScoutDatabase(string $normalizedSearch): array
+    {
+        return Institution::search($normalizedSearch)
+            ->query(function (Builder $query): Builder {
+                return $query
+                    ->where('institutions.is_active', true)
+                    ->where('status', 'verified')
+                    ->limit($this->typesenseResultLimit());
+            })
+            ->get()
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicSearchIdsFromDatabase(string $normalizedSearch): array
+    {
+        return Institution::query()
             ->active()
             ->where('status', 'verified')
             ->select('institutions.id')
-            ->tap(fn (Builder $query): Builder => $this->applySearch($query, $normalizedSearch))
+            ->tap(fn (Builder $query): Builder => $this->applyDatabaseSearch($query, $normalizedSearch))
             ->orderBy('name')
             ->pluck('institutions.id')
             ->map(static fn (mixed $id): string => (string) $id)
             ->values()
-            ->all());
-
-        return $ids;
+            ->all();
     }
 
     /**
@@ -106,7 +169,30 @@ class InstitutionSearchService
         );
 
         /** @var list<string> $ids */
-        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, fn (): array => Institution::query()
+        $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($minimumScore, $normalizedSearch): array {
+            if ($this->shouldUseTypesenseSearch()) {
+                try {
+                    return $this->searchIdsWithScout($normalizedSearch, [
+                        'filter_by' => 'is_active:=true && status:=verified',
+                        'prioritize_exact_match' => true,
+                    ]);
+                } catch (\Throwable $exception) {
+                    $this->logScoutFallback('Institution Typesense fuzzy search failed, falling back to database fuzzy search', $exception, $normalizedSearch);
+                }
+            }
+
+            return $this->publicFuzzySearchIdsFromDatabase($normalizedSearch, $minimumScore);
+        });
+
+        return $ids;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicFuzzySearchIdsFromDatabase(string $normalizedSearch, float $minimumScore): array
+    {
+        return Institution::query()
             ->active()
             ->where('status', 'verified')
             ->select(['id', 'name', 'nickname', 'description'])
@@ -142,9 +228,93 @@ class InstitutionSearchService
             ->sortByDesc('score')
             ->pluck('id')
             ->values()
-            ->all());
+            ->all();
+    }
 
-        return $ids;
+    protected function shouldUseScoutSearch(): bool
+    {
+        return in_array($this->scoutDriver(), ['typesense', 'database'], true);
+    }
+
+    protected function shouldUseTypesenseSearch(): bool
+    {
+        return $this->scoutDriver() === 'typesense';
+    }
+
+    protected function shouldUseScoutDatabaseSearch(): bool
+    {
+        return $this->scoutDriver() === 'database';
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return Builder<Institution>
+     */
+    protected function applyScoutSearch(Builder $query, string $search): Builder
+    {
+        $ids = $this->searchIdsWithScout($search, [
+            'num_typos' => 0,
+        ]);
+
+        if ($ids === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn($query->getModel()->qualifyColumn('id'), $ids);
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return list<string>
+     */
+    protected function searchIdsWithScout(string $search, array $options = []): array
+    {
+        if ($this->scoutDriver() === 'database') {
+            return Institution::search($search)
+                ->query(fn (Builder $query): Builder => $query->limit($this->typesenseResultLimit()))
+                ->get()
+                ->pluck('id')
+                ->map(static fn (mixed $id): string => (string) $id)
+                ->values()
+                ->all();
+        }
+
+        $rawResults = Institution::search($search)
+            ->options([
+                'query_by' => 'display_name,name,nickname,description,search_text',
+                'per_page' => $this->typesenseResultLimit(),
+                ...$options,
+            ])
+            ->raw();
+
+        /** @var array<int, array<string, mixed>> $hits */
+        $hits = is_array($rawResults) && is_array($rawResults['hits'] ?? null)
+            ? $rawResults['hits']
+            : [];
+
+        return collect($hits)
+            ->pluck('document.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    protected function typesenseResultLimit(): int
+    {
+        return max(50, (int) (config('scout.typesense.max_total_results') ?? 250));
+    }
+
+    protected function logScoutFallback(string $message, \Throwable $exception, string $search): void
+    {
+        Log::warning($message, [
+            'error' => $exception->getMessage(),
+            'search' => $search,
+        ]);
+    }
+
+    protected function scoutDriver(): string
+    {
+        return (string) config('scout.driver');
     }
 
     public function bustPublicSearchCache(): void
