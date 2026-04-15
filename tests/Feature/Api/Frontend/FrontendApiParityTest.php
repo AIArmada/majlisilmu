@@ -1065,6 +1065,7 @@ it('serializes institution directory payloads with card media aliases for mobile
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
     $malaysiaId = ensureFrontendApiMalaysiaCountryExists();
+    $user = User::factory()->create();
 
     $institution = Institution::factory()->create([
         'name' => 'Masjid API Directory',
@@ -1089,6 +1090,8 @@ it('serializes institution directory payloads with card media aliases for mobile
         'starts_at' => now()->addDays(3),
     ]);
 
+    $user->follow($institution);
+
     $directoryInstitution = $institution->fresh(['address.state', 'address.district', 'address.subdistrict', 'media']);
 
     expect($directoryInstitution)->not->toBeNull();
@@ -1102,7 +1105,7 @@ it('serializes institution directory payloads with card media aliases for mobile
     }]);
 
     $item = Closure::bind(
-        fn (): array => $this->institutionListData($directoryInstitution),
+        fn (): array => $this->institutionListData($directoryInstitution, $user),
         app(SearchController::class),
         SearchController::class,
     )();
@@ -1117,8 +1120,81 @@ it('serializes institution directory payloads with card media aliases for mobile
         ->and(data_get($item, 'public_image_url'))->toBe(data_get($item, 'image_url'))
         ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'cover_url'))
         ->and(data_get($item, 'image_url'))->not->toBe(data_get($item, 'logo_url'))
+        ->and(data_get($item, 'is_following'))->toBeTrue()
         ->and(array_key_exists('location', $item))->toBeTrue()
         ->and(array_key_exists('location_text', $item))->toBeTrue();
+});
+
+it('returns authenticated follow state in the frontend institution api', function () {
+    $user = User::factory()->create();
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Follow Institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($institution);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.institutions.index', ['search' => 'Masjid Follow Institution']))
+        ->assertOk()
+        ->assertJsonPath('data.0.is_following', true);
+});
+
+it('returns the total followed institution count for the full institution query, not just the current page', function () {
+    $user = User::factory()->create();
+
+    $followedInstitutions = Institution::factory()->count(3)->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Unfollowed Institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    foreach ($followedInstitutions as $institution) {
+        $user->follow($institution);
+    }
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.institutions.index', ['per_page' => 1]))
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.total', 4)
+        ->assertJsonPath('meta.following.total', 3);
+});
+
+it('supports server-side filtering to only followed institutions in the frontend institution api', function () {
+    $user = User::factory()->create();
+
+    $followedInstitution = Institution::factory()->create([
+        'name' => 'Followed Institution Only',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Not Followed Institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($followedInstitution);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.institutions.index', ['following' => 1]))
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', $followedInstitution->slug)
+        ->assertJsonPath('data.0.is_following', true)
+        ->assertJsonPath('meta.pagination.total', 1)
+        ->assertJsonPath('meta.following.total', 1);
 });
 
 it('bumps the institution directory cache version when institution records change', function () {

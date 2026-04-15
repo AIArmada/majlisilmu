@@ -88,6 +88,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('country', $this->nullableReference($components, 'Country'))
                 ->addProperty('location', (new StringType)->nullable(true))
                 ->addProperty('location_text', (new StringType)->nullable(true))
+                ->addProperty('is_following', new BooleanType)
                 ->setRequired([
                     'id',
                     'slug',
@@ -103,6 +104,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     'country',
                     'location',
                     'location_text',
+                    'is_following',
                 ]),
         );
     }
@@ -391,6 +393,12 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 (new ObjectType)
                     ->addProperty('version', new StringType)
                     ->setRequired(['version']),
+            )
+            ->addProperty(
+                'following',
+                (new ObjectType)
+                    ->addProperty('total', new IntegerType)
+                    ->setRequired(['total']),
             )
             ->addProperty('request_id', new StringType)
             ->setRequired(['pagination', 'cache', 'request_id']);

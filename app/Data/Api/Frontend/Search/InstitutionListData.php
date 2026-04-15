@@ -3,6 +3,7 @@
 namespace App\Data\Api\Frontend\Search;
 
 use App\Models\Institution;
+use App\Models\User;
 use App\Support\Location\AddressHierarchyFormatter;
 use Spatie\LaravelData\Data;
 
@@ -26,10 +27,15 @@ class InstitutionListData extends Data
         public ?array $country,
         public ?string $location,
         public ?string $location_text,
+        public bool $is_following,
     ) {}
 
-    public static function fromModel(Institution $institution): self
+    public static function fromModel(Institution $institution, ?User $user = null): self
     {
+        $attributes = $institution->getAttributes();
+        $isFollowing = array_key_exists('is_following', $attributes)
+            ? (bool) $attributes['is_following']
+            : ($user?->isFollowing($institution) ?? false);
         $eventsCount = (int) ($institution->events_count ?? 0);
         $publicImageUrl = (string) $institution->public_image_url;
         $logoUrl = (string) $institution->public_logo_url;
@@ -55,6 +61,7 @@ class InstitutionListData extends Data
             country: CountryData::fromAddress($institution->address)?->toArray(),
             location: $location !== '' ? $location : null,
             location_text: $location !== '' ? $location : null,
+            is_following: $isFollowing,
         );
     }
 }
