@@ -1,3 +1,39 @@
+# Uncommitted Change Audit
+
+- [x] Audit the uncommitted dashboard and contribution-flow changes for behavior regressions
+- [x] Restore the intended dashboard institution direct-edit context and related suggest-update behavior
+- [x] Preserve contributions page section state across pagination/navigation and add focused regressions
+- [x] Run focused formatting, static analysis, and Pest coverage for the audited changes
+
+## Review
+
+- Corrected the earlier audit fix: the institution suggest-update reviewer note is permission-based, so direct-edit users hide it regardless of entry path and the dashboard link no longer carries a special context flag.
+- Added URL-backed contributions tab state so the selected section survives reloads, sharable links, and paginator navigation instead of snapping back to the Events tab.
+- Updated the focused dashboard, contributions, Ahli, location-picker, and Socialite regressions to match the audited behavior.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/Index.php app/Livewire/Pages/Contributions/SuggestUpdate.php app/Livewire/Pages/Contributions/SubmitInstitution.php app/Livewire/Pages/Dashboard/InstitutionDashboard.php app/Forms/InstitutionContributionFormSchema.php app/Livewire/Concerns/InteractsWithLocationPickerSelection.php tests/Feature/ContributionPagesTest.php tests/Feature/DashboardPagesTest.php tests/Feature/AhliPanelInstitutionEditingTest.php tests/Feature/InstitutionContributionLocationPickerTest.php tests/Feature/SocialiteAuthTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 52 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 27 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => 21 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionContributionLocationPickerTest.php` => 7 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialiteAuthTest.php` => 9 passed
+
+# Google Login Account Chooser
+
+- [x] Force the Google OAuth redirect to show the account chooser every time
+- [x] Add a Socialite redirect regression that asserts the Google prompt parameter
+- [x] Run focused formatting and auth verification
+
+## Review
+
+- Added the Google-specific `prompt=select_account` Socialite redirect parameter so the web login flow always shows the account chooser.
+- Extended the Socialite feature test to assert the redirect query contains the chooser prompt and the configured callback.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Http/Controllers/Auth/SocialiteController.php tests/Feature/SocialiteAuthTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SocialiteAuthTest.php` => 9 passed
+
 # Laravel Data Adoption Guidance
 
 - [x] Audit current `spatie/laravel-data` usage and candidate surfaces

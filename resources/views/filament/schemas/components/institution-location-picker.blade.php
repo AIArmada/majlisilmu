@@ -1,6 +1,6 @@
 @php
-    $pickerTitle = $title ?? __('Find the institution location');
-    $pickerDescription = $description ?? __('Search like a ride-hailing destination, pick the correct place, then confirm it on the map before submitting.');
+    $pickerTitle = $title ?? null;
+    $pickerDescription = $description ?? null;
     $pickerSearchLabel = $searchLabel ?? __('Search for an institution or address');
     $pickerFieldLabel = $label ?? $pickerSearchLabel;
     $pickerSelectedLabel = $selectedLabel ?? __('Selected location');
@@ -230,12 +230,12 @@
         },
     }"
     x-init="init()"
-    class="mi-institution-location-picker space-y-4"
+    class="mi-institution-location-picker space-y-2"
 >
     <div
         x-show="enabled"
         x-cloak
-        class="space-y-3"
+        class="space-y-2"
     >
         @if (filled($pickerTitle) || filled($pickerDescription))
             <div class="space-y-1.5">
@@ -252,12 +252,6 @@
         @endif
 
         <div class="space-y-2">
-            @if (filled($pickerFieldLabel))
-                <label class="text-sm font-medium text-slate-900" for="institution-location-search">
-                    {{ $pickerFieldLabel }}
-                </label>
-            @endif
-
             <div
                 id="institution-location-search"
                 x-ref="autocompleteHost"
@@ -275,7 +269,7 @@
         >
             <div x-ref="mapCanvas" class="h-72 w-full"></div>
 
-            <div class="space-y-1 border-t border-slate-100 px-4 py-3">
+            <div class="space-y-1 border-t border-slate-100 px-4 py-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
                     {{ $pickerSelectedLabel }}
                 </p>

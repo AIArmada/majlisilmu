@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 use RuntimeException;
@@ -39,6 +40,9 @@ class Index extends Component implements HasForms
     use InteractsWithForms;
     use InteractsWithToasts;
     use WithPagination;
+
+    #[Url(as: 'section', except: 'events')]
+    public string $activeTab = 'events';
 
     /** @var array<string, string> */
     public array $reviewNotes = [];
@@ -53,10 +57,17 @@ class Index extends Component implements HasForms
     {
         abort_unless(auth()->user() instanceof User, 403);
 
+        $this->activeTab = $this->normalizeActiveTab($this->activeTab);
+
         $this->claimEntryForm()->fill([
             'subject_type' => MemberSubjectType::Institution->value,
             'subject_slug' => null,
         ]);
+    }
+
+    public function updatedActiveTab(string $value): void
+    {
+        $this->activeTab = $this->normalizeActiveTab($value);
     }
 
     /**
@@ -342,5 +353,12 @@ class Index extends Component implements HasForms
         }
 
         return $this->institutionMembershipClaimLabel($institution);
+    }
+
+    private function normalizeActiveTab(string $value): string
+    {
+        return in_array($value, ['events', 'contributions', 'updates', 'reports', 'membership'], true)
+            ? $value
+            : 'events';
     }
 }
