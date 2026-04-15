@@ -8,6 +8,7 @@ use App\Enums\ReferenceType;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\State;
@@ -536,4 +537,87 @@ it('serializes event detail payloads with poster metadata and included speakers'
         ->and(data_get($payload, 'end_time_display'))->toBe('10:15 PM')
         ->and(is_array(data_get($payload, 'speakers.0')))->toBeTrue()
         ->and(array_key_exists('pivot', data_get($payload, 'speakers.0')))->toBeFalse();
+});
+
+it('serializes included institution address display fields on event detail payloads', function () {
+    $countryId = DB::table('countries')->where('id', 132)->value('id');
+
+    if (! is_int($countryId)) {
+        $countryId = DB::table('countries')->insertGetId([
+            'id' => 132,
+            'iso2' => 'MY',
+            'name' => 'Malaysia',
+            'status' => 1,
+            'phone_code' => '60',
+            'iso3' => 'MYS',
+            'region' => 'Asia',
+            'subregion' => 'South-Eastern Asia',
+        ]);
+    }
+
+    $state = State::where('country_code', 'MY')->first();
+
+    if (! $state) {
+        $stateId = DB::table('states')->insertGetId([
+            'country_id' => $countryId,
+            'name' => 'Selangor',
+            'country_code' => 'MY',
+        ]);
+
+        $state = State::query()->findOrFail($stateId);
+    }
+
+    $district = District::query()->create([
+        'country_id' => $state->country_id,
+        'state_id' => $state->id,
+        'country_code' => 'MY',
+        'name' => 'API Event District '.uniqid(),
+    ]);
+
+    $subdistrict = Subdistrict::query()->create([
+        'country_id' => $state->country_id,
+        'state_id' => $state->id,
+        'district_id' => $district->id,
+        'country_code' => 'MY',
+        'name' => 'API Event Subdistrict '.uniqid(),
+    ]);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution->address()->delete();
+    $institution->address()->create([
+        'line1' => 'No. 12 Jalan Ilmu',
+        'line2' => 'Blok B',
+        'postcode' => '43000',
+        'country_id' => $countryId,
+        'state_id' => $state->id,
+        'district_id' => $district->id,
+        'subdistrict_id' => $subdistrict->id,
+        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
+        'waze_url' => 'https://waze.com/ul?ll=3.1390,101.6869',
+        'lat' => 3.139,
+        'lng' => 101.6869,
+    ]);
+
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson('/api/v1/events/'.$event->id.'?include=institution,institution.address');
+
+    $response->assertOk()
+        ->assertJsonPath('data.institution.id', $institution->id)
+        ->assertJsonPath('data.institution.address_line', $subdistrict->name.', '.$district->name.', '.$state->name)
+        ->assertJsonPath('data.institution.street_address_line', 'No. 12 Jalan Ilmu, Blok B')
+        ->assertJsonPath('data.institution.locality_address_line', $subdistrict->name.', 43000')
+        ->assertJsonPath('data.institution.regional_address_line', $district->name.', '.$state->name)
+        ->assertJsonPath('data.institution.map_url', 'https://maps.google.com/?q=3.1390,101.6869')
+        ->assertJsonPath('data.institution.map_lat', 3.139)
+        ->assertJsonPath('data.institution.map_lng', 101.6869)
+        ->assertJsonPath('data.institution.waze_url', 'https://waze.com/ul?ll=3.1390,101.6869');
 });
