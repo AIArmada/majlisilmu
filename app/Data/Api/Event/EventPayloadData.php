@@ -2,10 +2,12 @@
 
 namespace App\Data\Api\Event;
 
+use App\Enums\EventType;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Support\Timezone\UserDateTimeFormatter;
 use DateTimeInterface;
+use Illuminate\Support\Collection;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Support\Transformation\TransformationContext;
 use Spatie\LaravelData\Support\Transformation\TransformationContextFactory;
@@ -33,6 +35,7 @@ class EventPayloadData extends Data
             'end_time_display' => $event->ends_at instanceof DateTimeInterface
                 ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
                 : null,
+            'event_type_label' => self::resolveEventTypeLabel($event),
         ];
 
         if ($event->relationLoaded('speakers')) {
@@ -53,6 +56,25 @@ class EventPayloadData extends Data
         null|TransformationContextFactory|TransformationContext $transformationContext = null,
     ): array {
         return $this->payload;
+    }
+
+    private static function resolveEventTypeLabel(Event $event): ?string
+    {
+        $eventType = $event->event_type;
+
+        $first = $eventType instanceof Collection
+            ? $eventType->first()
+            : (is_array($eventType) ? ($eventType[0] ?? null) : null);
+
+        if ($first instanceof EventType) {
+            return $first->getLabel();
+        }
+
+        if (is_string($first) && $first !== '') {
+            return EventType::tryFrom($first)?->getLabel();
+        }
+
+        return null;
     }
 
     /**

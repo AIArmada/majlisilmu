@@ -1305,6 +1305,43 @@ it('exposes the institution public image url in the frontend institution detail 
         ->and($response->json('data.institution.media.public_image_url'))->toBe($response->json('data.institution.media.logo_url'));
 });
 
+it('returns institution follow state on the authenticated detail route response', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Follow State API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($institution);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.institutions.show', ['institutionKey' => $institution->slug]))
+        ->assertOk()
+        ->assertJsonPath('data.institution.followers_count', 1)
+        ->assertJsonPath('data.institution.is_following', true);
+});
+
+it('returns institution follow state on the detail route for bearer token requests', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Bearer Follow State API',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($institution);
+
+    $token = $user->createToken('mobile-app')->plainTextToken;
+
+    $this->withToken($token)
+        ->getJson(route('api.client.institutions.show', ['institutionKey' => $institution->slug]))
+        ->assertOk()
+        ->assertJsonPath('data.institution.followers_count', 1)
+        ->assertJsonPath('data.institution.is_following', true);
+});
+
 it('serializes institution detail payloads with address and donation metadata for mobile clients', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
