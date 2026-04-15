@@ -1,3 +1,65 @@
+# Suggest-Update Compact Shell
+
+- [x] Remove the remaining bottom padding from the shared suggest-update page
+- [x] Tighten the internal wrapper and submit-row spacing
+- [x] Add speaker-route coverage for the shared compact shell
+- [x] Re-run the focused formatting, PHPStan, and contribution-page regression checks
+
+## Review
+
+- Reduced the shared page shell in [resources/views/livewire/pages/contributions/suggest-update.blade.php](resources/views/livewire/pages/contributions/suggest-update.blade.php) to `bg-white pb-0`, tightened the wrapper to `gap-2 px-4 py-2 sm:gap-3 sm:px-6 sm:py-4 lg:px-8 lg:py-6`, and trimmed the form spacing so the page ends much closer to the submit button.
+- Kept the heading split intact: public users still see "Cadangan Kemas Kini" while direct editors see "Kemas Kini".
+- Added a focused speaker-route regression in [tests/Feature/ContributionPagesTest.php](tests/Feature/ContributionPagesTest.php) so the exact speaker URL now protects the same compact shell.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 53 passed
+
+# Suggest-Update Height Constraint
+
+- [x] Remove the full-screen height constraint from the shared suggest-update page
+- [x] Tighten the bottom padding so the page ends closer to the submit button
+- [x] Re-run the focused formatting, PHPStan, and contribution-page regression checks
+
+## Review
+
+- Removed the `min-h-screen` constraint from [resources/views/livewire/pages/contributions/suggest-update.blade.php](resources/views/livewire/pages/contributions/suggest-update.blade.php) so the page no longer reserves a large empty white block below the form when the content is short.
+- Reduced the shared bottom padding to `pb-6 sm:pb-8` so both the institution and speaker update routes have a shorter tail beneath the submit button.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 52 passed
+
+# Suggest-Update Bottom Spacing
+
+- [x] Reduce the shared bottom padding below the institution and speaker update forms
+- [x] Keep the Malay heading split between public and direct-edit users
+- [x] Re-run the focused formatting, PHPStan, and contribution-page regression checks
+
+## Review
+
+- Reduced the shared page bottom padding in [resources/views/livewire/pages/contributions/suggest-update.blade.php](resources/views/livewire/pages/contributions/suggest-update.blade.php) so both contribution-update routes finish with less empty space below the form actions.
+- Kept the direct-edit Malay heading as "Kemas Kini" while leaving the public heading as "Cadangan Kemas Kini" in [resources/lang/ms.json](resources/lang/ms.json) and [resources/lang/ms_MY.json](resources/lang/ms_MY.json).
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 52 passed
+
+# Suggest-Update Layout Cleanup
+
+- [x] Remove the suggest-update label and outer shell from the shared contribution page
+- [x] Tighten the page spacing and CTA layout for mobile screens
+- [x] Update the focused contribution-page regression and verify the page
+
+## Review
+
+- Removed the shared suggest-update eyebrow label and the rounded white outer shell from [resources/views/livewire/pages/contributions/suggest-update.blade.php](resources/views/livewire/pages/contributions/suggest-update.blade.php), leaving a flatter page header and the existing form sections to define the content structure.
+- Tightened the page wrapper to a smaller mobile-first width, reduced nested padding, and slightly enlarged the submit button tap target so the form reads better on small screens without changing the underlying Filament schema.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 52 passed
+
 # Malay Suggest-Update Copy
 
 - [x] Change the Malay suggest-update heading from "Cadangkan Kemas Kini" to "Cadangan Kemas Kini"

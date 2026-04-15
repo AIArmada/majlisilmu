@@ -371,11 +371,14 @@ it('renders the suggest update page with translated event form copy when the loc
         'subjectId' => $event->slug,
     ]))
         ->assertOk()
-        ->assertSee('Cadangan Komuniti')
         ->assertSee('Cadangan Kemas Kini')
         ->assertSee('Terangkan perubahan')
         ->assertSee('Audiens & Bahasa')
         ->assertSee('Penganjur & Lokasi')
+        ->assertSee('bg-white pb-0', false)
+        ->assertSee('max-w-5xl flex-col gap-2 px-4 py-2', false)
+        ->assertDontSee('rounded-3xl border border-slate-200 bg-white px-4 py-5 shadow-sm', false)
+        ->assertDontSee('Cadangan Komuniti')
         ->assertDontSee('Community Suggestion')
         ->assertDontSee('Suggest an Update')
         ->assertDontSee('Cadangkan Kemas Kini')
@@ -401,11 +404,34 @@ it('renders the institution suggest update page with translated direct-edit copy
         'subjectId' => $institution->slug,
     ]))
         ->assertOk()
-        ->assertSee('Cadangan Kemas Kini')
-        ->assertSee('Anda sudah mempunyai akses suntingan untuk rekod ini, jadi perubahan daripada borang ini akan diterapkan serta-merta.')
+        ->assertSee('Kemas Kini')
+        ->assertDontSee('Cadangan Kemas Kini')
+        ->assertDontSee('Cadangan Komuniti')
         ->assertDontSee('Terangkan perubahan')
         ->assertDontSee('Laksanakan Kemas Kini')
         ->assertDontSee(__('View My Contributions'));
+});
+
+it('renders the speaker suggest update page with the compact shared shell', function () {
+    $user = User::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app()->setLocale('ms');
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Speaker->publicRouteSegment(),
+        'subjectId' => $speaker->slug,
+    ]))
+        ->assertOk()
+        ->assertSee('Cadangan Kemas Kini')
+        ->assertSee('bg-white pb-0', false)
+        ->assertSee('max-w-5xl flex-col gap-2 px-4 py-2', false)
+        ->assertDontSee('Cadangan Komuniti')
+        ->assertDontSee('Cadangkan Kemas Kini');
 });
 
 it('shows the institution media uploads on the suggest update page only for maintainers', function () {
