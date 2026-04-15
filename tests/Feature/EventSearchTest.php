@@ -18,6 +18,7 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
 use App\Support\Location\PublicGeolocationPermission;
@@ -194,6 +195,17 @@ describe('Event Search Filters', function () {
         $response->assertOk()
             ->assertSee('Save This Search')
             ->assertSee('/carian-tersimpan?search=halaqah', false);
+    });
+
+    it('shows a saved searches re-entry link for authenticated users without active filters', function () {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/events');
+
+        $response->assertOk()
+            ->assertSee('Saved Searches')
+            ->assertSee('Keep the filters you use often for quick access.')
+            ->assertSee(route('saved-searches.index'), false);
     });
 
     it('keeps the nearby button visible while gating radius controls on geolocation permission', function () {

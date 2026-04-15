@@ -519,6 +519,19 @@
                 </div>
             </div>
 
+            @auth
+                <div class="mb-5 flex items-center justify-between gap-3 rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-2.5">
+                    <div class="flex items-center gap-2.5">
+                        <svg class="h-4 w-4 shrink-0 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                        <p class="text-sm text-slate-600">{{ __('Keep the filters you use often for quick access.') }}</p>
+                    </div>
+                    <a href="{{ route('saved-searches.index') }}" wire:navigate
+                        class="shrink-0 text-sm font-semibold text-sky-700 hover:text-sky-600 hover:underline">
+                        {{ __('Saved Searches') }} →
+                    </a>
+                </div>
+            @endauth
+
             <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                 <div class="flex items-center gap-2">
                     <button type="button" @click="locate" :disabled="locating"

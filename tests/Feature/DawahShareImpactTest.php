@@ -162,7 +162,7 @@ test('viewing a shareable page does not create a share link until payload is req
         ]));
 
     $response->assertOk()
-        ->assertJsonPath('url', fn (string $url): bool => str_contains($url, 'mi_share='));
+        ->assertJsonPath('url', fn (string $url): bool => str_contains($url, 'share='));
 
     expect(AffiliateLink::count())->toBe(1);
 
@@ -1348,7 +1348,7 @@ test('share redirect route records outbound provider clicks without visitor visi
 
     expect(AffiliateLink::count())->toBe(1);
     expect(AffiliateTouchpoint::query()->where('metadata->event_type', 'visit')->count())->toBe(0);
-    expect(rawurldecode((string) $response->headers->get('Location')))->toContain('mi_channel=whatsapp');
+    expect(rawurldecode((string) $response->headers->get('Location')))->toContain('channel=whatsapp');
 
     $this->assertDatabaseHas('affiliate_touchpoints', [
         'affiliate_id' => $link->affiliate_id,

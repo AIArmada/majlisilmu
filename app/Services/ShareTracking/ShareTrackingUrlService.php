@@ -177,8 +177,8 @@ final class ShareTrackingUrlService
         $path = (string) ($parsed['path'] ?? '/');
         $query = $this->normalizeQueryFromUrl($url);
 
-        unset($query[(string) config('dawah-share.query_parameter', 'mi_share')]);
-        unset($query[(string) config('dawah-share.provider_query_parameter', 'mi_channel')]);
+        unset($query[(string) config('dawah-share.query_parameter', 'share')]);
+        unset($query[(string) config('dawah-share.provider_query_parameter', 'channel')]);
 
         return $this->buildAbsoluteUrl($path, $query);
     }
@@ -230,7 +230,7 @@ final class ShareTrackingUrlService
         }
 
         return $this->appendQueryParameters($url, [
-            (string) config('dawah-share.provider_query_parameter', 'mi_channel') => $provider,
+            (string) config('dawah-share.provider_query_parameter', 'channel') => $provider,
         ]);
     }
 
@@ -242,7 +242,7 @@ final class ShareTrackingUrlService
         parse_str((string) parse_url($this->normalizeAbsoluteInternalUrl($url), PHP_URL_QUERY), $query);
 
         $query = Arr::where($query, fn (mixed $value): bool => $this->filledQueryValue($value));
-        unset($query[(string) config('dawah-share.query_parameter', 'mi_share')]);
+        unset($query[(string) config('dawah-share.query_parameter', 'share')]);
 
         return $this->sortQueryRecursively($query);
     }

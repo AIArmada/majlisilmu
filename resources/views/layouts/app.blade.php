@@ -149,9 +149,14 @@
                         ->whereNull('read_at')
                         ->count()
                     : 0;
-                $usesDashboardMenuLabel = in_array($currentLocale, ['ms', 'ms_MY'], true);
-                $dashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard' : __('Dashboard');
-                $institutionDashboardMenuLabel = $usesDashboardMenuLabel ? 'Dashboard Institusi' : __('Institution Dashboard');
+                $dashboardMenuLabel = __('My Dashboard');
+                $homeMenuHeading = __('Home');
+                $workspaceMenuHeading = __('Workspaces');
+                $accountMenuHeading = __('Account');
+                $inboxMenuLabel = __('Inbox');
+                $contributionsMenuLabel = __('My Contributions');
+                $settingsMenuLabel = __('Settings');
+                $institutionDashboardMenuLabel = __('Manage Institution');
             @endphp
 
             <!-- Premium Header -->
@@ -275,53 +280,54 @@
                                     </svg>
                                 </button>
                                 <div
-                                    class="absolute right-0 top-full mt-2 w-48 origin-top-right scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
+                                    class="absolute right-0 top-full mt-2 w-56 origin-top-right scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
                                     <div class="px-3 py-2 border-b border-slate-50 mb-1">
                                         <p class="text-xs text-slate-500">{{ __('Signed in as') }}</p>
                                         <p class="text-sm font-bold text-slate-900 truncate">{{ auth()->user()->email }}</p>
                                     </div>
-                                    <a href="{{ route('dashboard') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ $dashboardMenuLabel }}
-                                    </a>
-                                    <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Dawah Impact') }}
-                                    </a>
-                                    <a href="{{ route('dashboard.account-settings') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Account Settings') }}
-                                    </a>
-                                    <a href="{{ route('dashboard.notifications') }}" wire:navigate
-                                        class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        <span>{{ __('notifications.pages.inbox.nav_label') }}</span>
-                                        @if($notificationUnreadCount > 0)
-                                            <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                                                {{ $notificationUnreadCount }}
-                                            </span>
-                                        @endif
-                                    </a>
-                                    <a href="{{ route('saved-searches.index') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Saved Searches') }}
-                                    </a>
-                                    <a href="{{ route('contributions.index') }}" wire:navigate
-                                        class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                        {{ __('Sumbangan') }}
-                                    </a>
-                                    @if($hasInstitutionDashboardAccess)
-                                        <a href="{{ route('dashboard.institutions') }}" wire:navigate
-                                            class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                                            {{ $institutionDashboardMenuLabel }}
+                                    <div class="border-b border-slate-50 pb-1">
+                                        <p class="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $homeMenuHeading }}</p>
+                                        <a href="{{ route('dashboard') }}" wire:navigate
+                                            class="block rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50">
+                                            {{ $dashboardMenuLabel }}
                                         </a>
-                                    @endif
-                                    <form method="POST" action="{{ route('logout') }}">
-                                        @csrf
-                                        <button type="submit"
-                                            class="w-full text-left rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                                            {{ __('Log Out') }}
-                                        </button>
-                                    </form>
+                                        <a href="{{ route('dashboard.notifications') }}" wire:navigate
+                                            class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50">
+                                            <span>{{ $inboxMenuLabel }}</span>
+                                            @if($notificationUnreadCount > 0)
+                                                <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                                                    {{ $notificationUnreadCount }}
+                                                </span>
+                                            @endif
+                                        </a>
+                                    </div>
+                                    <div class="border-b border-slate-50 py-1">
+                                        <p class="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $workspaceMenuHeading }}</p>
+                                        <a href="{{ route('contributions.index') }}" wire:navigate
+                                            class="block rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50">
+                                            {{ $contributionsMenuLabel }}
+                                        </a>
+                                        @if($hasInstitutionDashboardAccess)
+                                            <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                                class="block rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50">
+                                                {{ $institutionDashboardMenuLabel }}
+                                            </a>
+                                        @endif
+                                    </div>
+                                    <div class="pt-1">
+                                        <p class="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $accountMenuHeading }}</p>
+                                        <a href="{{ route('dashboard.account-settings') }}" wire:navigate
+                                            class="block rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50">
+                                            {{ $settingsMenuLabel }}
+                                        </a>
+                                        <form method="POST" action="{{ route('logout') }}">
+                                            @csrf
+                                            <button type="submit"
+                                                class="w-full text-left rounded-lg px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50">
+                                                {{ __('Log Out') }}
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         @else
@@ -377,48 +383,51 @@
                                         <p class="text-xs text-slate-500 truncate">{{ auth()->user()->email }}</p>
                                     </div>
                                 </div>
-                                <a href="{{ route('dashboard') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ $dashboardMenuLabel }}
-                                </a>
-                                <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Dawah Impact') }}
-                                </a>
-                                <a href="{{ route('dashboard.account-settings') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Account Settings') }}
-                                </a>
-                                <a href="{{ route('dashboard.notifications') }}" wire:navigate
-                                    class="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    <span>{{ __('notifications.pages.inbox.nav_label') }}</span>
-                                    @if($notificationUnreadCount > 0)
-                                        <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                                            {{ $notificationUnreadCount }}
-                                        </span>
-                                    @endif
-                                </a>
-                                <a href="{{ route('saved-searches.index') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Saved Searches') }}
-                                </a>
-                                <a href="{{ route('contributions.index') }}" wire:navigate
-                                    class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                    {{ __('Sumbangan') }}
-                                </a>
-                                @if($hasInstitutionDashboardAccess)
-                                    <a href="{{ route('dashboard.institutions') }}" wire:navigate
-                                        class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
-                                        {{ $institutionDashboardMenuLabel }}
-                                    </a>
-                                @endif
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button type="submit"
-                                        class="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600">
-                                        {{ __('Log Out') }}
-                                    </button>
-                                </form>
+                                <div class="space-y-3 border-t border-slate-100 pt-4">
+                                    <div class="space-y-2">
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $homeMenuHeading }}</p>
+                                        <a href="{{ route('dashboard') }}" wire:navigate
+                                            class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                            {{ $dashboardMenuLabel }}
+                                        </a>
+                                        <a href="{{ route('dashboard.notifications') }}" wire:navigate
+                                            class="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                            <span>{{ $inboxMenuLabel }}</span>
+                                            @if($notificationUnreadCount > 0)
+                                                <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                                                    {{ $notificationUnreadCount }}
+                                                </span>
+                                            @endif
+                                        </a>
+                                    </div>
+                                    <div class="space-y-2 border-t border-slate-100 pt-4">
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $workspaceMenuHeading }}</p>
+                                        <a href="{{ route('contributions.index') }}" wire:navigate
+                                            class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                            {{ $contributionsMenuLabel }}
+                                        </a>
+                                        @if($hasInstitutionDashboardAccess)
+                                            <a href="{{ route('dashboard.institutions') }}" wire:navigate
+                                                class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                                {{ $institutionDashboardMenuLabel }}
+                                            </a>
+                                        @endif
+                                    </div>
+                                    <div class="space-y-2 border-t border-slate-100 pt-4">
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $accountMenuHeading }}</p>
+                                        <a href="{{ route('dashboard.account-settings') }}" wire:navigate
+                                            class="block rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                                            {{ $settingsMenuLabel }}
+                                        </a>
+                                        <form method="POST" action="{{ route('logout') }}">
+                                            @csrf
+                                            <button type="submit"
+                                                class="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600">
+                                                {{ __('Log Out') }}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
                             @endguest
                         </div>
                         <!-- Mobile Language Switcher -->
