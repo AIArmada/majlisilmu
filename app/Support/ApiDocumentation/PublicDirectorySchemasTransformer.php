@@ -310,7 +310,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         return Schema::fromType(
             (new ObjectType)
                 ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference('InstitutionListItem')))
-                ->addProperty('meta', $this->directoryMetaType())
+                ->addProperty('meta', $this->institutionDirectoryMetaType())
                 ->setRequired(['data', 'meta']),
         );
     }
@@ -402,6 +402,20 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             )
             ->addProperty('request_id', new StringType)
             ->setRequired(['pagination', 'cache', 'request_id']);
+    }
+
+    private function institutionDirectoryMetaType(): ObjectType
+    {
+        return $this->directoryMetaType()
+            ->addProperty('types', (new ArrayType)->setItems($this->directoryFilterOptionType()));
+    }
+
+    private function directoryFilterOptionType(): ObjectType
+    {
+        return (new ObjectType)
+            ->addProperty('value', new StringType)
+            ->addProperty('label', new StringType)
+            ->setRequired(['value', 'label']);
     }
 
     private function requestMetaType(): ObjectType

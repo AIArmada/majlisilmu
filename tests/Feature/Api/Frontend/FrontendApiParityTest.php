@@ -10,6 +10,7 @@ use App\Enums\EventStructure;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\InspirationCategory;
+use App\Enums\InstitutionType;
 use App\Http\Controllers\Api\Frontend\SearchController;
 use App\Models\ContributionRequest;
 use App\Models\Country;
@@ -1195,6 +1196,36 @@ it('supports server-side filtering to only followed institutions in the frontend
         ->assertJsonPath('data.0.is_following', true)
         ->assertJsonPath('meta.pagination.total', 1)
         ->assertJsonPath('meta.following.total', 1);
+});
+
+it('returns enum-backed institution type filters and supports server-side type filtering in the frontend institution api', function () {
+    $masjid = Institution::factory()->create([
+        'name' => 'Masjid Type Filter Match',
+        'status' => 'verified',
+        'is_active' => true,
+        'type' => InstitutionType::Masjid,
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Surau Type Filter Miss',
+        'status' => 'verified',
+        'is_active' => true,
+        'type' => InstitutionType::Surau,
+    ]);
+
+    $response = $this->getJson(route('api.client.institutions.index', ['type' => InstitutionType::Masjid->value]))
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', $masjid->slug)
+        ->assertJsonPath('meta.pagination.total', 1);
+
+    expect($response->json('meta.types'))->toBe(array_map(
+        static fn (InstitutionType $type): array => [
+            'value' => $type->value,
+            'label' => $type->getLabel(),
+        ],
+        InstitutionType::cases(),
+    ));
 });
 
 it('bumps the institution directory cache version when institution records change', function () {

@@ -20,6 +20,7 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Enums\InspirationCategory;
+use App\Enums\InstitutionType;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
@@ -125,6 +126,7 @@ class SearchController extends FrontendController
     {
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
+        $institutionType = $this->normalizedInstitutionType($request->query('type'));
         $countryId = $this->requestedCountryId($request);
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
@@ -133,6 +135,7 @@ class SearchController extends FrontendController
         $followingOnly = $request->boolean('following');
 
         $baseQuery = $this->baseInstitutionQuery(
+            type: $institutionType,
             countryId: $countryId,
             stateId: $stateId,
             districtId: $districtId,
@@ -165,6 +168,7 @@ class SearchController extends FrontendController
                 'following' => [
                     'total' => $followingTotal,
                 ],
+                'types' => $this->institutionTypeFiltersData(),
                 'cache' => $this->institutionDirectoryCacheData(),
             ],
         ]);
@@ -701,6 +705,7 @@ class SearchController extends FrontendController
      * @return Builder<Institution>
      */
     private function baseInstitutionQuery(
+        ?InstitutionType $type = null,
         ?int $countryId = null,
         ?int $stateId = null,
         ?int $districtId = null,
@@ -729,9 +734,27 @@ class SearchController extends FrontendController
             }])
             ->with(['address.country', 'address.state', 'address.district', 'address.subdistrict', 'media']);
 
+        if ($type instanceof InstitutionType) {
+            $query->where('institutions.type', $type->value);
+        }
+
         $this->applyInstitutionLocationScope($query, $countryId, $stateId, $districtId, $subdistrictId);
 
         return $query;
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    private function institutionTypeFiltersData(): array
+    {
+        return array_map(
+            static fn (InstitutionType $type): array => [
+                'value' => $type->value,
+                'label' => $type->getLabel(),
+            ],
+            InstitutionType::cases(),
+        );
     }
 
     /**
@@ -763,6 +786,7 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @param  Builder<Institution>  $base
      * @return LengthAwarePaginator<int, Institution>
      */
     private function institutionDirectorySearchPaginator(Request $request, string $search, int $perPage, Builder $base): LengthAwarePaginator
@@ -821,6 +845,7 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @param  Builder<Institution>  $base
      * @param  list<string>  $orderedIds
      * @return list<string>
      */
@@ -1607,6 +1632,17 @@ class SearchController extends FrontendController
         }
 
         return (int) $normalized;
+    }
+
+    private function normalizedInstitutionType(mixed $value): ?InstitutionType
+    {
+        $normalized = $this->normalizedString($value);
+
+        if ($normalized === null) {
+            return null;
+        }
+
+        return InstitutionType::tryFrom($normalized);
     }
 
     private function requestedCountryId(Request $request): ?int
