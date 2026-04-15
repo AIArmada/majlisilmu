@@ -40,23 +40,14 @@ class UserDashboard extends Component
     }
 
     /**
-     * @return array<string, int>
+     * @return array{going_count: int, saved_count: int}
      */
     #[Computed]
     public function summaryStats(): array
     {
-        $user = $this->user();
-        $upcomingAgenda = $this->upcomingAgenda();
-        $submittedEvents = $this->submittedEvents();
-
         return [
-            'planning_count' => $upcomingAgenda->count(),
             'going_count' => $this->countCalendarEntriesForRole('going', futureOnly: true),
-            'registered_count' => $this->countCalendarEntriesForRole('registered', futureOnly: true),
             'saved_count' => $this->countCalendarEntriesForRole('saved', futureOnly: true),
-            'submitted_count' => $submittedEvents->count(),
-            'checkins_count' => EventCheckin::query()->where('user_id', $user->id)->count(),
-            'institutions_count' => $user->institutions()->count(),
         ];
     }
 
@@ -206,9 +197,6 @@ class UserDashboard extends Component
         $entries = [];
         $savedEvents = $this->savedEvents();
         $goingEvents = $this->goingEvents();
-        $registeredEvents = $this->registeredEvents();
-        $submittedEvents = $this->submittedEvents();
-        $recentCheckins = $this->recentCheckins();
 
         foreach ($savedEvents as $event) {
             $this->mergeEventIntoCalendarEntries($entries, $event, 'saved');
@@ -218,22 +206,6 @@ class UserDashboard extends Component
             $this->mergeEventIntoCalendarEntries($entries, $event, 'going');
         }
 
-        foreach ($registeredEvents as $registration) {
-            if (! $registration->event instanceof Event || ! in_array($registration->status, ['registered', 'attended'], true)) {
-                continue;
-            }
-
-            $this->mergeEventIntoCalendarEntries($entries, $registration->event, 'registered');
-        }
-
-        foreach ($submittedEvents as $submissionEntry) {
-            $this->mergeEventIntoCalendarEntries($entries, $submissionEntry['event'], 'submitted');
-        }
-
-        foreach ($recentCheckins as $checkin) {
-            $this->mergeCheckinIntoCalendarEntries($entries, $checkin);
-        }
-
         /** @var list<array<string, mixed>> $entryList */
         $entryList = array_values($entries);
 
@@ -241,6 +213,7 @@ class UserDashboard extends Component
         $sorted = collect($entryList)
             ->sortBy([
                 ['date_key', 'asc'],
+                ['role_order', 'asc'],
                 ['starts_at_ts', 'asc'],
                 ['title', 'asc'],
             ])
@@ -461,7 +434,9 @@ class UserDashboard extends Component
     protected function sortEventsForPlanner(Collection $events): Collection
     {
         return $events
-            ->sort(fn (Event $left, Event $right): int => $this->comparePlannerDates($left->starts_at, $right->starts_at))
+            ->sort(function (Event $left, Event $right): int {
+                return $this->comparePlannerDates($left->starts_at, $right->starts_at);
+            })
             ->values();
     }
 
@@ -510,6 +485,22 @@ class UserDashboard extends Component
         }
 
         return [0, $localized->getTimestamp()];
+    }
+
+    /**
+     * @param  list<string>  $roles
+     */
+    protected function plannerRolePriority(array $roles): int
+    {
+        if (in_array('saved', $roles, true)) {
+            return 0;
+        }
+
+        if (in_array('going', $roles, true)) {
+            return 1;
+        }
+
+        return 99;
     }
 
     /**
@@ -609,6 +600,7 @@ class UserDashboard extends Component
             ],
             $roles
         );
+        $entry['role_order'] = $this->plannerRolePriority($roles);
         $entry['panel_class'] = $this->entryPanelClass($status, $primaryRole, (bool) ($entry['is_checkin'] ?? false));
     }
 
@@ -644,6 +636,7 @@ class UserDashboard extends Component
             'status_class' => $this->eventStatusClass($status),
             'roles' => [],
             'role_badges' => [],
+            'role_order' => $this->plannerRolePriority([$primaryRole]),
             'primary_role' => $primaryRole,
             'panel_class' => $this->entryPanelClass($status, $primaryRole, $isCheckin),
             'starts_at_ts' => $timestamp,
@@ -723,35 +716,17 @@ class UserDashboard extends Component
     protected function roleDefinitions(): array
     {
         return [
-            'going' => [
-                'label' => __('Going'),
-                'badge_class' => 'bg-emerald-100 text-emerald-700',
-                'active_button_class' => 'border-emerald-500 bg-emerald-600 text-white shadow-sm shadow-emerald-500/20',
-                'inactive_button_class' => 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300',
-            ],
-            'registered' => [
-                'label' => __('Registered'),
-                'badge_class' => 'bg-sky-100 text-sky-700',
-                'active_button_class' => 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-500/20',
-                'inactive_button_class' => 'border-sky-200 bg-white text-sky-700 hover:border-sky-300',
-            ],
             'saved' => [
                 'label' => __('Saved'),
                 'badge_class' => 'bg-amber-100 text-amber-700',
                 'active_button_class' => 'border-amber-500 bg-amber-500 text-white shadow-sm shadow-amber-500/20',
                 'inactive_button_class' => 'border-amber-200 bg-white text-amber-700 hover:border-amber-300',
             ],
-            'submitted' => [
-                'label' => __('Submitted'),
-                'badge_class' => 'bg-violet-100 text-violet-700',
-                'active_button_class' => 'border-violet-500 bg-violet-600 text-white shadow-sm shadow-violet-500/20',
-                'inactive_button_class' => 'border-violet-200 bg-white text-violet-700 hover:border-violet-300',
-            ],
-            'checkin' => [
-                'label' => __('Check-ins'),
-                'badge_class' => 'bg-slate-200 text-slate-700',
-                'active_button_class' => 'border-slate-500 bg-slate-700 text-white shadow-sm shadow-slate-500/20',
-                'inactive_button_class' => 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+            'going' => [
+                'label' => __('Going'),
+                'badge_class' => 'bg-emerald-100 text-emerald-700',
+                'active_button_class' => 'border-emerald-500 bg-emerald-600 text-white shadow-sm shadow-emerald-500/20',
+                'inactive_button_class' => 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300',
             ],
         ];
     }
@@ -759,11 +734,8 @@ class UserDashboard extends Component
     protected function rolePriority(string $role): int
     {
         return match ($role) {
-            'going' => 0,
-            'registered' => 1,
-            'saved' => 2,
-            'submitted' => 3,
-            'checkin' => 4,
+            'saved' => 0,
+            'going' => 1,
             default => 99,
         };
     }

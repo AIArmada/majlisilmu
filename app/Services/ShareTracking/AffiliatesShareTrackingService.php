@@ -144,7 +144,7 @@ final readonly class AffiliatesShareTrackingService
             return $cookieState['encoded'] ?? null;
         }
 
-        $parameter = (string) config('dawah-share.query_parameter', 'mi_share');
+        $parameter = (string) config('dawah-share.query_parameter', 'share');
         $signedToken = $request->query($parameter);
         $visitorKey = $cookieState['visitor_key'] ?? (string) Str::ulid();
         $shareProvider = $this->shareProviderFromRequest($request);
@@ -415,7 +415,7 @@ final readonly class AffiliatesShareTrackingService
     private function sharedUrlForLink(AffiliateLink $link): string
     {
         return $this->appendQueryParameters($link->destination_url, [
-            (string) config('dawah-share.query_parameter', 'mi_share') => $this->signedToken((string) $link->custom_slug),
+            (string) config('dawah-share.query_parameter', 'share') => $this->signedToken((string) $link->custom_slug),
         ]);
     }
 
@@ -522,8 +522,8 @@ final readonly class AffiliatesShareTrackingService
                 'visitor_key' => $visitorKey,
                 'share_provider' => $shareProvider,
                 'query' => Arr::except($request->query(), [
-                    (string) config('dawah-share.query_parameter', 'mi_share'),
-                    (string) config('dawah-share.provider_query_parameter', 'mi_channel'),
+                    (string) config('dawah-share.query_parameter', 'share'),
+                    (string) config('dawah-share.provider_query_parameter', 'channel'),
                 ]),
             ]),
         ];
@@ -922,7 +922,7 @@ final readonly class AffiliatesShareTrackingService
 
     private function shareProviderFromRequest(Request $request): ?string
     {
-        $provider = $request->query((string) config('dawah-share.provider_query_parameter', 'mi_channel'));
+        $provider = $request->query((string) config('dawah-share.provider_query_parameter', 'channel'));
 
         return is_string($provider) ? $this->shareTrackingUrlService->normalizeProvider($provider) : null;
     }

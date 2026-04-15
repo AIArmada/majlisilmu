@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 return [
-    'query_parameter' => 'mi_share',
+    'query_parameter' => 'share',
 
-    'provider_query_parameter' => 'mi_channel',
+    'provider_query_parameter' => 'channel',
 
     'ttl_days' => 30,
 

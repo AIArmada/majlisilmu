@@ -37,8 +37,9 @@
     x-data="{ activeTab: @js($activeTab) }"
 >
     {{-- Page header --}}
-    <div class="border-b border-slate-200 bg-white">
-        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
+        <div class="pointer-events-none absolute inset-0 bg-[url('/images/pattern-bg.png')] bg-[size:300px] opacity-[0.025]"></div>
+        <div class="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">{{ __('Sumbangan') }}</p>

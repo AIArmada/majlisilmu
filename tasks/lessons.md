@@ -1,5 +1,7 @@
 # Lessons
 
+- When you demote a destination from persistent navigation, audit page-level hero and shortcut CTAs in the same pass; a hero button can still keep that destination functionally first-class even after the menu is cleaned up.
+- When reworking navigation, audit each destination by its actual page responsibilities and contextual entry points before removing or demoting menu items; similar labels do not imply redundant workflows.
 - When correcting a permission-gated UI behavior, do not preserve a query-string or entry-point split unless the user explicitly confirms that split is part of the product requirement; keep the condition tied to authorization first.
 - When a user explicitly says a conditional form field should depend only on real authorization/ownership, do not add entry-point flags or URL context switches first; use the permission check directly in the field visibility rule unless there is a proven product need for different behavior by entry path.
 - When a user says a dashboard edit form should be similar to a public `kemas-kini` flow, verify whether they mean shared schema only or shared route/component too; public suggestion flows and privileged owner/admin direct-edit flows can look alike while still needing separate entry points.

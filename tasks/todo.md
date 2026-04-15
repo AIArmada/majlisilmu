@@ -1,3 +1,58 @@
+# Share Tracking Parameter Audit
+
+- [x] Trace share-tracking link generation, redirect handling, and attribution capture parameters
+- [x] Cross-check request/query parameters against persisted attribution and outcome metadata
+- [x] Summarize every involved parameter with source, purpose, and where it is used
+
+## Review
+
+- Renamed the public share-tracking query parameters in [config/dawah-share.php](config/dawah-share.php), [app/Services/ShareTracking/AffiliatesShareTrackingService.php](app/Services/ShareTracking/AffiliatesShareTrackingService.php), and [app/Services/ShareTracking/ShareTrackingUrlService.php](app/Services/ShareTracking/ShareTrackingUrlService.php) from the legacy query keys to `share` / `channel` as a hard cut with no backward compatibility.
+- Updated the focused public URL assertions in [tests/Feature/DawahShareImpactTest.php](tests/Feature/DawahShareImpactTest.php) so the suite now expects `share=` and `channel=` in generated URLs.
+- Follow-up repo-wide grep confirmed all application source, views, routes, and tests now read or emit only the current tracking keys; the last legacy mentions were removed from this internal task log.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php` => 32 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminShareAnalyticsPageTest.php` => 8 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/SignalsIntegrationTest.php` => 5 passed
+
+# Contextual Re-entry Pass
+
+- [x] Demote Dawah Impact from the dashboard hero so it only remains in its dedicated insight teaser
+- [x] Add a persistent Saved Searches re-entry point inside the events discovery flow for signed-in users
+- [x] Verify the updated signed-in menu and both contextual entry points in Chrome MCP
+- [x] Re-run focused formatting and regression coverage for the updated dashboard and events pages
+
+## Review
+
+- Removed the dashboard hero-level `Dawah Impact` action from [resources/views/livewire/pages/dashboard/user-dashboard.blade.php](resources/views/livewire/pages/dashboard/user-dashboard.blade.php) so the page now treats impact as a secondary destination through its dedicated summary card instead of a co-equal primary action.
+- Added a signed-in Saved Searches callout to [resources/views/livewire/pages/events/index.blade.php](resources/views/livewire/pages/events/index.blade.php) so users can reopen saved filters directly from the event-discovery surface even before activating a new search.
+- Updated the focused regressions in [tests/Feature/DashboardPagesTest.php](tests/Feature/DashboardPagesTest.php) and [tests/Feature/EventSearchTest.php](tests/Feature/EventSearchTest.php) to cover the demoted impact link count and the new saved-searches re-entry card.
+- Live browser review in Chrome MCP confirmed the lean account menu, the dashboard impact teaser, and the new events-page Saved Searches card render correctly for a signed-in superadmin account.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 27 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => 70 passed
+  - Focused `phpstan analyse` on the touched test files is not applicable in this repo because [phpstan.neon](phpstan.neon) excludes `tests/*` from analysis.
+
+# Header Menu IA
+
+- [x] Re-audit the authenticated shell against actual destination responsibilities instead of menu labels
+- [x] Implement the lean signed-in desktop and mobile menu in [resources/views/layouts/app.blade.php](resources/views/layouts/app.blade.php)
+- [x] Add localized menu labels for the new shell wording in [resources/lang/en.json](resources/lang/en.json), [resources/lang/ms.json](resources/lang/ms.json), and [resources/lang/ms_MY.json](resources/lang/ms_MY.json)
+- [x] Update the focused dashboard regression coverage for the new menu labels and structure
+- [x] Re-run focused formatting, static analysis, and dashboard verification
+
+## Review
+
+- Reworked the signed-in shell in [resources/views/layouts/app.blade.php](resources/views/layouts/app.blade.php) to a leaner IA: `My Dashboard`, `Inbox`, `My Contributions`, conditional `Manage Institution`, `Settings`, and `Log Out`, with `Dawah Impact` and `Saved Searches` removed from the persistent menu.
+- Added lightweight section headings for desktop and mobile signed-in menus so the remaining destinations read as `Home`, `Workspaces`, and `Account` without changing the public discovery header.
+- Added the supporting localized labels in [resources/lang/en.json](resources/lang/en.json), [resources/lang/ms.json](resources/lang/ms.json), and [resources/lang/ms_MY.json](resources/lang/ms_MY.json).
+- Updated [tests/Feature/DashboardPagesTest.php](tests/Feature/DashboardPagesTest.php) to assert the new menu wording and fixed the brittle section boundary that still referenced the removed `planner-registered` block.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw resources/views/layouts/app.blade.php tests/Feature/DashboardPagesTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 27 passed
+
 # Suggest-Update Compact Shell
 
 - [x] Remove the remaining bottom padding from the shared suggest-update page
@@ -5130,7 +5185,7 @@
 ## Review
 
 - Chrome MCP audit covered the authenticated sharer flow on speaker, institution, and event pages plus receiver landings on attributed links.
-- Provider redirects generated tracked Majlis Ilmu URLs with `mi_share` and `mi_channel`, and the Dawah Impact dashboard reflected the exercised speaker, institution, and event links.
+- Provider redirects generated tracked Majlis Ilmu URLs with the public tracking query keys in use at the time, and the Dawah Impact dashboard reflected the exercised speaker, institution, and event links.
 - The audit exposed a real analytics defect in channel reporting: provider cards could show visits while reporting `0` visitors when older or partially migrated records only carried provider metadata on visit touchpoints.
 - Fixed provider-level unique visitor counting in the affiliate-backed analytics service by treating provider-tagged visit identities as the primary source and falling back to attribution cookies only when visit identities are absent.
 - Tightened feature coverage with a regression test for missing attribution provider metadata and aligned the share-surface UI test with the actual search-results share implementation.

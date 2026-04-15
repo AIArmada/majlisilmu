@@ -8,17 +8,8 @@
     $summary = $this->summaryStats;
     $savedEvents = $this->savedEvents;
     $goingEvents = $this->goingEvents;
-    $registeredEvents = $this->registeredEvents;
-    $submittedEvents = $this->submittedEvents;
-    $recentCheckins = $this->recentCheckins;
-    $upcomingAgenda = $this->upcomingAgenda;
-    $nextAgendaItem = $this->nextAgendaItem;
-    $paginatedAgenda = $this->paginatedAgenda;
     $paginatedGoingEvents = $this->paginatedGoingEvents;
-    $paginatedRegisteredEvents = $this->paginatedRegisteredEvents;
     $paginatedSavedEvents = $this->paginatedSavedEvents;
-    $paginatedSubmittedEvents = $this->paginatedSubmittedEvents;
-    $paginatedRecentCheckins = $this->paginatedRecentCheckins;
     $dawahImpactSummary = $this->dawahImpactSummary;
     $calendarFilters = $this->calendarFilters;
     $calendarFilterList = collect($calendarFilters)->map(
@@ -47,53 +38,6 @@
     $shouldShowEventStatusBadge = static function (string $status, bool $isOwnSubmission = false): bool {
         return $status !== 'approved' || $isOwnSubmission;
     };
-    $isSubmittedPlannerItem = static function (mixed $roles): bool {
-        return is_array($roles) && in_array('submitted', $roles, true);
-    };
-    $plannerQuickLinks = [
-        [
-            'label' => __('Calendar'),
-            'count' => $summary['planning_count'],
-            'href' => '#planner-calendar',
-            'class' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        ],
-        [
-            'label' => __('Agenda'),
-            'count' => $upcomingAgenda->count(),
-            'href' => '#planner-agenda',
-            'class' => 'border-sky-200 bg-sky-50 text-sky-700',
-        ],
-        [
-            'label' => __('Going'),
-            'count' => $summary['going_count'],
-            'href' => '#planner-going',
-            'class' => 'border-emerald-200 bg-white text-emerald-700',
-        ],
-        [
-            'label' => __('Registered'),
-            'count' => $summary['registered_count'],
-            'href' => '#planner-registered',
-            'class' => 'border-sky-200 bg-white text-sky-700',
-        ],
-        [
-            'label' => __('Saved'),
-            'count' => $summary['saved_count'],
-            'href' => '#planner-saved',
-            'class' => 'border-amber-200 bg-white text-amber-700',
-        ],
-        [
-            'label' => __('Submitted'),
-            'count' => $summary['submitted_count'],
-            'href' => '#planner-submitted',
-            'class' => 'border-violet-200 bg-white text-violet-700',
-        ],
-        [
-            'label' => __('Check-ins'),
-            'count' => $summary['checkins_count'],
-            'href' => '#planner-checkins',
-            'class' => 'border-slate-200 bg-white text-slate-700',
-        ],
-    ];
     $eventStatusClass = static fn (string $status): string => match ($status) {
         'approved' => 'bg-emerald-100 text-emerald-700',
         'pending', 'needs_changes' => 'bg-amber-100 text-amber-700',
@@ -101,140 +45,47 @@
         'draft' => 'bg-slate-200 text-slate-700',
         default => 'bg-slate-200 text-slate-700',
     };
-    $registrationStatusClass = static fn (string $status): string => match ($status) {
-        'registered', 'attended' => 'bg-sky-100 text-sky-700',
-        'cancelled', 'no_show' => 'bg-rose-100 text-rose-700',
-        default => 'bg-slate-200 text-slate-700',
-    };
-    $checkinMethodLabel = static fn (string $method): string => match ($method) {
-        'registered_self_checkin' => __('Registered self check-in'),
-        'organizer_verified' => __('Organizer verified'),
-        default => __('Self reported'),
-    };
 @endphp
 
 <div class="min-h-screen bg-slate-50 py-10 pb-32">
     <div class="container mx-auto px-6 lg:px-12">
         <div class="mx-auto max-w-7xl space-y-8">
-            <section class="relative overflow-hidden rounded-[2rem] border border-slate-200/60 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-950 p-6 shadow-2xl shadow-emerald-950/10 md:p-8">
-                <div class="pointer-events-none absolute inset-0">
-                    <div class="absolute -top-24 left-12 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl"></div>
-                    <div class="absolute bottom-0 right-10 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl"></div>
-                    <div class="absolute inset-0 opacity-[0.04]" style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 240px;"></div>
-                </div>
+            <section class="relative overflow-hidden rounded-[2rem] border border-emerald-100/80 shadow-sm">
+                {{-- Layered background --}}
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-50/80 via-white to-slate-50/60"></div>
+                <div class="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl"></div>
+                <div class="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-teal-200/20 blur-2xl"></div>
+                <div class="pointer-events-none absolute inset-0 bg-[url('/images/pattern-bg.png')] bg-[size:320px] opacity-[0.025]"></div>
+                {{-- Top accent --}}
+                <div class="relative h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400"></div>
+                <div class="relative p-6 md:p-8">
+                    <div class="grid gap-8">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">{{ $dashboardPageLabel }}</p>
+                            <h1 class="mt-2 font-heading text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
+                                {{ __('Assalamualaikum, :name', ['name' => $firstName]) }}
+                            </h1>
 
-                <div class="relative z-10 grid gap-8 xl:grid-cols-[1.3fr,0.9fr] xl:items-start">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">{{ $dashboardPageLabel }}</p>
-                        <h1 class="mt-3 font-heading text-3xl font-bold tracking-tight text-white md:text-4xl">
-                            {{ __('Assalamualaikum, :name', ['name' => $firstName]) }}
-                        </h1>
-                        <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                            {{ __('Track what you saved, what you plan to attend, and what you have already checked into. The calendar below is designed to help you plan your month without mixing in institution operations.') }}
-                        </p>
-
-                        <div class="mt-6 flex flex-wrap gap-3">
-                            <a href="{{ route('events.index') }}" wire:navigate
-                                class="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-emerald-50 hover:text-emerald-700">
-                                {{ __('Discover Events') }}
-                            </a>
-                            <a href="{{ route('submit-event.create') }}" wire:navigate
-                                class="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-emerald-300 hover:bg-emerald-500/20">
-                                {{ __('Submit Event') }}
-                            </a>
-                            <a href="{{ route('contributions.index') }}" wire:navigate
-                                class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-300 hover:text-emerald-200">
-                                {{ __('Sumbangan') }}
-                            </a>
-                            <a href="{{ route('dashboard.dawah-impact') }}" wire:navigate
-                                class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-300 hover:text-emerald-200">
-                                {{ __('Dawah Impact') }}
-                            </a>
-                            @if($summary['institutions_count'] > 0)
-                                <a href="{{ route('dashboard.institutions') }}" wire:navigate
-                                    class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-300 hover:text-sky-200">
-                                    {{ __('Institution Dashboard') }}
+                            <div class="mt-6 grid grid-cols-2 gap-3">
+                                <a href="#planner-saved" class="group rounded-2xl border border-amber-100 bg-white/70 p-4 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md">
+                                    <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 transition group-hover:bg-amber-200">
+                                        <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                                    </div>
+                                    <p class="text-3xl font-black text-slate-900">{{ $summary['saved_count'] }}</p>
+                                    <p class="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-amber-600">{{ __('Saved') }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ __('Bookmarks and watchlist.') }}</p>
                                 </a>
-                            @endif
-                        </div>
-
-                        <div class="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">{{ __('Upcoming plan') }}</p>
-                                <p class="mt-2 text-3xl font-black text-white">{{ $summary['planning_count'] }}</p>
-                                <p class="mt-2 text-xs text-slate-300">{{ __('Unique upcoming events across your tracked activity.') }}</p>
-                            </div>
-                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">{{ __('Going') }}</p>
-                                <p class="mt-2 text-3xl font-black text-white">{{ $summary['going_count'] }}</p>
-                                <p class="mt-2 text-xs text-slate-300">{{ __('Events you explicitly plan to attend.') }}</p>
-                            </div>
-                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">{{ __('Registered') }}</p>
-                                <p class="mt-2 text-3xl font-black text-white">{{ $summary['registered_count'] }}</p>
-                                <p class="mt-2 text-xs text-slate-300">{{ __('Registrations that need reminders, travel, or follow-through.') }}</p>
-                            </div>
-                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">{{ __('Submitted') }}</p>
-                                <p class="mt-2 text-3xl font-black text-white">{{ $summary['submitted_count'] }}</p>
-                                <p class="mt-2 text-xs text-slate-300">{{ __('Events you submitted into the platform workflow.') }}</p>
-                            </div>
-                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">{{ __('Check-ins') }}</p>
-                                <p class="mt-2 text-3xl font-black text-white">{{ $summary['checkins_count'] }}</p>
-                                <p class="mt-2 text-xs text-slate-300">{{ __('Attendance history you have already recorded.') }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="rounded-[1.75rem] border border-white/10 bg-white/10 p-5 backdrop-blur">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">{{ __('Next up') }}</p>
-                                <h2 class="mt-1 font-heading text-xl font-bold text-white">{{ __('Your next relevant event') }}</h2>
-                            </div>
-                            <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
-                                {{ __('Planner view') }}
-                            </span>
-                        </div>
-
-                        @if($nextAgendaItem)
-                            <a href="{{ $nextAgendaItem['url'] }}" wire:navigate
-                                class="mt-5 block overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-900/40 transition hover:border-emerald-300/40 hover:bg-slate-900/60">
-                                <div class="aspect-[16/9] overflow-hidden bg-slate-900">
-                                    <img src="{{ $nextAgendaItem['image_url'] }}" alt="{{ $nextAgendaItem['title'] }}"
-                                        class="h-full w-full object-cover transition duration-500 hover:scale-105">
-                                </div>
-                                <div class="space-y-4 p-5">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        @foreach($nextAgendaItem['role_badges'] as $badge)
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $badge['class'] }}">
-                                                {{ $badge['label'] }}
-                                            </span>
-                                        @endforeach
-                                        @if($shouldShowEventStatusBadge((string) ($nextAgendaItem['status'] ?? 'approved'), $isSubmittedPlannerItem($nextAgendaItem['roles'] ?? null)))
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $nextAgendaItem['status_class'] }}">
-                                                {{ $eventWorkflowStatusLabel((string) ($nextAgendaItem['status'] ?? 'approved')) }}
-                                            </span>
-                                        @endif
+                                <a href="#planner-going" class="group rounded-2xl border border-emerald-100 bg-white/70 p-4 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+                                    <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 transition group-hover:bg-emerald-200">
+                                        <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     </div>
-                                    <div>
-                                        <h3 class="font-heading text-2xl font-bold text-white">{{ $nextAgendaItem['title'] }}</h3>
-                                        <p class="mt-2 text-sm text-slate-300">{{ $nextAgendaItem['time_label'] }}</p>
-                                        <p class="mt-1 text-sm text-slate-400">{{ $nextAgendaItem['secondary_label'] }}</p>
-                                    </div>
-                                </div>
-                            </a>
-                        @else
-                            <div class="mt-5 rounded-[1.5rem] border border-dashed border-white/15 bg-white/5 p-8 text-center">
-                                <p class="text-lg font-semibold text-white">{{ __('Nothing scheduled yet') }}</p>
-                                <p class="mt-2 text-sm text-slate-300">{{ __('Start saving, registering, or marking events as going to build your planner.') }}</p>
-                                <a href="{{ route('events.index') }}" wire:navigate
-                                    class="mt-5 inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-emerald-50 hover:text-emerald-700">
-                                    {{ __('Browse upcoming events') }}
+                                    <p class="text-3xl font-black text-slate-900">{{ $summary['going_count'] }}</p>
+                                    <p class="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">{{ __('Going') }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ __('Events you plan to attend.') }}</p>
                                 </a>
                             </div>
-                        @endif
+                        </div>
+
                     </div>
                 </div>
             </section>
@@ -270,32 +121,16 @@
                         <p class="mt-2 text-xs text-slate-500">{{ __('New accounts created after a share touch.') }}</p>
                     </div>
                     <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Registrations') }}</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['event_registrations']) }}</p>
-                        <p class="mt-2 text-xs text-slate-500">{{ __('Event registrations credited to your sharing.') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Responses') }}</p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">{{ number_format($dawahImpactSummary['total_outcomes']) }}</p>
+                        <p class="mt-2 text-xs text-slate-500">{{ __('Beneficial actions taken after your shared links.') }}</p>
                     </div>
                 </div>
             </section>
 
-            <section class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ __('Jump to section') }}</p>
-                        <p class="mt-1 text-sm text-slate-500">{{ __('Use quick links to move between planner views and activity buckets without re-reading summary cards.') }}</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        @foreach($plannerQuickLinks as $quickLink)
-                            <a href="{{ $quickLink['href'] }}"
-                                class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition hover:-translate-y-0.5 hover:shadow-sm {{ $quickLink['class'] }}">
-                                <span>{{ $quickLink['label'] }}</span>
-                                <span class="rounded-full bg-slate-900/5 px-2 py-0.5 text-[11px] font-bold">{{ $quickLink['count'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-            </section>
 
-            <section class="grid gap-8 xl:grid-cols-[1.45fr,0.95fr]"
+
+            <div
                 x-data="{
                     locale: '{{ str_replace('_', '-', app()->getLocale()) }}',
                     calendarMonth: new Date().getMonth(),
@@ -345,7 +180,7 @@
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">{{ __('Overview Calendar') }}</p>
                                 <h2 class="mt-2 font-heading text-2xl font-bold text-slate-900">{{ __('See your month at a glance') }}</h2>
-                                <p class="mt-2 max-w-2xl text-sm text-slate-500">{{ __('Filter the calendar by saved, going, registered, submitted, and check-in history. Events with multiple roles are merged into one calendar entry.') }}</p>
+                                <p class="mt-2 max-w-2xl text-sm text-slate-500">{{ __('Filter the calendar by events you are going to and ones you have saved.') }}</p>
                             </div>
 
                             <div class="flex flex-wrap gap-2">
@@ -415,154 +250,9 @@
                         </div>
                     </div>
                 </section>
-
-                <section id="planner-agenda" class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-                    <div>
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-sky-600">{{ __('Upcoming Agenda') }}</p>
-                        </div>
-                    </div>
-
-                    @if($paginatedAgenda->isEmpty())
-                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                            @if($nextAgendaItem)
-                                <p class="text-base font-semibold text-slate-700">{{ __('Your next event is already featured above.') }}</p>
-                                <p class="mt-2 text-sm text-slate-500">{{ __('As you save or register for more events, the rest of your month will continue to fill in here.') }}</p>
-                            @else
-                                <p class="text-base font-semibold text-slate-700">{{ __('No events are on your immediate agenda.') }}</p>
-                                <p class="mt-2 text-sm text-slate-500">{{ __('Mark events as going, register, or save them to start filling the planner.') }}</p>
-                            @endif
-                        </div>
-                    @else
-                        <div class="mt-6 space-y-3">
-                            @foreach($paginatedAgenda as $item)
-                                <a href="{{ $item['url'] }}" wire:navigate
-                                    class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-emerald-200 hover:shadow-md">
-                                    <div class="h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                        <img src="{{ $item['image_url'] }}" alt="{{ $item['title'] }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            @foreach($item['role_badges'] as $badge)
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $badge['class'] }}">
-                                                    {{ $badge['label'] }}
-                                                </span>
-                                            @endforeach
-                                            @if($shouldShowEventStatusBadge((string) ($item['status'] ?? 'approved'), $isSubmittedPlannerItem($item['roles'] ?? null)))
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $item['status_class'] }}">
-                                                    {{ $eventWorkflowStatusLabel((string) ($item['status'] ?? 'approved')) }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <h3 class="mt-3 font-semibold text-slate-900 transition group-hover:text-emerald-700">{{ $item['title'] }}</h3>
-                                        <p class="mt-1 text-sm text-slate-600">{{ $item['time_label'] }}</p>
-                                        <p class="mt-1 text-sm text-slate-500">{{ $item['secondary_label'] }}</p>
-                                    </div>
-                                </a>
-                            @endforeach
-                        </div>
-                        @if($paginatedAgenda->hasPages())
-                            <div class="mt-5">
-                                {{ $paginatedAgenda->links(data: ['scrollTo' => '#planner-agenda']) }}
-                            </div>
-                        @endif
-                    @endif
-                </section>
-            </section>
+            </div>
 
             <section class="grid gap-6 xl:grid-cols-2">
-                <article id="planner-going" class="rounded-[2rem] border border-emerald-200/70 bg-white p-6 shadow-sm">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Going') }}</h2>
-                            <p class="mt-2 text-sm text-slate-500">{{ __('Your strongest attendance signal. These should be easy to act on.') }}</p>
-                        </div>
-                        <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{{ $goingEvents->count() }}</span>
-                    </div>
-                    @if($goingEvents->isEmpty())
-                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                            {{ __('Nothing marked as going yet.') }}
-                        </div>
-                    @else
-                        <div class="mt-6 space-y-3">
-                            @foreach($paginatedGoingEvents as $event)
-                                @php($eventHasPoster = $event->hasMedia('poster'))
-                                <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-emerald-200 hover:shadow-md">
-                                    <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <h3 class="font-semibold text-slate-900 transition group-hover:text-emerald-700">{{ $event->title }}</h3>
-                                            @if($shouldShowEventStatusBadge((string) $event->status))
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $eventStatusClass((string) $event->status) }}">
-                                                    {{ $eventWorkflowStatusLabel((string) $event->status) }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <p class="mt-1 text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A') : __('Time to be confirmed') }}</p>
-                                        <p class="mt-1 text-sm text-slate-500">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online / TBD') }}</p>
-                                    </div>
-                                </a>
-                            @endforeach
-                        </div>
-                        @if($paginatedGoingEvents->hasPages())
-                            <div class="mt-5">
-                                {{ $paginatedGoingEvents->links(data: ['scrollTo' => '#planner-going']) }}
-                            </div>
-                        @endif
-                    @endif
-                </article>
-
-                <article id="planner-registered" class="rounded-[2rem] border border-sky-200/70 bg-white p-6 shadow-sm">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Registered') }}</h2>
-                            <p class="mt-2 text-sm text-slate-500">{{ __('Registrations that may need follow-through, reminders, or travel planning.') }}</p>
-                        </div>
-                        <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">{{ $registeredEvents->count() }}</span>
-                    </div>
-                    @if($registeredEvents->isEmpty())
-                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                            {{ __('No registrations yet.') }}
-                        </div>
-                    @else
-                        <div class="mt-6 space-y-3">
-                            @foreach($paginatedRegisteredEvents as $registration)
-                                @php($event = $registration->event)
-                                @if($event)
-                                    @php($eventHasPoster = $event->hasMedia('poster'))
-                                    <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-sky-200 hover:shadow-md">
-                                        <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
-                                        </div>
-                                        <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $registrationStatusClass((string) $registration->status) }}">
-                                                {{ $translateStatusLabel((string) $registration->status) }}
-                                            </span>
-                                            @if($shouldShowEventStatusBadge((string) $event->status))
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $eventStatusClass((string) $event->status) }}">
-                                                    {{ $eventWorkflowStatusLabel((string) $event->status) }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                            <h3 class="mt-3 font-semibold text-slate-900 transition group-hover:text-sky-700">{{ $event->title }}</h3>
-                                            <p class="mt-1 text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A') : __('Time to be confirmed') }}</p>
-                                            <p class="mt-1 text-sm text-slate-500">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online / TBD') }}</p>
-                                        </div>
-                                    </a>
-                                @endif
-                            @endforeach
-                        </div>
-                        @if($paginatedRegisteredEvents->hasPages())
-                            <div class="mt-5">
-                                {{ $paginatedRegisteredEvents->links(data: ['scrollTo' => '#planner-registered']) }}
-                            </div>
-                        @endif
-                    @endif
-                </article>
-
                 <article id="planner-saved" class="rounded-[2rem] border border-amber-200/70 bg-white p-6 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -605,129 +295,50 @@
                         @endif
                     @endif
                 </article>
-            </section>
 
-            <section id="planner-submitted" class="rounded-[2rem] border border-violet-200/70 bg-white p-6 shadow-sm md:p-8">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">{{ __('Submitted Events') }}</p>
-                        <h2 class="mt-2 font-heading text-2xl font-bold text-slate-900">{{ __('Your own submissions') }}</h2>
-                        <p class="mt-2 max-w-2xl text-sm text-slate-500">{{ __('Submitted events stay visible here as a separate workflow so the main planner remains attendee-first.') }}</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">{{ $submittedEvents->count() }}</span>
-                        <a href="{{ route('submit-event.create') }}" wire:navigate
-                            class="inline-flex items-center justify-center rounded-xl border border-violet-200 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">
-                            {{ __('Submit another event') }}
-                        </a>
-                    </div>
-                </div>
-
-                    @if($submittedEvents->isEmpty())
-                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                            <p class="text-base font-semibold text-slate-700">{{ __('No submitted events yet.') }}</p>
-                            <p class="mt-2 text-sm text-slate-500">{{ __('When you submit events, they will appear here with status and quick links.') }}</p>
+                <article id="planner-going" class="rounded-[2rem] border border-emerald-200/70 bg-white p-6 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 class="font-heading text-xl font-bold text-slate-900">{{ __('Going') }}</h2>
+                            <p class="mt-2 text-sm text-slate-500">{{ __('Your strongest attendance signal. These should be easy to act on.') }}</p>
                         </div>
-                    @else
-                        <div class="mt-6 grid gap-4 lg:grid-cols-2">
-                            @foreach($paginatedSubmittedEvents as $submissionEntry)
-                                @php($event = $submissionEntry['event'])
-                                @if($event)
-                                    @php($eventHasPoster = $event->hasMedia('poster'))
-                                    <article class="overflow-hidden rounded-[1.5rem] border border-slate-200">
-                                    <div class="aspect-[16/8] overflow-hidden bg-slate-100">
-                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
-                                    </div>
-                                    <div class="space-y-4 p-5">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $eventStatusClass((string) $event->status) }}">
-                                                {{ $eventWorkflowStatusLabel((string) $event->status) }}
-                                            </span>
-                                            <span class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                                                {{ __('Submitted') }} {{ $submissionEntry['created_at']?->diffForHumans() }}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-heading text-xl font-bold text-slate-900">{{ $event->title }}</h3>
-                                            <p class="mt-2 text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A') : __('Time to be confirmed') }}</p>
-                                            <p class="mt-1 text-sm text-slate-500">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online / TBD') }}</p>
-                                        </div>
-                                        @if(filled($submissionEntry['notes']))
-                                            <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                                                {{ $submissionEntry['notes'] }}
-                                            </div>
-                                        @endif
-                                        <div class="flex flex-wrap gap-2">
-                                            <a href="{{ route('events.show', $event) }}" wire:navigate
-                                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-600">
-                                                {{ __('View event') }}
-                                            </a>
-                                            @if($this->canManageSubmittedEvent($event))
-                                                <a href="{{ \App\Filament\Ahli\Resources\Events\EventResource::getUrl('view', ['record' => $event], panel: 'ahli') }}"
-                                                    class="inline-flex items-center justify-center rounded-xl border border-violet-200 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">
-                                                    {{ __('Manage event') }}
-                                                </a>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </article>
-                                @endif
-                            @endforeach
-                        </div>
-                        @if($paginatedSubmittedEvents->hasPages())
-                            <div class="mt-5">
-                                {{ $paginatedSubmittedEvents->links(data: ['scrollTo' => '#planner-submitted']) }}
-                            </div>
-                        @endif
-                    @endif
-                </section>
-
-            <section id="planner-checkins" class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{{ __('Recent Check-ins') }}</p>
-                        <h2 class="mt-2 font-heading text-2xl font-bold text-slate-900">{{ __('Attendance history') }}</h2>
-                        <p class="mt-2 max-w-2xl text-sm text-slate-500">{{ __('Check-ins remain historical. They appear as past markers in the calendar and as recent attendance records below.') }}</p>
+                        <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{{ $goingEvents->count() }}</span>
                     </div>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{{ $recentCheckins->count() }}</span>
-                </div>
-
-                    @if($recentCheckins->isEmpty())
-                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                            <p class="text-base font-semibold text-slate-700">{{ __('No check-ins recorded yet.') }}</p>
-                            <p class="mt-2 text-sm text-slate-500">{{ __('When you check in from an event page, your attendance history will appear here.') }}</p>
+                    @if($goingEvents->isEmpty())
+                        <div class="mt-6 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                            {{ __('Nothing marked as going yet.') }}
                         </div>
                     @else
                         <div class="mt-6 space-y-3">
-                            @foreach($paginatedRecentCheckins as $checkin)
-                                @php($event = $checkin->event)
-                                <article class="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    @if($event)
-                                        <a href="{{ route('events.show', $event) }}" wire:navigate class="font-semibold text-slate-900 transition hover:text-emerald-700">
-                                            {{ $event->title }}
-                                        </a>
-                                        <p class="mt-1 text-sm text-slate-600">
-                                            {{ $checkin->checked_in_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($checkin->checked_in_at, 'd M Y, h:i A') : __('Attendance recorded') }}
-                                        </p>
+                            @foreach($paginatedGoingEvents as $event)
+                                @php($eventHasPoster = $event->hasMedia('poster'))
+                                <a href="{{ route('events.show', $event) }}" wire:navigate class="group flex gap-4 rounded-[1.5rem] border border-slate-200 p-3 transition hover:border-emerald-200 hover:shadow-md">
+                                    <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+                                        <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <h3 class="font-semibold text-slate-900 transition group-hover:text-emerald-700">{{ $event->title }}</h3>
+                                            @if($shouldShowEventStatusBadge((string) $event->status))
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $eventStatusClass((string) $event->status) }}">
+                                                    {{ $eventWorkflowStatusLabel((string) $event->status) }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <p class="mt-1 text-sm text-slate-600">{{ $event->starts_at ? \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A') : __('Time to be confirmed') }}</p>
                                         <p class="mt-1 text-sm text-slate-500">{{ $event->venue?->name ?? $event->institution?->name ?? __('Online / TBD') }}</p>
-                                    @else
-                                        <p class="font-semibold text-slate-900">{{ __('Checked-in event') }}</p>
-                                    @endif
-                                </div>
-                                <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                    {{ $checkinMethodLabel((string) $checkin->method) }}
-                                </span>
-                                </article>
+                                    </div>
+                                </a>
                             @endforeach
                         </div>
-                        @if($paginatedRecentCheckins->hasPages())
+                        @if($paginatedGoingEvents->hasPages())
                             <div class="mt-5">
-                                {{ $paginatedRecentCheckins->links(data: ['scrollTo' => '#planner-checkins']) }}
+                                {{ $paginatedGoingEvents->links(data: ['scrollTo' => '#planner-going']) }}
                             </div>
                         @endif
                     @endif
-                </section>
+                </article>
+            </section>
         </div>
     </div>
 </div>
