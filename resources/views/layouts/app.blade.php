@@ -206,7 +206,7 @@
                                 </svg>
                             </button>
                             <div
-                                class="absolute right-0 top-full mt-2 w-44 origin-top-right scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
+                                class="absolute right-0 top-full mt-2 w-12 origin-top-right scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
                                 @foreach ($publicCountries as $countryKey => $country)
                                     @if ($country['enabled'])
                                         <a href="{{ route('country.switch', $countryKey) }}"
