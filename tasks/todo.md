@@ -1,3 +1,18 @@
+# Institution Directory Type Filter API
+
+- [x] Expose enum-backed institution type filter metadata on the frontend directory API
+- [x] Support server-side institution directory filtering by requested institution type
+- [x] Add focused API parity coverage and rerun formatting / static analysis / Pest
+
+## Review
+
+- The frontend institution directory API now accepts a `type` query parameter, scopes results server-side with the canonical `InstitutionType` enum, and returns enum-backed `meta.types` filter options for the mobile client.
+- Kept the public API documentation in sync by extending the institution directory schema metadata contract to include the new type-filter payload.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent app/Http/Controllers/Api/Frontend/SearchController.php app/Support/ApiDocumentation/Schemas/InstitutionDirectoryResponse.php app/Support/ApiDocumentation/PublicDirectorySchemasTransformer.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Http/Controllers/Api/Frontend/SearchController.php app/Support/ApiDocumentation/Schemas/InstitutionDirectoryResponse.php app/Support/ApiDocumentation/PublicDirectorySchemasTransformer.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='(serializes institution directory payloads with card media aliases for mobile clients|returns authenticated follow state in the frontend institution api|returns the total followed institution count for the full institution query, not just the current page|supports server-side filtering to only followed institutions in the frontend institution api|returns enum-backed institution type filters and supports server-side type filtering in the frontend institution api)'` => 5 passed
+
 # Uncommitted Change Audit
 
 - [x] Audit the uncommitted dashboard and contribution-flow changes for behavior regressions
