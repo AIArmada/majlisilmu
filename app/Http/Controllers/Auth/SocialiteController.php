@@ -10,6 +10,7 @@ use App\Support\Auth\IntendedRedirect;
 use App\Support\Auth\SocialiteProviderConfiguration;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\AbstractProvider as OAuthTwoProvider;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
 class SocialiteController extends Controller
@@ -28,7 +29,13 @@ class SocialiteController extends Controller
             ]);
         }
 
-        return Socialite::driver($provider)->redirect();
+        $socialiteProvider = Socialite::driver($provider);
+
+        if ($provider === 'google' && $socialiteProvider instanceof OAuthTwoProvider) {
+            $socialiteProvider->with(['prompt' => 'select_account']);
+        }
+
+        return $socialiteProvider->redirect();
     }
 
     /**
