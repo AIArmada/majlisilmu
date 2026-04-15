@@ -39,8 +39,8 @@ class CatalogController extends FrontendController
     {
         return response()->json([
             'data' => $this->catalogs->subdistricts(
-                $request->integer('state_id'),
-                $request->integer('district_id'),
+                $request->filled('state_id') ? $request->integer('state_id') : null,
+                $request->filled('district_id') ? $request->integer('district_id') : null,
             ),
         ]);
     }
