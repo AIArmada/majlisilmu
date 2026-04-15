@@ -10,5 +10,18 @@
         "vscode"
     ],
     "guidelines": true,
-    "herd_mcp": true
+    "herd_mcp": true,
+    "skills": [
+        "ai-sdk-development",
+        "fortify-development",
+        "laravel-best-practices",
+        "configuring-horizon",
+        "mcp-development",
+        "scout-development",
+        "socialite-development",
+        "fluxui-development",
+        "pest-testing",
+        "tailwindcss-development",
+        "laravel-specialist"
+    ]
 }
