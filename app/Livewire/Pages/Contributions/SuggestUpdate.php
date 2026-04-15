@@ -15,6 +15,7 @@ use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\ReferenceContributionFormSchema;
 use App\Forms\SharedFormSchema;
 use App\Forms\SpeakerContributionFormSchema;
+use App\Livewire\Concerns\InteractsWithLocationPickerSelection;
 use App\Livewire\Concerns\InteractsWithToasts;
 use App\Models\ContributionRequest;
 use App\Models\Event;
@@ -44,6 +45,7 @@ class SuggestUpdate extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
     use InteractsWithForms;
+    use InteractsWithLocationPickerSelection;
     use InteractsWithToasts;
     use WithFileUploads;
 
@@ -150,7 +152,8 @@ class SuggestUpdate extends Component implements HasActions, HasForms
                     ->label(__('Explain the change'))
                     ->helperText(__('Optional: add context that helps maintainers review your update faster.'))
                     ->rows(4)
-                    ->maxLength(2000),
+                    ->maxLength(2000)
+                    ->hidden(fn (): bool => $this->canDirectEdit()),
             ]);
     }
 
@@ -371,59 +374,16 @@ class SuggestUpdate extends Component implements HasActions, HasForms
      */
     private function institutionSubjectSchema(): array
     {
-        $components = InstitutionContributionFormSchema::components(
-            includeMedia: false,
+        return InstitutionContributionFormSchema::directEditComponents(
             addressStatePath: 'address',
             includeLocationPicker: true,
+            mediaFields: $this->directEditMediaFields,
         );
-
-        if ($this->shouldShowDirectEditMediaSection()) {
-            array_splice($components, 1, 0, [$this->institutionDirectEditMediaSection()]);
-        }
-
-        return $components;
     }
 
     private function shouldShowDirectEditMediaSection(): bool
     {
         return $this->canDirectEdit() && $this->directEditMediaFields !== [];
-    }
-
-    private function institutionDirectEditMediaSection(): Section
-    {
-        $components = [];
-
-        if (in_array('cover', $this->directEditMediaFields, true)) {
-            $components[] = SpatieMediaLibraryFileUpload::make('cover')
-                ->label(__('Cover Image'))
-                ->collection('cover')
-                ->image()
-                ->imageEditor()
-                ->imageAspectRatio('16:9')
-                ->automaticallyOpenImageEditorForAspectRatio()
-                ->imageEditorAspectRatioOptions(['16:9'])
-                ->automaticallyCropImagesToAspectRatio()
-                ->conversion('banner')
-                ->responsiveImages()
-                ->deletable(false)
-                ->columnSpanFull();
-        }
-
-        if (in_array('gallery', $this->directEditMediaFields, true)) {
-            $components[] = SpatieMediaLibraryFileUpload::make('gallery')
-                ->label(__('Gallery'))
-                ->collection('gallery')
-                ->multiple()
-                ->reorderable()
-                ->image()
-                ->conversion('gallery_thumb')
-                ->responsiveImages()
-                ->columnSpanFull();
-        }
-
-        return Section::make(__('Media'))
-            ->schema($components)
-            ->columns(['default' => 1, 'sm' => 2]);
     }
 
     private function speakerDirectEditMediaSection(): Section

@@ -19,9 +19,11 @@ use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Support\Enums\Width;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\PaginationMode;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -558,6 +560,26 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
                     ->label(__('Location'))
                     ->placeholder('-')
                     ->wrap(),
+                TextColumn::make('dashboard_registrations_count')
+                    ->label(__('Registrations'))
+                    ->numeric()
+                    ->sortable()
+                    ->alignEnd()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('visibility')
+                    ->label(__('Visibility'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => $this->translateStatusLabel($state))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('event_structure')
+                    ->label(__('Structure'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => $this->translateStatusLabel($state))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                IconColumn::make('is_active')
+                    ->label(__('Active'))
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort(fn (Builder $query): string|Builder|null => $this->applyLegacyEventSort($query), fn (): string => $this->legacyEventSortDirection())
             ->searchPlaceholder(__('Search by event title or venue'))
@@ -573,7 +595,9 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
             ->filtersFormColumns(2)
             ->filtersFormWidth(Width::Medium)
             ->paginated([8, 15, 25])
+            ->paginationMode(PaginationMode::Default)
             ->defaultPaginationPageOption(8)
+            ->extremePaginationLinks()
             ->recordClasses(fn (Event $record): ?string => (string) $record->status === 'pending' ? 'bg-amber-50/80' : null)
             ->stackedOnMobile()
             ->scrollToTopOnPageChange()

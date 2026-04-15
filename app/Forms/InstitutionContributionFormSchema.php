@@ -124,6 +124,68 @@ class InstitutionContributionFormSchema
         return $components;
     }
 
+    /**
+     * @param  list<string>  $mediaFields
+     * @return array<int, Component>
+     */
+    public static function directEditComponents(
+        ?string $addressStatePath = null,
+        bool $includeLocationPicker = false,
+        array $mediaFields = [],
+    ): array {
+        $components = self::components(
+            includeMedia: false,
+            addressStatePath: $addressStatePath,
+            includeLocationPicker: $includeLocationPicker,
+        );
+
+        if ($mediaFields !== []) {
+            array_splice($components, 1, 0, [self::directEditMediaSection($mediaFields)]);
+        }
+
+        return $components;
+    }
+
+    /**
+     * @param  list<string>  $mediaFields
+     */
+    public static function directEditMediaSection(array $mediaFields): Section
+    {
+        $components = [];
+
+        if (in_array('cover', $mediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Cover Image'))
+                ->collection('cover')
+                ->image()
+                ->imageEditor()
+                ->imageAspectRatio('16:9')
+                ->automaticallyOpenImageEditorForAspectRatio()
+                ->imageEditorAspectRatioOptions(['16:9'])
+                ->automaticallyCropImagesToAspectRatio()
+                ->conversion('banner')
+                ->responsiveImages()
+                ->deletable(false)
+                ->columnSpanFull();
+        }
+
+        if (in_array('gallery', $mediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('gallery')
+                ->label(__('Gallery'))
+                ->collection('gallery')
+                ->multiple()
+                ->reorderable()
+                ->image()
+                ->conversion('gallery_thumb')
+                ->responsiveImages()
+                ->columnSpanFull();
+        }
+
+        return Section::make(__('Media'))
+            ->schema($components)
+            ->columns(['default' => 1, 'sm' => 2]);
+    }
+
     private static function shouldRenderLocationPicker(bool $includeLocationPicker, ?string $addressStatePath): bool
     {
         return $includeLocationPicker

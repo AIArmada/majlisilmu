@@ -1,5 +1,8 @@
 # Lessons
 
+- When correcting a permission-gated UI behavior, do not preserve a query-string or entry-point split unless the user explicitly confirms that split is part of the product requirement; keep the condition tied to authorization first.
+- When a user explicitly says a conditional form field should depend only on real authorization/ownership, do not add entry-point flags or URL context switches first; use the permission check directly in the field visibility rule unless there is a proven product need for different behavior by entry path.
+- When a user says a dashboard edit form should be similar to a public `kemas-kini` flow, verify whether they mean shared schema only or shared route/component too; public suggestion flows and privileged owner/admin direct-edit flows can look alike while still needing separate entry points.
 - When a user asks for public navigation wording or selector presentation, treat it as a layout-level UX correction: preserve runtime locale/country support unless they explicitly ask to remove it, and change only the visible menu chrome (for example title-case labels or flag-only selectors).
 - When asserting layout order on event detail pages, prefer dedicated DOM hooks or raw HTML positions over venue URLs or titles; schema and metadata blocks can appear earlier in the response and make broad order checks fail for the wrong reason.
 - When changing public directory ordering or browsing behavior, audit the matching public API collection endpoints in the same pass; do not assume a page-only change is sufficient if clients can browse the same resource over the API.
