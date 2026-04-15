@@ -65,10 +65,10 @@ it('renders the institution location picker when google places is enabled', func
 
     $this->get(route('contributions.submit-institution'))
         ->assertOk()
-        ->assertSee(__('Find the institution location'))
-        ->assertSee(__('Search like a ride-hailing destination, pick the correct place, then confirm it on the map before submitting.'))
+        ->assertDontSee(__('Find the institution location'))
+        ->assertDontSee(__('Search like a ride-hailing destination, pick the correct place, then confirm it on the map before submitting.'))
         ->assertSee(__('Search for an institution or address'))
-        ->assertSee('<label class="text-sm font-medium text-slate-900" for="institution-location-search">', false)
+        ->assertDontSee('<label class="text-sm font-medium text-slate-900" for="institution-location-search">', false)
         ->assertSee('element.placeholder =', false)
         ->assertSee('mi-institution-location-picker-search', false)
         ->assertSee('rounded-xl border border-slate-200 bg-white shadow-sm', false)

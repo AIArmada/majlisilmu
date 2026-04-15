@@ -2,6 +2,7 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
+use App\Enums\ContributionSubjectType;
 use App\Filament\Ahli\Resources\Events\EventResource;
 use App\Filament\Ahli\Resources\Events\Pages\ViewEvent as AhliViewEvent;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource;
@@ -553,7 +554,7 @@ it('does not allow editing institutions outside user membership in ahli panel', 
         ->assertNotFound();
 });
 
-it('shows ahli edit links on institution dashboard only when user can update', function () {
+it('shows dashboard edit links only when user can update', function () {
     $adminUser = User::factory()->create();
     $viewerUser = User::factory()->create();
     $registrant = User::factory()->create();
@@ -587,7 +588,10 @@ it('shows ahli edit links on institution dashboard only when user can update', f
         $viewerUser->syncRoles(['viewer']);
     }, $viewerUser);
 
-    $institutionEditUrl = InstitutionResource::getUrl('edit', ['record' => $institution], panel: 'ahli');
+    $institutionEditUrl = route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]);
     $institutionInvitationsUrl = InstitutionResource::getUrl('edit', ['record' => $institution, 'relation' => 'member_invitations'], panel: 'ahli');
     $eventEditUrl = EventResource::getUrl('edit', ['record' => $event], panel: 'ahli');
     $eventRegistrationsUrl = EventResource::getUrl('view', ['record' => $event, 'relation' => 'registrations'], panel: 'ahli');

@@ -299,6 +299,25 @@ it('keeps reviewer context fields on update suggestion pages', function () {
         ->assertSee(__('Optional: add context that helps maintainers review your update faster.'));
 });
 
+it('hides reviewer context fields for direct institution edits', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+
+    $this->actingAs($user);
+
+    $this->get(route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]))
+        ->assertOk()
+        ->assertDontSee(__('Explain the change'))
+        ->assertDontSee(__('Optional: add context that helps maintainers review your update faster.'));
+});
+
 it('renders the action modal stack on event update pages for create-option fields', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
@@ -382,6 +401,7 @@ it('renders the institution suggest update page with translated direct-edit copy
         ->assertOk()
         ->assertSee('Cadangan Kemas Kini')
         ->assertSee('Anda sudah mempunyai akses suntingan untuk rekod ini, jadi perubahan daripada borang ini akan diterapkan serta-merta.')
+        ->assertDontSee('Terangkan perubahan')
         ->assertDontSee('Laksanakan Kemas Kini')
         ->assertDontSee(__('View My Contributions'));
 });
@@ -434,7 +454,7 @@ it('uses the institution location picker on the suggest update page when google 
         'subjectId' => $institution->slug,
     ]))
         ->assertOk()
-        ->assertSee(__('Find the institution location'))
+        ->assertDontSee(__('Find the institution location'))
         ->assertSee(__('Search for an institution or address'));
 });
 
@@ -1093,18 +1113,15 @@ it('renders contribution requests and event submissions without approval control
         ->assertSee(__('Submit Event'))
         ->assertSee(__('Submit Institution'))
         ->assertSee(__('Submit Speaker'))
-        ->assertDontSee('bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700', false)
         ->assertDontSee('xl:grid-cols-[1.15fr_0.85fr]', false)
         ->assertSee(__('Event Submissions'))
-        ->assertSee(__('Contribution Requests'))
+        ->assertSee(__('New Submissions'))
         ->assertSee(__('Update Submissions'))
         ->assertSee(__('Report Submissions'))
-        ->assertSee('Status Hantaran Majlis')
-        ->assertSee('Status Kemaskini')
-        ->assertSee('Status Hantaran Instititusi & Penceramah')
-        ->assertSee('Status Hantaran Laporan')
-        ->assertSee('Pengurusan Institusi & Penceramah')
-        ->assertSee('Tuntut Pengurusan')
+        ->assertSee(__('Requests for new institutions and speakers.'))
+        ->assertSee(__('Updates you submit here will appear with their status and review notes.'))
+        ->assertSee(__('Reports you submit here will appear with their status and review notes.'))
+        ->assertSee(__('Membership Claims'))
         ->assertDontSee('Jika anda benar-benar mengurus institusi atau penceramah tertentu, cari rekodnya di sini dan teruskan ke borang tuntutan. Laluan ini diletakkan di halaman sumbangan kerana ia hanya relevan kepada sebilangan kecil pengguna.')
         ->assertSee($createRequest->proposed_data['name'])
         ->assertSee($updateRequest->entity->name)
@@ -1121,6 +1138,24 @@ it('renders contribution requests and event submissions without approval control
         ->assertDontSee(__('Pending Approvals'))
         ->assertDontSee(__('Approve'))
         ->assertDontSee(__('Reject'));
+});
+
+it('restores the active contributions section from the query string', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams(['section' => 'reports'])
+        ->test(ContributionsIndex::class)
+        ->assertSet('activeTab', 'reports');
+
+    $this->get(route('contributions.index', ['section' => 'reports']))
+        ->assertOk()
+        ->assertSee('data-active-tab="reports"', false);
+
+    $this->get(route('contributions.index', ['section' => 'unknown']))
+        ->assertOk()
+        ->assertSee('data-active-tab="events"', false);
 });
 
 it('formats institution membership claim options with the location hierarchy', function () {

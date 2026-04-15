@@ -7,6 +7,7 @@ use App\Actions\Location\ResolveGooglePlaceSelectionAction;
 use App\Enums\ContributionSubjectType;
 use App\Forms\InstitutionContributionFormSchema;
 use App\Forms\SharedFormSchema;
+use App\Livewire\Concerns\InteractsWithLocationPickerSelection;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Location\GooglePlacesConfiguration;
@@ -25,6 +26,7 @@ class SubmitInstitution extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
     use InteractsWithForms;
+    use InteractsWithLocationPickerSelection;
     use WithFileUploads;
 
     /** @var array<string, mixed>|null */
@@ -79,28 +81,6 @@ class SubmitInstitution extends Component implements HasActions, HasForms
     public function applyPlaceSelection(array $selection, ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction): array
     {
         return $this->applyLocationPickerSelection('data.address', $selection, $resolveGooglePlaceSelectionAction);
-    }
-
-    /**
-     * @param  array<string, mixed>  $selection
-     * @return array<string, mixed>
-     */
-    public function applyLocationPickerSelection(
-        string $statePath,
-        array $selection,
-        ResolveGooglePlaceSelectionAction $resolveGooglePlaceSelectionAction,
-    ): array {
-        $currentAddress = data_get($this, $statePath);
-        $currentAddress = is_array($currentAddress) ? $currentAddress : [];
-        $resolvedAddress = $resolveGooglePlaceSelectionAction->handle(array_merge($selection, [
-            'fallbackCountryId' => $currentAddress['country_id'] ?? null,
-        ]));
-
-        data_set($this, $statePath, array_merge($currentAddress, $resolvedAddress, [
-            'cascade_reset_guard' => SharedFormSchema::publicLocationPickerCascadeResetGuard(),
-        ]));
-
-        return $resolvedAddress;
     }
 
     public function submit(SubmitStagedContributionCreateAction $submitStagedContributionCreateAction): void
