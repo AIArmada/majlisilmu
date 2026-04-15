@@ -1745,39 +1745,7 @@ class SearchController extends FrontendController
      */
     private function addressDisplayLines(?Address $address): array
     {
-        if (! $address instanceof Address) {
-            return [
-                'street' => null,
-                'locality' => null,
-                'regional' => null,
-            ];
-        }
-
-        $locationHierarchyParts = AddressHierarchyFormatter::parts($address);
-        $streetAddressLine = implode(', ', array_filter([
-            $address->line1,
-            $address->line2,
-        ]));
-
-        if ($locationHierarchyParts !== []) {
-            $localityAddressLine = implode(', ', array_filter([
-                array_shift($locationHierarchyParts),
-                $address->postcode,
-            ]));
-            $regionalAddressLine = $locationHierarchyParts === [] ? '' : implode(', ', $locationHierarchyParts);
-        } else {
-            $localityAddressLine = implode(', ', array_filter([
-                $address->city?->name,
-                $address->postcode,
-            ]));
-            $regionalAddressLine = filled($address->state?->name) ? (string) $address->state->name : '';
-        }
-
-        return [
-            'street' => $streetAddressLine !== '' ? $streetAddressLine : null,
-            'locality' => $localityAddressLine !== '' ? $localityAddressLine : null,
-            'regional' => $regionalAddressLine !== '' ? $regionalAddressLine : null,
-        ];
+        return AddressHierarchyFormatter::displayLines($address);
     }
 
     private function addressLocation(?Address $address): ?string
