@@ -1,3 +1,33 @@
+# Malay Suggest-Update Copy
+
+- [x] Change the Malay suggest-update heading from "Cadangkan Kemas Kini" to "Cadangan Kemas Kini"
+- [x] Remove the public explanatory paragraph while keeping the direct-edit note visible
+- [x] Update the focused contribution-page regression and verify the page copy
+
+## Review
+
+- Removed the public explanatory paragraph from [resources/views/livewire/pages/contributions/suggest-update.blade.php](resources/views/livewire/pages/contributions/suggest-update.blade.php) while keeping the direct-edit message visible only for maintainers.
+- Updated the Malay suggest-update labels in [resources/lang/ms.json](resources/lang/ms.json) and [resources/lang/ms_MY.json](resources/lang/ms_MY.json) so the visible heading and subject title now use "Cadangan Kemas Kini".
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Livewire/Pages/Contributions/SuggestUpdate.php tests/Feature/ContributionPagesTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 52 passed
+
+# Logout Page Preservation
+
+- [x] Add a Fortify logout response that redirects back to the originating page when safe
+- [x] Reuse the auth redirect sanitizer for logout targets and keep a home fallback
+- [x] Add focused auth regression coverage and rerun verification
+
+## Review
+
+- Bound Fortify's logout response to a safe same-origin redirect target so logout now returns users to the page they came from when possible, with `/` as the fallback.
+- Reused the existing auth redirect sanitizer in [app/Support/Auth/IntendedRedirect.php](/Users/Saiffil/Herd/majlisilmu/app/Support/Auth/IntendedRedirect.php) and aligned the unused fallback controller with the same behavior.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress --error-format=raw app/Support/Auth/IntendedRedirect.php app/Providers/FortifyServiceProvider.php app/Http/Controllers/Auth/LogoutController.php tests/Feature/Auth/AuthenticationTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Auth/AuthenticationTest.php` => 8 passed
+
 # Uncommitted Change Audit
 
 - [x] Audit the uncommitted dashboard and contribution-flow changes for behavior regressions

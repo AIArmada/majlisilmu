@@ -10,7 +10,7 @@ class IntendedRedirect
 {
     public static function captureFromRequest(Request $request): ?string
     {
-        $redirect = self::sanitize($request->query('redirect'));
+        $redirect = self::sanitize($request->query('redirect'), $request);
 
         if ($redirect !== null) {
             $request->session()->put('url.intended', $redirect);
@@ -48,7 +48,15 @@ class IntendedRedirect
         return ['redirect' => $redirect];
     }
 
-    public static function sanitize(mixed $redirect): ?string
+    public static function logoutTarget(Request $request): string
+    {
+        $redirect = self::sanitize($request->input('redirect'), $request)
+            ?? self::sanitize($request->headers->get('referer'), $request);
+
+        return $redirect ?? route('home');
+    }
+
+    public static function sanitize(mixed $redirect, ?Request $request = null): ?string
     {
         if (! is_string($redirect)) {
             return null;
@@ -68,13 +76,15 @@ class IntendedRedirect
             return null;
         }
 
+        $request ??= request();
+
         $parts = parse_url($redirect);
 
         if (! is_array($parts)) {
             return null;
         }
 
-        if (($parts['host'] ?? null) !== request()->getHost()) {
+        if (($parts['host'] ?? null) !== $request->getHost()) {
             return null;
         }
 

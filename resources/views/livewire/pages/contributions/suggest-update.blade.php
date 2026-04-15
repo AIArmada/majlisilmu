@@ -28,15 +28,11 @@
                 <h1 class="mt-3 font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">
                     {{ $canDirectEdit ? __('Apply an Update') : __('Suggest an Update') }}
                 </h1>
-                <p @class([
-                    'mt-3 text-sm leading-6 text-slate-600 sm:text-base',
-                    'max-w-3xl' => ! $canDirectEdit,
-                    'max-w-none' => $canDirectEdit,
-                ])>
-                    {{ $canDirectEdit
-                        ? __('You already have edit access for this record, so changes from this form will be applied immediately.')
-                        : __('Submit a structured change request so the owner or admin team can review it without losing the current record history.') }}
-                </p>
+                @if ($canDirectEdit)
+                    <p class="mt-3 text-sm leading-6 text-slate-600 sm:text-base max-w-none">
+                        {{ __('You already have edit access for this record, so changes from this form will be applied immediately.') }}
+                    </p>
+                @endif
 
                 <form wire:submit="submit" class="mt-6 space-y-5 sm:mt-8 sm:space-y-6">
                     {{ $this->form }}
