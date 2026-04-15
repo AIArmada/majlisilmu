@@ -25,10 +25,11 @@ final readonly class InstitutionListItem implements Arrayable
         public ?Country $country,
         public ?string $location,
         public ?string $location_text,
+        public bool $is_following,
     ) {}
 
     /**
-     * @return array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, event_count: int, public_image_url: string, image_url: string, logo_url: string, cover_url: ?string, country: array{id: int, name: string, iso2: string, key: ?string}|null, location: ?string, location_text: ?string}
+     * @return array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, event_count: int, public_image_url: string, image_url: string, logo_url: string, cover_url: ?string, country: array{id: int, name: string, iso2: string, key: ?string}|null, location: ?string, location_text: ?string, is_following: bool}
      */
     public function toArray(): array
     {
@@ -47,6 +48,7 @@ final readonly class InstitutionListItem implements Arrayable
             'country' => $this->country?->toArray(),
             'location' => $this->location,
             'location_text' => $this->location_text,
+            'is_following' => $this->is_following,
         ];
     }
 }

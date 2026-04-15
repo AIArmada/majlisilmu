@@ -123,24 +123,47 @@ class SearchController extends FrontendController
     )]
     public function institutions(Request $request): JsonResponse
     {
+        $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
         $countryId = $this->requestedCountryId($request);
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
         $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
         $perPage = $request->integer('per_page', 12);
+        $followingOnly = $request->boolean('following');
+
+        $baseQuery = $this->baseInstitutionQuery(
+            countryId: $countryId,
+            stateId: $stateId,
+            districtId: $districtId,
+            subdistrictId: $subdistrictId,
+            user: $user,
+        );
+
+        $followedInstitutionQuery = clone $baseQuery;
+
+        $this->applyInstitutionFollowingScope($followedInstitutionQuery, $user);
+
+        $followingTotal = $this->institutionDirectoryTotalWithBase($request, $search, $followedInstitutionQuery);
+
+        if ($followingOnly) {
+            $this->applyInstitutionFollowingScope($baseQuery, $user);
+        }
 
         $institutions = $search === null
-            ? $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)->publicDirectoryOrder()->paginate($perPage)
-            : $this->institutionDirectorySearchPaginator($request, $search, $perPage, $countryId, $stateId, $districtId, $subdistrictId);
+            ? $baseQuery->publicDirectoryOrder()->paginate($perPage)
+            : $this->institutionDirectorySearchPaginator($request, $search, $perPage, $baseQuery);
 
         return response()->json([
-            'data' => collect($institutions->items())->map(fn (Institution $institution): array => $this->institutionListData($institution))->all(),
+            'data' => collect($institutions->items())->map(fn (Institution $institution): array => $this->institutionListData($institution, $user))->all(),
             'meta' => [
                 'pagination' => [
                     'page' => $institutions->currentPage(),
                     'per_page' => $institutions->perPage(),
                     'total' => $institutions->total(),
+                ],
+                'following' => [
+                    'total' => $followingTotal,
                 ],
                 'cache' => $this->institutionDirectoryCacheData(),
             ],
@@ -677,9 +700,24 @@ class SearchController extends FrontendController
     /**
      * @return Builder<Institution>
      */
-    private function baseInstitutionQuery(?int $countryId = null, ?int $stateId = null, ?int $districtId = null, ?int $subdistrictId = null): Builder
-    {
-        $query = Institution::query()
+    private function baseInstitutionQuery(
+        ?int $countryId = null,
+        ?int $stateId = null,
+        ?int $districtId = null,
+        ?int $subdistrictId = null,
+        ?User $user = null,
+    ): Builder {
+        $query = Institution::query();
+
+        if ($user instanceof User) {
+            $query->select('institutions.*')
+                ->selectRaw(
+                    'exists(select 1 from followings where followings.user_id = ? and followings.followable_id = institutions.id and followings.followable_type = ?) as is_following',
+                    [$user->id, (new Institution)->getMorphClass()],
+                );
+        }
+
+        $query
             ->active()
             ->where('status', 'verified')
             ->withCount(['events' => function (Builder $query): void {
@@ -727,12 +765,12 @@ class SearchController extends FrontendController
     /**
      * @return LengthAwarePaginator<int, Institution>
      */
-    private function institutionDirectorySearchPaginator(Request $request, string $search, int $perPage, ?int $countryId, ?int $stateId, ?int $districtId, ?int $subdistrictId): LengthAwarePaginator
+    private function institutionDirectorySearchPaginator(Request $request, string $search, int $perPage, Builder $base): LengthAwarePaginator
     {
         $matchingIds = $this->institutionSearchService->publicSearchIds($search);
 
         if ($matchingIds !== []) {
-            $directMatches = $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)
+            $directMatches = (clone $base)
                 ->whereIn('institutions.id', $matchingIds)
                 ->publicDirectoryOrder()
                 ->paginate($perPage);
@@ -744,13 +782,7 @@ class SearchController extends FrontendController
             return $this->emptyInstitutionPaginator($request, $perPage);
         }
 
-        $orderedIds = $this->filterInstitutionSearchIds(
-            $this->institutionSearchService->publicFuzzySearchIds($search),
-            $countryId,
-            $stateId,
-            $districtId,
-            $subdistrictId,
-        );
+        $orderedIds = $this->filterInstitutionSearchIds($base, $this->institutionSearchService->publicFuzzySearchIds($search));
 
         if ($orderedIds === []) {
             return $this->emptyInstitutionPaginator($request, $perPage);
@@ -769,7 +801,7 @@ class SearchController extends FrontendController
             );
         }
 
-        $institutions = $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)
+        $institutions = (clone $base)
             ->whereIn('institutions.id', $paginatedIds)
             ->get()
             ->sortBy(static function (Institution $institution) use ($paginatedIds): int {
@@ -792,13 +824,13 @@ class SearchController extends FrontendController
      * @param  list<string>  $orderedIds
      * @return list<string>
      */
-    private function filterInstitutionSearchIds(array $orderedIds, ?int $countryId, ?int $stateId, ?int $districtId, ?int $subdistrictId): array
+    private function filterInstitutionSearchIds(Builder $base, array $orderedIds): array
     {
         if ($orderedIds === []) {
             return [];
         }
 
-        $scopedIds = $this->baseInstitutionQuery($countryId, $stateId, $districtId, $subdistrictId)
+        $scopedIds = (clone $base)
             ->whereIn('institutions.id', $orderedIds)
             ->pluck('institutions.id')
             ->map(static fn (mixed $id): string => (string) $id)
@@ -812,6 +844,39 @@ class SearchController extends FrontendController
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  Builder<Institution>  $base
+     */
+    private function institutionDirectoryTotalWithBase(Request $request, ?string $search, Builder $base): int
+    {
+        if ($search === null) {
+            return (clone $base)->count();
+        }
+
+        return $this->institutionDirectorySearchPaginator($request, $search, 1, $base)->total();
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     */
+    private function applyInstitutionFollowingScope(Builder $query, ?User $user): void
+    {
+        if (! $user instanceof User) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereExists(function ($followingQuery) use ($user): void {
+            $followingQuery
+                ->selectRaw('1')
+                ->from('followings')
+                ->where('followings.user_id', $user->id)
+                ->where('followings.followable_type', (new Institution)->getMorphClass())
+                ->whereColumn('followings.followable_id', 'institutions.id');
+        });
     }
 
     /**
@@ -1369,9 +1434,9 @@ class SearchController extends FrontendController
     /**
      * @return array<string, mixed>
      */
-    private function institutionListData(Institution $institution): array
+    private function institutionListData(Institution $institution, ?User $user = null): array
     {
-        return InstitutionListData::fromModel($institution)->toArray();
+        return InstitutionListData::fromModel($institution, $user)->toArray();
     }
 
     /**
