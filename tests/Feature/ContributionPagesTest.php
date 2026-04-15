@@ -372,13 +372,15 @@ it('renders the suggest update page with translated event form copy when the loc
     ]))
         ->assertOk()
         ->assertSee('Cadangan Komuniti')
-        ->assertSee('Cadangkan Kemas Kini')
+        ->assertSee('Cadangan Kemas Kini')
         ->assertSee('Terangkan perubahan')
         ->assertSee('Audiens & Bahasa')
         ->assertSee('Penganjur & Lokasi')
         ->assertDontSee('Community Suggestion')
         ->assertDontSee('Suggest an Update')
+        ->assertDontSee('Cadangkan Kemas Kini')
         ->assertDontSee('Explain the change')
+        ->assertDontSee('Hantar permintaan perubahan berstruktur supaya pemilik atau pasukan pentadbir boleh menyemaknya tanpa menjejaskan sejarah rekod semasa.')
         ->assertDontSee('Audience & Language')
         ->assertDontSee('Organizer & Location');
 });

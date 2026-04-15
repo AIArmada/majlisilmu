@@ -58,3 +58,25 @@ test('forgot password screen can be rendered', function () {
     $response->assertStatus(200)
         ->assertSee('autocomplete="email"', false);
 });
+
+test('users are redirected back to the current page when they logout', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->from('/majlis?halaman=2')
+        ->post(route('logout'));
+
+    $this->assertGuest();
+    $response->assertRedirect(url('/majlis?halaman=2'));
+});
+
+test('logout ignores external redirect targets', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->withHeader('referer', 'https://example.com/phishing')
+        ->post(route('logout'));
+
+    $this->assertGuest();
+    $response->assertRedirect(route('home'));
+});

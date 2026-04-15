@@ -16,6 +16,7 @@ use Laravel\Fortify\Actions\CanonicalizeUsername;
 use Laravel\Fortify\Actions\EnsureLoginIsNotThrottled;
 use Laravel\Fortify\Actions\PrepareAuthenticatedSession;
 use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
+use Laravel\Fortify\Contracts\LogoutResponse as LogoutResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
@@ -27,7 +28,17 @@ class FortifyServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
-        //
+        $this->app->instance(LogoutResponseContract::class, new class implements LogoutResponseContract
+        {
+            public function toResponse($request): mixed
+            {
+                if (! $request instanceof Request) {
+                    return redirect()->route('home');
+                }
+
+                return redirect()->to(IntendedRedirect::logoutTarget($request));
+            }
+        });
     }
 
     /**
