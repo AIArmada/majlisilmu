@@ -15,17 +15,23 @@ beforeEach(function () {
     config()->set('services.google.redirect', 'https://majlisilmu.test/oauth/google/callback');
 });
 
-it('redirects to google when the provider is configured', function () {
+it('redirects to google with the account chooser prompt when the provider is configured', function () {
     $response = $this->get(route('socialite.redirect', ['provider' => 'google']));
 
     $response->assertRedirect();
 
     $location = (string) $response->headers->get('Location');
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
 
     expect($location)
-        ->toContain('https://accounts.google.com/o/oauth2/auth')
-        ->toContain('client_id=google-client-id')
-        ->toContain(rawurlencode('https://majlisilmu.test/oauth/google/callback'));
+        ->toContain('https://accounts.google.com/o/oauth2/auth');
+
+    expect($query)
+        ->toMatchArray([
+            'client_id' => 'google-client-id',
+            'redirect_uri' => 'https://majlisilmu.test/oauth/google/callback',
+            'prompt' => 'select_account',
+        ]);
 });
 
 it('does not expose google sign-in when the provider is not configured', function () {

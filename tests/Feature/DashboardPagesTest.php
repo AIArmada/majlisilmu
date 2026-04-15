@@ -2,6 +2,7 @@
 
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Role;
+use App\Enums\ContributionSubjectType;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Filament\Ahli\Resources\Events\EventResource;
@@ -19,6 +20,7 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use Filament\Tables\Enums\PaginationMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -402,7 +404,7 @@ it('hides institution dashboard access for users without institution membership'
         ->assertForbidden();
 });
 
-it('renders the institution dashboard picker as a searchable flux select', function () {
+it('renders the institution dashboard picker as a plain selector without search UI', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create(['name' => 'Masjid Flux Pilihan']);
 
@@ -413,12 +415,13 @@ it('renders the institution dashboard picker as a searchable flux select', funct
 
     $response->assertOk()
         ->assertSee('data-testid="institution-dashboard-picker"', false)
-        ->assertSee('data-testid="institution-dashboard-picker-option"', false)
-        ->assertDontSee('data-flux-select-native', false)
+        ->assertSee('data-testid="institution-dashboard-select"', false)
+        ->assertDontSee('data-testid="institution-dashboard-picker-option"', false)
+        ->assertDontSee('Search institution...')
         ->assertSee('Masjid Flux Pilihan');
 });
 
-it('loads filament table assets before livewire on the institution dashboard', function () {
+it('loads filament table assets after the core filament scripts on the institution dashboard', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create(['name' => 'Masjid Table Assets']);
 
@@ -428,13 +431,14 @@ it('loads filament table assets before livewire on the institution dashboard', f
         ->get(route('dashboard.institutions', ['institution' => $institution->id]));
 
     $response->assertOk()
+        ->assertSee('/js/filament/support/support.js', false)
         ->assertSee('/js/filament/tables/tables.js', false)
         ->assertSee('data-update-uri=', false);
 
     $html = $response->getContent();
 
     expect($html)->toBeString();
-    expect(strpos((string) $html, '/js/filament/tables/tables.js'))->toBeLessThan(strpos((string) $html, 'data-update-uri='));
+    expect(strpos((string) $html, '/js/filament/support/support.js'))->toBeLessThan(strpos((string) $html, '/js/filament/tables/tables.js'));
 });
 
 it('merges overlapping planner relationships into one calendar entry', function () {
@@ -541,9 +545,7 @@ it('shows institution profile and events for members without a separate registra
         ->assertSee('Masjid Al-Ikhlas')
         ->assertSee('Event List')
         ->assertSee('Submit Event')
-        ->assertSee('Advanced parent-program builder is temporarily unavailable on this dashboard.')
         ->assertDontSee('Create Advanced Program')
-        ->assertSee('Search by event title or venue')
         ->assertSee('Members & Roles')
         ->assertSee('Speakers')
         ->assertSee('References')
@@ -790,7 +792,7 @@ it('filters and sorts institution events on the dashboard', function () {
             'Zulu Public Event',
         ]);
 
-    Livewire::withQueryParams(['institution' => $institution->id])
+    $tableTest = Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($user)
         ->test(InstitutionDashboard::class)
         ->assertTableColumnExists('title')
@@ -799,11 +801,23 @@ it('filters and sorts institution events on the dashboard', function () {
         ->assertTableColumnExists('speaker_names')
         ->assertTableColumnExists('reference_titles')
         ->assertTableColumnExists('space.name')
+        ->assertTableColumnExists('dashboard_registrations_count')
+        ->assertTableColumnExists('visibility')
+        ->assertTableColumnExists('event_structure')
+        ->assertTableColumnExists('is_active')
         ->searchTable('alpha')
         ->filterTable('status', 'pending')
         ->filterTable('visibility', EventVisibility::Private->value)
         ->assertCanSeeTableRecords([$alphaEvent])
         ->assertCanNotSeeTableRecords([$zuluEvent, $betaEvent, $outsideEvent]);
+
+    /** @var InstitutionDashboard $tableInstance */
+    $tableInstance = $tableTest->instance();
+
+    expect($tableInstance->getTable()->getColumn('dashboard_registrations_count')?->isToggledHiddenByDefault())->toBeTrue()
+        ->and($tableInstance->getTable()->getColumn('visibility')?->isToggledHiddenByDefault())->toBeTrue()
+        ->and($tableInstance->getTable()->getColumn('event_structure')?->isToggledHiddenByDefault())->toBeTrue()
+        ->and($tableInstance->getTable()->getColumn('is_active')?->isToggledHiddenByDefault())->toBeTrue();
 
     Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($user)
@@ -855,6 +869,20 @@ it('paginates institution events on the dashboard', function () {
         ->assertSee('Paged Institution Event 01')
         ->assertSee('Paged Institution Event 08')
         ->assertDontSee('Paged Institution Event 09');
+
+    $paginationTest = Livewire::withQueryParams([
+        'institution' => $institution->id,
+        'event_sort' => 'title_asc',
+        'event_per_page' => 8,
+    ])
+        ->actingAs($user)
+        ->test(InstitutionDashboard::class);
+
+    /** @var InstitutionDashboard $paginationInstance */
+    $paginationInstance = $paginationTest->instance();
+
+    expect($paginationInstance->getTable()->getPaginationMode())->toBe(PaginationMode::Default)
+        ->and($paginationInstance->getTable()->hasExtremePaginationLinks())->toBeTrue();
 
     $pageTwo = $this->actingAs($user)
         ->get(route('dashboard.institutions', [
@@ -911,9 +939,7 @@ it('clearly distinguishes public and internal institution data for members', fun
         ->assertSee('Public Institution Event')
         ->assertSee('Internal Institution Event')
         ->assertDontSee('Public Event Registrant')
-        ->assertDontSee('Internal Event Registrant')
-        ->assertSee('Public active: 1')
-        ->assertSee('Internal / hidden: 1');
+        ->assertDontSee('Internal Event Registrant');
 });
 
 it('lets institution owners and admins add members and manage scoped roles from the dashboard', function () {
@@ -948,6 +974,14 @@ it('lets institution owners and admins add members and manage scoped roles from 
         ->assertHasNoErrors()
         ->assertSet('newMemberEmail', '')
         ->assertSet('newMemberRoleId', '');
+
+    $response = $this->withSession(['locale' => 'en'])
+        ->actingAs($adminUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+
+    $response->assertOk()
+        ->assertSee('Members & Roles')
+        ->assertSee('Manage Invitations');
 
     expect($institution->fresh()->members()->whereKey($memberUser->id)->exists())->toBeTrue();
 
@@ -1015,7 +1049,7 @@ it('only lets institution owners and admins manage members and never removes own
         ->get(route('dashboard.institutions', ['institution' => $institution->id]));
 
     $response->assertOk()
-        ->assertSee('Only institution owners and admins can add, remove, or update member roles from this dashboard.')
+        ->assertDontSee('Members & Roles')
         ->assertDontSee('Add Member')
         ->assertDontSee('Remove')
         ->assertDontSee('Owner cannot be removed');
@@ -1044,6 +1078,56 @@ it('only lets institution owners and admins manage members and never removes own
 
     expect($institution->fresh()->members()->whereKey($ownerUser->id)->exists())->toBeTrue()
         ->and(Authz::withScope($institutionScope, fn (): array => $ownerUser->fresh()->getRoleNames()->values()->all(), $ownerUser))->toBe(['owner']);
+});
+
+it('links institution admins to the suggest update page', function () {
+    $adminUser = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Dashboard Edit',
+        'status' => 'verified',
+    ]);
+
+    $institution->members()->syncWithoutDetaching([$adminUser->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($adminUser): void {
+        $adminUser->syncRoles(['admin']);
+    }, $adminUser);
+
+    $institutionEditUrl = route('contributions.suggest-update', [
+        'subjectType' => ContributionSubjectType::Institution->publicRouteSegment(),
+        'subjectId' => $institution->slug,
+    ]);
+
+    $this->withSession(['locale' => 'en'])
+        ->actingAs($adminUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertSee('Edit Institution')
+        ->assertSee($institutionEditUrl, false);
+});
+
+it('does not show the institution edit link to institution viewers', function () {
+    $viewerUser = User::factory()->create();
+    $institution = Institution::factory()->create(['status' => 'verified']);
+
+    $institution->members()->syncWithoutDetaching([$viewerUser->id]);
+
+    app(ScopedMemberRoleSeeder::class)->ensureForInstitution();
+
+    $institutionScope = app(MemberRoleScopes::class)->institution();
+
+    Authz::withScope($institutionScope, function () use ($viewerUser): void {
+        $viewerUser->syncRoles(['viewer']);
+    }, $viewerUser);
+
+    $this->actingAs($viewerUser)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->assertOk()
+        ->assertDontSee('Edit Institution');
 });
 
 it('forbids selecting institutions the user does not belong to', function () {
