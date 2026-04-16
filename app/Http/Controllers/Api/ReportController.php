@@ -10,17 +10,24 @@ use App\Data\Api\Report\ReportSubmissionData;
 use App\Http\Controllers\Controller;
 use App\Models\Report;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
+#[Group('Report', 'Authenticated reporting endpoints for user-submitted data and content issue reports.')]
 class ReportController extends Controller
 {
     /**
      * Store a newly created report.
      * Per documentation B5b - POST /reports
      */
+    #[Endpoint(
+        title: 'Submit a report',
+        description: 'Creates a content or data report against a supported entity when the authenticated user passes report authorization and duplicate checks.',
+    )]
     public function store(
         Request $request,
         ResolveReportCategoryOptionsAction $resolveReportCategoryOptionsAction,

@@ -10,17 +10,24 @@ use App\Exceptions\SavedSearchLimitReachedException;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
+#[Group('Saved Search', 'Authenticated saved-search CRUD and execution endpoints for event discovery workflows.')]
 class SavedSearchController extends Controller
 {
     /**
      * List all saved searches for the authenticated user.
      */
+    #[Endpoint(
+        title: 'List saved searches',
+        description: 'Returns the authenticated user\'s saved search definitions for event discovery.',
+    )]
     public function index(): JsonResponse
     {
         $savedSearches = SavedSearch::where('user_id', Auth::id())
@@ -35,6 +42,10 @@ class SavedSearchController extends Controller
     /**
      * Create a new saved search.
      */
+    #[Endpoint(
+        title: 'Create a saved search',
+        description: 'Creates a new saved search definition from the supplied event-query payload.',
+    )]
     public function store(Request $request, CreateSavedSearchAction $createSavedSearchAction): JsonResponse
     {
         $validated = $request->validate([
@@ -102,6 +113,10 @@ class SavedSearchController extends Controller
     /**
      * Get a specific saved search.
      */
+    #[Endpoint(
+        title: 'Get a saved search',
+        description: 'Returns one saved search definition owned by the current authenticated user.',
+    )]
     public function show(SavedSearch $savedSearch): JsonResponse
     {
         $this->authorize('view', $savedSearch);
@@ -114,6 +129,10 @@ class SavedSearchController extends Controller
     /**
      * Update a saved search.
      */
+    #[Endpoint(
+        title: 'Update a saved search',
+        description: 'Updates one saved search definition owned by the current authenticated user.',
+    )]
     public function update(
         Request $request,
         SavedSearch $savedSearch,
@@ -170,6 +189,10 @@ class SavedSearchController extends Controller
     /**
      * Delete a saved search.
      */
+    #[Endpoint(
+        title: 'Delete a saved search',
+        description: 'Deletes one saved search definition owned by the current authenticated user.',
+    )]
     public function destroy(SavedSearch $savedSearch): Response
     {
         $this->authorize('delete', $savedSearch);
@@ -182,6 +205,10 @@ class SavedSearchController extends Controller
     /**
      * Execute a saved search and return results.
      */
+    #[Endpoint(
+        title: 'Execute a saved search',
+        description: 'Executes a stored saved-search definition and returns the current matching event results.',
+    )]
     public function execute(SavedSearch $savedSearch, ExecuteSavedSearchAction $executeSavedSearchAction): JsonResponse
     {
         $this->authorize('view', $savedSearch);

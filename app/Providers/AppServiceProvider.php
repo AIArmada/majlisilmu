@@ -63,6 +63,7 @@ use Laravel\Ai\Events\ImageGenerated;
 use Laravel\Ai\Events\Reranked;
 use Laravel\Ai\Events\TranscriptionGenerated;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use PhpParser\PrettyPrinter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -82,6 +83,8 @@ class AppServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
+        $this->app->singleton(PrettyPrinter::class, PrettyPrinter\Standard::class);
+
         $filamentAuditingViews = base_path('vendor/tapp/filament-auditing/resources/views');
         $filamentSignalsViews = base_path('../commerce/packages/filament-signals/resources/views');
 

@@ -11,6 +11,20 @@ Use this document as the source of truth for mobile and AI agent integrations.
 
 ---
 
+## AI Quickstart
+
+If you are building an AI client, use this read order:
+
+1. Fetch `/docs.json` first for the current OpenAPI contract.
+2. Choose the correct routing surface: `/api/v1` for public and client behavior, `/api/v1/admin` for admin-only reads and writes.
+3. Call `GET /manifest` for public workflow discovery or `GET /admin/manifest` for admin resource discovery.
+4. Before any write, fetch the exact contract first: `GET /forms/*` for public flows, or `GET /admin/{resourceKey}/schema` for admin writes.
+5. Use admin UUID `id` values for mutation paths. Do not use public slugs or `route_key` values on admin write routes.
+6. Send UTC timestamps and build date filters in UTC even when the user-facing timezone is MYT.
+7. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
+
+---
+
 ## Quick-reference: Routing Surfaces
 
 This API has **two distinct routing surfaces**. Understanding the difference is critical before making any request.
@@ -220,7 +234,7 @@ Validation failures use the same `error` envelope with a field-level bag preserv
 
 For native clients and AI agents that need to mirror the current web client behavior rather than the lower-level REST resources, use the high-level client surface under `/api/v1`.
 
-Interactive local API docs are available at [https://majlisilmu.test/docs](https://majlisilmu.test/docs), with the generated OpenAPI JSON at [https://majlisilmu.test/docs.json](https://majlisilmu.test/docs.json).
+Interactive API docs are available on the API host under `/docs`, with the generated OpenAPI JSON published at `/docs.json`.
 
 ### Discovery and contracts
 

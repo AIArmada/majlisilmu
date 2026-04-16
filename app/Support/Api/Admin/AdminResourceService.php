@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Api\Admin;
 
 use App\Models\User;
+use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ class AdminResourceService
     public function __construct(
         private readonly AdminResourceRegistry $registry,
         private readonly AdminResourceMutationService $mutationService,
+        private readonly ApiDocumentationUrlResolver $urlResolver,
     ) {}
 
     /**
@@ -35,6 +37,32 @@ class AdminResourceService
 
         return [
             'data' => [
+                'version' => '2026-04-16',
+                'docs' => [
+                    'ui' => $this->urlResolver->docsUrl(),
+                    'openapi' => $this->urlResolver->docsJsonUrl(),
+                    'api_base' => $this->urlResolver->apiBaseUrl(),
+                ],
+                'write_workflow' => [
+                    'discover_resources' => route('api.admin.manifest'),
+                    'fetch_create_schema_template' => route('api.admin.resources.schema', ['resourceKey' => 'resourceKey'], false).'?operation=create',
+                    'fetch_update_schema_template' => route('api.admin.resources.schema', ['resourceKey' => 'resourceKey'], false).'?operation=update&recordKey=recordKey',
+                    'create_endpoint_template' => route('api.admin.resources.store', ['resourceKey' => 'resourceKey'], false),
+                    'update_endpoint_template' => route('api.admin.resources.update', ['resourceKey' => 'resourceKey', 'recordKey' => 'recordKey'], false),
+                ],
+                'rules' => [
+                    'Use resource keys returned by the manifest to select the correct admin schema and route family.',
+                    'Use UUID id values returned by admin collection or record endpoints as recordKey inputs.',
+                    'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
+                    'Admin PUT requests are full schema-guided updates, not partial patches.',
+                    'Use authenticated /admin/catalogs/* endpoints for dependent selectors referenced by schema catalog metadata.',
+                ],
+                'catalogs' => [
+                    'countries' => route('api.admin.catalogs.countries'),
+                    'states' => route('api.admin.catalogs.states'),
+                    'districts' => route('api.admin.catalogs.districts'),
+                    'subdistricts' => route('api.admin.catalogs.subdistricts'),
+                ],
                 'resources' => array_values(array_map(
                     fn (array $resource): array => $compact ? $this->summarizeResource($resource) : $resource,
                     $resources,

@@ -101,6 +101,7 @@ it('exposes corrected frontend contract metadata', function () {
     $membershipClaimFlow = $manifest['flows']['membership_claim'] ?? [];
     $followFlow = $manifest['flows']['follow'] ?? [];
     $inspirationFlow = $manifest['flows']['inspirations_random'] ?? [];
+    $quickstart = $manifest['ai_quickstart']['read_order'] ?? [];
 
     $submitEvent = $this->getJson(route('api.client.forms.submit-event'))
         ->assertOk()
@@ -110,6 +111,13 @@ it('exposes corrected frontend contract metadata', function () {
     $submitEventConditionalRules = collect($submitEvent['conditional_rules'] ?? []);
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
+        ->and($manifest['version'] ?? null)->toBe('2026-04-16')
+        ->and($manifest['docs']['ui'] ?? null)->toBe('https://api.majlisilmu.test/docs')
+        ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
+        ->and($manifest['routing_surfaces']['public']['manifest_endpoint'] ?? null)->toContain('/api/v1/manifest')
+        ->and($manifest['routing_surfaces']['admin']['manifest_endpoint'] ?? null)->toContain('/api/v1/admin/manifest')
+        ->and($manifest['rules'] ?? [])->toContain('Use admin UUID id values for admin mutation paths; do not use route_key or public slugs.')
+        ->and($quickstart[0]['endpoint'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
         ->and($submitEventFields)->toContain('submission_country_id', 'submission_country_code', 'submission_country_key')
         ->not->toContain('timezone')

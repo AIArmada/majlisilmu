@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,12 +14,17 @@ use Illuminate\Support\Str;
 use OwenIt\Auditing\Models\Audit;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+#[Group('RegistrationExport', 'Authenticated CSV export endpoints for institution event registrations.')]
 class RegistrationExportController extends Controller
 {
     /**
      * Export registrations for an event as CSV.
      * Per documentation B9d: exports require institution owner/admin role and are audit logged.
      */
+    #[Endpoint(
+        title: 'Export registrations as CSV',
+        description: 'Streams a CSV export of event registrations when the current authenticated user is authorized to export them.',
+    )]
     public function export(Request $request, Event $event): StreamedResponse|JsonResponse
     {
         // Check authorization via EventPolicy

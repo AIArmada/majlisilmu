@@ -12,6 +12,8 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +22,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
+#[Group('InstitutionWorkspace', 'Authenticated institution workspace endpoints for member-management and institution-scoped event listings.')]
 class InstitutionWorkspaceController extends FrontendController
 {
     public function __construct(
@@ -27,6 +30,10 @@ class InstitutionWorkspaceController extends FrontendController
         private readonly ScopedMemberRoleSeeder $scopedMemberRoleSeeder,
     ) {}
 
+    #[Endpoint(
+        title: 'Get institution workspace',
+        description: 'Returns the current user\'s institution workspace payload, including accessible institutions, events, members, and role options.',
+    )]
     public function show(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
@@ -140,6 +147,10 @@ class InstitutionWorkspaceController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Add an institution member',
+        description: 'Adds a member to the selected institution workspace using an email address and role identifier.',
+    )]
     public function addMember(
         string $institutionId,
         Request $request,
@@ -181,6 +192,10 @@ class InstitutionWorkspaceController extends FrontendController
         ], 201);
     }
 
+    #[Endpoint(
+        title: 'Update an institution member role',
+        description: 'Changes the selected member\'s role assignment inside the institution workspace.',
+    )]
     public function updateMemberRole(
         string $institutionId,
         string $memberId,
@@ -221,6 +236,10 @@ class InstitutionWorkspaceController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Remove an institution member',
+        description: 'Removes a non-owner member from the selected institution workspace.',
+    )]
     public function removeMember(
         string $institutionId,
         string $memberId,

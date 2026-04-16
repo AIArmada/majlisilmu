@@ -9,8 +9,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\ParallelTesting;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -30,6 +32,19 @@ pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->beforeEach(function () {
         PreventRequestForgery::except('*');
+
+        $compiledViewPath = storage_path('framework/views/testing_'.ParallelTesting::token());
+
+        File::ensureDirectoryExists($compiledViewPath);
+        config()->set('view.compiled', $compiledViewPath);
+
+        if (app()->resolved('blade.compiler')) {
+            $compiler = app('blade.compiler');
+
+            (function () use ($compiledViewPath): void {
+                $this->cachePath = $compiledViewPath;
+            })->bindTo($compiler, $compiler)();
+        }
 
         if (! Schema::hasTable(config('affiliates.database.tables.affiliates', 'affiliate_affiliates'))) {
             Artisan::call('migrate', [

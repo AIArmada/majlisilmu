@@ -15,6 +15,7 @@ use App\Support\Authz\MemberRoleCatalog;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Submission\EntitySubmissionAccess;
 use App\Support\Timezone\UserDateTimeFormatter;
+use BackedEnum;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -569,12 +570,12 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
                 TextColumn::make('visibility')
                     ->label(__('Visibility'))
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => $this->translateStatusLabel($state))
+                    ->formatStateUsing(fn (mixed $state): string => $this->translateStatusLabel($state))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('event_structure')
                     ->label(__('Structure'))
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => $this->translateStatusLabel($state))
+                    ->formatStateUsing(fn (mixed $state): string => $this->translateStatusLabel($state))
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label(__('Active'))
@@ -717,8 +718,25 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
         abort_unless($user instanceof User && $this->userHasInstitutionManagementRole($user), 403);
     }
 
-    protected function translateStatusLabel(string $status): string
+    protected function translateStatusLabel(mixed $status): string
     {
+        if ($status instanceof BackedEnum) {
+            if (method_exists($status, 'getLabel')) {
+                return (string) $status->getLabel();
+            }
+
+            if (method_exists($status, 'label')) {
+                return (string) $status->label();
+            }
+
+            $status = $status->value;
+        }
+
+        if (! is_scalar($status)) {
+            return '';
+        }
+
+        $status = (string) $status;
         $translated = __($status);
 
         if ($translated !== $status) {

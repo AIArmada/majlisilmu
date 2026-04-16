@@ -9,12 +9,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\Registration;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+#[Group('Event Registration', 'Public event registration submission and authenticated registration-status endpoints.')]
 class EventRegistrationController extends Controller
 {
+    #[Endpoint(
+        title: 'Register for an event',
+        description: 'Creates a registration for the target event using guest contact details or the current authenticated user context.',
+    )]
     public function store(Request $request, Event $event, RegisterForEventAction $registerForEventAction): JsonResponse
     {
         $validated = $request->validate([
@@ -40,6 +47,10 @@ class EventRegistrationController extends Controller
         ], 201);
     }
 
+    #[Endpoint(
+        title: 'Get the current user registration status for an event',
+        description: 'Returns the current authenticated user\'s registration state for the target event.',
+    )]
     public function status(Request $request, Event $event): JsonResponse
     {
         $registration = Registration::query()
