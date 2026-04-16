@@ -4,7 +4,9 @@ namespace App\Data\Api\Event;
 
 use App\Enums\EventType;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\Speaker;
+use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Timezone\UserDateTimeFormatter;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -37,6 +39,13 @@ class EventPayloadData extends Data
                 : null,
             'event_type_label' => self::resolveEventTypeLabel($event),
         ];
+
+        if ($event->relationLoaded('institution') && $event->institution instanceof Institution) {
+            $payload['institution'] = self::serializeInstitutionPayload(
+                $event->institution,
+                is_array($payload['institution'] ?? null) ? $payload['institution'] : [],
+            );
+        }
 
         if ($event->relationLoaded('speakers')) {
             $event->speakers->loadMissing('media');
@@ -75,6 +84,29 @@ class EventPayloadData extends Data
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function serializeInstitutionPayload(Institution $institution, array $payload): array
+    {
+        $address = $institution->addressModel;
+        $addressLines = AddressHierarchyFormatter::displayLines($address);
+        $addressLine = AddressHierarchyFormatter::format($address);
+
+        return [
+            ...$payload,
+            'address_line' => $addressLine !== '' ? $addressLine : null,
+            'street_address_line' => $addressLines['street'],
+            'locality_address_line' => $addressLines['locality'],
+            'regional_address_line' => $addressLines['regional'],
+            'map_url' => $address?->google_maps_url,
+            'map_lat' => $address?->lat,
+            'map_lng' => $address?->lng,
+            'waze_url' => $address?->waze_url,
+        ];
     }
 
     /**
