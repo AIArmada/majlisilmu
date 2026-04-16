@@ -11,6 +11,11 @@ class ApiDocumentationUrlResolver
         return $this->joinPath($this->apiOrigin(), 'docs');
     }
 
+    public function docsJsonUrl(): string
+    {
+        return $this->joinPath($this->apiOrigin(), 'docs.json');
+    }
+
     public function apiBaseUrl(): string
     {
         $apiPath = trim((string) config('scramble.api_path', 'api/v1'), '/');

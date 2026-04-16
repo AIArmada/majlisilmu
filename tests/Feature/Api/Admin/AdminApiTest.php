@@ -41,6 +41,12 @@ it('lists accessible admin resources for privileged users', function () {
     $response = $this->getJson('/api/v1/admin/manifest')
         ->assertOk();
 
+    expect($response->json('data.version'))->toBe('2026-04-16')
+        ->and($response->json('data.docs.ui'))->toBe('https://api.majlisilmu.test/docs')
+        ->and($response->json('data.docs.openapi'))->toBe('https://api.majlisilmu.test/docs.json')
+        ->and($response->json('data.write_workflow.discover_resources'))->toContain('/api/v1/admin/manifest')
+        ->and($response->json('data.rules'))->toContain('Use UUID id values returned by admin collection or record endpoints as recordKey inputs.');
+
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 
     expect($resourceKeys)->toContain('speakers', 'events', 'institutions', 'references', 'subdistricts', 'venues');

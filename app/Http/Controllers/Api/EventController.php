@@ -13,6 +13,7 @@ use App\Models\Event;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
 use App\Support\Timezone\UserDateTimeFormatter;
+use Dedoc\Scramble\Attributes\Endpoint;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -337,6 +338,10 @@ class EventController extends Controller
     /**
      * Show a single event by ID or slug.
      */
+    #[Endpoint(
+        title: 'Get a public event',
+        description: 'Returns the public event detail payload by slug or UUID, including all allowed related resources requested through `include` parameters.',
+    )]
     public function show(Request $request, Event $event): JsonResponse
     {
         /** @var list<string> $allowedIncludes */

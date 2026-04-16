@@ -8,9 +8,14 @@ use App\Actions\Auth\RegisterApiUserAction;
 use App\Actions\Auth\RevokeCurrentApiTokenAction;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Data\Api\Auth\AuthTokenData;
+use App\Data\Api\Auth\AuthTokenResponseData;
+use App\Data\Api\MessageResponseData;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\BodyParameter;
+use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\Response;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +31,18 @@ class AuthController extends Controller
      * The returned `access_token` should be sent on future requests using
      * `Authorization: Bearer {token}`.
      */
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[BodyParameter('name', 'Display name for the new account.', type: 'string', infer: false, example: 'Mobile User')]
+    #[BodyParameter('email', 'Unique email address. Required when `phone` is omitted.', required: false, type: 'string', infer: false, example: 'mobile@example.com')]
+    #[BodyParameter('phone', 'Unique phone number. Required when `email` is omitted.', required: false, type: 'string', infer: false, example: '+60111222333')]
+    #[BodyParameter('password', 'Account password.', type: 'string', infer: false, example: 'password')]
+    #[BodyParameter('password_confirmation', 'Password confirmation matching `password`.', type: 'string', infer: false, example: 'password')]
+    #[BodyParameter('device_name', 'Client-defined Sanctum token name.', type: 'string', infer: false, example: 'iPhone 15 Pro')]
+    #[Endpoint(
+        title: 'Register and issue a bearer token',
+        description: 'Creates a new account and immediately returns a Sanctum bearer token. Supply either `email` or `phone`, plus `password`, `password_confirmation`, and `device_name`.',
+    )]
+    #[Response(status: 201, description: 'Successful registration response.', type: AuthTokenResponseData::class)]
     public function register(Request $request, RegisterApiUserAction $registerApiUserAction): JsonResponse
     {
         $validated = $request->validate([
@@ -45,10 +61,16 @@ class AuthController extends Controller
      * Exchange account credentials for a Sanctum bearer token.
      *
      * Send either an email address or phone number in `login`, plus the user's
-     * password and a client-defined `device_name`. Existing integrations may also
-     * create personal access tokens from the Account Settings screen inside the app.
+     * password and a client-defined `device_name`. Long-lived manual tokens are
+     * issued and revoked by super admins from Admin > Authz > User > API Access
+     * for the selected user.
      */
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[Endpoint(
+        title: 'Log in and issue a bearer token',
+        description: 'Authenticates an existing account using either an email address or phone number in `login`, then returns a Sanctum bearer token. Long-lived manual tokens are managed by super admins from Admin > Authz > User > API Access for the selected user.',
+    )]
+    #[Response(status: 200, description: 'Successful login response.', type: AuthTokenResponseData::class)]
     public function login(Request $request, AuthenticateApiUserAction $authenticateApiUserAction): JsonResponse
     {
         $validated = $request->validate([
@@ -73,7 +95,12 @@ class AuthController extends Controller
     /**
      * Exchange a Google provider token for a Sanctum bearer token.
      */
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[Endpoint(
+        title: 'Exchange a Google token for a bearer token',
+        description: 'Validates a Google access token, creates or links the local user, and returns a Sanctum bearer token for API use.',
+    )]
+    #[Response(status: 200, description: 'Successful Google token exchange response.', type: AuthTokenResponseData::class)]
     public function google(Request $request, AuthenticateSocialiteApiUserAction $authenticateSocialiteApiUserAction): JsonResponse
     {
         $validated = $request->validate([
@@ -97,7 +124,12 @@ class AuthController extends Controller
     /**
      * Revoke the currently authenticated Sanctum bearer token.
      */
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[Endpoint(
+        title: 'Revoke the current bearer token',
+        description: 'Revokes the current Sanctum bearer token without affecting other device sessions.',
+    )]
+    #[Response(status: 200, description: 'Successful logout response.', type: MessageResponseData::class)]
     public function logout(Request $request, RevokeCurrentApiTokenAction $revokeCurrentApiTokenAction): JsonResponse
     {
         $revokeCurrentApiTokenAction->handle($this->currentUser($request));
@@ -107,7 +139,12 @@ class AuthController extends Controller
         ]);
     }
 
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[Endpoint(
+        title: 'Send a password reset link',
+        description: 'Starts the password-broker reset flow. The response is intentionally the same whether or not the email exists.',
+    )]
+    #[Response(status: 200, description: 'Password reset link dispatch response.', type: MessageResponseData::class)]
     public function forgotPassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -123,7 +160,12 @@ class AuthController extends Controller
         ]);
     }
 
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[Endpoint(
+        title: 'Reset a password with a broker token',
+        description: 'Consumes a password broker token plus the new password and returns a success message when the reset succeeds.',
+    )]
+    #[Response(status: 200, description: 'Successful password reset response.', type: MessageResponseData::class)]
     public function resetPassword(Request $request, ResetUserPassword $resetUserPassword): JsonResponse
     {
         $request->validate([
@@ -164,7 +206,12 @@ class AuthController extends Controller
         ]);
     }
 
-    #[Group('Authentication')]
+    #[Group('Authentication', 'Bearer-token issuance, password recovery, and verification endpoints for API clients.')]
+    #[Endpoint(
+        title: 'Resend the verification email',
+        description: 'Resends the verification email for the current authenticated user when the address is still unverified.',
+    )]
+    #[Response(status: 200, description: 'Verification resend response.', type: MessageResponseData::class)]
     public function resendVerificationEmail(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);

@@ -10,12 +10,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+#[Group('EventCheckIn', 'Authenticated event self-check-in endpoints for state discovery and check-in recording.')]
 class EventCheckInController extends Controller
 {
+    #[Endpoint(
+        title: 'Get event check-in state',
+        description: 'Returns whether the authenticated user can currently check in and whether they have already checked in.',
+    )]
     public function show(Request $request, Event $event, ResolveEventCheckInStateAction $resolveEventCheckInStateAction): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -34,6 +41,10 @@ class EventCheckInController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Record an event check-in',
+        description: 'Records a self-check-in for the authenticated user when the current check-in state allows it.',
+    )]
     public function store(
         Request $request,
         Event $event,

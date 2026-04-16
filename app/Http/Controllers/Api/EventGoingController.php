@@ -11,13 +11,20 @@ use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+#[Group('EventGoing', 'Authenticated event-going endpoints for listing, reading, creating, and deleting the current user\'s going state.')]
 class EventGoingController extends Controller
 {
+    #[Endpoint(
+        title: 'List going events',
+        description: 'Returns the authenticated user\'s current going-event list with pagination metadata.',
+    )]
     public function index(Request $request): JsonResponse
     {
         $goingEvents = $this->currentUser($request)
@@ -43,6 +50,10 @@ class EventGoingController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Get going state',
+        description: 'Returns whether the authenticated user has marked the target event as going.',
+    )]
     public function show(Request $request, Event $event): JsonResponse
     {
         $isGoing = DB::table('event_attendees')
@@ -58,6 +69,10 @@ class EventGoingController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Mark an event as going',
+        description: 'Creates a going record for the authenticated user when the target event is still engageable.',
+    )]
     public function store(Request $request, Event $event, MarkEventGoingAction $markEventGoingAction): JsonResponse
     {
         if (! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true) || $event->visibility !== EventVisibility::Public) {
@@ -97,6 +112,10 @@ class EventGoingController extends Controller
         ], 201);
     }
 
+    #[Endpoint(
+        title: 'Remove going state',
+        description: 'Deletes the authenticated user\'s going record for the target event.',
+    )]
     public function destroy(Request $request, Event $event, RemoveEventGoingAction $removeEventGoingAction): JsonResponse
     {
         $result = $removeEventGoingAction->handle($event->id, $this->currentUser($request));

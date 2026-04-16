@@ -7,18 +7,25 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
 use DateTimeZone;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
+#[Group('AccountSettings', 'Authenticated account-settings read and update endpoints for client applications.')]
 class AccountSettingsController extends FrontendController
 {
     public function __construct(
         private readonly NotificationSettingsManager $notificationSettingsManager,
     ) {}
 
+    #[Endpoint(
+        title: 'Get account settings',
+        description: 'Returns the current authenticated user\'s account profile settings payload.',
+    )]
     public function show(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
@@ -33,6 +40,10 @@ class AccountSettingsController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Update account settings',
+        description: 'Updates the current authenticated user\'s profile, timezone, and prayer-institution preferences.',
+    )]
     public function update(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);

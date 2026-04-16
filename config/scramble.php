@@ -32,7 +32,7 @@ return [
         'description' => <<<'MD'
     Canonical API documentation for Majlis Ilmu client and platform integrations.
 
-    Get an access token by calling POST /auth/login or POST /auth/register with a device_name, then send the returned access_token as Authorization: Bearer {token}. Existing users can also create and revoke personal access tokens from Account Settings > API Access inside the application.
+    Get an access token by calling POST /auth/login or POST /auth/register with a device_name, then send the returned access_token as Authorization: Bearer {token}. For integrations that should not store an account password, super admins can issue and revoke long-lived personal access tokens from Admin > Authz > User > API Access for the selected user.
 
     ROUTING SURFACES:
 

@@ -10,17 +10,27 @@ use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ShareTrackingService;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\PathParameter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+#[Group('Follow', 'Authenticated endpoints for reading and mutating follow state across public institutions, speakers, references, and series.')]
 class FollowController extends FrontendController
 {
     public function __construct(
         private readonly ShareTrackingService $shareTrackingService,
     ) {}
 
+    #[PathParameter('type', 'Followable public resource type.', example: 'institution')]
+    #[PathParameter('subject', 'Public slug or UUID of the followable resource.', example: 'masjid-jamek-kuala-lumpur')]
+    #[Endpoint(
+        title: 'Get follow state',
+        description: 'Returns whether the current authenticated user is following the requested public institution, speaker, reference, or series.',
+    )]
     public function show(string $type, string $subject, Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
@@ -34,6 +44,12 @@ class FollowController extends FrontendController
         ]);
     }
 
+    #[PathParameter('type', 'Followable public resource type.', example: 'institution')]
+    #[PathParameter('subject', 'Public slug or UUID of the followable resource.', example: 'masjid-jamek-kuala-lumpur')]
+    #[Endpoint(
+        title: 'Follow a resource',
+        description: 'Creates a follow relationship for the current authenticated user and the requested public institution, speaker, reference, or series.',
+    )]
     public function store(string $type, string $subject, Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
@@ -63,6 +79,12 @@ class FollowController extends FrontendController
         ], 201);
     }
 
+    #[PathParameter('type', 'Followable public resource type.', example: 'institution')]
+    #[PathParameter('subject', 'Public slug or UUID of the followable resource.', example: 'masjid-jamek-kuala-lumpur')]
+    #[Endpoint(
+        title: 'Unfollow a resource',
+        description: 'Removes the follow relationship between the current authenticated user and the requested public institution, speaker, reference, or series.',
+    )]
     public function destroy(string $type, string $subject, Request $request): JsonResponse
     {
         $user = $this->requireUser($request);

@@ -17,6 +17,7 @@ use App\Enums\PreNominal;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Models\User;
+use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Location\GooglePlacesConfiguration;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryRegistry;
@@ -25,6 +26,7 @@ class FrontendFormContractService
 {
     public function __construct(
         private readonly FrontendCatalogService $catalogService,
+        private readonly ApiDocumentationUrlResolver $urlResolver,
     ) {}
 
     /**
@@ -33,7 +35,81 @@ class FrontendFormContractService
     public function manifest(?User $user): array
     {
         return [
-            'version' => '2026-04-10',
+            'version' => '2026-04-16',
+            'docs' => [
+                'ui' => $this->urlResolver->docsUrl(),
+                'openapi' => $this->urlResolver->docsJsonUrl(),
+                'api_base' => $this->urlResolver->apiBaseUrl(),
+            ],
+            'routing_surfaces' => [
+                'public' => [
+                    'base_path' => '/api/v1',
+                    'record_scope' => 'Only active and verified public records.',
+                    'manifest_endpoint' => route('api.client.manifest'),
+                    'write_contract_family' => 'GET /forms/*',
+                ],
+                'admin' => [
+                    'base_path' => '/api/v1/admin',
+                    'record_scope' => 'All accessible records, including inactive, pending, and rejected records.',
+                    'manifest_endpoint' => route('api.admin.manifest'),
+                    'write_contract_family' => 'GET /admin/{resourceKey}/schema',
+                ],
+            ],
+            'ai_quickstart' => [
+                'read_order' => [
+                    [
+                        'step' => 1,
+                        'action' => 'Fetch the machine-readable OpenAPI document.',
+                        'endpoint' => $this->urlResolver->docsJsonUrl(),
+                    ],
+                    [
+                        'step' => 2,
+                        'action' => 'Discover public client workflows and endpoint templates.',
+                        'endpoint' => route('api.client.manifest'),
+                    ],
+                    [
+                        'step' => 3,
+                        'action' => 'Before any public write, fetch the exact public form contract.',
+                        'endpoint_family' => 'GET /forms/*',
+                    ],
+                    [
+                        'step' => 4,
+                        'action' => 'Before any admin write, fetch the admin resource manifest then the exact resource schema.',
+                        'endpoint' => route('api.admin.manifest'),
+                    ],
+                ],
+                'decision_points' => [
+                    [
+                        'need' => 'Public search, public detail pages, and client-parity reads.',
+                        'use_surface' => 'public',
+                    ],
+                    [
+                        'need' => 'Admin search, inactive or pending records, and schema-driven writes.',
+                        'use_surface' => 'admin',
+                    ],
+                ],
+            ],
+            'rules' => [
+                'Treat error.code as the machine-readable failure type.',
+                'Use meta.request_id for request tracing and support handoff.',
+                'Use UTC timestamps and UTC date-filter boundaries.',
+                'Use admin UUID id values for admin mutation paths; do not use route_key or public slugs.',
+                'Fetch the exact form or schema contract before sending write payloads.',
+            ],
+            'catalogs' => [
+                'countries' => route('api.client.catalogs.countries'),
+                'states' => route('api.client.catalogs.states'),
+                'districts' => route('api.client.catalogs.districts'),
+                'subdistricts' => route('api.client.catalogs.subdistricts'),
+                'languages' => route('api.client.catalogs.languages'),
+                'submit_speakers' => route('api.client.catalogs.submit-speakers'),
+                'submit_institutions' => route('api.client.catalogs.submit-institutions'),
+                'venues' => route('api.client.catalogs.venues'),
+                'references' => route('api.client.catalogs.references'),
+                'tags_template' => route('api.client.catalogs.tags', ['type' => 'type'], false),
+                'prayer_institutions' => $user instanceof User ? route('api.client.catalogs.prayer-institutions') : null,
+                'institution_roles' => $user instanceof User ? route('api.client.catalogs.institution-roles') : null,
+            ],
             'flows' => [
                 'search' => [
                     'method' => 'GET',
@@ -164,6 +240,7 @@ class FrontendFormContractService
             ],
             'auth_context' => [
                 'authenticated' => $user instanceof User,
+                'requires_bearer_token_for_mutations' => true,
             ],
         ];
     }

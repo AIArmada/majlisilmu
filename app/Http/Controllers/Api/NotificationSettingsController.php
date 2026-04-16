@@ -6,15 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Notifications\NotificationSettingsManager;
 use App\Support\Notifications\NotificationCatalog;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+#[Group('Notification Settings', 'Authenticated notification preference discovery and update endpoints.')]
 class NotificationSettingsController extends Controller
 {
     public function __construct(
         protected NotificationSettingsManager $settingsManager,
     ) {}
 
+    #[Endpoint(
+        title: 'Get notification catalog',
+        description: 'Returns notification families, triggers, and selectable option sets for the current authenticated user.',
+    )]
     public function catalog(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -52,6 +59,10 @@ class NotificationSettingsController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Get current notification settings',
+        description: 'Returns the current authenticated user\'s notification preferences and resolved delivery destinations.',
+    )]
     public function show(Request $request): JsonResponse
     {
         return response()->json([
@@ -59,6 +70,10 @@ class NotificationSettingsController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Update notification settings',
+        description: 'Updates notification preferences, digest timing, fallback strategy, and channel selections for the current authenticated user.',
+    )]
     public function update(Request $request): JsonResponse
     {
         $validated = $request->validate([

@@ -11,14 +11,21 @@ use App\Models\MembershipClaim;
 use App\Models\User;
 use App\Support\Api\Frontend\FrontendMediaSyncService;
 use App\Support\Membership\MembershipClaimPresenter;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
+#[Group('MembershipClaim', 'Authenticated membership-claim endpoints for listing, creating, and cancelling subject membership claims.')]
 class MembershipClaimController extends FrontendController
 {
+    #[Endpoint(
+        title: 'List membership claims',
+        description: 'Returns the current authenticated user\'s membership claims with review metadata and evidence links.',
+    )]
     public function index(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
@@ -36,6 +43,10 @@ class MembershipClaimController extends FrontendController
         ]);
     }
 
+    #[Endpoint(
+        title: 'Submit a membership claim',
+        description: 'Creates a new membership claim with justification text and evidence uploads for the selected subject.',
+    )]
     public function store(
         string $subjectType,
         string $subject,
@@ -98,6 +109,10 @@ class MembershipClaimController extends FrontendController
         ], 201);
     }
 
+    #[Endpoint(
+        title: 'Cancel a membership claim',
+        description: 'Cancels one pending membership claim owned by the current authenticated user.',
+    )]
     public function cancel(string $claimId, Request $request, CancelMembershipClaimAction $cancelMembershipClaimAction): JsonResponse
     {
         $user = $this->requireUser($request);

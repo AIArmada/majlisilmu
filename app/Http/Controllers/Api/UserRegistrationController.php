@@ -5,15 +5,22 @@ namespace App\Http\Controllers\Api;
 use App\Data\Api\UserRegistration\UserRegistrationItemData;
 use App\Http\Controllers\Controller;
 use App\Models\Registration;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+#[Group('UserRegistration', 'Authenticated user registration-history endpoints for the current bearer-token holder.')]
 class UserRegistrationController extends Controller
 {
     /**
      * List registrations for the authenticated user.
      */
+    #[Endpoint(
+        title: 'List the current user registrations',
+        description: 'Returns the authenticated user\'s event registrations with pagination metadata and related event context.',
+    )]
     public function index(Request $request): JsonResponse
     {
         $registrations = $request->user()

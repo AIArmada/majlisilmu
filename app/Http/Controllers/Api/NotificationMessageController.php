@@ -10,11 +10,18 @@ use App\Http\Controllers\Controller;
 use App\Models\NotificationMessage;
 use App\Models\User;
 use App\Support\Notifications\NotificationCatalog;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+#[Group('Notification Inbox', 'Authenticated inbox endpoints for listing notification messages and marking them as read.')]
 class NotificationMessageController extends Controller
 {
+    #[Endpoint(
+        title: 'List notification messages',
+        description: 'Returns the authenticated user\'s inbox-visible notification messages with filtering and pagination support.',
+    )]
     public function index(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -45,6 +52,10 @@ class NotificationMessageController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Mark a notification message as read',
+        description: 'Marks one inbox notification message as read for the current authenticated user.',
+    )]
     public function read(
         Request $request,
         string $message,
@@ -58,6 +69,10 @@ class NotificationMessageController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Mark all notification messages as read',
+        description: 'Marks every inbox-visible notification message as read for the current authenticated user.',
+    )]
     public function readAll(Request $request, MarkAllNotificationMessagesReadAction $markAllNotificationMessagesReadAction): JsonResponse
     {
         $updated = $markAllNotificationMessagesReadAction->handle($this->currentUser($request), $request);

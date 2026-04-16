@@ -1,3 +1,23 @@
+# AI API Documentation Hardening
+
+- [x] Audit the current API docs and discovery manifests from an AI-consumer perspective
+- [x] Replace environment-specific docs links with resolved production-safe URLs and add an AI quick-start
+- [x] Expand the public and admin manifests with machine-readable onboarding, workflow, and rule metadata
+- [x] Tighten high-value endpoint documentation and schemas for auth and authenticated workflow surfaces
+- [x] Add focused regression coverage for the docs, manifests, and endpoint contract improvements
+
+## Review
+
+- Added an AI-oriented quickstart and production-safe docs references to [docs/MAJLISILMU_MOBILE_API_REFERENCE.md](docs/MAJLISILMU_MOBILE_API_REFERENCE.md), then injected that guidance into the generated Scramble description from [app/Providers/ApiDocumentationServiceProvider.php](app/Providers/ApiDocumentationServiceProvider.php) via [app/Support/ApiDocumentation/ApiDocumentationUrlResolver.php](app/Support/ApiDocumentation/ApiDocumentationUrlResolver.php).
+- Expanded the public and admin discovery surfaces in [app/Support/Api/Frontend/FrontendFormContractService.php](app/Support/Api/Frontend/FrontendFormContractService.php) and [app/Support/Api/Admin/AdminResourceService.php](app/Support/Api/Admin/AdminResourceService.php) so AI clients now receive docs URLs, routing/workflow guidance, rules, and catalogs directly from the manifests.
+- Tightened endpoint metadata for auth and authenticated workflow controllers, including explicit auth/message response DTOs in [app/Data/Api/Auth/AuthTokenResponseData.php](app/Data/Api/Auth/AuthTokenResponseData.php) and [app/Data/Api/MessageResponseData.php](app/Data/Api/MessageResponseData.php), with Scramble annotations centered in [app/Http/Controllers/Api/AuthController.php](app/Http/Controllers/Api/AuthController.php).
+- Added and stabilized focused regressions in [tests/Feature/ScrambleDocsTest.php](tests/Feature/ScrambleDocsTest.php), [tests/Feature/Api/Frontend/FrontendApiParityTest.php](tests/Feature/Api/Frontend/FrontendApiParityTest.php), and [tests/Feature/Api/Admin/AdminApiTest.php](tests/Feature/Api/Admin/AdminApiTest.php) so the docs, manifests, and key auth docs signals are covered without relying on brittle parallel-worker-specific `$ref` output.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php | cat` => 14 passed
+  - `vendor/bin/pest --parallel tests/Feature/Api/Frontend/FrontendApiParityTest.php | cat` => 77 passed
+  - `vendor/bin/pest --parallel tests/Feature/Api/Admin/AdminApiTest.php | cat` => 21 passed
+
 # Share Tracking Parameter Audit
 
 - [x] Trace share-tracking link generation, redirect handling, and attribution capture parameters

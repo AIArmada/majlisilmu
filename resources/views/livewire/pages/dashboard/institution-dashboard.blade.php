@@ -39,23 +39,18 @@
             <div class="flex justify-end" data-testid="institution-dashboard-picker">
                 <div class="flex w-full flex-col justify-end gap-3 sm:flex-row sm:items-end sm:justify-end">
                     <div class="w-full sm:max-w-md">
-                        <label for="institution-dashboard-select" class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                            {{ __('Institution') }}
-                        </label>
-                        <select
-                            id="institution-dashboard-select"
+                        <flux:select
                             wire:model.live="institutionId"
                             data-testid="institution-dashboard-select"
-                            class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-xs transition hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            label="{{ __('Institution') }}"
+                            placeholder="{{ __('Select institution') }}"
+                            label:class="text-xs font-bold uppercase tracking-wide !text-slate-600"
+                            class="h-11 rounded-xl border-slate-300 bg-white !text-slate-900 shadow-xs hover:border-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 [&>option]:text-slate-900"
                         >
-                            @if($selectedInstitution === null)
-                                <option value="">{{ __('Select institution') }}</option>
-                            @endif
-
                             @foreach($institutions as $institution)
-                                <option value="{{ $institution->id }}">{{ $institution->name }}</option>
+                                <flux:select.option value="{{ $institution->id }}">{{ $institution->name }}</flux:select.option>
                             @endforeach
-                        </select>
+                        </flux:select>
                     </div>
 
                     @if($institutionEditUrl)

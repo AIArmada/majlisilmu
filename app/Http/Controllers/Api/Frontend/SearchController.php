@@ -45,6 +45,7 @@ use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
+use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\Response;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
@@ -65,6 +66,11 @@ class SearchController extends FrontendController
         private readonly SpeakerSearchService $speakerSearchService,
     ) {}
 
+    #[Group('Search', 'Public aggregate search endpoints across events, speakers, and institutions.')]
+    #[Endpoint(
+        title: 'Search events, speakers, and institutions',
+        description: 'Returns a compact public search payload for events, speakers, and institutions using the same visibility rules as the client surface.',
+    )]
     public function search(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -116,7 +122,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Institution')]
+    #[Group('Institution', 'Public institution directory and detail endpoints.')]
+    #[Endpoint(
+        title: 'List public institutions',
+        description: 'Returns the public institution directory with search, location, type, and follow-state filters.',
+    )]
     #[Response(
         status: 200,
         description: 'Institution directory response.',
@@ -174,7 +184,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Speaker')]
+    #[Group('Speaker', 'Public speaker directory and detail endpoints.')]
+    #[Endpoint(
+        title: 'List public speakers',
+        description: 'Returns the public speaker directory with search, location, gender, and follow-state filters.',
+    )]
     #[Response(
         status: 200,
         description: 'Speaker directory response.',
@@ -239,7 +253,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Inspiration')]
+    #[Group('Inspiration', 'Public inspiration discovery endpoints for random featured inspiration content.')]
+    #[Endpoint(
+        title: 'Get a random inspiration',
+        description: 'Returns one random active inspiration record, localized when a `locale` query value is provided.',
+    )]
     public function randomInspiration(Request $request): JsonResponse
     {
         $locale = $this->normalizedString($request->query('locale'));
@@ -258,7 +276,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Institution')]
+    #[Group('Institution', 'Public institution directory and detail endpoints.')]
+    #[Endpoint(
+        title: 'Get a public institution',
+        description: 'Returns the public institution detail payload by slug or UUID, including upcoming and past events.',
+    )]
     #[Response(
         status: 200,
         description: 'Institution detail response.',
@@ -321,7 +343,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Speaker')]
+    #[Group('Speaker', 'Public speaker directory and detail endpoints.')]
+    #[Endpoint(
+        title: 'Get a public speaker',
+        description: 'Returns the public speaker detail payload by slug or UUID, including speaker events and other key-person participations.',
+    )]
     #[Response(
         status: 200,
         description: 'Speaker detail response.',
@@ -467,7 +493,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Venue')]
+    #[Group('Venue', 'Public venue detail endpoints for active verified venues and their related events.')]
+    #[Endpoint(
+        title: 'Get a public venue',
+        description: 'Returns the public venue detail payload by slug or UUID, including upcoming and past events hosted there.',
+    )]
     public function showVenue(Request $request, string $venueKey): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -542,7 +572,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Reference')]
+    #[Group('Reference', 'Public reference detail endpoints for active references and their related events.')]
+    #[Endpoint(
+        title: 'Get a public reference',
+        description: 'Returns the public reference detail payload by slug or UUID, including upcoming and past events linked to that reference.',
+    )]
     public function showReference(Request $request, string $referenceKey): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -605,7 +639,11 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Series')]
+    #[Group('Series', 'Public series detail endpoints for visible series and their related events.')]
+    #[Endpoint(
+        title: 'Get a public series',
+        description: 'Returns the public series detail payload by slug or UUID, including upcoming and past events in the series.',
+    )]
     public function showSeries(Request $request, string $series): JsonResponse
     {
         $user = $this->currentUser($request);

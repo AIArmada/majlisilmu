@@ -24,7 +24,7 @@ class ManifestController extends FrontendController
     #[Endpoint(
         title: 'Discover public client flows',
         description: 'Returns the public capability manifest for frontend and mobile clients. '
-            .'Use it to discover available flows, auth requirements, schema endpoints, and follow or update endpoint templates.',
+            .'Use it to discover available flows, auth requirements, schema endpoints, follow or update endpoint templates, docs URLs, routing-surface guidance, and AI-consumer operating rules.',
     )]
     public function manifest(Request $request): JsonResponse
     {

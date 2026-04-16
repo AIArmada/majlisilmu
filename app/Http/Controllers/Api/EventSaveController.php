@@ -11,16 +11,23 @@ use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+#[Group('Event Save', 'Authenticated endpoints for listing, creating, removing, and checking saved public events.')]
 class EventSaveController extends Controller
 {
     /**
      * List all saved events for the authenticated user.
      */
+    #[Endpoint(
+        title: 'List saved events',
+        description: 'Returns the authenticated user\'s saved public events with pagination metadata.',
+    )]
     public function index(Request $request): JsonResponse
     {
         $savedEvents = $request->user()
@@ -49,6 +56,10 @@ class EventSaveController extends Controller
     /**
      * Save an event (bookmark).
      */
+    #[Endpoint(
+        title: 'Save an event',
+        description: 'Creates a saved-event bookmark for the authenticated user when the target event is allowed to be saved.',
+    )]
     public function store(Request $request, SaveEventAction $saveEventAction): JsonResponse
     {
         $validated = $request->validate([
@@ -109,6 +120,10 @@ class EventSaveController extends Controller
     /**
      * Remove a saved event (unbookmark).
      */
+    #[Endpoint(
+        title: 'Remove a saved event',
+        description: 'Deletes a saved-event bookmark for the authenticated user.',
+    )]
     public function destroy(Request $request, string $eventId, UnsaveEventAction $unsaveEventAction): JsonResponse
     {
         /** @var User $user */
@@ -135,6 +150,10 @@ class EventSaveController extends Controller
     /**
      * Check if an event is saved.
      */
+    #[Endpoint(
+        title: 'Check saved-event state',
+        description: 'Returns whether the authenticated user has already saved the target public event.',
+    )]
     public function show(Request $request, string $eventId): JsonResponse
     {
         $isSaved = DB::table('event_saves')
