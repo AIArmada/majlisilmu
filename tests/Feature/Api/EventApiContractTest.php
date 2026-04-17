@@ -231,6 +231,46 @@ it('interprets starts_after filter in the user timezone', function () {
         ->not()->toContain($excluded->id);
 });
 
+it('keeps raw utc event timestamps stable while localizing helper fields from request timezone context', function () {
+    $startsAt = Carbon::create(2026, 4, 12, 0, 30, 0, 'UTC');
+    $endsAt = Carbon::create(2026, 4, 12, 2, 0, 0, 'UTC');
+    $expectedStartsAt = $startsAt->copy()->format('Y-m-d\TH:i:s.u\Z');
+    $expectedEndsAt = $endsAt->copy()->format('Y-m-d\TH:i:s.u\Z');
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'timing_mode' => TimingMode::Absolute,
+        'starts_at' => $startsAt,
+        'ends_at' => $endsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ]);
+
+    $utcResponse = $this->getJson('/api/v1/events?sort=starts_at')
+        ->assertOk();
+
+    $mytResponse = $this->withHeader('X-Timezone', 'Asia/Kuala_Lumpur')
+        ->getJson('/api/v1/events?sort=starts_at')
+        ->assertOk();
+
+    $utcEvent = collect($utcResponse->json('data'))->firstWhere('id', (string) $event->getKey());
+    $mytEvent = collect($mytResponse->json('data'))->firstWhere('id', (string) $event->getKey());
+
+    expect($utcEvent)->toBeArray()
+        ->and($mytEvent)->toBeArray()
+        ->and($utcEvent['starts_at'])->toBe($expectedStartsAt)
+        ->and($mytEvent['starts_at'])->toBe($expectedStartsAt)
+        ->and($utcEvent['ends_at'])->toBe($expectedEndsAt)
+        ->and($mytEvent['ends_at'])->toBe($expectedEndsAt)
+        ->and($utcEvent['timing_display'])->toBe($startsAt->copy()->timezone('UTC')->format('g:i A'))
+        ->and($mytEvent['timing_display'])->toBe($startsAt->copy()->timezone('Asia/Kuala_Lumpur')->format('g:i A'))
+        ->and($utcEvent['end_time_display'])->toBe($endsAt->copy()->timezone('UTC')->format('h:i A'))
+        ->and($mytEvent['end_time_display'])->toBe($endsAt->copy()->timezone('Asia/Kuala_Lumpur')->format('h:i A'))
+        ->and($utcEvent['timing_display'])->not->toBe($mytEvent['timing_display'])
+        ->and($utcEvent['end_time_display'])->not->toBe($mytEvent['end_time_display']);
+});
+
 it('filters events by prayer_time keyword', function () {
     $maghribEvent = Event::factory()->create([
         'status' => 'approved',
