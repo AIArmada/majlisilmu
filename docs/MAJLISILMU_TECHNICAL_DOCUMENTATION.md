@@ -252,13 +252,13 @@ Authenticated (`auth:sanctum`):
 - `POST /auth/logout`
 - `GET /user`
 - `GET /user/registrations`
-- `GET /user/going-events`
-- `GET /events/{event}/registration-status`
-- `GET /events/{event}/check-in-state`
+- `GET /me/events/going`
+- `GET /me/events/saved`
+- `GET /events/{event}/me`
 - `POST /events/{event}/check-ins`
-- `GET/POST/DELETE /events/{event}/going`
+- `PUT/DELETE /events/{event}/going`
+- `PUT/DELETE /events/{event}/saved`
 - Saved-search CRUD + execute
-- Event saves CRUD-like endpoints
 - Event interests endpoints
 - `POST /reports` (reports throttle applied)
 - Notifications inbox/settings endpoints

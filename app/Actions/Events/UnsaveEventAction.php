@@ -28,7 +28,10 @@ class UnsaveEventAction
                 ->delete();
 
             if ($deletedRows === 0) {
-                return ['deleted' => false, 'saves_count' => 0];
+                return [
+                    'deleted' => false,
+                    'saves_count' => $event instanceof Event ? $this->syncSavesCount($eventId) : 0,
+                ];
             }
 
             return [

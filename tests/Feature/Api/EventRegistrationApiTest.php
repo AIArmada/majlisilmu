@@ -51,14 +51,14 @@ it('allows an authenticated user to register through the api', function () {
         ->assertJsonPath('data.created_at', $registration->created_at?->toIso8601String())
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
-    $this->getJson(route('api.events.registrations.status', $event))
+    $this->getJson(route('api.events.me.show', $event))
         ->assertOk()
-        ->assertJsonPath('data.is_registered', true)
-        ->assertJsonPath('data.registration.id', $registration->id)
-        ->assertJsonPath('data.registration.event_id', $event->id)
-        ->assertJsonPath('data.registration.user_id', $user->id)
-        ->assertJsonPath('data.registration.name', 'Registered Mobile User')
-        ->assertJsonPath('data.registration.created_at', $registration->created_at?->toIso8601String())
+        ->assertJsonPath('data.registration.is_registered', true)
+        ->assertJsonPath('data.registration.registration.id', $registration->id)
+        ->assertJsonPath('data.registration.registration.event_id', $event->id)
+        ->assertJsonPath('data.registration.registration.user_id', $user->id)
+        ->assertJsonPath('data.registration.registration.name', 'Registered Mobile User')
+        ->assertJsonPath('data.registration.registration.created_at', $registration->created_at?->toIso8601String())
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
@@ -107,9 +107,33 @@ it('allows registration for unlisted events when registration is enabled', funct
         ->assertJsonPath('data.event_id', $event->id);
 });
 
-it('requires authentication to inspect the current users registration status', function () {
+it('returns current user event state for active unlisted events', function () {
+    $user = User::factory()->create();
+    $event = registrationReadyEvent([
+        'visibility' => EventVisibility::Unlisted,
+        'is_active' => true,
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $registrationResponse = $this->postJson(route('api.events.registrations.store', $event), [
+        'name' => 'Unlisted State User',
+    ]);
+
+    $registrationId = (string) $registrationResponse->json('data.id');
+
+    $this->getJson(route('api.events.me.show', $event))
+        ->assertOk()
+        ->assertJsonPath('data.registration.is_registered', true)
+        ->assertJsonPath('data.registration.registration.id', $registrationId)
+        ->assertJsonPath('data.registration.registration.event_id', $event->id)
+        ->assertJsonPath('data.registration.registration.user_id', $user->id)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+});
+
+it('requires authentication to inspect the current users event state', function () {
     $event = registrationReadyEvent();
 
-    $this->getJson(route('api.events.registrations.status', $event))
+    $this->getJson(route('api.events.me.show', $event))
         ->assertUnauthorized();
 });

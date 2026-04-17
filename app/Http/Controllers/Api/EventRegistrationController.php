@@ -4,10 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Events\RegisterForEventAction;
 use App\Data\Api\EventRegistration\EventRegistrationData;
-use App\Data\Api\EventRegistration\EventRegistrationStatusData;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\Registration;
 use App\Models\User;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -15,7 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
-#[Group('Event Registration', 'Public event registration submission and authenticated registration-status endpoints.')]
+#[Group('Event Registration', 'Public event registration submission endpoints. Authenticated registration state is exposed via `GET /events/{event}/me`.')]
 class EventRegistrationController extends Controller
 {
     #[Endpoint(
@@ -45,39 +43,5 @@ class EventRegistrationController extends Controller
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
         ], 201);
-    }
-
-    #[Endpoint(
-        title: 'Get the current user registration status for an event',
-        description: 'Returns the current authenticated user\'s registration state for the target event.',
-    )]
-    public function status(Request $request, Event $event): JsonResponse
-    {
-        $registration = Registration::query()
-            ->where('event_id', $event->id)
-            ->where('user_id', $this->currentUser($request)->id)
-            ->where('status', '!=', 'cancelled')
-            ->latest('created_at')
-            ->first();
-
-        $registrationData = $registration instanceof Registration
-            ? EventRegistrationData::fromModel($registration)
-            : null;
-
-        return response()->json([
-            'data' => EventRegistrationStatusData::fromNullableRegistration($registrationData)->toArray(),
-            'meta' => [
-                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
-            ],
-        ]);
-    }
-
-    protected function currentUser(Request $request): User
-    {
-        $user = $request->user();
-
-        abort_unless($user instanceof User, 403);
-
-        return $user;
     }
 }

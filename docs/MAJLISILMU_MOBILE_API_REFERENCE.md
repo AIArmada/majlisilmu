@@ -607,36 +607,77 @@ Mobile recommendation:
 
 ## 4. Event Engagement
 
+### Event state
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/events/{event}/me` | Return the authenticated user’s saved, going, registration, and check-in state for an active public or unlisted event |
+
+`GET /events/{event}/me` returns:
+
+```json
+{
+  "data": {
+    "saved": {
+      "is_saved": false,
+      "saves_count": 12
+    },
+    "going": {
+      "is_going": true,
+      "going_count": 48
+    },
+    "registration": {
+      "is_registered": true,
+      "registration": {
+        "id": "uuid",
+        "event_id": "uuid",
+        "user_id": "uuid",
+        "name": "Registered User",
+        "email": "user@example.com",
+        "phone": null,
+        "status": "registered",
+        "created_at": "2026-04-17T12:00:00+00:00"
+      }
+    },
+    "check_in": {
+      "is_checked_in": false,
+      "available": true,
+      "reason": null,
+      "method": "registered_self_checkin",
+      "registration_id": "uuid"
+    }
+  }
+}
+```
+
 ### Saved events
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/event-saves` | List saved events for the authenticated user |
-| `POST` | `/event-saves` | Save an event |
-| `GET` | `/event-saves/{eventId}` | Check if the event is saved |
-| `DELETE` | `/event-saves/{eventId}` | Remove a saved event |
+| `GET` | `/me/events/saved` | List saved events for the authenticated user |
+| `PUT` | `/events/{event}/saved` | Idempotently save an event |
+| `DELETE` | `/events/{event}/saved` | Idempotently remove saved state |
 
-Request body for `POST /event-saves`:
+Notes:
 
-```json
-{
-  "event_id": "uuid"
-}
-```
+- Use `GET /events/{event}/me` for the current saved flag and count.
+- `PUT /events/{event}/saved` is restricted to active public events in engageable statuses.
+- `PUT /events/{event}/saved` returns `201` on first save and `200` when the event was already saved.
+- `DELETE /events/{event}/saved` always returns the final saved state payload.
 
 ### Going
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/user/going-events` | List events the authenticated user marked as going |
-| `GET` | `/events/{event}/going` | Check if the user marked the event as going |
-| `POST` | `/events/{event}/going` | Mark the event as going |
+| `GET` | `/me/events/going` | List events the authenticated user marked as going |
+| `PUT` | `/events/{event}/going` | Idempotently mark the event as going |
 | `DELETE` | `/events/{event}/going` | Remove the going record |
 
 Notes:
 
-- `POST /events/{event}/going` is restricted to public, engageable, future events.
-- Response returns the updated `going_count`.
+- Use `GET /events/{event}/me` for the current going flag and count.
+- `PUT /events/{event}/going` is restricted to active public, engageable, future events.
+- `PUT /events/{event}/going` returns `201` on first write and `200` when the state was already set.
 
 ---
 
@@ -647,7 +688,6 @@ Notes:
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `POST` | `/events/{event}/registrations` | Optional | Register for an event |
-| `GET` | `/events/{event}/registration-status` | Required | Return the authenticated user’s registration state |
 | `GET` | `/user/registrations` | Required | List the authenticated user’s registrations |
 | `GET` | `/events/{event}/registrations/export` | Required | Export event registrations as CSV if authorized |
 
@@ -667,31 +707,18 @@ Notes:
 - Authenticated users may register without `email` or `phone`.
 - Registration follows the same `RegisterForEventAction` rules as the web route.
 - Unlisted events remain registerable when registration is enabled, matching the existing web behavior.
+- The current authenticated registration state lives under `data.registration` in `GET /events/{event}/me`, including active unlisted events when the client already has the event identifier.
 
 ### Check-in
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/events/{event}/check-in-state` | Return current user check-in availability |
 | `POST` | `/events/{event}/check-ins` | Record a check-in for the authenticated user |
-
-`GET /events/{event}/check-in-state` returns:
-
-```json
-{
-  "data": {
-    "is_checked_in": false,
-    "available": true,
-    "reason": null,
-    "method": "self_reported",
-    "registration_id": null
-  }
-}
-```
 
 Notes:
 
 - Check-in uses the shared `ResolveEventCheckInStateAction`, so API and web eligibility rules now match.
+- Current check-in availability and checked-in state live under `data.check_in` in `GET /events/{event}/me`.
 - If the event requires registration, the check-in state returns `registered_self_checkin` and the relevant `registration_id`.
 - Duplicate check-ins return HTTP `200` with `data.status = "duplicate"` instead of creating another row.
 
@@ -802,11 +829,7 @@ Notes:
 Recommended event detail fetch sequence:
 
 1. `GET /events/{eventOrSlug}` with the includes required for the screen.
-2. If authenticated, fetch in parallel:
-   - `GET /event-saves/{eventId}`
-   - `GET /events/{event}/going`
-   - `GET /events/{event}/registration-status`
-   - `GET /events/{event}/check-in-state`
+2. If authenticated, fetch `GET /events/{event}/me`.
 
 Recommended auth flow:
 
@@ -819,8 +842,6 @@ Recommended auth flow:
 
 ## 10. Current Gaps To Be Aware Of
 
-- Event saves still use the older collection-style endpoints (`/event-saves`) rather than nested event routes.
-- There is no single `/events/{event}/me` aggregate endpoint yet; current mobile clients should fetch per-feature state in parallel.
 - Registration export is CSV-only and intended for operator workflows rather than general attendee-facing mobile screens.
 
 ---

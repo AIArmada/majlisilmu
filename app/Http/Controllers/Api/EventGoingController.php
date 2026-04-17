@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Events\MarkEventGoingAction;
 use App\Actions\Events\RemoveEventGoingAction;
 use App\Data\Api\EventEngagement\EventEngagementListItemData;
-use App\Data\Api\EventGoing\EventGoingResultData;
 use App\Data\Api\EventGoing\EventGoingStateData;
 use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
@@ -16,23 +15,21 @@ use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-#[Group('EventGoing', 'Authenticated event-going endpoints for listing, reading, creating, and deleting the current user\'s going state.')]
+#[Group('Event Going', 'Authenticated event-going endpoints for listing and idempotent event going state management.')]
 class EventGoingController extends Controller
 {
     #[Endpoint(
         title: 'List going events',
-        description: 'Returns the authenticated user\'s current going-event list with pagination metadata.',
+        description: 'Returns the authenticated user\'s current going-event list from the `/me/events/going` collection.',
     )]
     public function index(Request $request): JsonResponse
     {
         $goingEvents = $this->currentUser($request)
             ->goingEvents()
             ->with(['institution:id,name,slug', 'venue:id,name', 'speakers:id,name,slug'])
-            ->whereIn('status', Event::PUBLIC_STATUSES)
-            ->where('visibility', 'public')
+            ->active()
             ->orderBy('starts_at')
             ->paginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
 
@@ -52,31 +49,12 @@ class EventGoingController extends Controller
     }
 
     #[Endpoint(
-        title: 'Get going state',
-        description: 'Returns whether the authenticated user has marked the target event as going.',
-    )]
-    public function show(Request $request, Event $event): JsonResponse
-    {
-        $isGoing = DB::table('event_attendees')
-            ->where('user_id', $this->currentUser($request)->id)
-            ->where('event_id', $event->id)
-            ->exists();
-
-        return response()->json([
-            'data' => EventGoingStateData::fromState($isGoing, (int) ($event->going_count ?? 0))->toArray(),
-            'meta' => [
-                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
-            ],
-        ]);
-    }
-
-    #[Endpoint(
         title: 'Mark an event as going',
-        description: 'Creates a going record for the authenticated user when the target event is still engageable.',
+        description: 'Idempotently marks the target public event as going for the authenticated user when it is still engageable.',
     )]
     public function store(Request $request, Event $event, MarkEventGoingAction $markEventGoingAction): JsonResponse
     {
-        if (! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true) || $event->visibility !== EventVisibility::Public) {
+        if (! $event->is_active || ! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true) || $event->visibility !== EventVisibility::Public) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',
@@ -96,42 +74,37 @@ class EventGoingController extends Controller
 
         $goingState = $markEventGoingAction->handle($event, $this->currentUser($request), $request);
 
-        if ($goingState['status'] === 'conflict') {
+        if ($goingState['status'] === 'not_found') {
             return response()->json([
                 'error' => [
-                    'code' => 'conflict',
-                    'message' => 'You have already marked going for this event.',
+                    'code' => 'not_found',
+                    'message' => 'Event not found.',
                 ],
-            ], 409);
+            ], 404);
         }
 
+        $created = $goingState['status'] === 'created';
+
         return response()->json([
-            'data' => EventGoingResultData::fromOutcome('Going recorded successfully.', $goingState['going_count'])->toArray(),
+            'message' => $created ? 'Going recorded successfully.' : 'Event already marked as going.',
+            'data' => EventGoingStateData::fromState(true, $goingState['going_count'])->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],
-        ], 201);
+        ], $created ? 201 : 200);
     }
 
     #[Endpoint(
         title: 'Remove going state',
-        description: 'Deletes the authenticated user\'s going record for the target event.',
+        description: 'Idempotently removes the authenticated user\'s going state for the target event.',
     )]
     public function destroy(Request $request, Event $event, RemoveEventGoingAction $removeEventGoingAction): JsonResponse
     {
         $result = $removeEventGoingAction->handle($event->id, $this->currentUser($request));
 
-        if (! $result['deleted']) {
-            return response()->json([
-                'error' => [
-                    'code' => 'not_found',
-                    'message' => 'Going record not found.',
-                ],
-            ], 404);
-        }
-
         return response()->json([
-            'data' => EventGoingResultData::fromOutcome('Going removed successfully.', $result['going_count'])->toArray(),
+            'message' => $result['deleted'] ? 'Going removed successfully.' : 'Event was not marked as going.',
+            'data' => EventGoingStateData::fromState(false, $result['going_count'])->toArray(),
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
             ],

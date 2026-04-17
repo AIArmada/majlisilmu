@@ -28,7 +28,10 @@ final class RemoveEventGoingAction
                 ->delete();
 
             if ($deletedRows === 0) {
-                return ['deleted' => false, 'going_count' => 0];
+                return [
+                    'deleted' => false,
+                    'going_count' => $event instanceof Event ? $this->syncGoingCount($eventId) : 0,
+                ];
             }
 
             return [
