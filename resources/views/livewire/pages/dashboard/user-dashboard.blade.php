@@ -55,7 +55,7 @@
                 <div class="absolute inset-0 bg-gradient-to-br from-emerald-50/80 via-white to-slate-50/60"></div>
                 <div class="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl"></div>
                 <div class="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-teal-200/20 blur-2xl"></div>
-                <div class="pointer-events-none absolute inset-0 bg-[url('/images/pattern-bg.png')] bg-[size:320px] opacity-[0.025]"></div>
+                <div class="pointer-events-none absolute inset-0 bg-[size:320px] opacity-[0.025]" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
                 {{-- Top accent --}}
                 <div class="relative h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400"></div>
                 <div class="relative p-6 md:p-8">
