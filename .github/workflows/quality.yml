@@ -41,8 +41,36 @@ jobs:
       - name: Prepare application environment
         run: cp .env.example .env
 
+      - name: Verify Composer private repository auth
+        env:
+          COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
+        run: |
+          if [ -z "$COMPOSER_AUTH" ]; then
+            echo "::error::Missing COMPOSER_AUTH GitHub secret. Set it to a Composer auth JSON payload that includes http-basic credentials for packages.filamentphp.com."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          try:
+              auth = json.loads(os.environ['COMPOSER_AUTH'])
+          except json.JSONDecodeError as error:
+              print(f"::error::COMPOSER_AUTH is not valid JSON: {error}")
+              sys.exit(1)
+
+          credentials = auth.get('http-basic', {}).get('packages.filamentphp.com', {})
+
+          if not credentials.get('username') or not credentials.get('password'):
+              print('::error::COMPOSER_AUTH must include http-basic credentials for packages.filamentphp.com.')
+              sys.exit(1)
+          PY
+
       - name: Install Composer dependencies
         env:
+          COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           composer config --global github-oauth.github.com "$GITHUB_TOKEN"
@@ -101,8 +129,36 @@ jobs:
       - name: Prepare application environment
         run: cp .env.example .env
 
+      - name: Verify Composer private repository auth
+        env:
+          COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
+        run: |
+          if [ -z "$COMPOSER_AUTH" ]; then
+            echo "::error::Missing COMPOSER_AUTH GitHub secret. Set it to a Composer auth JSON payload that includes http-basic credentials for packages.filamentphp.com."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          try:
+              auth = json.loads(os.environ['COMPOSER_AUTH'])
+          except json.JSONDecodeError as error:
+              print(f"::error::COMPOSER_AUTH is not valid JSON: {error}")
+              sys.exit(1)
+
+          credentials = auth.get('http-basic', {}).get('packages.filamentphp.com', {})
+
+          if not credentials.get('username') or not credentials.get('password'):
+              print('::error::COMPOSER_AUTH must include http-basic credentials for packages.filamentphp.com.')
+              sys.exit(1)
+          PY
+
       - name: Install Composer dependencies
         env:
+          COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           composer config --global github-oauth.github.com "$GITHUB_TOKEN"
