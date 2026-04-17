@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -22,6 +23,7 @@ use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
+use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
@@ -535,6 +537,22 @@ it('returns a bearer-auth challenge for unauthenticated MCP stream requests', fu
     $response->assertUnauthorized();
     $response->assertHeader('WWW-Authenticate');
     expect((string) $response->headers->get('WWW-Authenticate'))->toContain('Bearer realm="mcp"');
+});
+
+it('rejects member-scoped tokens on the admin MCP stream endpoint even for dual-scope users', function () {
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(AddMemberToSubject::class)->handle($institution, $admin, 'admin');
+
+    $token = $admin->createToken('mcp-member-only', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
+
+    $this->withToken($token)
+        ->get('/mcp/admin')
+        ->assertForbidden();
 });
 
 it('initializes and lists admin MCP tools over the HTTP endpoint', function () {

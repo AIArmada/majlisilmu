@@ -1,9 +1,13 @@
 <?php
 
+use App\Actions\Membership\AddMemberToSubject;
 use App\Models\Institution;
 use App\Models\User;
+use App\Support\Mcp\McpTokenManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -132,4 +136,92 @@ it('returns the updated account settings profile payload after saving', function
         ->and($user->timezone)->toBe('Asia/Kuala_Lumpur')
         ->and($user->daily_prayer_institution_id)->toBe($dailyInstitution->id)
         ->and($user->friday_prayer_institution_id)->toBe($fridayInstitution->id);
+});
+
+it('lists, creates, and revokes member MCP tokens through account settings', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'MCP Token Institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create([
+        'name' => 'MCP Token User',
+        'phone' => '+60112223344',
+        'phone_verified_at' => now(),
+    ]);
+
+    app(AddMemberToSubject::class)->handle($institution, $user, 'admin');
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.forms.account-settings'))
+        ->assertOk()
+        ->assertJsonPath('data.mcp_tokens_endpoint', route('api.client.account-settings.mcp-tokens.index'))
+        ->assertJsonPath('data.mcp_token_store_endpoint', route('api.client.account-settings.mcp-tokens.store'))
+        ->assertJsonPath('data.mcp_servers.member.endpoint', url('/mcp/member'));
+
+    $this->getJson(route('api.client.account-settings.mcp-tokens.index'))
+        ->assertOk()
+        ->assertJsonPath('data.tokens', []);
+
+    $createResponse = $this->postJson(route('api.client.account-settings.mcp-tokens.store'), [
+        'name' => 'VS Code Member MCP',
+        'server' => 'member',
+    ])->assertCreated();
+
+    $tokenId = $createResponse->json('data.token_meta.id');
+
+    expect($createResponse->json('data.token'))->toBeString()
+        ->and($createResponse->json('data.token_meta.server'))->toBe('member')
+        ->and($user->fresh()->tokens()->value('abilities'))->toBe([McpTokenManager::MEMBER_ABILITY]);
+
+    $this->getJson(route('api.client.account-settings.mcp-tokens.index'))
+        ->assertOk()
+        ->assertJsonPath('data.tokens.0.name', 'VS Code Member MCP')
+        ->assertJsonPath('data.tokens.0.server', 'member')
+        ->assertJsonPath('data.tokens.0.endpoint', url('/mcp/member'));
+
+    $this->deleteJson(route('api.client.account-settings.mcp-tokens.destroy', ['tokenId' => $tokenId]))
+        ->assertOk()
+        ->assertJsonPath('data.message', 'MCP token revoked successfully.');
+
+    expect($user->fresh()->tokens()->count())->toBe(0);
+});
+
+it('forbids MCP token management for authenticated users without MCP access', function () {
+    $user = User::factory()->create();
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.account-settings.mcp-tokens.index'))
+        ->assertForbidden();
+
+    $this->postJson(route('api.client.account-settings.mcp-tokens.store'), [
+        'name' => 'No Access MCP',
+        'server' => 'member',
+    ])->assertForbidden();
+});
+
+it('lists legacy wildcard MCP tokens as admin tokens for admin-capable users', function () {
+    if (! Role::query()->where('name', 'super_admin')->where('guard_name', 'web')->exists()) {
+        $role = new Role;
+        $role->forceFill([
+            'id' => (string) Str::uuid(),
+            'name' => 'super_admin',
+            'guard_name' => 'web',
+        ])->save();
+    }
+
+    $user = User::factory()->create();
+    $user->assignRole('super_admin');
+    $user->createToken('legacy-admin-mcp');
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.client.account-settings.mcp-tokens.index'))
+        ->assertOk()
+        ->assertJsonPath('data.tokens.0.name', 'legacy-admin-mcp')
+        ->assertJsonPath('data.tokens.0.server', 'admin')
+        ->assertJsonPath('data.tokens.0.endpoint', url('/mcp/admin'));
 });
