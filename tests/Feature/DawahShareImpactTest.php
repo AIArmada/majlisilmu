@@ -467,7 +467,7 @@ test('event registrations are attributed after a shared landing', function () {
     ]);
 });
 
-test('event saves and going actions are attributed through authenticated api actions', function (string $routeName, string $outcomeType) {
+test('event saves and going actions are attributed through authenticated api actions', function (string $routeName, string $outcomeType, string $method) {
     $visitor = User::factory()->create();
     $event = Event::factory()->create([
         'status' => 'approved',
@@ -494,11 +494,9 @@ test('event saves and going actions are attributed through authenticated api act
     $response = $this->withCredentials()
         ->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue());
 
-    if ($routeName === 'api.event-saves.store') {
+    if ($method === 'put') {
         $response
-            ->postJson(route($routeName), [
-                'event_id' => $event->id,
-            ])
+            ->putJson(route($routeName, $event))
             ->assertCreated();
     } else {
         $response
@@ -513,8 +511,8 @@ test('event saves and going actions are attributed through authenticated api act
         'metadata->subject_id' => $event->id,
     ]);
 })->with([
-    'event save' => ['api.event-saves.store', 'event_save'],
-    'event going' => ['api.events.going.store', 'event_going'],
+    'event save' => ['api.events.saved.update', 'event_save', 'put'],
+    'event going' => ['api.events.going.update', 'event_going', 'put'],
 ]);
 
 test('saved-search creation is attributed after a shared search landing', function () {
@@ -1010,9 +1008,7 @@ test('impact dashboard exposes provider channel performance', function () {
 
     $this->withCredentials()
         ->withCookie(config('dawah-share.cookie.name'), $cookie?->getValue())
-        ->postJson(route('api.event-saves.store'), [
-            'event_id' => $event->id,
-        ])
+        ->putJson(route('api.events.saved.update', $event))
         ->assertCreated();
 
     $attribution = AffiliateAttribution::query()->latest('created_at')->firstOrFail();

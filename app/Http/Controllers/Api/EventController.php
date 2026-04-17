@@ -2,7 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Events\ResolveEventCheckInStateAction;
+use App\Data\Api\Event\EventMeData;
 use App\Data\Api\Event\EventPayloadData;
+use App\Data\Api\EventCheckIn\EventCheckInStateData;
+use App\Data\Api\EventGoing\EventGoingStateData;
+use App\Data\Api\EventRegistration\EventRegistrationData;
+use App\Data\Api\EventRegistration\EventRegistrationStatusData;
+use App\Data\Api\EventSave\EventSaveStateData;
 use App\Data\Api\Frontend\Search\EventListData;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
@@ -11,6 +18,8 @@ use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\EventCheckin;
+use App\Models\Registration;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
 use App\Support\Api\ApiPagination;
@@ -21,6 +30,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -391,15 +401,7 @@ class EventController extends Controller
             'address.city',
         ];
 
-        $status = (string) $event->getRawOriginal('status');
-        $visibility = (string) $event->getRawOriginal('visibility');
-
-        abort_unless(
-            $event->is_active
-                && in_array($status, self::PUBLIC_STATUSES, true)
-                && $visibility === EventVisibility::Public->value,
-            404,
-        );
+        $this->abortUnlessPublicEvent($event);
 
         $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references']))
             ->allowedIncludes(...$allowedIncludes)
@@ -407,6 +409,65 @@ class EventController extends Controller
             ->firstOrFail();
 
         return response()->json(['data' => $this->serializeEventPayload($event)]);
+    }
+
+    #[Endpoint(
+        title: 'Get current user event state',
+        description: 'Returns the authenticated user\'s saved, going, registration, and check-in state for the target active public or unlisted event in one response.',
+    )]
+    public function me(Request $request, Event $event, ResolveEventCheckInStateAction $resolveEventCheckInStateAction): JsonResponse
+    {
+        $this->abortUnlessStateVisibleEvent($event);
+
+        $user = $this->currentUser($request);
+
+        $registration = Registration::query()
+            ->where('event_id', $event->getKey())
+            ->where('user_id', $user->getKey())
+            ->where('status', '!=', 'cancelled')
+            ->latest('created_at')
+            ->first();
+
+        $registrationData = $registration instanceof Registration
+            ? EventRegistrationData::fromModel($registration)
+            : null;
+
+        $checkInState = $resolveEventCheckInStateAction->handle($event->loadMissing('settings'), $user);
+
+        $isCheckedIn = EventCheckin::query()
+            ->where('event_id', $event->getKey())
+            ->where('user_id', $user->getKey())
+            ->exists();
+
+        $savesCount = (int) DB::table('event_saves')
+            ->where('event_id', $event->getKey())
+            ->count();
+
+        $isSaved = DB::table('event_saves')
+            ->where('user_id', $user->getKey())
+            ->where('event_id', $event->getKey())
+            ->exists();
+
+        $goingCount = (int) DB::table('event_attendees')
+            ->where('event_id', $event->getKey())
+            ->count();
+
+        $isGoing = DB::table('event_attendees')
+            ->where('user_id', $user->getKey())
+            ->where('event_id', $event->getKey())
+            ->exists();
+
+        return response()->json([
+            'data' => EventMeData::fromState(
+                saved: EventSaveStateData::fromState($isSaved, $savesCount),
+                going: EventGoingStateData::fromState($isGoing, $goingCount),
+                registration: EventRegistrationStatusData::fromNullableRegistration($registrationData),
+                checkIn: EventCheckInStateData::fromState($isCheckedIn, $checkInState),
+            )->toArray(),
+            'meta' => [
+                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
+            ],
+        ]);
     }
 
     /**
@@ -423,6 +484,41 @@ class EventController extends Controller
     private function serializeEventListPayload(Event $event): array
     {
         return EventListData::fromModel($event)->toArray();
+    }
+
+    private function abortUnlessPublicEvent(Event $event): void
+    {
+        $status = (string) $event->getRawOriginal('status');
+        $visibility = (string) $event->getRawOriginal('visibility');
+
+        abort_unless(
+            $event->is_active
+                && in_array($status, self::PUBLIC_STATUSES, true)
+                && $visibility === EventVisibility::Public->value,
+            404,
+        );
+    }
+
+    private function abortUnlessStateVisibleEvent(Event $event): void
+    {
+        $status = (string) $event->getRawOriginal('status');
+        $visibility = (string) $event->getRawOriginal('visibility');
+
+        abort_unless(
+            $event->is_active
+                && in_array($status, self::PUBLIC_STATUSES, true)
+                && in_array($visibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true),
+            404,
+        );
+    }
+
+    private function currentUser(Request $request): User
+    {
+        $user = $request->user();
+
+        abort_unless($user instanceof User, 403);
+
+        return $user;
     }
 
     private function parseDate(mixed $value, bool $endOfDay): ?Carbon

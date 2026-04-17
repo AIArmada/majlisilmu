@@ -23,15 +23,15 @@ it('returns check-in state and records a self-reported check-in for open events'
 
     Sanctum::actingAs($user);
 
-    $stateResponse = $this->getJson(route('api.events.check-in-state.show', $event));
+    $stateResponse = $this->getJson(route('api.events.me.show', $event));
 
     $stateResponse
         ->assertOk()
-        ->assertJsonPath('data.is_checked_in', false)
-        ->assertJsonPath('data.available', true)
-        ->assertJsonPath('data.reason', null)
-        ->assertJsonPath('data.method', 'self_reported')
-        ->assertJsonPath('data.registration_id', null)
+        ->assertJsonPath('data.check_in.is_checked_in', false)
+        ->assertJsonPath('data.check_in.available', true)
+        ->assertJsonPath('data.check_in.reason', null)
+        ->assertJsonPath('data.check_in.method', 'self_reported')
+        ->assertJsonPath('data.check_in.registration_id', null)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $storeResponse = $this->postJson(route('api.events.check-ins.store', $event));
@@ -77,10 +77,10 @@ it('requires registration before check-in when the event requires registration',
 
     Sanctum::actingAs($user);
 
-    $this->getJson(route('api.events.check-in-state.show', $event))
+    $this->getJson(route('api.events.me.show', $event))
         ->assertOk()
-        ->assertJsonPath('data.available', false)
-        ->assertJsonPath('data.reason', 'Majlis ini memerlukan pendaftaran sebelum check-in.');
+        ->assertJsonPath('data.check_in.available', false)
+        ->assertJsonPath('data.check_in.reason', 'Majlis ini memerlukan pendaftaran sebelum check-in.');
 
     $this->postJson(route('api.events.check-ins.store', $event))
         ->assertForbidden()
@@ -112,11 +112,11 @@ it('uses the registered check-in path when the user already has a registration',
 
     Sanctum::actingAs($user);
 
-    $this->getJson(route('api.events.check-in-state.show', $event))
+    $this->getJson(route('api.events.me.show', $event))
         ->assertOk()
-        ->assertJsonPath('data.available', true)
-        ->assertJsonPath('data.method', 'registered_self_checkin')
-        ->assertJsonPath('data.registration_id', $registration->id);
+        ->assertJsonPath('data.check_in.available', true)
+        ->assertJsonPath('data.check_in.method', 'registered_self_checkin')
+        ->assertJsonPath('data.check_in.registration_id', $registration->id);
 
     $this->postJson(route('api.events.check-ins.store', $event))
         ->assertCreated()

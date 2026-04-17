@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Events\RecordEventCheckInAction;
 use App\Actions\Events\ResolveEventCheckInStateAction;
 use App\Data\Api\EventCheckIn\EventCheckInData;
-use App\Data\Api\EventCheckIn\EventCheckInStateData;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\EventCheckin;
 use App\Models\User;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -16,31 +14,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
-#[Group('EventCheckIn', 'Authenticated event self-check-in endpoints for state discovery and check-in recording.')]
+#[Group('Event Check-In', 'Authenticated event self-check-in mutation endpoint. Current check-in availability and state are exposed via `GET /events/{event}/me`.')]
 class EventCheckInController extends Controller
 {
-    #[Endpoint(
-        title: 'Get event check-in state',
-        description: 'Returns whether the authenticated user can currently check in and whether they have already checked in.',
-    )]
-    public function show(Request $request, Event $event, ResolveEventCheckInStateAction $resolveEventCheckInStateAction): JsonResponse
-    {
-        $user = $this->currentUser($request);
-        $state = $resolveEventCheckInStateAction->handle($event->loadMissing('settings'), $user);
-
-        $isCheckedIn = EventCheckin::query()
-            ->where('event_id', $event->id)
-            ->where('user_id', $user->id)
-            ->exists();
-
-        return response()->json([
-            'data' => EventCheckInStateData::fromState($isCheckedIn, $state)->toArray(),
-            'meta' => [
-                'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
-            ],
-        ]);
-    }
-
     #[Endpoint(
         title: 'Record an event check-in',
         description: 'Records a self-check-in for the authenticated user when the current check-in state allows it.',

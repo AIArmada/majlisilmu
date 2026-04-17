@@ -15,13 +15,12 @@ beforeEach(function () {
 test('authenticated user can save an event', function () {
     Sanctum::actingAs($this->user);
 
-    $response = $this->postJson(route('api.event-saves.store'), [
-        'event_id' => $this->event->id,
-    ]);
+    $response = $this->putJson(route('api.events.saved.update', $this->event));
 
     $response->assertStatus(201)
         ->assertJsonPath('message', 'Event saved successfully.')
-        ->assertJsonPath('data.message', 'Event saved successfully.')
+        ->assertJsonPath('data.is_saved', true)
+        ->assertJsonPath('data.saves_count', 1)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $this->assertDatabaseHas('event_saves', [
@@ -31,40 +30,64 @@ test('authenticated user can save an event', function () {
 });
 
 test('unauthenticated user cannot save an event', function () {
-    $response = $this->postJson(route('api.event-saves.store'), [
-        'event_id' => $this->event->id,
-    ]);
+    $response = $this->putJson(route('api.events.saved.update', $this->event));
 
     $response->assertStatus(401);
 });
 
-test('cannot save the same event twice', function () {
+test('saving the same event twice is idempotent', function () {
     Sanctum::actingAs($this->user);
 
-    // Save first time
-    $this->postJson(route('api.event-saves.store'), ['event_id' => $this->event->id]);
+    $this->putJson(route('api.events.saved.update', $this->event));
 
-    // Save second time
-    $response = $this->postJson(route('api.event-saves.store'), [
-        'event_id' => $this->event->id,
+    $response = $this->putJson(route('api.events.saved.update', $this->event));
+
+    $response->assertOk()
+        ->assertJsonPath('message', 'Event already saved.')
+        ->assertJsonPath('data.is_saved', true)
+        ->assertJsonPath('data.saves_count', 1);
+});
+
+test('authenticated user can save a pending active public event', function () {
+    Sanctum::actingAs($this->user);
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+        'visibility' => 'public',
+        'is_active' => true,
     ]);
 
-    $response->assertStatus(409)
-        ->assertJsonPath('error.code', 'conflict');
+    $this->putJson(route('api.events.saved.update', $event))
+        ->assertCreated()
+        ->assertJsonPath('data.is_saved', true)
+        ->assertJsonPath('data.saves_count', 1);
+});
+
+test('inactive events cannot be saved through the api', function () {
+    Sanctum::actingAs($this->user);
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => false,
+    ]);
+
+    $this->putJson(route('api.events.saved.update', $event))
+        ->assertForbidden()
+        ->assertJsonPath('error.message', 'This event cannot be saved.');
 });
 
 test('authenticated user can unsave an event', function () {
     Sanctum::actingAs($this->user);
 
-    // Save first
-    $this->postJson(route('api.event-saves.store'), ['event_id' => $this->event->id]);
+    $this->putJson(route('api.events.saved.update', $this->event));
 
-    // Unsave
-    $response = $this->deleteJson(route('api.event-saves.destroy', $this->event->id));
+    $response = $this->deleteJson(route('api.events.saved.destroy', $this->event));
 
     $response->assertStatus(200)
-        ->assertJsonPath('message', 'Event unsaved successfully.')
-        ->assertJsonPath('data.message', 'Event unsaved successfully.')
+        ->assertJsonPath('message', 'Event save removed successfully.')
+        ->assertJsonPath('data.is_saved', false)
+        ->assertJsonPath('data.saves_count', 0)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $this->assertDatabaseMissing('event_saves', [
@@ -73,31 +96,32 @@ test('authenticated user can unsave an event', function () {
     ]);
 });
 
-test('cannot unsave an event that is not saved', function () {
+test('removing a save is idempotent even when it was not set', function () {
     Sanctum::actingAs($this->user);
 
-    $response = $this->deleteJson(route('api.event-saves.destroy', $this->event->id));
+    $response = $this->deleteJson(route('api.events.saved.destroy', $this->event));
 
-    $response->assertStatus(404)
-        ->assertJsonPath('error.code', 'not_found');
+    $response->assertOk()
+        ->assertJsonPath('message', 'Event was not saved.')
+        ->assertJsonPath('data.is_saved', false)
+        ->assertJsonPath('data.saves_count', 0);
 });
 
-test('can check if event is saved', function () {
+test('event me shows whether the event is saved', function () {
     Sanctum::actingAs($this->user);
 
-    // Initially not saved
-    $this->getJson(route('api.event-saves.show', $this->event->id))
+    $this->getJson(route('api.events.me.show', $this->event))
         ->assertOk()
-        ->assertJsonPath('data.is_saved', false)
+        ->assertJsonPath('data.saved.is_saved', false)
+        ->assertJsonPath('data.saved.saves_count', 0)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
-    // Save it
-    $this->postJson(route('api.event-saves.store'), ['event_id' => $this->event->id]);
+    $this->putJson(route('api.events.saved.update', $this->event));
 
-    // Now saved
-    $this->getJson(route('api.event-saves.show', $this->event->id))
+    $this->getJson(route('api.events.me.show', $this->event))
         ->assertOk()
-        ->assertJsonPath('data.is_saved', true)
+        ->assertJsonPath('data.saved.is_saved', true)
+        ->assertJsonPath('data.saved.saves_count', 1)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
@@ -106,9 +130,7 @@ test('saving an event recalculates stale saves_count from source rows', function
 
     $this->event->update(['saves_count' => 99]);
 
-    $response = $this->postJson(route('api.event-saves.store'), [
-        'event_id' => $this->event->id,
-    ]);
+    $response = $this->putJson(route('api.events.saved.update', $this->event));
 
     $response->assertStatus(201);
 
@@ -146,15 +168,23 @@ test('saved events index still includes cancelled events', function () {
     $cancelledEvent = Event::factory()->create([
         'status' => 'cancelled',
         'visibility' => 'public',
+        'is_active' => true,
         'starts_at' => now()->addDays(10),
+    ]);
+    $inactiveEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => false,
+        'starts_at' => now()->addDays(12),
     ]);
 
     $savedEvent->speakers()->attach($speaker->id);
 
     $this->user->savedEvents()->attach($savedEvent->id);
     $this->user->savedEvents()->attach($cancelledEvent->id);
+    $this->user->savedEvents()->attach($inactiveEvent->id);
 
-    $response = $this->getJson(route('api.event-saves.index'));
+    $response = $this->getJson(route('api.events.saved.index'));
 
     $response->assertOk()
         ->assertJsonPath('meta.pagination.total', 2)
@@ -175,6 +205,7 @@ test('saved events index still includes cancelled events', function () {
         ->assertJsonPath('data.0.speakers.0.pivot.event_id', $savedEvent->id)
         ->assertJsonPath('data.0.pivot.event_id', $savedEvent->id)
         ->assertJsonPath('data.0.pivot.user_id', $this->user->id)
+        ->assertJsonMissing(['id' => $inactiveEvent->id])
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
@@ -189,7 +220,7 @@ test('saved events index clamps per_page values to the supported maximum', funct
         $this->user->savedEvents()->attach($event->id);
     });
 
-    $this->getJson(route('api.event-saves.index', ['per_page' => 500]))
+    $this->getJson(route('api.events.saved.index', ['per_page' => 500]))
         ->assertOk()
         ->assertJsonPath('meta.pagination.per_page', 100)
         ->assertJsonCount(100, 'data');
@@ -209,7 +240,7 @@ test('saved events index keeps missing institution and venue relations as null',
 
     $this->user->savedEvents()->attach($event->id);
 
-    $this->getJson(route('api.event-saves.index'))
+    $this->getJson(route('api.events.saved.index'))
         ->assertOk()
         ->assertJsonPath('data.0.id', $event->id)
         ->assertJsonPath('data.0.institution', null)

@@ -23,11 +23,11 @@ beforeEach(function () {
 it('allows an authenticated user to mark going for an event', function () {
     Sanctum::actingAs($this->user);
 
-    $response = $this->postJson(route('api.events.going.store', $this->event));
+    $response = $this->putJson(route('api.events.going.update', $this->event));
 
     $response->assertCreated()
         ->assertJsonPath('message', 'Going recorded successfully.')
-        ->assertJsonPath('data.message', 'Going recorded successfully.')
+        ->assertJsonPath('data.is_going', true)
         ->assertJsonPath('data.going_count', 1)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
@@ -37,15 +37,15 @@ it('allows an authenticated user to mark going for an event', function () {
     ]);
 });
 
-it('returns current going state for the authenticated user', function () {
+it('event me returns current going state for the authenticated user', function () {
     Sanctum::actingAs($this->user);
 
-    $this->postJson(route('api.events.going.store', $this->event));
+    $this->putJson(route('api.events.going.update', $this->event));
 
-    $this->getJson(route('api.events.going.show', $this->event))
+    $this->getJson(route('api.events.me.show', $this->event))
         ->assertOk()
-        ->assertJsonPath('data.is_going', true)
-        ->assertJsonPath('data.going_count', 1)
+        ->assertJsonPath('data.going.is_going', true)
+        ->assertJsonPath('data.going.going_count', 1)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
@@ -78,14 +78,22 @@ it('lists the current users going events', function () {
         'title' => 'Going Event Two',
         'status' => 'cancelled',
         'visibility' => 'public',
+        'is_active' => true,
         'starts_at' => now()->addDays(2),
+    ]);
+    $inactive = Event::factory()->create([
+        'title' => 'Inactive Going Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => false,
+        'starts_at' => now()->addDays(4),
     ]);
 
     $first->speakers()->attach($speaker->id);
 
-    $this->user->goingEvents()->attach([$first->id, $second->id]);
+    $this->user->goingEvents()->attach([$first->id, $second->id, $inactive->id]);
 
-    $this->getJson(route('api.user.going-events.index'))
+    $this->getJson(route('api.events.going.index'))
         ->assertOk()
         ->assertJsonPath('meta.pagination.total', 2)
         ->assertJsonPath('data.0.id', $first->id)
@@ -105,18 +113,19 @@ it('lists the current users going events', function () {
         ->assertJsonPath('data.0.speakers.0.pivot.event_id', $first->id)
         ->assertJsonPath('data.0.pivot.event_id', $first->id)
         ->assertJsonPath('data.0.pivot.user_id', $this->user->id)
+        ->assertJsonMissing(['id' => $inactive->id])
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
 it('allows an authenticated user to remove a going record', function () {
     Sanctum::actingAs($this->user);
 
-    $this->postJson(route('api.events.going.store', $this->event));
+    $this->putJson(route('api.events.going.update', $this->event));
 
     $this->deleteJson(route('api.events.going.destroy', $this->event))
         ->assertOk()
         ->assertJsonPath('message', 'Going removed successfully.')
-        ->assertJsonPath('data.message', 'Going removed successfully.')
+        ->assertJsonPath('data.is_going', false)
         ->assertJsonPath('data.going_count', 0)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
@@ -131,7 +140,7 @@ it('recalculates stale going_count from source rows when marking going', functio
 
     $this->event->update(['going_count' => 17]);
 
-    $this->postJson(route('api.events.going.store', $this->event))
+    $this->putJson(route('api.events.going.update', $this->event))
         ->assertCreated()
         ->assertJsonPath('data.going_count', 1);
 
@@ -147,10 +156,25 @@ it('rejects marking going for past events', function () {
         'starts_at' => now()->subDay(),
     ]);
 
-    $this->postJson(route('api.events.going.store', $pastEvent))
+    $this->putJson(route('api.events.going.update', $pastEvent))
         ->assertForbidden()
         ->assertJsonPath('error.message', 'Cannot mark going for past events.');
 
+});
+
+it('rejects marking going for inactive events', function () {
+    Sanctum::actingAs($this->user);
+
+    $inactiveEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => false,
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $this->putJson(route('api.events.going.update', $inactiveEvent))
+        ->assertForbidden()
+        ->assertJsonPath('error.message', 'This event cannot be marked as going.');
 });
 
 it('keeps missing institution and venue relations as null in the going events list', function () {
@@ -167,21 +191,22 @@ it('keeps missing institution and venue relations as null in the going events li
 
     $this->user->goingEvents()->attach($event->id);
 
-    $this->getJson(route('api.user.going-events.index'))
+    $this->getJson(route('api.events.going.index'))
         ->assertOk()
         ->assertJsonPath('data.0.id', $event->id)
         ->assertJsonPath('data.0.institution', null)
         ->assertJsonPath('data.0.venue', null);
 });
 
-it('returns a conflict response when the user already marked going', function () {
+it('marking going twice is idempotent', function () {
     Sanctum::actingAs($this->user);
 
-    $this->postJson(route('api.events.going.store', $this->event))
+    $this->putJson(route('api.events.going.update', $this->event))
         ->assertCreated();
 
-    $this->postJson(route('api.events.going.store', $this->event))
-        ->assertConflict()
-        ->assertJsonPath('error.code', 'conflict')
-        ->assertJsonPath('error.message', 'You have already marked going for this event.');
+    $this->putJson(route('api.events.going.update', $this->event))
+        ->assertOk()
+        ->assertJsonPath('message', 'Event already marked as going.')
+        ->assertJsonPath('data.is_going', true)
+        ->assertJsonPath('data.going_count', 1);
 });

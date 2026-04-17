@@ -178,19 +178,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/user', CurrentUserController::class)->name('api.user.show');
     Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
         ->name('api.user.registrations.index');
-    Route::get('/user/going-events', [EventGoingController::class, 'index'])
-        ->name('api.user.going-events.index');
+    Route::get('/me/events/going', [EventGoingController::class, 'index'])
+        ->name('api.events.going.index');
+    Route::get('/me/events/saved', [EventSaveController::class, 'index'])
+        ->name('api.events.saved.index');
 
-    Route::get('/events/{event}/registration-status', [EventRegistrationController::class, 'status'])
-        ->name('api.events.registrations.status');
-    Route::get('/events/{event}/check-in-state', [EventCheckInController::class, 'show'])
-        ->name('api.events.check-in-state.show');
+    Route::get('/events/{event}/me', [EventController::class, 'me'])
+        ->name('api.events.me.show');
     Route::post('/events/{event}/check-ins', [EventCheckInController::class, 'store'])
         ->name('api.events.check-ins.store');
-    Route::get('/events/{event}/going', [EventGoingController::class, 'show'])
-        ->name('api.events.going.show');
-    Route::post('/events/{event}/going', [EventGoingController::class, 'store'])
-        ->name('api.events.going.store');
+    Route::put('/events/{event}/going', [EventGoingController::class, 'store'])
+        ->name('api.events.going.update');
     Route::delete('/events/{event}/going', [EventGoingController::class, 'destroy'])
         ->name('api.events.going.destroy');
 
@@ -202,10 +200,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->name('api.saved-searches.execute');
 
     // Event Saves / Bookmarks (per documentation B5)
-    Route::get('/event-saves', [EventSaveController::class, 'index'])->name('api.event-saves.index');
-    Route::post('/event-saves', [EventSaveController::class, 'store'])->name('api.event-saves.store');
-    Route::get('/event-saves/{eventId}', [EventSaveController::class, 'show'])->name('api.event-saves.show');
-    Route::delete('/event-saves/{eventId}', [EventSaveController::class, 'destroy'])->name('api.event-saves.destroy');
+    Route::put('/events/{event}/saved', [EventSaveController::class, 'store'])->name('api.events.saved.update');
+    Route::delete('/events/{event}/saved', [EventSaveController::class, 'destroy'])->name('api.events.saved.destroy');
 
     // Registration Exports (per documentation B9d)
     Route::get('/events/{event}/registrations/export', [RegistrationExportController::class, 'export'])

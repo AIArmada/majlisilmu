@@ -65,6 +65,29 @@
 - [ ] Add focused regressions for docs stability and lean event list payloads
 - [ ] Re-run formatting and focused verification
 
+# Event API Native Cutover
+
+- [x] Replace fragmented authenticated event state endpoints with a single `/events/{event}/me` contract
+- [x] Move saved and going collections to `/me/events/*` and make event save/going mutations idempotent
+- [x] Refresh the mobile reference, technical docs, and Scramble assertions for the new contract
+- [x] Re-run focused formatting, API tests, and docs verification
+
+## Review
+
+- Replaced the old authenticated event fan-out contract with a single [app/Http/Controllers/Api/EventController.php](app/Http/Controllers/Api/EventController.php) `me()` endpoint at `GET /api/v1/events/{event}/me`, returning saved, going, registration, and check-in state in one payload for native clients.
+- Removed the legacy saved-event and per-feature state reads from the authenticated API surface: saved events now live at `GET /api/v1/me/events/saved`, going events at `GET /api/v1/me/events/going`, event saves use `PUT/DELETE /api/v1/events/{event}/saved`, and going uses `PUT/DELETE /api/v1/events/{event}/going` with idempotent write semantics.
+- Updated [app/Http/Controllers/Api/EventSaveController.php](app/Http/Controllers/Api/EventSaveController.php), [app/Http/Controllers/Api/EventGoingController.php](app/Http/Controllers/Api/EventGoingController.php), [app/Http/Controllers/Api/EventRegistrationController.php](app/Http/Controllers/Api/EventRegistrationController.php), [app/Http/Controllers/Api/EventCheckInController.php](app/Http/Controllers/Api/EventCheckInController.php), and the new [app/Data/Api/Event/EventMeData.php](app/Data/Api/Event/EventMeData.php) payload to reflect the cutover.
+- Refreshed [docs/MAJLISILMU_MOBILE_API_REFERENCE.md](docs/MAJLISILMU_MOBILE_API_REFERENCE.md), [docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md](docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md), and [tests/Feature/ScrambleDocsTest.php](tests/Feature/ScrambleDocsTest.php) so the checked-in and generated API docs now describe the new native-client contract.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - Focused `phpstan analyse` on the touched event API files => pass
+  - `vendor/bin/pest --parallel tests/Feature/Api/EventSaveTest.php` => 10 passed
+  - `vendor/bin/pest --parallel tests/Feature/Api/EventGoingApiTest.php` => 8 passed
+  - `vendor/bin/pest --parallel tests/Feature/Api/EventRegistrationApiTest.php` => 5 passed
+  - `vendor/bin/pest --parallel tests/Feature/Api/EventCheckInApiTest.php` => 4 passed
+  - `vendor/bin/pest --parallel tests/Feature/DawahShareImpactTest.php` => 32 passed
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php` => 24 passed
+
 # Homepage Date Filter Alignment
 
 - [x] Audit the homepage day-count and `/majlis?date=...` flows against the timezone-aware API behavior
