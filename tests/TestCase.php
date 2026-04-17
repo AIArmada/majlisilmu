@@ -11,4 +11,11 @@ abstract class TestCase extends BaseTestCase
     public $service;
 
     public $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
 }
