@@ -81,7 +81,7 @@ class ContributionController extends FrontendController
         description: 'Creates a new public institution contribution request. '
             .'The proposer is not automatically added as an institution owner, admin, editor, or member; they only receive review outcome notifications. '
             .'Duplicate institutions are rejected when the normalized name and locality match an existing institution. '
-            .'Institution payloads must include an explicit address country via `address.country_id`, `address.country_code`, or `address.country_key`. '
+            .'Institution payloads must include an explicit address country via `address.country_id`. '
             .'Fetch `GET /forms/contributions/institutions` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeInstitution(
@@ -98,9 +98,7 @@ class ContributionController extends FrontendController
             'nickname' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable'],
             'address' => ['present', 'array'],
-            'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
-            'address.country_code' => ['nullable', 'string', 'size:2'],
-            'address.country_key' => ['nullable', 'string', 'max:255'],
+            'address.country_id' => ['required', 'integer', 'exists:countries,id'],
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
             'address.subdistrict_id' => ['nullable', 'integer'],
@@ -161,7 +159,7 @@ class ContributionController extends FrontendController
         title: 'Create a speaker contribution',
         description: 'Creates a new public speaker contribution request using a region-level address payload plus an explicit country selection. '
             .'The payload may also set one affiliated institution and an optional position label. '
-            .'Clients may send `address.country_id`, `address.country_code`, or `address.country_key`, but must not send detailed street or map keys here. '
+            .'Clients must send `address.country_id`, but must not send detailed street or map keys here. '
             .'Duplicate speakers are rejected when the normalized name, gender, title set, and country match an existing speaker. '
             .'Fetch `GET /forms/contributions/speakers` first to discover required fields, defaults, media support, and conditional rules.',
     )]
@@ -188,9 +186,7 @@ class ContributionController extends FrontendController
             'institution_id' => ['nullable', 'uuid', 'exists:institutions,id'],
             'institution_position' => ['nullable', 'string', 'max:255'],
             'address' => ['required', 'array'],
-            'address.country_id' => ['nullable', 'integer', 'exists:countries,id'],
-            'address.country_code' => ['nullable', 'string', 'size:2'],
-            'address.country_key' => ['nullable', 'string', 'max:255'],
+            'address.country_id' => ['required', 'integer', 'exists:countries,id'],
             'address.state_id' => ['nullable', 'integer'],
             'address.district_id' => ['nullable', 'integer'],
             'address.subdistrict_id' => ['nullable', 'integer'],

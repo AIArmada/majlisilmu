@@ -189,9 +189,7 @@ class AdminResourceRegistry
             return $routeBoundRecord;
         }
 
-        return $this->queryFor($resourceClass)
-            ->whereKey($recordKey)
-            ->firstOrFail();
+        abort(404);
     }
 
     /**

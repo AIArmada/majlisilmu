@@ -28,7 +28,7 @@ beforeEach(function () {
 });
 
 it('ignores the legacy public_market cookie when resolving the selected country', function () {
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set(LEGACY_PUBLIC_MARKET_COOKIE, 'indonesia');
 
     $preference = app(PublicCountryPreference::class);
@@ -38,7 +38,7 @@ it('ignores the legacy public_market cookie when resolving the selected country'
 });
 
 it('ignores the legacy public_market session key when a current country cookie is available', function () {
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->setLaravelSession(app('session')->driver());
     $request->session()->put('public_market', 'indonesia');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'malaysia');
@@ -64,7 +64,7 @@ it('ignores the legacy public_market cookie so country inference can still use t
     app()->forgetInstance(PublicCountryRegistry::class);
     app()->forgetInstance(PublicCountryPreference::class);
 
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set(LEGACY_PUBLIC_MARKET_COOKIE, 'malaysia');
     $request->cookies->set('user_timezone', 'Asia/Singapore');
     $request->headers->set('CF-IPCountry', 'SG');

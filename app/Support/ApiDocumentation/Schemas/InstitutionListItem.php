@@ -10,7 +10,7 @@ use Illuminate\Contracts\Support\Arrayable;
 /**
  * @phpstan-import-type CountryArray from Country
  *
- * @phpstan-type InstitutionListItemArray array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, event_count: int, public_image_url: string, image_url: string, logo_url: string, cover_url: ?string, country: CountryArray|null, location: ?string, location_text: ?string, is_following: bool}
+ * @phpstan-type InstitutionListItemArray array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, public_image_url: string, logo_url: string, cover_url: ?string, country: CountryArray|null, location: ?string, distance_km: ?float, is_following: bool}
  *
  * @implements Arrayable<string, mixed>
  */
@@ -24,14 +24,12 @@ final readonly class InstitutionListItem implements Arrayable
         public ?string $nickname,
         public string $display_name,
         public int $events_count,
-        public int $event_count,
         public string $public_image_url,
-        public string $image_url,
         public string $logo_url,
         public ?string $cover_url,
         public ?Country $country,
         public ?string $location,
-        public ?string $location_text,
+        public ?float $distance_km,
         public bool $is_following,
     ) {}
 
@@ -45,14 +43,12 @@ final readonly class InstitutionListItem implements Arrayable
             'nickname' => $this->nickname,
             'display_name' => $this->display_name,
             'events_count' => $this->events_count,
-            'event_count' => $this->event_count,
             'public_image_url' => $this->public_image_url,
-            'image_url' => $this->image_url,
             'logo_url' => $this->logo_url,
             'cover_url' => $this->cover_url,
             'country' => $this->country?->toArray(),
             'location' => $this->location,
-            'location_text' => $this->location_text,
+            'distance_km' => $this->distance_km,
             'is_following' => $this->is_following,
         ];
     }

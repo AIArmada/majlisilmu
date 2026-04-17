@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Admin;
 
 use App\Models\User;
+use App\Support\Mcp\McpAuthenticatedUserResolver;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -29,7 +30,7 @@ abstract class AbstractAdminTool extends Tool
 
     protected function authorizeAdmin(Request $request): User
     {
-        $user = $request->user();
+        $user = app(McpAuthenticatedUserResolver::class)->resolve($request->user());
 
         abort_unless($user instanceof User && $user->hasApplicationAdminAccess(), 403);
 

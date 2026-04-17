@@ -67,7 +67,7 @@ AI QUICKSTART:
 3. For public and client workflows, discover the live contract at {$publicManifestUrl}.
 4. For admin workflows, discover writable resources at {$adminManifestUrl}.
 5. Before any write, fetch the exact schema first: `GET /forms/*` on the public surface, or `GET /admin/{resourceKey}/schema` on the admin surface.
-6. For admin record-specific schema and mutation paths, use the admin record `route_key` returned by collection or record endpoints. The legacy `id` remains accepted as a compatibility fallback.
+6. For admin record-specific schema and mutation paths, use the admin record `route_key` returned by collection or record endpoints.
 7. Treat `error.code` as the machine-readable failure type and `meta.request_id` as the trace identifier.
 MD;
     }

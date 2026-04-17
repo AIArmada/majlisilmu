@@ -29,7 +29,7 @@ beforeEach(function () {
 it('registers media conversions for Event model', function () {
     $event = Event::factory()->create();
 
-    $event->addMedia(UploadedFile::fake()->image('poster.jpg', 1200, 800))
+    $event->addMedia(fakeGeneratedImageUpload('poster.png', 1200, 800))
         ->toMediaCollection('poster');
 
     $media = $event->getFirstMedia('poster');
@@ -46,7 +46,7 @@ it('registers media conversions for Event model', function () {
 it('detects portrait poster orientation', function () {
     $event = Event::factory()->create();
 
-    $event->addMedia(UploadedFile::fake()->image('poster-portrait.jpg', 800, 1200))
+    $event->addMedia(fakeGeneratedImageUpload('poster-portrait.png', 800, 1200))
         ->toMediaCollection('poster');
 
     expect($event->poster_orientation)->toBe('portrait');
@@ -55,7 +55,7 @@ it('detects portrait poster orientation', function () {
 it('detects landscape poster orientation', function () {
     $event = Event::factory()->create();
 
-    $event->addMedia(UploadedFile::fake()->image('poster-landscape.jpg', 1200, 800))
+    $event->addMedia(fakeGeneratedImageUpload('poster-landscape.png', 1200, 800))
         ->toMediaCollection('poster');
 
     expect($event->poster_orientation)->toBe('landscape');
@@ -63,15 +63,15 @@ it('detects landscape poster orientation', function () {
 
 it('maps poster display aspect ratios to the closest supported event ratios', function () {
     $portraitEvent = Event::factory()->create();
-    $portraitEvent->addMedia(UploadedFile::fake()->image('poster-portrait.jpg', 800, 1200))
+    $portraitEvent->addMedia(fakeGeneratedImageUpload('poster-portrait.png', 800, 1200))
         ->toMediaCollection('poster');
 
     $standardLandscapeEvent = Event::factory()->create();
-    $standardLandscapeEvent->addMedia(UploadedFile::fake()->image('poster-standard.jpg', 1200, 800))
+    $standardLandscapeEvent->addMedia(fakeGeneratedImageUpload('poster-standard.png', 1200, 800))
         ->toMediaCollection('poster');
 
     $wideLandscapeEvent = Event::factory()->create();
-    $wideLandscapeEvent->addMedia(UploadedFile::fake()->image('poster-wide.jpg', 1600, 900))
+    $wideLandscapeEvent->addMedia(fakeGeneratedImageUpload('poster-wide.png', 1600, 900))
         ->toMediaCollection('poster');
 
     expect($portraitEvent->poster_display_aspect_ratio)->toBe('4:5')
@@ -81,7 +81,7 @@ it('maps poster display aspect ratios to the closest supported event ratios', fu
 
 it('backfills missing poster dimensions after resolving the display aspect ratio', function () {
     $event = Event::factory()->create();
-    $event->addMedia(UploadedFile::fake()->image('poster-wide.jpg', 1600, 900))
+    $event->addMedia(fakeGeneratedImageUpload('poster-wide.png', 1600, 900))
         ->toMediaCollection('poster');
 
     $posterMedia = $event->getFirstMedia('poster');
@@ -124,7 +124,7 @@ it('returns fallback URL when Event has no poster', function () {
 it('uses thumb conversion in Event card_image_url accessor', function () {
     $event = Event::factory()->create();
 
-    $event->addMedia(UploadedFile::fake()->image('poster.jpg', 1200, 800))
+    $event->addMedia(fakeGeneratedImageUpload('poster.png', 1200, 800))
         ->toMediaCollection('poster');
 
     $cardUrl = $event->card_image_url;
@@ -134,7 +134,7 @@ it('uses thumb conversion in Event card_image_url accessor', function () {
 
 it('uses institution logo when Event has no poster', function () {
     $institution = Institution::factory()->create();
-    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+    $institution->addMedia(fakeGeneratedImageUpload('logo.png', 400, 400))
         ->toMediaCollection('logo');
 
     $event = Event::factory()->for($institution)->create();
@@ -157,7 +157,7 @@ it('falls back to placeholder in Event card_image_url when no media exists', fun
 it('registers media conversions for Institution model', function () {
     $institution = Institution::factory()->create();
 
-    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+    $institution->addMedia(fakeGeneratedImageUpload('logo.png', 400, 400))
         ->toMediaCollection('logo');
 
     $media = $institution->getFirstMedia('logo');
@@ -184,7 +184,7 @@ it('rejects non-image files for Institution logo', function () {
 it('registers media conversions for Institution gallery collection', function () {
     $institution = Institution::factory()->create();
 
-    $institution->addMedia(UploadedFile::fake()->image('gallery.jpg', 1200, 800))
+    $institution->addMedia(fakeGeneratedImageUpload('gallery.png', 1200, 800))
         ->toMediaCollection('gallery');
 
     $media = $institution->getFirstMedia('gallery');
@@ -196,7 +196,7 @@ it('registers media conversions for Institution gallery collection', function ()
 it('uses the institution logo as the public image when no cover exists', function () {
     $institution = Institution::factory()->create();
 
-    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+    $institution->addMedia(fakeGeneratedImageUpload('logo.png', 400, 400))
         ->toMediaCollection('logo');
 
     expect($institution->public_cover_url)->toBe('')
@@ -210,7 +210,7 @@ it('bumps the institution public image version when logo media is updated', func
 
     $institution = Institution::factory()->create();
 
-    $institution->addMedia(UploadedFile::fake()->image('logo.png', 400, 400))
+    $institution->addMedia(fakeGeneratedImageUpload('logo.png', 400, 400))
         ->toMediaCollection('logo');
 
     $initialUrl = $institution->fresh()->public_image_url;
@@ -235,7 +235,7 @@ it('bumps the institution public image version when logo media is updated', func
 it('registers media conversions for Speaker model', function () {
     $speaker = Speaker::factory()->create();
 
-    $speaker->addMedia(UploadedFile::fake()->image('avatar.jpg', 500, 500))
+    $speaker->addMedia(fakeGeneratedImageUpload('avatar.png', 500, 500))
         ->toMediaCollection('avatar');
 
     $media = $speaker->getFirstMedia('avatar');
@@ -248,9 +248,9 @@ it('registers media conversions for Speaker model', function () {
 it('registers media conversions for Speaker cover and gallery collections', function () {
     $speaker = Speaker::factory()->create();
 
-    $speaker->addMedia(UploadedFile::fake()->image('cover.png', 100, 100))
+    $speaker->addMedia(fakeGeneratedImageUpload('cover.png', 100, 100))
         ->toMediaCollection('cover');
-    $speaker->addMedia(UploadedFile::fake()->image('gallery.png', 100, 100))
+    $speaker->addMedia(fakeGeneratedImageUpload('gallery.png', 100, 100))
         ->toMediaCollection('gallery');
 
     $coverMedia = $speaker->getFirstMedia('cover');
@@ -273,7 +273,7 @@ it('returns fallback URL when Speaker has no avatar', function () {
 it('returns avatar_url using thumb conversion when media exists', function () {
     $speaker = Speaker::factory()->create();
 
-    $speaker->addMedia(UploadedFile::fake()->image('avatar.jpg', 500, 500))
+    $speaker->addMedia(fakeGeneratedImageUpload('avatar.png', 500, 500))
         ->toMediaCollection('avatar');
 
     $avatarUrl = $speaker->avatar_url;
@@ -285,7 +285,7 @@ it('returns avatar_url using thumb conversion when media exists', function () {
 it('returns public_avatar_url using the higher-resolution profile conversion when media exists', function () {
     $speaker = Speaker::factory()->create();
 
-    $speaker->addMedia(UploadedFile::fake()->image('avatar.jpg', 500, 500))
+    $speaker->addMedia(fakeGeneratedImageUpload('avatar.png', 500, 500))
         ->toMediaCollection('avatar');
 
     $publicAvatarUrl = $speaker->public_avatar_url;
@@ -302,7 +302,7 @@ it('returns public_avatar_url using the higher-resolution profile conversion whe
 it('registers media conversions for Venue model', function () {
     $venue = Venue::factory()->create();
 
-    $venue->addMedia(UploadedFile::fake()->image('cover.jpg', 1200, 800))
+    $venue->addMedia(fakeGeneratedImageUpload('cover.png', 1200, 800))
         ->toMediaCollection('cover');
 
     $media = $venue->getFirstMedia('cover');
@@ -327,7 +327,7 @@ it('returns fallback URL when Venue has no cover image', function () {
 it('registers media conversions for Series model', function () {
     $series = Series::factory()->create();
 
-    $series->addMedia(UploadedFile::fake()->image('cover.jpg', 800, 500))
+    $series->addMedia(fakeGeneratedImageUpload('cover.png', 800, 500))
         ->toMediaCollection('cover');
 
     $media = $series->getFirstMedia('cover');
@@ -343,7 +343,7 @@ it('registers media conversions for Series model', function () {
 it('registers media conversions for Reference model', function () {
     $reference = Reference::factory()->create();
 
-    $reference->addMedia(UploadedFile::fake()->image('book-cover.jpg', 400, 560))
+    $reference->addMedia(fakeGeneratedImageUpload('book-cover.png', 400, 560))
         ->toMediaCollection('front_cover');
 
     $media = $reference->getFirstMedia('front_cover');
@@ -359,7 +359,7 @@ it('registers media conversions for Reference model', function () {
 it('registers media conversions for Report model', function () {
     $report = Report::factory()->create();
 
-    $report->addMedia(UploadedFile::fake()->image('evidence.jpg', 800, 600))
+    $report->addMedia(fakeGeneratedImageUpload('evidence.png', 800, 600))
         ->toMediaCollection('evidence');
 
     $media = $report->getFirstMedia('evidence');
@@ -371,7 +371,7 @@ it('registers media conversions for Report model', function () {
 it('registers media conversions for MembershipClaim model', function () {
     $claim = MembershipClaim::factory()->create();
 
-    $claim->addMedia(UploadedFile::fake()->image('claim-evidence.jpg', 800, 600))
+    $claim->addMedia(fakeGeneratedImageUpload('claim-evidence.png', 800, 600))
         ->toMediaCollection('evidence');
 
     $media = $claim->getFirstMedia('evidence');
@@ -401,7 +401,7 @@ it('accepts PDF files for Report evidence', function () {
 it('registers media conversions for DonationChannel model', function () {
     $channel = DonationChannel::factory()->create();
 
-    $channel->addMedia(UploadedFile::fake()->image('qr.png', 300, 300))
+    $channel->addMedia(fakeGeneratedImageUpload('qr.png', 300, 300))
         ->toMediaCollection('qr');
 
     $media = $channel->getFirstMedia('qr');

@@ -23,9 +23,6 @@ final class ApiJsonResponseNormalizer
         }
 
         $payload = $this->normalizeErrorPayload($payload, $response->getStatusCode());
-        $payload = $this->liftNestedDataMessage($payload);
-        $payload = $this->normalizeTopLevelPagination($payload);
-        $payload = $this->normalizeMetaPagination($payload);
         $payload = $this->appendRequestId($payload, $request);
 
         $response->setData($payload);
@@ -42,9 +39,7 @@ final class ApiJsonResponseNormalizer
             || array_key_exists('message', $payload)
             || array_key_exists('error', $payload)
             || array_key_exists('errors', $payload)
-            || array_key_exists('meta', $payload)
-            || $this->hasPaginationKeys($payload)
-            || $this->hasPaginationKeys($this->meta($payload));
+            || array_key_exists('meta', $payload);
     }
 
     /**
@@ -76,78 +71,6 @@ final class ApiJsonResponseNormalizer
 
         $payload['message'] = $message;
         $payload['error'] = $error;
-
-        return $payload;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function liftNestedDataMessage(array $payload): array
-    {
-        if (! is_array($payload['data'] ?? null) || ! array_key_exists('message', $payload['data'])) {
-            return $payload;
-        }
-
-        $message = $payload['data']['message'];
-
-        if (! is_string($message) || trim($message) === '') {
-            return $payload;
-        }
-
-        if (! is_string($payload['message'] ?? null) || trim($payload['message']) === '') {
-            $payload['message'] = $message;
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function normalizeTopLevelPagination(array $payload): array
-    {
-        if (! $this->hasPaginationKeys($payload)) {
-            return $payload;
-        }
-
-        $meta = $this->meta($payload);
-        $meta['pagination'] = $this->paginationData($payload);
-
-        $links = $this->linkData($payload);
-
-        if ($links !== []) {
-            $meta['links'] = $links;
-        }
-
-        $payload['meta'] = $meta;
-
-        return $payload;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function normalizeMetaPagination(array $payload): array
-    {
-        $meta = $this->meta($payload);
-
-        if (! $this->hasPaginationKeys($meta)) {
-            return $payload;
-        }
-
-        $meta['pagination'] = $this->paginationData($meta);
-
-        $links = $this->linkData($meta);
-
-        if ($links !== []) {
-            $meta['links'] = array_merge(is_array($meta['links'] ?? null) ? $meta['links'] : [], $links);
-        }
-
-        $payload['meta'] = $meta;
 
         return $payload;
     }
@@ -189,46 +112,5 @@ final class ApiJsonResponseNormalizer
         }
 
         return ApiResponseFactory::messageForStatus($status);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function hasPaginationKeys(array $payload): bool
-    {
-        return array_key_exists('current_page', $payload)
-            || array_key_exists('last_page', $payload)
-            || array_key_exists('per_page', $payload)
-            || array_key_exists('total', $payload);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, int|null>
-     */
-    private function paginationData(array $payload): array
-    {
-        return array_filter([
-            'page' => is_numeric($payload['current_page'] ?? null) ? (int) $payload['current_page'] : null,
-            'per_page' => is_numeric($payload['per_page'] ?? null) ? (int) $payload['per_page'] : null,
-            'total' => is_numeric($payload['total'] ?? null) ? (int) $payload['total'] : null,
-            'last_page' => is_numeric($payload['last_page'] ?? null) ? (int) $payload['last_page'] : null,
-            'from' => is_numeric($payload['from'] ?? null) ? (int) $payload['from'] : null,
-            'to' => is_numeric($payload['to'] ?? null) ? (int) $payload['to'] : null,
-        ], static fn (mixed $value): bool => $value !== null);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, string>
-     */
-    private function linkData(array $payload): array
-    {
-        return array_filter([
-            'first' => is_string($payload['first_page_url'] ?? null) && $payload['first_page_url'] !== '' ? $payload['first_page_url'] : null,
-            'last' => is_string($payload['last_page_url'] ?? null) && $payload['last_page_url'] !== '' ? $payload['last_page_url'] : null,
-            'prev' => is_string($payload['prev_page_url'] ?? null) && $payload['prev_page_url'] !== '' ? $payload['prev_page_url'] : null,
-            'next' => is_string($payload['next_page_url'] ?? null) && $payload['next_page_url'] !== '' ? $payload['next_page_url'] : null,
-        ], static fn (mixed $value): bool => $value !== null);
     }
 }

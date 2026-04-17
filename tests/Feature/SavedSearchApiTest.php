@@ -42,7 +42,7 @@ describe('Saved Search API Endpoints', function () {
                     'name' => 'Kuliah Maghrib',
                     'query' => 'maghrib',
                     'filters' => [
-                        'language' => 'malay',
+                        'language_codes' => ['ms'],
                         'key_person_roles' => [EventKeyPersonRole::Imam->value],
                         'imam_ids' => [$imamSpeaker->id],
                     ],
@@ -58,6 +58,19 @@ describe('Saved Search API Endpoints', function () {
                     'user_id' => $this->user->id,
                     'name' => 'Kuliah Maghrib',
                 ]);
+            });
+
+            it('rejects the legacy singular language filter key', function () {
+                $response = $this->postJson('/api/v1/saved-searches', [
+                    'name' => 'Legacy Language Search',
+                    'filters' => [
+                        'language' => 'malay',
+                    ],
+                    'notify' => 'daily',
+                ]);
+
+                $response->assertUnprocessable()
+                    ->assertJsonValidationErrors(['filters']);
             });
 
             it('validates required fields', function () {
@@ -227,7 +240,7 @@ describe('Saved Search API Endpoints', function () {
                 $search = SavedSearch::factory()->create([
                     'user_id' => $this->user->id,
                     'query' => 'test',
-                    'filters' => ['language' => 'malay'],
+                    'filters' => ['language_codes' => ['ms']],
                 ]);
 
                 $response = $this->postJson("/api/v1/saved-searches/{$search->id}/execute");

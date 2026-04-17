@@ -244,7 +244,7 @@ it('records signals events for api and saved search executions', function () {
     $savedSearch = SavedSearch::factory()->create([
         'user_id' => $user->id,
         'query' => 'Signals',
-        'filters' => ['language' => 'malay'],
+        'filters' => ['language_codes' => ['ms']],
     ]);
 
     $this->getJson('/api/v1/events?filter[search]=Signals')
@@ -296,7 +296,7 @@ it('does not break search execution when signals ingestion fails', function () {
     $savedSearch = SavedSearch::factory()->create([
         'user_id' => $user->id,
         'query' => 'Signals',
-        'filters' => ['language' => 'malay'],
+        'filters' => ['language_codes' => ['ms']],
     ]);
 
     $this->getJson('/api/v1/events?filter[search]=Signals')

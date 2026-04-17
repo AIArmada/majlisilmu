@@ -49,7 +49,7 @@ class ManifestController extends FrontendController
         title: 'Get institution contribution field contract',
         description: 'Returns the canonical field contract for authenticated public institution creation. '
             .'Use this before calling `POST /contributions/institutions`. '
-            .'Institution create requires an explicit address country and accepts `address.country_id`, `address.country_code`, or `address.country_key`.',
+            .'Institution create requires an explicit address country via `address.country_id`.',
     )]
     public function submitInstitution(): JsonResponse
     {
@@ -62,7 +62,7 @@ class ManifestController extends FrontendController
         title: 'Get speaker contribution field contract',
         description: 'Returns the canonical field contract for authenticated public speaker creation. '
             .'Use this before calling `POST /contributions/speakers`. '
-            .'Speaker create requires an explicit address country and accepts `address.country_id`, `address.country_code`, or `address.country_key`. '
+            .'Speaker create requires an explicit address country via `address.country_id`. '
             .'Detailed street and map fields remain unsupported on this public speaker flow.',
     )]
     public function submitSpeaker(): JsonResponse

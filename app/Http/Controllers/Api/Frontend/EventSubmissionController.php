@@ -33,7 +33,7 @@ class EventSubmissionController extends FrontendController
         title: 'Submit a public event',
         description: 'Creates a new event submission. '
             .'This route is create-only; use the contribution suggestion endpoints for later event updates. '
-            .'Clients must provide an explicit submission country using `submission_country_id`, `submission_country_code`, or `submission_country_key`. '
+            .'Clients must provide an explicit submission country using `submission_country_id`. '
             .'Fetch `GET /forms/submit-event` first to resolve required versus optional fields, conditional rules, catalogs, and guest-contact requirements.',
     )]
     public function store(
@@ -91,9 +91,7 @@ class EventSubmissionController extends FrontendController
             'other_key_people.*.name' => ['nullable', 'string', 'max:255'],
             'other_key_people.*.is_public' => ['nullable', 'boolean'],
             'other_key_people.*.notes' => ['nullable', 'string', 'max:1000'],
-            'submission_country_id' => ['nullable', 'integer'],
-            'submission_country_code' => ['nullable', 'string', 'size:2'],
-            'submission_country_key' => ['nullable', 'string', 'max:255'],
+            'submission_country_id' => ['required', 'integer'],
             'submitter_name' => [$user instanceof User ? 'nullable' : 'required', 'string', 'max:255'],
             'submitter_email' => ['nullable', 'email', 'max:255'],
             'submitter_phone' => ['nullable', 'string', 'max:20'],

@@ -17,6 +17,7 @@
         "laravel-best-practices",
         "configuring-horizon",
         "mcp-development",
+        "passport-development",
         "scout-development",
         "socialite-development",
         "fluxui-development",

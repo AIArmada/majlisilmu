@@ -14,6 +14,7 @@ use App\States\EventStatus\Draft;
 use App\States\EventStatus\Pending;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Nnjeim\World\Models\Language;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -126,6 +127,31 @@ it('searchable payload includes is_active and subdistrict_id location fields', f
         ->and($payload)->toHaveKey('state_id', $state->id)
         ->and($payload)->toHaveKey('district_id', $district->id)
         ->and($payload)->toHaveKey('subdistrict_id', $subdistrict->id);
+});
+
+it('searchable payload uses canonical language_codes', function () {
+    $malay = Language::query()->firstOrCreate(
+        ['code' => 'ms'],
+        ['name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr'],
+    );
+
+    $english = Language::query()->firstOrCreate(
+        ['code' => 'en'],
+        ['name' => 'English', 'name_native' => 'English', 'dir' => 'ltr'],
+    );
+
+    $event = Event::factory()->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $event->languages()->attach([$malay->getKey(), $english->getKey()]);
+
+    $payload = $event->fresh()->toSearchableArray();
+
+    expect($payload['language_codes'])->toBe(['ms', 'en'])
+        ->and($payload)->not->toHaveKey('language');
 });
 
 it('deduplicates key person roles in the searchable payload', function () {

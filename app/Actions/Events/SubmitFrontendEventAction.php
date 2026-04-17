@@ -530,9 +530,7 @@ class SubmitFrontendEventAction
         return $date->between($startDate, $endDate);
     }
 
-    /**
-     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
-     */
+    /** @param  array{submission_country_id?: int|string|null}  $validated */
     private function assertValidSubmissionCountryId(array $validated, string $validationKeyPrefix): void
     {
         if (! $this->submissionCountryInputProvided($validated)) {
@@ -550,9 +548,7 @@ class SubmitFrontendEventAction
         ]);
     }
 
-    /**
-     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
-     */
+    /** @param  array{submission_country_id?: int|string|null}  $validated */
     private function resolveSubmissionCountryId(array $validated): int
     {
         $normalizedCountryId = $this->normalizedSubmissionCountryId($validated);
@@ -566,9 +562,7 @@ class SubmitFrontendEventAction
         ]);
     }
 
-    /**
-     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
-     */
+    /** @param  array{submission_country_id?: int|string|null}  $validated */
     private function resolveSubmissionTimezone(array $validated, ?int $submissionCountryId = null): string
     {
         $resolvedCountryId = $submissionCountryId ?? $this->resolveSubmissionCountryId($validated);
@@ -576,35 +570,25 @@ class SubmitFrontendEventAction
         return app(PublicCountryRegistry::class)->defaultTimezoneForCountryId($resolvedCountryId);
     }
 
-    /**
-     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
-     */
+    /** @param  array{submission_country_id?: int|string|null}  $validated */
     private function submissionCountryInputProvided(array $validated): bool
     {
-        foreach (['submission_country_id', 'submission_country_code', 'submission_country_key'] as $field) {
-            $value = $validated[$field] ?? null;
+        $value = $validated['submission_country_id'] ?? null;
 
-            if (is_int($value)) {
-                return true;
-            }
-
-            if (is_string($value) && trim($value) !== '') {
-                return true;
-            }
+        if (is_int($value)) {
+            return true;
         }
 
-        return false;
+        return is_string($value) && trim($value) !== '';
     }
 
-    /**
-     * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
-     */
+    /** @param  array{submission_country_id?: int|string|null}  $validated */
     private function normalizedSubmissionCountryId(array $validated): ?int
     {
         return app(PublicCountryRegistry::class)->resolveCountryId(
             $validated['submission_country_id'] ?? null,
-            $validated['submission_country_code'] ?? null,
-            $validated['submission_country_key'] ?? null,
+            null,
+            null,
             enabledOnly: true,
         );
     }

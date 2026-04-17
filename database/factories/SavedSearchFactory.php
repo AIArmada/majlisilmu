@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\EventType;
 use App\Models\SavedSearch;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -28,8 +29,8 @@ class SavedSearchFactory extends Factory
             'query' => fake()->optional()->words(2, true),
             'filters' => fake()->boolean(50)
                 ? [
-                    'genre' => fake()->randomElement(['kuliah', 'ceramah', 'tazkirah', 'forum']),
-                    'language' => fake()->randomElement(['bm', 'en', 'ar']),
+                    'event_type' => [fake()->randomElement(array_column(EventType::cases(), 'value'))],
+                    'language_codes' => [fake()->randomElement(['ms', 'en', 'ar'])],
                 ]
                 : null,
             'radius_km' => $radius,

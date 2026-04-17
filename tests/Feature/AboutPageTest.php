@@ -2,16 +2,18 @@
 
 use function Pest\Laravel\get;
 
-it('loads the about page through the primary and legacy routes', function (): void {
+it('loads the about page through the canonical route and rejects the removed legacy alias', function (): void {
     $expected = data_get(trans('about'), 'hero.title');
 
     get(route('about'))
         ->assertOk()
         ->assertSee((string) $expected);
 
-    get('/about')
+    get('/tentang-kami')
         ->assertOk()
         ->assertSee((string) $expected);
+
+    get('/about')->assertNotFound();
 });
 
 it('renders the about page in each supported locale', function (string $locale, string $expected): void {

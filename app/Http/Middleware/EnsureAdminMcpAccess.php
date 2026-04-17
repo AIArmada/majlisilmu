@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\Mcp\McpAuthenticatedUserResolver;
 use App\Support\Mcp\McpTokenManager;
 use Closure;
 use Illuminate\Http\Request;
@@ -14,11 +15,12 @@ class EnsureAdminMcpAccess
 {
     public function __construct(
         private readonly McpTokenManager $tokenManager,
+        private readonly McpAuthenticatedUserResolver $userResolver,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        $user = $this->userResolver->resolve($request->user());
 
         abort_unless(
             $user instanceof User
@@ -26,6 +28,8 @@ class EnsureAdminMcpAccess
                 && $this->tokenManager->allowsServer($user, McpTokenManager::ADMIN_SERVER),
             403,
         );
+
+        $request->setUserResolver(static fn (): User => $user);
 
         return $next($request);
     }

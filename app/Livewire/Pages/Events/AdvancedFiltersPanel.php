@@ -609,7 +609,6 @@ class AdvancedFiltersPanel extends Component implements HasForms
             'state_id' => null,
             'district_id' => null,
             'subdistrict_id' => null,
-            'language' => null,
             'language_codes' => [],
             'event_type' => [],
             'gender' => null,
@@ -657,13 +656,6 @@ class AdvancedFiltersPanel extends Component implements HasForms
         $normalized = array_replace($defaults, $raw);
 
         $languageCodes = $this->normalizeStringArray($normalized['language_codes'] ?? []);
-        $legacyLanguage = filled($normalized['language'] ?? null) ? (string) $normalized['language'] : null;
-
-        if ($languageCodes === [] && $legacyLanguage !== null) {
-            $languageCodes = [$legacyLanguage];
-        }
-
-        $normalizedLanguage = $languageCodes !== [] ? $languageCodes[0] : $legacyLanguage;
         $timeScope = (string) ($normalized['time_scope'] ?? $defaults['time_scope']);
         $sort = (string) ($normalized['sort'] ?? $defaults['sort']);
         $timingMode = (string) ($normalized['timing_mode'] ?? '');
@@ -699,7 +691,6 @@ class AdvancedFiltersPanel extends Component implements HasForms
             'state_id' => filled($normalized['state_id']) ? (string) $normalized['state_id'] : null,
             'district_id' => filled($normalized['district_id']) ? (string) $normalized['district_id'] : null,
             'subdistrict_id' => filled($normalized['subdistrict_id']) ? (string) $normalized['subdistrict_id'] : null,
-            'language' => $normalizedLanguage,
             'language_codes' => $languageCodes,
             'event_type' => $this->normalizeStringArray($normalized['event_type'] ?? []),
             'gender' => filled($normalized['gender']) ? (string) $normalized['gender'] : null,

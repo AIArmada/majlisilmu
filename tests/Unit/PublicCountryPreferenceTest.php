@@ -26,7 +26,7 @@ beforeEach(function () {
 });
 
 it('treats unsupported and disabled saved country values as absent selections', function () {
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'indonesia');
 
     $preference = app(PublicCountryPreference::class);
@@ -36,7 +36,7 @@ it('treats unsupported and disabled saved country values as absent selections', 
 });
 
 it('falls back to a valid cookie selection when the session country value is stale', function () {
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->setLaravelSession(app('session')->driver());
     $request->session()->put(PublicCountryPreference::SESSION_KEY, 'indonesia');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'malaysia');
@@ -62,7 +62,7 @@ it('ignores an invalid saved country so CF-IPCountry can still win later in reso
     app()->forgetInstance(PublicCountryRegistry::class);
     app()->forgetInstance(PublicCountryPreference::class);
 
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'unsupported-country');
     $request->headers->set('CF-IPCountry', 'SG');
 

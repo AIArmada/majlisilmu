@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Actions\SavedSearches\CreateSavedSearchAction;
 use App\Actions\SavedSearches\ExecuteSavedSearchAction;
 use App\Actions\SavedSearches\UpdateSavedSearchAction;
+use App\Enums\EventAgeGroup;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\EventType;
 use App\Exceptions\SavedSearchLimitReachedException;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\BodyParameter;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -42,49 +45,24 @@ class SavedSearchController extends Controller
     /**
      * Create a new saved search.
      */
+    #[BodyParameter('name', 'Human-readable label for the saved search.', type: 'string', infer: false, example: 'Kuliah Maghrib Kuala Lumpur')]
+    #[BodyParameter('query', 'Free-text event discovery query.', required: false, type: 'string', infer: false, example: 'muamalat')]
+    #[BodyParameter('filters', 'Canonical saved-search filters keyed by event discovery fields.', required: false, type: 'object', infer: false, example: [
+        'language_codes' => ['ms'],
+        'event_type' => ['kuliah_ceramah'],
+        'age_group' => ['all_ages'],
+    ])]
+    #[BodyParameter('radius_km', 'Optional search radius in kilometers when latitude and longitude are provided.', required: false, type: 'integer', infer: false, example: 25)]
+    #[BodyParameter('lat', 'Latitude anchor used with `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
+    #[BodyParameter('lng', 'Longitude anchor used with `radius_km`.', required: false, type: 'number', infer: false, example: 101.6869)]
+    #[BodyParameter('notify', 'Notification cadence for saved-search alerts.', type: 'string', infer: false, example: 'daily')]
     #[Endpoint(
         title: 'Create a saved search',
         description: 'Creates a new saved search definition from the supplied event-query payload.',
     )]
     public function store(Request $request, CreateSavedSearchAction $createSavedSearchAction): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:100',
-            'query' => 'nullable|string|max:255',
-            'filters' => 'nullable|array',
-            'filters.state_id' => 'nullable|integer|exists:states,id',
-            'filters.district_id' => 'nullable|integer|exists:districts,id',
-            'filters.subdistrict_id' => 'nullable|integer|exists:subdistricts,id',
-            'filters.language' => ['nullable', Rule::in(['malay', 'english', 'arabic', 'mixed'])],
-            'filters.genre' => ['nullable', Rule::in(['kuliah', 'ceramah', 'tazkirah', 'forum', 'halaqah', 'other'])],
-            'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
-            'filters.speaker_ids' => 'nullable|array',
-            'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
-            'filters.key_person_roles' => 'nullable|array',
-            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
-            'filters.moderator_ids' => 'nullable|array',
-            'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
-            'filters.imam_ids' => 'nullable|array',
-            'filters.imam_ids.*' => 'uuid|exists:speakers,id',
-            'filters.khatib_ids' => 'nullable|array',
-            'filters.khatib_ids.*' => 'uuid|exists:speakers,id',
-            'filters.bilal_ids' => 'nullable|array',
-            'filters.bilal_ids.*' => 'uuid|exists:speakers,id',
-            'filters.topic_ids' => 'nullable|array',
-            'filters.topic_ids.*' => 'uuid|exists:tags,id',
-            'filters.domain_tag_ids' => 'nullable|array',
-            'filters.domain_tag_ids.*' => 'uuid|exists:tags,id',
-            'filters.source_tag_ids' => 'nullable|array',
-            'filters.source_tag_ids.*' => 'uuid|exists:tags,id',
-            'filters.issue_tag_ids' => 'nullable|array',
-            'filters.issue_tag_ids.*' => 'uuid|exists:tags,id',
-            'filters.reference_ids' => 'nullable|array',
-            'filters.reference_ids.*' => 'uuid|exists:references,id',
-            'radius_km' => 'nullable|integer|min:1|max:1000',
-            'lat' => 'nullable|required_with:radius_km|numeric|between:-90,90',
-            'lng' => 'nullable|required_with:radius_km|numeric|between:-180,180',
-            'notify' => ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
-        ]);
+        $validated = $request->validate($this->savedSearchValidationRules());
 
         $user = $request->user();
 
@@ -129,6 +107,17 @@ class SavedSearchController extends Controller
     /**
      * Update a saved search.
      */
+    #[BodyParameter('name', 'Updated human-readable label for the saved search.', required: false, type: 'string', infer: false, example: 'Kuliah Maghrib KL')]
+    #[BodyParameter('query', 'Updated free-text event discovery query.', required: false, type: 'string', infer: false, example: 'forum')]
+    #[BodyParameter('filters', 'Updated canonical saved-search filters keyed by event discovery fields.', required: false, type: 'object', infer: false, example: [
+        'language_codes' => ['ms', 'en'],
+        'event_type' => ['forum'],
+        'age_group' => ['youth'],
+    ])]
+    #[BodyParameter('radius_km', 'Updated search radius in kilometers when latitude and longitude are provided.', required: false, type: 'integer', infer: false, example: 25)]
+    #[BodyParameter('lat', 'Updated latitude anchor used with `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
+    #[BodyParameter('lng', 'Updated longitude anchor used with `radius_km`.', required: false, type: 'number', infer: false, example: 101.6869)]
+    #[BodyParameter('notify', 'Updated notification cadence for saved-search alerts.', required: false, type: 'string', infer: false, example: 'instant')]
     #[Endpoint(
         title: 'Update a saved search',
         description: 'Updates one saved search definition owned by the current authenticated user.',
@@ -140,43 +129,7 @@ class SavedSearchController extends Controller
     ): JsonResponse {
         $this->authorize('update', $savedSearch);
 
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:100',
-            'query' => 'nullable|string|max:255',
-            'filters' => 'nullable|array',
-            'filters.state_id' => 'nullable|integer|exists:states,id',
-            'filters.district_id' => 'nullable|integer|exists:districts,id',
-            'filters.subdistrict_id' => 'nullable|integer|exists:subdistricts,id',
-            'filters.language' => ['nullable', Rule::in(['malay', 'english', 'arabic', 'mixed'])],
-            'filters.genre' => ['nullable', Rule::in(['kuliah', 'ceramah', 'tazkirah', 'forum', 'halaqah', 'other'])],
-            'filters.audience' => ['nullable', Rule::in(['general', 'men_only', 'women_only', 'youth', 'children', 'families'])],
-            'filters.speaker_ids' => 'nullable|array',
-            'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
-            'filters.key_person_roles' => 'nullable|array',
-            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
-            'filters.moderator_ids' => 'nullable|array',
-            'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
-            'filters.imam_ids' => 'nullable|array',
-            'filters.imam_ids.*' => 'uuid|exists:speakers,id',
-            'filters.khatib_ids' => 'nullable|array',
-            'filters.khatib_ids.*' => 'uuid|exists:speakers,id',
-            'filters.bilal_ids' => 'nullable|array',
-            'filters.bilal_ids.*' => 'uuid|exists:speakers,id',
-            'filters.topic_ids' => 'nullable|array',
-            'filters.topic_ids.*' => 'uuid|exists:tags,id',
-            'filters.domain_tag_ids' => 'nullable|array',
-            'filters.domain_tag_ids.*' => 'uuid|exists:tags,id',
-            'filters.source_tag_ids' => 'nullable|array',
-            'filters.source_tag_ids.*' => 'uuid|exists:tags,id',
-            'filters.issue_tag_ids' => 'nullable|array',
-            'filters.issue_tag_ids.*' => 'uuid|exists:tags,id',
-            'filters.reference_ids' => 'nullable|array',
-            'filters.reference_ids.*' => 'uuid|exists:references,id',
-            'radius_km' => 'nullable|integer|min:1|max:1000',
-            'lat' => 'nullable|numeric|between:-90,90',
-            'lng' => 'nullable|numeric|between:-180,180',
-            'notify' => ['sometimes', 'required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
-        ]);
+        $validated = $request->validate($this->savedSearchValidationRules(partial: true));
 
         $savedSearch = $updateSavedSearchAction->handle($savedSearch, $validated);
 
@@ -218,11 +171,105 @@ class SavedSearchController extends Controller
         return response()->json([
             'data' => $events->items(),
             'meta' => [
-                'current_page' => $events->currentPage(),
-                'last_page' => $events->lastPage(),
-                'per_page' => $events->perPage(),
-                'total' => $events->total(),
+                'pagination' => [
+                    'page' => $events->currentPage(),
+                    'per_page' => $events->perPage(),
+                    'total' => $events->total(),
+                ],
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function savedSearchValidationRules(bool $partial = false): array
+    {
+        return [
+            'name' => $partial ? 'sometimes|required|string|max:100' : 'required|string|max:100',
+            'query' => 'nullable|string|max:255',
+            'filters' => 'nullable|array:'.implode(',', $this->allowedFilterKeys()),
+            'filters.country_id' => 'nullable|integer|exists:countries,id',
+            'filters.state_id' => 'nullable|integer|exists:states,id',
+            'filters.district_id' => 'nullable|integer|exists:districts,id',
+            'filters.subdistrict_id' => 'nullable|integer|exists:subdistricts,id',
+            'filters.language_codes' => 'nullable|array',
+            'filters.language_codes.*' => 'string|max:12',
+            'filters.event_type' => 'nullable|array',
+            'filters.event_type.*' => ['string', Rule::in(array_column(EventType::cases(), 'value'))],
+            'filters.age_group' => 'nullable|array',
+            'filters.age_group.*' => ['string', Rule::in(array_column(EventAgeGroup::cases(), 'value'))],
+            'filters.speaker_ids' => 'nullable|array',
+            'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
+            'filters.key_person_roles' => 'nullable|array',
+            'filters.key_person_roles.*' => ['string', Rule::in(array_keys(EventKeyPersonRole::nonSpeakerOptions()))],
+            'filters.moderator_ids' => 'nullable|array',
+            'filters.moderator_ids.*' => 'uuid|exists:speakers,id',
+            'filters.imam_ids' => 'nullable|array',
+            'filters.imam_ids.*' => 'uuid|exists:speakers,id',
+            'filters.khatib_ids' => 'nullable|array',
+            'filters.khatib_ids.*' => 'uuid|exists:speakers,id',
+            'filters.bilal_ids' => 'nullable|array',
+            'filters.bilal_ids.*' => 'uuid|exists:speakers,id',
+            'filters.topic_ids' => 'nullable|array',
+            'filters.topic_ids.*' => 'uuid|exists:tags,id',
+            'filters.domain_tag_ids' => 'nullable|array',
+            'filters.domain_tag_ids.*' => 'uuid|exists:tags,id',
+            'filters.source_tag_ids' => 'nullable|array',
+            'filters.source_tag_ids.*' => 'uuid|exists:tags,id',
+            'filters.issue_tag_ids' => 'nullable|array',
+            'filters.issue_tag_ids.*' => 'uuid|exists:tags,id',
+            'filters.reference_ids' => 'nullable|array',
+            'filters.reference_ids.*' => 'uuid|exists:references,id',
+            'radius_km' => 'nullable|integer|min:1|max:1000',
+            'lat' => $partial ? 'nullable|numeric|between:-90,90' : 'nullable|required_with:radius_km|numeric|between:-90,90',
+            'lng' => $partial ? 'nullable|numeric|between:-180,180' : 'nullable|required_with:radius_km|numeric|between:-180,180',
+            'notify' => $partial
+                ? ['sometimes', 'required', Rule::in(['off', 'instant', 'daily', 'weekly'])]
+                : ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedFilterKeys(): array
+    {
+        return [
+            'country_id',
+            'state_id',
+            'district_id',
+            'subdistrict_id',
+            'institution_id',
+            'venue_id',
+            'speaker_ids',
+            'key_person_roles',
+            'moderator_ids',
+            'imam_ids',
+            'khatib_ids',
+            'bilal_ids',
+            'domain_tag_ids',
+            'topic_ids',
+            'source_tag_ids',
+            'issue_tag_ids',
+            'reference_ids',
+            'language_codes',
+            'event_type',
+            'event_format',
+            'gender',
+            'starts_after',
+            'starts_before',
+            'time_scope',
+            'prayer_time',
+            'timing_mode',
+            'starts_time_from',
+            'starts_time_until',
+            'children_allowed',
+            'is_muslim_only',
+            'has_event_url',
+            'has_live_url',
+            'has_end_time',
+            'age_group',
+        ];
     }
 }

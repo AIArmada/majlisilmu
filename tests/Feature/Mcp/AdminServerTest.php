@@ -18,6 +18,7 @@ use App\Mcp\Tools\Admin\AdminListResourcesTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\PassportUser;
 use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
@@ -26,6 +27,7 @@ use App\Models\User;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Passport\Passport;
 use Spatie\Permission\Models\Role;
 
 it('lists accessible admin resources for admin users through the MCP server', function () {
@@ -539,6 +541,122 @@ it('returns a bearer-auth challenge for unauthenticated MCP stream requests', fu
     expect((string) $response->headers->get('WWW-Authenticate'))->toContain('Bearer realm="mcp"');
 });
 
+it('exposes OAuth metadata for MCP clients', function () {
+    $this->getJson('/.well-known/oauth-authorization-server/mcp/admin')
+        ->assertOk()
+        ->assertJsonPath('authorization_endpoint', route('passport.authorizations.authorize'))
+        ->assertJsonPath('token_endpoint', route('passport.token'))
+        ->assertJsonPath('registration_endpoint', url('/oauth/mcp/register'))
+        ->assertJsonPath('scopes_supported.0', 'mcp:use');
+
+    $this->getJson('/.well-known/oauth-protected-resource/mcp/admin')
+        ->assertOk()
+        ->assertJsonPath('resource', url('/mcp/admin'))
+        ->assertJsonPath('authorization_servers.0', url('/'))
+        ->assertJsonPath('scopes_supported.0', 'mcp:use');
+});
+
+it('uses a hardened default MCP OAuth allowlist', function () {
+    expect(config('mcp.redirect_domains'))
+        ->toContain(rtrim((string) config('app.url'), '/'))
+        ->toContain('http://localhost')
+        ->toContain('https://chatgpt.com')
+        ->not->toContain('*');
+
+    expect(config('mcp.custom_schemes'))->toBeArray();
+});
+
+it('only registers OAuth clients for allowed redirect domains and schemes', function () {
+    config()->set('mcp.redirect_domains', [
+        'https://majlisilmu.test',
+        'https://chatgpt.com',
+        'http://localhost',
+    ]);
+    config()->set('mcp.custom_schemes', ['vscode']);
+
+    $this->postJson('/oauth/mcp/register', [
+        'client_name' => 'ChatGPT',
+        'redirect_uris' => ['https://chatgpt.com/connector/oauth/callback-123'],
+    ])->assertOk()
+        ->assertJsonPath('redirect_uris.0', 'https://chatgpt.com/connector/oauth/callback-123')
+        ->assertJsonPath('scope', 'mcp:use');
+
+    $this->postJson('/oauth/mcp/register', [
+        'client_name' => 'VS Code',
+        'redirect_uris' => ['vscode://copilot/mcp-callback'],
+    ])->assertOk()
+        ->assertJsonPath('redirect_uris.0', 'vscode://copilot/mcp-callback');
+
+    $this->postJson('/oauth/mcp/register', [
+        'client_name' => 'Blocked Host',
+        'redirect_uris' => ['https://evil.example/callback'],
+    ])->assertStatus(400)
+        ->assertJsonPath('error', 'invalid_redirect_uri');
+
+    $this->postJson('/oauth/mcp/register', [
+        'client_name' => 'Blocked Scheme',
+        'redirect_uris' => ['cursor://mcp-callback'],
+    ])->assertStatus(400)
+        ->assertJsonPath('error', 'invalid_redirect_uri');
+});
+
+it('serves the admin MCP stream for Passport-authenticated admin users', function () {
+    $admin = adminMcpUser('super_admin');
+
+    Passport::actingAs(adminPassportUser($admin), ['mcp:use']);
+
+    $response = $this->get('/mcp/admin');
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('text/event-stream');
+    expect($response->streamedContent())->toContain(': keep-alive');
+});
+
+it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-authenticated admins', function () {
+    $admin = adminMcpUser('super_admin');
+
+    Passport::actingAs(adminPassportUser($admin), ['mcp:use']);
+
+    $initialize = $this->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-admin-mcp-passport',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $listTools = $this->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'list-tools-admin-mcp-passport',
+        'method' => 'tools/list',
+        'params' => [],
+    ])->assertOk();
+
+    $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
+
+    expect($toolNames)->toContain('admin-list-resources', 'admin-get-record');
+});
+
+it('rejects Passport-authenticated users without admin access on the admin MCP stream endpoint', function () {
+    $user = User::factory()->create();
+
+    Passport::actingAs(adminPassportUser($user), ['mcp:use']);
+
+    $this->get('/mcp/admin')->assertForbidden();
+});
+
 it('rejects member-scoped tokens on the admin MCP stream endpoint even for dual-scope users', function () {
     $admin = adminMcpUser('super_admin');
     $institution = Institution::factory()->create([
@@ -617,6 +735,11 @@ function ensureMcpMalaysiaCountryExists(): int
         'region' => 'Asia',
         'subregion' => 'South-Eastern Asia',
     ]);
+}
+
+function adminPassportUser(User $user): PassportUser
+{
+    return PassportUser::query()->findOrFail($user->getKey());
 }
 
 function adminMcpUser(string $role): User

@@ -106,9 +106,9 @@ class AccountSettingsController extends FrontendController
         }
 
         return response()->json([
+            'message' => __('Account settings updated.'),
             'data' => [
                 'profile' => AccountProfileData::fromModel($freshUser)->toArray(),
-                'message' => __('Account settings updated.'),
             ],
             'meta' => [
                 'request_id' => $this->requestId($request),

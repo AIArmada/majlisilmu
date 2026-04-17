@@ -888,8 +888,8 @@
                                     class="font-heading text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-emerald-700">
                                     {{ $sp->formatted_name ?? $sp->name }}
                                 </h3>
-                                @if($sp->title)
-                                    <p class="mt-0.5 text-sm font-semibold text-slate-500">{{ $sp->title }}</p>
+                                    @if($sp->job_title)
+                                        <p class="mt-0.5 text-sm font-semibold text-slate-500">{{ $sp->job_title }}</p>
                                 @endif
                                 @if($spBio)
                                     <p class="mt-4 text-sm leading-relaxed text-slate-600">{{ $spBio }}</p>
@@ -938,8 +938,8 @@
                                                 class="font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-emerald-700">
                                                 {{ $speaker->formatted_name ?? $speaker->name }}
                                             </h4>
-                                            @if($speaker->title)
-                                                <p class="mt-1 text-sm font-medium text-slate-500">{{ $speaker->title }}</p>
+                                            @if($speaker->job_title)
+                                                <p class="mt-1 text-sm font-medium text-slate-500">{{ $speaker->job_title }}</p>
                                             @endif
                                         </div>
                                     </div>

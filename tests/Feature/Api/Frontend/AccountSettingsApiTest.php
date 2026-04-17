@@ -116,7 +116,7 @@ it('returns the updated account settings profile payload after saving', function
     ]);
 
     $response->assertOk()
-        ->assertJsonPath('data.message', __('Account settings updated.'))
+        ->assertJsonPath('message', __('Account settings updated.'))
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $user->refresh();
@@ -184,7 +184,7 @@ it('lists, creates, and revokes member MCP tokens through account settings', fun
 
     $this->deleteJson(route('api.client.account-settings.mcp-tokens.destroy', ['tokenId' => $tokenId]))
         ->assertOk()
-        ->assertJsonPath('data.message', 'MCP token revoked successfully.');
+        ->assertJsonPath('message', 'MCP token revoked successfully.');
 
     expect($user->fresh()->tokens()->count())->toBe(0);
 });

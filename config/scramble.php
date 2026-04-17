@@ -74,7 +74,7 @@ return [
 
     GET /institution-workspace auto-selects the first accessible institution when institution_id is omitted and always returns selected_institution together with events_pagination and members_pagination metadata.
 
-    Public institution, speaker, and submit-event writes must include an explicit country selection. Canonical fields remain *_country_id, while *_country_code and *_country_key are accepted aliases.
+    Public institution, speaker, and submit-event writes must include an explicit country selection using the canonical *_country_id fields.
 
     Speaker create/update still forbids detailed street or map fields: address.line1, address.line2, address.postcode, address.lat, address.lng, address.google_maps_url, address.google_place_id, and address.waze_url return HTTP 422 on speaker contribution flows.
 
@@ -82,7 +82,7 @@ return [
 
     Admin create and update flows are schema-driven: discover writable resources with GET /admin/manifest, then fetch the exact contract with GET /admin/{resourceKey}/schema?operation=create or GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}.
 
-    The recordKey parameter should use the record route_key returned by the admin collection or record-detail responses. For UUID-backed resources, route_key may still equal id. The legacy id remains accepted as a compatibility fallback.
+    The recordKey parameter should use the record route_key returned by the admin collection or record-detail responses. For UUID-backed resources, route_key may still equal id.
 
     Admin PUT is not a partial update. Fields marked required in the schema must be sent on every update, not just on create.
 

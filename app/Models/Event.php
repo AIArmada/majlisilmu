@@ -330,7 +330,7 @@ class Event extends Model implements AuditableContract, HasMedia
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
         return $query
-            ->with(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references'])
+            ->with(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references', 'languages'])
             ->where('events.is_active', true)
             ->whereIn('events.status', self::PUBLIC_STATUSES)
             ->where('events.visibility', EventVisibility::Public)
@@ -349,7 +349,7 @@ class Event extends Model implements AuditableContract, HasMedia
             return $this->toScoutDatabaseSearchableArray();
         }
 
-        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references']);
+        $this->loadMissing(['institution', 'institution.address', 'venue', 'venue.address', 'speakers', 'keyPeople.speaker', 'tags', 'references', 'languages']);
         $venueAddress = $this->venue?->addressModel;
         $institutionAddress = $this->institution?->addressModel;
         $institution = $this->institution;
@@ -357,6 +357,17 @@ class Event extends Model implements AuditableContract, HasMedia
         $gender = $this->gender;
         $eventFormat = $this->event_format;
         $visibility = $this->visibility;
+
+        $languageCodes = $this->languages
+            ->pluck('code')
+            ->filter(fn (mixed $languageCode): bool => is_string($languageCode) && $languageCode !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($languageCodes === [] && is_string($this->language) && $this->language !== '') {
+            $languageCodes = [$this->language];
+        }
 
         $ageGroupCollection = $this->age_group;
 
@@ -472,11 +483,10 @@ class Event extends Model implements AuditableContract, HasMedia
                 : ($institutionAddress instanceof Address
                     ? $institutionAddress->subdistrict_id
                     : ''),
-            'language' => $this->language,
+            'language_codes' => $languageCodes,
             'event_type' => $this->normalizedEventTypeValues(),
             'gender' => $gender instanceof EventGenderRestriction ? $gender->value : ((is_string($gender) && $gender !== '') ? $gender : 'all'),
             'age_group' => $ageGroupValues,
-            'audience' => $ageGroupValues,
             'event_format' => $eventFormat instanceof EventFormat ? $eventFormat->value : ((is_string($eventFormat) && $eventFormat !== '') ? $eventFormat : 'physical'),
             'children_allowed' => $this->children_allowed ?? true,
             'is_active' => (bool) $this->is_active,
@@ -1076,38 +1086,6 @@ class Event extends Model implements AuditableContract, HasMedia
         }
 
         return 'landscape';
-    }
-
-    /**
-     * Map 'genre' to 'event_type' for compatibility.
-     *
-     * @return list<string>
-     */
-    public function getGenreAttribute(): array
-    {
-        return $this->normalizedEventTypeValues();
-    }
-
-    /**
-     * Map 'audience' to 'age_group' for compatibility.
-     * Returns string values for search indexing.
-     *
-     * @return list<string>
-     */
-    public function getAudienceAttribute(): array
-    {
-        $ageGroup = $this->age_group;
-
-        if ($ageGroup instanceof Collection) {
-            return $ageGroup
-                ->map(fn (EventAgeGroup $value): string => $value->value)
-                ->values()
-                ->all();
-        }
-
-        return is_array($ageGroup)
-            ? array_values(array_map(strval(...), $ageGroup))
-            : ['all_ages'];
     }
 
     /**

@@ -348,8 +348,10 @@ class EventSearchService
             $filterParts[] = 'subdistrict_id:='.$filters['subdistrict_id'];
         }
 
-        if (! empty($filters['language'])) {
-            $filterParts[] = 'language:='.$filters['language'];
+        $languageCodes = $this->normalizeArrayFilter($filters['language_codes'] ?? null);
+
+        if ($languageCodes !== []) {
+            $filterParts[] = 'language_codes:['.implode(',', $languageCodes).']';
         }
 
         if (! empty($filters['event_type'])) {
@@ -368,14 +370,6 @@ class EventSearchService
             }
         }
 
-        if (! empty($filters['genre'])) {
-            $eventTypes = $this->normalizeArrayFilter($filters['genre']);
-
-            if ($eventTypes !== []) {
-                $filterParts[] = 'event_type:['.implode(',', $eventTypes).']';
-            }
-        }
-
         if (! empty($filters['gender'])) {
             $filterParts[] = 'gender:='.$filters['gender'];
         }
@@ -385,14 +379,6 @@ class EventSearchService
 
             if ($ageGroups !== []) {
                 $filterParts[] = 'age_group:['.implode(',', $ageGroups).']';
-            }
-        }
-
-        if (! empty($filters['audience'])) {
-            $ageGroups = $this->normalizeArrayFilter($filters['audience']);
-
-            if ($ageGroups !== []) {
-                $filterParts[] = 'audience:['.implode(',', $ageGroups).']';
             }
         }
 
@@ -530,12 +516,6 @@ class EventSearchService
             $this->applyLocationAddressFilter($queryBuilder, 'subdistrict_id', $filters['subdistrict_id']);
         }
 
-        if (! empty($filters['language'])) {
-            $queryBuilder->whereHas('languages', function (Builder $languageQuery) use ($filters) {
-                $languageQuery->where('code', $filters['language']);
-            });
-        }
-
         $languageCodes = $this->normalizeArrayFilter($filters['language_codes'] ?? null);
 
         if ($languageCodes !== []) {
@@ -550,16 +530,6 @@ class EventSearchService
             $queryBuilder->where(function (Builder $eventTypeQuery) use ($eventTypes) {
                 foreach ($eventTypes as $eventType) {
                     $eventTypeQuery->orWhereJsonContains('event_type', $eventType);
-                }
-            });
-        }
-
-        $genres = $this->normalizeArrayFilter($filters['genre'] ?? null);
-
-        if ($genres !== []) {
-            $queryBuilder->where(function (Builder $genreQuery) use ($genres) {
-                foreach ($genres as $genre) {
-                    $genreQuery->orWhereJsonContains('event_type', $genre);
                 }
             });
         }
@@ -580,16 +550,6 @@ class EventSearchService
             $queryBuilder->where(function (Builder $ageGroupQuery) use ($ageGroups) {
                 foreach ($ageGroups as $ageGroup) {
                     $ageGroupQuery->orWhereJsonContains('age_group', $ageGroup);
-                }
-            });
-        }
-
-        $audiences = $this->normalizeArrayFilter($filters['audience'] ?? null);
-
-        if ($audiences !== []) {
-            $queryBuilder->where(function (Builder $audienceQuery) use ($audiences) {
-                foreach ($audiences as $audience) {
-                    $audienceQuery->orWhereJsonContains('age_group', $audience);
                 }
             });
         }
