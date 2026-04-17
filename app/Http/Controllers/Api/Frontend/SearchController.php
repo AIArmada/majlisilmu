@@ -24,7 +24,6 @@ use App\Enums\InstitutionType;
 use App\Enums\SocialMediaPlatform;
 use App\Models\Address;
 use App\Models\Contact;
-use App\Models\Country;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
@@ -37,10 +36,12 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use App\Support\Api\ApiPagination;
 use App\Support\ApiDocumentation\Schemas\InstitutionDetailResponse;
 use App\Support\ApiDocumentation\Schemas\InstitutionDirectoryResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDetailResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDirectoryResponse;
+use App\Support\Cache\PublicDirectoryCacheVersion;
 use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
@@ -50,7 +51,6 @@ use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\Response;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -64,6 +64,7 @@ class SearchController extends FrontendController
         private readonly EventSearchService $eventSearchService,
         private readonly InstitutionSearchService $institutionSearchService,
         private readonly SpeakerSearchService $speakerSearchService,
+        private readonly PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
     ) {}
 
     #[Group('Search', 'Public aggregate search endpoints across events, speakers, and institutions.')]
@@ -141,7 +142,7 @@ class SearchController extends FrontendController
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
         $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
-        $perPage = $request->integer('per_page', 12);
+        $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
         $followingOnly = $request->boolean('following');
 
         $baseQuery = $this->baseInstitutionQuery(
@@ -199,7 +200,7 @@ class SearchController extends FrontendController
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
         $directorySeed = $this->normalizedString($request->query('directory_seed'));
-        $perPage = $request->integer('per_page', 12);
+        $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
         $countryId = $this->requestedCountryId($request);
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
@@ -972,31 +973,7 @@ class SearchController extends FrontendController
      */
     private function institutionDirectoryCacheData(): array
     {
-        $institutionQuery = $this->institutionDirectoryInstitutionQuery();
-
-        return $this->directoryCacheVersion([
-            'institutions' => $this->queryVersionSegment(
-                $institutionQuery,
-                ['id', 'type', 'name', 'nickname', 'slug', 'status', 'is_active', 'updated_at'],
-            ),
-            'countries' => $this->queryVersionSegment(
-                Country::query(),
-                ['id', 'name', 'iso2'],
-            ),
-            'public_countries' => app(PublicCountryRegistry::class)->all(),
-            'addresses' => $this->queryVersionSegment(
-                $this->institutionDirectoryAddressQuery($institutionQuery),
-                ['id', 'addressable_id', 'country_id', 'state_id', 'district_id', 'subdistrict_id', 'city_id', 'line1', 'postcode', 'updated_at'],
-            ),
-            'media' => $this->queryVersionSegment(
-                $this->directoryMediaQuery((new Institution)->getMorphClass(), ['logo', 'cover'], $institutionQuery),
-                ['id', 'model_id', 'collection_name', 'file_name', 'updated_at'],
-            ),
-            'events' => $this->queryVersionSegment(
-                $this->institutionDirectoryEventQuery($institutionQuery),
-                ['id', 'institution_id', 'status', 'visibility', 'event_structure', 'is_active', 'updated_at'],
-            ),
-        ]);
+        return $this->publicDirectoryCacheVersion->institution();
     }
 
     /**
@@ -1004,185 +981,7 @@ class SearchController extends FrontendController
      */
     private function speakerDirectoryCacheData(): array
     {
-        $speakerQuery = $this->speakerDirectorySpeakerQuery();
-
-        return $this->directoryCacheVersion([
-            'speakers' => $this->queryVersionSegment(
-                $speakerQuery,
-                ['id', 'slug', 'name', 'gender', 'honorific', 'pre_nominal', 'post_nominal', 'job_title', 'status', 'is_active', 'updated_at'],
-            ),
-            'countries' => $this->queryVersionSegment(
-                Country::query(),
-                ['id', 'name', 'iso2'],
-            ),
-            'public_countries' => app(PublicCountryRegistry::class)->all(),
-            'addresses' => $this->queryVersionSegment(
-                $this->speakerDirectoryAddressQuery($speakerQuery),
-                ['id', 'addressable_id', 'country_id', 'state_id', 'district_id', 'subdistrict_id', 'updated_at'],
-            ),
-            'media' => $this->queryVersionSegment(
-                $this->directoryMediaQuery((new Speaker)->getMorphClass(), ['avatar', 'cover'], $speakerQuery),
-                ['id', 'model_id', 'collection_name', 'file_name', 'updated_at'],
-            ),
-            'event_key_people' => $this->queryVersionSegment(
-                $this->speakerDirectoryEventKeyPersonQuery($speakerQuery),
-                ['id', 'event_id', 'speaker_id', 'updated_at'],
-            ),
-            'events' => $this->queryVersionSegment(
-                $this->speakerDirectoryEventQuery($speakerQuery),
-                ['id', 'status', 'visibility', 'event_structure', 'is_active', 'starts_at', 'updated_at'],
-            ),
-        ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $segments
-     * @return array{version: string}
-     */
-    private function directoryCacheVersion(array $segments): array
-    {
-        return [
-            'version' => sha1(json_encode($segments) ?: ''),
-        ];
-    }
-
-    /**
-     * @template TModel of Model
-     *
-     * @param  Builder<TModel>  $query
-     * @param  list<string>  $columns
-     * @return array{count: int, latest: string}
-     */
-    private function queryVersionSegment(Builder $query, array $columns): array
-    {
-        return [
-            'count' => (clone $query)->count(),
-            'latest' => $this->latestFingerprint($query, $columns),
-        ];
-    }
-
-    /**
-     * @template TModel of Model
-     *
-     * @param  Builder<TModel>  $query
-     * @param  list<string>  $columns
-     */
-    private function latestFingerprint(Builder $query, array $columns): string
-    {
-        $model = $query->getModel();
-        $latestQuery = (clone $query)->reorder();
-        $updatedAtColumn = $model->getUpdatedAtColumn();
-
-        if ($model->usesTimestamps() && is_string($updatedAtColumn) && $updatedAtColumn !== '') {
-            $latestQuery->orderByDesc($updatedAtColumn);
-        }
-
-        $latestQuery->orderByDesc($model->getKeyName());
-
-        $record = $latestQuery->first($columns);
-
-        if (! $record instanceof Model) {
-            return '';
-        }
-
-        return sha1(json_encode($record->getAttributes()) ?: '');
-    }
-
-    /**
-     * @return Builder<Institution>
-     */
-    private function institutionDirectoryInstitutionQuery(): Builder
-    {
-        return Institution::query()
-            ->active()
-            ->where('status', 'verified');
-    }
-
-    /**
-     * @param  Builder<Institution>  $institutionQuery
-     * @return Builder<Address>
-     */
-    private function institutionDirectoryAddressQuery(Builder $institutionQuery): Builder
-    {
-        return Address::query()
-            ->where('addressable_type', (new Institution)->getMorphClass())
-            ->whereIn('addressable_id', (clone $institutionQuery)->select('id'));
-    }
-
-    /**
-     * @param  Builder<Institution>  $institutionQuery
-     * @return Builder<Event>
-     */
-    private function institutionDirectoryEventQuery(Builder $institutionQuery): Builder
-    {
-        return Event::query()
-            ->whereIn('institution_id', (clone $institutionQuery)->select('id'))
-            ->where('events.is_active', true)
-            ->whereIn('events.status', Event::PUBLIC_STATUSES)
-            ->where('events.visibility', EventVisibility::Public)
-            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
-    }
-
-    /**
-     * @return Builder<Speaker>
-     */
-    private function speakerDirectorySpeakerQuery(): Builder
-    {
-        return Speaker::query()
-            ->active()
-            ->where('status', 'verified');
-    }
-
-    /**
-     * @param  Builder<Speaker>  $speakerQuery
-     * @return Builder<Address>
-     */
-    private function speakerDirectoryAddressQuery(Builder $speakerQuery): Builder
-    {
-        return Address::query()
-            ->where('addressable_type', (new Speaker)->getMorphClass())
-            ->whereIn('addressable_id', (clone $speakerQuery)->select('id'));
-    }
-
-    /**
-     * @param  Builder<Speaker>  $speakerQuery
-     * @return Builder<Event>
-     */
-    private function speakerDirectoryEventQuery(Builder $speakerQuery): Builder
-    {
-        return Event::query()
-            ->whereIn('events.id', EventKeyPerson::query()
-                ->select('event_id')
-                ->whereIn('speaker_id', (clone $speakerQuery)->select('id')))
-            ->where('events.is_active', true)
-            ->whereIn('events.status', Event::PUBLIC_STATUSES)
-            ->where('events.visibility', EventVisibility::Public)
-            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-            ->where('events.starts_at', '>=', now());
-    }
-
-    /**
-     * @param  Builder<Speaker>  $speakerQuery
-     * @return Builder<EventKeyPerson>
-     */
-    private function speakerDirectoryEventKeyPersonQuery(Builder $speakerQuery): Builder
-    {
-        return EventKeyPerson::query()
-            ->whereIn('speaker_id', (clone $speakerQuery)->select('id'))
-            ->whereIn('event_id', $this->speakerDirectoryEventQuery($speakerQuery)->select('events.id'));
-    }
-
-    /**
-     * @param  Builder<Institution>|Builder<Speaker>  $directoryQuery
-     * @param  list<string>  $collections
-     * @return Builder<Media>
-     */
-    private function directoryMediaQuery(string $modelType, array $collections, Builder $directoryQuery): Builder
-    {
-        return Media::query()
-            ->where('model_type', $modelType)
-            ->whereIn('collection_name', $collections)
-            ->whereIn('model_id', (clone $directoryQuery)->select('id'));
+        return $this->publicDirectoryCacheVersion->speaker();
     }
 
     /**

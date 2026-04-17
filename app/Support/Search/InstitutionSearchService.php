@@ -196,6 +196,9 @@ class InstitutionSearchService
             ->active()
             ->where('status', 'verified')
             ->select(['id', 'name', 'nickname', 'description'])
+            ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateFilter($query, $normalizedSearch))
+            ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateOrdering($query, $normalizedSearch))
+            ->limit($this->typesenseResultLimit())
             ->get()
             ->map(function (Institution $institution) use ($normalizedSearch): array {
                 $candidates = array_values(array_filter([
@@ -229,6 +232,126 @@ class InstitutionSearchService
             ->pluck('id')
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return Builder<Institution>
+     */
+    private function applyFuzzyCandidateFilter(Builder $query, string $normalizedSearch): Builder
+    {
+        $patterns = $this->fuzzyCandidatePatterns($normalizedSearch);
+
+        if ($patterns === []) {
+            return $query;
+        }
+
+        $operator = DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
+
+        return $query->where(function (Builder $candidateQuery) use ($operator, $patterns): void {
+            foreach ($patterns as $pattern) {
+                $candidateQuery
+                    ->orWhere('institutions.name', $operator, $pattern)
+                    ->orWhere('institutions.nickname', $operator, $pattern)
+                    ->orWhere('institutions.description', $operator, $pattern);
+            }
+        });
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return Builder<Institution>
+     */
+    private function applyFuzzyCandidateOrdering(Builder $query, string $normalizedSearch): Builder
+    {
+        return $query
+            ->orderByRaw(
+                "case when lower(coalesce(institutions.name, '')) = ? or lower(coalesce(institutions.nickname, '')) = ? then 0 when lower(coalesce(institutions.name, '')) like ? or lower(coalesce(institutions.nickname, '')) like ? then 1 else 2 end",
+                [$normalizedSearch, $normalizedSearch, $normalizedSearch.'%', $normalizedSearch.'%']
+            )
+            ->orderByRaw("length(coalesce(institutions.name, ''))")
+            ->orderBy('institutions.name')
+            ->orderBy('institutions.id');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fuzzyCandidatePatterns(string $normalizedSearch): array
+    {
+        $tokens = array_values(array_unique(array_filter([
+            $normalizedSearch,
+            ...array_filter(explode(' ', $normalizedSearch), static fn (string $token): bool => mb_strlen($token) >= 3),
+        ], static fn (string $token): bool => $token !== '')));
+
+        $patterns = [];
+
+        foreach ($tokens as $token) {
+            foreach ($this->fuzzyPatternSources($token) as $patternSource) {
+                $pattern = $this->fuzzySubsequencePattern($patternSource);
+
+                if ($pattern !== null) {
+                    $patterns[] = $pattern;
+                }
+            }
+        }
+
+        return array_values(array_unique($patterns));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fuzzyPatternSources(string $value): array
+    {
+        $sources = [$value];
+
+        if (str_contains($value, ' ') || mb_strlen($value) < 5) {
+            return $sources;
+        }
+
+        return array_values(array_unique([
+            ...$sources,
+            ...$this->fuzzyOmissionVariants($value),
+        ]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fuzzyOmissionVariants(string $value): array
+    {
+        $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
+
+        if (! is_array($characters) || count($characters) < 2) {
+            return [];
+        }
+
+        $variants = [];
+
+        foreach (array_keys($characters) as $index) {
+            $variantCharacters = $characters;
+            unset($variantCharacters[$index]);
+
+            $variant = implode('', $variantCharacters);
+
+            if ($variant !== '') {
+                $variants[] = $variant;
+            }
+        }
+
+        return array_values(array_unique($variants));
+    }
+
+    private function fuzzySubsequencePattern(string $value): ?string
+    {
+        $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
+
+        if (! is_array($characters) || $characters === []) {
+            return null;
+        }
+
+        return '%'.implode('%', $characters).'%';
     }
 
     protected function shouldUseScoutSearch(): bool

@@ -6,6 +6,7 @@ use App\Actions\Events\GenerateEventSlugAction;
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Actions\Speakers\GenerateSpeakerSlugAction;
 use App\Models\Speaker;
+use App\Support\Cache\PublicDirectoryCacheVersion;
 use App\Support\Cache\PublicListingsCache;
 use App\Support\Search\SpeakerSearchService;
 
@@ -15,6 +16,7 @@ class SpeakerObserver
         protected GenerateEventSlugAction $generateEventSlugAction,
         protected GenerateSpeakerSlugAction $generateSpeakerSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
+        protected PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
         protected PublicListingsCache $publicListingsCache,
         protected SpeakerSearchService $speakerSearchService,
     ) {}
@@ -38,6 +40,7 @@ class SpeakerObserver
         }
 
         $this->publicListingsCache->bustMajlisListing();
+        $this->publicDirectoryCacheVersion->bumpSpeaker();
     }
 
     public function deleted(Speaker $speaker): void
@@ -48,5 +51,6 @@ class SpeakerObserver
         $this->generateEventSlugAction->syncEventSlugsForSpeakerName($speaker->name);
         $this->speakerSearchService->purgeSpeakerRecord($speaker);
         $this->publicListingsCache->bustMajlisListing();
+        $this->publicDirectoryCacheVersion->bumpSpeaker();
     }
 }

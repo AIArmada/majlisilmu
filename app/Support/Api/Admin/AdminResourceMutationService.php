@@ -93,7 +93,7 @@ class AdminResourceMutationService
                 'operation' => $operation,
                 'method' => $updating ? 'PUT' : 'POST',
                 'endpoint' => $updating && $record instanceof Model
-                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
                     : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
                 'content_type' => 'multipart/form-data',
                 'slug_behavior' => 'auto_managed',
@@ -111,7 +111,7 @@ class AdminResourceMutationService
                 'operation' => $operation,
                 'method' => $updating ? 'PUT' : 'POST',
                 'endpoint' => $updating && $record instanceof Model
-                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
                     : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
                 'content_type' => 'multipart/form-data',
                 'slug_behavior' => 'auto_managed',
@@ -128,7 +128,7 @@ class AdminResourceMutationService
                 'operation' => $operation,
                 'method' => $updating ? 'PUT' : 'POST',
                 'endpoint' => $updating && $record instanceof Model
-                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
                     : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
                 'content_type' => 'multipart/form-data',
                 'slug_behavior' => 'auto_managed',
@@ -143,7 +143,7 @@ class AdminResourceMutationService
                 'operation' => $operation,
                 'method' => $updating ? 'PUT' : 'POST',
                 'endpoint' => $updating && $record instanceof Model
-                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
                     : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
                 'content_type' => 'multipart/form-data',
                 'slug_behavior' => 'auto_managed',
@@ -161,7 +161,7 @@ class AdminResourceMutationService
                 'operation' => $operation,
                 'method' => $updating ? 'PUT' : 'POST',
                 'endpoint' => $updating && $record instanceof Model
-                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
                     : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
                 'content_type' => 'multipart/form-data',
                 'slug_behavior' => 'auto_managed',
@@ -176,7 +176,7 @@ class AdminResourceMutationService
                 'operation' => $operation,
                 'method' => $updating ? 'PUT' : 'POST',
                 'endpoint' => $updating && $record instanceof Model
-                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $record->getKey()], false)
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
                     : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
                 'content_type' => 'application/json',
                 'slug_behavior' => 'not_applicable',
@@ -354,7 +354,9 @@ class AdminResourceMutationService
      */
     private function defaultsForRecord(Model $record): array
     {
-        $defaults = $this->contributionEntityMutationService->stateFor($record);
+        $defaults = $record instanceof Subdistrict
+            ? []
+            : $this->contributionEntityMutationService->stateFor($record);
 
         if ($record instanceof Institution) {
             $defaults['status'] = $record->status;
@@ -417,6 +419,11 @@ class AdminResourceMutationService
         }
 
         return $defaults;
+    }
+
+    private function recordKey(Model $record): string
+    {
+        return (string) ($record->getRouteKey() ?? $record->getKey());
     }
 
     /**

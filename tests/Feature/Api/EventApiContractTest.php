@@ -102,6 +102,19 @@ it('filters events by json event_type values', function () {
         ->not()->toContain($forum->id);
 });
 
+it('clamps public event index per_page values to the supported maximum', function () {
+    Event::factory()->count(60)->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $this->getJson('/api/v1/events?per_page=500')
+        ->assertOk()
+        ->assertJsonPath('per_page', 50)
+        ->assertJsonCount(50, 'data');
+});
+
 it('filters events by district_id and subdistrict_id', function () {
     $state = State::where('country_code', 'MY')->first();
 

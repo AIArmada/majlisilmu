@@ -138,6 +138,7 @@ test('saved events index still includes cancelled events', function () {
         'status' => 'approved',
         'visibility' => 'public',
         'starts_at' => now()->addDays(5),
+        'event_url' => 'https://example.com/events/saved-event-one',
         'institution_id' => $institution->id,
         'venue_id' => $venue->id,
     ]);
@@ -162,6 +163,7 @@ test('saved events index still includes cancelled events', function () {
         ->assertJsonPath('data.0.slug', 'saved-event-one')
         ->assertJsonPath('data.0.status', 'approved')
         ->assertJsonPath('data.0.visibility', 'public')
+        ->assertJsonPath('data.0.event_url', 'https://example.com/events/saved-event-one')
         ->assertJsonPath('data.0.institution.id', $institution->id)
         ->assertJsonPath('data.0.institution.name', 'Masjid Saved')
         ->assertJsonPath('data.0.institution.slug', $institution->slug)
@@ -174,4 +176,42 @@ test('saved events index still includes cancelled events', function () {
         ->assertJsonPath('data.0.pivot.event_id', $savedEvent->id)
         ->assertJsonPath('data.0.pivot.user_id', $this->user->id)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+});
+
+test('saved events index clamps per_page values to the supported maximum', function () {
+    Sanctum::actingAs($this->user);
+
+    Event::factory()->count(105)->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(2),
+    ])->each(function (Event $event): void {
+        $this->user->savedEvents()->attach($event->id);
+    });
+
+    $this->getJson(route('api.event-saves.index', ['per_page' => 500]))
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.per_page', 100)
+        ->assertJsonCount(100, 'data');
+});
+
+test('saved events index keeps missing institution and venue relations as null', function () {
+    Sanctum::actingAs($this->user);
+
+    $event = Event::factory()->create([
+        'title' => 'Saved Event Without Relations',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(3),
+        'institution_id' => null,
+        'venue_id' => null,
+    ]);
+
+    $this->user->savedEvents()->attach($event->id);
+
+    $this->getJson(route('api.event-saves.index'))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $event->id)
+        ->assertJsonPath('data.0.institution', null)
+        ->assertJsonPath('data.0.venue', null);
 });

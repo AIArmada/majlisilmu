@@ -33,6 +33,18 @@ use UnitEnum;
  */
 class AdminResourceRegistry
 {
+    /** @var list<class-string<resource>>|null */
+    private ?array $resourcesCache = null;
+
+    /** @var list<class-string<resource>>|null */
+    private ?array $accessibleResourcesCache = null;
+
+    /** @var array<class-string<resource>, array<string, mixed>> */
+    private array $metadataCache = [];
+
+    /** @var array<class-string<resource>, list<string>> */
+    private array $searchableColumnsCache = [];
+
     public function __construct(
         private readonly AdminResourceMutationService $mutationService,
     ) {}
@@ -42,10 +54,14 @@ class AdminResourceRegistry
      */
     public function resources(): array
     {
+        if (is_array($this->resourcesCache)) {
+            return $this->resourcesCache;
+        }
+
         /** @var array<int|string, class-string<resource>> $resources */
         $resources = Filament::getPanel('admin')->getResources();
 
-        return array_values($resources);
+        return $this->resourcesCache = array_values($resources);
     }
 
     /**
@@ -53,7 +69,11 @@ class AdminResourceRegistry
      */
     public function accessibleResources(): array
     {
-        return array_values(array_filter(
+        if (is_array($this->accessibleResourcesCache)) {
+            return $this->accessibleResourcesCache;
+        }
+
+        return $this->accessibleResourcesCache = array_values(array_filter(
             $this->resources(),
             $this->canAccessResource(...),
         ));
@@ -85,10 +105,15 @@ class AdminResourceRegistry
      */
     public function metadata(string $resourceClass): array
     {
+        if (array_key_exists($resourceClass, $this->metadataCache)) {
+            return $this->metadataCache[$resourceClass];
+        }
+
         $key = $this->keyFor($resourceClass);
         $pages = $resourceClass::getPages();
+        $supportsMutation = $this->mutationService->supports($resourceClass);
 
-        return [
+        return $this->metadataCache[$resourceClass] = [
             'key' => $key,
             'resource_class' => $resourceClass,
             'model_class' => $resourceClass::getModel(),
@@ -112,21 +137,21 @@ class AdminResourceRegistry
                 'reorder' => $resourceClass::canReorder(),
             ],
             'write_support' => [
-                'schema' => $this->mutationService->supports($resourceClass),
-                'store' => $this->mutationService->supports($resourceClass) && array_key_exists('create', $pages),
-                'update' => $this->mutationService->supports($resourceClass) && array_key_exists('edit', $pages),
+                'schema' => $supportsMutation,
+                'store' => $supportsMutation && array_key_exists('create', $pages),
+                'update' => $supportsMutation && array_key_exists('edit', $pages),
             ],
             'api_routes' => [
                 'collection' => route('api.admin.resources.index', ['resourceKey' => $key], false),
                 'meta' => route('api.admin.resources.meta', ['resourceKey' => $key], false),
-                'schema' => $this->mutationService->supports($resourceClass)
+                'schema' => $supportsMutation
                     ? route('api.admin.resources.schema', ['resourceKey' => $key], false)
                     : null,
-                'store' => $this->mutationService->supports($resourceClass) && array_key_exists('create', $pages)
+                'store' => $supportsMutation && array_key_exists('create', $pages)
                     ? route('api.admin.resources.store', ['resourceKey' => $key], false)
                     : null,
                 'item_template' => route('api.admin.resources.show', ['resourceKey' => $key, 'recordKey' => 'record'], false),
-                'update_template' => $this->mutationService->supports($resourceClass) && array_key_exists('edit', $pages)
+                'update_template' => $supportsMutation && array_key_exists('edit', $pages)
                     ? route('api.admin.resources.update', ['resourceKey' => $key, 'recordKey' => 'record'], false)
                     : null,
             ],
@@ -154,21 +179,18 @@ class AdminResourceRegistry
 
     public function resolveRecord(string $resourceClass, string $recordKey): Model
     {
-        $query = $this->queryFor($resourceClass);
-        $model = $query->getModel();
-        $routeKeyName = $model->getRouteKeyName();
-        $keyName = $model->getKeyName();
+        $model = $this->queryFor($resourceClass)->getModel();
 
-        return $query
-            ->where(function (Builder $builder) use ($recordKey, $routeKeyName, $keyName, $model): void {
-                if ($routeKeyName !== '') {
-                    $builder->where($model->qualifyColumn($routeKeyName), $recordKey);
-                }
+        $routeBoundRecord = $model
+            ->resolveRouteBindingQuery($this->queryFor($resourceClass), $recordKey)
+            ->first();
 
-                if ($routeKeyName !== $keyName) {
-                    $builder->orWhere($model->qualifyColumn($keyName), $recordKey);
-                }
-            })
+        if ($routeBoundRecord instanceof Model) {
+            return $routeBoundRecord;
+        }
+
+        return $this->queryFor($resourceClass)
+            ->whereKey($recordKey)
             ->firstOrFail();
     }
 
@@ -229,6 +251,10 @@ class AdminResourceRegistry
      */
     public function searchableColumns(string $resourceClass): array
     {
+        if (array_key_exists($resourceClass, $this->searchableColumnsCache)) {
+            return $this->searchableColumnsCache[$resourceClass];
+        }
+
         $modelClass = $resourceClass::getModel();
         $model = new $modelClass;
         $table = $model->getTable();
@@ -253,7 +279,7 @@ class AdminResourceRegistry
 
         $normalizedCandidates = array_values(array_unique($normalizedCandidates));
 
-        return array_values(array_filter(
+        return $this->searchableColumnsCache[$resourceClass] = array_values(array_filter(
             $normalizedCandidates,
             static fn (string $column): bool => Schema::hasColumn($table, $column),
         ));

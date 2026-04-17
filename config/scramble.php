@@ -42,6 +42,8 @@ return [
 
     The same search= parameter on both surfaces returns different result sets by design.
 
+    Collection endpoints clamp per_page to server-supported maxima. Public /events, /institutions, and /speakers currently cap at 50. Most authenticated collections and admin resource listings currently cap at 100.
+
     Do not send public contribution payloads to /admin endpoints and do not expect admin schemas from /forms endpoints.
 
     TIMEZONE:
@@ -68,15 +70,19 @@ return [
 
     For public update suggestions specifically, fetch GET /forms/contributions/{subjectType}/{subject}/suggest first to get the current state, sparse editable fields, and direct-edit media capabilities.
 
+    GET /catalogs/spaces returns only global spaces when institution_id is omitted, and returns global plus institution-linked spaces when institution_id is provided.
+
+    GET /institution-workspace auto-selects the first accessible institution when institution_id is omitted and always returns selected_institution together with events_pagination and members_pagination metadata.
+
     Public institution, speaker, and submit-event writes must include an explicit country selection. Canonical fields remain *_country_id, while *_country_code and *_country_key are accepted aliases.
 
     Speaker create/update still forbids detailed street or map fields: address.line1, address.line2, address.postcode, address.lat, address.lng, address.google_maps_url, address.google_place_id, and address.waze_url return HTTP 422 on speaker contribution flows.
 
     ADMIN FLOWS:
 
-    Admin create and update flows are schema-driven: discover writable resources with GET /admin/manifest, then fetch the exact contract with GET /admin/{resourceKey}/schema?operation=create or GET /admin/{resourceKey}/schema?operation=update&recordKey={id}.
+    Admin create and update flows are schema-driven: discover writable resources with GET /admin/manifest, then fetch the exact contract with GET /admin/{resourceKey}/schema?operation=create or GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}.
 
-    The recordKey parameter must be the UUID primary key (the id field from collection or record-detail responses). Slugs (route_key) are not accepted as recordKey.
+    The recordKey parameter should use the record route_key returned by the admin collection or record-detail responses. For UUID-backed resources, route_key may still equal id. The legacy id remains accepted as a compatibility fallback.
 
     Admin PUT is not a partial update. Fields marked required in the schema must be sent on every update, not just on create.
 

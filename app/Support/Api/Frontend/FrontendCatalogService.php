@@ -270,7 +270,13 @@ class FrontendCatalogService
             ->orderBy('name');
 
         if (is_string($institutionId) && $institutionId !== '') {
-            $query->where('institution_id', $institutionId);
+            $query->where(function (Builder $spaceQuery) use ($institutionId): void {
+                $spaceQuery
+                    ->whereDoesntHave('institutions')
+                    ->orWhereHas('institutions', fn (Builder $institutionQuery) => $institutionQuery->whereKey($institutionId));
+            });
+        } else {
+            $query->whereDoesntHave('institutions');
         }
 
         return $query

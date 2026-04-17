@@ -13,6 +13,7 @@ use App\Models\Event;
 use App\Models\Speaker;
 use App\Services\Notifications\EventNotificationService;
 use App\Services\PrayerTimeService;
+use App\Support\Cache\PublicDirectoryCacheVersion;
 use App\Support\Cache\PublicListingsCache;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -24,6 +25,7 @@ class EventObserver
         protected GenerateEventSlugAction $generateEventSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
         protected PrayerTimeService $prayerTimeService,
+        protected PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
         protected PublicListingsCache $publicListingsCache
     ) {}
 
@@ -69,11 +71,13 @@ class EventObserver
     public function created(Event $event): void
     {
         $this->publicListingsCache->bustMajlisListing();
+        $this->publicDirectoryCacheVersion->bumpForEvent($event);
     }
 
     public function updated(Event $event): void
     {
         $this->publicListingsCache->bustMajlisListing();
+        $this->publicDirectoryCacheVersion->bumpForEvent($event);
 
         if ($event->wasChanged(['title', 'starts_at', 'timezone', 'organizer_type', 'organizer_id'])) {
             $previousTitle = trim((string) ($event->getPrevious()['title'] ?? ''));
@@ -103,6 +107,7 @@ class EventObserver
         $this->syncSlugRedirectAction->purgeForModel($event);
         $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);
         $this->publicListingsCache->bustMajlisListing();
+        $this->publicDirectoryCacheVersion->bumpForEvent($event);
     }
 
     /**

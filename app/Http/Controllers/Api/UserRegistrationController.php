@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Data\Api\UserRegistration\UserRegistrationItemData;
 use App\Http\Controllers\Controller;
 use App\Models\Registration;
+use App\Support\Api\ApiPagination;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +35,7 @@ class UserRegistrationController extends Controller
                     ]),
             ])
             ->latest()
-            ->paginate($request->integer('per_page', 20));
+            ->paginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
 
         return response()->json([
             'data' => collect($registrations->items())

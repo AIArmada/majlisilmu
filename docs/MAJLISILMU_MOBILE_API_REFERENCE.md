@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-16
+**Last Updated:** 2026-04-17
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -19,7 +19,7 @@ If you are building an AI client, use this read order:
 2. Choose the correct routing surface: `/api/v1` for public and client behavior, `/api/v1/admin` for admin-only reads and writes.
 3. Call `GET /manifest` for public workflow discovery or `GET /admin/manifest` for admin resource discovery.
 4. Before any write, fetch the exact contract first: `GET /forms/*` for public flows, or `GET /admin/{resourceKey}/schema` for admin writes.
-5. Use admin UUID `id` values for mutation paths. Do not use public slugs or `route_key` values on admin write routes.
+5. Use the admin record `route_key` returned by collection or detail payloads for record-specific schema and mutation paths. The legacy `id` remains accepted as a compatibility fallback.
 6. Send raw timestamp fields in UTC. For date-only filters, send the user's local calendar date together with timezone context so the server can convert it to UTC boundaries.
 7. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
 
@@ -38,7 +38,7 @@ Key routing rules:
 
 - **Public query routes** (`/api/v1/speakers`, `/api/v1/institutions`, etc.) return only records where `is_active = true` AND `status = 'verified'`. They never return drafts or rejected records.
 - **Admin routes** (`/api/v1/admin/speakers`, etc.) use Filament's own Eloquent query, which includes all records regardless of active or status state. The same `search=...` parameter on both surfaces therefore returns different result sets.
-- **Admin mutation routes** (POST / PUT) use the resource key and the record's **UUID primary key** (`id` field), never a slug. The format is `/api/v1/admin/{resourceKey}/{id}`. The `id` field is returned by the admin collection or record-detail endpoints; the `route_key` field is the human-readable slug and must not be used in mutation paths.
+- **Admin mutation routes** (POST / PUT) use the resource key and the record's admin **route_key** for record-specific paths. The format is `/api/v1/admin/{resourceKey}/{recordKey}`. For slug-backed resources this is the slug; for UUID-backed resources it may still equal the primary key. The legacy `id` remains accepted as a compatibility fallback.
 - Do not send public contribution payloads to `/api/v1/admin`, and do not expect admin schemas from `/api/v1/forms/...`.
 
 ---
@@ -205,6 +205,8 @@ Paginated list endpoints generally return:
 
 `meta.pagination` is the canonical pagination bag for new clients. Some list endpoints may still retain the native Laravel paginator keys such as `current_page`, `per_page`, `total`, and `links` at the top level for backward compatibility.
 
+List endpoints clamp `per_page` to server-supported maxima. Public `/events`, `/institutions`, and `/speakers` currently cap at 50. Most authenticated collections and admin resource listings currently cap at 100.
+
 Validation failures use the same `error` envelope with a field-level bag preserved for direct form binding:
 
 ```json
@@ -276,6 +278,7 @@ Notes:
 - Institution payloads now expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews unless you explicitly need the raw compatibility aliases (`image_url`, `logo_url`, `cover_url`, `chip_image_url`).
 - The inspiration endpoint returns `title`, plain-text `content`, `content_html`, `preview_text`, `source`, category metadata, and both thumb/full media URLs when an image exists.
 - `speakerKey`, `venueKey`, `institutionKey`, and `referenceKey` intentionally bypass the app-wide public-slug route binders so the API can safely resolve slug or UUID itself.
+- `GET /catalogs/spaces` returns only global spaces when `institution_id` is omitted. When `institution_id` is provided, the response includes those global spaces plus spaces linked to the selected institution.
 
 ### Submission and authenticated workflow endpoints
 
@@ -308,6 +311,7 @@ Authorization note:
 - These endpoints intentionally mirror the current web client policy and role checks.
 - `can_direct_edit`, `direct_edit_media_fields`, institution workspace access, and approval abilities all come from live policy and role evaluation for the authenticated user, not from bearer-token abilities.
 - Institution workspace permissions currently follow the existing app model where scoped member roles are assigned per subject type, not per individual institution. The API matches that behavior exactly.
+- `GET /institution-workspace` auto-selects the first accessible institution when `institution_id` is omitted and always returns a non-null `selected_institution` block together with `events_pagination` and `members_pagination` metadata.
 
 ### Public contribution rules you must follow
 
@@ -403,13 +407,13 @@ Current limitation:
 | `GET` | `/admin/manifest` | Required Filament admin-panel access | List admin resources visible through the API |
 | `GET` | `/admin/{resourceKey}/meta` | Required Filament admin-panel access | Return metadata, pages, relations, abilities, and write-support flags for one admin resource |
 | `GET` | `/admin/{resourceKey}/schema?operation=create` | Required Filament admin-panel access | Return the create contract for supported write resources |
-| `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordUuid}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
+| `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
 | `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource |
 | `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources |
-| `GET` | `/admin/{resourceKey}/{id}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
-| `PUT` | `/admin/{resourceKey}/{id}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources |
+| `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
+| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources |
 
-> **Route key format:** `{id}` in PUT and GET record routes is always the **UUID primary key** (`id` field) returned by the collection or record-detail endpoints. Using a slug here will cause a `404` in most cases unless the slug happens to also be a valid UUID. The `route_key` field in the response is the human-readable slug; `id` is the mutation key.
+> **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or record-detail endpoints. For slug-backed resources this is the slug; for UUID-backed resources it may still equal the primary key. The legacy `id` remains accepted as a compatibility fallback, but new clients should standardize on `route_key`.
 
 Authorization note:
 
@@ -425,12 +429,12 @@ The `GET /admin/{resourceKey}/schema` endpoint is the authoritative source for w
 
 ```
 GET /api/v1/admin/speakers/schema?operation=create
-GET /api/v1/admin/speakers/schema?operation=update&recordKey=0195b86a-3c15-73fa-a2d8-5a45f6a7f701
+GET /api/v1/admin/speakers/schema?operation=update&recordKey=ahmad-fauzi-my
 ```
 
 Rules:
 
-- `recordKey` **must be the UUID primary key** (`id`) of the existing record. The slug (`route_key`) is not accepted here.
+- `recordKey` should use the record `route_key` returned by the admin collection or record-detail payload. For resources whose route key remains the UUID primary key, `route_key` and `id` are the same value. The legacy `id` remains accepted as a compatibility fallback.
 - The schema response embeds an `endpoint` field with the exact URL you should POST or PUT to — use that directly.
 - The schema response also embeds `defaults` with current field values, and `current_media` with existing media URLs, enabling pre-population of edit forms.
 - The `method` field tells you whether to use `POST` or `PUT`.
@@ -500,14 +504,14 @@ is_freelance=false
 is_active=true
 address[state_id]=14
 
-# 4. Note the returned record id (UUID primary key)
+# 4. Note the returned admin route_key
 # { "data": { "record": { "id": "0195b86a-3c15-73fa-a2d8-5a45f6a7f701", "route_key": "ahmad-fauzi-my", ... } } }
 
-# 5. Get the update schema using the id (UUID primary key, not the slug)
-GET /api/v1/admin/speakers/schema?operation=update&recordKey=0195b86a-3c15-73fa-a2d8-5a45f6a7f701
+# 5. Get the update schema using the route_key returned by the record payload
+GET /api/v1/admin/speakers/schema?operation=update&recordKey=ahmad-fauzi-my
 
 # 6. Update — name, gender, status are always required
-PUT /api/v1/admin/speakers/0195b86a-3c15-73fa-a2d8-5a45f6a7f701
+PUT /api/v1/admin/speakers/ahmad-fauzi-my
 Content-Type: multipart/form-data
 
 name=Ahmad Fauzi bin Abdullah
@@ -829,12 +833,12 @@ This section summarizes the non-obvious rules that AI agents must internalize be
 
 | Use case | Field to use |
 |---|---|
-| Read a record detail via admin API | `id` (UUID primary key) or `route_key` (slug) — both accepted in the path |
-| Fetch write schema (`?operation=update&recordKey=...`) | **`id` (UUID primary key only)** — slugs are not accepted here |
-| PUT to update a record via admin API | **`id` (UUID primary key) in path** (`/admin/{resourceKey}/{id}`) |
+| Read a record detail via admin API | `route_key` preferred, `id` accepted as a compatibility fallback |
+| Fetch write schema (`?operation=update&recordKey=...`) | `route_key` preferred, `id` accepted as a compatibility fallback |
+| PUT to update a record via admin API | `route_key` preferred in `/admin/{resourceKey}/{recordKey}`; `id` remains accepted as a compatibility fallback |
 | Resolve public speaker/institution | Slug or UUID both accepted (`/speakers/{speakerKey}`) |
 
-> The `id` field in API responses is always the UUID primary key. The `route_key` field is the human-readable slug. For any mutation or schema fetch, always use `id`.
+> The `route_key` field in admin API responses is the canonical record-specific path key for new clients. For resources that still use the UUID primary key as their route key, `route_key` and `id` are the same value. The legacy `id` remains accepted as a compatibility fallback on admin record and schema routes.
 
 ### Field requirement rules
 

@@ -141,7 +141,7 @@ class CatalogController extends FrontendController
 
     #[Endpoint(
         title: 'List spaces catalog',
-        description: 'Returns institution space options for the selected `institution_id` when event flows need a space selector.',
+        description: 'Returns global space options when no `institution_id` is selected, and returns global plus institution-linked spaces when an `institution_id` is provided for event flows.',
     )]
     public function spaces(Request $request): JsonResponse
     {

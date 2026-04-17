@@ -35,6 +35,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Observers\AddressObserver;
+use App\Observers\EventKeyPersonObserver;
 use App\Observers\EventObserver;
 use App\Observers\GeographyObserver;
 use App\Observers\InstitutionObserver;
@@ -124,6 +125,7 @@ class AppServiceProvider extends ServiceProvider
 
         if (app()->runningUnitTests() || ! self::$publicListingObserversRegistered) {
             Address::observe(AddressObserver::class);
+            EventKeyPerson::observe(EventKeyPersonObserver::class);
             Institution::observe(InstitutionObserver::class);
             Reference::observe(ReferenceObserver::class);
             Speaker::observe(SpeakerObserver::class);

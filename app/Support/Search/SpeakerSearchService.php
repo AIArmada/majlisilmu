@@ -262,7 +262,10 @@ class SpeakerSearchService
             $speakerQuery = Speaker::query()
                 ->active()
                 ->where('status', 'verified')
-                ->select(['id']);
+                ->select(['id'])
+                ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateFilter($query, $normalizedSearch))
+                ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateOrdering($query, $normalizedSearch))
+                ->limit($this->typesenseResultLimit());
 
             if ($this->hasSearchableNameColumn()) {
                 $speakerQuery->addSelect('searchable_name');
@@ -309,6 +312,52 @@ class SpeakerSearchService
         });
 
         return $ids;
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     * @return Builder<Speaker>
+     */
+    private function applyFuzzyCandidateFilter(Builder $query, string $normalizedSearch): Builder
+    {
+        $patterns = $this->fuzzyCandidatePatterns($normalizedSearch);
+
+        if ($patterns === []) {
+            return $query;
+        }
+
+        $operator = DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
+        $columns = $this->hasSearchableNameColumn()
+            ? ['speakers.searchable_name']
+            : ['speakers.name'];
+
+        return $query->where(function (Builder $candidateQuery) use ($columns, $operator, $patterns): void {
+            foreach ($patterns as $pattern) {
+                foreach ($columns as $column) {
+                    $candidateQuery->orWhere($column, $operator, $pattern);
+                }
+            }
+        });
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     * @return Builder<Speaker>
+     */
+    private function applyFuzzyCandidateOrdering(Builder $query, string $normalizedSearch): Builder
+    {
+        $primaryColumn = $this->hasSearchableNameColumn()
+            ? 'speakers.searchable_name'
+            : 'speakers.name';
+
+        return $query
+            ->orderByRaw(
+                "case when lower(coalesce({$primaryColumn}, '')) = ? then 0 when lower(coalesce({$primaryColumn}, '')) like ? then 1 else 2 end",
+                [$normalizedSearch, $normalizedSearch.'%']
+            )
+            ->orderByRaw("length(coalesce({$primaryColumn}, ''))")
+            ->orderBy($primaryColumn)
+            ->orderBy('speakers.id');
     }
 
     protected function shouldUseScoutSearch(): bool
@@ -657,6 +706,86 @@ class SpeakerSearchService
             ->all();
 
         return $normalized;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fuzzyCandidatePatterns(string $normalizedSearch): array
+    {
+        $tokens = array_values(array_unique(array_filter([
+            $normalizedSearch,
+            ...array_filter(explode(' ', $normalizedSearch), static fn (string $token): bool => mb_strlen($token) >= 3),
+        ], static fn (string $token): bool => $token !== '')));
+
+        $patterns = [];
+
+        foreach ($tokens as $token) {
+            foreach ($this->fuzzyPatternSources($token) as $patternSource) {
+                $pattern = $this->fuzzySubsequencePattern($patternSource);
+
+                if ($pattern !== null) {
+                    $patterns[] = $pattern;
+                }
+            }
+        }
+
+        return array_values(array_unique($patterns));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fuzzyPatternSources(string $value): array
+    {
+        $sources = [$value];
+
+        if (str_contains($value, ' ') || mb_strlen($value) < 5) {
+            return $sources;
+        }
+
+        return array_values(array_unique([
+            ...$sources,
+            ...$this->fuzzyOmissionVariants($value),
+        ]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fuzzyOmissionVariants(string $value): array
+    {
+        $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
+
+        if (! is_array($characters) || count($characters) < 2) {
+            return [];
+        }
+
+        $variants = [];
+
+        foreach (array_keys($characters) as $index) {
+            $variantCharacters = $characters;
+            unset($variantCharacters[$index]);
+
+            $variant = implode('', $variantCharacters);
+
+            if ($variant !== '') {
+                $variants[] = $variant;
+            }
+        }
+
+        return array_values(array_unique($variants));
+    }
+
+    private function fuzzySubsequencePattern(string $value): ?string
+    {
+        $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
+
+        if (! is_array($characters) || $characters === []) {
+            return null;
+        }
+
+        return '%'.implode('%', $characters).'%';
     }
 
     private function hasSearchableNameColumn(): bool

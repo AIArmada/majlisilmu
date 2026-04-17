@@ -93,7 +93,7 @@ class FrontendFormContractService
                 'Treat error.code as the machine-readable failure type.',
                 'Use meta.request_id for request tracing and support handoff.',
                 'Use UTC timestamps and UTC date-filter boundaries.',
-                'Use admin UUID id values for admin mutation paths; do not use route_key or public slugs.',
+                'Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths; id remains accepted as a compatibility fallback.',
                 'Fetch the exact form or schema contract before sending write payloads.',
             ],
             'catalogs' => [

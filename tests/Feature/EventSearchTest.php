@@ -501,6 +501,69 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Kuliah Maghrib Irsyad');
     });
 
+    it('supports fuzzy search with adjacent transposition title typos', function () {
+        config()->set('scout.driver', 'collection');
+
+        createVisibleEventForSearch([
+            'title' => 'Kuliah Ahmad',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        createVisibleEventForSearch([
+            'title' => 'Kuliah Aziz',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $events = app(EventSearchService::class)->search(
+            query: 'Ahmda',
+            filters: [],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($events->items())->pluck('title')->all())
+            ->toContain('Kuliah Ahmad')
+            ->not->toContain('Kuliah Aziz');
+    });
+
+    it('keeps the best textual event title match inside the capped fuzzy candidate set', function () {
+        config()->set('scout.driver', 'collection');
+
+        foreach (range(1, 260) as $index) {
+            createVisibleEventForSearch([
+                'title' => "Samadx Alpha {$index}",
+                'status' => 'approved',
+                'visibility' => 'public',
+                'published_at' => now(),
+                'starts_at' => now()->addMinutes($index),
+            ]);
+        }
+
+        createVisibleEventForSearch([
+            'title' => 'Samadx',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addYear(),
+        ]);
+
+        $events = app(EventSearchService::class)->search(
+            query: 'Samdax',
+            filters: [],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($events->items())->pluck('title')->all())
+            ->toContain('Samadx');
+    });
+
     it('updates event results live when search changes', function () {
         $matchVenue = Venue::factory()->create([
             'name' => 'Surau Taman Melawati',

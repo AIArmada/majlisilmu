@@ -45,7 +45,7 @@ it('lists accessible admin resources for privileged users', function () {
         ->and($response->json('data.docs.ui'))->toBe('https://api.majlisilmu.test/docs')
         ->and($response->json('data.docs.openapi'))->toBe('https://api.majlisilmu.test/docs.json')
         ->and($response->json('data.write_workflow.discover_resources'))->toContain('/api/v1/admin/manifest')
-        ->and($response->json('data.rules'))->toContain('Use UUID id values returned by admin collection or record endpoints as recordKey inputs.');
+        ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or record endpoints for record-specific paths; id remains accepted as a compatibility fallback.');
 
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 
@@ -626,6 +626,7 @@ it('exposes admin reference write schema and can create and update references th
 
     $referenceId = (string) $createResponse->json('data.record.id');
     $reference = Reference::query()->with('socialMedia')->findOrFail($referenceId);
+    $referenceRouteKey = (string) $reference->getRouteKey();
 
     expect($reference->title)->toBe('Admin API Reference')
         ->and($reference->slug)->toBe('admin-api-reference')
@@ -635,7 +636,18 @@ it('exposes admin reference write schema and can create and update references th
         ->and($reference->socialMedia)->toHaveCount(1)
         ->and($reference->socialMedia->first()?->platform)->toBe('website');
 
-    $this->putJson('/api/v1/admin/references/'.$referenceId, [
+    $this->getJson('/api/v1/admin/references/'.$referenceRouteKey)
+        ->assertOk()
+        ->assertJsonPath('data.record.route_key', $referenceRouteKey)
+        ->assertJsonPath('data.record.attributes.slug', 'admin-api-reference');
+
+    $this->getJson('/api/v1/admin/references/schema?operation=update&recordKey='.$referenceRouteKey)
+        ->assertOk()
+        ->assertJsonPath('data.schema.method', 'PUT')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/references/'.$referenceRouteKey)
+        ->assertJsonPath('data.schema.defaults.title', 'Admin API Reference');
+
+    $this->putJson('/api/v1/admin/references/'.$referenceRouteKey, [
         'title' => 'Admin API Reference Updated',
         'author' => 'Admin API Editor',
         'type' => 'article',
@@ -668,6 +680,11 @@ it('exposes admin reference write schema and can create and update references th
         ->and($reference->is_active)->toBeFalse()
         ->and($reference->socialMedia)->toHaveCount(1)
         ->and($reference->socialMedia->first()?->platform)->toBe('youtube');
+
+    $this->getJson('/api/v1/admin/references/'.$reference->getRouteKey())
+        ->assertOk()
+        ->assertJsonPath('data.record.route_key', 'admin-api-reference-updated')
+        ->assertJsonPath('data.record.attributes.slug', 'admin-api-reference-updated');
 });
 
 it('exposes admin subdistrict write schema and can create and update subdistricts through the api', function () {
@@ -708,6 +725,15 @@ it('exposes admin subdistrict write schema and can create and update subdistrict
         ->and($subdistrict->district_id)->toBeNull()
         ->and($subdistrict->country_code)->toBe('MY');
 
+    $this->getJson('/api/v1/admin/subdistricts/schema?operation=update&recordKey='.$subdistrictId)
+        ->assertOk()
+        ->assertJsonPath('data.schema.method', 'PUT')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/subdistricts/'.$subdistrictId)
+        ->assertJsonPath('data.schema.defaults.country_id', $fixtures['country_id'])
+        ->assertJsonPath('data.schema.defaults.state_id', $fixtures['federal_state_id'])
+        ->assertJsonPath('data.schema.defaults.district_id', null)
+        ->assertJsonPath('data.schema.defaults.name', 'Admin API Federal Territory Subdistrict');
+
     $this->putJson('/api/v1/admin/subdistricts/'.$subdistrictId, [
         'country_id' => $fixtures['country_id'],
         'state_id' => $fixtures['state_id'],
@@ -722,6 +748,18 @@ it('exposes admin subdistrict write schema and can create and update subdistrict
     expect((int) $subdistrict->state_id)->toBe($fixtures['state_id'])
         ->and((int) $subdistrict->district_id)->toBe($fixtures['district_id'])
         ->and($subdistrict->name)->toBe('Admin API Updated Subdistrict');
+});
+
+it('clamps admin collection per_page values to the supported maximum', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    Speaker::factory()->count(110)->create();
+
+    $this->getJson('/api/v1/admin/speakers?per_page=500')
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.per_page', 100)
+        ->assertJsonCount(100, 'data');
 });
 
 it('requires district_id for non-federal-territory subdistrict writes', function () {

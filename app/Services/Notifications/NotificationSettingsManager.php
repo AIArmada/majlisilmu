@@ -35,40 +35,65 @@ class NotificationSettingsManager
             ]
         );
 
+        $existingRules = NotificationRule::query()
+            ->where('user_id', $user->id)
+            ->get(['scope_type', 'scope_key'])
+            ->groupBy(static fn (NotificationRule $rule): string => $rule->scope_type instanceof NotificationRuleScope
+                ? $rule->scope_type->value
+                : (string) $rule->scope_type)
+            ->map(static fn (Collection $rules): array => $rules
+                ->pluck('scope_key')
+                ->map(static fn (mixed $scopeKey): string => (string) $scopeKey)
+                ->all());
+
+        $rulePrototype = new NotificationRule;
+        $missingRules = [];
+        $timestamp = now();
+
         foreach (NotificationCatalog::families() as $familyKey => $definition) {
-            NotificationRule::query()->firstOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'scope_type' => NotificationRuleScope::Family->value,
-                    'scope_key' => $familyKey,
-                ],
-                [
-                    'enabled' => true,
-                    'cadence' => $definition['default_cadence']->value,
-                    'channels' => $definition['default_channels'],
-                    'fallback_channels' => $definition['default_channels'],
-                    'urgent_override' => null,
-                    'meta' => ['inherits_family' => false],
-                ]
-            );
+            if (in_array($familyKey, $existingRules->get(NotificationRuleScope::Family->value, []), true)) {
+                continue;
+            }
+
+            $missingRules[] = [
+                'id' => $rulePrototype->newUniqueId(),
+                'user_id' => $user->id,
+                'scope_type' => NotificationRuleScope::Family->value,
+                'scope_key' => $familyKey,
+                'enabled' => true,
+                'cadence' => $definition['default_cadence']->value,
+                'channels' => json_encode($definition['default_channels'], JSON_THROW_ON_ERROR),
+                'fallback_channels' => json_encode($definition['default_channels'], JSON_THROW_ON_ERROR),
+                'urgent_override' => null,
+                'meta' => json_encode(['inherits_family' => false], JSON_THROW_ON_ERROR),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
         }
 
         foreach (NotificationCatalog::triggers() as $triggerKey => $definition) {
-            NotificationRule::query()->firstOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'scope_type' => NotificationRuleScope::Trigger->value,
-                    'scope_key' => $triggerKey,
-                ],
-                [
-                    'enabled' => true,
-                    'cadence' => $definition['default_cadence']->value,
-                    'channels' => $definition['default_channels'],
-                    'fallback_channels' => $definition['default_channels'],
-                    'urgent_override' => null,
-                    'meta' => ['inherits_family' => true],
-                ]
-            );
+            if (in_array($triggerKey, $existingRules->get(NotificationRuleScope::Trigger->value, []), true)) {
+                continue;
+            }
+
+            $missingRules[] = [
+                'id' => $rulePrototype->newUniqueId(),
+                'user_id' => $user->id,
+                'scope_type' => NotificationRuleScope::Trigger->value,
+                'scope_key' => $triggerKey,
+                'enabled' => true,
+                'cadence' => $definition['default_cadence']->value,
+                'channels' => json_encode($definition['default_channels'], JSON_THROW_ON_ERROR),
+                'fallback_channels' => json_encode($definition['default_channels'], JSON_THROW_ON_ERROR),
+                'urgent_override' => null,
+                'meta' => json_encode(['inherits_family' => true], JSON_THROW_ON_ERROR),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        if ($missingRules !== []) {
+            NotificationRule::query()->insertOrIgnore($missingRules);
         }
 
         $this->syncSystemDestinations($user);
@@ -325,9 +350,9 @@ class NotificationSettingsManager
             );
         }
 
-        $this->syncSystemDestinations($user->fresh());
+        $this->syncSystemDestinations($user);
 
-        return $this->stateFor($user->fresh());
+        return $this->stateFor($user);
     }
 
     public function resolvePolicy(User $user, NotificationTrigger $trigger): ResolvedNotificationPolicy
